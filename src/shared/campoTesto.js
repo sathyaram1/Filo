@@ -33,8 +33,10 @@
     while (el && giri++ < 32) {
       if (el.shadowRoot && el.shadowRoot.activeElement) { el = el.shadowRoot.activeElement; continue; }
       if (/^i?frame$/i.test(el.tagName || '')) {
+        // Da un riquadro in arrivo non si legge: toccato perderebbe il suo Filo (#1560), e la domanda va fatta a lui.
+        const R = typeof globalThis !== 'undefined' ? globalThis.SN_RIQUADRI_IN_ARRIVO : null;
         let dentro = null;
-        try { dentro = el.contentDocument; } catch (_) { dentro = null; }
+        if (!R || !R.inArrivo(el)) { try { dentro = el.contentDocument; } catch (_) { dentro = null; } }
         if (!dentro) return null;
         el = dentro.activeElement;
         continue;

@@ -1606,7 +1606,7 @@
     return esito && (esito.kind === 'ok' || esito.reload) ? 'decisa' : null;
   }
   function opzioniLivelli(fb) {
-    return { fusioni, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
+    return { fusioni, fusioniLette: fusioniOk, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
   }
   // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
   function statoFusioniCambiato() {
@@ -2539,6 +2539,7 @@
     ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
     volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
     decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
+    senza: { etichetta: 'fusione ferma', titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla', tooltip: 'ferma al cancello, nessuna richiesta aperta' },
   };
   function fusioneFerma(fb) {
     return MR.fusioneInAttesa(fb, { fusioni });
@@ -2678,7 +2679,7 @@
 
   // Il segno dei Ricevuti (D93): la forma del livello che ha fermato la pratica, il motivo sotto il puntatore.
   function segnoFermataHtml(fb) {
-    const s = MR.segnoFermata(fb, { fusioni });
+    const s = MR.segnoFermata(fb, { fusioni, fusioniLette: fusioniOk });
     if (!s || !FORME_SVG[s.forma]) return '';
     const cls = 'mg-segno-fermata' + (s.classe ? ` mg-forma--${s.classe}` : ' mg-segno-fermata--vuoto');
     return `<span class="${cls}" data-forma="${esc(s.forma)}" data-livello="${esc(s.livello)}" title="${esc(s.testo)}" aria-label="${esc(s.testo)}" role="img">`
@@ -3930,10 +3931,14 @@
     aggiornaBottoneSegno(fb);
   }
 
-  // Una scrittura in volo spegne TUTTA la riga: «Archivia» premuto mentre «→ In coda» è in volo
-  // scriverebbe due decisioni sulla stessa segnalazione.
+  // Una scrittura in volo spegne TUTTA la riga, non solo il bottone premuto:
+  // «Archivia» premuto mentre «→ In coda» è ancora in volo scriverebbe due
+  // decisioni sulla stessa segnalazione.
+  let azioniInVolo = false;
   function setActionsBusy(busy) {
+    azioniInVolo = !!busy;
     if (mgActionsRow) mgActionsRow.querySelectorAll('button').forEach((b) => { b.disabled = !!busy; });
+    if (mgSideBody) mgSideBody.querySelectorAll('[data-strada]').forEach((b) => { b.disabled = !!busy; });
     if (mgReopenConfirm) mgReopenConfirm.disabled = !!busy;
     if (mgReopenCancel) mgReopenCancel.disabled = !!busy;
   }
@@ -4734,6 +4739,12 @@
   function setActionMsg(text, kind) {
     mgActionMsg.textContent = text || '';
     mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    // Chi ha premuto nel quadrato guarda il pannello, non la riga in fondo.
+    const specchio = document.getElementById('mgL5StradeEsito');
+    if (specchio) {
+      specchio.textContent = text || '';
+      specchio.dataset.kind = kind === 'err' || kind === 'ok' ? kind : (text ? 'wait' : '');
+    }
     riflettiMessaggiOwner();
   }
 
@@ -5119,8 +5130,12 @@
     mgToastTempo = mgToastTempi.avvia(window.SN_AVVISI.durata(Math.max(4500, Number(ms) || 0)), () => nascondiToast(el));
   }
 
-  // Il contenuto di un livello arriva pronto dal modulo condiviso: qui restano il markup e i
-  // due pezzi che il markup non può avere (tasti della fusione, «Salta il controllo»).
+  // ── Il pannello di un livello ─────────────────────────────────────────────
+  //
+  // Il contenuto (titolo, righe, testo, azioni) arriva già pronto dal modulo
+  // condiviso: qui c'è solo il markup, e i pezzi che il markup non può avere —
+  // i tasti Approva/Scarta della fusione (li costruisce il modulo delle fusioni),
+  // le strade di una fusione ferma senza richiesta e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
     const liv = MR.livelloPer(fb, key, opzioniLivelli(fb));
@@ -5159,6 +5174,8 @@
     }
 
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
+    const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
+    if (strade) body.appendChild(strade);
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
@@ -5213,8 +5230,50 @@
     return host;
   }
 
-  // «Salta il controllo» si offre su una bocciatura dell'audit e sulle pratiche ferme prima
-  // che l'audit lasciasse traccia (`design` con motivo `secaudit`): o non avrebbero uscita.
+  // Ferma al cancello senza richiesta (#1556): le due strade sono le azioni di stato della riga dell'owner, per lo
+  // stesso cammino, così guardiano, commento di revisione ed esiti sono quelli di là.
+  const STRADE_FUSIONE = {
+    rimanda: { key: 'accept', id: 'mgL5RimandaBtn', label: 'Rimanda in lavorazione', primary: true },
+    archivia: { key: 'archive', id: 'mgL5ArchiviaBtn', label: 'Archivia', primary: false },
+  };
+  function titoloStrada(fb, key) {
+    if (key !== 'accept') return ACTION_TITLE[key] || '';
+    return MR.isLocalOnly(fb) ? 'Torna nei Lavori server e il lavoro si rifà' : 'Torna in coda e le routine rifanno il lavoro';
+  }
+  function pannelloStradeFusione(fb, liv) {
+    if (!isAdmin) return null;
+    const strade = (liv.pannello.azioni || []).map((k) => STRADE_FUSIONE[k]).filter(Boolean)
+      .map((s) => ({ ...s, azione: MR.ownerActionFor(fb, s.key, { releasedVersion }) }))
+      .filter((s) => s.azione);
+    if (!strade.length) return null;
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const fila = document.createElement('div');
+    fila.className = 'mg-liv-strade';
+    for (const s of strade) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
+      b.id = s.id;
+      b.dataset.strada = s.key;
+      b.textContent = s.label;
+      b.title = titoloStrada(fb, s.key);
+      b.disabled = azioniInVolo;
+      b.addEventListener('click', () => applyAction(s.azione, null));
+      fila.appendChild(b);
+    }
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.id = 'mgL5StradeEsito';
+    esito.setAttribute('role', 'status');
+    box.append(fila, esito);
+    return box;
+  }
+
+  // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
+  // pratiche vecchie, ferme prima che l'audit lasciasse traccia: lì il segno è
+  // lo stato (`design` con motivo `secaudit`). Senza questo secondo caso quelle
+  // pratiche non avrebbero nessuna via d'uscita.
   function mostraSaltaAudit(fb, liv) {
     if (!isAdmin || !liv || liv.key !== 'l4') return false;
     if (liv.pannello.azioni.includes('salta_l4')) return true;
@@ -7965,6 +8024,17 @@
     apriDomandaDelFeedback(m[1]);
   }
   window.addEventListener('hashchange', apriDomandaDallIndirizzo);
+
+  // Un indirizzo che nomina una scheda o una sezione la apre, come un clic (#1414: è così che arrivano i vecchi indirizzi
+  // delle pagine dell'owner). Poi torna pulito: riaprendo la scheda scavalcherebbe ogni volta la scelta d'apertura.
+  function apriDaIndirizzo() {
+    const tab = MR.schedaDaIndirizzo(location.hash);
+    if (!tab) return;
+    selectTab(tab);
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+  }
+  window.addEventListener('hashchange', apriDaIndirizzo);
+  apriDaIndirizzo();
 
   // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
   const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);

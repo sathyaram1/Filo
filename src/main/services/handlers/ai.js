@@ -94,6 +94,9 @@ module.exports = function register(on, ctx) {
     if (daQui) {
       const incognito = Boolean(winOf && winOf(sender)?._filoTabs?.incognito);
       await Immagini.segna(dataUrl, { incognito }).catch(() => {});
+      // Al modello va la copia coi campi segreti coperti (#810.7): incollata altrove, l'utente ha la foto vera.
+      const originale = msg.payload.originale;
+      if (typeof originale === 'string' && originale !== dataUrl) await Immagini.segna(originale, { incognito }).catch(() => {});
       return true;
     }
     if (delicata.attivo === false) return false;

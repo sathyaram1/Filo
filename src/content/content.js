@@ -32,6 +32,9 @@
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,
+    aiutoPasso: () => aiutoPasso(),
+    aiutoStato: () => Sidebar.stato(),
+    aiutoAcceso: () => aiutoAcceso(),
   });
   TTS.init({
     getSettings: () => settings,
@@ -759,8 +762,7 @@
       yield doc;
       if (n >= 4) return;
       for (const r of radici(doc)) for (const f of r.querySelectorAll('iframe, frame')) {
-        let d = null;
-        try { d = f.contentDocument; } catch (_) {}
+        const d = globalThis.SN_RIQUADRI_IN_ARRIVO?.documento(f);
         if (d) yield* documenti(d, n + 1);
       }
     }
@@ -804,9 +806,10 @@
         for (const f of win.document.querySelectorAll('iframe, frame')) riquadro(f);
       } catch (_) {}
     }
+    // Uno che carica ancora il suo indirizzo non si tocca (perderebbe il suo Filo, #1560): lo riprende onCaricato.
     function riquadro(f) {
-      let w = null;
-      try { w = f.contentWindow; if (!w || !w.document) return; } catch (_) { return; }
+      const w = globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f);
+      try { if (!w || !w.document) return; } catch (_) { return; }
       osserva(w);
     }
     const eRiquadro = (t) => !!(t && t.tagName && /^i?frame$/i.test(t.tagName));
@@ -873,20 +876,25 @@
     const spento = isBlocked();
     if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
     self.__snFiloSpento = spento;
+    riferisciAiuto();
   }
 
-  function isBlocked() {
+  function isBlocked() { return !!motivoBlocco(); }
+
+  // 'pagina' dove Filo non c'è mai, 'sito' dove l'utente l'ha spento; '' altrimenti.
+  function motivoBlocco() {
     const url = location.href;
     // Dentro un riquadro «about:blank» e «about:srcdoc» sono contenuto di chi lo ospita, non
     // pagine di sistema: lì il menu deve esserci come ovunque (#405).
     const embeddedAbout = IS_SUBFRAME && /^about:(blank|srcdoc)/i.test(url);
-    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
+    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return 'pagina';
     const blocklist = settings?.blocklist || [];
     const matches = (host) => !!host && blocklist.some((d) => host === d || host.endsWith('.' + d));
-    // Filo spento su un sito resta spento nei riquadri che quel sito incorpora: il riquadro
-    // ha un'altra origine e da solo non lo saprebbe, quindi guarda l'indirizzo dell'ospite.
-    if (matches(hostOfUrl(pageUrl))) return true;
-    return matches(location.hostname);
+    // Se l'utente ha spento Filo su un sito, deve restare spento anche nei
+    // riquadri che quel sito incorpora: il riquadro ha un'altra origine e da
+    // solo non lo saprebbe, quindi guarda l'indirizzo della pagina ospite.
+    if (matches(hostOfUrl(pageUrl))) return 'sito';
+    return matches(location.hostname) ? 'sito' : '';
   }
 
   function hostOfUrl(url) {
@@ -1120,6 +1128,9 @@
     if (el.disabled || el.readOnly) return false;
     const t = (el.getAttribute('type') || 'text').toLowerCase();
     if (!['text', 'search', ''].includes(t)) return false;
+    // La correzione manda al modello la parola e tutto il campo: in una password resa visibile, no (#810.7).
+    if (Extract?.campoSegreto?.(el)) return false;
+    // Rispetta la disabilitazione esplicita.
     const sc = el.getAttribute('spellcheck');
     if (sc === 'false') return false;
     return true;
@@ -1525,7 +1536,7 @@
   // Il riconoscimento sta in un posto solo: il menu si apre da due strade (normale e
   // correzione), e copiato in entrambe lo stesso clic dava due menu diversi.
   function detectContext(target, x, y) {
-    const linkEl = closestAcrossShadow(target, 'a[href]');
+    const linkEl = closestAcrossShadow(target, Actions.SELETTORE_COLLEGAMENTO);
     const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
     // Un solo hit-test per tutte e tre le famiglie: è la stessa pila. `view` = la pila PIÙ
     // il punto, perché un rettangolo vale come misura solo se copre quel punto.
@@ -1570,8 +1581,8 @@
   }
 
   function findLinkUnder(view, target, contentUnder) {
-    const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
-    const hit = owner || findUnder(view, 'a[href]', target);
+    const owner = contentUnder ? closestAcrossShadow(contentUnder, Actions.SELETTORE_COLLEGAMENTO) : null;
+    const hit = owner || findUnder(view, Actions.SELETTORE_COLLEGAMENTO, target);
     if (!hit) return null;
     try {
       // Un collegamento che non riceve i click non esiste per il menu (#499): un clic sinistro
@@ -1603,6 +1614,7 @@
     const value = el.value || '';
     const selection = value.slice(start, end).trim();
     if (!selection) return null;
+    if (Extract.campoSegreto?.(el)) return { selection, sentence: selection, segreto: true };
     return { selection, sentence: value.trim() || selection };
   }
 
@@ -2047,20 +2059,21 @@
   function buildLinkActionItems(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
+    const indirizzo = Actions.indirizzoDelLink(linkEl);
     const out = [];
     // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
-    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(indirizzo)) {
       out.push({
         type: 'item',
         label: I18n.t('menu_redeem_invite'),
-        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: String(linkEl.href) }).catch(() => {}); },
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: indirizzo }).catch(() => {}); },
       });
     }
     out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(indirizzo)),
       },
     );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
@@ -2078,7 +2091,7 @@
       {
         type: 'item',
         label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyUrlToClipboard(linkEl.href),
+        onClick: () => Actions.copyUrlToClipboard(indirizzo),
       },
       {
         type: 'item',
@@ -2094,7 +2107,23 @@
     return out;
   }
 
-  // Matrice: testo, testo editabile, video-audio, immagine (+ link), link, input, niente.
+  // L'immagine su cui è disegnata la zona di una mappa: fra quelle che usano la mappa, quella sotto il cursore.
+  function immagineDellaZona(area, view) {
+    if (!area || area.tagName !== 'AREA') return null;
+    const mappa = area.closest('map');
+    const nome = String((mappa && (mappa.getAttribute('name') || mappa.id)) || '').toLowerCase();
+    if (!nome) return null;
+    let usano = [];
+    try {
+      usano = [...area.getRootNode().querySelectorAll('img[usemap]')]
+        .filter((img) => String(img.getAttribute('usemap') || '').toLowerCase() === '#' + nome);
+    } catch (_) {}
+    return usano.find((img) => view?.stack?.includes(img)) || usano[0] || null;
+  }
+
+  // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
+  // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
+  // casella input / niente.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
   }) {
@@ -2105,6 +2134,7 @@
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
+      if (selInfo.segreto) return items;
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -2118,6 +2148,7 @@
 
     if (selInfo) {
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      if (selInfo.segreto) return items;
       items.push({
         type: 'item',
         label: I18n.t('menu_search_text'),
@@ -2164,8 +2195,25 @@
     }
 
     if (linkEl) {
-      // Il player copre il filmato col suo overlay: per chi guarda è lo stesso filmato dentro
-      // lo stesso link, ma solo se è DAVVERO quello della scheda (#444).
+      // La zona di una mappa d'immagine è il collegamento cliccato, disegnato su un'immagine (#725.6): prima le sue voci,
+      // poi quelle dell'immagine, e la sezione parla del collegamento, col suo avviso.
+      const immagineZona = immagineDellaZona(linkEl, layers);
+      if (immagineZona) {
+        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        items.push({ type: 'separator' });
+        for (const it of buildImageActionItems(immagineZona)) items.push(it);
+        items.push({ type: 'separator' });
+        items.push(Actions.buildInlineExplainLink(linkEl));
+        return items;
+      }
+      // Copertina di un video dentro un link con il player che copre il filmato
+      // col suo overlay: il clic destro arriva all'overlay, quindi il <video>
+      // non è fra gli antenati e finisce in `mediaUnder`. Per chi guarda è lo
+      // stesso identico filmato dentro lo stesso identico link: il menu deve
+      // essere lo stesso del ramo qui sopra, overlay o non overlay. Solo se il
+      // filmato è DAVVERO quello della scheda, però: dentro il collegamento
+      // oppure a occuparne la superficie. Un video di sfondo che si ritrova per
+      // caso un link sopra non deve intrufolarsi nel menu di quel link.
       const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
         for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
@@ -2258,6 +2306,41 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
+
+  // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
+  function aiutoPasso() {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+    Sidebar.passo();
+  }
+
+  // Alla barra laterale: cosa farà il clic sulla sua icona Aiuto, perché è spenta, e la risposta ancora da leggere.
+  // Solo dal frame principale: il pannello vive lì.
+  let aiutoRiferito = '';
+  let rispostaRiferita = null;
+  function riferisciAiuto() {
+    if (IS_SUBFRAME || !Sidebar?.stato) return;
+    const s = Sidebar.stato();
+    const spento = motivoBlocco() || (aiutoAcceso() ? '' : 'aiuto');
+    const firma = `${s.pannello}|${s.voce}|${spento}`;
+    try {
+      if (firma !== aiutoRiferito) {
+        aiutoRiferito = firma;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AIUTO_STATO, pannello: s.pannello, voce: s.voce, spento })).catch(() => {});
+      }
+      if (s.nonLetta !== rispostaRiferita) {
+        rispostaRiferita = s.nonLetta;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RISPOSTA_IN_ATTESA, fonte: 'aiuto', attesa: s.nonLetta })).catch(() => {});
+      }
+    } catch (_) {}
+  }
+  try { Sidebar?.suCambio?.(riferisciAiuto); } catch (_) {}
+  // Tornata dalla cache di navigazione: per il main è un documento nuovo, e il suo Aiuto va ridetto.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    aiutoRiferito = '';
+    rispostaRiferita = null;
+    riferisciAiuto();
+  });
 
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
@@ -2356,7 +2439,7 @@
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(impostazioniDelCorrettore());
       // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
-      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close({ davvero: true });
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
@@ -2411,6 +2494,8 @@
       else Popup.showToast(I18n.t('err_no_selection'));
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
+    } else if (command === 'aiuto-dalla-barra') {
+      aiutoPasso();
     }
   }
 

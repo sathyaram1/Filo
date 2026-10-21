@@ -289,6 +289,9 @@
     // come «Salva immagine come…», con Referer e cookie della scheda. Restituisce solo immagini.
     // { url } → { ok, dataUrl } | { ok:false, error, tooBig?, notImage? }
     IMAGE_BYTES: 'image_bytes',
+    // #1307 — se Filo non contatterebbe il sito di un link (sospetto, o in lista), senza contattarlo.
+    // { url } → { bloccato?: 'blacklist'|'lists', host?, sospetto? } | {}
+    LINK_FERMATO: 'link_fermato',
     // #946 — «Copia immagine» appena scritta negli appunti: gli appunti la ricodificano
     // e ne perdono le etichette, quindi il main ricorda l'esito letto sull'originale
     // per i pixel della copia, e la chat lo ritrova quando la si incolla.
@@ -421,6 +424,9 @@
     BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
     BARRA_ETICHETTE_CHIEDI: 'barra_etichette_chiedi', // spinta alla scheda davanti → { ids }: come si chiamano adesso le sue azioni nella barra
     BARRA_ETICHETTE: 'barra_etichette',             // dalla scheda davanti { voci: [{ id, etichetta, icona }] } → { ok }
+    // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
+    AIUTO_STATO: 'aiuto_stato',                     // { pannello: chiuso|ridotto|aperto, voce, spento: ''|aiuto|sito|pagina } → { ok }
+    RISPOSTA_IN_ATTESA: 'risposta_in_attesa',       // { fonte: aiuto|app, attesa } → { ok }: la striscia della barra si accende
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }

@@ -29,6 +29,8 @@
       const conColore = registry[id].nelloStrato === 'contagocce';
       out[id] = { ...registry[id], onClick: (scelto) => (conColore && scelto ? registry[id].onClick(scelto) : runInTopFrame(id)) };
     }
+    // Il pannello Aiuto vive nel frame principale e qui il suo stato non si vede: da un riquadro l'icona lo apre, come la voce «Aiuto».
+    if (out.help) out.help = { ...out.help, onClick: () => runInTopFrame(null, 'help') };
     return out;
   }
 
@@ -49,9 +51,9 @@
     } catch (_) {}
   }
 
-  function runInTopFrame(iconId) {
+  function runInTopFrame(iconId, surface = null) {
     try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
+      Promise.resolve(chrome.runtime.sendMessage(surface ? { type: MSG.RUN_IN_TOP_FRAME, surface } : { type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
     } catch (_) {}
   }
 
@@ -89,7 +91,13 @@
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
     const canBack = navState ? !!navState.canBack : true;
     const canFwd = navState ? !!navState.canFwd : true;
+    // Come nella barra laterale: l'icona dice cosa farà il clic sul pannello Aiuto di questa pagina (#1432).
+    const statoAiuto = (typeof deps.aiutoStato === 'function' && deps.aiutoStato()) || {};
+    const aiuto = Disp.aspettoAiuto({ ...statoAiuto, risposta: !!statoAiuto.nonLetta });
+    // Spento in Preferenze: spenta come nella barra, e il nome dice perché.
+    const aiutoSpento = typeof deps.aiutoAcceso === 'function' && !deps.aiutoAcceso();
     const registry = {
+      help:          { id: 'help',          icon: I(aiutoSpento ? 'help' : aiuto.icona), iconName: aiutoSpento ? 'help' : aiuto.icona, label: I18n.t(aiutoSpento ? 'aiuto_spento_barra' : aiuto.etichetta), disabled: aiutoSpento, onClick: () => deps.aiutoPasso && deps.aiutoPasso() },
       translate:     { id: 'translate',     icon: translateIcon,    iconName: restore ? 'showOriginal' : 'translate', label: translateLabel, onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => Actions.takeScreenshot() },
       screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => Actions.takePartialScreenshot() },

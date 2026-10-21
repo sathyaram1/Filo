@@ -189,10 +189,7 @@
   }
 
   function riquadroDi(win) {
-    try {
-      for (const el of document.querySelectorAll('iframe, frame')) { if (el.contentWindow === win) return el; }
-    } catch (_) {}
-    return null;
+    return global.SN_RIQUADRI_IN_ARRIVO?.riquadroDi(win, document) || null;
   }
 
   function suMessaggio(e) {

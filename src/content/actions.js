@@ -413,15 +413,20 @@
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
-  async function requestImageDescription(dataUrl) {
-    // Nessun modello di ripiego scritto qui: valgono solo quelli configurati per questa
-    // funzione. Senza modello la descrizione non si fa e l'utente lo viene a sapere.
+  // `originale`: la foto che l'utente tiene, quando al modello va una copia coperta.
+  async function requestImageDescription(dataUrl, originale = null) {
+    // NIENTE modello di ripiego scritto qui: gli unici modelli ammessi sono
+    // quelli configurati per questa funzione (il ripiego VOLUTO fra i modelli
+    // della catena vive nel main, dentro la catena). Se la funzione non ha un
+    // modello — o cita una scorciatoia che non esiste — la descrizione non si
+    // fa e l'utente lo viene a sapere, invece di riceverla da un modello che
+    // nessuno ha mai scelto.
     let res;
     try {
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl, automatica: true },
+        payload: { dataUrl, automatica: true, ...(originale && originale !== dataUrl ? { originale } : {}) },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
@@ -500,6 +505,10 @@
       Popup.showToast(I18n.t('err_no_selection'));
       return;
     }
+    if (selInfo.segreto) {
+      Popup.showToast(I18n.t('err_secret_selection'));
+      return;
+    }
     let title;
     if (action === ACTIONS.EXPLAIN) title = I18n.t('popup_explain_title');
     else if (action === ACTIONS.EXPLAIN_DEEP) title = I18n.t('popup_explain_deep_title');
@@ -556,7 +565,7 @@
     const Gesto = global.SN_GESTO;
     if (!Gesto || !Gesto.recente(Gesto.SELEZIONA)) return;
     const sel = Extract.getSelectionWithSentence();
-    if (!sel) return;
+    if (!sel || sel.segreto) return;
     if (sel.selection.length > PREFETCH_MAX_CHARS) return;
     const key = explainKey(sel.selection);
     if (key.length < 3) return;
@@ -685,6 +694,27 @@
     };
   }
 
+  // Un collegamento è anche la zona di una mappa d'immagine e l'<a> di un disegno SVG, anche con l'xlink:href dei disegni
+  // vecchi (#725.6, #725.7). Lì `href` è un oggetto, non l'indirizzo: chi vuole l'indirizzo lo chiede qui.
+  const SELETTORE_COLLEGAMENTO = 'a[href], a[*|href], area[href]';
+  const XLINK = 'http://www.w3.org/1999/xlink';
+  function indirizzoDelLink(el) {
+    if (!el) return '';
+    let h;
+    try { h = el.href; } catch (_) { return ''; }
+    if (typeof h === 'string') return h;
+    const scritto = String((h && h.animVal) || el.getAttribute?.('href') || el.getAttributeNS?.(XLINK, 'href') || '').trim();
+    if (!scritto) return '';
+    try { return new URL(scritto, el.baseURI || location.href).href; } catch (_) { return scritto; }
+  }
+
+  // Il nome con cui il collegamento si presenta: una zona di mappa non ha testo, solo il suo `alt`.
+  function nomeDelLink(el) {
+    if (!el) return '';
+    const testo = el.tagName === 'AREA' ? '' : (el.textContent || '').trim();
+    return testo || String(el.getAttribute?.('alt') || el.getAttribute?.('aria-label') || el.getAttribute?.('title') || '').trim();
+  }
+
   // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
   // resta anche se la spiegazione non arriva mai (#725).
   function mostraAvvisoLink(el, url) {
@@ -739,7 +769,8 @@
         origine.className = 'sn-menu-origine';
         origine.hidden = true;
         el.appendChild(origine);
-        if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
+        const indirizzo = indirizzoDelLink(linkEl);
+        if (indirizzo) mostraAvvisoLink(el, indirizzo);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
         body.textContent = I18n.t('menu_explain_loading');
@@ -752,6 +783,16 @@
           return () => {};
         }
         let cancelled = false;
+        // Il sito in lista lo dice anche l'immagine che fa da link, come il link di testo; la domanda non contatta il sito.
+        if (indirizzo) {
+          chrome.runtime.sendMessage({ type: MSG.LINK_FERMATO, url: indirizzo }).then((r) => {
+            if (cancelled || !r?.bloccato) return;
+            const nota = document.createElement('div');
+            nota.className = 'sn-menu-link-nota';
+            nota.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            el.insertBefore(nota, body);
+          }).catch(() => {});
+        }
         (async () => {
           let dataUrl;
           try {
@@ -804,6 +845,7 @@
     };
   }
 
+  // Sezione inline "Spiega link": il link non si apre in una scheda; titolo e descrizione li legge il main.
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
@@ -813,8 +855,8 @@
         el.classList.add('sn-menu-inline-loading');
         let cancelled = false;
         (async () => {
-          const url = linkEl.href;
-          const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
+          const url = indirizzoDelLink(linkEl);
+          const anchorText = nomeDelLink(linkEl).slice(0, 200);
           const flags = LinkSospetto.analizza(url);
           el.textContent = '';
           mostraAvvisoLink(el, url);
@@ -823,16 +865,16 @@
           body.textContent = I18n.t('menu_link_loading');
           el.appendChild(body);
 
-          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in
-          // modo grave.
-          let ogTitle = '', ogDescription = '';
-          if (!flags.includes('side_effect')) {
-            try {
-              const r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url });
-              if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
-            } catch (_) {}
-          }
+          // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
+          let ogTitle = '', ogDescription = '', r = null;
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url }); } catch (_) {}
           if (cancelled) return;
+          if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
+          else if (r?.bloccato) {
+            el.classList.remove('sn-menu-inline-loading');
+            body.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            return;
+          }
 
           let port;
           try {
@@ -900,9 +942,23 @@
     });
   }
 
+  // La foto resta com'è per l'utente; `campi` sono i campi segreti da coprire nella copia che va a un modello (#810.7),
+  // null se non si sono potuti trovare tutti: quella copia allora non parte.
   async function captureVisibleTab() {
     await attendiCompositor();
-    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    const prima = Extract.campiSegretiInVista();
+    const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true, campiNellaPagina: prima.length });
+    if (r?.ok) return { ...r, campi: prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista()) };
+    if (r?.code !== 'segreti') return r;
+    const pura = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    return pura?.ok ? { ...pura, campi: null } : pura;
+  }
+
+  // Il nome del file lo sceglie un modello guardando la foto: gli arriva coi campi segreti coperti, o non gli arriva.
+  async function descrizioneCoperta(dataUrl, campi, ritaglio = null) {
+    if (!Array.isArray(campi)) return null;
+    const perModello = campi.length ? await Extract.fotoCoperta(dataUrl, campi, { ritaglio }) : dataUrl;
+    return requestImageDescription(perModello, dataUrl);
   }
 
   function buildSavePayload() {
@@ -1047,8 +1103,8 @@
   async function saveLink(linkEl) {
     const res = await chrome.runtime.sendMessage({
       type: MSG.SAVE_LINK,
-      url: linkEl.href,
-      title: linkEl.textContent?.trim() || linkEl.href,
+      url: indirizzoDelLink(linkEl),
+      title: nomeDelLink(linkEl) || indirizzoDelLink(linkEl),
     });
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
@@ -1120,8 +1176,7 @@
   ]);
   function isDownloadableLink(linkEl) {
     if (!linkEl) return false;
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) { return false; }
+    const href = indirizzoDelLink(linkEl);
     if (!/^https?:/i.test(href)) return false;
     try { if (linkEl.hasAttribute && linkEl.hasAttribute('download')) return true; } catch (_) {}
     let pathname = '';
@@ -1135,8 +1190,7 @@
   // Instrada il download NATIVO della scheda, così il menu e il clic sul link danno lo
   // stesso risultato visibile: barra, cartella Download, cronologia (#410.2).
   async function downloadLink(linkEl) {
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) {}
+    const href = indirizzoDelLink(linkEl);
     if (!href) return;
     // Vedi downloadImage: data: e blob: restano sul cammino anchor.
     if (/^(data:|blob:)/i.test(href)) {
@@ -1171,12 +1225,12 @@
   // Senza condivisione nativa si copia negli appunti: vale il discorso di «Copia URL»
   // (#437), l'indirizzo deve essere apribile.
   async function shareLink(linkEl) {
-    const href = linkEl?.href || '';
+    const href = indirizzoDelLink(linkEl);
     if (!isAddress(href)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
       return;
     }
-    const data = { title: linkEl.textContent?.trim() || href, url: href };
+    const data = { title: nomeDelLink(linkEl) || href, url: href };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
@@ -1436,7 +1490,7 @@
       } catch (_) {}
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await requestImageDescription(cap.dataUrl).catch(() => null);
+      const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1559,7 +1613,7 @@
         canvas.toBlob((blob) => {
           if (!blob) { resolve(null); return; }
           const r = new FileReader();
-          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h } });
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, campi: cap.campi });
           r.onerror = () => resolve(null);
           r.readAsDataURL(blob);
         }, 'image/png');
@@ -1610,7 +1664,7 @@
         }
       } catch (_) {}
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await requestImageDescription(dataUrl).catch(() => null);
+      const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1930,6 +1984,8 @@
     leggiOrigine,
     scaricaImmagine,
     buildInlineExplainLink,
+    SELETTORE_COLLEGAMENTO,
+    indirizzoDelLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,

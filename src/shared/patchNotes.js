@@ -10,10 +10,18 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.244', date: '2026-10-21',
-      features: [],
+      features: [
+        'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
+      ],
       fixes: [
+        'L\'assistente di pagina e la spiegazione del tasto destro non leggono più la password, il numero della carta e i codici che scrivi in un modulo, nemmeno nel riquadro del servizio di pagamento. L\'assistente sa a cosa serve ogni campo, ma al posto di quello che hai scritto vede i puntini.',
+        'Nell\'Editor, con la finestra piccola o quando la domanda accanto a microfono e invio non si leggerebbe tutta, la casella della chat prende tutta la riga e i due tasti vanno sotto. Prima poteva restare larga due o tre parole. Mentre scrivi resta in vista la fine dell\'ultima risposta di Filo. In una chat molto bassa una domanda lunga scorre dentro la casella, e per leggerla tutta basta allargare il riquadro della chat.',
         'Nella home il microfono e il tasto per inviare stanno al centro del campo dove scrivi, alla stessa distanza dal bordo sopra, sotto e a destra. Quando vai a capo restano sull\'ultima riga.',
         'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
+        'Filo legge le pagine molto lunghe aperte in una scheda anche su un computer lento. Se non fa in tempo a leggerle tutte usa la prima parte e ti dice che il resto non l\'ha letto. Prima a volte non ne leggeva niente.',
+        'Nei riquadri incorporati dello stesso sito, come un blocco commenti, Alt+E e il tasto destro di Filo funzionano sempre. Prima, se il riquadro finiva di caricare dopo la pagina o ci passavi sopra col puntatore mentre caricava, lì dentro Filo non rispondeva più.',
+        'La Cronologia AI resta svelta anche con migliaia di voci. Mentre scrivi nella ricerca la pagina non si blocca più, e scorrendo verso le voci vecchie non scatta.',
+        'Il tasto destro su un link non visita più i siti che Filo ti segnala come sospetti né quelli della tua lista dei siti bloccati. Per un sito in lista il menu ti dice che è bloccato. Le zone cliccabili di un\'immagine e i link dentro un disegno ora hanno le voci del link e l\'avviso giusto quando imitano un sito noto.',
       ],
     },
     {

@@ -8,6 +8,7 @@ const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
 const { tastoPremuto } = require('./tastoDelMouse');
+const RisposteInAttesa = require('./risposteInAttesa');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -40,6 +41,8 @@ const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
+// Perché l'icona Aiuto è spenta, nel suggerimento: chiavi i18n per i motivi che la pagina riferisce.
+const MOTIVI_AIUTO_SPENTO = { aiuto: 'aiuto_spento_barra', sito: 'aiuto_spento_sito', pagina: 'aiuto_spento_pagina' };
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
@@ -430,7 +433,21 @@ class BarraLaterale {
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
+      aiuto: this._aiuto(t),
+      risposta: !!t && RisposteInAttesa.inAttesa(t),
     };
+  }
+
+  // L'icona Aiuto (#1432) da quello che la scheda davanti riferisce del suo pannello. `spenta` dove la voce «Aiuto» del
+  // tasto destro non c'è; sotto l'avviso del sito il clic è la domanda a Filo su quel sito, come dalla scorciatoia.
+  _aiuto(t) {
+    if (!t) return { spenta: 'pagina' };
+    const a = t.aiuto;
+    if (this.tabs.vistaSottoIlVuoto() !== t.view) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
+    // Nessuna notizia dalla pagina: si sta ancora caricando, o Filo lì dentro non c'è (il visore PDF).
+    if (!a) return t.loading ? { pannello: 'chiuso' } : { spenta: 'pagina' };
+    if (a.spento) return { spenta: a.spento };
+    return { pannello: a.pannello, voce: a.voce, risposta: RisposteInAttesa.inAttesa(t, 'aiuto') };
   }
 
   _attiva() {
@@ -467,6 +484,7 @@ class BarraLaterale {
     for (const id of this.layout.bar) {
       const d = D.ICONE[id];
       if (!d || (d.soloOwner && !owner)) continue;
+      if (d.tipo === 'aiuto') { out.push(this._iconaAiuto(id, nav.aiuto)); continue; }
       let icona = d.icona;
       let chiave = d.etichetta;
       if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
@@ -479,6 +497,21 @@ class BarraLaterale {
       out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
     }
     return out;
+  }
+
+  _iconaAiuto(id, a) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const I18n = globalThis.SN_I18N;
+    const t = (k) => (I18n ? I18n.t(k) : k);
+    const aspetto = D.aspettoAiuto(a);
+    const spenta = !!a.spenta;
+    const T = globalThis.SN_TASTI;
+    const tasto = !spenta && aspetto.icona === 'help' && T ? T.etichettaFilo(T.scorciatoiaFilo('open-help-sidebar')) : '';
+    return {
+      id, icona: aspetto.icona, etichetta: t(aspetto.etichetta), tasto, spenta,
+      motivo: spenta ? t(MOTIVI_AIUTO_SPENTO[a.spenta] || MOTIVI_AIUTO_SPENTO.pagina) : '',
+      accesa: !spenta && aspetto.ascolta, ascolta: !spenta && aspetto.ascolta, risposta: !spenta && !!a.risposta, pagina: false,
+    };
   }
 
   // ── le azioni della pagina, col nome che hanno sulla pagina ──────────────
@@ -534,6 +567,8 @@ class BarraLaterale {
       trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
+      // Una risposta di Filo da leggere nella scheda davanti (#1432).
+      risposta: this._nav().risposta,
       strisciaPx: this.strisciaPx || STRISCIA,
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
@@ -553,6 +588,7 @@ class BarraLaterale {
     if (d.soloOwner && !this._owner()) return;
     const tabs = this.tabs;
     const attiva = this._attiva();
+    if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
       if (!attiva || !this._nav().pagina) return;
       this.chiudi();
@@ -580,6 +616,23 @@ class BarraLaterale {
       default: return;
     }
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.
+    if (daTastiera) this.chiudi();
+  }
+
+  // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
+  // la consegna aspetta i suoi pezzi di Filo se si sta ancora caricando.
+  _passoAiuto(attiva) {
+    if (!attiva) return;
+    const a = this._aiuto(attiva);
+    if (a.spenta) return;
+    const daTastiera = this.motivo === 'tasto';
+    if (this.tabs.vistaSottoIlVuoto() !== attiva.view) {
+      require('./services/interruttoreAiuto').seAcceso(this.win, () => this.tabs._sbScelta(attiva, 'chiedi'));
+      if (daTastiera) this.chiudi();
+      return;
+    }
+    this._restituisciTastiera();
+    try { attiva.view.webContents.send('shortcut:triggered', { command: 'aiuto-dalla-barra' }); } catch (_) {}
     if (daTastiera) this.chiudi();
   }
 
@@ -628,6 +681,7 @@ class BarraLaterale {
       }
       if (pagine.length) voci.push({ type: 'separator' });
       else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
+      else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
       voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);

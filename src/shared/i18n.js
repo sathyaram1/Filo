@@ -184,6 +184,9 @@
     voce_err_muto: 'Non ho sentito niente: premi il microfono e parla, o controlla che sia acceso quello giusto.',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
+    // #1307 — al posto della spiegazione, per un sito che Filo non contatta.
+    menu_link_blocked: 'Porta a %s, che è nella tua lista dei siti bloccati. Filo non l’ha contattato.',
+    menu_link_blocked_lists: 'Porta a %s, uno dei siti di pubblicità e tracciamento che Filo blocca. Filo non l’ha contattato.',
 
     edit_box_title: 'Modifica testo',
     edit_box_original: 'Originale',
@@ -226,7 +229,13 @@
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Filo è spento su questo sito.',
     err_no_selection: 'Nessuna selezione di testo.',
+    err_secret_selection: 'Filo non manda al modello password e dati della carta.',
     help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
+    // L'icona Aiuto della barra laterale (#1432): la risposta da leggere, e perché è spenta.
+    aiuto_leggi_risposta: 'Leggi la risposta',
+    aiuto_spento_barra: 'Aiuto spento in Preferenze',
+    aiuto_spento_sito: 'Filo è spento su questo sito',
+    aiuto_spento_pagina: 'Qui l\'Aiuto non c\'è',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
@@ -437,8 +446,7 @@
     options_category_pages: '%s schede',
     options_category_name_taken: 'C\'è già «%s»: Rinomina le unisce',
 
-    // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
-    admin_defaults_title: 'Modelli predefiniti',
+    // Gestione → Impostazioni predefinite → "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_intro:
       'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Provider e modelli arrivano subito a tutte le installazioni. Le chiavi no. Nessuna installazione le legge da qui: le incastona la prossima versione pubblicata, e l\'aggiornamento le consegna.',
     admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',

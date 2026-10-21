@@ -2,7 +2,10 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const siteBlock = require('../siteBlock');
+require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
@@ -294,6 +297,21 @@ module.exports = function register(on, ctx) {
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
+    // Per un modello (#810.7): i campi segreti che il content script non vede (riquadri di altri siti, componenti
+    // chiusi), e con campi da coprire la foto piena, che diventa leggera dopo la copertura.
+    if (msg && msg.campiSegreti) {
+      const [img, fuori] = await Promise.all([wc.capturePage(), campiSegretiFuoriPagina(wc)]);
+      if (fuori.nonCoperti) return { ok: false, code: 'segreti', error: 'campi segreti che non si riescono a coprire' };
+      if (img.isEmpty()) return { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
+      if (fuori.campi.length || Number(msg.campiNellaPagina) > 0) {
+        const leggera = msg.leggera === true
+          ? { fattore: Foto.fattoreDiScala(sender, require('electron').screen), qualita: Foto.QUALITA_LEGGERA } : {};
+        return { ok: true, dataUrl: img.toDataURL(), campi: fuori.campi, ...leggera };
+      }
+      if (msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL(), campi: [] };
+      const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
+      return dataUrl ? { ok: true, dataUrl, campi: [] } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
+    }
     const img = await wc.capturePage();
     if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
     const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
@@ -735,19 +753,34 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // L'anteprima di un link è una visita al suo sito: mai a un indirizzo che l'avviso giudica sospetto, mai a un sito della
+  // lista dei bloccati, nemmeno a metà dei rinvii (#1307). Per il bloccato si dice chi lo ferma, e il menu lo scrive.
+  function anteprimaFerma(url) {
+    const b = siteBlock.shouldBlockNavigation(url);
+    if (b.block) return { bloccato: b.reason, host: b.host };
+    if (globalThis.SN_LINK_SOSPETTO.analizza(url).length) return { sospetto: true };
+    return null;
+  }
+
+  on(MSG.LINK_FERMATO, async (msg) => anteprimaFerma(String((msg && msg.url) || '')) || {});
+
   on('fetch_link_meta', async (msg, sender) => {
+    let rinvio = null;
     try {
-      const url = msg.url;
+      const url = String(msg.url || '');
       if (!url) return { ok: false, error: 'url mancante' };
+      const ferma = anteprimaFerma(url);
+      if (ferma) return { ok: false, ...ferma };
       // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
       // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
-      const porta = await controllaUscita({ type: 'NAVIGA', url: String(url) }, { sender });
+      const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
-      // safeFetch: solo http/https e blocco degli indirizzi privati, a ogni redirect — una pagina
-      // non deve poter sondare i servizi locali attraverso il main (SSRF).
-      const r = await safeFetch(url, { signal: controller.signal });
+      // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando
+      // ogni redirect. Evita che una pagina usi questa fetch del main per
+      // sondare/leggere servizi locali o interni (SSRF).
+      const r = await safeFetch(url, { signal: controller.signal, redirectAmmesso: (_da, prossimo) => !(rinvio = anteprimaFerma(prossimo.href)) });
       clearTimeout(t);
       let html = '';
       const reader = r.body?.getReader?.();
@@ -772,6 +805,7 @@ module.exports = function register(on, ctx) {
                             pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
       return { ok: true, ogTitle, ogDescription };
     } catch (e) {
+      if (rinvio) return { ok: false, ...rinvio };
       return { ok: false, error: e.message || String(e) };
     }
   });

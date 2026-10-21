@@ -1,6 +1,6 @@
-// Pagina admin «Modelli predefiniti»: la config condivisa che si propaga a tutti via
-// Firestore. Il main rifiuta i non-admin, ma la garanzia forte sono le regole Firestore.
-// Le chiavi vere non arrivano mai qui: solo booleani `apiKeysPresent`.
+// Gestione → Impostazioni predefinite → «Modelli predefiniti» (pagina admin-defaults fino a #1414): la config condivisa
+// (registry, modelli per azione, chiavi predefinite) che arriva a TUTTI. Il main rifiuta i non admin (DEFAULTS_GET/UPDATE)
+// e le regole Firestore sono la garanzia forte; le chiavi vere non arrivano qui, solo `apiKeysPresent`.
 
 (function () {
   'use strict';
@@ -24,6 +24,14 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // La lista dei soprannomi per i menu delle catene: in Gestione `nicknames-list` è dei Modelli di supporto.
+  const NICKNAMES = 'nicknames-list-predefiniti';
+  function leggiSoprannomi() {
+    const dl = $(NICKNAMES);
+    return dl ? Array.from(dl.options).map((o) => ({ value: o.value, label: o.label && o.label !== o.value ? o.label : '' })) : [];
+  }
+
+  // Id della datalist (combobox) associata a un provider.
   function datalistIdFor(provider) {
     return `models-list-${provider}`;
   }
@@ -78,8 +86,6 @@
   }
 
   function fillStaticText() {
-    document.title = I18n.t('admin_defaults_title');
-    $('title').textContent = I18n.t('admin_defaults_title');
     $('denied-msg').textContent = I18n.t('admin_defaults_denied');
     $('intro').textContent = I18n.t('admin_defaults_intro');
     $('h-keys').textContent = I18n.t('admin_defaults_keys');
@@ -453,7 +459,7 @@
   }
 
   function populateNicknames(registry) {
-    const dl = $('nicknames-list');
+    const dl = $(NICKNAMES);
     dl.innerHTML = '';
     for (const nick of Object.keys(registry || {})) {
       const opt = document.createElement('option');
@@ -720,6 +726,7 @@
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
       getRegistry: () => collectModelRegistry().registry,
+      readOptions: leggiSoprannomi,
       // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
       avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref], collectExcluded()),
       costoDi: costoModello,
@@ -1039,8 +1046,22 @@
     }
   }
 
+  // Si legge quando la scheda si mostra, e di nuovo solo dopo una porta chiusa (l'accesso può essere arrivato nel
+  // frattempo): una seconda lettura riscriverebbe le modifiche non ancora salvate.
+  let letta = false;
+  function aMostra() {
+    if (letta && $('sec-denied').hidden) return;
+    letta = true;
+    load().catch((e) => { letta = false; console.error('[manage/predefiniti] lettura fallita', e); });
+  }
+  const mostrata = () => !!document.querySelector('.mg-tab[data-tab="predefiniti"].mg-tab--active');
+  document.addEventListener('mg-scheda', (e) => { if (e.detail && e.detail.tab === 'predefiniti') aMostra(); });
+  if (window.filo && window.filo.onBroadcast) {
+    window.filo.onBroadcast((m) => { if (m && m.type === (MSG.AUTH_CHANGED || 'auth_changed') && mostrata()) aMostra(); });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
-    load();
+    if (mostrata()) aMostra();
     // Una regola sola per tutta la pagina, campi di oggi e righe aggiunte dopo:
     // ciò che cambia sullo schermo spegne la conferma dell'ultimo salvataggio.
     for (const evento of ['input', 'change']) {

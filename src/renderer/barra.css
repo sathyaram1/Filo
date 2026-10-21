@@ -60,8 +60,10 @@ html, body {
   transition: opacity calc(var(--dur) * var(--sn-motion, 1)), width calc(var(--dur) * var(--sn-motion, 1));
 }
 .striscia:hover::before, .striscia.spinge::before, .striscia.bordo::before { opacity: 1; width: 4px; }
-/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge. */
-html.senza-striscia .striscia:not(.spinge):not(.bordo)::before { opacity: 0; }
+/* Filo ha risposto a pannello chiuso o ridotto (#1432): accesa e ferma, piena d'accento, finché la risposta non si apre. */
+.striscia.risposta::before { opacity: 1; width: 4px; background: var(--accent); }
+/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge o c'è una risposta. */
+html.senza-striscia .striscia:not(.spinge):not(.bordo):not(.risposta)::before { opacity: 0; }
 html.aperta .striscia { pointer-events: none; }
 html.aperta .striscia::before { opacity: 0; }
 
@@ -152,6 +154,23 @@ html.aperta .pannello {
 .ico[aria-disabled="true"]:hover { background: transparent; color: var(--fg-soft); }
 .ico[aria-disabled="true"]:active { transform: none; }
 .ico.accesa { color: var(--accent); }
+/* L'Aiuto in ascolto: il microfono acceso, su un fondo d'accento che si distingue dal passaggio del puntatore. */
+.ico.ascolta, .ico.ascolta:hover { color: var(--accent); background: rgba(var(--accent-rgb), 0.16); box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), 0.55); }
+/* Una risposta da leggere dietro questa icona: lo stesso accento della striscia, che a barra aperta non si vede. */
+.ico.risposta::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--tab-active);
+}
+@media (prefers-color-scheme: dark) {
+  .ico.risposta::after { box-shadow: 0 0 0 2px var(--tab-bg, var(--tab-active)); }
+}
 .ico.nuova { animation: posa calc(320ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1); }
 .ico.trascinata { opacity: 0.3; }
 .ico svg { width: 18px; height: 18px; display: block; pointer-events: none; }

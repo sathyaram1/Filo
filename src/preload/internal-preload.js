@@ -17,6 +17,9 @@ const IS_FILO_ORIGIN = (() => {
 // Quel marcatore vale solo se il documento è davvero filo://: se un documento
 // non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
 // scriverebbe da sé per rendersi impossibile da ingrandire (#686).
+// Chi tocca un riquadro passa da qui (#1560). Nelle pagine interne i riquadri non hanno un preload da perdere: il conto
+// dei load non serve, e nessuno risulta in arrivo.
+try { require('../shared/riquadriInArrivo.js'); } catch (e) { console.error('[Filo internal] riquadri in arrivo', e); }
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
 
@@ -300,6 +303,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'qr.js'));
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
+  safe(path.join(SHARED, 'guardianoStatico.js')); // #810.7 — la forma di un numero di carta: PRIMA di extractContext
+  safe(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js

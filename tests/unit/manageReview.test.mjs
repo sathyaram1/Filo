@@ -1553,6 +1553,73 @@ test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenc
   assert.equal(l5.colore, MR.REASONS.attack.color);
 });
 
+test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le strade sono rifare o archiviare', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+  const nota = 'Il cancello non fonde il ramo del server. Decidi tu: archiviarlo, o farlo rifare.';
+  const fb = {
+    status: 'design', statusReason: 'l5',
+    notes: `Report di chi ha risolto.\n\n--- Aggiornamento dell'agente del 21/10/26, 15:43 ---\n${nota}`,
+    // L'audit passato nello stesso minuto della nota: i marcatori non hanno i secondi.
+    livelli: { l4: { esito: 'pass', at: new Date(2026, 9, 21, 15, 43, 40).toISOString() } },
+  };
+  const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
+  const l5 = MR.livelloL5(fb, lette);
+  assert.equal(l5.esito, 'bloccato', 'resta una decisione dell’owner');
+  assert.equal(l5.pannello.testo, nota);
+
+  // Una nota di agente nata prima dell'audit (un report, una domanda già risposta) non è il motivo della fermata.
+  const vecchia = { ...fb, notes: "--- Aggiornamento dell'agente del 20/10/26, 09:00 ---\nReport: tasto spostato a destra." };
+  assert.match(MR.livelloL5(vecchia, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  assert.deepEqual(MR.livelloL5(vecchia, lette).pannello.righe, []);
+  // Senza l'ora dell'audit nessuna nota si può dire del cancello.
+  assert.match(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  assert.deepEqual(l5.pannello.azioni, ['rimanda', 'archivia']);
+  assert.equal(l5.fusione, 'senza');
+  assert.ok(l5.pannello.righe.some((r) => r.etichetta === 'Quando'));
+  assert.doesNotMatch(MR.segnoFermata(fb, lette).testo, /via libera/);
+
+  // Senza nota: lo dice, senza far credere che una richiesta stia arrivando.
+  const muta = MR.livelloL5({ status: 'design', statusReason: 'l5' }, lette);
+  assert.match(muta.pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  assert.doesNotMatch(muta.pannello.testo, /ancora/);
+  assert.deepEqual(muta.pannello.azioni, ['rimanda', 'archivia']);
+  // Elenchi non letti: «nessuna richiesta» sarebbe un'ipotesi, e la lista non lo afferma.
+  const presto = MR.livelloL5({ status: 'design', statusReason: 'l5' }, { fusioni: {} });
+  assert.match(presto.pannello.testo, /non sono ancora arrivate/);
+  assert.equal(presto.fusione, null);
+  // Conversazione cifrata: niente blob, e le strade restano.
+  const cifrata = MR.livelloL5({ status: 'design', statusReason: 'l5', notes: 'FENC1:abc' }, lette);
+  assert.doesNotMatch(cifrata.pannello.testo, /FENC/);
+  assert.match(cifrata.pannello.testo, /cifrata/);
+  // Con una richiesta aperta il quadrato resta quello di prima: niente strade.
+  const conRichiesta = MR.livelloL5({ ...fb, _id: 'x1' }, { ...lette, fusioni: { pending: [{ id: 'r', feedbackId: 'x1' }] } });
+  assert.deepEqual(conRichiesta.pannello.azioni, []);
+  assert.equal(conRichiesta.richiesta.id, 'r');
+});
+
+test('livelli L5 senza richiesta (#1556): la nota del server, con l’ora in UTC, letta in Italia resta il motivo', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+  const tzPrima = process.env.TZ;
+  process.env.TZ = 'Europe/Rome';
+  try {
+    const nota = 'Il cancello non fonde il ramo del server. Decidi tu: archiviarlo, o farlo rifare.';
+    const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
+    const fb = (marcatore) => ({
+      status: 'design', statusReason: 'l5',
+      notes: `Report.\n\n--- Aggiornamento dell'agente del ${marcatore} ---\n${nota}`,
+      livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } },
+    });
+    // Il server scrive «15:55» per le 15:55 UTC: un quarto d'ora dopo l'audit, anche se in Italia sono le 17:55.
+    assert.equal(MR.livelloL5(fb('21/10/26, 15:55'), lette).pannello.testo, nota);
+    // Uno strumento dell'owner scrive nella sua ora: le 17:55 italiane sono sempre dopo l'audit.
+    assert.equal(MR.livelloL5(fb('21/10/26, 17:55'), lette).pannello.testo, nota);
+    // Scritta dal server un'ora prima dell'audit: non è il motivo della fermata.
+    assert.match(MR.livelloL5(fb('21/10/26, 14:40'), lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  } finally {
+    if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
+  }
+});
+
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
   const fb = { status: 'design', statusReason: 'l5' };
   assert.equal(MR.classifyBlock(fb).reason, 'l5');
@@ -1748,6 +1815,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
     inbox: 'feedback', queue: 'feedback', local: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
     automation: 'routine', crediti: 'routine', log: 'routine',
+    utenti: 'utenti', predefiniti: 'predefinite',
   };
   for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
   const tutte = MR.SEZIONI.flatMap((s) => s.schede);
@@ -1756,6 +1824,18 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
   assert.equal(MR.sezioneDiScheda('nessuna'), null);
   assert.equal(MR.schedaPredefinita('feedback'), 'inbox');
   assert.equal(MR.schedaPredefinita('routine'), 'automation');
+});
+
+// #1414: i vecchi indirizzi delle pagine dell'owner arrivano col nome della sezione.
+test('indirizzo: nomina una scheda o una sezione, il resto non apre niente', () => {
+  assert.equal(MR.schedaDaIndirizzo('#utenti'), 'utenti');
+  assert.equal(MR.schedaDaIndirizzo('#predefiniti'), 'predefiniti');
+  assert.equal(MR.schedaDaIndirizzo('#predefinite'), 'predefiniti');
+  assert.equal(MR.schedaDaIndirizzo('#routine'), 'automation');
+  assert.equal(MR.schedaDaIndirizzo('#Log'), 'log');
+  for (const no of ['', '#', '#nessuna', '#__proto__', '#constructor', null, undefined, 42]) {
+    assert.equal(MR.schedaDaIndirizzo(no), null, String(no));
+  }
 });
 
 test('scelta ricordata: torna intera o non torna', () => {

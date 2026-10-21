@@ -39,7 +39,10 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
   chiusura o un ridimensionamento il bordo conta solo quando il puntatore si
   muove. Il mouse di Playwright entra dritto in una vista e salta questa
   scelta: la prova è col puntatore vero (`tests/barra-laterale-bordo.spec.mjs`,
-  XTest sotto xvfb).
+  XTest sotto xvfb). Una prova che spinge la striscia col mouse di Playwright
+  prima chiama `puntatoreCheSegue` (`tests/helpers/barra.mjs`): sennò il main
+  legge il puntatore del sistema lontano e, se il pannello tarda a dire
+  «dentro», chiude la barra appena aperta (#1216.2).
 - **Il menu aperto dove si apre la barra** non si copre: trascinando un'icona
   da un menu che comincia nella fascia del pannello, la barra si apre solo al
   bordo, a sinistra del menu, e si richiude se il puntatore torna sul menu.
@@ -80,3 +83,23 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
 - **Chi aveva spostato le globali non perde niente**: alla prima apertura con la
   barra, le globali rimaste in «Altro…» vanno nella barra; quelle che l'utente
   aveva portato nella riga restano lì.
+
+## L'Aiuto nella barra, e la risposta che accende la striscia (#1432)
+
+- **L'icona Aiuto dice cosa farà il clic**: punto di domanda ad Aiuto chiuso o ridotto (lo apre), microfono ad Aiuto
+  aperto (detta, lo stesso microfono della casella), microfono acceso mentre ascolta (ferma, anche ad Aiuto ridotto).
+  Col mouse la barra resta aperta: due clic nello stesso punto e si parla. Lo stato lo riferisce la pagina
+  (`MSG.AIUTO_STATO`), il clic lo decide lei sul suo stato vero; aspetto e clic escono dalla stessa `aspettoAiuto`
+  (`src/shared/disposizioneIcone.js`), per la barra e per la riga del tasto destro: due regole separate avevano
+  già divergito sul pannello ridotto (giro 1 di #1432). Dove la voce «Aiuto» non c'è l'icona è spenta e il suggerimento dice
+  perché; sotto l'avviso del sito fa la domanda a Filo su quel sito, come la scorciatoia.
+- **Una risposta arrivata a pannello ridotto o chiuso dall'utente non si apre da sola e non si perde**: la striscia
+  si accende ferma, d'accento, e l'icona che apre il pannello porta un punto, finché la risposta non si apre. Chi
+  riduce o chiude mentre Filo pensa sta dicendo «non adesso». La regola è di ogni pannello dove Filo risponde
+  (l'Aiuto, il pannello di destra delle app): la pagina manda `MSG.RISPOSTA_IN_ATTESA` con la sua `fonte`, il main
+  la tiene per scheda e per fonte (`src/main/risposteInAttesa.js`, una fonte nuova va in `FONTI`), la striscia
+  segue la scheda davanti. La fine la constata il main: documento nuovo, pagina caduta, scheda chiusa.
+- **Ridotto dall'utente vince sul modello**, ridotto dal modello (un passo da cliccare sulla pagina) non accende
+  niente: lì la risposta è il segno sulla pagina. **Chiuso a metà di un turno**, il pannello si nasconde invece di
+  sparire: la risposta ci entra, i passi da solo e i segni sulla pagina no, e ogni strada che riapre l'Aiuto mostra
+  quella conversazione. Prova: `tests/barra-laterale-aiuto.spec.mjs`.

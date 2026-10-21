@@ -1,6 +1,6 @@
-// Pagina «Inviti e utenti», solo owner (#598): codici d'invito, regali di crediti per
-// pseudonimo, tabella utenti con saldo e consumo. Chi non è owner vede una riga sola.
-// Sta a parte dalla pagina Crediti dell'utente: due lavori diversi, due pagine.
+// Gestione → Utenti → «Inviti e utenti», solo owner (#598; pagina a sé, credits/owner.html, fino a #1414): codici
+// d'invito, regali di crediti per pseudonimo, utenti con saldo, consumo, registro e dettaglio d'uso, esiti di
+// giornaliera e riconciliazione. Non è la pagina Crediti dell'utente né Routine → Crediti. Chi non è owner legge una riga.
 
 (function () {
   'use strict';
@@ -1262,5 +1262,17 @@
     });
   }
 
-  load().catch((e) => { console.error('[credits/owner] load fallito', e); });
+  // Si legge quando la scheda si mostra, e di nuovo solo dopo una porta chiusa: l'accesso può essere arrivato nel frattempo.
+  let letta = false;
+  function aMostra() {
+    if (letta && $('ownerDenied').hidden) return;
+    letta = true;
+    load().catch((e) => { letta = false; console.error('[credits/owner] load fallito', e); });
+  }
+  const mostrata = () => !!document.querySelector('.mg-tab[data-tab="utenti"].mg-tab--active');
+  document.addEventListener('mg-scheda', (e) => { if (e.detail && e.detail.tab === 'utenti') aMostra(); });
+  if (window.filo && window.filo.onBroadcast) {
+    window.filo.onBroadcast((m) => { if (m && m.type === (MSG.AUTH_CHANGED || 'auth_changed') && mostrata()) aMostra(); });
+  }
+  if (mostrata()) aMostra();
 })();

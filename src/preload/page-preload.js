@@ -23,6 +23,12 @@ try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo
 let riscrittura = null;
 try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
 
+// Prima che nasca un riquadro: chi lo tocca mentre carica il suo indirizzo gli toglie il preload (#1560).
+try {
+  require(path.join(__dirname, '..', 'shared', 'riquadriInArrivo.js'));
+  globalThis.SN_RIQUADRI_IN_ARRIVO.osserva(window);
+} catch (e) { console.error('[Filo CS] riquadri in arrivo', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
@@ -341,7 +347,12 @@ function riquadriFigli() {
     try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
     for (const f of lista) {
       out.push(f);
-      try { if (f.contentWindow.location.protocol === 'about:' && f.contentDocument) docs.push(f.contentDocument); } catch (_) {}
+      const R = globalThis.SN_RIQUADRI_IN_ARRIVO;
+      try {
+        const w = R && R.finestra(f);
+        const d = w && w.location.protocol === 'about:' ? R.documento(f) : null;
+        if (d) docs.push(d);
+      } catch (_) {}
     }
   }
   return out;
@@ -371,7 +382,7 @@ if (IS_SUBFRAME) try {
     // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
     if (!visto) {
       for (const f of riquadriFigli()) {
-        try { f.contentWindow.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
+        try { globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f)?.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
       }
     }
     for (const fn of inAttesaDiVerdetto) fn();
@@ -661,10 +672,11 @@ try {
   // Il segno lo mette solo il preload di un frame per sé; lo vedono i preload degli altri frame dello stesso sito.
   const PRELOAD_PROPRIO = Symbol.for('filo:gesto-preload-proprio');
   const seguiti = new WeakSet();
-  const inArrivo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
+  // Visto per la prima volta con un indirizzo, si presume in arrivo: in una radice ombra il conto dei load non c'è.
+  const conIndirizzo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
   const senzaPreload = (f, caricato) => {
-    if (!caricato && inArrivo(f)) return null;
-    try { const w = f.contentWindow; return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
+    if (!caricato && conIndirizzo(f)) return null;
+    try { const w = globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f); return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
   };
   // Riquadri che aspettano il primo load: finché c'è, nessuna finestra si tocca alla cieca.
   const inAttesa = new Set();
@@ -673,7 +685,7 @@ try {
     if (seguiti.has(f)) return;
     seguiti.add(f);
     f.addEventListener('load', () => { inAttesa.delete(f); const w = senzaPreload(f, true); if (w) segui(w); }, true);
-    if (inArrivo(f)) inAttesa.add(f);
+    if (conIndirizzo(f)) inAttesa.add(f);
     const w = senzaPreload(f, false);
     if (w) segui(w);
   };
@@ -724,7 +736,7 @@ try {
     if (figli.length > visti) {
       for (const f of inAttesa) if (!f.isConnected) inAttesa.delete(f);
       // Toccato prima del suo load un riquadro perde il preload: alla cieca solo quando nessuno è in arrivo.
-      if (inAttesa.size) return;
+      if (inAttesa.size || globalThis.SN_RIQUADRI_IN_ARRIVO?.qualcunoInArrivo()) return;
       for (const c of figli) { try { c.executeJavaScriptInIsolatedWorld(MONDO_DEL_PRELOAD, [{ code: PRESENTATI }], false).catch(() => {}); } catch (_) {} }
     }
     figliContati = figli.length;
@@ -864,6 +876,8 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'qr.js')); } catch (e) { console.error('[Filo CS] qr', e); }
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
+  try { require(path.join(SHARED_DIR, 'guardianoStatico.js')); } catch (e) { console.error('[Filo CS] guardianoStatico', e); } // #810.7 — la forma di un numero di carta: PRIMA di extractContext
+  try { require(path.join(SHARED_DIR, 'campiSegreti.js')); } catch (e) { console.error('[Filo CS] campiSegreti', e); } // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
   try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo CS] gesto', e); } // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js

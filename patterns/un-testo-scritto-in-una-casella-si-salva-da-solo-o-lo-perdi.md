@@ -190,7 +190,7 @@ scheda col cursore dentro buttava via il numero (#666).
   (e resta da spedire); un salvataggio chiesto in quel mentre parte appena
   torna la risposta.
 - **Dove:** `collega` in `src/shared/campoNumero.js`, `costruisciManopole` in
-  `src/pages/credits/owner.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.
+  `src/pages/manage/manageUtenti.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.
 
 ## Il main aspetta la pagina anche alla finestra chiusa e all'uscita da Filo
 
