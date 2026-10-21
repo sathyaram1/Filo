@@ -391,18 +391,36 @@ const TIPO_VERDETTO = {
   esatto: 'nome', esattodentro: 'nome',
 };
 
+// Le forme che le regole di prima prendevano sempre: il nome intero del marchio (amazon.online, google.web.app,
+// microsoft.com.altro.net), con un numero o «my» (amazon24, myapple), o a una lettera da un marchio di almeno cinque.
+function formaCerta(c) {
+  if (c.mut) return false;
+  if (c.tipo === 'esatto') return true;
+  const lungo = c.mc.token.length >= 5;
+  if (c.tipo === 'typo') return lungo && c.d === 1 && c.zona === 'sld';
+  if (c.tipo !== 'esattodentro') return false;
+  const prima = c.sk.crudo.slice(0, c.inizio);
+  const dopo = c.sk.crudo.slice(c.fine);
+  if (lungo && c.zona === 'sld' && prima.length + dopo.length === 1) return true;
+  return (prima === '' || prima === 'my') && /^\d*$/.test(dopo) && !!(prima || dopo);
+}
+
 // Il verdetto sul nome: null, o il marchio imitato con { tipo: 'omografo'|'sosia'|'typo'|'nome', zona, punteggio,
 // forte }. `forte`: travestimento o refuso a una lettera di un marchio lungo, che da solo basta per «Pericoloso».
+// Una forma certa la scagiona solo un modello sicuro che il sito è vero (sotto `sogliaCerte`): è la cura dei falsi
+// allarmi di prima, non una porta per le imitazioni che le regole prendevano (#1375).
 function giudica(norm, { esca } = {}) {
   const lista = esempi(norm, esca);
   if (!lista.length) return null;
   const m = caricaModello();
+  const sogliaCerte = Math.min(m.soglia, m.sogliaCerte ?? m.soglia);
   let meglio = null;
   for (const { c, feats } of lista) {
     const p = punteggio(feats, m);
-    if (!meglio || p > meglio.punteggio) meglio = { c, punteggio: p };
+    const passa = p >= m.soglia || (formaCerta(c) && p >= sogliaCerte);
+    if (passa && (!meglio || p > meglio.punteggio)) meglio = { c, punteggio: p };
   }
-  if (meglio.punteggio < m.soglia) return null;
+  if (!meglio) return null;
   const { c } = meglio;
   const tipo = TIPO_VERDETTO[c.tipo];
   const travestito = tipo === 'omografo' || tipo === 'sosia';
