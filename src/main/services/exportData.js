@@ -711,13 +711,15 @@ function senzaSegretiVuoti(dati, cur) {
 
 // Il tetto di spesa mensile non sale con un backup: alzarlo toglie un freno e vuole un sì (#1050). Resta il più stretto
 // fra qui e il backup (0 è nessun tetto); quello del backup, se più largo, lo offre la conferma e lo mette solo il suo bottone.
+// Se è più stretto entra, e la conferma lo dice coi due numeri (`prima`): un tetto sceso ferma i modelli a metà mese.
 function tettoSpesa(qui, backup) {
   const valido = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const q = valido(qui) ? qui : costanti().DEFAULT_SETTINGS.monthlyLimitEur;
-  if (!valido(backup)) return { tenuto: q, offerto: null };
+  if (!valido(backup)) return { tenuto: q, offerto: null, prima: null };
   const largo = (v) => (v > 0 ? v : Infinity);
-  if (largo(backup) > largo(q)) return { tenuto: q, offerto: backup };
-  return { tenuto: largo(backup) < largo(q) ? backup : q, offerto: null };
+  if (largo(backup) > largo(q)) return { tenuto: q, offerto: backup, prima: null };
+  if (largo(backup) < largo(q)) return { tenuto: backup, offerto: null, prima: q };
+  return { tenuto: q, offerto: null, prima: null };
 }
 
 function mergeImportedData(current, imported, opzioni = {}) {
