@@ -814,11 +814,14 @@
         type: MSG.TEST_PROVIDER,
         provider: providerId,
         apiKey,
+        ...(apiKey ? {} : { chiaveDellUso: true }),
         model: modelId,
         sort: conf.sort || '',
         reasoning: conf.reasoning || '',
       });
-      if (!res?.ok) {
+      if (!res?.ok && res?.code === 'NO_API_KEY') {
+        statusEl.textContent = I18n.t('options_test_no_key');
+      } else if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
