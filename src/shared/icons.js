@@ -664,6 +664,13 @@
     `<path d="M7 21l-3-3 3-3"/>` +
     `<path d="M4 18h12a4 4 0 0 0 4-4v-1"/>`;
 
+  // --- Aiuto (punto di domanda in un fumetto): la conversazione con Filo sulla pagina. Copia in ICON_PATHS.help
+  //     (src/main/popup-menu.js), lo stesso disegno della voce «Aiuto» sulla scheda.
+  const help =
+    `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>` +
+    `<path d="M9.2 9.3a2.8 2.8 0 0 1 5.4 1c0 1.8-2.6 2.4-2.6 2.4"/>` +
+    `<path d="M12 15.2h.01"/>`;
+
   // --- PREVISTE: chiede all'utente (cerchio con "?").
   const question =
     `<circle cx="12" cy="12" r="8.5"/>` +
