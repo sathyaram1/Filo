@@ -334,7 +334,7 @@ test('chat a Normale, dopo una ricerca: «dimentica per sempre» vuole la parola
     await chiedi(page, 'cerca il meteo');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Sole.' })).toBeVisible({ timeout: 15000 });
     await chiedi(page, 'dimentica per sempre che vivo a Bologna');
-    const btn = page.locator('button', { hasText: 'cancellare per sempre' });
+    const btn = page.locator('button.dash-action-btn', { hasText: 'cancellare per sempre' });
     await expect(btn).toBeVisible({ timeout: 15000 });
     expect(await lezioni(app)).toContain('Vive a Bologna.');
     await btn.click();
