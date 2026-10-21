@@ -1688,8 +1688,13 @@
           <!-- Il tasto destro, o il glifo ⇅, apre il menu di riordino (numero / priorità / creatore). -->
           <div class="mg-col-head mg-list-head-row" id="mgListHeadRow">
             <div id="mgListHead">Ricevuti</div>
-            <button type="button" class="mg-sort-btn" id="mgSortBtn"
-              title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+            <span class="mg-head-tasti">
+              <!-- «Solo non fidate» (#1575): vale per tutte le schede dei feedback e per le Domande. Non si ricorda. -->
+              <button type="button" class="mg-livello-btn mg-fiducia-filtro" id="mgFiduciaFiltro" aria-pressed="false"
+                title="Mostra solo le pratiche non fidate" hidden>Solo non fidate<span class="mg-livello-count"></span></button>
+              <button type="button" class="mg-sort-btn" id="mgSortBtn"
+                title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+            </span>
           </div>
           <!-- Ricevuti per livello (SPEC-DOMANDE §2.2): nessuno acceso = tutto, più accesi = unione. Non si ricorda. -->
           <div class="mg-livelli-filtro" id="mgLivelliFiltro" role="group" aria-label="Filtra i Ricevuti per livello" hidden>
