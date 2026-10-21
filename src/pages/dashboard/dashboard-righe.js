@@ -190,6 +190,10 @@
     ];
     if (r.vista.dove && VAI[r.vista.app]) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: VAI[r.vista.app], onClick: () => apri(r) });
     voci.push({ type: 'item', icon: icona('copy', 16), label: 'Copia lo scambio', onClick: () => copia(r).catch(() => {}) });
+    // #1295 — come una conversazione della home: nascosta si rimette, «Togli dal filo» la cancella.
+    if (global.SN_DASH_CODA && global.SN_DASH_CODA.nascondi) {
+      voci.push({ type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', onClick: () => { global.SN_DASH_CODA.nascondi(r.vista.id, { vicino: r.el }).catch(() => {}); } });
+    }
     voci.push({ type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => togli(r).catch(() => {}) });
     return voci;
   }
@@ -261,9 +265,13 @@
       global.chrome.runtime.onMessage.addListener((m) => {
         if (!m) return;
         if (m.type === MSG.FILO_RIGHE_APP_CAMBIATE) presto();
-        else if (m.type === MSG.FILO_CHATS_UPDATED && m.cancellata && righe.has(m.cancellata)) {
-          righe.get(m.cancellata).el.remove();
-          righe.delete(m.cancellata);
+        else if (m.type === MSG.FILO_CHATS_UPDATED && m.rimessa) presto();
+        else if (m.type === MSG.FILO_CHATS_UPDATED && (m.cancellata || m.nascosta) && righe.has(m.cancellata || m.nascosta)) {
+          const via = m.cancellata || m.nascosta;
+          // Nascosta altrove: al suo posto resta «Rimetti», come col tasto destro (#1295).
+          if (m.nascosta && global.SN_DASH_CODA && global.SN_DASH_CODA.nascostaAltrove) global.SN_DASH_CODA.nascostaAltrove(via);
+          righe.get(via).el.remove();
+          righe.delete(via);
           vuoto();
         }
       });

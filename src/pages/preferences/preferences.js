@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, tempiCorrettore } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -862,13 +862,22 @@
       case 'contatori.attivi': return $('contatoriAttivi').checked;
       case 'featureFlags.help': return $('aiutoAcceso').checked;
       case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
+      case 'featureFlags.spellcheckContext': return $('correttoreSuggerimenti').checked;
       case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
+      case 'correttore.modelloErrori': return $('correttoreModello').checked;
+      case 'correttore.ripetizioni': return $('correttoreRipetizioni').checked;
+      case 'correttore.pausaRapidoMs': return tempoCorrettoreDelCampo('pausaRapidoMs');
+      case 'correttore.ogniRapidoMs': return tempoCorrettoreDelCampo('ogniRapidoMs');
+      case 'correttore.pausaRagionatoMs': return tempoCorrettoreDelCampo('pausaRagionatoMs');
       default: return undefined;
     }
   }
 
   // Gli interruttori di funzione con il loro valore di serie: acceso finché non è `false`, o spento finché non è `true`.
-  const INTERRUTTORI = [['help', 'aiutoAcceso', true], ['spellcheck', 'correttoreAcceso', true], ['categorize', 'categorieAutomatiche', false]];
+  const INTERRUTTORI = [['help', 'aiutoAcceso', true], ['spellcheck', 'correttoreAcceso', true], ['spellcheckContext', 'correttoreSuggerimenti', true], ['categorize', 'categorieAutomatiche', false]];
+  // I tempi del correttore (#1446): campo per chiave; limiti e predefiniti in SN_CONST.CORRETTORE_TEMPI.
+  const CAMPI_TEMPI_CORRETTORE = { pausaRapidoMs: 'correttorePausaRapido', ogniRapidoMs: 'correttoreOgniRapido', pausaRagionatoMs: 'correttorePausaRagionato' };
+  const tempoCorrettoreDelCampo = (campo) => tempiCorrettore({ correttore: { [campo]: $(CAMPI_TEMPI_CORRETTORE[campo]).value } })[campo];
   const interruttore = (s, nome, diSerie) => {
     const v = s.featureFlags && s.featureFlags[nome];
     return diSerie ? v !== false : v === true;
@@ -933,8 +942,14 @@
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
       case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
+      case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
+      case 'correttore.ripetizioni': return !(s.correttore && s.correttore.ripetizioni === false);
+      case 'correttore.pausaRapidoMs':
+      case 'correttore.ogniRapidoMs':
+      case 'correttore.pausaRagionatoMs': return tempiCorrettore(s)[k.split('.')[1]];
       case 'featureFlags.help':
       case 'featureFlags.spellcheck':
+      case 'featureFlags.spellcheckContext':
       case 'featureFlags.categorize': {
         const [nome, , diSerie] = INTERRUTTORI.find(([n]) => k === `featureFlags.${n}`);
         return interruttore(s, nome, diSerie);
@@ -1134,6 +1149,13 @@
     if (vuole('contatori.attivi')) $('contatoriAttivi').checked = !(settings.contatori && settings.contatori.attivi === false);
     for (const [nome, id, diSerie] of INTERRUTTORI) {
       if (vuole(`featureFlags.${nome}`)) $(id).checked = interruttore(settings, nome, diSerie);
+    }
+    const corr = settings.correttore || {};
+    if (vuole('correttore.modelloErrori')) $('correttoreModello').checked = corr.modelloErrori !== false;
+    if (vuole('correttore.ripetizioni')) $('correttoreRipetizioni').checked = corr.ripetizioni !== false;
+    const tempiCorr = tempiCorrettore(settings);
+    for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
+      if (vuole(`correttore.${campo}`)) $(id).value = String(tempiCorr[campo]);
     }
 
     if (vuole('timerRingtone')) {
@@ -1803,6 +1825,13 @@
     $('descriviImmagini').addEventListener('change', persist);
     $('contatoriAttivi').addEventListener('change', persist);
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
+    $('correttoreModello').addEventListener('change', persist);
+    $('correttoreRipetizioni').addEventListener('change', persist);
+    for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
+      $(id).addEventListener('change', persist);
+      // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
+      $(id).addEventListener('blur', () => { $(id).value = String(tempiCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
+    }
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));

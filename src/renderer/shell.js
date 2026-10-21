@@ -1557,8 +1557,14 @@
       for (let i = 0; i < over; i++) {
         const c = live[i]; // le più vecchie sono in cima (append in coda)
         if (c._tempo) c._tempo.annulla();
+        uscita(c);
         try { c.remove(); } catch (_) {}
       }
+    }
+    function uscita(card) {
+      const fn = card._alChiudere;
+      card._alChiudere = null;
+      if (typeof fn === 'function') { try { fn(); } catch (_) {} }
     }
     function avviaTempo(card, ms) {
       if (card._tempo) card._tempo.annulla();
@@ -1569,6 +1575,7 @@
       card.dataset.closing = '1';
       if (card._tempo) card._tempo.annulla();
       card._tempo = null;
+      uscita(card);
       card.classList.remove('show');
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
       if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
@@ -1600,7 +1607,8 @@
       card.insertBefore(bar, card.querySelector('.shell-notif-close'));
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
-    // actions: [{ label, onClick }], unica }. Senza opts usa la config delle Preferenze.
+    // actions: [{ label, onClick }], unica, alChiudere }. Senza opts usa la config delle Preferenze.
+    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, tetto).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
     function show(text, opts) {
@@ -1615,6 +1623,8 @@
       const gemella = chiave && Array.from(hostEl().children)
         .find((c) => c.dataset.unica === chiave && c.dataset.closing !== '1');
       if (gemella) {
+        if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
+        gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
         avviaTempo(gemella, durata);
@@ -1624,6 +1634,7 @@
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
+      card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
 
@@ -1712,6 +1723,8 @@
 
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
+    let annullata = false;
+    let allaChiusura = null;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito; con apriComunque scavalca la lista dei siti bloccati (#170.3).
@@ -1728,11 +1741,18 @@
             const sito = a.restaConnesso;
             return { label: a.label, onClick: () => restaConnesso(null, true, sito) };
           }
+          // F4 — la segnalazione automatica aspetta questo avviso (#784.6): Annulla la ferma, chiuderlo la fa partire.
           if (a && a.cancelAutoFeedback && !a.onClick) {
-            const fbId = a.cancelAutoFeedback;
+            const fbId = String(a.cancelAutoFeedback);
+            const nonRitirata = (r) => NOTIFS.show((r && r.frase) || 'Non sono riuscito a ritirare la segnalazione');
+            allaChiusura = () => { if (!annullata) api.message({ type: 'auto_feedback_parti', id: fbId }).catch(() => {}); };
             return {
               label: a.label,
-              onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
+              onClick: () => {
+                annullata = true;
+                api.message({ type: 'cancel_auto_feedback', id: fbId })
+                  .then((r) => { if (!r || r.ok === false) nonRitirata(r); }, () => nonRitirata(null));
+              },
             };
           }
           // #975 — la proposta del menu del sito: «Sì» lo mette al primo posto su quel sito, «Annulla» lo toglie.
@@ -1785,6 +1805,7 @@
           return a;
         }),
       };
+      if (allaChiusura) opts.alChiudere = allaChiusura;
     }
     NOTIFS.show(info.text, opts);
   });

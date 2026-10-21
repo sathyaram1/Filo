@@ -76,14 +76,18 @@
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
-//         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         note, feedback, domanda. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
 //         mandato il feedback, che la vede nella sua bacheca. `--segnala
 //         <file.md>` (su status, fixed e verdict) è la segnalazione per
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
-//         e scritta dal server nel livello L3 del feedback.
+//         e scritta dal server nel livello L3 del feedback. `--domanda
+//         <file.json>` (su status, fixed e verdict, #1358) è la domanda per
+//         l'owner già nel formato di SPEC-DOMANDE §3.1: ferma il lavoro come la
+//         segnalazione, e il feedback aspetta lei. `--status attack|spam` col
+//         perché nelle note: il giudizio di chi l'ha letto (Ricevuti L3).
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
 //
@@ -1217,13 +1221,34 @@ if (isMain) {
   }
   delete data.segnala;
 
+  // `--domanda <file.json>` accanto a una fermata (#1358): la domanda per l'owner, controllata qui come la controlla il
+  // server. L'intento `domanda` la legge più sotto, da sola; su note, secaudit e feedback non fermerebbe niente.
+  if (typeof data.domanda === 'string' && cmd === 'deliver') {
+    const intentoDom = [args[0], args[1]].find((a) => ['status', 'fixed', 'verdict', 'domanda'].includes(a));
+    if (!intentoDom) {
+      console.error('--domanda vale solo su deliver domanda, status, fixed e verdict: non ho consegnato niente.');
+      process.exit(1);
+    }
+    if (intentoDom !== 'domanda') {
+      let testo = '';
+      try { testo = readFileSync(resolve(data.domanda), 'utf8'); } catch (e) {
+        console.error(`Non leggo ${data.domanda} (${e.code || e.message}): non ho consegnato niente.`);
+        process.exit(1);
+      }
+      const { leggiDomandaJson } = await import('./domanda.mjs');
+      const letta = leggiDomandaJson(testo, { conOrigine: false });
+      if (letta.errore) { console.error(letta.errore); process.exit(1); }
+      data.domanda = letta.domanda;
+    }
+  }
+
   // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
   // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
   // decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
-    if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
+    if (data.stop !== true || !suFixed || !(data.segnalazione || (data.domanda && typeof data.domanda === 'object'))) {
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> o --domanda <file.json> (che da sole fermano già il lavoro): non ho consegnato niente.');
       process.exit(1);
     }
   }
@@ -1640,9 +1665,13 @@ if (isMain) {
       // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
       // adesso, o crede di averlo mandato in verifica.
       const fermo = r.reply && r.reply.outcome === 'stop';
-      const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
-      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
-      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
+      const conDomanda = !!data.domanda && typeof data.domanda === 'object' && intento !== 'domanda';
+      const conSegnalazione = (typeof data.segnalazione === 'string' && data.segnalazione.trim()) || conDomanda;
+      const cosa = conDomanda ? 'la domanda' : (typeof data.segnalazione === 'string' && data.segnalazione.trim()) ? 'la segnalazione' : 'la fermata';
+      const dom = r.reply && typeof r.reply.domanda === 'string' && r.reply.domanda ? `, domanda ${r.reply.domanda}` : '';
+      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (${cosa} è consegnata${dom}). Rilascia il biglietto.`);
+      else if (r.reply && r.reply.outcome === 'server') console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: passato ai lavori server, che lo riprendono dal ramo. Rilascia il biglietto.`);
+      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`);
       else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
       process.exit(0);
     }

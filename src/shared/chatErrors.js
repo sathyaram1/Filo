@@ -42,7 +42,8 @@
 //     La stessa cosa già pronta da mostrare: ogni superficie usa questa, così
 //     l'indirizzo e l'etichetta non vengono riscritti uno per riquadro.
 //   SN_CHAT_ERRORS.fraseNessunHost({ modello, funzione, motivo, rimedio })
-//     → la frase di un modello che nessun host ammesso serve (#828), la stessa ovunque.
+//     → la frase di un modello che nessun host ammesso serve (#828), la stessa ovunque; anche quella di un modello
+//       che coi crediti di Filo non si usa (#830: motivoCrediti, rimedioCrediti).
 //
 // Logica PURA: niente I/O, niente Electron → unit-testabile.
 
@@ -115,6 +116,8 @@
     if (x && typeof x === 'object') {
       if (x.keyRefused) return 'crediti';
       if (x.code === 'NO_TOOL_HOST' && Number(x.maxTokens) > 0) return 'preferenze';
+      // Un modello che i crediti di Filo non pagano (#830): la frase propone prima la chiave propria.
+      if (x.code === 'NO_ALLOWED_HOST' && x.reason === 'crediti') return 'crediti';
       if (x.code === 'RISPOSTA_TAGLIATA' && x.finishReason === 'error') return '';
       return RIMEDIO[String(x.code || '')] || '';
     }
@@ -171,6 +174,7 @@
   // Voce e dettatura sanno anche quali host conservano, e se il router potrebbe sceglierne uno fra altri che no.
   function motivoNessunHost(err) {
     const reason = err && err.reason;
+    if (reason === 'crediti') return motivoCrediti(!!err.chiaveRifiutata);
     const { testo, quanti } = elencoNomi(err && err.hosts);
     const loro = quanti > 1 ? ['Lo servono', 'si impegnano', 'loro'] : ['Lo serve', 'si impegna', 'lui'];
     if (reason === 'zdr') return quanti ? `${NESSUN_HOST_ZDR}. ${loro[0]} solo ${testo}, che non ${loro[1]} a non conservarli` : NESSUN_HOST_ZDR;
@@ -185,9 +189,25 @@
     const n = breve(nome, 60);
     return `questo modello lo serve solo ${n || 'il suo produttore'}, e adesso non risponde`;
   }
+  // Coi crediti di Filo girano solo i modelli della politica (#830): `ripiego` quando la chiave propria è stata
+  // rifiutata e i crediti non possono subentrare. Il rimedio offre prima la chiave, poi un altro modello.
+  const MOTIVO_CREDITI = 'coi crediti di Filo questo modello non si usa';
+  function motivoCrediti(ripiego) {
+    return ripiego ? `OpenRouter ha rifiutato la tua chiave, e ${MOTIVO_CREDITI}` : MOTIVO_CREDITI;
+  }
+  const ALTRO_MODELLO_CREDITI = {
+    opzioni: ', o scegline un altro in Opzioni → Modelli per azione.',
+    predefiniti: '; per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione.',
+    gestione: ', o scegline un altro in Gestione → Automazioni, fra i Modelli di supporto.',
+  };
+  function rimedioCrediti(dove, ripiego) {
+    const chiave = ripiego ? 'Controlla la tua chiave nella pagina Crediti' : 'Per usarlo metti una tua chiave OpenRouter nella pagina Crediti';
+    return chiave + (ALTRO_MODELLO_CREDITI[dove] || ALTRO_MODELLO_CREDITI.opzioni);
+  }
   // Il rimedio per dove si sceglie il modello ('opzioni' | 'predefiniti' | 'gestione'); se l'ha pagata la chiave
   // propria con l'interruttore dei fornitori esclusi spento (#962), anche la strada di accenderlo.
   function rimedioNessunHost(dove, err, effettive) {
+    if (err && err.reason === 'crediti') return rimedioCrediti(dove, !!err.chiaveRifiutata);
     const base = RIMEDI_NESSUN_HOST[dove] || RIMEDI_NESSUN_HOST.opzioni;
     // Il vincolo del produttore vale anche con la chiave propria: accendere i fornitori esclusi non lo scioglie.
     const spento = Boolean(err && err.keySource === 'own') && err.reason !== 'produttore'
@@ -215,6 +235,7 @@
     // quanti crediti arrivano domani: vale più di qualsiasi ricostruzione.
     if (res && typeof res.userMessage === 'string' && res.userMessage) e.userMessage = res.userMessage;
     if (res && res.keyRefused) e.keyRefused = true;
+    if (res && res.reason === 'crediti') e.reason = 'crediti';
     if (res && Number(res.maxTokens) > 0) e.maxTokens = Number(res.maxTokens);
     if (res && Number(res.finestra) > 0) e.finestra = Number(res.finestra);
     if (res && typeof res.finishReason === 'string' && res.finishReason) e.finishReason = res.finishReason;
@@ -428,6 +449,7 @@
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
+    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

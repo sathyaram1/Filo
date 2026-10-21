@@ -108,15 +108,23 @@ module.exports = function register(on, ctx) {
     return Boolean(s && s.descriviImmagini && s.descriviImmagini.enabled === false);
   }
 
-  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: il controllo di coerenza
-  // (#1115) parte col solo testo di chi scrive, e lo dice alla pagina, che allora non ha citazioni da confrontare.
+  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: i due controlli del
+  // correttore (#1446) partono col solo testo di chi scrive e il nome del sito, e lo dicono alla pagina, che allora non
+  // ha citazioni da confrontare.
+  const DEL_CORRETTORE = new Set([SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC, SN_CONST.ACTIONS.SPELLCHECK_CONTEXT]);
+  const sitoDi = (url) => {
+    try { const u = new URL(url); return u.protocol === 'filo:' ? 'Filo' : (u.hostname || ''); } catch (_) { return ''; }
+  };
   async function senzaPaginaDelicata(msg, sender) {
-    if (!msg || msg.action !== SN_CONST.ACTIONS.SPELLCHECK_CONTEXT || !msg.payload) return false;
+    if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
     const url = String(sender?.tab?.url || sender?.url || '');
     if (!/^https?:/i.test(url)) return false;
     let delicata = true;
     try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
-    if (delicata) msg.payload = { ...msg.payload, contesto: {} };
+    if (delicata) {
+      const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
+      msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
+    }
     return delicata;
   }
 
@@ -141,6 +149,12 @@ module.exports = function register(on, ctx) {
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
     const senzaContesto = await senzaPaginaDelicata(msg, sender);
+    // Chiavi, password e carte scritte nel campo restano sul computer (#1446); il sito lo dice chi ha mandato, non la pagina.
+    if (msg && DEL_CORRETTORE.has(msg.action) && msg.payload && typeof msg.payload === 'object') {
+      msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
+      const sito = sitoDi(String(sender?.tab?.url || sender?.url || ''));
+      msg.payload.luogo = { ...(msg.payload.luogo && typeof msg.payload.luogo === 'object' ? msg.payload.luogo : {}), sito };
+    }
     // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
     const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
     if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
@@ -505,12 +519,14 @@ module.exports = function register(on, ctx) {
     return '';
   }
 
-  on(MSG.TEST_PROVIDER, async (msg) => {
+  on(MSG.TEST_PROVIDER, async (msg, sender, origin) => {
     try {
       const provider = msg.provider;
-      const apiKey = (msg.apiKey || '').trim();
-      // Stesso cancello della politica di ogni richiesta (vedi openWeightsBlockReason). Il
-      // fornitore si controlla prima del modello: se non può servire, il modello non conta.
+      let apiKey = (msg.apiKey || '').trim();
+      // "Solo modelli a pesi aperti" (#461): la prova è una chiamata VERA, quindi
+      // passa dallo stesso cancello delle funzioni. Il fornitore si controlla
+      // prima del modello: chiedergli quale modello proverebbe non ha senso se
+      // comunque non può essere interrogato.
       const s = await getEffectiveSettings();
       if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
         return { ok: false, error: openWeightsBlockReason(s, { provider }) };
@@ -522,7 +538,18 @@ module.exports = function register(on, ctx) {
           error: `Nessun modello ${provider} impostato per la prova: scegline uno in «Prova di un fornitore», fra le funzioni delle Opzioni.`,
         };
       }
-      if (!apiKey) return { ok: false, error: 'API key mancante' };
+      // La riga delle Opzioni senza chiave scritta si prova con la chiave con cui la funzione pagherebbe davvero, cioè
+      // i crediti di Filo (#598, #830); la sceglie il main, e solo per le pagine di Filo: un sito non spende crediti.
+      // Mai quella di fabbrica: su un modello qualunque la spende solo chi amministra (TEST_DEFAULT_MODEL).
+      if (!apiKey && msg.chiaveDellUso === true && daFilo(origin, sender)) {
+        const dellUso = String((s.apiKeys && s.apiKeys[provider]) || '').trim();
+        if (dellUso && await chiaveDellUtente(dellUso)) apiKey = dellUso;
+      }
+      if (!apiKey) return { ok: false, code: 'NO_API_KEY', error: 'API key mancante' };
+      // Modello indicato dalla riga (registry personale): se è proprietario la
+      // prova non parte, altrimenti l'unica richiesta che l'interruttore non
+      // ferma sarebbe proprio quella che si lancia dalla pagina dove lo si
+      // accende.
       const modelBlocked = openWeightsBlockReason(s, { provider, model });
       if (modelBlocked) return { ok: false, error: modelBlocked };
       // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
@@ -530,9 +557,10 @@ module.exports = function register(on, ctx) {
       const rowEntry = (s.modelRegistry || {})[msg.nickname] || null;
       // La riga delle Opzioni manda ordinamento e ragionamento già risolti al clic: la misura le verrà attribuita.
       const sortRiga = typeof msg.sort === 'string' ? msg.sort : null;
+      const pesiRiga = SN_CONST.pesiDichiaratiPer(rowEntry, model);
       const routing = sortRiga != null
-        ? providerRouting({ ...s, providerSort: '' }, sortRiga)
-        : providerRouting(s, rowEntry && rowEntry.sort);
+        ? providerRouting({ ...s, providerSort: '' }, sortRiga, pesiRiga)
+        : providerRouting(s, rowEntry && rowEntry.sort, pesiRiga);
       const reasoningRiga = typeof msg.reasoning === 'string' ? msg.reasoning : (rowEntry && rowEntry.reasoning);
       const kind = modelKind(provider, model, rowEntry);
       if (kind !== 'text') {
@@ -593,21 +621,38 @@ module.exports = function register(on, ctx) {
       entry = { provider: msg.provider, model: msg.model.trim() };
     } else {
       const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
-      if (raw) entry = registryEntryToSingle(raw);
+      if (raw) entry = { ...registryEntryToSingle(raw), weights: raw.weights };
     }
     if (!entry || !entry.model) return { ok: true, verdict: 'na' };
-    const v = await modelGate.hostVerdict({
-      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing, filoPays,
-    });
+    const apiKey = (s.apiKeys && s.apiKeys[entry.provider]) || '';
+    const I18n = globalThis.SN_I18N;
+    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
+    // Un modello che i crediti di Filo non pagano (#830) si dice mentre lo si sceglie, prima di chi lo ospita.
+    if (!(await SN_CONST.creditsAllowModelLetto(entry.model, entry.weights)) && (filoPays === true || await pagaFilo(apiKey))) {
+      return { ok: true, verdict: 'crediti', hosts: [], warning: I18n ? I18n.t('audio_host_warn_crediti', label, I18n.t(fn)) : 'crediti' };
+    }
+    const v = await modelGate.hostVerdict({ provider: entry.provider, apiKey, model: entry.model, providerRouting: routing, filoPays });
     if (v.ok) return { ok: true, verdict: 'ok' };
     const many = v.excluded.length > 1 ? '_many' : '';
     const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
-    const I18n = globalThis.SN_I18N;
-    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
     const nomi = new Intl.ListFormat('it', { type: 'conjunction' }).format(v.excluded);
     const warning = I18n ? I18n.t(key, label, I18n.t(fn), nomi) : key;
     return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
   });
+
+  // La chiave spende i crediti di Filo (la personale o quella di fabbrica)? Senza chi tiene le chiavi non si sa: no.
+  async function pagaFilo(apiKey) {
+    const K = globalThis.SN_WALLET_MAIN;
+    if (!apiKey || !K || typeof K.keySourceOf !== 'function') return false;
+    try { return ['personal', 'factory'].includes(await K.keySourceOf(apiKey)); } catch (_) { return false; }
+  }
+
+  // La chiave è di chi usa Filo: la sua o la personale dei crediti, non quella di fabbrica.
+  async function chiaveDellUtente(apiKey) {
+    const K = globalThis.SN_WALLET_MAIN;
+    if (!apiKey || !K || typeof K.keySourceOf !== 'function') return false;
+    try { return ['own', 'personal'].includes(await K.keySourceOf(apiKey)); } catch (_) { return false; }
+  }
 
   // Normalizza una entry del registry (nuovo schema { provider, model } o
   // vecchio duale { openrouter, … }) in { provider, model } — stessa logica
@@ -746,9 +791,10 @@ module.exports = function register(on, ctx) {
       // L'editor e le Opzioni mandano l'ordinamento già risolto dalla pagina (al clic: la misura va a quello, anche se
       // la tendina cambia intanto). Senza, una voce predefinita si prova con la scelta personale di questo utente.
       const sortDelClic = !explicitModel && typeof msg.sort === 'string' ? msg.sort : null;
+      const pesi = SN_CONST.pesiDichiaratiPer(regEntry, modelId);
       const routing = explicitModel || sortDelClic != null
-        ? providerRouting({ ...eff, providerSort: '' }, explicitModel ? tuning.sort : sortDelClic)
-        : providerRouting(eff, SN_CONST.ordinamentoPerUtente(eff.ordineHost, tuning.sort, ''));
+        ? providerRouting({ ...eff, providerSort: '' }, explicitModel ? tuning.sort : sortDelClic, pesi)
+        : providerRouting(eff, SN_CONST.ordinamentoPerUtente(eff.ordineHost, tuning.sort, ''), pesi);
       if (kind !== 'text') {
         return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing, nickname });
       }

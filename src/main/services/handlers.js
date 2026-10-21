@@ -27,7 +27,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   getSettings: () => getEffectiveSettings(),
   buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
   modelFor: (s, action) => modelForAction(s, action),
-  routing: (s, a) => providerRouting(s, a && a.sort),
+  routing: (s, a) => providerRouting(s, a && a.sort, a && a.weights),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
   segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
@@ -39,6 +39,8 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   contatore: () => globalThis.SN_CONTATORI_MAIN,
   durataCache: (s) => globalThis.SN_FILO_CONTESTO.tetti(s && s.contestoFilo, Defaults.get().contestoFilo).cache,
 });
+// Coi crediti un modello che i nomi non riconoscono si cerca nel catalogo del router (#830): lo stesso del listino.
+SN_CONST.registraCaricatoreCatalogo(() => require('./costoModelli').listino());
 // Più chiamate che per chi usa Filo sono una richiesta sola (un messaggio coi suoi giri di strumenti, una dettatura
 // coi suoi ripieghi) contano un uso, con l'attesa da quando è partita la richiesta (#969).
 function unUsoContato(action, fn) {
@@ -247,12 +249,13 @@ async function buildMessages(action, payload) {
     ] }];
   }
 
+  // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti.
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
-    return [{ role: 'user', content: PROMPTS.spellcheckSemantic({ text: payload.text, context: payload.context }) }];
+    return [{ role: 'user', content: PROMPTS.spellcheckErrori(payload || {}) }];
   }
   if (action === ACTIONS.SPELLCHECK_CONTEXT) {
     // La data la dà l'orologio di qui, non la pagina.
-    return [{ role: 'user', content: PROMPTS.spellcheckContext({ text: payload.text, contesto: payload.contesto, oggi: new Date() }) }];
+    return [{ role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...(payload || {}), oggi: new Date() }) }];
   }
   if (action === ACTIONS.EDIT_TEXT) {
     return [{ role: 'user', content: PROMPTS.editText({ original: payload.original, instruction: payload.instruction }) }];
@@ -262,12 +265,6 @@ async function buildMessages(action, payload) {
       url: payload.url, anchorText: payload.anchorText,
       ogTitle: payload.ogTitle, ogDescription: payload.ogDescription,
       suspiciousFlags: payload.suspiciousFlags,
-    }) }];
-  }
-  if (action === ACTIONS.SPELLCHECK_WORD) {
-    return [{ role: 'user', content: PROMPTS.spellcheckWord({
-      word: payload.word, sentence: payload.sentence || payload.word,
-      prev: payload.prev || '', next: payload.next || '',
     }) }];
   }
   if (action === ACTIONS.HELP_INTENT_GUESS) {
@@ -369,7 +366,8 @@ function withDefaults(settings) {
     const apiKeys = own.openrouter || !personal ? own : { ...own, openrouter: personal };
     // Un fornitore salvato che Filo non ha più (Gemini) spegnerebbe ogni funzione che cerca la sua chiave.
     const provider = Defaults.fornitoreUsabile(settings.provider) ? settings.provider : d.provider;
-    return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, excludedProvidersOwnKey, providerSort, security };
+    const modelRegistry = SN_CONST.registroConPesiCondivisi(settings.modelRegistry, d.modelRegistry);
+    return { ...settings, modelRegistry, provider, apiKeys, openWeightsOnly, excludedProviders, excludedProvidersOwnKey, providerSort, security };
   }
   // OpenRouter (#598): fra la chiave dell'utente e quella di fabbrica c'è la
   // PERSONALE creata dal server al riscatto dell'invito (il suo tetto sono i
@@ -511,7 +509,7 @@ function buildAttemptChain(settings, modelRef, action) {
   // servita da un fornitore escluso.
   for (const a of out) {
     if (a.provider !== 'openrouter') continue;
-    const routing = providerRouting(settings, a.sort);
+    const routing = providerRouting(settings, a.sort, a.weights);
     if (routing) a.providerRouting = routing;
   }
   // Il tetto della risposta per la famiglia della funzione (#1097.3): Preferenze, poi Modelli predefiniti, poi il codice.
@@ -530,8 +528,8 @@ function buildAttemptChain(settings, modelRef, action) {
 // l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
 // Ritorna null se non c'è niente da dire.
 // La regola (la voce vince sul globale, `ignore` resta com'è) sta in SN_CONST.
-function providerRouting(settings, entrySort) {
-  return SN_CONST.providerRoutingFor(settings, entrySort);
+function providerRouting(settings, entrySort, entryWeights) {
+  return SN_CONST.providerRoutingFor(settings, entrySort, entryWeights);
 }
 
 // Cancello della politica per chi NON passa da buildAttemptChain: i pulsanti «Prova» mandano
@@ -783,7 +781,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
-    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD && action !== ACTIONS.SPELLCHECK_CONTEXT
+    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
     // Passaggio interno di una ricerca, non una richiesta dell'utente: fuori dalla cronologia.
     && action !== ACTIONS.MANAGE_SEARCH
@@ -2075,7 +2073,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   const st = A.stato({ fonti: fontiDelCompito(sender, contesto, fontiLette, assistente), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const ingressi = {
     livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
-    elenco: ing.elenco, difesa: ing.difesa, origine, dentroPerimetro, guardiano: false,
+    elenco: ing.elenco, difesa: ing.difesa, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);
   let perche = '';
@@ -2296,6 +2294,25 @@ async function eseguiAzioneFilo(action, {
     action._righe = righeDaDimenticare.map((r) => r.testo);
     // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
     action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+  }
+
+  // #1295 — la conversazione la trova il main (l'id detto, o quella di adesso), prima del gate: il popup dice quale.
+  if (type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'le conversazioni si toccano solo dalle pagine di Filo' };
+    }
+    const detto = String(action.id ?? action.chatId ?? '').trim();
+    const id = detto || (type === 'TOGLI_CHAT' ? String(chatId || '') : '');
+    let chat = null;
+    try { chat = id ? await FiloChats.get(id) : null; } catch (_) { chat = null; }
+    if (!chat || (type === 'RIMETTI_CHAT' && !chat.nascosta)) {
+      return { executed: false, kept: false, output: { trovata: false, ...(chat ? { giaInVista: true } : {}) } };
+    }
+    action.id = chat.id;
+    action._titolo = chat.title || ChatArchive.fallbackTitle(chat.messages);
+    action._corrente = !!chatId && chat.id === chatId;
+    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
+    if (type === 'TOGLI_CHAT') action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
   }
 
   // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
@@ -2924,6 +2941,10 @@ async function eseguiAzioneFilo(action, {
           if (id) {
             const chat = await FiloChats.get(id);
             if (!chat) return { executed: false, kept: true, output: { chatRead: id, found: false } };
+            // Nascosta dall'utente (#1295): Filo sa che c'è e come si chiama, il testo torna solo dopo RIMETTI_CHAT.
+            if (chat.nascosta) {
+              return { executed: true, kept: true, output: { chatRead: id, found: true, nascosta: true, title: chat.title || ChatArchive.fallbackTitle(chat.messages) } };
+            }
             // Una rilettura sta nella finestra del modello insieme al resto della richiesta (#868.7): oltre, testa, coda e
             // il resto a pezzi della stessa misura. Fuori dalla chat vale il tetto in token.
             let cap = globalThis.SN_FILO_CONTESTO.RILETTURA_MIN;
@@ -2952,6 +2973,13 @@ async function eseguiAzioneFilo(action, {
           // Se la ricerca stretta non trova niente si allarga alle parole che
           // distinguono, e l'esito dice con quali ha cercato davvero.
           const { results: found, termini, allargata } = ChatArchive.searchWide(altre, query, { limit: 8 });
+          // Le nascoste che combaciano: solo nome e data, così Filo può proporre di rimetterle senza leggerle.
+          // Senza parole, o chiedendo proprio delle nascoste («quelle che ho tolto»), tornano tutte: si vedono tutte.
+          const tutteNascoste = (await FiloChats.list({ nascoste: 'solo' })).filter((c) => c && c.id !== chatId && (c.messages || []).length);
+          const combaciano = query ? ChatArchive.searchWide(tutteNascoste, query, { limit: 8 }).results : [];
+          const nascosteTutte = !combaciano.length && (!query || ChatArchive.chiedeLeNascoste(query));
+          const nascosteTrovate = (nascosteTutte ? tutteNascoste : combaciano)
+            .map((c) => ({ id: c.id, title: c.title || ChatArchive.fallbackTitle(c.messages), date: c.closedAt || c.updatedAt || null }));
           const nessunCambio = { cambi: [], termini: [], allargata: false };
           const [pagine, cambiCercati] = query
             ? await Promise.all([paginePerChat(query).catch(() => []), cambiPerChat(query).catch(() => nessunCambio)])
@@ -2985,6 +3013,7 @@ async function eseguiAzioneFilo(action, {
               ...(pagine.length ? { pagine } : {}),
               ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
               ...(cambiTrovati.length && cambiCercati.allargata ? { cambiCercatiCon: cambiCercati.termini } : {}),
+              ...(nascosteTrovate.length ? { nascoste: nascosteTrovate, ...(nascosteTutte ? { nascosteTutte: true } : {}) } : {}),
             },
           };
         } catch (e) {
@@ -3216,6 +3245,18 @@ async function eseguiAzioneFilo(action, {
         }
         const ok = await FiloMem.editLine(rigaDaCorreggere.via, l.testo);
         return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
+      }
+      case 'TOGLI_CHAT': {
+        if (action.per_sempre === true) {
+          const via = await cancellaChatPerSempre(action.id);
+          return { executed: via, kept: false, output: { cancellata: via, perSempre: true } };
+        }
+        const c = await nascondiChat(action.id, true);
+        return { executed: !!c, kept: false, output: { nascosta: !!c } };
+      }
+      case 'RIMETTI_CHAT': {
+        const c = await nascondiChat(action.id, false);
+        return { executed: !!c, kept: false, output: { rimessa: !!c } };
       }
       case 'DIMENTICA': {
         if (!righeDaDimenticare.length) {
@@ -3953,6 +3994,11 @@ function chatSearchesForPrompt(actions) {
           : `[La conversazione "${quale}" non è (più) nell'archivio]`);
         continue;
       }
+      if (out.nascosta) {
+        blocks.push(`[La conversazione "${quale}" l'ha nascosta l'utente: il testo non torna. Se vuole riprenderla, rimettila con RIMETTI_CHAT e quell'id, poi rileggila.]\n`
+          + E.imbusta({ tipo: 'TESTO_SALVATO', testo: `Titolo: ${E.neutralizza(out.title || 'senza titolo', { unaRiga: true })}`, conIntestazione: true }));
+        continue;
+      }
       const when = out.date ? new Date(out.date).toLocaleString('it-IT') : 'data ignota';
       blocks.push(
         '[Una conversazione passata fra te e l\'utente, ripescata dall\'archivio.]\n'
@@ -3988,6 +4034,13 @@ function chatSearchesForPrompt(actions) {
     const usati = Array.isArray(out.cercatoCon) ? out.cercatoCon : [];
     const pagine = Array.isArray(out.pagine) ? out.pagine : [];
     const cambiTrovati = Array.isArray(out.cambi) ? out.cambi : [];
+    const nascoste = Array.isArray(out.nascoste) ? out.nascoste : [];
+    // #1295 — le nascoste si nominano e basta: l'utente le ha tolte dalla vista, e si rimettono solo se lo chiede.
+    if (nascoste.length) {
+      const righe = nascoste.map((c) => `- [${c.id}] "${E.neutralizza(c.title || 'senza titolo', { unaRiga: true })}"${c.date ? ` · ${new Date(c.date).toLocaleDateString('it-IT')}` : ''}`);
+      blocks.push(`[${out.nascosteTutte ? `Tutte le ${nascoste.length} conversazioni che l'utente ha nascosto` : `Conversazioni che l'utente ha nascosto e che combaciano con "${cercato}"`}: non le leggi. Se è una di queste che cerca, diglielo e chiedigli se vuole rimetterla (RIMETTI_CHAT con l'id).]\n`
+        + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
+    }
     // #868 — le pagine visitate: titoli, indirizzi e riassunti li scrivono i siti, quindi in busta.
     if (pagine.length) {
       const righe = pagine.map((pg) => {
@@ -4011,7 +4064,7 @@ function chatSearchesForPrompt(actions) {
     if (cancellati) {
       blocks.push(`[${cancellati === 1 ? 'Un risultato' : `${cancellati} risultati`} della ricerca "${cercato}" ${cancellati === 1 ? 'è stato cancellato' : 'sono stati cancellati'} dall'utente: non ci sono più e non vanno citati.]`);
     }
-    if (!results.length && (pagine.length || cambiTrovati.length || cancellati)) continue;
+    if (!results.length && (pagine.length || cambiTrovati.length || nascoste.length || cancellati)) continue;
     if (!results.length) {
       // Zero risultati non vuol dire «quella conversazione non c'è»: vuol dire
       // che nessuna chat contiene tutte quelle parole. Chi legge deve saperlo,
@@ -4555,6 +4608,16 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? 'Più righe della memoria corrispondono: non ne ho corretta nessuna. Copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.'
       : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa SALVA_LEZIONE.';
   }
+  if ((type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') && res.output && !res.needsConfirm) {
+    const o = res.output;
+    if (o.giaInVista) return 'Quella conversazione non è nascosta: è già nel filo. Niente da rimettere.';
+    if (o.trovata === false) return 'Nessuna conversazione con quell\'id. Se serve rifai CERCA_CHAT e usa un id preso da lì, mai inventato.';
+    const titolo = nomiSalvati([action._titolo || 'senza titolo']);
+    if (o.cancellata) return `Cancellata per sempre: non c'è più nel filo né sul computer.\n${titolo}`;
+    if (o.nascosta) return `Nascosta: esce dalla home e da quello che ricordi, ma resta salvata. L'utente la rimette cercandola nel filo della home o chiedendotelo (RIMETTI_CHAT).${action._corrente ? ' Era la conversazione di adesso: da qui in poi se ne apre una nuova.' : ''}\n${titolo}`;
+    if (o.rimessa) return `Rimessa nel filo, al suo posto nel tempo. Ora si rilegge con CERCA_CHAT e l'id ${action.id}.\n${titolo}`;
+    return 'Conversazione NON toccata.';
+  }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length
       ? (res.output.perSempre ? `Cancellate per sempre:\n${nomiSalvati(res.output.dimenticate)}`
@@ -4710,15 +4773,12 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // F4 — invia un feedback autonomo in background se la risposta segnala un gap
 // di capacità o una lamentela. Non blocca mai il flusso della chat.
 // Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
-// Undo: manda un toast con azione "Annulla" che cancella il feedback appena creato.
+// Parte quando si chiude il suo avviso: «Annulla» la ferma prima (autoFeedbackAttesa.js, #784.6).
 //
 // `proposed`: in questo turno Filo ha già messo in chat una segnalazione da
 // confermare (#360). In quel caso NON mandiamo anche quella anonima: sarebbero
 // due segnalazioni per lo stesso buco, e quella che l'utente autorizza è più
 // utile (dice cosa aveva chiesto) di quella generica.
-//
-// «Annulla» ignora solo gli id partiti da qui: quelli della bacheca li legge chiunque (#784.3).
-const autoFeedbackAnnullabili = new Set();
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
   try {
     if (proposed) return;
@@ -4757,30 +4817,19 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
     };
-    const result = await (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
-      .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
-
-    // In coda non c'è ancora un documento da annullare.
-    if (!result || !result.id || result.queued) return;
-    const feedbackId = result.id;
-    autoFeedbackAnnullabili.add(String(feedbackId));
-
-    // Toast non bloccante con undo: l'utente può annullare entro la durata del toast.
+    const spedisci = () => (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce));
+    const Attesa = require('./autoFeedbackAttesa');
     const win = winOf(sender);
-    if (win) {
-      try {
-        win.webContents.send('shell:toast', {
-          text: 'L\'ho segnalato a chi sviluppa Filo',
-          opts: {
-            durationSec: 8,
-            actions: [{
-              label: 'Annulla',
-              // Azione dichiarativa: un canale che la shell interpreta come «cancella feedback».
-              cancelAutoFeedback: feedbackId,
-            }],
-          },
-        });
-      } catch (_) {}
+    const biglietto = Attesa.trattieni(spedisci, win);
+    try {
+      win.webContents.send('shell:toast', {
+        text: 'L\'ho segnalato a chi sviluppa Filo',
+        // La shell traduce `cancelAutoFeedback`: Annulla la ferma, la chiusura dell'avviso la fa partire.
+        opts: { durationSec: 8, actions: [{ label: 'Annulla', cancelAutoFeedback: biglietto }] },
+      });
+    } catch (_) {
+      // Nessun avviso a schermo: nessuno può dire no.
+      Attesa.parti(biglietto);
     }
   } catch (e) {
     console.warn('[F4] maybeAutoFeedback errore:', e?.message || e);
@@ -5593,10 +5642,15 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         lettura: (a) => !!a && !a._argsError && globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type),
       });
       if (partite.fermato) { fermato = true; break; }
+      // Un comando secco riuscito o fermo sulla conferma parla da sé (#1130): niente secondo giro. Solo al primo giro con
+      // azioni: dopo una lettura il modello ha ancora da dire cosa ha trovato. L'intervista finisce ogni turno con una battuta.
+      // Un seguito già scritto (#1296) va letto al passo dopo, insieme all'esito: il turno resta uno.
+      const chiude = passi === 1 && !onbActive && !turno.seguiti.length
+        && GiroAzioni.chiudeIlTurno(results, { testo: text, daLeggere: (x) => !!observationsForPrompt([x.rendered]) });
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
-      // Quello di un giro di soli bottoni invece resta nella bolla.
-      const diRisposta = !!text.trim() && giroDiSoliBottoni(results);
+      // Quello di un giro di soli bottoni, o dell'ultimo, invece resta nella bolla.
+      const diRisposta = !!text.trim() && (chiude || giroDiSoliBottoni(results));
       const fraLeNote = !!text.trim() && !diRisposta;
       if (diRisposta) {
         risposta.push(text.trim());
@@ -5608,6 +5662,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       push('filo:action', { kind: 'round', text, ...(diRisposta ? { risposta: true } : {}) });
       textReply = diRisposta ? '' : text;
       reasoningDetails = r.reasoningDetails || [];
+      if (chiude) {
+        exhausted = false;
+        interrotta = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) ? r.finishReason : false;
+        break;
+      }
       if (legacy) {
         // Formato vecchio: si prosegue solo se un esito deve tornare e niente attende conferma.
         const obs = observationsForPrompt(roundRendered);
@@ -6268,12 +6327,13 @@ const handlerCtx = {
   dimenticaChat,
   portaAllaChat,
   affidaChat,
+  nascondiChat,
+  cancellaChatPerSempre,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
   claimOnboardingResume,
   releaseOnboardingResume,
-  autoFeedbackAnnullabili,
 };
 
 require('./handlers/nav')(on, handlerCtx);
@@ -6498,6 +6558,8 @@ async function summarizeTab(title, content) {
 // è di più.
 async function appendToChatArchive(chatId, turn, meta) {
   if (!chatId || !FiloChats) return null;
+  // Cancellata per sempre mentre il turno era in corso: la risposta non la fa rinascere con la stessa targa.
+  if (chatCancellate.has(String(chatId))) return null;
   try { return await FiloChats.append(chatId, turn, meta); }
   catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); return null; }
 }
@@ -6542,6 +6604,34 @@ function dimenticaChat(chatId) {
   if (!chatId) return;
   proprietariDiChat.delete(chatId);
   codeDiChiusura.delete(chatId);
+}
+
+// Le chat cancellate per sempre in questa sessione: un turno ancora in corso non ci riscrive dentro.
+const chatCancellate = new Set();
+async function cancellaChatPerSempre(id) {
+  if (!id || !FiloChats) return false;
+  id = String(id);
+  const c = await FiloChats.get(id);
+  if (!c) return false;
+  chatCancellate.add(id);
+  await FiloChats.remove(id);
+  dimenticaChat(id);
+  try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: id }); } catch (_) {}
+  return true;
+}
+
+// #1295 — nascondere si disfa: la chat resta nel filo, esce dalla home e da ciò che Filo ha davanti. Una chat ancora
+// in corso si chiude, così la scheda che la stava facendo apre una conversazione nuova al messaggio dopo.
+async function nascondiChat(id, nascosta = true) {
+  const prima = id ? await FiloChats.get(String(id)) : null;
+  if (!prima) return null;
+  const chat = await FiloChats.nascondi(prima.id, nascosta);
+  if (nascosta) {
+    if (!prima.closedAt && prima.messages.length) closeAndTriageChat(prima.id, { fine: true }).catch(() => {});
+    else dimenticaChat(prima.id);
+  }
+  try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, ...(nascosta ? { nascosta: prima.id } : { rimessa: prima.id }) }); } catch (_) {}
+  return chat;
 }
 
 // Una conversazione ancora in corso VIVE in una scheda. Chi la clicca in

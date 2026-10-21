@@ -112,6 +112,7 @@
     // Lo stesso verdetto mentre si sceglie il modello (Opzioni, «Detta» dal tasto destro). %s = modello, funzione, host.
     audio_host_fn_tts: 'la lettura ad alta voce',
     audio_host_fn_stt: 'la dettatura',
+    audio_host_warn_crediti: 'Con «%s» %s non parte coi crediti di Filo: per usarlo metti una tua chiave OpenRouter nella pagina Crediti.',
     audio_host_warn_excluded: 'Con «%s» %s non parte: lo serve solo %s, che Filo esclude.',
     audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
     audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',
@@ -810,11 +811,11 @@
     security_export_fail: 'Esportazione non riuscita',
     security_import_title: 'Importa dati Filo',
     security_import_btn: 'Importa dati (.zip)',
+    // Non promette quello che la fusione non mantiene: il dettaglio lo dice la conferma, col file davanti (#1256).
     security_import_desc:
       'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, chat con ' +
-      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni. ' +
-      'Quello che hai già non viene ' +
-      'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni, ' +
+      'unendoli a quello che hai. Prima di importare Filo ti dice cosa entra e cosa cambia.',
     security_visite_title: 'Pagine visitate',
     security_visite_desc: 'Filo ricorda le pagine che apri nelle schede, sul tuo computer. Quelle aperte in incognito no.',
     security_visite_ora: 'Cancella l’ultima ora',
@@ -832,21 +833,39 @@
     security_import_confirm_text:
       'Dal file%2:\n"%1"\n%3 e %4%5.\n\n' +
       '%6le liste (chat, pagine visitate, pagine salvate, ' +
-      'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
+      'cronologia, appunti, download) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
-      'quello del backup. Le impostazioni del backup diventano attive subito. ' +
+      'quello del backup. Le impostazioni del backup diventano attive subito, ma il ' +
+      'limite di spesa mensile non si allarga e resta il più stretto dei due. ' +
       'Della spesa resta, mese per mese, la più alta fra adesso e il backup. ' +
       'I crediti e le schede aperte restano quelli di adesso.',
     // Righe in fondo alla conferma, solo quando servono. %1 = numero
     security_import_images_lost: 'Immagini che non si leggono: %1. Al loro posto non ci sarà niente.',
     security_import_filo_lost: 'Le chat e le pagine visitate del backup non si leggono.',
+    security_import_voci_perse: 'File dentro l’archivio che non si leggono: %1. Quello che contengono non arriva.',
     // %1 = quante restano fuori, %2 = il tetto
     security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
     security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_appunti_out: 'Appunti copiati che non entrano: %1. L’elenco ne tiene %2, i più recenti.',
+    security_import_appunti_out_mine: 'Fra questi, appunti che hai adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_download_out: 'Download che non entrano nell’elenco: %1. L’elenco ne tiene %2, i più recenti.',
+    security_import_download_out_mine: 'Fra questi, download che hai adesso nell’elenco: %1. Escono dall’elenco, ma i file restano sul computer.',
+    // %1 = il limite di adesso, %2 = quello del backup, %3 = il bottone che lo mette
+    security_import_tetto_backup: 'Il limite di spesa mensile resta %1. Nel backup era %2. Per usare quello, scegli «%3».',
+    security_import_tetto_senza: 'Il limite di spesa mensile resta %1. Nel backup non c’era un limite. Per toglierlo, scegli «%3».',
+    // %1 = il limite di adesso, %2 = quello del backup, più stretto, che entra
+    security_import_tetto_sceso: 'Il limite di spesa mensile scende da %1 a %2, quello del backup.',
+    security_import_tetto_sceso_senza: 'Il limite di spesa mensile diventa %2, quello del backup: adesso non hai un limite.',
+    security_import_tetto_btn: 'Importa col limite del backup',
+    security_import_tetto_btn_senza: 'Importa e togli il limite',
     security_import_senza_chiavi: 'Le chiavi API non sono nell’archivio. Quelle salvate qui restano come sono.',
     security_import_proxy_senza_credenziali: 'Il proxy arriva senza utente e password: per usarlo, scrivi di nuovo a Filo il suo indirizzo intero.',
     security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
-    security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
+    // %1 = "le pagine salvate più vecchie", "gli appunti copiati più vecchi"… già uniti
+    security_import_escono_mie: 'Di ciò che hai ora escono solo %1, coi numeri qui sotto: ',
+    security_import_escono_pagine: 'le pagine salvate più vecchie',
+    security_import_escono_appunti: 'gli appunti copiati più vecchi',
+    security_import_escono_download: 'le voci più vecchie dell’elenco dei download',
     security_import_confirm_ok: 'Importa',
     security_import_done: 'Dati importati',
     security_import_invalid: 'Non è un archivio esportato da Filo',
@@ -922,22 +941,24 @@
     history_no_results: 'Nessun risultato per la ricerca.',
     history_no_results_filter: 'Nessuna interazione per il filtro selezionato.',
 
-    spell_correct: 'Correggi',
+    // Il correttore (#1446)
     spell_add_dict: 'Aggiungi al dizionario',
     spell_autocorrect: 'Correggi automaticamente',
     spell_manage: 'Gestisci correttore',
-    spell_resolve: 'Risolvi',
-    spell_semantic_issue: 'Possibile errore',
-    spell_loading: 'Cerco una correzione…',
-    spell_no_suggestion: 'Nessuna correzione disponibile.',
-    spell_action_semantic_label: 'Correttore contestuale (zigzag blu)',
-    spell_action_word_label: 'Suggerimento ortografico (zigzag rosso, on demand)',
-    spell_feature_label: 'Correttore AI (zigzag blu per errori contestuali)',
-    spell_action_coerenza_label: 'Coerenza col contesto (puntini ocra)',
-    spell_switch_blu: 'Errori di lingua (zigzag blu)',
-    spell_switch_blu_desc: 'Parole giuste nel posto sbagliato, grammatica, ripetizioni.',
-    spell_switch_ocra: 'Coerenza col contesto (puntini ocra)',
-    spell_switch_ocra_desc: 'Giorni, date, nomi e numeri che non tornano con la pagina, frasi che si leggono in due modi.',
+    spell_action_semantic_label: 'Errori del correttore (controllo rapido)',
+    spell_action_coerenza_label: 'Suggerimenti del correttore (controllo ragionato)',
+    spell_switch_errori: 'Errori',
+    spell_switch_errori_desc: 'Quello che Filo sa sbagliato: parole che non esistono, una parola al posto di un\'altra, grammatica, fatti sbagliati. Spento, sparisce anche la sottolineatura del browser.',
+    spell_switch_suggerimenti: 'Suggerimenti',
+    spell_switch_suggerimenti_desc: 'Quello che decidi tu: frasi poco chiare, date e giorni che non tornano, cose diverse da quelle già dette nella pagina.',
+    spell_ripetuta: '«%s» ripetuto',
+    spell_fisso: 'Si scrive «%s».',
+    spell_perche_dizionario: 'non è nel dizionario',
+    spell_perche_chiesta: 'chiesta col tasto destro',
+    spell_errore_forse: 'Il dizionario non conosce questa parola.',
+    spell_errore_generico: 'Da correggere.',
+    spell_togli: 'Togli «%s»',
+    spell_correggi_tutti: 'Correggi tutti gli errori (%s)',
     spell_ocra_ignora: 'Ignora',
     spell_ocra_prima: 'prima: «%s»',
     spell_ocra_controlla: 'Controlla qui',

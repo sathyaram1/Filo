@@ -19,6 +19,8 @@ scrivi l'elenco dei test rossi dopo il rebase.
 
 <!-- includi: _immagini.md -->
 
+<!-- includi: _cornice-feedback.md -->
+
 1. `git fetch origin main && git rebase origin/main`. In ogni conflitto tieni
    **tutte e due le intenzioni**: quella del lavoro e quella arrivata su
    `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
@@ -47,7 +49,7 @@ scrivi l'elenco dei test rossi dopo il rebase.
 ## Consegna
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--segnala <file.md>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--domanda <file.json>]
 ```
 
 Frase e riga di changelog del primo passaggio restano valide: cambiale solo se

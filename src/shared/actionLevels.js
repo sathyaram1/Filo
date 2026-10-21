@@ -710,6 +710,40 @@
       },
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
+    // #1295 — «cancella questa chat» la nasconde: esce dalla home e da ciò che Filo ha davanti, e si rimette (costo 1,
+    // decisione dell'owner). Il «per sempre» butta il testo: il costo più alto del registro, e vuole la parola «conferma»
+    // a ogni livello (`parola`) finché il registro non ha un costo suo per questo (#1050). La chat la trova il main.
+    TOGLI_CHAT: {
+      costo: (a) => (a && a.per_sempre === true ? 3 : 1),
+      campo: null,
+      parola: (a) => !!(a && a.per_sempre === true),
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const quale = a && a._corrente ? 'questa conversazione' : 'la conversazione';
+        if (a && a.per_sempre === true) {
+          return [`Cancellare per sempre ${quale} `, cit(t || 'senza titolo'),
+            '.\nTutti i suoi messaggi spariscono dal filo e dal computer, e Filo non la ritrova più.'];
+        }
+        return [`Nascondere ${quale} `, cit(t || 'senza titolo'),
+          '.\nEsce dalla home e da quello che Filo ricorda; la rimetti cercandola nel filo o chiedendolo a Filo.'];
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (o.trovata === false) return 'Conversazione non trovata';
+        return `${a && a.per_sempre === true ? 'Cancellata per sempre' : 'Nascosta'} la conversazione «${t || 'senza titolo'}»`;
+      },
+    },
+    RIMETTI_CHAT: {
+      costo: 1,
+      campo: null,
+      describe: (a) => ['Rimettere nel filo la conversazione ', cit(String((a && a._titolo) || 'senza titolo').replace(/\s+/g, ' ').trim().slice(0, 80))],
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        if (o.trovata === false) return 'Conversazione nascosta non trovata';
+        return `Rimessa nel filo la conversazione «${String((a && a._titolo) || 'senza titolo').replace(/\s+/g, ' ').trim().slice(0, 80)}»`;
+      },
+    },
     CORREGGI_MEMORIA: {
       // Cambia una riga che entra in ogni prompt, come una lezione (#872): il popup mostra prima e dopo. La riga la
       // trova il main (`_righe`); nessuna, più d'una o una correzione che il tetto rifiuta → 1, il dispatch lo dice.
@@ -1163,6 +1197,40 @@
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
+  // Azioni secche che, riuscite, parlano da sé (#1130): un giro fatto solo di loro chiude il turno senza richiamare il
+  // modello. Per ognuna, quando l'esito è riuscito e non lascia niente da dire: un tetto toccato, un costo o un avviso li
+  // dice il modello, e lì il giro riparte.
+  const fatta = (r) => r.executed === true;
+  const senza = (...campi) => (r) => fatta(r) && !campi.some((c) => r.output && r.output[c]);
+  const accesaOSpenta = (r) => fatta(r) && !!r.output && typeof r.output.acceso === 'boolean' && !Array.isArray(r.output.elenco);
+  const TERMINALI = Object.freeze({
+    NAVIGA: fatta,
+    TIMER: fatta,
+    SVEGLIA: fatta,
+    CANCELLA_SVEGLIA: fatta,
+    MODIFICA_SVEGLIA: fatta,
+    ZOOM_PAGINA: senza('limitato'),
+    VOLUME: senza('limitato'),
+    WIFI: accesaOSpenta,
+    BLUETOOTH: accesaOSpenta,
+    IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
+    IMPOSTA_ESTETICA: fatta,
+    COMANDO_FINESTRA: senza('already'),
+    TIENI_APERTA: fatta,
+    NON_TENERE_APERTA: fatta,
+    STILE_PAGINA: fatta,
+    RIPRISTINA_STILE_PAGINA: fatta,
+    SALVA_APPUNTO: fatta,
+    ANNULLA_CAMBIO: (r) => fatta(r) && !(r.output && Array.isArray(r.output.saltati) && r.output.saltati.length),
+    APRI_FILE: fatta,
+    // Il bottone dell'evento lo aziona l'utente: riuscita vuol dire proposto.
+    EVENTO_CALENDARIO: (r) => r.kept === true && !!(r.output && r.output.proposta),
+  });
+  const parlaDaSe = (type, esito) => {
+    const t = String(type || '').toUpperCase();
+    return !!esito && Object.prototype.hasOwnProperty.call(TERMINALI, t) && TERMINALI[t](esito);
+  };
+
   function fonteDi(action) {
     const entry = voce(action);
     const out = action && action._output;
@@ -1189,6 +1257,9 @@
     }
     let difesa = false;
     try { difesa = !!valore(entry.difesa, action, ctx); } catch (_) { difesa = true; }
+    // Un'azione che vuole la parola «conferma» a ogni livello, senza abbassare una difesa (#1295).
+    let parola = false;
+    try { parola = !!valore(entry.parola, action, ctx); } catch (_) { parola = true; }
     let dove = '';
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
     let dentroPerimetro = true;
@@ -1196,7 +1267,7 @@
     // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
     let perchePerimetro = '';
     try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro, perchePerimetro };
+    return { costo, campo: campoFor(action), elenco, segreto, difesa, parola, dove, dentroPerimetro, perchePerimetro };
   }
 
   const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || p.citazione != null);
@@ -1248,5 +1319,5 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

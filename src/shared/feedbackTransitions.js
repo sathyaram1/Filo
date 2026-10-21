@@ -68,6 +68,9 @@
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
       archived: ['owner'],   // un doppione, o una cosa che non si farà più
+      // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
+      attack:   ['routine'],
+      spam:     ['routine'],
       // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
       // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
       // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
@@ -81,11 +84,15 @@
       // Alla terza volta va in `design`.
       todo:                ['routine'],
       archived:            ['owner'],
+      attack:              ['routine'],
+      spam:                ['routine'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
       design:            ['routine'], // fail cap raggiunto → statusReason loop
       archived:          ['owner'],
+      attack:            ['routine'],
+      spam:              ['routine'],
     },
     revision_security: {
       done:     ['routine'], // PASS secaudit + merge-gate fonde su main
@@ -98,6 +105,8 @@
       // sul contenuto nuovo. Senza questa riga il giro di riallineamento
       // moriva alla consegna: la macchina rifiutava il rientro.
       revision_capability: ['routine'],
+      attack:              ['routine'],
+      spam:                ['routine'],
     },
     done: {
       archived: ['owner'],  // verifica umana ok

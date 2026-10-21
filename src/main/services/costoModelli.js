@@ -24,6 +24,7 @@ async function scarica() {
   // Senza la lista principale (quella dei modelli di testo) il listino non c'è: le altre da sole sarebbero un buco.
   if (liste[0].status !== 'fulfilled') throw liste[0].reason;
   const voci = liste.flatMap((l) => (l.status === 'fulfilled' ? l.value : []));
+  try { globalThis.SN_CONST.registraCatalogoPesi(voci); } catch (_) {}
   return { listino: S.listinoDaCatalogo(voci), finestre: finestreDaCatalogo(voci) };
 }
 

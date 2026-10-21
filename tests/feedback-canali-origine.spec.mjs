@@ -79,8 +79,10 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       // Iscriversi al giro è farsi mandare i feedback dell'owner a ogni
       // cambiamento: la porta più golosa di tutte per un sito visitato.
       giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
-      // L'«Annulla» del toast della segnalazione automatica: scrive `ignored` col token di chi è dentro (#784.3).
+      // L'avviso della segnalazione automatica: Annulla scrive `ignored` col token di chi è dentro (#784.3), la
+      // chiusura la fa partire (#784.6).
       annullaSegnalazioneAutomatica: { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-uno' },
+      partenzaSegnalazioneAutomatica: { type: MSG.AUTO_FEEDBACK_PARTI, id: 'fb-uno' },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {
@@ -132,7 +134,7 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       continue;
     }
     // L'annullo lo usa chiunque abbia visto il toast, ma solo per la segnalazione partita da qui: «fb-uno» no.
-    if (porta === 'annullaSegnalazioneAutomatica') {
+    if (porta === 'annullaSegnalazioneAutomatica' || porta === 'partenzaSegnalazioneAutomatica') {
       expect(String(r.code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
       expect(String(r.error || ''), `filo/${porta}`).toContain('partita da qui');
       continue;

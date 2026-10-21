@@ -64,6 +64,7 @@ async function configureModel(app) {
 }
 
 // Provider finto: `giri` è la lista delle risposte, una per giro del modello.
+// Un comando secco chiude il turno al primo giro (#1130): la frase va scritta insieme alle azioni.
 async function fakeProvider(app, giri, slot = '__fake') {
   // In `app.evaluate` il primo parametro è il modulo Electron: l'argomento
   // nostro arriva per secondo.
@@ -150,12 +151,12 @@ test('A2 — un byte nullo nell\'etichetta non arriva nel diario, e il colore ti
 
   await fakeProvider(app, [
     {
+      text: 'Fatto.',
       toolCalls: [
         { id: 'z1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"pa\\u0000sta"}' },
         { id: 'z2', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"accent","valore":"#3a7d44"}' },
       ],
     },
-    { text: 'Fatto.' },
   ], '__fakeA2');
 
   await page.locator('#input').fill('timer 2 minuti e accento verde');
@@ -225,7 +226,8 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
   await configureModel(app);
 
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":true}' }] },
+    // Col testo insieme a una conferma il modello riparte (#1130): la frase arriva dal giro che ha letto l'esito.
+    { text: 'Accendo il terminale.', toolCalls: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":true}' }] },
     { text: 'Ti chiedo conferma.' },
     { text: 'Sì, la modalità terminale è attiva.' },
   ], '__fakeC');
@@ -278,7 +280,11 @@ test('D — guasto a metà: al nuovo tentativo il modello sa cosa era già stato
   await configureModel(app);
 
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'd1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"Pasta"}' }] },
+    // Una lettura nel giro: un timer da solo chiuderebbe il turno senza il secondo giro che si guasta (#1130).
+    { toolCalls: [
+      { id: 'd1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"Pasta"}' },
+      { id: 'd2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+    ] },
     { errore: 'fetch failed' },
     { text: 'Il timer della pasta è già avviato.' },
   ], '__fakeD');
@@ -452,8 +458,7 @@ test('F3 — la spunta dopo un appunto salvato chiude la conversazione', async (
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"comprare il latte","contesto":"spesa"}' }] },
-    { text: 'Segnato.' },
+    { text: 'Segnato.', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"comprare il latte","contesto":"spesa"}' }] },
     { text: 'Di niente.' },
   ], '__fakeF3');
   await page.locator('#input').fill('ricordami di comprare il latte');
@@ -481,13 +486,13 @@ test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app,
 
   await fakeProvider(app, [
     {
+      text: 'Eccolo, aggiungilo col bottone.',
       toolCalls: [{
         id: 'g1',
         name: 'EVENTO_CALENDARIO',
         arguments: '{"data":"2026-09-24","ora":"15:00","titolo":"Riunione team","dettagli":"Sala 2","durata_min":30}',
       }],
     },
-    { text: 'Eccolo, aggiungilo col bottone.' },
   ], '__fakeG');
 
   await page.locator('#input').fill('segna la riunione di giovedì alle 15');
@@ -546,8 +551,7 @@ test('G2 — l\'evento senza ora si aggiunge come evento di tutto il giorno', as
   await app.evaluate(({ shell: sh }) => { sh.openPath = async () => ''; });
 
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'g2', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Compleanno di Anna","data":"2026-10-12"}' }] },
-    { text: 'Te lo segno.' },
+    { text: 'Te lo segno.', toolCalls: [{ id: 'g2', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Compleanno di Anna","data":"2026-10-12"}' }] },
   ], '__fakeG2');
   await page.locator('#input').fill('segnami il compleanno di Anna il 12 ottobre');
   await page.locator('#sendBtn').click();
@@ -622,7 +626,7 @@ test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ri
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'h1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: 'L\'utente non beve caffè' }) }] },
+    { text: 'Me lo ricordo, se mi dici di sì.', toolCalls: [{ id: 'h1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: 'L\'utente non beve caffè' }) }] },
     { text: 'Me lo ricordo, se mi dici di sì.' },
   ], '__fakeH');
 
@@ -692,7 +696,7 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }); });
   const cartella = `${process.env.FILO_USER_DATA || '/tmp'}/filo-diario-I-${Date.now()}`;
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'i2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir ${cartella}` }) }] },
+    { text: 'Creo la cartella.', toolCalls: [{ id: 'i2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir ${cartella}` }) }] },
     { text: 'Creo la cartella.' },
   ], '__fakeI2');
   await page.locator('#input').fill('crea la cartella');
@@ -787,8 +791,7 @@ test('L2 — l’evento aggiunto col bottone resta aggiunto anche nella chat ria
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
 
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'l3', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Cena con Anna","data":"2026-10-02","ora":"20:30"}' }] },
-    { text: 'Te lo segno.' },
+    { text: 'Te lo segno.', toolCalls: [{ id: 'l3', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Cena con Anna","data":"2026-10-02","ora":"20:30"}' }] },
   ], '__fakeL3');
   await page.locator('#input').fill('segnami la cena con Anna venerdì alle 20:30');
   await page.locator('#sendBtn').click();
@@ -817,12 +820,12 @@ test('M — due appuntamenti chiesti insieme restano due nel diario', async ({ a
 
   await fakeProvider(app, [
     {
+      text: 'Te li segno tutti e due.',
       toolCalls: [
         { id: 'm1', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Cena con Anna","data":"2026-10-02","ora":"20:30"}' },
         { id: 'm2', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Pranzo con Bruno","data":"2026-10-03","ora":"13:00"}' },
       ],
     },
-    { text: 'Te li segno tutti e due.' },
   ], '__fakeM');
   await page.locator('#input').fill('segnami la cena con Anna venerdì e il pranzo con Bruno sabato');
   await page.locator('#sendBtn').click();

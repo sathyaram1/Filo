@@ -38,12 +38,14 @@ async function modelloFinto(app, giri) {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__imp_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     globalThis.__imp_tool = [];
+    globalThis.__imp_esiti = {};
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
       const giro = g[Math.min(n, g.length - 1)];
       n += 1;
       const ultimo = [...messages].reverse().find((m) => m.role === 'tool');
       if (ultimo) globalThis.__imp_tool.push(String(ultimo.content || ''));
+      for (const m of messages) if (m.role === 'tool') globalThis.__imp_esiti[m.tool_call_id] = String(m.content || '');
       let text = giro.text || '';
       if (giro.rispondiDa) {
         const riga = String((ultimo && ultimo.content) || '').split('\n').find((r) => r.startsWith(`- ${giro.rispondiDa}:`));
@@ -60,6 +62,8 @@ async function modelloFinto(app, giri) {
   }, giri);
 }
 const ripristina = (app) => app.evaluate(() => { try { globalThis.__imp_restore?.(); } catch (_) {} });
+// Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme. Ferma sulla conferma, col testo il modello riparte.
+const impostaDicendo = (testo, ...arg) => ({ ...imposta(...arg), text: testo });
 const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
 const imposta = (chiave, valore, id = 'i1') => ({
   toolCalls: [{ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave, valore }) }],
@@ -79,7 +83,7 @@ test('A — «spegni il blocco della pubblicità»: conferma, interruttore spent
   const sec = await openTab('filo://security/security.html');
   await expect(sec.locator('#sec-adblock')).toBeChecked({ timeout: 8_000 });
 
-  await modelloFinto(app, [imposta('blocco_pubblicita', false), { text: 'Ti chiedo conferma.' }]);
+  await modelloFinto(app, [impostaDicendo('Ti chiedo conferma.', 'blocco_pubblicita', false), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'spegni il blocco della pubblicità');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
   // Il popup dice cosa cambia e cosa rischia; finché non c'è l'OK non cambia niente.
@@ -209,11 +213,15 @@ test('D — una voce avanzata delle Preferenze dalla chat: un valore del colore 
   const prefs = await openTab('filo://preferences/preferences.html');
   await expect(prefs.locator('#tabcol-saturazione_tab')).toBeVisible({ timeout: 8_000 });
 
-  await modelloFinto(app, [imposta('saturazione_tab', '0,4'), { text: 'Fatto.' }]);
+  // Una lettura nel giro rimanda l'esito al modello: l'impostazione da sola chiuderebbe il turno.
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }, ...imposta('saturazione_tab', '0,4').toolCalls] },
+    { text: 'Fatto.' },
+  ]);
   await scrivi(chat, 'abbassa la saturazione delle tab a 0,4');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => (await impostazioni(app)).tabColor.saturazione_tab, { timeout: 5_000 }).toBe(0.4);
-  const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
+  const esito = await app.evaluate(() => globalThis.__imp_esiti.i1);
   expect(esito).toMatch(/^Eseguita: Impostazione applicata: Colore delle tab, saturazione tab → 0,4\. .*«annulla»/);
   await prefs.bringToFront();
   await expect(prefs.locator('#tabcol-saturazione_tab')).toHaveValue('0.4', { timeout: 3_000 });
@@ -228,8 +236,7 @@ test('D — una voce avanzata delle Preferenze dalla chat: un valore del colore 
   // Il ↺ di un token, chiesto a parole: torna al valore di serie, e la riga della pagina lo mostra.
   await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ themeTokens: { accent: '#cc2200', radius: '9px' } }));
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'accent', valore: 'predefinito' }) }] },
-    { text: 'Rimesso.' },
+    { text: 'Rimesso.', toolCalls: [{ id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'accent', valore: 'predefinito' }) }] },
   ]);
   await scrivi(chat, 'rimetti il colore d\'accento di serie');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Rimesso.' })).toBeVisible({ timeout: 10_000 });
@@ -285,13 +292,13 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await configura(app);
   const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
 
-  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
+  await modelloFinto(app, [impostaDicendo('Bloccato a.it.', 'siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
   await scrivi(chat, 'blocca a.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
 
-  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
+  await modelloFinto(app, [impostaDicendo('Bloccato b.it.', 'siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
   await scrivi(chat, 'blocca b.it');
   await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);

@@ -123,8 +123,13 @@
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
-    'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
-    'featureFlags.spellcheckContext': { nome: 'controllo di coerenza col contesto', valore: ATTIVO, livello: 1 },
+    'featureFlags.spellcheck': { nome: 'errori del correttore', valore: ATTIVI, livello: 1 },
+    'featureFlags.spellcheckContext': { nome: 'suggerimenti del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.modelloErrori': { nome: 'controllo degli errori col modello', valore: ATTIVO, livello: 1 },
+    'correttore.ripetizioni': { nome: 'parole ripetute segnate dal correttore', valore: sino('segnate', 'non segnate'), livello: 1 },
+    'correttore.pausaRapidoMs': { nome: 'pausa prima del controllo degli errori', valore: millisecondi, livello: 1 },
+    'correttore.ogniRapidoMs': { nome: 'controllo degli errori mentre si scrive senza pause', valore: millisecondi, livello: 1 },
+    'correttore.pausaRagionatoMs': { nome: 'pausa prima del controllo dei suggerimenti', valore: millisecondi, livello: 1 },
     'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
@@ -630,7 +635,7 @@
   // (src/shared/chatArchive.js): «cambio tema scuro» trova il tema messo ieri come «tema scuro» (#868.1).
   function cercaPerChat(eventi, query, { max = 6 } = {}) {
     const CA = global.SN_CHAT_ARCHIVE;
-    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query)).length) return { cambi: [], termini: [], allargata: false };
+    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query), query).length) return { cambi: [], termini: [], allargata: false };
     const lista = Array.isArray(eventi) ? eventi : [];
     const candidati = [];
     for (let i = lista.length - 1; i >= 0; i--) {

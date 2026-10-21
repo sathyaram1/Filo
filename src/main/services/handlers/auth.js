@@ -1516,7 +1516,7 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
-    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
+    return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {

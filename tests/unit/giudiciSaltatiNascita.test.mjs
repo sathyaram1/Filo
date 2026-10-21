@@ -61,8 +61,8 @@ test('il segno senza la fiducia, o un valore sconosciuto, non vale; la prova del
   assert.equal(MR.classifyLegacyBlock(routine({ fiducia: undefined })).reason, 'unfiltered', 'il segno senza fiducia non lo toglie dal ri-giudizio');
 });
 
-// Chi risolve per una routine non apre lavoro locale: rimanda nei Ricevuti col motivo di --serve-locale.
-test('i tre ruoli di chi risolve dicono come rimandare un lavoro che si fa solo in locale', async () => {
+// Chi risolve per una routine non apre lavoro sul PC dell'owner: passa ai lavori server, o chiede la fiducia o un suo passo.
+test('i tre ruoli di chi risolve dicono cosa fare di un lavoro che dalla cloud non si fa', async () => {
   const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
   const { readFileSync } = await import('node:fs');
   const dir = join(__dirname, '..', '..', 'routines', 'roles');

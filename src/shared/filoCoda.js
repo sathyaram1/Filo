@@ -56,7 +56,19 @@
         altri.push({ k: 'app', key: `a:${c.id}`, chat: c.id, ts: vista.inizio, vista, _n: n++ });
         continue;
       }
-      c.messages.forEach((m, i) => { if (haContenuto(m) && Number.isFinite(ms(m.ts))) altri.push({ ...voceMessaggio(c, m, i, qui), _n: n++ }); });
+      // Una riga tardiva (l'esito arrivato a conversazione lasciata, #1295) sta subito dopo la sua chat, non sotto la
+      // conversazione dopo; `fine` è l'arrivo, così chi chiede le novità la riceve lo stesso.
+      let prima = NaN;
+      c.messages.forEach((m, i) => {
+        const t = ms(m.ts);
+        if (!Number.isFinite(t)) return;
+        const posto = m.tardiva && Number.isFinite(prima) && prima < t ? prima + 1 : t;
+        prima = posto;
+        if (!haContenuto(m)) return;
+        const v = voceMessaggio(c, m, i, qui);
+        if (posto !== t) { v.ts = new Date(posto).toISOString(); v.fine = m.ts; }
+        altri.push({ ...v, _n: n++ });
+      });
     }
     for (const e of Array.isArray(cambi) ? cambi : []) {
       if (!e || !e.id || VIE_COL_SEGNO.has(e.via) || !Number.isFinite(ms(e.ts))) continue;
@@ -189,13 +201,22 @@
   function termini(q) {
     return [...new Set(norma(q).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2))];
   }
-  const contiene = (testo, ts) => { const n = norma(testo); return ts.every((w) => n.includes(w)); };
+  // Nei passi allargati una parola corta vale dall'inizio di una parola: «iva» non trova «arrivano» (#1295).
+  const inizi = new Map();
+  function dove(n, w, aInizio) {
+    if (!aInizio || w.length > 3) return n.indexOf(w);
+    let re = inizi.get(w);
+    if (!re) { re = new RegExp(`(?:^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'u'); inizi.set(w, re); }
+    const m = re.exec(n);
+    return m ? m.index + m[0].length - w.length : -1;
+  }
+  const contiene = (testo, ts, aInizio) => { const n = norma(testo); return ts.every((w) => dove(n, w, aInizio) >= 0); };
 
-  function estratto(testo, ts, largo = 70) {
+  function estratto(testo, ts, largo = 70, aInizio = false) {
     const t = String(testo || '').replace(/\s+/g, ' ').trim();
     const n = norma(t);
     let at = -1;
-    for (const w of ts) { const i = n.indexOf(w); if (i >= 0 && (at < 0 || i < at)) at = i; }
+    for (const w of ts) { const i = dove(n, w, aInizio); if (i >= 0 && (at < 0 || i < at)) at = i; }
     if (at < 0 || t.length <= largo * 2) return t.length > largo * 2 ? `${t.slice(0, largo * 2)}…` : t;
     const da = Math.max(0, at - largo);
     const a = Math.min(t.length, at + largo);
@@ -205,7 +226,7 @@
   // Cerca nel filo senza passare dal modello: parole nei messaggi (anche delle altre app), nei titoli e negli indirizzi
   // delle pagine visitate, e nel contenuto delle schede chiuse (riassunto ed estratto che il loro archivio tiene).
   // Tutte le parole devono esserci; dal più recente.
-  function cerca({ chats = [], pagine = [], schede = [] } = {}, q, { max = 40 } = {}) {
+  function cerca({ chats = [], pagine = [], schede = [] } = {}, q, { max = 40, largo = false } = {}) {
     const ts = termini(q);
     if (!ts.length) return { messaggi: [], pagine: [], termini: [] };
     const messaggi = [];
@@ -213,9 +234,9 @@
       if (!c || !Array.isArray(c.messages)) continue;
       c.messages.forEach((m, i) => {
         const testo = String((m && m.text) || '');
-        if (!testo.trim() || !contiene(testo, ts)) return;
+        if (!testo.trim() || !contiene(testo, ts, largo)) return;
         messaggi.push({
-          k: 'msg', chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: estratto(testo, ts),
+          k: 'msg', chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: estratto(testo, ts, 70, largo),
           ...(eApp(c) ? { app: c.app } : {}),
         });
       });
@@ -223,23 +244,23 @@
     messaggi.sort((a, b) => (ms(b.ts) || 0) - (ms(a.ts) || 0));
     const perUrl = new Map();
     for (const p of Array.isArray(pagine) ? pagine : []) {
-      if (!p || !p.url || !contiene(`${p.titolo || ''} ${p.url}`, ts)) continue;
+      if (!p || !p.url || !contiene(`${p.titolo || ''} ${p.url}`, ts, largo)) continue;
       const prima = perUrl.get(p.url);
       if (!prima || ms(p.ts) > ms(prima.ts)) perUrl.set(p.url, { k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts, ...(p.archivio ? { archivio: p.archivio } : {}) });
     }
     for (const s of Array.isArray(schede) ? schede : []) {
       if (!s || !s.url) continue;
       const dentro = `${s.summary || ''} ${s.snippet || ''}`;
-      if (!contiene(`${s.title || ''} ${s.url} ${dentro}`, ts)) continue;
+      if (!contiene(`${s.title || ''} ${s.url} ${dentro}`, ts, largo)) continue;
       const ts0 = s.closedAt || s.openedAt || '';
       const prima = perUrl.get(s.url);
-      const nelContenuto = !contiene(`${s.title || ''} ${s.url}`, ts);
+      const nelContenuto = !contiene(`${s.title || ''} ${s.url}`, ts, largo);
       const voce = {
         k: 'pagina', url: s.url, titolo: String(s.title || ''), ts: prima && ms(prima.ts) > ms(ts0) ? prima.ts : ts0,
         ...(prima && prima.id ? { id: prima.id } : {}),
         // La scheda chiusa si riapre com'era (scroll, paese): la voce d'archivio la conosce il main (#872).
         ...(s.id ? { archivio: s.id } : {}),
-        ...(nelContenuto ? { estratto: estratto(dentro, ts) } : {}),
+        ...(nelContenuto ? { estratto: estratto(dentro, ts, 70, largo) } : {}),
       };
       if (!prima || nelContenuto) perUrl.set(s.url, voce);
       // Trovata per titolo fra le visite: si riapre lo stesso dalla voce d'archivio più recente.

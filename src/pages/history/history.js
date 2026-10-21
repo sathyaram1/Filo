@@ -23,11 +23,19 @@
     $('clear').textContent = I18n.t('history_clear');
     $('empty').textContent = I18n.t('history_empty');
 
+    await leggi();
+  }
+
+  async function leggi() {
     const r = await chrome.runtime.sendMessage({ type: MSG.GET_HISTORY });
     items = r?.items || [];
     buildFilterOptions();
     render();
   }
+  // Un backup importato in un'altra scheda porta voci sue: compaiono senza riaprire la pagina (#1256).
+  try {
+    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.type === MSG.DATI_IMPORTATI) leggi().catch(() => {}); });
+  } catch (_) {}
 
   // Il menu "filtra per tipo" elenca solo i tipi presenti, e per ETICHETTA, non
   // per codice: più codici interni portano lo stesso nome (#481), e la voce deve

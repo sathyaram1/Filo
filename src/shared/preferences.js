@@ -622,6 +622,19 @@
 
   // Un tempo della barra laterale in millisecondi ("300", "300 ms", "0,5 secondi"); fuori dai limiti è un
   // rifiuto col numero, mai un taglio. Un numero sotto 10 senza unità sono secondi: nessuno chiede 1 ms.
+  // I tempi del correttore (#1446): come quelli della barra, «mezzo secondo» o «800 ms»; fuori dai limiti si rifiuta col numero.
+  function msCorrettore(v, campo, etichetta) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 100)) n *= 1000;
+    n = Math.round(n);
+    const { min, max } = global.SN_CONST.CORRETTORE_TEMPI[campo];
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+    return { partial: { correttore: { [campo]: n } }, label: etichetta(cifre(n)) };
+  }
+
   function msBarra(v, campo, etichetta) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
@@ -1031,27 +1044,71 @@
     },
 
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → costo 1 ──
+    // Il correttore (#1446): «Errori» e «Suggerimenti», la parte del modello degli errori, le ripetizioni, i tempi.
     {
       scrive: ['featureFlags.spellcheck'],
-      aiuto: 'true | false (correttore AI della lingua: lo zigzag blu)',
+      aiuto: 'true | false (gli ERRORI del correttore: parole sbagliate, grammatica, fatti sbagliati, con l\'onda sotto; spento toglie anche la sottolineatura del browser)',
       costo: 1,
-      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione', 'zigzag blu'],
+      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione', 'errori', 'errori del correttore', 'segna errori', 'zigzag blu', 'sottolineatura rossa'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { featureFlags: { spellcheck: b } }, label: `Correttore ortografico → ${b ? 'attivo' : 'disattivato'}` };
+        return { partial: { featureFlags: { spellcheck: b } }, label: `Errori del correttore → ${b ? 'attivi' : 'spenti'}` };
       },
     },
     {
       scrive: ['featureFlags.spellcheckContext'],
-      aiuto: 'true | false (coerenza col contesto della pagina: i puntini ocra sotto giorni, date e nomi che non tornano)',
+      aiuto: 'true | false (i SUGGERIMENTI del correttore, che decide l\'utente: frasi poco chiare, date e giorni che non tornano, contraddizioni con la pagina, coi puntini sotto)',
       costo: 1,
-      keys: ['coerenza', 'controllo coerenza', 'controllo di coerenza', 'coerenza col contesto', 'puntini ocra', 'sottolineatura ocra', 'incoerenze', 'contraddizioni'],
+      keys: ['suggerimenti', 'suggerimenti del correttore', 'coerenza', 'controllo coerenza', 'controllo di coerenza', 'coerenza col contesto', 'puntini ocra', 'sottolineatura ocra', 'incoerenze', 'contraddizioni'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { featureFlags: { spellcheckContext: b } }, label: `Controllo di coerenza → ${b ? 'attivo' : 'disattivato'}` };
+        return { partial: { featureFlags: { spellcheckContext: b } }, label: `Suggerimenti del correttore → ${b ? 'attivi' : 'spenti'}` };
       },
+    },
+    {
+      scrive: ['correttore.modelloErrori'],
+      aiuto: 'true | false (un modello controlla gli errori del correttore; spento restano solo quelli che Filo trova da sé, sbiaditi, e non si spende)',
+      costo: 1,
+      keys: ['modello errori', 'controllo rapido', 'correttore col modello', 'correttore senza modello', 'correttore senza ai', 'modello del correttore'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { modelloErrori: b } }, label: `Controllo degli errori col modello → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    {
+      scrive: ['correttore.ripetizioni'],
+      aiuto: 'true | false (il correttore segna le parole ripetute per sbaglio, come «il il»)',
+      costo: 1,
+      keys: ['ripetizioni', 'parole ripetute', 'il il', 'segna ripetizioni'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { ripetizioni: b } }, label: `Parole ripetute nel correttore → ${b ? 'segnate' : 'non segnate'}` };
+      },
+    },
+    {
+      scrive: ['correttore.pausaRapidoMs'],
+      costo: 1,
+      aiuto: 'millisecondi 200-5000 (pausa nello scrivere prima del controllo degli errori)',
+      keys: ['pausa errori', 'attesa correttore', 'pausa del correttore', 'controllo rapido dopo'],
+      build(v) { return msCorrettore(v, 'pausaRapidoMs', (n) => `Controllo degli errori dopo ${n} ms di pausa`); },
+    },
+    {
+      scrive: ['correttore.ogniRapidoMs'],
+      costo: 1,
+      aiuto: 'millisecondi 1000-60000 (mentre si scrive senza pause, ogni quanto parte il controllo degli errori)',
+      keys: ['ogni quanto errori', 'controllo rapido ogni', 'frequenza correttore'],
+      build(v) { return msCorrettore(v, 'ogniRapidoMs', (n) => `Controllo degli errori al più ogni ${n} ms mentre scrivi`); },
+    },
+    {
+      scrive: ['correttore.pausaRagionatoMs'],
+      costo: 1,
+      aiuto: 'millisecondi 1000-30000 (pausa nello scrivere prima del controllo dei suggerimenti)',
+      keys: ['pausa suggerimenti', 'controllo ragionato dopo', 'attesa suggerimenti'],
+      build(v) { return msCorrettore(v, 'pausaRagionatoMs', (n) => `Controllo dei suggerimenti dopo ${n} ms di pausa`); },
     },
     {
       scrive: ['featureFlags.help'],

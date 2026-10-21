@@ -50,6 +50,7 @@ const {
   writeState,
   clearState,
   fixedPayload,
+  leggiOpzioniRegistrazione,
   fermaSenzaSegnalazione,
   fixedReplyText,
   FERMA_NOTE,
@@ -503,6 +504,16 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
   assert.equal(fixedPayload({ report: 'r', ferma: true, segnalazione: 's' }).stop, true);
   assert.ok(!('stop' in fixedPayload({ report: 'r' })), 'una consegna normale non porta il campo');
   assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
+});
+
+test('fixedPayload e le opzioni dei --record-*: la domanda (#1358) viaggia come oggetto, accanto alla segnalazione', () => {
+  const d = { titolo: 'Quale?', priorita: 'importante' };
+  assert.deepEqual(fixedPayload({ report: 'r', domanda: d }).domanda, d);
+  assert.ok(!('domanda' in fixedPayload({ report: 'r', domanda: 'percorso.json' })), 'un percorso non è una domanda');
+  const o = leggiOpzioniRegistrazione(['--record-fixed', 'id1', 'report lungo', '--domanda', 'd.json']);
+  assert.equal(o.error, '');
+  assert.equal(o.valori['--domanda'], 'd.json');
+  assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'id1', 'pass', '--domanda', 'd.json']).error, /--domanda non vale con --record-secaudit/);
 });
 
 test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {
@@ -1314,6 +1325,38 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   const app = buildPayload(bucket, serverCtx(bucket, { payload: {} }, 'DIFF'));
   assert.equal(app.diffServer, undefined);
   assert.equal(app.diffServerHead, undefined);
+});
+
+test('secaudit di un lavoro solo server: il diff dell’app vuoto non dice «nessuna modifica» accanto al diff del server (#1418)', () => {
+  const bucket = { role: 'secaudit', id: 's', num: '#1418', branch: 'worker/s' };
+  const base = { ref: 'origin/main', sha: '2'.repeat(40) };
+  const busta = (diff) => ({ payload: { diffServer: { diff, base: { ref: 'main di filo-security', sha: '1'.repeat(40) }, head: 'a'.repeat(40) } } });
+  const vuotoApp = (commitPropri) => ({ diff: '', base, head: 'b'.repeat(40), vuoto: { commitPropri } });
+  const testo = (fromServer, commitPropri) => buildPayload(bucket, serverCtx(bucket, fromServer, vuotoApp(commitPropri))).diffVuoto;
+  const server = busta('diff --git a/functions/index.js b/functions/index.js\n+una riga del server\n');
+  for (const commitPropri of [0, 2, null]) {
+    const t = testo(server, commitPropri);
+    assert.doesNotMatch(t, /non porta nessuna modifica|Il diff è vuoto davvero/, `«${t}»`);
+    assert.match(t, /vuoto solo lui/, `dice di quale diff parla: «${t}»`);
+    assert.match(t, /diff del server \(diffServerFile\)[^]*resta da giudicare intero/, `e che quello del server resta da giudicare: «${t}»`);
+    assert.match(t, /non fa passare il controllo/, `«${t}»`);
+  }
+  assert.match(testo(server, 2), /2 commit propri/, 'il perché del diff dell’app vuoto resta');
+  // Vuoti tutti e due, o lavoro dell'app: il testo di sempre.
+  for (const fromServer of [busta(''), null]) {
+    assert.equal(testo(fromServer, 0), 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.');
+    assert.equal(testo(fromServer, 2), 'Il diff è vuoto davvero: il ramo ha 2 commit propri, ma ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).');
+  }
+});
+
+test('secaudit.md: «il controllo passa» col diff vuoto vale solo senza un diff del server da giudicare, nella stessa frase (#1418)', () => {
+  // Un modello piccolo si ferma alla prima regola che lo autorizza: la condizione sta lì, non in un paragrafo più sotto.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const frasi = t.split(/(?<=\.)\s+/).filter((f) => /il controllo passa/i.test(f));
+  assert.ok(frasi.length, 'la regola del diff vuoto deve dire quando il controllo passa');
+  for (const f of frasi) assert.match(f, /Senza un `diffServerFile` con del contenuto[^]*il controllo passa/, `la frase lega il via libera all'assenza del diff del server: «${f}»`);
+  const lavoroServer = t.match(/\*\*Lavoro server\.\*\*[^]*?## Passi/);
+  assert.ok(lavoroServer && /anche quando quello dell'app è vuoto/.test(lavoroServer[0]), 'il paragrafo del server vale anche col diff dell’app vuoto');
 });
 
 test('cleanup STATE_DIR temporanea', () => {

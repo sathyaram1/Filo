@@ -112,6 +112,8 @@
     const code = String(err.code || '');
     if (err.name === 'AbortError' || code === 'ABORT_ERR') return null;
     if (MAI_PARTITE.has(code)) return null;
+    // Un modello che i crediti di Filo non pagano (#830) non è partito: conta solo la chiave propria che è stata rifiutata.
+    if (code === 'NO_ALLOWED_HOST' && err.reason === 'crediti') return err.chiaveRifiutata ? 'chiave' : null;
     // Il produttore che non risponde (#829) porta il codice del «nessun host», ma è un guasto del servizio: si conta per status.
     if (SENZA_HOST.has(code) && err.reason !== 'produttore') return 'nessun_host';
     const W = global.SN_WALLET;

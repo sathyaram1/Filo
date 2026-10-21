@@ -6,7 +6,7 @@ module.exports = function register(on, ctx) {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
-    saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
+    saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const { soloFilo: soloSuperficiDiFilo } = require('./origine');
   const { SN_CONST } = globalThis;
@@ -71,7 +71,8 @@ module.exports = function register(on, ctx) {
       // Il tetto e il taglio decidono se accanto alla frase ci va il tasto per le Preferenze (#1097.3).
       const tetto = Number(e && e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {};
       const taglio = e && e.code === 'RISPOSTA_TAGLIATA' ? { finishReason: e.finishReason || null } : {};
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio };
+      const crediti = e && e.reason === 'crediti' ? { reason: 'crediti' } : {};
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio, ...crediti };
     } finally {
       fineLavoro();
     }
@@ -416,16 +417,20 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_CHAT_DELETE, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    await FiloChats.remove(msg.id);
     // #525 — la conversazione cancellata può essere ancora a schermo in
     // un'altra scheda. Se nessuno glielo dice, quella scheda continua a
     // scrivere sulla stessa targa e la chat RINASCE: stessa targa, i messaggi
     // di prima persi, e di nuovo in Cronologia. L'utente aveva chiesto il
     // contrario. La scheda che la sta vivendo se ne libera e il messaggio dopo
     // apre una conversazione nuova, con una targa sua.
-    ctx.dimenticaChat(msg.id);
-    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: msg.id }); } catch (_) {}
+    await ctx.cancellaChatPerSempre(msg.id);
     return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  on(MSG.FILO_CHAT_NASCONDI, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const chat = await ctx.nascondiChat(msg && msg.id, !(msg && msg.nascosta === false));
+    return chat ? { ok: true, nascosta: !!chat.nascosta } : { ok: false, error: 'chat inesistente' };
   });
 
   // #525 — una riga che Filo ha scritto in chat senza passare da un modello
@@ -455,7 +460,7 @@ module.exports = function register(on, ctx) {
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
-      ...(guardate.length ? { guardate } : {}),
+      ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
     });
     return { ok: true };
   });
@@ -551,7 +556,9 @@ module.exports = function register(on, ctx) {
     if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
     return { ok: true, ...r };
   }));
-  on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
+  on(MSG.FILO_CERCA, soloFilo(async (msg) => (msg && msg.nascoste === 'tutte'
+    ? { ok: true, messaggi: [], pagine: [], nascoste: await Coda.nascoste() }
+    : { ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
   on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
     const url = msg && typeof msg.url === 'string' ? msg.url : '';
     const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
@@ -745,26 +752,9 @@ module.exports = function register(on, ctx) {
   })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
-  // F4 — «Annulla» del toast: scrive `ignored` con le credenziali di chi è dentro, quindi mai per un sito e solo per
-  // un auto-feedback partito da qui (#784.3). Senza la sessione dell'owner le regole rifiutano e resta `new`.
-  on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => {
-    const id = String(msg && msg.id || '').trim();
-    if (!id) return { ok: false, error: 'id mancante' };
-    if (!autoFeedbackAnnullabili.has(id)) return { ok: false, error: 'non è una segnalazione partita da qui' };
-    const FB = globalThis.SN_FEEDBACK;
-    if (!FB || typeof FB.updateStatus !== 'function') return { ok: false, error: 'FB non disponibile' };
-    // Tolto prima di scrivere: un doppio clic non scrive due volte; se la scrittura fallisce torna annullabile.
-    autoFeedbackAnnullabili.delete(id);
-    try {
-      const auth = require('../../auth/google-auth');
-      const idToken = await auth.getIdToken().catch(() => null);
-      await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
-      return { ok: true };
-    } catch (e) {
-      autoFeedbackAnnullabili.add(id);
-      console.warn('[F4] cancel auto-feedback fallito:', e?.message || e);
-      // Non è un errore fatale: il feedback rimane ma non interferisce col triage.
-      return { ok: false, error: e?.message || String(e) };
-    }
-  }));
+  // F4 — l'avviso della segnalazione automatica: mai da un sito, e solo per una partita da qui (#784.3, #784.6).
+  const AttesaAutoFeedback = require('../autoFeedbackAttesa');
+  on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => AttesaAutoFeedback.annulla(String(msg && msg.id || '').trim())));
+  on(MSG.AUTO_FEEDBACK_PARTI, soloSuperficiDiFilo(async (msg) => (AttesaAutoFeedback.parti(String(msg && msg.id || '').trim())
+    ? { ok: true } : { ok: false, error: 'non è una segnalazione partita da qui' })));
 };

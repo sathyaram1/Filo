@@ -32,8 +32,10 @@
     // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
     // all'origine filo://: una pagina web non deve poter aprire un file dialog
     // né riscrivere lo storage (comprese le chiavi API).
-    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
-    IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, vociPerse, pagineFuori, appuntiFuori, downloadFuori, tettoSpesa, token }
+    IMPORT_DATA_APPLY: 'import_data_apply',       // { token, tettoDelBackup } → { ok, added, updated, images }
+    // Segnale senza contenuto alle pagine filo:// a importazione finita: chi mostra una lista la rilegge (#1256).
+    DATI_IMPORTATI: 'dati_importati',
     // Solo dalla pagina Sicurezza (#850): Filo si chiude e al riavvio svuota la cartella dei dati.
     CANCELLA_TUTTI_I_DATI: 'cancella_tutti_i_dati',             // { parola: 'conferma', ancheIdentita } → { ok } | { ok:false, error }
     CANCELLA_TUTTI_I_DATI_STATO: 'cancella_tutti_i_dati_stato', // → { ok, identita, inCorso }
@@ -509,12 +511,16 @@
     // Broadcast main→content per un toast di sistema (es. esito differito di un invio).
     // Lo mostra solo la scheda in primo piano. { text, duration? }
     SHOW_TOAST: 'show_toast',                      // { text, duration? }
-    // F4 — Annulla un auto-feedback appena inviato (undo dal toast). Marca il
-    // feedback come `ignored` così non compare nel triage. { id } → { ok }
-    // Solo da una superficie di Filo, e solo per un id che questo Filo ha appena mandato (#784.3).
+    // F4 — l'avviso della segnalazione automatica (#784.6): la segnalazione aspetta che si chiuda. «Annulla» la ferma
+    // (partita, la ritira solo l'owner; `frase` dice perché no); chiuso senza Annulla, parte. Solo dalle superfici di
+    // Filo e solo per un `id` che questo Filo ha messo nell'avviso (#784.3). { id } → { ok, frase? }
     CANCEL_AUTO_FEEDBACK: 'cancel_auto_feedback', // { id }
-    // Modalità annotazione: il box vive in un content script e da lì non può oscurare la barra
-    // in alto (è della shell). Questo messaggio fa da ponte, così TUTTO Filo entra in penombra.
+    AUTO_FEEDBACK_PARTI: 'auto_feedback_parti',   // { id }
+    // Entra/esce dalla "modalità annotazione" del box feedback: il box vive in
+    // un content script sulla pagina (WebContentsView) e da lì non può oscurare
+    // la barra in alto di Filo (renderizzata dalla shell). Questo messaggio fa
+    // da ponte: il main lo inoltra alla shell, che mostra/nasconde un velo
+    // d'ombra sopra la sua barra così TUTTO Filo entra in penombra. → { ok }
     FEEDBACK_ANNOTATE: 'feedback_annotate',       // { on: boolean }
     // La barra in alto vive nella shell e ha una sua tela: i due disegni vanno sincronizzati.
     // CLEAR_DRAW cancella anche i tratti sulla barra; DRAW_STATE dice al box che lì c'è disegno.
@@ -861,6 +867,8 @@
     FILO_CHAT_CLOSE: 'filo_chat_close',
     // Cancellazione manuale di una chat, dopo la conferma. { id } → { ok, chats }
     FILO_CHAT_DELETE: 'filo_chat_delete',
+    // #1295 — nascondere una chat (si disfa) o rimetterla nel filo. { id, nascosta: bool } → { ok }
+    FILO_CHAT_NASCONDI: 'filo_chat_nascondi',
     // Ricerca per testo dentro tutte le chat. { query, kind?, limit? }
     // Risposta: { ok, chats } (voci d'elenco, con il frammento che combacia).
     FILO_CHATS_SEARCH: 'filo_chats_search',
@@ -870,6 +878,7 @@
     // quando l'hanno aperta. Con `cancellata: <id>` dice anche QUALE è stata
     // cancellata: la scheda che quella conversazione la sta ancora vivendo
     // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
+    // `nascosta: <id>` e `rimessa: <id>` (#1295): la home la toglie dalla vista o la rimette al suo posto.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
     // #866 — le pagine visitate che il filo ricorda, dalla pagina Sicurezza. Solo pagine filo://: è la cronologia
     // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).

@@ -292,16 +292,19 @@ test('in chat, quello che è già com\'è chiesto non chiede conferma: rete già
   });
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth spento', { timeout: 8_000 });
+  // Un acceso/spento riuscito chiude il turno da sé (#1130): una chiamata sola. Gli altri esiti tornano al modello.
   const casi = [
-    ['collegati a Casa', 'WIFI', { rete: 'Casa' }],
-    ['scollega le cuffie', 'BLUETOOTH', { dispositivo: 'Cuffie', collega: false }],
-    ['spegni il Bluetooth', 'BLUETOOTH', { acceso: false }],
+    ['collegati a Casa', 'WIFI', { rete: 'Casa' }, 2],
+    ['scollega le cuffie', 'BLUETOOTH', { dispositivo: 'Cuffie', collega: false }, 2],
+    ['spegni il Bluetooth', 'BLUETOOTH', { acceso: false }, 1],
   ];
-  for (const [i, [frase, nome, args]] of casi.entries()) {
+  for (const [i, [frase, nome, args, giri]] of casi.entries()) {
     await modelloFinto(app, [{ toolCalls: [{ id: `g${i}`, name: nome, arguments: JSON.stringify(args) }] }, { text: 'Era già così.' }]);
     await chiedi(page, frase);
-    // L'esito torna al modello senza che un popup lo fermi: non c'era niente che cadesse.
-    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBeGreaterThan(1);
+    // Il turno arriva in fondo senza che un popup lo fermi: non c'era niente che cadesse.
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBeGreaterThan(0);
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 8_000 });
+    expect((await chiamateAlModello(app)).length, frase).toBe(giri);
     await page.waitForTimeout(500);
     expect(await confirmText(page).catch(() => ''), frase).toBe('');
     await ripristina(app);

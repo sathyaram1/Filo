@@ -239,9 +239,14 @@ function creaFilo({ cartella } = {}) {
     return incog ? incognito : normale;
   }
 
+  // Una chat nascosta (#1295) non la vede nessuno che chiede «le chat»: solo chi la chiede (`nascoste`: true tutte, 'solo').
+  const quali = (opts) => {
+    const n = opts && opts.nascoste;
+    return n === 'solo' ? (c) => !!c.nascosta : (n ? () => true : (c) => !c.nascosta);
+  };
   async function chats(opts) {
     const v = await vista(opts);
-    return E().elencoChat(v.stato).map(E().copiaChat);
+    return E().elencoChat(v.stato).filter(quali(opts)).map(E().copiaChat);
   }
 
   async function chat(id, opts) {
@@ -257,7 +262,7 @@ function creaFilo({ cartella } = {}) {
     return {
       pos: v.stato.pos,
       qui: normale.dispositivo,
-      chats: E().elencoChat(v.stato).map((c) => E().copiaChat(c, { dispositivi: true })),
+      chats: E().elencoChat(v.stato).filter(quali(opts)).map((c) => E().copiaChat(c, { dispositivi: true })),
       pagine: E().pagineNelPeriodo(v.stato, { da: null, a: null }).map((p) => ({ ...p })),
     };
   }

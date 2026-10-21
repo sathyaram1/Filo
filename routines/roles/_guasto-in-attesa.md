@@ -17,8 +17,6 @@ per lui»:
       "azione": { "tipo": "riprendi", "feedbackId": "<payload.id>" } },
     { "testo": "Affidare la riparazione a un agente", "pro": "<cosa può riparare un agente col repo>", "contro": "<…>",
       "azione": { "tipo": "compito" } },
-    { "testo": "Farlo in locale", "pro": "<…>", "contro": "<…>",
-      "azione": { "tipo": "approva_locale", "feedbackId": "<payload.id>" } },
     { "testo": "Archiviare il feedback", "pro": "<…>", "contro": "<…>",
       "azione": { "tipo": "archivia", "feedbackId": "<payload.id>" } }
   ],
@@ -28,17 +26,18 @@ per lui»:
 }
 ```
 
-Le quattro strade sono un modello: tieni quelle che per questo guasto hanno un
+Le tre strade sono un modello: tieni quelle che per questo guasto hanno un
 pro vero. La riparazione (azione `compito`, SPEC-DOMANDE § 3.3: la domanda passa
 a un agente col repo) si toglie quando la causa sta fuori dal repo, come una
 credenziale o un'impostazione dell'owner. `consiglio.opzione` è l'indice di
 quella che sceglieresti.
 
-Poi il feedback aspetta l'owner col motivo `guasto`, non `locale`:
+Sul PC dell'owner non lavora nessuno: farlo «in locale» non è una strada da offrire. Poi il feedback aspetta
+l'owner col motivo `guasto`, non `locale`:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason guasto \
-  --notes "Guasto, non lavoro locale: <gruppo>. Domanda D-<n>. [cosa resta sul ramo]"
+  --notes "Guasto, non per regola: <gruppo>. Domanda D-<n>. [cosa resta sul ramo]"
 ```
 
 Se il server rifiuta questa consegna (exit 4), non insistere: il suo messaggio

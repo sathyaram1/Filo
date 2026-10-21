@@ -315,6 +315,15 @@
       chrome.runtime.openOptionsPage();
     });
 
+    // Un backup importato in un'altra scheda porta parole sue: compaiono senza riaprire la pagina (#1256).
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== window.SN_MSG.MSG.DATI_IMPORTATI) return;
+      chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT]).then((data) => {
+        renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
+        renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
+      }).catch(() => {});
+    });
+
     // Aggiornamento live se cambia da un altro tab.
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;

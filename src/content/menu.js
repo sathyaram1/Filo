@@ -86,11 +86,66 @@
 
   let activeMenu = null;
 
+  // Shift+F10 e il tasto Menu aprono il menu da tastiera (#1295): si usa con frecce, Tab, Home/Fine, Invio e la prima
+  // lettera, e chiuso il fuoco torna dov'era.
+  let tastoMenuAlle = 0;
+  try {
+    document.addEventListener('keydown', (e) => {
+      if (e.isTrusted && (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey))) tastoMenuAlle = Date.now();
+    }, true);
+  } catch (_) {}
+  const daTastiera = () => Date.now() - tastoMenuAlle < 1000;
+
+  const scrivibile = (n) => !!n && n.nodeType === 1 && (n.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(n.tagName));
+  function vociDaTastiera(root) {
+    return [...root.querySelectorAll('button')].filter((b) => !b.disabled && !b.classList.contains('sn-disabled')
+      && b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden');
+  }
+  const etichettaDi = (b) => String(((b.querySelector('.sn-menu-label') || b).textContent) || '').trim()
+    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Ritorna true se il tasto l'ha usato il menu. Solo i tasti veri: sul sito anche il suo script ne fabbrica.
+  function tastoNelMenu(e, m) {
+    if (!e.isTrusted) return false;
+    const root = m.root;
+    const attivo = document.activeElement;
+    // La cronologia degli appunti ha il suo campo e le sue frecce: lì il menu non si prende i tasti.
+    if (nelSub(attivo)) return false;
+    const dentro = root.contains(attivo);
+    if (dentro && scrivibile(attivo)) return false;
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const voci = vociDaTastiera(root);
+    if (!voci.length) return false;
+    const i = dentro ? voci.indexOf(attivo) : -1;
+    const vai = (j) => { const b = voci[(j + voci.length) % voci.length]; try { b.focus({ preventScroll: false }); } catch (_) { b.focus(); } };
+    const k = e.key;
+    if (k === 'ArrowDown') { vai(i < 0 ? 0 : i + 1); return true; }
+    if (k === 'ArrowUp') { vai(i < 0 ? voci.length - 1 : i - 1); return true; }
+    if (!dentro && !m.tastiera) return false;
+    if (k === 'Home') { vai(0); return true; }
+    if (k === 'End') { vai(voci.length - 1); return true; }
+    if (k === 'Tab') { vai(e.shiftKey ? (i < 0 ? voci.length - 1 : i - 1) : i + 1); return true; }
+    if (k.length === 1 && k.trim()) {
+      const c = k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      for (let n = 1; n <= voci.length; n++) {
+        const j = ((i < 0 ? -1 : i) + n) % voci.length;
+        if (etichettaDi(voci[j]).startsWith(c)) { vai(j); return true; }
+      }
+      return true;
+    }
+    return false;
+  }
+
   function close() {
     try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
     if (activeMenu) {
+      const torna = activeMenu.opener;
+      const eraDentro = activeMenu.root.contains(document.activeElement);
       activeMenu.root.remove();
+      if (eraDentro && torna && torna.isConnected && typeof torna.focus === 'function') {
+        try { torna.focus({ preventScroll: true }); } catch (_) {}
+      }
       staccaSub();
       document.removeEventListener('mousedown', activeMenu.onDocClick, true);
       document.removeEventListener('keydown', activeMenu.onKey, true);
@@ -263,6 +318,13 @@
   // onClick, items? }. 'inline' mostra contenuto dinamico, 'paste' apre la cronologia.
   function open({ x, y, items, keepOnScroll }) {
     close();
+    const tastiera = daTastiera();
+    tastoMenuAlle = 0;
+    const opener = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+    // Da tastiera il punto può mancare: il menu nasce sotto l'elemento che ha il fuoco.
+    if (tastiera && opener && !(x > 0 || y > 0)) {
+      try { const r = opener.getBoundingClientRect(); x = r.left + 8; y = r.bottom; } catch (_) {}
+    }
     const root = document.createElement('div');
     root.className = 'sn-menu';
     // UI di Filo dentro la pagina del sito, marcata alla nascita: la traduzione la salta senza
@@ -489,6 +551,7 @@
           try { it.onClick && it.onClick(); } catch (e) { console.error(e); }
         });
       }
+      if (it.primaDaTastiera) el.dataset.snPrima = '1';
       root.appendChild(el);
     }
 
@@ -534,7 +597,10 @@
       close();
     };
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape') {
+        if (activeMenu && activeMenu.root === root && tastoNelMenu(e, activeMenu)) { e.preventDefault(); e.stopPropagation(); }
+        return;
+      }
       close();
       // Quel tasto l'abbiamo usato noi: dichiararlo è ciò che tiene lo schermo
       // intero acceso mentre il menu si chiude (#514).
@@ -572,8 +638,13 @@
 
     activeMenu = {
       root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
-      subRoot: null, subHost: null, subAnchor: null, subMode: null,
+      subRoot: null, subHost: null, subAnchor: null, subMode: null, opener, tastiera,
     };
+    if (tastiera) {
+      const voci = vociDaTastiera(root);
+      const prima = voci.find((b) => b.dataset.snPrima === '1') || voci[0];
+      if (prima) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
+    }
   }
 
   // Il mousedown non deve spostare il fuoco dal campo al bottone: il punto in cui si
@@ -1529,6 +1600,7 @@
 
   global.SN_MENU = {
     _test: { cronologia: statoCronologia },
+    daTastiera,
     open,
     close,
     computeCap: Place.computeCap,

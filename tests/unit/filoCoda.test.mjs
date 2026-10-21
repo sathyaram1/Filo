@@ -149,6 +149,16 @@ test('cercare nel filo: tutte le parole, senza accenti né maiuscole, nei messag
   assert.equal(C.cerca({ chats }, ' ').messaggi.length, 0);
 });
 
+test('nei passi allargati una parola corta vale da inizio parola (#1295)', () => {
+  const chats = [
+    chat('z', [m('user', 'Parliamo di Zen e del respiro', fa(30))]),
+    chat('x', [m('user', 'Quando arrivano i pacchi?', fa(20))]),
+  ];
+  assert.deepEqual(C.cerca({ chats }, 'iva', { largo: true }).messaggi, []);
+  assert.equal(C.cerca({ chats }, 'iva').messaggi.length, 1, 'la ricerca stretta resta com’era');
+  assert.deepEqual(C.cerca({ chats }, 'zen', { largo: true }).messaggi.map((x) => x.chat), ['z']);
+});
+
 test('un messaggio di Filo che si fonde riscrive il suo di prima; senza il segno, o con l’utente in mezzo, restano due', () => {
   const st = E.nuovoStato();
   const scrivi = (msg, ts) => E.applica(st, E.crea(E.TIPI.MESSAGGIO, { chat: 'h', msg }, { ts, dispositivo: 'qui', autore: msg.role === 'user' ? 'utente' : 'filo' }));
@@ -253,4 +263,24 @@ test('una scheda chiusa ritrovata nel filo porta la sua voce d’archivio', () =
   // Una visita entrata dall'archivio (le schede di prima del filo) lo dice da sé.
   const migrata = C.cerca({ chats: [], pagine: [{ id: 'v9', ts: '2026-01-01T00:00:00.000Z', url: 'https://c.test/', titolo: 'Delfini', archivio: 'arch-9' }], schede: [] }, 'delfini');
   assert.equal(migrata.pagine[0].archivio, 'arch-9');
+});
+
+test('una riga tardiva si posa subito dopo la sua chat, e chi chiede le novità la riceve lo stesso (#1295)', () => {
+  const t = (s) => `2026-10-20T07:01:${s}.000Z`;
+  const kant = { id: 'k', messages: [
+    { role: 'user', text: 'Parlami di Kant', ts: t('01') },
+    { role: 'user', text: '/sleep 4', ts: t('02') },
+    { role: 'filo', text: 'ESITO', ts: t('10'), tardiva: true },
+    { role: 'filo', text: 'ESITO 2', ts: t('11'), tardiva: true },
+  ] };
+  const carbonara = { id: 'c', messages: [{ role: 'user', text: 'Carbonara?', ts: t('05') }, { role: 'filo', text: 'Così.', ts: t('06') }] };
+  const el = C.elementi({ chats: [kant, carbonara] });
+  assert.deepEqual(el.map((e) => e.text), ['Parlami di Kant', '/sleep 4', 'ESITO', 'ESITO 2', 'Carbonara?', 'Così.']);
+  const novita = C.pezzo(el, { dopo: t('06') }).elementi.map((e) => e.text);
+  assert.deepEqual(novita, ['ESITO', 'ESITO 2']);
+  // Senza il segno conta l'ora d'arrivo, come sempre.
+  const senza = C.elementi({ chats: [{ ...kant, messages: kant.messages.map(({ tardiva, ...m }) => m) }, carbonara] });
+  assert.deepEqual(senza.map((e) => e.text).slice(-2), ['ESITO', 'ESITO 2']);
+  assert.equal(CA.toStoredMessage({ role: 'filo', text: 'x', tardiva: true }).tardiva, true);
+  assert.equal(CA.toStoredMessage({ role: 'user', text: 'x', tardiva: true }).tardiva, undefined);
 });

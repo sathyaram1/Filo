@@ -17,6 +17,7 @@
 //   click-shell:SELECT   click su selettore CSS della shell (tab bar/barra ind.)
 //   click-view:SELECT    click su selettore CSS della view attiva
 //   eval-view:JS         esegui JS nella view attiva (per stati dietro flussi non scriptabili)
+//   main-file:PERCORSO   esegui nel processo main il corpo di funzione del file (un modello finto, una pagina servita)
 //   type:TESTO           digita testo nella view attiva
 //   key:KEY              premi un tasto (es. Enter, Control+b)
 //   wait:MS              attendi N ms
@@ -121,6 +122,15 @@ async function run() {
             } catch (e) { console.log('  eval-view err', e.message); }
           }
           await d.sleep(400); break;
+        }
+        case 'main-file': {
+          // Il corpo di una funzione asincrona, da un file: in un passo i punti e virgola dividerebbero il codice.
+          try {
+            const corpo = readFileSync(resolve(arg), 'utf8');
+            const r = await app.evaluate(new Function('electron', `return (async () => { ${corpo}\n })()`));
+            console.log('  main-file:', JSON.stringify(r));
+          } catch (e) { console.log('  main-file err', e.message); }
+          break;
         }
         case 'type': await d.typeText(app, shell, arg); break;
         case 'key': await d.pressKey(app, shell, arg); break;

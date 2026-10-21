@@ -92,7 +92,8 @@
   // Senza scheda pubblica solo il lavoro dell'owner e delle sessioni: il feedback di un utente approvato come lavoro
   // locale (#913) la tiene, è da lì che chi l'ha mandato vede la risoluzione. Gemello: isPrivateLocalWork sul server.
   function isPrivateLocalWork(fb) {
-    return isLocalOnly(fb) && !isLocalApproved(fb);
+    // Il segno messo da una routine (#1358, il lavoro passato ai lavori server) non toglie la scheda a chi l'aveva.
+    return isLocalOnly(fb) && !isLocalApproved(fb) && String(fb.localOnly.by || '') !== 'routine';
   }
   // Un utente approvato (#913) vede la risoluzione con la sola frase per lui: la chiusura locale non la porta, la scrive la sessione.
   function fraseAttesa(fb) {
@@ -372,6 +373,7 @@
   function classifyBlock(fb) {
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
+    if (aspettaDomanda(fb)) return null;
     if (status === 'aligned') return worstVerdictBlock(fb);
     if (inAttesaOrigine(fb)) return null;
     const info = fs.STATUSES[status];
@@ -511,6 +513,8 @@
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
+    fidato: 'chiede di renderlo fidato: il lavoro tocca il server',
+    worker: 'segnalato da chi ci lavorava',
     attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
     guasto: 'fermo per un guasto',
@@ -526,6 +530,8 @@
   // giudice ha segnalato un rischio NON lo è: non deve finire nell'approvazione in blocco.
   function isAligned(fb) {
     if (normalizeStatus(fb).status !== 'aligned') return false;
+    // Con la domanda aperta non si approva in blocco: si risponde a lei (SPEC-DOMANDE §3.8).
+    if (aspettaDomanda(fb)) return false;
     return !worstVerdictBlock(fb);
   }
 
@@ -548,12 +554,31 @@
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
+    // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
+    if (tab === 'inbox' && aspettaDomanda(fb)) return isLocalOnly(fb) ? 'local' : 'queue';
     // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
     // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
     if (tab === 'queue' && isLocalOnly(fb)) return 'local';
     // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
     if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
+  }
+
+  // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
+  const ATTESE_CON_DOMANDA = {
+    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa'],
+    aligned: ['origine_chiusa', 'origine_mancante'],
+  };
+  const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
+
+  /** L'id della domanda che questo feedback aspetta (`D-12`), o ''. PURA. */
+  function aspettaDomanda(fb) {
+    if (!fb || statusUnreadable(fb)) return '';
+    const id = String(fb.domandaId || '');
+    if (!DOMANDA_ID_RE.test(id)) return '';
+    const { status, statusReason } = normalizeStatus(fb);
+    const motivi = ATTESE_CON_DOMANDA[status];
+    return motivi && motivi.includes(String(statusReason || '')) ? id : '';
   }
 
   // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
@@ -752,6 +777,8 @@
       return acts;
     }
     if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+      // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
+      if (aspettaDomanda(fb)) return [{ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false }];
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
@@ -1200,6 +1227,8 @@
    */
   function aspettaRisposta(fb) {
     if (!fb || statusUnreadable(fb)) return false;
+    // Con la domanda si risponde lì, in un posto solo.
+    if (aspettaDomanda(fb)) return false;
     const norm = normalizeStatus(fb);
     if (norm.status !== 'design') return false;
     return MOTIVI_RISPOSTA.includes(String(norm.statusReason || '')) || String(fb.status || '') === 'clarify';
@@ -1240,9 +1269,18 @@
   }
 
   const L3_LOCALE = 'Richiede lavoro locale';
+  const L3_FIDATO = 'Chiede di renderlo fidato: il lavoro tocca il server';
+
+  /** Un worker chiede di renderlo fidato perché il lavoro tocca il server (#1358, SPEC-DOMANDE §2.2). PURA. */
+  function chiedeFiducia(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const norm = normalizeStatus(fb);
+    return norm.status === 'design' && String(norm.statusReason || '') === 'fidato';
+  }
 
   // Il rombo azzurro (#1060): lo stato basta a dirlo, quindi si colora anche prima che arrivi il documento intero.
-  function livelloL3Locale(fb, l, letto) {
+  function livelloL3Locale(fb, l, letto, titoloL3 = L3_LOCALE) {
+    const L3_LOCALE = titoloL3;
     const nota = judgesNote(fb);
     const righe = (nota && nota.text) ? [riga('In breve', nota.text)] : [];
     if (!letto) {
@@ -1274,7 +1312,22 @@
     const letto = !(opts && opts.dettaglioLetto === false);
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
+    // Con la domanda (SPEC-DOMANDE §3.8) il rombo rimanda lì: è il posto dove si risponde.
+    const dom = aspettaDomanda(fb);
+    if (dom) {
+      const t = `Aspetta la tua risposta alla domanda ${dom}`;
+      if (!letto) return nonLetto('l3', 'rombo', t);
+      const testoL = segnalato ? String(l.testo || '').trim() : '';
+      return forma('l3', 'rombo', t, 'design', segnalato ? 'segnalato' : 'domande', {
+        titolo: t,
+        righe: [],
+        testo: testoL || `Si risponde nella sezione Domande: la domanda ${dom} ha le opzioni, il consiglio e lo spazio per scrivere.`,
+        illeggibile: !!testoL && valueUnreadable(l.testo),
+        azioni: [],
+      });
+    }
     if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
+    if (chiedeFiducia(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto, L3_FIDATO);
     // Fermo al livello 3 senza una scelta da fare qui (guasto, arenato, loop): il rombo dice quello che dice il segno in
     // lista, con l'ultima nota; verde solo se una domanda aperta aspetta l'owner (il guasto), grigio per gli altri.
     const fermo = !attesa && !segnalato ? fermoAlLivello3(fb) : null;
@@ -1341,6 +1394,12 @@
         illeggibile: cifrata && conversazioneCifrata,
         azioni: [],
       });
+    }
+    // Il worker che l'ha giudicata attacco o spam: il rombo prende la tinta del blocco, il titolo dice il giudizio.
+    const norm = normalizeStatus(fb);
+    if ((norm.status === 'attack' || norm.status === 'spam') && String(norm.statusReason || '') === 'worker') {
+      const t = `Segnalata come ${norm.status === 'attack' ? 'attacco' : 'spam'} da chi ci lavorava`;
+      return forma('l3', 'rombo', t, norm.status, 'segnalato', { titolo: t, righe, testo, illeggibile: valueUnreadable(l.testo), azioni: [] });
     }
     return forma('l3', 'rombo', titolo, 'design', 'segnalato', {
       titolo,
@@ -1527,6 +1586,7 @@
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
     guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
+    fidato:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_FIDATO },
   };
 
   /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
@@ -1552,6 +1612,8 @@
         ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
         : 'Fermo al cancello di fusione: aspetta il tuo via libera');
     }
+    // Chi aspetta una domanda sta In coda col suo segno: non è un fermo dei Ricevuti.
+    if (aspettaDomanda(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (!isRicevutiStatus(status)) return null;
     if (status === 'design') {
@@ -1564,6 +1626,8 @@
     if (status === 'suspicious_file') return out('triangolo', 'l1', 'attack', 'Il filtro d’ingresso ha trovato un file sospetto');
     if (status === 'attack' || status === 'spam') {
       const parola = status === 'attack' ? 'attacco' : 'spam';
+      // Il giudizio di chi ci lavorava (SPEC-DOMANDE §2.2): L3, accanto alle sue altre segnalazioni.
+      if (String(statusReason || '') === 'worker') return out('rombo', 'l3', status, `Chi ci lavorava l’ha segnalata come ${parola}`);
       const dalFiltro = status === 'attack'
         ? (p.action === 'block_attack' || p.l1Category === 'dangerous')
         : (p.action === 'block_spam' || p.l1Category === 'spam');
@@ -1731,7 +1795,7 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
-    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
+    aspettaRisposta, aspettaDomanda, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,

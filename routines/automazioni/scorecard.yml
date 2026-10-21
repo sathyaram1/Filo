@@ -1,0 +1,46 @@
+# OpenSSF Scorecard (#1421): il voto alle pratiche del repo, in Security → Code scanning e nel badge del README.
+# Qui non gira: le automazioni le porta in .github/workflows solo l'owner (#1140), spostando questo file così com'è.
+# Regole (solo main, permessi minimi, azioni fissate per sha): tests/unit/scorecardAzione.test.mjs.
+
+name: Scorecard
+
+on:
+  # Il controllo Branch-Protection si rifà quando cambia la regola di protezione.
+  branch_protection_rule:
+  schedule:
+    - cron: '23 4 * * 1'
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  analisi:
+    name: Scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Un avvio a mano da un altro ramo non pubblica niente: il voto è quello di main.
+    if: github.ref == 'refs/heads/main'
+    # L'API che serve il badge accetta i risultati solo se il lavoro ha questi passi e niente env, defaults o run.
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - name: Codice
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Analisi
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Risultati in code scanning
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: results.sarif
