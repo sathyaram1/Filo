@@ -1554,7 +1554,7 @@
       } catch (_) {}
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await requestImageDescription(cap.dataUrl).catch(() => null);
+      const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
