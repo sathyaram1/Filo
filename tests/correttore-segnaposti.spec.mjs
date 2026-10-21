@@ -313,6 +313,83 @@ test('«Ci sono xx abitanti a Roma.» e «… a Milano.» hanno ciascuna il suo 
   await expect(valori).toHaveText(['1370000'], { timeout: 10000 });
 });
 
+// La rilettura che chiede un dato decide: un'altra domanda rilegge prima le fonti già lette, e ripaga la ricerca solo
+// se lì il dato non c'è. Quando tace, un refuso corto corretto non toglie il valore.
+async function rilettura(app, righe, valore) {
+  await app.evaluate((_e, [righe, valore]) => {
+    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+    const righeDi = new Function('t', `return (${righe})(t);`);
+    const valoreDi = new Function('t', `return (${valore})(t);`);
+    const f = async (a) => {
+      const t = String(a.messages[a.messages.length - 1].content);
+      const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
+      if (t.includes('Chi scrive ha messo delle x')) return fine(valoreDi(t));
+      if (t.includes('proponi SUGGERIMENTI')) { await prima(a); return fine(righeDi(t).join('\n') || '[][][][nessuno]'); }
+      return prima(a);
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = f;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = f;
+  }, [righe.toString(), valore.toString()]);
+}
+async function sostituisci(page, vecchio, nuovo) {
+  const ta = page.locator('#ta');
+  const i = (await ta.inputValue()).indexOf(vecchio);
+  await ta.evaluate((e, [a, b]) => e.setSelectionRange(a, b), [i, i + vecchio.length]);
+  await page.keyboard.type(nuovo);
+  await page.keyboard.press('End');
+}
+const pronti = (page) => page.locator('.sn-spell-valori .sn-spell-valore:not(.sn-cercando)');
+
+for (const riga of ['[di soli xx][][Google P/E ratio][cerca][web]', '']) {
+  test(`«a» corretto in «ha» dopo il valore, la frase riletta ${riga ? 'con altre parole' : 'tacendo'}: il 27 resta e non si ricerca`, async ({ app, openTab, testServer }) => {
+    const page = await apri(app, openTab, testServer, P_E);
+    await webLento(app);
+    await rilettura(app, new Function('t', `return t.includes('Google a un') ? ['[di soli xx][][Alphabet P/E ratio][cerca][web]'] : (t.includes('Google ha un') ? ${JSON.stringify(riga ? [riga] : [])} : []);`),
+      () => '[27][Rapporto prezzo/utili di Alphabet][1][20 ottobre 2026]');
+    await page.locator('#ta').click();
+    await page.keyboard.type('Google a un p/e di soli xx, davvero basso. ');
+    await expect(pronti(page)).toHaveText(['27'], { timeout: 10000 });
+    await sostituisci(page, ' a ', ' ha ');
+    await expect.poll(async () => (await globale(app, '__ragionate')).some((r) => r.nuovo.includes('Google ha un')), { timeout: 8000 }).toBe(true);
+    await restaIlValore(page, '27', 3000);
+    expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+  });
+}
+
+test('un dato precisato dopo la pausa («al picco delle dot-com») o un nome cambiato (Iran → Iraq) prende il valore nuovo', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, P_E);
+  await rilettura(app, (t) => {
+    if (t.includes('Iraq ha')) return ['[ha xx abitanti][][Popolazione dell\'Iraq][cerca][web]'];
+    if (t.includes('Iran ha')) return ['[ha xx abitanti][][Popolazione dell\'Iran][cerca][web]'];
+    if (t.includes('dot-com')) return ['[un p/e di xx][][Nasdaq average P/E at the 2000 dot-com peak][cerca][web]'];
+    return t.includes('p/e di xx') ? ['[un p/e di xx][][Nasdaq average P/E ratio][cerca][web]'] : [];
+  }, (t) => {
+    // Le fonti lette per un dato non dicono l'altro: il primo dei due dati nuovi si ricerca, il secondo no.
+    if (t.includes('Iraq')) return t.includes('risultati per Popolazione dell\'Iraq') ? '[46 milioni][Abitanti dell\'Iraq][1][2025]' : '[][][][nessuno]';
+    if (t.includes('Iran')) return '[90 milioni][Abitanti dell\'Iran][1][2025]';
+    return t.includes('dot-com peak') ? '[175][P/E medio del Nasdaq al picco del 2000][1][marzo 2000]' : '[31][P/E medio del Nasdaq oggi][1][20 ottobre 2026]';
+  });
+  await app.evaluate(() => {
+    globalThis.SN_FONTI_SEGNAPOSTO.web = async (q) => {
+      globalThis.__webChieste.push(q);
+      return [{ titolo: 'Dati', sito: 'dati.example', url: 'https://dati.example/x', data: '', testo: `risultati per ${q}` }];
+    };
+  });
+  const ta = page.locator('#ta');
+  await ta.click();
+  await page.keyboard.type('Il Nasdaq aveva in media un p/e di xx');
+  await expect(pronti(page)).toHaveText(['31'], { timeout: 10000 });
+  await page.keyboard.type(' al picco delle dot-com. ');
+  await expect(pronti(page)).toHaveText(['175'], { timeout: 10000 });
+  expect(await globale(app, '__webChieste')).toEqual(['Nasdaq average P/E ratio']);
+  await ta.fill('');
+  await page.keyboard.type("L'Iran ha xx abitanti. ");
+  await expect(pronti(page)).toHaveText(['90 milioni'], { timeout: 10000 });
+  await sostituisci(page, 'Iran', 'Iraq');
+  await expect(pronti(page)).toHaveText(['46 milioni'], { timeout: 10000 });
+  expect(await globale(app, '__webChieste')).toEqual(['Nasdaq average P/E ratio', 'Popolazione dell\'Iran', 'Popolazione dell\'Iraq']);
+});
+
 test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice, e «Cerca il dato» lo trova', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, P_E);
   await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
