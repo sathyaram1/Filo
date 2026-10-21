@@ -194,6 +194,15 @@ test('sul suggerimento del correttore «Valuta» c’è una volta sola e apre l�
   await expect(page.locator('.sn-sidebar-msg-assistant')).toContainText('C\'è un refuso.', { timeout: 20_000 });
 });
 
+test('di un testo oltre il tetto l’Aiuto dice fin dove arriva la valutazione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, { risposte: [['', PARERE]] });
+  await page.fill('#ta', 'parola '.repeat(15000));
+  await valutaSu(page, '#ta');
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'primi 100.000 caratteri' })).toBeVisible({ timeout: 8000 });
+  await expect(page.locator('.sn-sidebar-msg-assistant')).toContainText('C\'è un refuso.', { timeout: 20_000 });
+});
+
 test('aspetto delle correzioni col tema scuro', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });

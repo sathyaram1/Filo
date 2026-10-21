@@ -1696,7 +1696,7 @@
       esterno = { ...(esterno || {}), testoDaValutare: { testo: testoCampo } };
       const tetto = global.SN_CONST.VALUTA_MAX_CARATTERI;
       if (testoCampo.length > tetto) {
-        appendActionLog(I18n.t('help_valuta_lungo', tetto.toLocaleString('it-IT')))?.classList.add('sn-sidebar-log-intera');
+        appendActionLog(I18n.t('help_valuta_lungo', tetto.toLocaleString('it-IT', { useGrouping: true })))?.classList.add('sn-sidebar-log-intera');
       }
     }
 
