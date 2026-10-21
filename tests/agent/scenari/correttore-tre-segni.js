@@ -1,6 +1,6 @@
 // Per test:shoot (#1446): un modello finto per i due controlli del correttore e una pagina con un campo, servita su
 // http://127.0.0.1:47811/. Il controllo rapido conferma «quseta» e lascia in dubbio «Zanzottera»; il ragionato segna
-// «alle 18». Uso: main-file:tests/agent/scenari/correttore-tre-segni.js; tab:http://127.0.0.1:47811/
+// «alle 18». Uso: main-file:tests/agent/scenari/correttore-tre-segni.js; tab:http://127.0.0.1:47811/ (/scuro: pagina scura)
 const C = globalThis.SN_CONST;
 await globalThis.SN_STORAGE.updateSettings({
   useDefaultModels: false,
@@ -19,13 +19,13 @@ const finto = async ({ messages }) => {
 globalThis.SN_PROVIDERS.completeWithFallback = finto;
 globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
 const http = process.mainModule.require('node:http');
-const pagina = `<!doctype html><meta charset="utf-8"><title>Correttore</title>
-<body style="margin:0;padding:28px;font:17px sans-serif;background:#faf7f2;color:#2b2622">
+const pagina = (scuro) => `<!doctype html><meta charset="utf-8"><title>Correttore</title>
+<body style="margin:0;padding:28px;font:17px sans-serif;${scuro ? 'background:#1f1b18;color:#ece4da;color-scheme:dark' : 'background:#faf7f2;color:#2b2622'}">
 <p>Anna: ciao! ci vediamo martedì?</p>
 <textarea id="ta" lang="it" style="display:block;width:640px;height:120px;font:20px Georgia,serif;padding:10px"></textarea>
 </body>`;
 if (!globalThis.__paginaCorrettore) {
-  globalThis.__paginaCorrettore = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(pagina); });
+  globalThis.__paginaCorrettore = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(pagina(q.url.includes('scuro'))); });
   await new Promise((ok) => globalThis.__paginaCorrettore.listen(47811, '127.0.0.1', ok));
 }
 return 'pronto';
