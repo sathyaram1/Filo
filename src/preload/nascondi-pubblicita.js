@@ -114,9 +114,8 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
   // Chi manda il segnale può chiudere solo il proprio riquadro.
   window.addEventListener('message', (e) => {
     if (e.data !== RIQUADRO_FERMATO || !e.source) return;
-    let frames = [];
-    try { frames = document.querySelectorAll('iframe,frame'); } catch (_) {}
-    for (const f of frames) if (f.contentWindow === e.source) chiudi(f);
+    const f = globalThis.SN_RIQUADRI_IN_ARRIVO?.riquadroDi(e.source, document);
+    if (f) chiudi(f);
   });
   // L'errore di un'immagine arriva prima o dopo l'avviso del main: chi arriva secondo chiude.
   window.addEventListener('error', (e) => { if (bloccati.size) segna(e.target); }, true);
