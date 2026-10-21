@@ -200,8 +200,9 @@
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
+        const daMandare = await senzaSegreti(messages);
         r = await providers().completeWithFallback({
-          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
         });
       } catch (e) {
         throw conLaFunzione(e, s, action);
