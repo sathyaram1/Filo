@@ -464,3 +464,20 @@ test('ciò che una chat ha letto (#530) resta suo riaprendo il filo, senza doppi
   await Chats.remove('letta');
   assert.ok(!leggi(file).includes('web:ricerca'), 'le fonti di una chat cancellata restano su disco');
 });
+
+test('chiusa apposta, una chat lo resta riaprendo il filo; una scheda che se ne va non la segna; la riapre solo l’utente', async () => {
+  magazzino = {};
+  const { cartella } = nuovo();
+  await Chats.append('apposta', { role: 'user', text: 'portami alla home' });
+  await Chats.append('apposta', { role: 'filo', text: 'Sei già qui.' });
+  await Chats.close('apposta');
+  assert.ok(!(await Chats.get('apposta')).finita, 'la chiusura di una scheda che se ne va non è una fine voluta');
+  await Chats.close('apposta', { fine: true });
+  assert.equal((await Chats.get('apposta')).finita, true, 'chiusa già da una scheda, la fine voluta si scrive lo stesso');
+  nuovo(cartella);
+  assert.equal((await Chats.get('apposta')).finita, true, 'riaperto il filo, la fine voluta resta');
+  await Chats.append('apposta', { role: 'filo', text: 'risposta in ritardo' });
+  assert.equal((await Chats.get('apposta')).finita, true, 'una risposta arrivata dopo non la riapre');
+  await Chats.append('apposta', { role: 'user', text: 'riprendiamo' });
+  assert.ok(!(await Chats.get('apposta')).finita, 'l’utente che ci riscrive la riapre');
+});

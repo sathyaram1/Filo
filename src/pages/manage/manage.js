@@ -19,20 +19,11 @@
   const mgAutoToggle = document.getElementById('mgAutoToggle');
   const mgAutoState  = document.getElementById('mgAutoState');
   const mgAutoMsg    = document.getElementById('mgAutoMsg');
-  // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
-  // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
-  // Un interruttore per ogni categoria d'autore che la lista mostra come icona
-  // (AUTHOR_META più sotto): chi si vede separato si regola separato. Esplorazione
-  // e allarmi della pubblicazione no: entrano in coda comunque (#1035).
+  // Un interruttore per livello di fiducia (SPEC-DOMANDE.md §10: il mittente non dà permessi): la chiave è il gruppo
+  // di SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
   const mgAutoApprove = {
-    owner:    document.getElementById('mgAutoApproveOwner'),
-    user:     document.getElementById('mgAutoApproveUser'),
-    local:    document.getElementById('mgAutoApproveLocal'),
-    worker:   document.getElementById('mgAutoApproveWorker'),
-    verifier: document.getElementById('mgAutoApproveVerifier'),
-    residuo:  document.getElementById('mgAutoApproveResiduo'),
-    claude:   document.getElementById('mgAutoApproveClaude'),
-    filo:     document.getElementById('mgAutoApproveFilo'),
+    fidato:     document.getElementById('mgAutoApproveFidato'),
+    non_fidato: document.getElementById('mgAutoApproveNonFidato'),
   };
   // Interruttore master delle routine autonome (config/routines).
   const mgRoutinesSwitch = document.getElementById('mgRoutinesSwitch');
@@ -606,19 +597,18 @@
     });
   });
 
-  // ── Auto-approvazione per mittente (#446) ─────────────────────────────────
-  // Con l'automatica accesa, questi decidono DI CHI ci si fida abbastanza da
-  // farlo entrare in coda senza passare dall'owner. Spenta non contano, ma si
-  // possono preparare: valgono solo al giudizio, scriverli non muove niente.
+  // ── Auto-approvazione per fiducia (#446, §10) ─────────────────────────────
+  // Con l'automatica accesa, questi decidono quale fiducia basta per entrare in
+  // coda senza passare dall'owner. Spenta non contano, ma si possono preparare:
+  // valgono solo al giudizio, scriverli non muove niente.
   // Il main rilegge e riscrive la mappa intera: i salvataggi stanno in una fila
   // sola, e le scelte ancora in fila stanno sopra ogni mappa che arriva prima.
   let autoApproveServer = null;
   const autoApproveInAttesa = [];
   function reflectAutoApprove(map) {
     if (map !== undefined) autoApproveServer = map;
-    // Il ripiego sul vecchio interruttore unico di Claude vive nel modulo
-    // condiviso: una mappa salvata prima che si sdoppiassero non deve mostrare
-    // acceso ciò che l'owner aveva spento.
+    // Il ripiego sulla mappa per mittente vive nel modulo condiviso: una mappa
+    // salvata prima non deve mostrare acceso ciò che l'owner aveva spento.
     const base = autoApproveServer;
     const resolved = (TH && TH.resolveAutoApprove) ? TH.resolveAutoApprove(base) : null;
     const m = Object.assign({}, resolved || ((base && typeof base === 'object') ? base : {}));
@@ -6223,15 +6213,35 @@
     del.textContent = 'Rimuovi';
     del.addEventListener('click', () => { row.remove(); populateSmNicknames(); });
 
+    const warn = document.createElement('div');
+    warn.className = 'sn-model-row-warn';
+    warn.setAttribute('role', 'status');
+    warn.hidden = true;
+
     // Aggiornare nickname o modello ridisegna i suggerimenti dei selettori
     // (un nickname compare tra i suggerimenti solo quando ha anche un modello).
     nickIn.addEventListener('input', () => populateSmNicknames());
-    modelIn.addEventListener('input', () => populateSmNicknames());
+    modelIn.addEventListener('input', () => { populateSmNicknames(); avvisaProduttoreGiudice(row); });
 
     row.appendChild(nickIn);
     row.appendChild(modelWrap);
     row.appendChild(del);
+    row.appendChild(warn);
+    avvisaProduttoreGiudice(row);
     return row;
+  }
+
+  // I giudici girano sul server con la lista di esclusione del codice, la stessa di build qui (un test del server le
+  // confronta): un modello il cui produttore resta fra gli host lo si dice sulla riga (#1059).
+  function avvisaProduttoreGiudice(row) {
+    const warn = row.querySelector('.sn-model-row-warn');
+    const C = window.SN_CONST;
+    if (!warn || !C || typeof C.unexcludedProducer !== 'function') return;
+    const nome = C.unexcludedProducer(row.querySelector('.sn-model-id').value.trim(), C.DEFAULT_EXCLUDED_PROVIDERS);
+    warn.textContent = nome
+      ? `${nome} produce questo modello e i giudici non lo escludono come fornitore: le richieste possono arrivare a lui.`
+      : '';
+    warn.hidden = !nome;
   }
 
   function renderJudgeRegistry(registry) {
@@ -6746,7 +6756,7 @@
         + `${esc(gr.label)}<span class="mg-chip-n">${esc(fsNum(n))}</span></button>`;
     }).join('');
     const voci = gruppi + FS.CREATORI.map((kind) => {
-      const meta = AUTHOR_META[kind] || AUTHOR_META.user;
+      const meta = FS.CLASSI_META[kind] || { icon: '', label: kind };
       const on = fsCreators.indexOf(kind) >= 0;
       const n = conti[kind] || 0;
       return `<button type="button" class="mg-chip${on ? ' mg-chip--on' : ''}" data-fs-creator="${esc(kind)}"`
@@ -6838,7 +6848,12 @@
     if (kind === FS.CREATORE_ILLEGGIBILE) return FS.ETICHETTA_ILLEGGIBILE;
     const gr = FS.GRUPPI_CREATORI.find((x) => x.key === kind);
     if (gr) return gr.label;
-    return (AUTHOR_META[kind] || AUTHOR_META.user).label;
+    return (FS.CLASSI_META[kind] || { label: kind }).label;
+  }
+  // Il ruolo di una routine che ha scritto il feedback (`mittenteRuolo`), coi nomi del registro dei lanci.
+  const FS_RUOLI_MITTENTE = { residuo: 'Rilievi residui', ignoto: 'Ruolo non indicato' };
+  function fsEtichettaRuolo(ruolo) {
+    return FS_RUOLI_MITTENTE[ruolo] || roleLabel(ruolo);
   }
 
   // Un gruppo è acceso quando il filtro è ESATTAMENTE quel gruppo: se ci si
@@ -6950,7 +6965,11 @@
         + '<h4 style="margin-top:14px">…e per chi li ha mandati</h4>'
         + fsBars(stat.ricevuti.creatori.map((c) => ({
           key: c.kind, n: c.n, ids: c.ids, label: fsEtichettaCreatore(c.kind),
-        })), 'creatori') };
+        })), 'creatori')
+        + ((stat.ricevuti.ruoliRoutine || []).length
+          ? '<h4 style="margin-top:14px">…e le routine, per ruolo</h4>'
+            + fsBars(stat.ricevuti.ruoliRoutine.map((r) => ({ key: r.key, n: r.n, ids: r.ids, label: fsEtichettaRuolo(r.key) })), 'ruoliRoutine')
+          : '') };
     }
     if (fsAperto === 'lavorati') {
       return { titolo: 'Dove sono arrivati, oggi', html: fsBars(stat.lavorati.stati, 'stati') };
@@ -7356,6 +7375,10 @@
       let v = null;
       if (desc.gruppo === 'categorie') v = trova(fsStat.ricevuti.categorie, chiave);
       else if (desc.gruppo === 'creatori') v = trova(fsStat.ricevuti.creatori, chiave);
+      else if (desc.gruppo === 'ruoliRoutine') {
+        const r = trova(fsStat.ricevuti.ruoliRoutine, chiave);
+        v = r ? { ...r, label: `Routine: ${fsEtichettaRuolo(chiave)}` } : null;
+      }
       else if (desc.gruppo === 'stati') v = trova(fsStat.lavorati.stati, chiave);
       else if (desc.gruppo === 'audit') {
         const ids = (fsStat.auditIds && fsStat.auditIds[chiave]) || [];

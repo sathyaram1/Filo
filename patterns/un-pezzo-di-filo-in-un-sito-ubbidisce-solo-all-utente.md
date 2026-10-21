@@ -105,8 +105,10 @@ il clic sul pulsante del sito.
    - una voce **scoperta da poco aspetta mezzo secondo**: un velo tolto mentre
      la mano arriva non lascia il tempo di vedere. Non aspetta chi compare
      (menu appena aperto, voce rivelata da un filtro) e chi era coperto da un
-     pezzo di Filo sopra al menu (un avviso, la conferma di «Svuota»), se il
-     browser lo dice appena quel pezzo se ne va;
+     pezzo di Filo sopra al menu (la conferma di «Svuota»), se il browser lo
+     dice appena quel pezzo se ne va. La pila degli avvisi invece, finché il
+     menu è aperto, scende sotto il suo piano: un avviso sopra copriva le voci
+     del menu aperto su di lui e «Chiudi» veniva fermato (#1453);
    - si giudica alla **pressione**; un clic da tastiera, che non ha pressione, si
      giudica lì. Un clic fermato chiude il menu e lo dice con un avviso;
    - lo **zoom del foglio di stile** sul contenitore (`html { zoom: 2 }`)
@@ -251,3 +253,37 @@ contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi
 ([Un avviso su una pagina non sta dentro la pagina](un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md)).
+
+## Il permesso del sito non è di Filo (#586)
+
+Lo stesso vale per i permessi di Chromium: sono della pagina, non del mondo che chiede. Un «lasciapassare» di cinque
+secondi sulla scheda per Detta e Incolla valeva anche per gli script del sito, e passava sopra il no che l'utente gli
+aveva dato. Quindi Filo non prende in prestito il permesso del sito: il microfono di Detta lo apre la cornice e alla
+pagina arrivano solo i campioni, nel mondo del preload (`services/microfonoDiFilo.js`); gli appunti di Incolla li
+legge il main. Così funzionano proprio dove il sito ha avuto un no.
+
+Lo schermo segue la stessa idea dall'altro lato: si sceglie nella cornice prima del sì, perché Chromium chiama il
+gestore dello schermo dentro il sì a `getDisplayMedia` e lì si consegna la fonte scelta. La strada vecchia
+(`chromeMediaSource: 'desktop'`) arriva con gli stessi dati ma senza gestore e prenderebbe schermo e audio senza
+scelta: nella pagina la gira su `getDisplayMedia` e avvisa il main, che dopo la scelta dice no
+(`preload/schermo-vecchio.js`); chi la aggira si ferma prima di riceverli. Le stesse regole valgono nei **riquadri
+vuoti** che la pagina si crea (#1057): un `about:blank` non ha preload, e la sua funzione di fabbrica, presa anche per
+indice (`window[i]`), con una combinazione come «solo l'audio del computer» per Chromium è un messaggio guasto, che
+chiude la scheda prima di chiedere a Filo. Quindi ciò che Filo mette nel mondo della pagina si applica a ogni riquadro
+vuoto appena nasce (`preload/riquadri-vuoti.js`): dopo ogni via che inserisce nodi, al load (che per un riquadro vuoto
+arriva dentro l'inserimento), dai getter `contentWindow`/`contentDocument` (un riquadro in una radice ombra non sta fra
+quelli per indice) e da `window.open`; e lì dentro si legge e si chiede come nella pagina. Resta fuori solo il codice
+della pagina che gira **dentro** un inserimento prima che finisca (uno `<script>` o un elemento personalizzato inseriti
+insieme a un riquadro con un indirizzo, ancora sul suo `about:blank`, o scritti nello stesso `document.write`): è un
+sito che chiude la propria scheda apposta, come potrebbe fare con un ciclo infinito. Resta fuori anche un riquadro
+**in volo verso un indirizzo dello stesso sito** (o con `srcdoc`): toccato prima del suo load tiene la finestra
+all'arrivo e perde il preload (niente accesso, cookie, menu lì dentro), quindi non si tocca, né lui né, finché c'è,
+nessun riquadro alla cieca per indice. Il riquadro inserito vuoto che riceve l'indirizzo dello stesso sito solo dopo
+Filo l'ha già toccato all'inserimento, e lì il preload si perde ancora. Quelli di un altro sito in volo si sistemano:
+all'arrivo hanno una finestra nuova. I vincoli si guardano su una
+copia di soli dati, ed è la copia che va a Chromium: un getter o un Proxy che alla seconda lettura dice desktop
+chiuderebbe la scheda anche dalla pagina. La finestra vuota aperta con `window.open` ha `about:blank` come indirizzo:
+il sito che chiede lo dice l'origine del suo frame, non l'indirizzo. Prova:
+`tests/permessi-riquadro-vuoto.spec.mjs`. Il clic dentro il riquadro di un altro
+sito non passa da `input-event`: lo riferisce il preload del frame, e vale per quel riquadro e i suoi antenati. A richiesta in corso, su Linux, `desktopCapturer` con schermi e finestre
+insieme torna vuoto: si chiedono a parte. Sentinelle in `tests/unit/permessiPagine.test.mjs`.

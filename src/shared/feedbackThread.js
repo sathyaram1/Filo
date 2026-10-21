@@ -225,84 +225,46 @@
   }
 
   // ── Chi può entrare in coda da solo ────────────────────────────────────────
-  // La modalità automatica non è più un sì/no per tutti: l'owner sceglie QUALI
-  // mittenti si fida di far entrare in coda senza passare da lui.
-  //
-  // UN INTERRUTTORE PER OGNI AUTORE CHE LA DASHBOARD MOSTRA. Fino a oggi le
-  // cinque istanze di Claude (esplorazione, sviluppo, verifica, rilievi
-  // residui, sessione locale) stavano dietro un interruttore solo: la coda le
-  // distingueva con cinque icone diverse ma la fiducia era una sola, quindi
-  // per non far entrare da solo l'esploratore bisognava fermare anche la
-  // sessione locale. I due assi ora coincidono: chi si vede separato si regola
-  // separato, salvo chi nasce senza origine (SENZA_INTERRUTTORE, sotto): il
-  // gruppo `prober` resta per il gemello del server, ma non decide più niente.
-  //
-  // `filo` resta SEPARATO dalle automazioni: un feedback che nasce da Filo è
-  // la voce di un utente vero filtrata da un modello, non un processo
-  // dell'owner. Metterli insieme farebbe entrare in coda del contenuto scritto
-  // da un utente sotto l'etichetta "automazioni".
-  //
-  // L'ordine è quello della dashboard (AUTHOR_RANK in manage.js): prima le
-  // persone, poi le istanze di Claude dalla più vicina all'owner, in fondo Filo.
-  var AUTO_APPROVE_GROUPS = [
-    'owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo',
-  ];
+  // L'automatica ha un sottointerruttore per livello di fiducia, mai per mittente (SPEC-DOMANDE.md §10: il mittente
+  // non dà permessi). SPECCHIO di filo-security functions/src/autoApprove.js, che decide davvero: stessi casi in
+  // tests/unit/autoApprove.test.mjs e nel gemello del server.
+  var AUTO_APPROVE_GROUPS = ['fidato', 'non_fidato'];
 
-  // Le istanze di Claude. Servono al ripiego sul vecchio interruttore unico
-  // (vedi resolveAutoApprove): un documento salvato prima di oggi ha solo
-  // `claude`, e quel "no" deve continuare a valere per tutte e cinque finché
-  // l'owner non sceglie diversamente. Senza questo, spezzare l'interruttore
-  // riaprirebbe da solo cinque porte che l'owner aveva chiuso.
-  var CLAUDE_GROUPS = ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude'];
+  // Le mappe salvate prima del §10 avevano un interruttore per mittente: non riaprono da sole ciò che l'owner aveva
+  // chiuso. All'automatica arrivano fidati solo i ritrovamenti delle routine e gli allarmi; non fidato chiunque.
+  var LEGACY_GROUPS = {
+    fidato: ['worker', 'verifier', 'residuo', 'prober', 'claude'],
+    non_fidato: ['owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo'],
+  };
 
-  // Chi nasce senza origine (esplorazione, allarmi della pubblicazione) il server lo mette in coda comunque (#1035,
-  // functions/src/nascita.js): in Gestione niente interruttore. La costruzione resta nel gruppo che le dà il gemello.
-  var SENZA_INTERRUTTORE = { costruzione: 'claude' };
-
-  // Il gruppo di fiducia di un mittente = la sua categoria d'autore, quella che
-  // la dashboard mostra come icona. Una funzione sola per i due assi.
-  function autoApproveGroup(clientId) {
-    var k = authorKind(clientId);
-    return SENZA_INTERRUTTORE[k] || k;
+  // Il gruppo è la fiducia del feedback: assente o ignota vale non fidato.
+  function autoApproveGroup(fiducia) {
+    return fiducia === 'fidato' ? 'fidato' : 'non_fidato';
   }
 
   /**
-   * La mappa salvata → la mappa completa, un valore per ogni gruppo. PURA.
-   *
-   * Due ripieghi, in quest'ordine:
-   *   · gruppo assente e mappa con il vecchio `claude` → eredita quel valore
-   *     (solo per le istanze di Claude: è l'interruttore che le teneva tutte);
-   *   · tutto il resto assente → ammesso, che è la semantica che l'automatica
-   *     aveva prima che i sottointerruttori esistessero.
-   *
-   * Mappa assente del tutto ⇒ `null`: il chiamante sa che non c'è scelta
-   * registrata e ammette tutti.
+   * La mappa salvata → un valore per ogni gruppo. Un gruppo assente eredita dai vecchi interruttori per mittente (uno
+   * spento lo chiude); senza nemmeno quelli è ammesso. Mappa assente ⇒ `null`: il chiamante ammette tutti. PURA.
    */
   function resolveAutoApprove(map) {
     if (!map || typeof map !== 'object') return null;
-    var legacy = map.claude;
     var out = {};
     for (var i = 0; i < AUTO_APPROVE_GROUPS.length; i++) {
       var g = AUTO_APPROVE_GROUPS[i];
-      if (typeof map[g] === 'boolean') out[g] = map[g];
-      else if (legacy === false && CLAUDE_GROUPS.indexOf(g) >= 0) out[g] = false;
-      else out[g] = true;
+      out[g] = typeof map[g] === 'boolean'
+        ? map[g]
+        : !LEGACY_GROUPS[g].some(function (k) { return map[k] === false; });
     }
     return out;
   }
 
-  // Decide se un feedback SICURO (giudicato allineato) può entrare in coda da
-  // solo. PURA: la config arriva già letta.
-  //   cfg = { enabled: bool, autoApprove?: { <gruppo>: bool, … } }
-  // Interruttore master spento ⇒ mai, qualunque cosa dicano i sottointerruttori
-  // (è lo stato sicuro: uno solo da spegnere per fermare tutto).
-  // Mappa assente ⇒ tutti ammessi: è la semantica che l'automatica aveva prima
-  // che i sottointerruttori esistessero, e non deve cambiare da sola.
-  function autoApproveAllowed(clientId, cfg) {
+  // Un feedback giudicato sicuro può entrare in coda da solo? Master spento ⇒ mai (uno solo da spegnere per fermare
+  // tutto); mappa assente ⇒ tutti ammessi. PURA.
+  function autoApproveAllowed(fiducia, cfg) {
     if (!cfg || cfg.enabled !== true) return false;
     var map = resolveAutoApprove(cfg.autoApprove);
     if (!map) return true;
-    return map[autoApproveGroup(clientId)] !== false;
+    return map[autoApproveGroup(fiducia)] !== false;
   }
 
   // Marca un clientId come invio dell'owner. Idempotente: non raddoppia il
@@ -687,14 +649,12 @@
     // possano divergere su una stringa copiata a mano.
     LOCAL_CLIENT_ID: 'local:claude',
     MODEL_PREFIXES,
-    // Auto-approvazione per mittente (#446). La LOGICA è specchiata nel backend
-    // di sicurezza (filo-security: functions/src/autoApprove.js), che è l'unico
-    // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
+    // L'automatica per fiducia (§10): specchio di filo-security functions/src/autoApprove.js.
     autoApproveGroup,
     autoApproveAllowed,
     resolveAutoApprove,
     AUTO_APPROVE_GROUPS,
-    CLAUDE_GROUPS,
+    LEGACY_GROUPS,
     ownerize,
     userTurnMarker,
     istanteDelMarcatore,

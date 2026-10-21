@@ -187,6 +187,16 @@ function registerIpcHandlers() {
     }
   });
 
+  // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
+  ipcMain.on('filo:permessi-si', (event, parte) => {
+    try {
+      const url = (event.senderFrame && event.senderFrame.url) || event.sender.getURL();
+      event.returnValue = require('./services/permessiPagine').siDato(event.sender.session, url, parte);
+    } catch (_) {
+      event.returnValue = false;
+    }
+  });
+
   // Scrivere su un file o una cartella che la pagina ha già (#1069): la domanda, regole in services/permessiPagine.js.
   ipcMain.handle('filo:permessi-scrittura', (event) => {
     const wc = event.sender;
@@ -205,11 +215,20 @@ function registerIpcHandlers() {
 
   // Sincroni: devono arrivare prima della finestra che la pagina chiede nello stesso clic (#737.1 giri 6 e 7).
   ipcMain.on('filo:gesto-pagina', (event, tasto) => {
-    require('./services/permessiPagine').gestoDellaPagina(event.sender, event.senderFrame, tasto);
+    const vero = require('./services/permessiPagine').gestoDellaPagina(event.sender, event.senderFrame, tasto);
+    // Vale anche per il rilevatore dei siti pericolosi, riquadri compresi: uno scaricamento che segue l'ha chiesto l'utente (#814).
+    // Lo stesso gesto dei permessi: il clic che Filo dà da sé (il «Salta» delle pubblicità) non è dell'utente.
+    if (vero) for (const w of BrowserWindow.getAllWindows()) {
+      try { w._filoTabs?._sbGesto?.(event.sender); } catch (_) {}
+    }
     event.returnValue = true;
   });
   ipcMain.on('filo:gesto-di-filo', (event) => {
     require('./services/permessiPagine').gestoDiFilo(event.sender);
+    event.returnValue = true;
+  });
+  ipcMain.on('filo:schermo-vecchio', (event) => {
+    require('./services/permessiPagine').schermoVecchio(event.sender, event.senderFrame);
     event.returnValue = true;
   });
   ipcMain.on('filo:apertura-scelta', (event, url) => {
@@ -489,7 +508,9 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:open', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
-    const id = win._filoTabs.openTab(url || 'filo://newtab/');
+    // Per il giudizio sui siti «aperta da Filo» lo dice solo la barra di Filo.
+    const daShell = Boolean(finestraDellaBarra(event.sender));
+    const id = win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
     return { ok: true, id };
   });
   ipcMain.handle('tabs:close', (event, { id }) => {
@@ -574,10 +595,11 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
+  require('./services/microfonoDiFilo').registra({ ipcMain, BrowserWindow });
   // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
-  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+  ipcMain.handle('tabs:permesso-risposta', (event, { id, si, fonte } = {}) => {
     if (!finestraDellaBarra(event.sender) || !id) return { ok: false };
-    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
+    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true, typeof fonte === 'string' ? fonte.slice(0, 200) : undefined) };
   });
   // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
   const paginaDiScheda = (event, id) => {
@@ -663,7 +685,7 @@ function registerIpcHandlers() {
       if (typeof value === 'string' && value.startsWith('@action:')) {
         try { event.sender.send('shell:menu-action', value.slice('@action:'.length)); } catch (_) {}
       } else if (value) {
-        win._filoTabs.openTab(value);
+        win._filoTabs.openTab(value, finestraDellaBarra(event.sender) ? { origine: { tipo: 'filo' } } : {});
       }
     });
     return { ok: true };

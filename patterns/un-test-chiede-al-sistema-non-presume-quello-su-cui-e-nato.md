@@ -246,6 +246,28 @@ Le forme che cadevano, e cosa le ha sostituite:
   codice provato usa si cerca al caricamento del modulo, così se manca il file cade subito
   col nome del pacchetto.
 
+### Una prova che guarda un momento lo tiene aperto lei (#1321)
+
+Con quattro esecuzioni in parallelo le prove della chat della home cadevano a caso. La
+risposta in streaming usciva in pezzi a 500 ms l'uno dall'altro e la prova doveva vedere la
+testa senza la coda in quel mezzo secondo; il ragionamento in corso durava 3,6 s e la prova
+doveva cliccarci due volte e fare una foto; la riga «Avvio un timer…» restava 2,5 s.
+
+- Il modello finto si ferma dove la prova deve guardare (`await` di una promessa che la
+  prova scioglie con `app.evaluate(() => globalThis.__…())`). Senza il comportamento
+  provato la prova resta rossa: lo stato atteso non arriva mai.
+- La fine del turno si aspetta su un segno della pagina (il tasto d'invio che torna, il
+  bottone dell'azione), con un tetto che copre le attese che l'app fa apposta: aperta una
+  pagina, il turno aspetta fino a 5 s che arrivi (`esitoApertura`), e la prova ne dava 3.
+- Un'azione che apre un sito apre il server di prova (`testServer.html(…, { pubblico: true })`):
+  con example.com il turno aspettava la rete, che nei contenitori non c'è.
+- Un'attesa che prova un'assenza («nessuna scritta, nemmeno dopo un secondo») resta: guarda
+  che non succeda niente, non scommette che qualcosa arrivi prima di un orologio.
+
+Prove: `tests/dashboard-chat-streaming.spec.mjs`, `tests/dashboard-chat-attivita.spec.mjs`
+(A, B), `tests/dashboard-chat-strumenti.spec.mjs` (C). L'altra metà di quei rossi era un
+difetto vero: [Il filo dell'attesa](il-filo-dell-attesa.md), «La diretta si chiude sul segno di fine».
+
 ## Il verso opposto (#937)
 
 Una prova nata su Windows che asserisce un percorso `C:\…` cade su Linux se la

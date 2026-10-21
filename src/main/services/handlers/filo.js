@@ -3,7 +3,7 @@
 
 module.exports = function register(on, ctx) {
   const {
-    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
+    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
@@ -37,7 +37,18 @@ module.exports = function register(on, ctx) {
     try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
   };
 
+  // La risposta di un invoke può arrivare alla scheda prima degli ultimi eventi in diretta, che viaggiano su un'altra
+  // coda: il segno di fine li segue, e la scheda chiude la diretta solo quando lo vede (#1321).
+  const chiudiDiretta = (msg, sender) => {
+    const wc = sender && sender.wc;
+    if (!msg || !msg.reasoningReqId || !wc || (wc.isDestroyed && wc.isDestroyed())) return false;
+    try { wc.send('filo:action', { reqId: msg.reasoningReqId, kind: 'fine' }); return true; } catch (_) { return false; }
+  };
   on(MSG.FILO_CHAT, soloFilo(async (msg, sender) => {
+    const r = await turnoDellaChat(msg, sender);
+    return chiudiDiretta(msg, sender) ? { ...r, diretta: true } : r;
+  }));
+  async function turnoDellaChat(msg, sender) {
     let fineLavoro = () => {};
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
@@ -70,10 +81,12 @@ module.exports = function register(on, ctx) {
     } finally {
       fineLavoro();
     }
-  }));
+  }
 
   // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
-  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
+  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: await fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
+  // Il seguito scritto mentre Filo lavora (#1296): entra nel turno di questa scheda, o lo manda lei a turno finito.
+  on(MSG.FILO_CHAT_SEGUITO, soloFilo(async (msg, sender) => ({ ok: true, ...seguitoFiloChat(msg || {}, sender && sender.wc) })));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello
@@ -129,12 +142,14 @@ module.exports = function register(on, ctx) {
     const web = /^https?:/i.test(url);
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
+    // Il clic sul collegamento vale per la pagina d'arrivo come un clic su un sito: si legge prima della porta, che può attendere.
+    const origine = { tipo: 'filo', gesto: require('../permessiPagine').gestoDellUtente(sender?.wc) };
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: false,
       apri: () => {
         const tm = win?._filoTabs;
         if (!tm) return;
-        const apri = (segna) => { const id = tm.openTab(url); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
+        const apri = (segna) => { const id = tm.openTab(url, { origine }); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
         const da = schedaDi(tm, sender);
         if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
       },
@@ -152,9 +167,10 @@ module.exports = function register(on, ctx) {
     const avvisato = isFilo(origin);
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
-      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender) }); },
+      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender), gesto }); },
     });
     return { ok: true, ...r, avvisato };
   });
@@ -394,7 +410,7 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const id = msg.id;
     if (!id) return { ok: false, error: 'id mancante' };
-    closeAndTriageChat(id)
+    closeAndTriageChat(id, { fine: msg.fine === true })
       // La Cronologia può essere aperta in un'altra scheda mentre qui si
       // finisce di chattare: l'annuncio la fa riallineare da sola, invece di
       // lasciarla ferma a com'era e far credere che la chat non si sia

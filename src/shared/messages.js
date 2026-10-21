@@ -513,16 +513,22 @@
     TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
     // Una pagina filo:// ha caselle scritte e non ancora spedite (SN_CASELLE): chiudere la sua scheda aspetta che spedisca.
     CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
-    // Detta e Incolla di Filo su una pagina web: microfono o appunti per pochi secondi, senza domanda al sito (#591.1).
-    PERMESSO_FILO: 'permesso_filo',                  // { tipo: 'media'|'appunti' } → { ok }
+    // Incolla di Filo: gli appunti li legge il main, la pagina non riceve il permesso (#586).
+    APPUNTI_DI_FILO: 'appunti_di_filo',              // {} → { ok, testo, immagine (data URL png) }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
     PERMESSI_SITI_CAMBIATI: 'permessi_siti_cambiati', // main → pagine di Filo: la chat ha tolto una risposta ricordata
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
-    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
+    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty?, impronte? }
     TAB_ACTIVITY: 'tab_activity',
+    // Main → ogni frame: «rimanda adesso se hai testo da inviare» (la pulizia sta
+    // per decidere, #824). { impronte: del documento di prima } → TAB_ACTIVITY con formDirty.
+    FORM_RECHECK: 'form_recheck',
+    // Main → frame dello stesso sito: una richiesta della scheda ha portato fuori questo testo
+    // (senza spazi, in più forme). Le righe dell'utente che ci stanno dentro sono partite. { testo }
+    FORM_SENT: 'form_sent',
 
     // §2.1 — pulizia/riordino su richiesta esplicita dell'utente (lo invoca
     // l'agente Filo dopo conferma). Esegue il triage su tutte le tab della finestra.
@@ -761,7 +767,7 @@
     // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
-    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment?, insecureForm? }
     // #965 — i link che la pagina mostra, ai soli controlli locali: il verdetto resta nel main, per il clic. Aperto ai
     // siti di proposito (lo manda il content script della pagina); la pagina non ne riceve i verdetti, solo il conto.
     // Oltre LOTTO_MAX link → { ok:false, error:'troppi', max }; un esame già in coda → { ok:false, error:'occupato' }.
@@ -894,10 +900,15 @@
     // Filo Chat: invio messaggio utente all'agente conversazionale
     // { userMessage, threadHistory: [{role, text, actions?}] }
     // Risposta: { ok, text, actions: [...], model, costEur }
+    // Solo dalle pagine di Filo: la risposta porta quello che Filo ha letto (pagine, documenti, comandi).
     FILO_CHAT: 'filo_chat',
     // Ferma il turno di chat in corso (#578): { reqId } è il `reasoningReqId` del turno. Solo pagine di Filo, e solo
     // la scheda che l'ha avviato. Le azioni già partite finiscono, nessuna nuova parte. → { ok, fermato }
     FILO_CHAT_STOP: 'filo_chat_stop',
+    // Un seguito scritto mentre il turno lavora (#1296): { reqId, id, testo } lo affida al turno, che lo legge al passo
+    // dopo → { ok, accolto }; { reqId, id, togli: true } lo ritira se il modello non l'ha ancora letto → { ok, tolto, letto }.
+    // Solo pagine di Filo, solo la scheda del turno.
+    FILO_CHAT_SEGUITO: 'filo_chat_seguito',
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
@@ -930,7 +941,7 @@
     FILO_CHAT_GET: 'filo_chat_get',
     // Chiusura di una chat (ritorno alla home, chat nuova, chiusura dell'app):
     // fissa la data di chiusura e fa partire la classificazione (titolo +
-    // conversazione/comando). { id } → { ok }
+    // conversazione/comando). `fine`: chiusa apposta dall'utente, una scheda nuova non la continua. { id, fine? } → { ok }
     FILO_CHAT_CLOSE: 'filo_chat_close',
     // Cancellazione manuale di una chat, dopo la conferma. { id } → { ok, chats }
     FILO_CHAT_DELETE: 'filo_chat_delete',
@@ -1083,6 +1094,7 @@
     // livelli di sicurezza della chat dashboard. Torna { executed, kept,
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
+    // Da un sito visitato (con FILO_CONFIRM_ACTION) torna senza `output`: quello che l'azione ha letto resta a Filo.
     FILO_RUN_ACTION: 'filo_run_action',
     // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
     // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.

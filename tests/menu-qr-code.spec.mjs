@@ -8,6 +8,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { roundTrip, SN_QR } from './helpers/qr-decode.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo QR test</h1>
@@ -16,7 +17,7 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 
 async function openMenu(page) {
   await page.locator('#p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   return menu;
 }
@@ -29,7 +30,7 @@ test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', as
   // Feedback alpha: il QR deve stare FRA LE AZIONI RAPIDE (riga icone primaria),
   // non sepolto nell'overflow "Altro…". Lo cerchiamo direttamente nella riga,
   // fuori dalla griglia secondaria.
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   const qrBtn = menu.locator('.sn-menu-row [data-sn-icon-id="qrCode"]').first();
   await expect(qrBtn, 'qrCode deve essere fra le azioni rapide, non in "Altro…"').toBeVisible();
   // Sanity: l'overflow "Altro…" non è ancora aperto (la griglia secondaria non

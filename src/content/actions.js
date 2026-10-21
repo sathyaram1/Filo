@@ -104,6 +104,18 @@
     });
   }
 
+  // Senza fetch: la CSP di un sito può chiudere anche i data:.
+  function blobDaDataUrl(dataUrl) {
+    try {
+      const m = /^data:([^;,]+);base64,(.*)$/.exec(String(dataUrl || ''));
+      if (!m) return null;
+      const bin = atob(m[2]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: m[1] });
+    } catch (_) { return null; }
+  }
+
   // Descrizione provvisoria per un'immagine prima che arrivi quella generata
   // dall'AI (o il perché non arriverà: vedi imagePlaceholderLabel).
   async function describeImage(_blob) {
@@ -117,71 +129,53 @@
   const nostro = (ev) => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
 
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
+  // Gli appunti li legge il main per Filo: la pagina non riceve nessun permesso, nemmeno per un attimo (#586).
   async function pasteFromClipboard() {
     deps.restorePasteContext();
-    // Gli appunti li legge Filo per l'utente che ha scelto Incolla, non il sito: vale pochi secondi, solo qui.
-    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'appunti' }); } catch (_) {}
-    // Tenta lettura strutturata (testo + immagini)
-    try {
-      if (navigator.clipboard.read) {
-        const items = await navigator.clipboard.read();
-        for (const it of items) {
-          // Cerca un'immagine
-          const imgType = it.types.find((t) => t.startsWith('image/'));
-          if (imgType) {
-            const blob = await it.getType(imgType);
-            const dataUrl = await blobToDataUrl(blob);
-            deps.restorePasteContext();
-            const ctx = deps.getPasteContext();
-            const targetKind = ctx?.kind;
-            if (targetKind === 'input') {
-              // input/textarea non supportano immagini: prova a delegare ad
-              // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
-                bubbles: true, cancelable: true, detail: { blob },
-              }));
-              if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
-                return;
-              }
-              // Nessun handler ha accettato: ricadi sul testo se presente
-              const textType = it.types.find((t) => t === 'text/plain');
-              if (textType) {
-                const text = await (await it.getType(textType)).text();
-                insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text }, 'paste');
-              } else {
-                Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              }
-              return;
-            }
-            if (targetKind !== 'ce') {
-              // Nessun target editabile valido per un'immagine.
-              Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              return;
-            }
-            const ok = insertImageInEditable(blob, dataUrl);
-            if (!ok) {
-              Popup.showToast(I18n.t('toast_paste_failed'));
-              return;
-            }
-            const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
-            Popup.showToast(I18n.t('toast_pasted_image'));
-            return;
-          }
-        }
-      }
-    } catch (_) {
-      // Permessi negati o API non disponibile: ricadi sul testo
-    }
-    // Fallback: solo testo
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
+    let appunti = null;
+    try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
+    if (!appunti || !appunti.ok) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
+    const text = typeof appunti.testo === 'string' ? appunti.testo : '';
+    let blob = null;
+    if (appunti.immagine) blob = blobDaDataUrl(appunti.immagine);
+    if (blob) {
+      const dataUrl = appunti.immagine;
       deps.restorePasteContext();
-      insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text }, 'paste');
-    } catch (_) {}
+      const ctx = deps.getPasteContext();
+      const targetKind = ctx?.kind;
+      if (targetKind === 'input') {
+        // input/textarea non supportano immagini: prova a delegare ad
+        // un handler custom (es. il modal feedback) via evento bubbling.
+        const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
+          bubbles: true, cancelable: true, detail: { blob },
+        }));
+        if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) return;
+        if (text) {
+          insertTextAtSelection(text);
+          pushClipboardEntry({ type: 'text', text }, 'paste');
+        } else {
+          Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        }
+        return;
+      }
+      if (targetKind !== 'ce') {
+        // Nessun target editabile valido per un'immagine.
+        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        return;
+      }
+      if (!insertImageInEditable(blob, dataUrl)) {
+        Popup.showToast(I18n.t('toast_paste_failed'));
+        return;
+      }
+      const description = await describeImage(blob);
+      pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
+      Popup.showToast(I18n.t('toast_pasted_image'));
+      return;
+    }
+    if (!text) return;
+    deps.restorePasteContext();
+    insertTextAtSelection(text);
+    pushClipboardEntry({ type: 'text', text }, 'paste');
   }
 
   async function pasteHistoryEntry(entry) {

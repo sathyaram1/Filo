@@ -72,7 +72,7 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) 
         ? `Commit che aveva passato la verifica: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`
         : 'Commit che aveva passato la verifica: non comunicato.',
       '',
-      'Cosa ha scritto chi ha risolto il conflitto (dove c\'erano i conflitti, e se ha toccato la logica):',
+      'Cosa ha scritto chi ha rifatto la base (dove c\'erano i conflitti, se ha toccato la logica, quali unit erano rossi dopo il rebase):',
       report
         ? report.split('\n').map((l) => `> ${l}`).join('\n')
         : '  (nessun report: le zone in conflitto le ricavi dal diff; senza nemmeno quello, dichiaralo nella critica)',

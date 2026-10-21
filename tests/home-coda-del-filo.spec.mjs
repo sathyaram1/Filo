@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 mkdirSync(SHOTS, { recursive: true });
@@ -245,7 +246,7 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
   });
   const visita = await balene.getAttribute('data-id');
   await balene.click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   // Via quella visita; la riga si rifà sul filo, dove c'è anche la visita nuova che il clic ha aperto.
   await expect(riga.locator(`.dash-pagina[data-id="${visita}"]`)).toHaveCount(0);
   await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui balene');
@@ -325,7 +326,7 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   await riga.locator('.dash-pagine-testa').click();
   const orche = riga.locator('.dash-pagina', { hasText: 'YouTube: orche' });
   await orche.click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(orche).toHaveCount(0);
   const cerca = page.locator('#cercaInput');
   await cerca.fill('orche');
@@ -382,7 +383,7 @@ test('una pagina tolta dal filo mentre la sua scheda è aperta non torna nella r
   await riga.locator('.dash-pagine-testa').click();
   const orche = riga.locator('.dash-pagina', { hasText: 'orche marine' });
   await orche.click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(orche).toHaveCount(0);
   await shell.evaluate(async (u) => {
     const s = await window.filoShell.tabs.snapshot();
@@ -416,7 +417,7 @@ test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue
   const voce = page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'YouTube: orche' });
   await expect(voce).toHaveCount(1);
   await voce.click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(0);
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
   await expect(page.locator('.dash-pagine')).toHaveCount(0);
@@ -452,7 +453,7 @@ test('tolta la prima pagina del gruppo in corso, la riga resta una sola, aperta,
   await riga.locator('.dash-pagine-testa').click();
   const alfa = riga.locator('.dash-pagina', { hasText: 'alfa orche' });
   await alfa.click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(righePagine(page)).toHaveText(['2 pagine, fra cui gamma']);
   await expect(page.locator('.dash-pagine')).toHaveClass(/dash-pagine-aperte/);
   await visita(openTab, testServer, 'delta');
@@ -461,7 +462,7 @@ test('tolta la prima pagina del gruppo in corso, la riga resta una sola, aperta,
   // Dalla ricerca, la prima del gruppo: stessa cosa.
   await page.locator('#cercaInput').fill('beta');
   await page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'beta' }).click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(righePagine(page)).toHaveText(['2 pagine, fra cui delta']);
   await visita(openTab, testServer, 'epsilon');
   await tornaAllaHome(shell, page);

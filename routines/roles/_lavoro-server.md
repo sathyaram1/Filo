@@ -30,7 +30,7 @@ credenziali. La parte del server da qui non si fa, e la strada dipende dal perch
 - **un guasto** (GitHub che non risponde, il token respinto da GitHub o dal proxy, un rifiuto senza firma, i permessi
   della sessione, la rete): per qualunque ruolo è la domanda della
   sezione «Un guasto dell'ambiente si dice con una domanda», col testo esatto di git e la riga su chi ha respinto il
-  token. Il gruppo è `guasto: filo-security`;
+  token in `notePerAgenti`. Il gruppo è `guasto: filo-security`;
 - **un no per regola** (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro):
   - se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
     sezione «Se il lavoro si fa solo in locale», e scrivi nelle note il motivo;

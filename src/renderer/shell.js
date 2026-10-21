@@ -1123,6 +1123,7 @@
       const contenuto = Math.max(1, Math.ceil(w[i] - bordi));
       el.style.setProperty('--tab-chiesta', `${contenuto}px`);
       el.style.setProperty('--tab-crescita', String(contenuto));
+      el.classList.toggle('segni-stretti', w[i] < naturali[i]);
       el.classList.remove('misura');
     });
   }
@@ -1214,7 +1215,48 @@
     d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
     d.titolo = tabLabel(t);
     d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
+    const pm = t.permessi;
+    if (pm && ((pm.usati && pm.usati.length) || (pm.negati && pm.negati.length))) {
+      d.permessi = { usati: [...(pm.usati || [])].sort(), negati: [...(pm.negati || [])].sort() };
+    }
     return d;
+  }
+
+  // Il segno di cosa il sito della scheda ha avuto in questa pagina o si è visto negare (#586): icone piccole prima della
+  // croce. Se lo usa ancora lo sa solo la pagina, e la pagina può mentire: le frasi dicono cosa ha avuto, non «adesso».
+  const SEGNI_PERMESSI = {
+    audio: ['mic', 'Ha avuto il microfono in questa pagina', 'Microfono negato'],
+    video: ['camera', 'Ha avuto la fotocamera in questa pagina', 'Fotocamera negata'],
+    posizione: ['location', 'Ha saputo dove ti trovi in questa pagina', 'Posizione negata'],
+    schermo: ['windowFrame', 'Ha visto il tuo schermo in questa pagina', 'Schermo negato'],
+    notifiche: ['bell', '', 'Notifiche negate'],
+    appunti: ['clipboard', '', 'Appunti negati'],
+    schermi: ['windowFrame', '', 'Schermi negati'],
+    presenza: ['user', '', 'Presenza al computer negata'],
+    strumenti: ['readAloud', '', 'Strumenti musicali negati'],
+    rete: ['wifi', '', 'Rete locale negata'],
+    file: ['pencil', '', 'Modifica dei file negata'],
+  };
+  // Il primo segno è il più delicato: sulla scheda più stretta del suo contenuto resta solo lui (shell.css), la frase li dice tutti.
+  const PESO_SEGNO = ['schermo', 'video', 'audio', 'posizione'];
+  const pesoSegno = (x) => { const i = PESO_SEGNO.indexOf(x); return i < 0 ? PESO_SEGNO.length : i; };
+  function disegnaSegni(nodo, pm) {
+    const frasi = [];
+    nodo.replaceChildren();
+    const usati = [...pm.usati].sort((a, b) => pesoSegno(a) - pesoSegno(b));
+    for (const [parte, negato] of [...usati.map((x) => [x, false]), ...pm.negati.map((x) => [x, true])]) {
+      const def = SEGNI_PERMESSI[parte];
+      if (!def) continue;
+      const i = document.createElement('span');
+      i.className = negato ? 'segno negato' : 'segno';
+      i.dataset.parte = parte;
+      setIcon(i, def[0], 13);
+      nodo.appendChild(i);
+      frasi.push(negato ? def[2] : def[1]);
+    }
+    const tip = frasi.filter(Boolean).join(' · ');
+    nodo.dataset.tip = tip;
+    nodo.setAttribute('aria-label', tip);
   }
 
   function creaScheda(id) {
@@ -1228,7 +1270,7 @@
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
     else close.textContent = '×';
     el.append(ico, title, close);
-    el._parti = { ico, title, close, paese: null, audio: null };
+    el._parti = { ico, title, close, paese: null, audio: null, permessi: null };
     return el;
   }
 
@@ -1297,6 +1339,16 @@
       p.audio.innerHTML = muta ? MUTE_IND_SVG : AUDIO_IND_SVG;
     }
 
+    if (d.permessi && !p.permessi) {
+      p.permessi = document.createElement('span');
+      p.permessi.className = 'tab-permessi';
+      el.insertBefore(p.permessi, p.audio || p.close);
+    } else if (!d.permessi && p.permessi) {
+      p.permessi.remove();
+      p.permessi = null;
+    }
+    if (p.permessi) disegnaSegni(p.permessi, d.permessi);
+
     // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
     p.close.dataset.tip = d.attiva ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
   }
@@ -1335,7 +1387,7 @@
         el._firma = firma;
         cambiata = true;
       }
-      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0]);
+      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0, d.permessi || null]);
       nodi.push(el);
     }
     for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
@@ -1810,17 +1862,10 @@
   }
 
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
-  // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
-  // nativa della pagina) + pannello espandibile con i singoli download. Il
-  // pannello sfrutta reserveTop per rivelarsi SOPRA l'area pagina (che è una
-  // WebContentsView nativa e altrimenti lo occulterebbe).
+  // Pannello dei singoli download, che si apre da solo quando c'è una domanda (#588): nella fila di tab non
+  // c'è un tasto (#941), l'elenco sta nella home e nella pagina Download. reserveTop lo porta SOPRA la view
+  // nativa della pagina, che altrimenti lo coprirebbe.
   if (api.downloads) {
-    const dlBtn = document.getElementById('dl-indicator');
-    const dlIcon = document.getElementById('dl-ind-icon');
-    const dlCount = document.getElementById('dl-ind-count');
-    const dlFill = document.getElementById('dl-ind-fill');
-    setIcon(dlIcon, 'download', 15);
-
     // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
     let panelOpen = false;
@@ -1841,11 +1886,6 @@
 
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
-
-    // #1112 — nella home i download si vedono già (carte a sinistra, «Download» in «Altro»): lì l'indicatore
-    // c'è solo a pannello aperto, che una domanda sui programmi apre da sé (#588).
-    let suHome = true;
-    const indicatoreNascosto = () => dls.size === 0 || (suHome && !panelOpen);
 
     function fmtBytes(n) {
       n = Number(n) || 0;
@@ -1869,44 +1909,9 @@
       }
     }
 
-    function renderIndicator() {
-      const all = Array.from(dls.values());
-      if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
-      dlBtn.hidden = indicatoreNascosto();
-      const active = all.filter(isActive);
-      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
-      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
-      // segno che la domanda è ancora lì sparirebbe con lui.
-      const attesa = all.filter((r) => r && r.state === 'pending');
-      dlBtn.classList.toggle('attesa', attesa.length > 0);
-      dlBtn.dataset.tip = attesa.length
-        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
-        : 'Download';
-      if (active.length || attesa.length) {
-        dlCount.hidden = false;
-        dlCount.textContent = String(active.length + attesa.length);
-        // Avanzamento aggregato: byte ricevuti / totali sui download con totale
-        // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
-        let recv = 0; let total = 0; let known = 0;
-        for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (!active.length) {
-          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
-          // che aspetta l'utente e non si muove.
-          dlBtn.classList.remove('indeterminate', 'active');
-          dlFill.style.width = '0%';
-        } else if (known && total > 0) {
-          dlBtn.classList.remove('indeterminate');
-          dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
-          dlBtn.classList.add('active');
-        } else {
-          dlBtn.classList.add('indeterminate', 'active');
-          dlFill.style.width = '40%';
-        }
-      } else {
-        dlBtn.classList.remove('active', 'indeterminate');
-        dlCount.hidden = true;
-        dlFill.style.width = '0%';
-      }
+    // Un elenco svuotato non lascia aperto un pannello che direbbe solo «Nessun download».
+    function aggiornaPannello() {
+      if (!dls.size) { if (panelOpen) closePanel(); return; }
       if (panelOpen) renderPanel();
     }
 
@@ -1943,9 +1948,19 @@
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
+      // Senza un tasto nella fila di tab (#941) questa è la strada per chiuderlo col mouse; chiudere non risponde.
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'dl-panel-close';
+      closeBtn.id = 'dl-panel-close';
+      closeBtn.dataset.tip = 'Chiudi';
+      closeBtn.setAttribute('aria-label', 'Chiudi');
+      setIcon(closeBtn, 'close', 13);
+      closeBtn.addEventListener('click', () => closePanel());
       head.appendChild(title);
       head.appendChild(allBtn);
       head.appendChild(clearBtn);
+      head.appendChild(closeBtn);
       panel.appendChild(head);
       const list = document.createElement('div');
       list.className = 'dl-panel-list';
@@ -2188,8 +2203,6 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
-      dlBtn.hidden = indicatoreNascosto();
-      dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
       // I file possono essere spariti dal disco mentre il pannello era chiuso
@@ -2199,29 +2212,15 @@
     }
     function closePanel() {
       panelOpen = false;
-      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
-      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre un programma in attesa resta in
+      // attesa, e la risposta si dà dalla pagina Download o dalla carta della home.
       domandeApri.clear();
       avvisiRiga.clear();
       firmaElenco = '';
       if (panel) panel.hidden = true;
-      dlBtn.classList.remove('open');
-      dlBtn.hidden = indicatoreNascosto();
       riservaSopra('scaricamenti', 0);
     }
-    function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
-    dlBtn.addEventListener('click', togglePanel);
-
-    function seguiScheda(snap) {
-      const a = snap && Array.isArray(snap.tabs) ? snap.tabs.find((t) => t.id === snap.activeId) : null;
-      const home = isHomeUrl(a ? a.url : null);
-      if (home === suHome) return;
-      suHome = home;
-      renderIndicator();
-    }
-    api.tabs.onUpdate(seguiScheda);
-    api.tabs.snapshot().then(seguiScheda).catch(() => {});
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
@@ -2231,7 +2230,7 @@
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
-      renderIndicator();
+      aggiornaPannello();
       if (panelOpen) renderPanel();
     }
 
@@ -2241,7 +2240,7 @@
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
-      renderIndicator();
+      aggiornaPannello();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
       if (info.kind === 'ask') mostraRiga(info.item.id);
       else if (panelOpen) renderPanel();
@@ -2532,6 +2531,7 @@
       if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
       if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
       if (d.tipo === 'schermi') return { testo: 'vuole usare tutti i tuoi schermi', icone: ['windowFrame'] };
+      if (d.tipo === 'schermo') return { testo: 'vuole vedere il tuo schermo', icone: ['windowFrame'] };
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
@@ -2560,12 +2560,46 @@
       return bar;
     };
 
-    const rispondiA = (d, si) => {
+    const rispondiA = (d, si, fonte) => {
       const i = domande.indexOf(d);
       if (i >= 0) domande.splice(i, 1);
-      api.tabs.rispondiPermesso(d.id, si).catch(() => {});
+      api.tabs.rispondiPermesso(d.id, si, fonte).catch(() => {});
       mostraDomanda();
     };
+
+    const creaConsenti = (d) => {
+      const si = document.createElement('button');
+      si.type = 'button';
+      si.className = 'permesso-btn permesso-si';
+      si.textContent = 'Consenti';
+      si.addEventListener('click', () => rispondiA(d, true));
+      return si;
+    };
+
+    const fontiDelloSchermo = (d) => (Array.isArray(d.fonti) ? d.fonti : []).map((f) => {
+      const bt = document.createElement('button');
+      bt.type = 'button';
+      bt.className = 'permesso-btn permesso-fonte';
+      bt.dataset.tipo = String(f.tipo || '');
+      const nome = f.questa ? 'Questa scheda' : String(f.nome || '');
+      bt.dataset.tip = nome;
+      const vista = document.createElement('span');
+      vista.className = 'permesso-fonte-vista';
+      if (typeof f.anteprima === 'string' && f.anteprima.startsWith('data:image/')) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = f.anteprima;
+        vista.appendChild(img);
+      } else {
+        setIcon(vista, f.tipo === 'scheda' ? 'globe' : 'windowFrame', 22);
+      }
+      const n = document.createElement('span');
+      n.className = 'permesso-fonte-nome';
+      n.textContent = nome;
+      bt.append(vista, n);
+      bt.addEventListener('click', () => rispondiA(d, true, String(f.id || '')));
+      return bt;
+    });
 
     // Funzioni come costanti: una dichiarazione dentro il blocco rimpiazzerebbe il `render` della shell.
     const mostraDomanda = () => {
@@ -2618,25 +2652,30 @@
         n.title = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }
-      const si = document.createElement('button');
-      si.type = 'button';
-      si.className = 'permesso-btn permesso-si';
-      si.textContent = 'Consenti';
+      // Lo schermo (#586): ogni cosa che si può mostrare è il suo «Consenti», e la scelta vale per questa volta.
+      const consensi = d.tipo === 'schermo' ? fontiDelloSchermo(d) : [creaConsenti(d)];
       // Consenti si arma dopo ARMA_MS senza clic sulla striscia: una raffica che continua lo tiene spento (#591, giro 20).
       const arma = () => {
-        si.disabled = true;
+        for (const c of consensi) c.disabled = true;
         clearTimeout(timerArma);
-        timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+        timerArma = setTimeout(() => { if (mostrata === d) for (const c of consensi) c.disabled = false; }, ARMA_MS);
       };
       arma();
-      b.onpointerdown = () => { if (si.disabled) arma(); };
-      si.addEventListener('click', () => rispondiA(d, true));
+      b.onpointerdown = () => { if (consensi.some((c) => c.disabled)) arma(); };
       const no = document.createElement('button');
       no.type = 'button';
       no.className = 'permesso-btn permesso-no';
       no.textContent = 'Non consentire';
       no.addEventListener('click', () => rispondiA(d, false));
-      b.replaceChildren(icone, msg, no, si);
+      b.classList.toggle('permesso-schermo', d.tipo === 'schermo');
+      if (d.tipo === 'schermo') {
+        const fila = document.createElement('div');
+        fila.className = 'permesso-fonti';
+        fila.append(...consensi);
+        b.replaceChildren(icone, msg, no, fila);
+      } else {
+        b.replaceChildren(icone, msg, no, ...consensi);
+      }
       b.hidden = false;
       requestAnimationFrame(() => {
         const h = Math.ceil(b.getBoundingClientRect().height);
@@ -2664,6 +2703,66 @@
         }
       }
       mostraDomanda();
+    });
+  }
+
+  // Il microfono di Filo per una pagina web (#586): si apre qui, nella cornice, e alla pagina vanno solo i campioni a
+  // 16 kHz (services/microfonoDiFilo.js). Così il sito non riceve mai il permesso.
+  if (api.tabs.onMicrofono) {
+    const RATE = 16000;
+    const aperti = new Map();
+    const chiudiMic = (id) => {
+      const m = aperti.get(id);
+      aperti.delete(id);
+      if (!m || !m.ctx) return;
+      try { m.proc.onaudioprocess = null; m.proc.disconnect(); m.source.disconnect(); } catch (_) {}
+      try { m.stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+      try { m.ctx.close(); } catch (_) {}
+    };
+    const apriMic = async (id) => {
+      const Seg = window.SN_DICTATION_SEGMENTER;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      aperti.set(id, {});
+      let stream;
+      try {
+        if (!Seg || !Ctx) throw Object.assign(new Error('mic'), { name: 'NotSupportedError' });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        aperti.delete(id);
+        api.tabs.microfonoEsito(id, { ok: false, errore: String((e && e.name) || 'NotAllowedError') });
+        return;
+      }
+      // Chiuso mentre il sistema rispondeva: il microfono non resta acceso per nessuno.
+      if (!aperti.has(id)) { try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {} return; }
+      let ctx; let source; let proc;
+      try {
+        ctx = new Ctx();
+        source = ctx.createMediaStreamSource(stream);
+        proc = ctx.createScriptProcessor(4096, 1, 1);
+        try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
+      } catch (_) {
+        try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+        try { if (ctx) ctx.close(); } catch (_) {}
+        aperti.delete(id);
+        api.tabs.microfonoEsito(id, { ok: false, errore: 'NotReadableError' });
+        return;
+      }
+      aperti.set(id, { stream, ctx, source, proc });
+      proc.onaudioprocess = (e) => {
+        if (!aperti.has(id)) return;
+        try { api.tabs.microfonoDati(id, Seg.downsample(e.inputBuffer.getChannelData(0), ctx.sampleRate, RATE)); } catch (_) {}
+      };
+      source.connect(proc);
+      proc.connect(ctx.destination);
+      // Il microfono staccato a metà: la pagina lo sa, e non aspetta campioni che non arrivano.
+      for (const tr of stream.getAudioTracks()) tr.addEventListener('ended', () => { if (aperti.has(id)) { chiudiMic(id); api.tabs.microfonoFine(id); } });
+      api.tabs.microfonoEsito(id, { ok: true, rate: RATE });
+    };
+    api.tabs.onMicrofono(({ azione, id } = {}) => {
+      const k = String(id || '');
+      if (!k) return;
+      if (azione === 'apri') apriMic(k);
+      else if (azione === 'chiudi') chiudiMic(k);
     });
   }
 })();

@@ -153,7 +153,8 @@
   // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
-  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
+  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`, e
+  // nessun ripiego: se il produttore non risponde l'errore deve vedersi (#1059).
   // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
   function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
@@ -169,7 +170,10 @@
     if (tools) p.require_parameters = true;
     const C = global.SN_CONST;
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
-    if (rule) p.only = rule.only.slice();
+    if (rule) {
+      p.only = rule.only.slice();
+      p.allow_fallbacks = false;
+    }
     if (zdrApplies(model, ownKey)) p.zdr = true;
     return Object.keys(p).length ? p : null;
   }

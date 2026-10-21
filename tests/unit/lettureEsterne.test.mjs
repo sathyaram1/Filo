@@ -42,6 +42,18 @@ test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, rice
   assert.equal(L.motivoLettura(null), '');
 });
 
+test('classificatore: la lista dei passi, il riassunto e i capitoli dell’app desktop non sporcano; le sue letture sì (#1252)', () => {
+  const mcp = (tool_name) => L.motivoLettura({ tool_name, tool_input: { plan: [{ step: 'leggi https://x.it', status: 'pending' }], summary: 'fatto' } });
+  for (const n of ['mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_session__mark_chapter', 'mcp__ccd_turn__mark_chapter']) assert.equal(mcp(n), '', n);
+  // Le trascrizioni di altre sessioni, i widget, il browser, uno strumento qualsiasi; e i nomi che somigliano ai puliti
+  // senza esserlo: un altro server, un altro strumento, un a capo in coda.
+  for (const n of ['mcp__ccd_session__list_events', 'mcp__ccd_turn__list_events', 'mcp__ccd_widget__read_widget_context', 'mcp__Claude_Browser__navigate',
+    'mcp__Claude_Browser__get_page_text', 'mcp__github__get_file_contents', 'mcp__posta__update_plan', 'mcp__posta__mark_chapter', 'mcp__xccd_turn__mark_chapter',
+    'mcp__ccd__mark_chapter', 'mcp__ccd_turn__update_plan_x', 'mcp__ccd_turn__wrap_up__x', 'mcp__ccd_x__list_events__mark_chapter', 'mcp__ccd_turn__mark_chapter\n']) {
+    assert.equal(mcp(n), n.trim(), JSON.stringify(n));
+  }
+});
+
 test('classificatore: un artefatto sporca anche quando si pubblica; solo aprirlo, appuntarlo e cancellarlo no (#1211.2)', () => {
   const artefatto = (action, altro = {}) => L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, ...altro } });
   assert.equal(artefatto('read', { url: 'https://claude.ai/artifact/x' }), 'Artifact (read)');
@@ -64,7 +76,10 @@ test('classificatore: un sotto-agente sporca solo se gira fuori dal computer; To
   assert.equal(agente({ prompt: 'x' }, 'Task'), '');
   const cerca = (query) => L.motivoLettura({ tool_name: 'ToolSearch', tool_input: { query, max_results: 5 } });
   for (const q of ['select:Monitor', 'select:TaskCreate, TaskUpdate,EnterWorktree', ' select:WebFetch']) assert.equal(cerca(q), '', q);
-  for (const q of ['select:mcp__github__get_me', 'select:Monitor,mcp__x__y', 'select:MCP__x', 'select:*', 'select:', 'select:Monitor,', 'notebook jupyter', '+slack send', '', undefined]) {
+  // Caricare uno strumento MCP pulito non sporca più che chiamarlo (#1252).
+  for (const q of ['select:mcp__ccd_turn__update_plan,mcp__ccd_turn__wrap_up', 'select:Monitor, mcp__ccd_session__mark_chapter', 'select:mcp__ide__getDiagnostics']) assert.equal(cerca(q), '', q);
+  for (const q of ['select:mcp__github__get_me', 'select:Monitor,mcp__x__y', 'select:MCP__x', 'select:*', 'select:', 'select:Monitor,', 'notebook jupyter', '+slack send', '', undefined,
+    'select:mcp__ccd_turn__update_plan,mcp__ccd_session__list_events', 'select:mcp__ccd_widget__read_widget_context', 'ccd_turn update_plan']) {
     assert.equal(cerca(q), 'ToolSearch', String(q));
   }
 });
@@ -235,6 +250,9 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
     assert.deepEqual(prova('Read', { file_path: join(dirname(ROOT), 'LOCAL.md') }), []);
     assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plans', 'p.md') }, { env: { HOME: casa, USERPROFILE: casa } }), []);
     for (const n of ['Bash', 'Grep', 'Glob', 'mcp__ide__getDiagnostics']) assert.deepEqual(prova(n, { command: 'curl x', pattern: 'x', path: fuori }), [], n);
+    // L'apertura di un turno nell'app desktop: piano, capitolo, riassunto lasciano pulito; leggere gli eventi no (#1252).
+    for (const n of ['mcp__ccd_turn__update_plan', 'mcp__ccd_session__mark_chapter', 'mcp__ccd_turn__wrap_up']) assert.deepEqual(prova(n, { plan: [{ step: 'x', status: 'in_progress' }] }), [], n);
+    assert.deepEqual(prova('mcp__ccd_session__list_events', { session: 'altra' }), ['mcp__ccd_session__list_events']);
     assert.deepEqual(prova('SearchPlugins', { query: 'posta' }), ['SearchPlugins']);
     assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', isolation: 'remote' }), ['Agent (remote)']);
     assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', subagent_type: 'Explore' }), [], 'un sotto-agente locale');

@@ -41,6 +41,7 @@
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
+    LEGGI_PAGINA: 'readPage',
     CERCA_DOCUMENTI: 'search',
     LEGGI_TRASPARENZA: 'transparency',
     LEGGI_IMPOSTAZIONI: 'options',
@@ -80,7 +81,6 @@
   const PREVISTE = {
     LEGGI_POSTA: 'mailOpen',
     INVIA_POSTA: 'mailSend',
-    LEGGI_PAGINA: 'readPage',
     SCREENSHOT: 'screenshot',
     CLICCA: 'click',
     SCRIVI_NELLA_PAGINA: 'typeText',

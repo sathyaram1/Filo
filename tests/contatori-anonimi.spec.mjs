@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -328,7 +329,7 @@ test('selezionare senza aprire Spiega non conta usi; aprirla sulla risposta già
   // Aperta col tasto destro: la risposta era già pronta, nessuna chiamata nuova, un uso con un'attesa da nulla.
   const p = await puntoDellaParola(page, 'p2', 'fotosintesi');
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  await expect(page.locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
   expect(await app.evaluate(() => globalThis.__chiamate.spiega)).toBe(2);
   await expect.poll(() => usiOggi(app, 'explain'), { timeout: 5000 }).toBe(1);
   expect((await oggi(app)).uso.explain.fasce).toEqual({ ms500: 1 });
@@ -341,7 +342,7 @@ test('tradurre una pagina lunga è un uso, non uno per blocco', async ({ app, op
   const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><meta charset="utf-8"><body>${paragrafi}</body></html>`, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await page.locator('body').click({ button: 'right', position: { x: 5, y: 5 } });
-  await page.locator('[data-sn-icon-id="translate"]').click();
+  await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
   await expect(page.locator('p').last()).toHaveText(/^IT /, { timeout: 20_000 });
   const chiamate = await app.evaluate(() => globalThis.__chiamate.traduci);
   expect(chiamate, 'la pagina è abbastanza lunga da partire a più blocchi').toBeGreaterThan(2);

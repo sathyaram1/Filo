@@ -61,15 +61,19 @@ test('Claude via OpenRouter: la richiesta può andare solo agli host di Anthropi
   assert.deepEqual(conLista.provider.only, SOLO_ANTHROPIC);
   assert.deepEqual(conLista.provider.ignore, ['Google', 'OpenAI'], 'la lista di esclusione resta');
   assert.equal(conLista.provider.sort, 'latency');
+  // Nessun ripiego oltre il produttore (#1059): se Anthropic non risponde, l'errore si vede.
+  assert.equal(conLista.provider.allow_fallbacks, false);
 
   const senzaLista = await bodyOf(() => OpenRouter.complete({ apiKey: 'k', model: CLAUDE, messages: msgs }));
-  assert.deepEqual(senzaLista.provider, { only: SOLO_ANTHROPIC });
+  assert.deepEqual(senzaLista.provider, { only: SOLO_ANTHROPIC, allow_fallbacks: false });
 
   const inStreaming = await bodyOf(() => OpenRouter.streamComplete({ apiKey: 'k', model: 'Anthropic/Claude-Sonnet-4.5:thinking', messages: msgs, onDelta: () => {} }));
   assert.deepEqual(inStreaming.provider.only, SOLO_ANTHROPIC, 'maiuscole e varianti con i due punti sono lo stesso modello');
+  assert.equal(inStreaming.provider.allow_fallbacks, false);
 
   const indicizzazione = await bodyOf(() => OpenRouter.embed({ apiKey: 'k', model: CLAUDE, texts: ['a'] }));
   assert.deepEqual(indicizzazione.provider.only, SOLO_ANTHROPIC);
+  assert.equal(indicizzazione.provider.allow_fallbacks, false);
 });
 
 test('un modello non di Anthropic non viene legato a un host', async () => {
@@ -77,6 +81,7 @@ test('un modello non di Anthropic non viene legato a un host', async () => {
     apiKey: 'k', model: 'deepseek/deepseek-v4-flash', messages: [{ role: 'user', content: 'x' }], providerRouting: { ignore: ['DeepSeek'] },
   }));
   assert.equal(sent.provider.only, undefined);
+  assert.equal(sent.provider.allow_fallbacks, undefined, 'fra gli host ammessi di un modello aperto il ripiego serve');
   assert.equal(C.producerOnlyRule('mistralai/anthropic-like'), null);
   assert.equal(C.producerOnlyRule(''), null);
   assert.equal(C.producerOnlyRule(null), null);

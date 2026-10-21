@@ -4,6 +4,7 @@
 
 import { test, expect } from './helpers/reteFinta.mjs';
 import { nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA_A = '<title>Pagina A</title><body style="padding:40px;font:16px sans-serif"><h1>Articolo A</h1></body>';
 const PAGINA_B = '<title>Pagina B sorella</title><body style="padding:40px;font:16px sans-serif"><h1>Articolo B</h1></body>';
@@ -108,8 +109,8 @@ test('dal menu della pagina c\'è la stessa data, e quella scritta dalla pagina 
   });
 
   await pageA.locator('h1').click({ button: 'right' });
-  await expect(pageA.locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
-  await pageA.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await expect(menuDi(pageA).locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
+  await menuDi(pageA).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
   await expect(pageA.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
   await chiedi(pageA, 'da quanto è aperta questa scheda?');
 

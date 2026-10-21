@@ -45,6 +45,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 // Il tetto del testo che il server accetta vive in un posto solo: là sta anche
 // la regola che un taglio si dichiara invece di mangiare la parte che contava.
 import { testoEntroIlTetto, normalizzaChiavi, parolaDellaCostruzione, DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
+import { descriviErroreDiRete } from './lib/rete.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,35 +87,38 @@ function primaStringa(...valori) {
   return '';
 }
 
-// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
-// che serve a chi legge il guasto — degradare in silenzio non è degradare.
-// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
-// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
-async function fetchRemoteKeys(passphrase) {
-  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
+// Un solo «fetch failed» su un runner bastava a togliere Linux a una versione uscita (#1240): si copre un disservizio di minuti.
+export const ATTESE_S = [5, 15, 30, 60];
+// Senza tetto una richiesta appesa terrebbe fermo il lavoro fino al limite di sei ore di GitHub.
+export const TETTO_RICHIESTA_MS = 45_000;
+
+/** La rete e il server sovraccarico guariscono aspettando; un rifiuto o un documento senza chiavi no. PURA. */
+export function esitoDaRitentare(esito) {
+  if (!esito) return false;
+  if (esito.stato === 'rete') return true;
+  return esito.stato === 'http' && (esito.status >= 500 || esito.status === 429 || esito.status === 408);
+}
+
+function descriviErrore(e, tetto) {
+  if (e && e.name === 'TimeoutError') return `nessuna risposta in ${Math.ceil(tetto / 1000)} s`;
+  return descriviErroreDiRete(e);
+}
+
+async function unaRichiesta(passphrase, canale, tetto) {
   try {
-    const res = await fetch(`${CANALE}/buildKeys`, {
+    const res = await fetch(`${canale}/buildKeys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passphrase }),
+      signal: AbortSignal.timeout(tetto),
     });
-    if (!res.ok) {
-      const esito = { stato: 'http', status: res.status };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
-    }
+    if (!res.ok) return { apiKeys: {}, esito: { stato: 'http', status: res.status } };
     const j = await res.json().catch(() => null);
-    if (!j || typeof j !== 'object') {
-      const esito = { stato: 'illeggibile' };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
-    }
+    if (!j || typeof j !== 'object') return { apiKeys: {}, esito: { stato: 'illeggibile' } };
     // Il rifiuto arriva con HTTP 200 e `ok:false`: finiva in un `{}`
     // indistinguibile da «il documento non ha quella chiave», e non diceva niente.
     if (j.ok === false) {
-      const esito = { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
+      return { apiKeys: {}, esito: { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) } };
     }
     const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
     const sb = pickSafeBrowsing(j);
@@ -122,14 +126,37 @@ async function fetchRemoteKeys(passphrase) {
     const esito = Object.values(apiKeys).some((v) => typeof v === 'string' && v.trim())
       ? { stato: 'ok' }
       : { stato: 'senza-chiavi' };
-    if (esito.stato === 'senza-chiavi') {
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-    }
     return { apiKeys, esito };
   } catch (e) {
-    const esito = { stato: 'rete', messaggio: e.message };
-    console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-    return { apiKeys: {}, esito };
+    return { apiKeys: {}, esito: { stato: 'rete', messaggio: descriviErrore(e, tetto) } };
+  }
+}
+
+const attesaVera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
+// che serve a chi legge il guasto — degradare in silenzio non è degradare.
+// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
+// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
+export async function chiaviDalServer(passphrase, {
+  canale = CANALE, attese = ATTESE_S, tetto = TETTO_RICHIESTA_MS, aspetta = attesaVera, log = console.warn,
+} = {}) {
+  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
+  const tentativi = attese.length + 1;
+  for (let i = 0; ; i++) {
+    const r = await unaRichiesta(passphrase, canale, tetto);
+    if (esitoDaRitentare(r.esito) && i < attese.length) {
+      log(`[bake] ${descriviEsitoServer(r.esito)} Riprovo fra ${attese[i]} s (tentativo ${i + 1} di ${tentativi}).`);
+      await aspetta(attese[i] * 1000);
+      continue;
+    }
+    if (esitoDaRitentare(r.esito)) r.esito.tentativi = tentativi;
+    if (r.esito.stato === 'ok') {
+      if (i > 0) log(`[bake] chiavi dal server al tentativo ${i + 1} di ${tentativi}.`);
+    } else {
+      log(`[bake] ${descriviEsitoServer(r.esito)} Uso i secret d'ambiente.`);
+    }
+    return r;
   }
 }
 
@@ -174,15 +201,16 @@ const FONTE_SAFE_BROWSING = {
 /** Perché il server non ha dato la chiave, in una frase. PURA. */
 export function descriviEsitoServer(esito) {
   const e = esito || {};
+  const aTutti = e.tentativi > 1 ? `, a tutti i ${e.tentativi} tentativi` : '';
   switch (e.stato) {
     case 'passphrase-assente':
       return 'La costruzione non ha nemmeno interrogato il server: FILO_BUILD_PASSPHRASE è assente dal job.';
     case 'rifiutato':
       return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata. Va ricopiata ${DOVE_VA_LA_PAROLA}.`;
     case 'http':
-      return `Il server ha risposto HTTP ${e.status}.`;
+      return `Il server ha risposto HTTP ${e.status}${aTutti}.`;
     case 'rete':
-      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'}).`;
+      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'})${aTutti}.`;
     case 'illeggibile':
       return 'Il server ha risposto qualcosa che non è JSON: non è detto che sia il server giusto.';
     case 'senza-chiavi':
@@ -214,7 +242,7 @@ async function main() {
     console.warn('[bake] FILO_BUILD_PASSPHRASE assente: uso solo i secret d\'ambiente FILO_DEFAULT_*.');
   }
 
-  const { apiKeys: remote, esito: esitoServer } = await fetchRemoteKeys(passphrase);
+  const { apiKeys: remote, esito: esitoServer } = await chiaviDalServer(passphrase);
 
   const pick = (remoteKey, envName) => {
     const r = typeof remote[remoteKey] === 'string' ? remote[remoteKey].trim() : '';
@@ -256,7 +284,7 @@ async function main() {
     // d'ordine mancante del tutto) l'allarme non può suonare, perché si apre con
     // quella stessa parola d'ordine. È il motivo per cui serve fermarsi: una
     // pubblicazione che fallisce si vede, una riga rossa in un registro no.
-    await avvisa(mancanti, righe);
+    await avvisa(mancanti, righe, esitoServer);
     process.exit(1);
   }
 
@@ -301,9 +329,17 @@ export function chiaviAllarmeBake(mancanti) {
   return chiavi.length ? chiavi : ['bake'];
 }
 
+/** Col server muto la chiave sul server c'è: «manca la chiave» mandava l'owner a cercarla dove non mancava (#1240). PURA. */
+export function titoloAllarmeBake(nomi, esitoServer) {
+  if (esitoDaRitentare(esitoServer)) {
+    return `Pubblicazione ferma: il server delle chiavi non ha risposto${nomi ? ` e il job non ha la chiave di riserva ${nomi}` : ''}`;
+  }
+  return nomi ? `Pubblicazione ferma: manca la chiave di default ${nomi}` : 'Pubblicazione ferma: nessuna chiave di default';
+}
+
 // Apre un feedback quando la costruzione sta per produrre una versione monca,
 // con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
-async function avvisa(mancanti, righe) {
+async function avvisa(mancanti, righe, esitoServer) {
   const passphrase = parolaDellaCostruzione();
   if (!passphrase) {
     console.warn('::warning::Nessun feedback aperto per questa pubblicazione ferma: l\'allarme si apre con FILO_BUILD_PASSPHRASE, che qui manca. Resta solo il guasto qui sopra.');
@@ -321,9 +357,7 @@ async function avvisa(mancanti, righe) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         passphrase,
-        name: nomi
-          ? `Pubblicazione ferma: manca la chiave di default ${nomi}`
-          : 'Pubblicazione ferma: nessuna chiave di default',
+        name: titoloAllarmeBake(nomi, esitoServer),
         text: testo,
         keys: chiaviAllarmeBake(mancanti),
       }),

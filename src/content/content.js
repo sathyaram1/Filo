@@ -204,10 +204,13 @@
       // e lo mescola col fondo della barra nelle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
-      // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
+      // Segnali di attività (§2.1): ultima interazione, % di scroll.
       // Servono all'LLM per decidere cosa archiviare.
       try { startTabActivityReporter(); } catch (_) {}
     }
+    // Il testo da inviare invece si guarda in ogni frame: editor, commenti e
+    // moduli di contatto stanno spesso in un riquadro (#824).
+    try { startFormTracker(); } catch (_) {}
 
     // Siamo nati mentre lo schermo intero era già acceso? Lo CHIEDIAMO, non
     // aspettiamo l'annuncio: l'annuncio parte quando la modalità cambia, e una
@@ -489,11 +492,9 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta, quanto ha
-  // scrollato (0-100%) e se ha "sporcato" un form (input non ancora inviato).
-  // Throttled per non inondare l'IPC.
+  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
+  // scrollato (0-100%). Throttled per non inondare l'IPC.
   function startTabActivityReporter() {
-    let formDirty = false;
     let lastSentScroll = -1;
     let pending = false;
     let lastSend = 0;
@@ -535,26 +536,465 @@
       }, 500);
     }
 
-    // Form "sporco": primo input/change su un campo editabile. Si manda una volta.
-    function onFormInput(e) {
-      if (formDirty) return;
-      const t = e.target;
-      if (!t) return;
-      const tag = (t.tagName || '').toUpperCase();
-      const editable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
-      if (!editable) return;
-      formDirty = true;
-      send({ formDirty: true, scrollPct: Math.round(scrollPct()) });
-    }
-
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
     window.addEventListener('keydown', onInteract, { passive: true, capture: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('input', onFormInput, { passive: true, capture: true });
-    window.addEventListener('change', onFormInput, { passive: true, capture: true });
 
     // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+  }
+
+  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
+  // (#824). Conta il testo nato da un gesto (o scritto da Filo per lui), seguito per contenuto; il sito
+  // l'ha ricevuto quando una richiesta riuscita lo porta (src/main/tabs.js). Porte: tests/tab-auto-archive.spec.mjs.
+  function startFormTracker() {
+    if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
+    const PAGINA_DI_FILO = /^filo:/i.test(location.href);
+    // Area in cui l'utente ha scritto → testo che mostrava prima che ci scrivesse.
+    const aree = new Map();
+    const basi = new WeakMap();
+    // Caselle a più righe ed editor: il solo testo che si segue fuori dal suo campo.
+    const lunghe = new WeakSet();
+    // Componenti chiusi in cui è arrivata una scrittura: il testo lì dentro non si legge.
+    const opachi = new Set();
+    // Testo di un campo tolto dalla pagina: la pagina può tenerlo in memoria (il passo dopo di una
+    // procedura, il riepilogo), quindi protegge finché non ricompare in un campo o non parte. { t, righe }
+    const orfani = [];
+    // Le righe di ogni area all'ultima rilettura: tolta dalla pagina, un editor non le dà più.
+    const righeViste = new WeakMap();
+    // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
+    const partiti = new Set();
+    let ultimoMandato = null;
+    let ultimeImpronte = '';
+    let ultimoTocco = null;
+    let rilettura = null;
+    const TIPI_DI_TESTO = /^(text|search|email|url|tel|password|number)$/;
+    function campoDiTesto(t) {
+      if (t && t.nodeType === 3) t = t.parentElement;
+      if (!t || !t.tagName) return null;
+      const tag = t.tagName.toUpperCase();
+      if (tag === 'TEXTAREA') return t;
+      if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
+      if (!t.isContentEditable) return null;
+      while (t.parentElement && t.parentElement.isContentEditable) t = t.parentElement;
+      return t;
+    }
+    // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
+    // dato i risultati senza un invio da riconoscere.
+    function diRicerca(el) {
+      const tag = el.tagName.toUpperCase();
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+      if (/^searchbox$/i.test(el.getAttribute('role') || '') || el.closest('[role="search" i]')) return true;
+      if (/^(q|s|k|query|search|search_query|keywords?|field-keywords)$/i.test(el.name || '')) return true;
+      if (tag === 'TEXTAREA') return false;
+      if (String(el.type).toLowerCase() === 'search') return true;
+      return /(search|cerca|ricerca|busca|recherche|suche)/i.test(`${el.getAttribute('aria-label') || ''} ${el.placeholder || ''}`);
+    }
+    const grande = (el) => { try { const r = el.getBoundingClientRect(); return r.width >= 8 && r.height >= 8; } catch (_) { return true; } };
+    function primoGrande(da, body) {
+      for (let p = da, n = 0; p && p !== body && n < 8; p = p.parentElement, n++) if (grande(p)) return p;
+      return null;
+    }
+    // Gli editor di codice ricevono i tasti in una casella minuscola e mostrano il testo
+    // altrove: l'area è il contenitore visibile, o quello su cui si è cliccato per scrivere.
+    const areaDelCampo = new WeakMap();
+    function areaDi(campo) {
+      if (campo.isContentEditable) return campo;
+      let area = areaDelCampo.get(campo);
+      if (area && area.isConnected) return area;
+      const body = campo.ownerDocument.body;
+      const tocco = ultimoTocco && ultimoTocco.ownerDocument === campo.ownerDocument ? ultimoTocco : null;
+      area = grande(campo) ? campo : (primoGrande(campo.parentElement, body) || (tocco && primoGrande(tocco, body)) || campo);
+      areaDelCampo.set(campo, area);
+      return area;
+    }
+    function testo(area) {
+      const tag = area.tagName.toUpperCase();
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return area.value || '';
+      if (area.isContentEditable) return area.textContent || '';
+      return area.innerText || area.textContent || '';
+    }
+    // Gli editor ricchi lasciano spazi a larghezza zero anche quando sono vuoti.
+    const pulito = (s) => String(s).replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, '');
+    // Solo lettere e cifre minuscole, come il main riduce il testo delle richieste: il sito pu\u00F2
+    // averlo mandato in Markdown, in HTML o con le maiuscole sue.
+    const essenziale = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '');
+    // Casella a pi\u00F9 righe \u2192 il suo testo all'ultima richiesta riuscita che lo portava al sito.
+    const ricevuti = new WeakMap();
+    // Campo di una riga \u2192 il suo testo dopo l'ultima scrittura dell'utente: se la pagina lo cambia
+    // (una voce scelta dai suggerimenti, una correzione) quel testo non \u00E8 pi\u00F9 suo.
+    const digitati = new WeakMap();
+    const sostituito = (area) => !lunghe.has(area) && digitati.has(area) && essenziale(testo(area)) !== digitati.get(area);
+    // Un riquadro tolto dalla pagina lascia i suoi nodi «connessi» a un documento morto.
+    const viva = (a) => a.isConnected && !!(a.ownerDocument && a.ownerDocument.defaultView);
+
+    // Quello che Filo scrive per l'utente (Incolla, dettatura, sostituzioni, l'agente) arriva con
+    // eventi sintetici dal suo mondo isolato e conta come un gesto; quelli della pagina no.
+    let daFilo = 0;
+    const segnate = new WeakSet();
+    function segnaScrittureDiFilo(win) {
+      if (PAGINA_DI_FILO) return;
+      try {
+        const proto = win.EventTarget.prototype;
+        if (segnate.has(proto)) return;
+        segnate.add(proto);
+        const originale = proto.dispatchEvent;
+        proto.dispatchEvent = function (ev) { daFilo++; try { return originale.call(this, ev); } finally { daFilo--; } };
+      } catch (_) {}
+    }
+    const gesto = (e) => e.isTrusted || daFilo > 0 || PAGINA_DI_FILO;
+
+    // Un'area vuota resta in elenco: l'editor può rimetterci il testo dopo l'evento.
+    function stato() {
+      let daInviare = false;
+      for (const [area, base] of aree) {
+        if (!viva(area)) { lascia(area, base); continue; }
+        const ora = pulito(testo(area));
+        if (ora && ora !== pulito(base) && !sostituito(area)) daInviare = true;
+      }
+      // Un componente chiuso tolto dalla pagina non dice se il testo è ricomparso: resta protetto.
+      return daInviare || opachi.size > 0 || orfani.length > 0;
+    }
+    function righeDi(area) {
+      let s = '';
+      try { s = area.isContentEditable ? area.innerText || area.textContent || '' : testo(area); } catch (_) { s = testo(area); }
+      return s.split(/\r\n|\r|\n/).map(pulito).filter(Boolean);
+    }
+    function lascia(area, base) {
+      aree.delete(area);
+      // Una password non è una bozza: dopo un accesso fatto senza cambiare pagina proteggerebbe per sempre.
+      if (/^input$/i.test(area.tagName) && String(area.type).toLowerCase() === 'password') return;
+      const t = pulito(testo(area));
+      if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
+      if (ricevuti.get(area) === t || sostituito(area)) return;
+      const viste = righeViste.get(area);
+      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
+      if (orfani.length > 100) orfani.shift();
+    }
+    // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
+    // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
+    function partito(inviato) {
+      if (typeof inviato !== 'string' || !inviato) return;
+      const dentro = (t, righe) => {
+        const tutto = essenziale(t);
+        if (tutto && inviato.includes(tutto)) return true;
+        const r = righe.map(essenziale).filter(Boolean);
+        return r.length > 0 && r.every((x) => inviato.includes(x));
+      };
+      // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
+      stato();
+      for (const area of [...aree.keys()]) {
+        if (!viva(area)) continue;
+        const ora = testo(area);
+        if (!pulito(ora) || !dentro(ora, righeDi(area))) continue;
+        if (lunghe.has(area)) ricevuti.set(area, pulito(ora)); else aree.set(area, ora);
+      }
+      for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
+      aggiorna(false);
+    }
+    function impronta(s) {
+      let h1 = 0xdeadbeef;
+      let h2 = 0x41c6ce57;
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+    }
+    function impronte() {
+      const out = new Set(partiti);
+      for (const [area, base] of aree) {
+        if (!lunghe.has(area) || !viva(area)) continue;
+        const t = pulito(testo(area));
+        if (t && t !== pulito(base) && ricevuti.get(area) !== t) out.add(impronta(t));
+      }
+      return [...out].slice(-50);
+    }
+    function invia(payload) {
+      try { Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {}); } catch (_) {}
+    }
+    // Solo la digitazione vera è un'interazione: una risposta al ricontrollo non
+    // deve far sembrare la scheda appena usata al modello.
+    function manda(ora, daUtente) {
+      ultimoMandato = ora;
+      const payload = { type: MSG.TAB_ACTIVITY, formDirty: ora };
+      if (daUtente) payload.lastInteractionAt = Date.now();
+      invia(payload);
+    }
+    // Le impronte partono a riposo (dopo la rilettura, all'invio, al ricontrollo), mai a ogni tasto.
+    function mandaImpronte() {
+      const imp = impronte();
+      const k = imp.join(',');
+      if (k === ultimeImpronte) return;
+      ultimeImpronte = k;
+      invia({ type: MSG.TAB_ACTIVITY, impronte: imp });
+    }
+    function aggiorna(daUtente) {
+      const ora = stato();
+      if (ora !== ultimoMandato) manda(ora, daUtente);
+    }
+
+    const bersaglio = (e) => (e.composedPath && e.composedPath()[0]) || e.target;
+    // I riquadri di Filo nella pagina (feedback, spiegazioni, Aiuto) non sono del sito: il loro
+    // testo parte o si butta col riquadro. Vale l'elenco di chi li ha disegnati, non l'attributo.
+    function diFilo(el) {
+      let nostre = [];
+      try { nostre = self.SN_FILO_UI?.aperti?.() || []; } catch (_) {}
+      for (let n = el; n && nostre.length;) {
+        if (nostre.some((r) => r === n || (r.contains && r.contains(n)))) return true;
+        const radice = n.getRootNode && n.getRootNode();
+        n = radice && radice.host ? radice.host : null;
+      }
+      return false;
+    }
+    function campoDa(e) {
+      const el = campoDiTesto(bersaglio(e));
+      return el && !diRicerca(el) && !diFilo(el) ? el : null;
+    }
+    // Da dentro un componente chiuso la scrittura arriva al suo host, che non è un campo.
+    function opaco(e) {
+      if (typeof e.inputType !== 'string') return null;
+      const t = bersaglio(e);
+      if (!t || t.nodeType !== 1 || t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName)) return null;
+      return diFilo(t) ? null : t;
+    }
+    function aRiposo() {
+      clearTimeout(rilettura);
+      rilettura = setTimeout(() => {
+        stato();
+        for (const area of aree.keys()) righeViste.set(area, righeDi(area));
+        adotta(null);
+        aggiorna(false);
+        mandaImpronte();
+      }, 400);
+    }
+    // Un editor di codice riceve i tasti in una casella a più righe e mostra il testo altrove.
+    const aPiuRighe = (el) => !!el && (el.tagName.toUpperCase() === 'TEXTAREA' || el.isContentEditable);
+    function scritto(area, base, campo) {
+      if (!aree.has(area)) aree.set(area, base);
+      if (aPiuRighe(area) || aPiuRighe(campo)) lunghe.add(area);
+      else digitati.set(area, essenziale(testo(area)));
+      aggiorna(true);
+      aRiposo();
+    }
+    function scrittoInOpaco(e) {
+      const h = opaco(e);
+      if (!h || opachi.has(h)) return;
+      opachi.add(h);
+      aggiorna(true);
+    }
+    const iniziale = (a) => (/^(input|textarea)$/i.test(a.tagName) ? a.defaultValue || '' : '');
+    function onTocco(e) { ultimoTocco = bersaglio(e); }
+    function onPrima(e) {
+      if (!gesto(e)) return;
+      const campo = campoDa(e);
+      if (!campo) { scrittoInOpaco(e); return; }
+      const area = areaDi(campo);
+      if (!aree.has(area)) basi.set(area, testo(area));
+    }
+    function onFormInput(e) {
+      if (!gesto(e)) return;
+      const campo = campoDa(e);
+      if (!campo) { scrittoInOpaco(e); return; }
+      const area = areaDi(campo);
+      scritto(area, basi.has(area) ? basi.get(area) : iniziale(area), campo);
+    }
+    // Molti editor ricchi incollano e ricevono il trascinamento da soli, senza «input».
+    function onIncolla(e) {
+      if (!gesto(e)) return;
+      const campo = campoDa(e);
+      if (!campo) return;
+      const area = areaDi(campo);
+      scritto(area, testo(area), campo);
+      setTimeout(() => {
+        if (aree.has(area) && !lunghe.has(area)) digitati.set(area, essenziale(testo(area)));
+        aggiorna(true);
+      }, 0);
+    }
+
+    // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un rifiuto e un invio
+    // via script si somigliano: lì decide la risposta del sito alla richiesta che porta il testo (partito).
+    // Il testo si smette di seguire solo quando il documento se ne va (lo azzera il main): un modulo
+    // mandato in un'altra scheda, in un riquadro o senza cambiare pagina lo lascia nella casella.
+    function onSubmit(e) {
+      const form = e.target;
+      if (!form || !aree.size) return;
+      mandaImpronte();
+      setTimeout(() => {
+        if (e.defaultPrevented) return;
+        let conTesto = false;
+        for (const [a, base] of [...aree]) {
+          if (a.form !== form && !(form.contains && form.contains(a))) continue;
+          const ora = pulito(testo(a));
+          if (ora && ora !== pulito(base) && !sostituito(a)) conTesto = true;
+          const t = lunghe.has(a) ? ora : '';
+          if (t && t !== pulito(base)) partiti.add(impronta(t));
+        }
+        // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main).
+        // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
+        let dest = '';
+        try {
+          if (form.querySelector('input[type=password]')) conTesto = false;
+          dest = (e.submitter && e.submitter.getAttribute('formtarget')) || form.getAttribute('target') || '';
+        } catch (_) {}
+        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+        aggiorna(false);
+        mandaImpronte();
+      }, 0);
+    }
+    // L'accesso in testata c'è in ogni pagina del sito: nella pagina dopo non vuol dire sessione scaduta.
+    function passwordFuori(form) {
+      try {
+        return Array.prototype.some.call(document.querySelectorAll('input[type=password]'),
+          (el) => !form.contains(el) && el.getClientRects().length > 0);
+      } catch (_) { return false; }
+    }
+    // Il modulo parte anche senza il suo bottone (uno script, un controllo antispam, un editor in un
+    // riquadro che copia il testo nel modulo): conta quello che il modulo porta, non da dove si è scritto.
+    function onDatiModulo(e) {
+      const form = e.target;
+      if (IS_SUBFRAME || !form || !aree.size || !e.formData) return;
+      try {
+        if (form.querySelector('input[type=password]')) return;
+        if (!/^(|_self|_top)$/i.test(form.getAttribute('target') || '')) return;
+      } catch (_) { return; }
+      const valori = [];
+      try {
+        for (const [, v] of e.formData) {
+          if (typeof v !== 'string' || !v) continue;
+          const t = /[<&]/.test(v) ? new DOMParser().parseFromString(v, 'text/html').body.textContent || '' : v;
+          valori.push(essenziale(t));
+        }
+      } catch (_) {}
+      for (const [a, base] of aree) {
+        if (!viva(a) || sostituito(a)) continue;
+        const ora = testo(a);
+        if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
+        const ess = essenziale(ora);
+        if (ess && valori.some((v) => v.includes(ess))) {
+          invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+          return;
+        }
+      }
+    }
+
+    // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
+    // pagina: solo al ricontrollo, mai al caricamento.
+    function radici(doc) {
+      const out = [doc];
+      for (let i = 0; i < out.length; i++) for (const el of out[i].querySelectorAll('*')) if (el.shadowRoot) out.push(el.shadowRoot);
+      return out;
+    }
+    function* documenti(doc, n = 0) {
+      yield doc;
+      if (n >= 4) return;
+      for (const r of radici(doc)) for (const f of r.querySelectorAll('iframe, frame')) {
+        let d = null;
+        try { d = f.contentDocument; } catch (_) {}
+        if (d) yield* documenti(d, n + 1);
+      }
+    }
+    // Il testo dell'utente si segue per contenuto: un campo che mostra il testo di un'area tolta
+    // (cambio di editor) o rimandato dal server (anteprima, invio respinto, passo dopo) è ancora suo.
+    function adotta(daServer) {
+      const cercate = new Set(Array.isArray(daServer) ? daServer.map(String) : []);
+      if (!cercate.size && !orfani.length) return;
+      for (const doc of documenti(document)) for (const r of radici(doc)) {
+        for (const el of r.querySelectorAll('textarea, [contenteditable], input')) {
+          const nascosto = el.tagName.toUpperCase() === 'INPUT' && String(el.type).toLowerCase() === 'hidden';
+          const area = nascosto ? el : campoDiTesto(el);
+          if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area) || diFilo(area)) continue;
+          const t = pulito(testo(area));
+          if (!t) continue;
+          const o = orfani.findIndex((x) => x.t === t || (x.t.length >= 20 && t.includes(x.t)));
+          if (o < 0 && !cercate.has(impronta(t))) continue;
+          if (o >= 0) orfani.splice(o, 1);
+          aree.set(area, '');
+          if (area.tagName.toUpperCase() !== 'INPUT' || nascosto) lunghe.add(area);
+        }
+      }
+    }
+    // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
+    // non caricano Filo: li segue il documento che li contiene. Riaggiungere gli
+    // ascoltatori non li duplica, e dopo un document.open() li rimette.
+    function osserva(win) {
+      const o = { passive: true, capture: true };
+      segnaScrittureDiFilo(win);
+      try {
+        win.addEventListener('pointerdown', onTocco, o);
+        win.addEventListener('beforeinput', onPrima, o);
+        win.addEventListener('input', onFormInput, o);
+        win.addEventListener('change', onFormInput, o);
+        win.addEventListener('paste', onIncolla, o);
+        win.addEventListener('drop', onIncolla, o);
+        win.addEventListener('submit', onSubmit, o);
+        win.addEventListener('formdata', onDatiModulo, o);
+        win.addEventListener('blur', onUscita);
+        win.document.addEventListener('load', onCaricato, o);
+        for (const f of win.document.querySelectorAll('iframe, frame')) riquadro(f);
+      } catch (_) {}
+    }
+    function riquadro(f) {
+      let w = null;
+      try { w = f.contentWindow; if (!w || !w.document) return; } catch (_) { return; }
+      osserva(w);
+    }
+    const eRiquadro = (t) => !!(t && t.tagName && /^i?frame$/i.test(t.tagName));
+    function onCaricato(e) { if (eRiquadro(e.target)) riquadro(e.target); }
+    function onUscita(e) {
+      const w = e.target;
+      setTimeout(() => {
+        try {
+          let a = w.document.activeElement;
+          while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+          if (eRiquadro(a)) riquadro(a);
+        } catch (_) {}
+      }, 0);
+    }
+
+    // Tornando Indietro il browser rimette nei campi il testo di prima, senza
+    // eventi: è ancora testo dell'utente.
+    function adottaRipristinati() {
+      let nav = null;
+      try { nav = performance.getEntriesByType('navigation')[0]; } catch (_) {}
+      if (!nav || nav.type !== 'back_forward') return;
+      for (const el of document.querySelectorAll('input, textarea')) {
+        if (!campoDiTesto(el) || diRicerca(el) || !grande(el) || el.value === el.defaultValue) continue;
+        aree.set(el, el.defaultValue);
+        if (el.tagName.toUpperCase() === 'TEXTAREA') lunghe.add(el);
+      }
+    }
+    adottaRipristinati();
+    // In un riquadro Filo si monta al primo tocco: quel che si è scritto prima
+    // dell'arrivo di questo script sta nel campo col fuoco.
+    const attivo = IS_SUBFRAME && campoDiTesto(document.activeElement);
+    if (attivo && !diRicerca(attivo) && areaDi(attivo) === attivo
+      && (attivo.isContentEditable || attivo.value !== attivo.defaultValue)) {
+      aree.set(attivo, attivo.isContentEditable ? '' : attivo.defaultValue);
+      if (attivo.isContentEditable || attivo.tagName.toUpperCase() === 'TEXTAREA') lunghe.add(attivo);
+    }
+    if (aree.size) { aggiorna(false); mandaImpronte(); }
+
+    osserva(window);
+    // Pagina tornata dalla cache di navigazione: per il main è un documento nuovo.
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return;
+      manda(stato(), false);
+      ultimeImpronte = '';
+      mandaImpronte();
+    });
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
+      if (!msg || msg.type !== MSG.FORM_RECHECK) return;
+      osserva(window);
+      stato();
+      try { adotta(msg.impronte); } catch (_) {}
+      manda(stato(), false);
+      mandaImpronte();
+    });
   }
 
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).

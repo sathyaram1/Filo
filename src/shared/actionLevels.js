@@ -19,6 +19,15 @@
     + 'memorie. Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
     + 'documento potrebbe provare a fargliela ricordare.';
 
+  // La regola dell'indirizzo scritto (#553, decisione dell'owner su D-20): `_nonCompare` lo scrive il main
+  // (src/main/services/handlers.js → controllaUscita), mai l'LLM, e può solo alzare.
+  const RISCHIO_INVENTATO = 'Non compare da nessuna parte: non nelle tue parole, non nei risultati, non nelle pagine lette. '
+    + 'Un indirizzo inventato può portare fuori tuoi dati anche scritto con parole normali. Conferma solo se l\'hai chiesto tu.';
+  function costoIndirizzo(a, base) {
+    if (a && a._nonCompare) return 3;
+    return a && a._exfil ? Math.max(base, 2) : base;
+  }
+
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
@@ -210,18 +219,22 @@
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
       // La ricerca dell'Aiuto (`cerca`) porta fuori testo della pagina: costo 2, deciso qui una volta sola
       // (#530). Il campo può solo alzare il costo, quindi chi lo forgia non ottiene niente.
-      costo: (a) => (a && (a._exfil || a.cerca) ? 2 : 1),
+      costo: (a) => costoIndirizzo(a, a && a.cerca ? 2 : 1),
       campo: 'web',
-      uscita: (a) => String((a && (a.url ?? a.href ?? a.link)) || ''),
+      uscita: (a) => indirizzoDi(a),
       describe: (a) => {
-        const url = a.url || a.href || a.link || 'una pagina';
+        const url = indirizzoDi(a) || 'una pagina';
+        if (a && a._nonCompare) {
+          const primo = a._exfilReason ? `Aprire un link che ${a._exfilReason}, scritto a memoria da Filo` : 'Aprire un indirizzo scritto a memoria da Filo';
+          return [`${primo}:\n`, cit(url, true), `\n\n${RISCHIO_INVENTATO}`];
+        }
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
           return [`Aprire un link${why}:\n`, cit(url, true),
             '\n\nPotrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.'];
         }
         if (a && typeof a.cerca === 'string' && a.cerca.trim()) return ['Cercare sul web:\n', cit(a.cerca.trim())];
-        return a.url || a.href || a.link ? ['Aprire ', cit(url, true)] : 'Aprire una pagina';
+        return indirizzoDi(a) ? ['Aprire ', cit(url, true)] : 'Aprire una pagina';
       },
     },
     // Mette in chat il bottone del file e basta: ad aprirlo è il clic dell'utente (#947) → resta in chat, costo 0.
@@ -504,6 +517,35 @@
         const perche = documentoFuori(a);
         const motivo = perche ? [`\nPerché te lo chiedo: ${perche}`] : [];
         return p ? ['Leggere il documento ', cit(p, true), ...motivo] : ['Leggere il documento', ...motivo];
+      },
+    },
+    LEGGI_PAGINA: {
+      // Leggere è sola lettura, ma scaricare è una richiesta che esce: costa come aprire lo stesso indirizzo (NAVIGA).
+      // La scheda già aperta si legge senza uscire: resta in chat. `_nonCompare` ed `_exfil` li scrive il main, mai l'LLM.
+      costo: (a) => costoIndirizzo(a, indirizzoDi(a) ? 1 : 0),
+      campo: 'web',
+      uscita: (a) => indirizzoDi(a),
+      // Chi scrive la pagina è un autore ignoto, anche quando la pagina è una scheda dell'utente.
+      fonte: (a, out) => (out && (out.testo || out.text)
+        ? { classe: 5, campo: 'web', chiave: 'web:pagina', motivo: out.fonte === 'scheda' ? 'ho letto una pagina aperta in una tua scheda' : 'ho letto una pagina web' }
+        : null),
+      describe: (a) => {
+        const url = indirizzoDi(a);
+        if (!url && a && a.scheda) return ['Leggere la pagina aperta nella scheda ', cit(a.scheda)];
+        if (a && a._nonCompare) {
+          const primo = a._exfilReason ? `Leggere una pagina il cui indirizzo ${a._exfilReason}, scritto a memoria da Filo` : 'Leggere un indirizzo scritto a memoria da Filo';
+          return [`${primo}:\n`, cit(url, true), `\n\n${RISCHIO_INVENTATO}`];
+        }
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return [`Filo sta per leggere una pagina il cui indirizzo${why}:\n`, cit(url, true),
+            '\n\nPotrebbe inviare tuoi dati a un sito esterno. Conferma solo se l\'hai chiesto tu.'];
+        }
+        return url ? ['Leggere la pagina ', cit(url, true)] : 'Leggere una pagina';
+      },
+      describeDone: (a) => {
+        const url = indirizzoDi(a);
+        return url ? `Letta la pagina ${url}` : 'Letta una pagina';
       },
     },
     VEDI_SCHERMO: {
@@ -1109,7 +1151,7 @@
   // Sola lettura: non cambiano niente e nessuna aspetta l'esito di un'altra, quindi il giro della chat le lancia insieme
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
-    'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
     'VEDI_SCHERMO', 'CERCA_SALVATE',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
@@ -1188,5 +1230,17 @@
     try { return entry.describeDone(action) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza };
+  // L'indirizzo di un'azione che esce in rete, preso da tutti i campi che l'esecuzione accetta: il freno contro
+  // l'esfiltrazione, il popup e chi esegue leggono lo stesso campo, o un campo in più diventa una porta (#553).
+  const CAMPI_INDIRIZZO = ['url', 'href', 'link', 'indirizzo'];
+  function indirizzoDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_INDIRIZZO) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, indirizzoDi, costoIndirizzo };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

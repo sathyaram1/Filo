@@ -378,6 +378,17 @@ test('#592.7 — il testo proposto arriva intero nel suo riquadro, e il bottone 
   assert.match(AL.describe({ type: 'MODIFICA_SVEGLIA', orario: '08:00', _targets: ['a', 'b'] }), /alle 08:00/);
 });
 
+// #553, giro 12: la lettura accettava l'indirizzo nel campo «indirizzo» e il freno guardava solo «url»: la richiesta
+// carica di dati partiva senza conferma. Un campo in più fra chi esegue e chi frena è una porta.
+test('l\'indirizzo di un\'azione che esce in rete si legge da un posto solo, per il freno, il popup e chi esegue', () => {
+  for (const k of ['url', 'href', 'link', 'indirizzo']) assert.equal(AL.indirizzoDi({ [k]: ' https://x.it ' }), 'https://x.it', k);
+  assert.equal(AL.indirizzoDi({ url: '', indirizzo: 'https://y.it' }), 'https://y.it');
+  assert.ok(AL.describe({ type: 'LEGGI_PAGINA', indirizzo: 'https://z.it/?d=1', _exfil: true }).includes('https://z.it/?d=1'));
+  const { readFileSync } = require('node:fs');
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.ok(!/action\.url\s*(\?\?|\|\|)/.test(src), 'handlers.js legge l\'indirizzo con SN_ACTION_LEVELS.indirizzoDi');
+});
+
 test('lo stile del benvenuto si imposta senza riquadro solo col segno del main (#592.2)', () => {
   const stile = { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'Risposte brevi, dà del tu.' };
   // Fuori dal benvenuto, o col testo di altri nel contesto, resta il riquadro intero coi rischi.

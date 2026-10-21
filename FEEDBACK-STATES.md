@@ -76,10 +76,10 @@ functions. Qui sotto il perché dei passaggi, per attore.
 **Pipeline** (filo-security):
 - ingresso → gate file (prima dei giudici): flag → `suspicious_file`; pulito → `unlabeled`.
 - `unlabeled` —panel completo→ `attack` | `spam` | `design` | (sicuro: automatica ON **e
-  mittente ammesso** → `todo`, altrimenti → `aligned`; un ritrovamento del server senza
+  la sua fiducia ammessa** → `todo`, altrimenti → `aligned`; un ritrovamento del server senza
   origine → `todo` comunque, §4c).
-- `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
-  (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
+- `attack`/`spam` → `unlabeled`: un feedback fidato segnalato per errore torna al ri-giudizio
+  (sotto, «Feedback fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
   `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
 - **Un feedback che aspetta una scelta dell'owner non gira** (regola dell'owner del 22/09,
   #775). Il derivato nato da un rilievo col `?` porta il segno `chiedeDecisione` (in chiaro,
@@ -146,10 +146,12 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
   (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
-  (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
-  (riallineamento: main è avanzato e il merge non passa più da solo — non è una
-  bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
-  ripassa verifica e sicurezza sul contenuto nuovo).
+  (`statusReason: loop`); —conflitto di fusione, o unit rossi sul risultato
+  della fusione→ `revision_capability` (riallineamento: main è avanzato e il
+  merge non passa più da solo — non è una bocciatura di qualità, il contatore M
+  non si muove; il ramo viene ribasato e ripassa verifica e sicurezza sul
+  contenuto nuovo). Chi ribasa non corregge gli unit rossi: li elenca, e chi
+  verifica ne fa rilievi interni (#1204).
 - `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
   `revision_capability` in DUE passi: la riapertura `design → todo` a nome
   dell'owner (il click di approvazione è la sua decisione) e il rientro
@@ -182,11 +184,17 @@ Dalla copia dell'owner (#953) firmano tutte le strade: riquadro, chat, riapertur
 se il compito non ha letto testo di altri (lo stato dei livelli di autonomia, mai oltre la classe 2); altrimenti, e
 sempre dall'Aiuto di un sito, resta `filo:chat` con la sua prova: «Filo per conto dell'owner», non fidata, giudicata.
 La segnalazione automatica resta `auto:` (non l'ha letta né confermata) con la sua prova, come quella. Chi decide il mittente: `src/main/services/feedbackMittente.js`.
-Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
+Dal §10 (#1162) il mittente è solo statistica: il server stampa `mittenteClasse` (`owner`,
+`utente`, `filo_per_utente`, `sessione_locale`, `routine` con `mittenteRuolo`, `server`, `test`) alla
+nascita e con `npm run mittenti:migra` sui documenti di prima; la mappatura delle etichette sta in
+un posto solo, `src/shared/mittenti.js` (il server la incorpora). Il mittente decide solo la chiave
+di raffiche e segno: un processo dell'owner con la prova non è una persona e conta nel solo tetto
+globale. Ogni permesso segue `fiducia`; l'unico mittente che diventa fiducia è l'owner dall'app,
+alla nascita.
 
-**Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
-livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
-PANEL COMPLETO segnala un provato (L2 dice attack/spam a verdetti pieni), lo status resta
+**Feedback fidati** (`fiducia: fidato`, mai il mittente): mai `attack`/`spam`, mai contati come
+raffica né segnati; se un livello li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
+PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
 `unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria
 segnalata (rosso/arancio, frase "decidi tu") invece del bianco "non filtrato", e il
 bottone «Ri-valuta» lo salta (scelta owner 2026-08-29: la segnalazione resta visibile,
@@ -353,32 +361,20 @@ La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; s
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
 dai Ricevuti con «Approva tutti gli allineati» (`aligned→todo`).
 
-**Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
+**Per fiducia (#446, §10).** "ON" non è un sì/no per tutti: l'interruttore master
 (`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
-`config/automation.autoApprove` dice QUALI categorie di mittente ne beneficiano
-(una per categoria d'autore, dal prefisso e dal ruolo nel `clientId`). Master spento ⇒
-nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che esistesse.
-La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
-(dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
+`config/automation.autoApprove` dice QUALE fiducia ne beneficia: `fidato` e `non_fidato`, mai
+un mittente. Master spento ⇒ nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti.
+La logica è pura e vive in due copie da tenere allineate, con la stessa tabella di casi nei due
+test: `src/shared/feedbackThread.js` (dashboard) e `filo-security/functions/src/autoApprove.js`
+(chi decide davvero). All'automatica i fidati arrivano di rado: owner e sessioni pulite entrano
+in coda senza giudici (§4c); restano i ritrovamenti delle routine senza origine e gli allarmi.
 
-C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'icona:
-`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`
-(l'esplorazione a coda vuota, tolta col #1206: resta per i feedback che ha aperto),
-`claude` (automazioni che non dichiarano il ruolo) e `filo`. Fino al 2026-08-22 le cinque
-istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
-fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione
-locale. Adesso i due assi coincidono — chi si vede separato si regola separato.
-
-Due categorie non hanno interruttore in Gestione, perché nascono senza origine e vanno in
-coda comunque (§4c): l'esplorazione (`prober`, il gruppo resta nella mappa ma non decide
-più niente) e l'allarme della pubblicazione (`costruzione`, 🏗️, `agent:costruzione` con la
-prova del server; per la mappa sta in `claude`, come sul server). Gli interruttori di
-`worker`, `verifier` e `residuo` contano solo per i ritrovamenti NON fidati, quelli che
-passano dai giudici: un fidato va dove dice la sua origine.
-
-**Compatibilità:** un documento salvato prima, che ha il solo `claude`, fa ereditare quel
-valore a tutte le sue istanze (`resolveAutoApprove`, in entrambe le copie). Senza,
-sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiuso.
+**Compatibilità:** una mappa salvata prima del §10 ha un interruttore per categoria d'autore
+(`owner`, `user`, `local`, `worker`, `verifier`, `residuo`, `prober`, `claude`, `filo`). Finché
+l'owner non sceglie i due nuovi, uno spento chiude: `fidato` si chiude se è spenta una delle
+istanze delle routine (`worker`, `verifier`, `residuo`, `prober`, `claude`), `non_fidato` se è
+spento uno qualunque (`resolveAutoApprove`, in entrambe le copie).
 
 ## 5. La dashboard distingue i sotto-casi di `design`
 
@@ -549,6 +545,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
+  *(Dal 2026-10-15, #795: alla chiusura di un lavoro, per qualunque strada, i suoi giri
+  — data, livelli trovati, esterni, corretti, bilancio pagato, esito; mai il testo dei
+  rilievi — passano nella collezione `routine-giri`, chiusa alle app; lo stato del giro
+  si azzera come prima. Li stampa `node scripts/storico-giri.mjs --da … --a …`.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).

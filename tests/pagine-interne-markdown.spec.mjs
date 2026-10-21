@@ -5,6 +5,7 @@
 // modello entra nella pagina e va a chiedere l'indirizzo esterno.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const OSTILE = 'filo-853.invalid';
 const RISPOSTA_BELLA = 'Il **grassetto** resta.\n\n- la [guida](https://example.com/guida) si apre\n- secondo punto';
@@ -78,7 +79,7 @@ async function selezionaEApriMenu(page) {
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
   });
   await page.locator('#bersaglio853').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   const corpo = menu.locator('.sn-menu-inline-explain .sn-menu-inline-body');
   await expect(corpo).not.toHaveText(/Spiegazione…/, { timeout: 30_000 });

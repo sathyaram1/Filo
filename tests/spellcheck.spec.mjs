@@ -3,6 +3,7 @@
 
 import { appCondivisa } from './helpers/appCondivisa.mjs';
 import { statoDi, clicca, nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -68,8 +69,8 @@ test.describe('spellcheck', () => {
     const box = await page.locator(selector).boundingBox();
     await page.mouse.click(box.x + 16, box.y + 16, { button: 'right' });
 
-    await expect(page.locator('.sn-menu')).toBeVisible();
-    const corr = page.locator('.sn-menu-correction:visible');
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+    const corr = menuDi(page).locator('.sn-menu-correction:visible');
     await expect(corr.first()).toBeVisible({ timeout: 4000 });
     await expect(corr.first()).toContainText('ciao');
   }
@@ -273,7 +274,7 @@ test.describe('spellcheck-cached-negative-native', () => {
       }));
     }, coords);
 
-    await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
 
     // Ora arriva (in ritardo) il suggerimento del correttore NATIVO — quello dietro
     // lo zigzag rosso che l'utente vede nello screenshot.
@@ -285,7 +286,7 @@ test.describe('spellcheck-cached-negative-native', () => {
     });
 
     // La correzione nativa deve comparire in cima al menu.
-    const correction = page.locator('.sn-menu .sn-menu-correction');
+    const correction = menuDi(page).locator('.sn-menu .sn-menu-correction');
     await expect(correction).toBeVisible({ timeout: 5_000 });
     await expect(correction.locator('.sn-menu-label').first()).toHaveText('ciao');
   });
@@ -403,7 +404,7 @@ test.describe('spellcheck-filo-page', () => {
     }, coords);
 
     // Il menu Filo deve aprirsi con la correzione in cima.
-    const correction = page.locator('.sn-menu .sn-menu-correction');
+    const correction = menuDi(page).locator('.sn-menu .sn-menu-correction');
     await expect(correction).toBeVisible({ timeout: 5_000 });
 
     // Verifica che la correzione mostri il suggerimento nativo italiano.
@@ -562,11 +563,11 @@ test.describe('spellcheck-input-menu-top', () => {
     }, coords);
 
     // Il menu Filo si apre con la correzione come PRIMA voce.
-    const correction = page.locator('.sn-menu .sn-menu-correction');
+    const correction = menuDi(page).locator('.sn-menu .sn-menu-correction');
     await expect(correction).toBeVisible({ timeout: 5_000 });
 
     // È davvero il primo item del menu (in cima).
-    const firstItemIsCorrection = await page.evaluate(() => {
+    const firstItemIsCorrection = await menuDi(page).valuta(() => {
       const menu = document.querySelector('.sn-menu');
       if (!menu) return false;
       const first = Array.from(menu.children).find(
@@ -682,7 +683,7 @@ test.describe('spellcheck-native-event-fires', () => {
       await page.mouse.click(box.x + 20, box.y + 24, { button: 'right' });
 
       // Il menu Filo custom si apre comunque (nessuna regressione al menu).
-      await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 4000 });
+      await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 4000 });
 
       // Chiudi il menu e riapri: in headless Linux il primo click può essere
       // "sordo" per il context-menu del webContents (evento OS non sempre emesso
@@ -691,7 +692,7 @@ test.describe('spellcheck-native-event-fires', () => {
       await page.keyboard.press('Escape');
       await page.waitForTimeout(100);
       await page.mouse.click(box.x + 20, box.y + 24, { button: 'right' });
-      await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 4000 });
+      await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 4000 });
 
       // E l'evento nativo è scattato almeno una volta: senza il fix (preventDefault)
       // sarebbe sempre 0 perché preventDefault blocca l'emissione dell'evento.
@@ -853,15 +854,15 @@ test.describe('spellcheck-native', () => {
     const box = await page.locator('#ce').boundingBox();
     await page.mouse.click(box.x + 18, box.y + 16, { button: 'right' });
 
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 
     // La riga di correzione deve mostrare il suggerimento nativo "world" in cima.
-    const corr = page.locator('.sn-menu-correction:visible');
+    const corr = menuDi(page).locator('.sn-menu-correction:visible');
     await expect(corr.first()).toBeVisible({ timeout: 4000 });
     await expect(corr.first()).toContainText('world');
 
     // Ed è davvero la prima voce cliccabile del menu.
-    const firstIsCorrection = await page.evaluate(() => {
+    const firstIsCorrection = await menuDi(page).valuta(() => {
       const menu = document.querySelector('.sn-menu');
       if (!menu) return false;
       const first = Array.from(menu.children).find(
@@ -1307,7 +1308,7 @@ test.describe('spellcheck-segni-restano', () => {
     const { staii, ciiao } = await dueParoleRosse(app, page);
 
     await page.mouse.click(ciiao.x, ciiao.y, { button: 'right' });
-    const corr = page.locator('.sn-menu-correction:visible').first();
+    const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).not.toBeEmpty({ timeout: 4000 });
     await corr.click();
     await expect(page.locator('#ta')).toHaveValue(/^(?!ciiao )\p{L}+ amico mio\n/u);
@@ -1338,7 +1339,7 @@ test.describe('spellcheck-segni-restano', () => {
     await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.setSelectionRange(0, 'ciiao amico mio'.length); });
     const amico = await puntoInRiga(page, 0, 8);
     await page.mouse.click(amico.x, amico.y, { button: 'right' });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await expect(menu).toBeVisible({ timeout: 10_000 });
     await menu.locator('.sn-menu-item', { hasText: 'Modifica' }).click();
     await expect.poll(async () => (await statoDi(app, page, '.sn-editbox'))?.visibile, { timeout: 10_000 }).toBe(true);
@@ -1358,7 +1359,7 @@ test.describe('spellcheck-segni-restano', () => {
 
     const b = await blu(page).nth(1).boundingBox();
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
-    const corr = page.locator('.sn-menu-correction:visible').first();
+    const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).toContainText('y');
     await corr.click();
     await expect(page.locator('#ta')).toHaveValue('oggi xqprima1 bella giornata con y e poi xqterza3 fine ');
@@ -1444,7 +1445,7 @@ test.describe('spellcheck-shadow-editable', () => {
   // Apre il menu col tasto destro sopra la parola "ciiao" e ritorna il menu.
   async function rightClickOnWord(page, box) {
     await page.mouse.click(box.x + 16, box.y + 16, { button: 'right' });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await expect(menu).toBeVisible();
     return menu;
   }
@@ -1477,12 +1478,12 @@ test.describe('spellcheck-shadow-editable', () => {
     const menu = await rightClickOnWord(page, await shadowBox(page));
     await page.screenshot({ path: 'tests/.shots/spellcheck-shadow-ce.png' }).catch(() => {});
 
-    const corr = page.locator('.sn-menu-correction:visible');
+    const corr = menuDi(page).locator('.sn-menu-correction:visible');
     await expect(corr.first()).toBeVisible({ timeout: 4000 });
     await expect(corr.first()).toContainText('ciao');
 
     // Ed è davvero la prima voce cliccabile del menu, come in light DOM.
-    const firstIsCorrection = await page.evaluate(() => {
+    const firstIsCorrection = await menuDi(page).valuta(() => {
       const m = document.querySelector('.sn-menu');
       if (!m) return false;
       const first = Array.from(m.children).find(
@@ -1498,7 +1499,7 @@ test.describe('spellcheck-shadow-editable', () => {
     const page = await prepare({ app, openTab, testServer });
 
     await rightClickOnWord(page, await shadowBox(page));
-    const corr = page.locator('.sn-menu-correction:visible').first();
+    const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).toBeVisible({ timeout: 4000 });
     await corr.click();
 
@@ -1512,7 +1513,7 @@ test.describe('spellcheck-shadow-editable', () => {
 
     const box = await page.locator('#ce-light').boundingBox();
     await rightClickOnWord(page, box);
-    const corr = page.locator('.sn-menu-correction:visible');
+    const corr = menuDi(page).locator('.sn-menu-correction:visible');
     await expect(corr.first()).toBeVisible({ timeout: 4000 });
     await expect(corr.first()).toContainText('ciao');
   });
@@ -1566,14 +1567,14 @@ test.describe('spellcheck-shadow-editable', () => {
     // Click destro sopra la parola errata: il menu si apre "povero" (dentro un
     // blocco sigillato non sappiamo cosa sia stato cliccato).
     await page.mouse.click(24, 24, { button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 
     // …e subito dopo arrivano i suggerimenti nativi, come fa Electron sull'evento
     // context-menu del webContents.
     const sent = await sendNative(app, host, 'ciiao', ['ciao', 'chiao']);
     expect(sent).toBeGreaterThanOrEqual(1);
 
-    const corr = page.locator('.sn-menu-correction:visible');
+    const corr = menuDi(page).locator('.sn-menu-correction:visible');
     await expect(corr.first()).toBeVisible({ timeout: 4000 });
     await expect(corr.first()).toContainText('ciao');
   });
@@ -1582,11 +1583,11 @@ test.describe('spellcheck-shadow-editable', () => {
     const { page, host } = await openSealed({ openTab, testServer }, 'wrlod ciao');
 
     await page.mouse.click(24, 24, { button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
     await page.evaluate(() => window.__selectMisspelled(5));
     expect(await sendNative(app, host, 'wrlod', ['world', 'word'])).toBeGreaterThanOrEqual(1);
 
-    const corr = page.locator('.sn-menu-correction:visible').first();
+    const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).toBeVisible({ timeout: 4000 });
     await corr.click();
 
@@ -1602,14 +1603,14 @@ test.describe('spellcheck-shadow-editable', () => {
     const { page, host } = await openSealed({ openTab, testServer }, 'wrlod ciao');
 
     await page.mouse.click(24, 24, { button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
     await page.evaluate(() => window.__selectMisspelled(5));
     expect(await sendNative(app, host, 'wrlod', ['world', 'word'])).toBeGreaterThanOrEqual(1);
 
-    const corr = page.locator('.sn-menu-correction:visible').first();
+    const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).toBeVisible({ timeout: 4000 });
     await corr.locator('.sn-menu-correction-arrow').click();
-    const second = page.locator('.sn-menu-sub .sn-menu-item', { hasText: 'word' }).first();
+    const second = menuDi(page).locator('.sn-menu-sub .sn-menu-item', { hasText: 'word' }).first();
     await expect(second).toBeVisible({ timeout: 4000 });
     await second.click();
 

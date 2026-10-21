@@ -3,6 +3,7 @@
 // Sentinella sui canali: tests/unit/pagineSalvateVersoSiti.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 const TITOLO_A = 'Conto della banca 589';
@@ -26,7 +27,7 @@ test('un sito non legge le pagine salvate chiedendole alla chat di Filo', async 
   );
   const urlA = a.url();
   await a.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  await a.locator('.sn-menu [data-sn-icon-id="saveForLater"]').click();
+  await menuDi(a).locator('.sn-menu [data-sn-icon-id="saveForLater"]').click();
   await expect(a.locator('.sn-save-confirm')).toBeVisible();
 
   const home = await openTab('filo://home/home.html');

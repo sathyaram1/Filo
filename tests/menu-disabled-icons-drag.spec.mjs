@@ -13,6 +13,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Da #871 queste icone stanno nella barra laterale: qui si prova la strada del tasto destro,
 // quella di chi le ha rimesse nel menu.
@@ -25,12 +26,12 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 
 async function openOverflowGrid(page) {
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await expect(overflow).toBeVisible();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }
@@ -81,7 +82,7 @@ test('trascinare un\'altra icona non fa tornare colorati avanti/indietro', async
 
   // La griglia si ridisegna in-place dopo il drop: avanti/indietro DEVONO
   // restare grigi (prima del fix tornavano colorati).
-  const grid2 = page.locator('.sn-menu-icon-grid');
+  const grid2 = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid2).toBeVisible();
   await expect(grid2.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]')).toHaveClass(/sn-menu-btn-disabled/, { timeout: 3000 });
   await expect(grid2.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toHaveClass(/sn-menu-btn-disabled/);

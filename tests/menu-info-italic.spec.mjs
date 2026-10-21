@@ -7,6 +7,7 @@
 // ritorna 'normal' e il test diventa rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px"><h1 id="h">pagina</h1></body></html>`;
 
@@ -15,11 +16,11 @@ test('la riga commento/spiegazione del menu è in corsivo', async ({ openTab, te
 
   // Apri un menu reale: garantisce che la CSS del menu sia attiva nella pagina.
   await page.locator('#h').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 
   // Inietta una riga 'info' identica a quella prodotta dal menu per le
   // spiegazioni, e verifica che la CSS la renda in corsivo.
-  const fontStyle = await page.evaluate(() => {
+  const fontStyle = await menuDi(page).valuta(() => {
     const host = document.fullscreenElement || document.documentElement;
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';

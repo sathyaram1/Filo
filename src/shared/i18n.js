@@ -523,6 +523,8 @@
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_producer_not_excluded: '%s produce questo modello e non è fra i fornitori esclusi: le richieste possono arrivare a lui.',
+    admin_defaults_producer_exclude: 'Escludi %s',
     admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
     admin_defaults_open_weights_to: 'Passano a %s: %s',
     admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',

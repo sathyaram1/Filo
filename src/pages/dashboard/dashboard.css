@@ -623,6 +623,15 @@ html, body {
   background: var(--dash-ink);
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
+  transition: background calc(0.25s * var(--sn-motion, 1)) ease, color calc(0.25s * var(--sn-motion, 1)) ease;
+}
+/* #1296 — il seguito scritto mentre Filo lavora, in attesa: un foglietto tratteggiato non ancora consegnato, che si
+   riempie d'inchiostro quando Filo lo legge. */
+.dash-bubble-user.dash-bubble-attesa {
+  background: transparent;
+  color: var(--dash-ink-soft);
+  outline: 1.5px dashed var(--dash-ink-mute);
+  outline-offset: -1.5px;
 }
 /* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
    (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
@@ -1562,6 +1571,11 @@ html, body {
 /* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
 .dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform calc(160ms * var(--sn-motion, 1)) ease, opacity calc(160ms * var(--sn-motion, 1)) ease; }
 .dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo: si accende in quel tempo
+   vero, che la pagina gli scrive in --dash-pausa-quadrato (PAUSA_QUADRATO). Non è un token estetico. */
+.dash-send.dash-stop:not([disabled]) { animation: dash-stop-arma var(--dash-pausa-quadrato, 500ms) ease-in; }
+@keyframes dash-stop-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dash-send.dash-stop:not([disabled]) { animation-timing-function: step-end; } }
 
 .dash-img-preview {
   position: relative;

@@ -3,6 +3,7 @@
 // src/main/services/permessiPagine.js; lo schermo pieno lo rifiuta Chromium se Filo non regala il gesto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
@@ -325,7 +326,7 @@ test('«Apri in nuova tab» del menu di Filo apre il collegamento anche se la pa
   const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="${dest}">collegamento</a>
     <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
   await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await page.waitForTimeout(5600);
   await menu.locator('button', { hasText: 'Apri in nuova tab' }).first().click();
@@ -337,7 +338,7 @@ test('scegliere «Copia URL» nel menu di Filo non lascia alla pagina aprire la 
   const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="https://example.com/x">collegamento</a>
     <script>var AD=${JSON.stringify(ad)};document.addEventListener('click',function(){window.open(AD)},true)</script></body>`);
   await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await page.waitForTimeout(5600);
   await menu.locator('button', { hasText: 'Copia URL' }).first().click();
@@ -375,7 +376,7 @@ test('raffica: una pagina che chiede di continuo non passa col clic sul menu di 
   const passate = [];
   for (let i = 0; i < 4; i++) {
     await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await expect(menu).toBeVisible();
     await page.waitForTimeout(5600);
     const prima = await aperteSu(app, ad);
