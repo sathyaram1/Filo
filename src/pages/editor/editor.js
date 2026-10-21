@@ -3870,6 +3870,12 @@
       }
       log.scrollTop = log.scrollHeight;
     };
+    // La casella che cresce stringe il registro dal fondo: chi stava leggendo l'ultima risposta la tiene in vista.
+    let logInFondo = true;
+    log.addEventListener('scroll', () => { logInFondo = log.scrollHeight - log.scrollTop - log.clientHeight < 4; });
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(() => { if (logInFondo) log.scrollTop = log.scrollHeight; }).observe(log);
+    }
     renderLog();
     const send = async () => {
       const text = input.value.trim();
