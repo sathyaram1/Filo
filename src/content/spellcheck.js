@@ -1076,13 +1076,14 @@
     return da;
   }
 
-  // I tre pezzi che partono, più campo intero e testo sopra letto adesso, che restano al main: chi presenta una password
-  // può stare fuori dal pezzo, o essere la domanda a cui si risponde (correttoreRiservati.js).
-  function pezziDa(testo, start, end, el) {
+  // I tre pezzi che partono, più campo intero e testo sopra (letto a ogni richiesta), che restano al main: chi presenta
+  // una password può stare fuori dal pezzo, o essere la domanda a cui si risponde (correttoreRiservati.js).
+  function pezziDa(testo, start, end, sopra = '') {
     const da = inizioPrima(testo, start);
-    const sopra = el ? contestoDelCampo(el, { soloPrima: CONVERSAZIONE_MAX }).prima : '';
     return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), dopo: testo.slice(end, end + DOPO_MAX), campo: testo, campoDa: da, sopra };
   }
+
+  const sopraIlCampo = (el) => contestoDelCampo(el, { soloPrima: CONVERSAZIONE_MAX }).prima;
 
   // Dove si scrive: il sito e la coda del testo della pagina prima del campo (in una chat, gli ultimi messaggi). Si
   // rilegge ogni LUOGO_VALE_MS: la conversazione cambia, ma non a ogni tasto. Il sito lo rimette il main.
@@ -1118,7 +1119,7 @@
     const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     for (const c of candidati) state.richiesti.add(Rg.chiaveVerdetto(c));
     const payload = {
-      ...pezziDa(d.testo, g.start, g.end, state.el),
+      ...pezziDa(d.testo, g.start, g.end, sopraIlCampo(state.el)),
       candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       luogo: luogoDi(state),
     };
@@ -1165,7 +1166,7 @@
     const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     const contesto = contestoDelCampo(state.el);
     const payload = {
-      ...pezziDa(d.testo, g.start, g.end, state.el),
+      ...pezziDa(d.testo, g.start, g.end, contesto.prima.slice(-CONVERSAZIONE_MAX)),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       contesto,
       ripetizioni: ripetizioniAttive(),
@@ -1376,7 +1377,7 @@
     let sito = '';
     try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
     const payload = {
-      ...pezziDa(testo, wordCtx.start, wordCtx.end, el),
+      ...pezziDa(testo, wordCtx.start, wordCtx.end, sopraIlCampo(el)),
       candidati: [{ pezzo: wordCtx.word, perche: t('spell_perche_chiesta') }],
       luogo: { sito },
     };
