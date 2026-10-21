@@ -31,6 +31,9 @@ tests/agent/.env
 tests/agent/.out/
 tests/agent/reports/
 test-results/
+# L'esito di una parte della suite (suite.yml) e la loro unione: in GitHub stanno negli artifact.
+blob-report/
+suite-risultati.json
 .DS_Store
 *.log
 # Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
