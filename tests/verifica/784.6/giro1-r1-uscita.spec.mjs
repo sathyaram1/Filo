@@ -57,7 +57,8 @@ test('r1 uscire da Filo col toast a schermo: la segnalazione automatica arriva l
   const vista = await avvisi();
   await expect(vista.locator('.shell-notif.show', { hasText: 'segnalato a chi sviluppa Filo' })).toHaveCount(1, { timeout: 20_000 });
 
-  // L'utente chiude Filo subito, senza toccare il toast: non ha detto no.
+  // L'utente legge la risposta e due secondi dopo chiude Filo, senza toccare il toast: non ha detto no.
+  await page.waitForTimeout(2_000);
   const uscita = new Promise((r) => app.process().once('exit', r));
   await app.evaluate(({ app: a }) => { setTimeout(() => a.quit(), 50); });
   await uscita;
