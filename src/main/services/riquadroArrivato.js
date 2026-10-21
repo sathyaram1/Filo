@@ -1,4 +1,4 @@
-// Il lato main della regola sui riquadri in arrivo (src/preload/riquadri-in-arrivo.js, #1429): codice eseguito in un
+// Il lato main della regola sui riquadri in arrivo (src/shared/riquadriInArrivo.js, #1429): codice eseguito in un
 // riquadro prima del suo primo commit gira nel documento vuoto iniziale e gli toglie il preload di Filo.
 // Un riquadro così ha `url` vuoto; quello che la pagina scrive da sé è about:blank e si legge. Sentinella: tests/unit/riquadriInArrivo.test.mjs.
 
