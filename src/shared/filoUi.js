@@ -201,11 +201,22 @@
     const ex = D && D.execCommand;
     if (typeof ex === 'function') {
       D.execCommand = function (...a) {
+        const c = attivo();
+        const st = c && caselle.get(c);
+        const prima = st ? st.filo : null;
+        if (st) {
+          if (c.value !== st.buono && !inConsegna(st)) { const s = selezioneDi(c); ripristina(c, st); rimettiSelezione(c, s); }
+          const tipo = COMANDI[String(a[0] || '').toLowerCase()];
+          st.filo = tipo ? { tipo, dato: tipo === 'insertText' ? String(a[2] ?? '') : null, valore: c.value, sel: selezioneDi(c), riga: c.tagName !== 'TEXTAREA' } : null;
+        }
         nostraScrittura++;
-        try { return ex.apply(this, a); } finally { nostraScrittura--; }
+        try { return ex.apply(this, a); } finally { nostraScrittura--; if (st) st.filo = prima; }
       };
     }
   }
+  // Un comando di Filo dice cosa scrive, come un annuncio dell'utente: il sito che cambia il testo mentre lo si consegna
+  // non passa per Filo (#1340, giro 3). Un comando fuori elenco non scrive nelle caselle.
+  const COMANDI = { inserttext: 'insertText', delete: 'deleteContentBackward', forwarddelete: 'deleteContentForward' };
   function selezioneDi(c) {
     try { return [c.selectionStart, c.selectionEnd]; } catch (_) { return null; }
   }
