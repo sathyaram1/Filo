@@ -1569,7 +1569,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
-  padding: 6px;
+  /* Padding uguale sui quattro lati e una riga del campo alta quanto i tasti (36px): i tasti stanno al centro
+     della pastiglia, concentrici al suo bordo tondo, e con più righe restano sull'ultima (#1489). */
+  padding: 8px;
   background: var(--dash-card);
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius-pill);
@@ -1585,7 +1587,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   border: none;
   background: transparent;
   outline: none;
-  padding: 10px 14px;
+  padding: 7.5px 12px;
   font-size: 15px;
   line-height: 1.4;
   color: var(--dash-ink);
@@ -1667,7 +1669,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 6px 10px 2px;
+  padding: 4px 8px 2px;
 }
 .dash-img-previews .dash-img-preview { position: relative; padding: 0; }
 .dash-img-previews .dash-img-preview img {
@@ -1742,7 +1744,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 
 .dash-dir {
   flex-basis: 100%;
-  padding: 2px 14px 0;
+  padding: 2px 12px 0;
   font-size: 11.5px;
   color: var(--dash-ink-mute);
   font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
