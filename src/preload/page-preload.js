@@ -52,56 +52,6 @@ const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
 
-// Un riquadro dello stesso sito con un indirizzo suo, toccato prima che parta il suo preload, lo perde (#1568): ogni
-// pezzo di Filo chiede qui prima di toccarne finestra, documento o di eseguirci codice. Sentinella:
-// tests/unit/riquadriInVolo.test.mjs; racconto: patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md.
-const riquadriArrivati = new WeakSet();
-const eUnRiquadro = (t) => !!t && (t.localName === 'iframe' || t.localName === 'frame');
-const segnaArrivato = (t) => { if (eUnRiquadro(t)) riquadriArrivati.add(t); };
-try {
-  const segna = (e) => segnaArrivato(e && e.target);
-  const ascolta = () => window.addEventListener('load', segna, true);
-  ascolta();
-  // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
-  new MutationObserver(ascolta).observe(document, { childList: true });
-} catch (_) { /* mai bloccare il caricamento della pagina */ }
-// Il load di un riquadro dentro un'ombra o un riquadro scritto dalla pagina non arriva qui: il suo preload si presenta
-// al primo antenato con Filo, e da lì toccarlo non gli toglie più niente.
-if (IS_SUBFRAME) try {
-  const el = window.frameElement;
-  for (let p = window.parent, prima = window; el && p && p !== prima; prima = p, p = p.parent) {
-    if (typeof p.SN_RIQUADRO_SEGNA === 'function') { p.SN_RIQUADRO_SEGNA(el); break; }
-  }
-} catch (_) {}
-function riquadroInVolo(f) {
-  if (!eUnRiquadro(f) || riquadriArrivati.has(f)) return false;
-  if (f.hasAttribute('srcdoc')) return true;
-  const src = String(f.getAttribute('src') || '').trim();
-  if (!src || /^about:blank([?#]|$)/i.test(src)) return false;
-  // Un altro sito arriva in una finestra nuova: toccare quella vuota di prima non gli toglie niente.
-  try { return new URL(src, document.baseURI).origin === location.origin; } catch (_) { return false; }
-}
-// Nel documento, nelle sue ombre aperte e nei riquadri che la pagina riempie da sé (i loro riquadri si presentano a
-// noi); un'ombra chiusa non si vede (lo stesso limite dei gesti, più sotto).
-function riquadriInVolo(doc = document, livello = 0) {
-  try {
-    const radici = [doc];
-    for (let i = 0; i < radici.length; i++) {
-      for (const f of radici[i].querySelectorAll('iframe, frame')) {
-        if (riquadroInVolo(f)) return true;
-        let d = null;
-        try { if (livello < 4 && f.contentWindow.location.protocol === 'about:') d = f.contentDocument; } catch (_) {}
-        if (d && riquadriInVolo(d, livello + 1)) return true;
-      }
-      for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot);
-    }
-  } catch (_) {}
-  return false;
-}
-globalThis.SN_RIQUADRO_SEGNA = segnaArrivato;
-globalThis.SN_RIQUADRO_IN_VOLO = riquadroInVolo;
-globalThis.SN_RIQUADRI_IN_VOLO = riquadriInVolo;
-
 // ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
 //
 // Le schede riaperte all'avvio di Filo nascono con il flag
@@ -421,7 +371,6 @@ function riquadriFigli() {
     let lista = [];
     try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
     for (const f of lista) {
-      if (riquadroInVolo(f)) continue;
       out.push(f);
       const R = globalThis.SN_RIQUADRI_IN_ARRIVO;
       try {

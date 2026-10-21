@@ -884,8 +884,6 @@
       }
     }
 
-    // Un riquadro ancora in arrivo non si tocca: perderebbe Filo (la regola sta nel preload della pagina).
-    const inVolo = (f) => !!self.SN_RIQUADRO_IN_VOLO?.(f);
     // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
     // pagina: solo al ricontrollo, mai al caricamento.
     function radici(doc) {
