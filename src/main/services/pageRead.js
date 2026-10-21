@@ -962,6 +962,7 @@ const api = {
   serializzaVisibile,
   MAX_TEXT_CHARS,
   _dip: dip,
+  _tempi: tempi,
   _cache: cache,
   _riservate: riservate,
 };
