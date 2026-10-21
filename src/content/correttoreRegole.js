@@ -474,6 +474,13 @@
     };
   }
 
+  // Lo stesso dato è la stessa ricerca: la chiave è la domanda, non la frase, che cambia a ogni ritocco o pausa a metà e
+  // rifarebbe la ricerca (#1448). Due x della stessa frase con domande diverse restano due ricerche.
+  function chiaveRicerca(segment, cerca) {
+    const domanda = String(cerca?.domanda || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return [String(segment || '').toLowerCase(), domanda, cerca?.dove || ''].join('\u0000');
+  }
+
   // La risposta della ricerca di un segnaposto, una riga [valore][motivo][fonte][data][indirizzo] che il main ha
   // ricomposto: { valore, motivo, fonte, data, url }, o null se il dato non si è trovato.
   function valoreTrovato(raw) {
