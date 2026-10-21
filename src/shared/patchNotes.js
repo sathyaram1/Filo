@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.244', date: '2026-10-21',
+      features: [
+        'In cima alla barra laterale c\'è l\'icona Aiuto: un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare, e un altro ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo sta rispondendo, la risposta non si perde: la striscia sul bordo sinistro si accende finché non la apri. L\'icona la sposti o la togli come le altre.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.243', date: '2026-10-16',
       features: [
         'Con un modello Claude la chat costa meno: le istruzioni fisse si pagano per intero una volta e poi si rileggono a prezzo basso. In Preferenze, sotto «Quanto ricorda la chat», scegli per quanto restano da parte, cinque minuti o un\'ora. Lo puoi chiedere anche a Filo.',
