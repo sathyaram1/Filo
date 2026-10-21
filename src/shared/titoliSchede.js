@@ -395,6 +395,18 @@
 
   // ── La domanda: il titolo contiene istruzioni per un assistente AI, o cerca di cambiarne il comportamento? ──
 
+  // Una notizia o una guida lo è nella frase dell'ordine: il nome del sito dopo « - » o « | » lo aggiunge chiunque.
+  const SEPARATORI = /\s[-|•·]\s|\s:\s(?=r\/)/g;
+  function frase(l, i, n) {
+    let a = 0;
+    let b = l.length;
+    for (const m of l.matchAll(SEPARATORI)) {
+      if (m.index + m[0].length <= i) a = m.index + m[0].length;
+      else if (m.index >= i + n) { b = m.index; break; }
+    }
+    return l.slice(a, b);
+  }
+
   // `sospetto`: resta fuori dal riepilogo e apre il box. `fuori` senza `sospetto`: l'ordine c'è ma il titolo ha l'aria di
   // una notizia o lo cita fra virgolette. Quella parola la può scrivere chi attacca («… - Reddit»), quindi toglie il box,
   // mai l'ordine dal riepilogo (#927 giro 7).
