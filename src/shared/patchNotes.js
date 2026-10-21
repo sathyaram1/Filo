@@ -14,6 +14,7 @@
       fixes: [
         'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
         'Una scheda non si allarga più fino a prendere mezza barra in alto, nemmeno quella aperta accanto a schede dal titolo lungo. Arriva al massimo a 240 pixel, e il titolo intero lo leggi passandoci sopra col mouse. Il massimo lo cambi in Preferenze, nelle impostazioni avanzate, o chiedendo a Filo «schede più larghe».',
+        'Se chiedi «portami alla home» mentre sei già nella home, Filo non ti promette più di svuotarla. Ti dice che sei già lì, e il bottone sotto la risposta chiude la conversazione: quello che vi siete detti resta nella home.',
       ],
     },
     {
