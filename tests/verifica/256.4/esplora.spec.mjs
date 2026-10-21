@@ -23,8 +23,8 @@ test('esplora taglie', async ({ app, shell, openTab }) => {
   const casella = chat.locator('[data-chat="input"]');
   const righe = [];
   for (const [w, h] of TAGLIE) {
-    await app.evaluate(({ BrowserWindow }, [w, h]) => { BrowserWindow.getAllWindows()[0].setSize(w, h); }, [w, h]);
-    await ed.waitForTimeout(150);
+    await app.evaluate(({ BrowserWindow }, [w, h]) => { BrowserWindow.getAllWindows().find((x) => x.isVisible()).setSize(w, h); }, [w, h]);
+    await ed.waitForTimeout(400);
     for (const [nome, f] of Object.entries(FRASI)) {
       await casella.fill('');
       await casella.fill(f);
