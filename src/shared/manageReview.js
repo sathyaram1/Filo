@@ -1692,11 +1692,11 @@
     // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
     const lette = !!(opts && opts.fusioniLette);
     const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
+    const generica = lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
     return forma('l5', 'quadrato', 'Fusione', 'attack', 'bloccato', {
       titolo: 'Fusione',
       righe,
-      testo: (nota && nota.body) || (lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI),
-      illeggibile: cifrata,
+      testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
       azioni: ['rimanda', 'archivia'],
     }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
   }
