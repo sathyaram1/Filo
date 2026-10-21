@@ -3348,6 +3348,7 @@ class TabManager {
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
     MenuDiRiserva.segui(pwc);
+    this._stratoNellaFinestrella(win, pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
