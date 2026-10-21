@@ -83,6 +83,7 @@ test('il nome di un guasto è il file di prova o di test rosso; le chiavi il cui
   assert.equal(nomeDelGuasto('unit:tests/unit/fineRigaLf.test.mjs'), 'fineRigaLf');
   assert.equal(nomeDelGuasto('suite:fuori-dai-casi'), 'errori fuori dai casi');
   assert.equal(nomeDelGuasto('suite:non-partita'), 'suite non partita');
+  assert.equal(nomeDelGuasto('suite:tetto'), 'suite oltre il tetto di tempo');
   for (const k of ['unit', 'bake:tavily', 'piattaforma:mac', 'rilascio:fermo', '', undefined]) assert.equal(nomeDelGuasto(k), '', String(k));
 });
 

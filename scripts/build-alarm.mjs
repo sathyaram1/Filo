@@ -81,6 +81,7 @@ export function nomeDelGuasto(chiave) {
   const k = String(chiave || '').trim();
   if (k === 'suite:fuori-dai-casi') return 'errori fuori dai casi';
   if (k === 'suite:non-partita') return 'suite non partita';
+  if (k === 'suite:tetto') return 'suite oltre il tetto di tempo';
   if (k === 'suite:rossi-noti') return 'elenco dei rossi noti illeggibile';
   const m = k.match(/^suite:(?:tests\/)?(.+?)(?:\.spec\.m?js)?$/) || k.match(/^unit:(?:tests\/unit\/)?(.+?)(?:\.test\.m?js)?$/);
   return m ? m[1] : '';
