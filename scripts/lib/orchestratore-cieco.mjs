@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { unisciPermessi } from './permessi-routine.mjs';
 
 export const ETICHETTA = 'filo-orchestratore-cieco';
 // Un preflight lanciato a mano non deve accecare per sempre le sessioni di questa macchina.
