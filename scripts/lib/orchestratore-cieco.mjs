@@ -133,9 +133,8 @@ export function registraDecisione({ ticket, role = '', model = '', effort = '' }
 
 const nostro = (gruppo) => (gruppo?.hooks || []).some((h) => String(h?.command || '').includes(ETICHETTA));
 
-// Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive. I permessi
-// viaggiano nello stesso salvataggio: dopo, il gancio ConfigChange qui sotto rifiuterebbe ogni altra modifica.
-export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now(), permessi = [] } = {}) {
+// Unisce senza toccare il resto delle impostazioni dell'utente; un file illeggibile non si riscrive.
+export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato = Date.now() } = {}) {
   const file = join(dir, 'settings.json');
   let s = {};
   if (existsSync(file)) {
