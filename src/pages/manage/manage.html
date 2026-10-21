@@ -862,6 +862,24 @@
     /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «locale»
        insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
+    /* La fiducia (#1575) sta sul bordo destro, perché il sinistro dice già che decisione serve (attacco, spam…), e
+       nello scudo in fondo alla riga: pieno se fidata, vuoto e tratteggiato se no, così non la dice il solo colore. */
+    :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--fidata { border-right: 3px solid var(--mg-fidata-color); }
+    :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--nonfidata { border-right: 3px solid var(--mg-nonfidata-color); }
+    .mg-fiducia-segno {
+      flex: 0 0 auto; align-self: center; display: inline-flex; margin-left: auto;
+      width: var(--mg-scudo-size, 11px); height: var(--mg-scudo-size, 11px); cursor: help;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-fiducia-segno:hover { transform: scale(1.25); }
+    /* Quello che sta già a destra (priorità, data) tiene lo spazio libero: lo scudo gli si mette accanto. */
+    :is(.mg-priority, .mg-domanda-data, .mg-domanda-prio) ~ .mg-fiducia-segno { margin-left: 0; }
+    .mg-fiducia-segno svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .mg-fiducia-segno svg path { stroke-width: 1.5; stroke-linejoin: round; }
+    .mg-fiducia-segno--fidata { color: var(--mg-fidata-color); }
+    .mg-fiducia-segno--fidata svg path { fill: currentColor; stroke: currentColor; }
+    .mg-fiducia-segno--nonfidata { color: var(--mg-nonfidata-color); }
+    .mg-fiducia-segno--nonfidata svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 3 2; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
     /* Arrivata a pagina aperta: un punto caldo in testa finché non la si apre (con un ordinamento a scelta può
