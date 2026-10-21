@@ -211,6 +211,8 @@ module.exports = function register(on, ctx) {
     if (msg && typeof msg.id === 'string' && msg.id) {
       try { voce = (await ArchivedTabs.list()).find((t) => t.id === msg.id) || null; } catch (_) {}
       if (!voce) return { ok: false, error: 'not_found' };
+      // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: chi chiede apre il sito.
+      if (voce.urlTagliato) return { ok: false, error: 'url_tagliato' };
     }
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
