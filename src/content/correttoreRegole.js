@@ -452,9 +452,14 @@
       const pezzo = r.pezzo.trim();
       const dove = trovaPezzo(testo, pezzo, nuovo);
       if (!dove) continue;
-      if (tipo === 'giusto') { giusti.push(dove); continue; }
-      if (tipo === 'contraddizione' && !citata(r.citazione)) continue;
-      const errore = tipo === 'errore';
+      if (r.tipo === 'giusto') { giusti.push(dove); continue; }
+      if (r.tipo === 'contraddizione' && !citata(r.citazione)) continue;
+      if (r.tipo === 'segnaposto' || r.tipo === 'cerca') {
+        const s = segnoDelSegnaposto(r, testo, dove, fonte);
+        if (s && !(inScrittura && s.start < inScrittura.end && s.end > inScrittura.start)) segni.push(s);
+        continue;
+      }
+      const errore = r.tipo === 'errore';
       let start = dove.start;
       let end = dove.end;
       let correzioni = [];
