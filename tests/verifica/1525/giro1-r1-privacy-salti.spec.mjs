@@ -10,7 +10,7 @@ const eventi = (userData) => {
   return existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean).map((r) => JSON.parse(r)) : [];
 };
 
-test('r1 in privacy una pagina che salta da sola fra due siti lascia al più 30 visite', async ({ app, shell, openTab, testServer }) => {
+test('r1 in privacy una pagina che salta da sola fra due siti lascia al più 30 visite dopo la prima', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   await shell.evaluate(() => window.filoShell.message({
@@ -37,5 +37,6 @@ test('r1 in privacy una pagina che salta da sola fra due siti lascia al più 30 
   expect(salti).toBeGreaterThan(40);
   await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
   const visite = eventi(userData).filter((e) => e.tipo === 'navigazione' && new URL(e.url).pathname === percorso);
-  expect(visite.length).toBeLessThanOrEqual(30);
+  // La prima visita, aperta da Filo, più trenta senza gesto: come nella stessa vista.
+  expect(visite.length).toBeLessThanOrEqual(31);
 });
