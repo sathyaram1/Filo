@@ -147,6 +147,12 @@
       return G.oscuraSegreti(messages, lista);
     }
 
+    // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
+    function pianoCache(action, messages) {
+      const FC = global.SN_FILO_CONTESTO;
+      try { return FC && typeof FC.pianoDellaCache === 'function' ? FC.pianoDellaCache(action, messages) : null; } catch (_) { return null; }
+    }
+
     async function ensureUnderLimit(settings) {
       if (await costs.isOverLimit(settings && settings.monthlyLimitEur)) throw limitError();
     }
