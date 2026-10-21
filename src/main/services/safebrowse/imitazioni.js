@@ -1,7 +1,6 @@
 // Imitazioni di un marchio nel nome di un sito: i candidati dall'elenco dei marchi (brands.js), il verdetto da un
-// classificatore sulle lettere, locale e sincrono; uno solo per apertura e menu del link. Un falso allarme si cura con un
-// esempio in scripts/imitazioni/etichette.tsv e rigenerando (scripts/addestra-imitazioni.mjs); qui si decide solo dove un
-// marchio può stare, mai il verdetto.
+// classificatore sulle lettere, locale e sincrono, uno solo per apertura e menu. Qui si decide dove un marchio può stare,
+// mai il verdetto: un falso allarme si cura con un esempio in scripts/imitazioni/etichette.tsv e rigenerando il modello.
 
 'use strict';
 
