@@ -121,13 +121,20 @@ test('un link coi tuoi dati: chiesto da te in un compito pulito si apre; dall\'a
   await expect.poll(aperta, { timeout: 8000 }).toBe(true);
 });
 
-test('Conservativo: dopo una ricerca chiede anche un timer; i no dell’elenco fisso non si confermano', async ({ app }) => {
+test('Conservativo: dopo una ricerca chiede anche un timer o un «dimentica»; i no dell’elenco fisso non si confermano', async ({ app }) => {
   await home(app);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
   const timer = await execAction(app, { type: 'TIMER', seconds: 60, etichetta: 'pasta' }, { contesto: [ricercaFatta] });
   expect(timer.needsConfirm).toBe(2);
 
+  // «Dimentica» senza «per sempre» è costo 1 (#872): a Conservativo, dopo una lettura, l'OK semplice come il timer.
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Vive a Bologna.', PREFERENZE: '' }));
+  const dimentica = await execAction(app, { type: 'DIMENTICA', testo: 'Bologna' }, { contesto: [ricercaFatta] });
+  expect(dimentica.executed).toBe(false);
+  expect(dimentica.needsConfirm).toBe(2);
+  expect(dimentica.describe).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
+  expect(await lezioni(app)).toContain('Vive a Bologna.');
+
   for (const confirmed of [false, true]) {
     const r = await execAction(app, { type: 'CANCELLA_MEMORIA' }, { confirmed });
     expect(r.executed).toBe(false);
