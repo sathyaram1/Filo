@@ -42,6 +42,9 @@ const BASE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
 export const RELEASE_BUMP_URL = `${BASE}/releaseBump`;
+// La minor ha un indirizzo suo: un server che non la conosce risponde 404 (non pubblicata, si resta sul veloce),
+// mentre sullo stesso indirizzo della patch avrebbe ignorato il tipo e alzato una patch a ogni controllo.
+export const RELEASE_MINOR_URL = `${BASE}/releaseMinor`;
 
 /**
  * Dalla risposta grezza del server a un esito con un nome. PURA.
@@ -151,17 +154,16 @@ export function messageForBump(reply) {
  * La domanda al server: "qual è il numero della prossima versione, e scrivilo
  * tu". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerBump({ passphrase, tipo = 'patch', soloControllo = false, fetchImpl = fetch, url = RELEASE_BUMP_URL } = {}) {
+export async function askServerBump({ passphrase, tipo = 'patch', soloControllo = false, fetchImpl = fetch, url } = {}) {
   if (!passphrase) return { outcome: 'no_passphrase' };
-  // Il corpo è la credenziale più il TIPO di aumento: nessun numero, nessun contenuto. Se un giorno qualcuno ci
-  // infilasse la versione da scrivere, il server la ignorerebbe, ma il posto giusto perché non ci sia è questo.
+  const minor = tipo === 'minor';
+  const indirizzo = url || (minor ? RELEASE_MINOR_URL : RELEASE_BUMP_URL);
+  // Il corpo è la credenziale (e per la minor se è solo il controllo): nessun numero, nessun contenuto. Se un giorno
+  // qualcuno ci infilasse la versione da scrivere, il server la ignorerebbe, ma il posto giusto perché non ci sia è questo.
   const corpo = { passphrase };
-  if (tipo === 'minor') {
-    corpo.tipo = 'minor';
-    if (soloControllo) corpo.soloControllo = true;
-  }
+  if (minor && soloControllo) corpo.soloControllo = true;
   try {
-    const res = await fetchImpl(url, {
+    const res = await fetchImpl(indirizzo, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpo),

@@ -828,8 +828,9 @@ ma a scriverlo è il server.
   6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
      legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
      GitHub risponde 409 e non si scrive.
-- **La minor del canale stabile** (SPEC-DOMANDE.md §4.2): `{ passphrase, tipo:
-  'minor' }` alza la seconda cifra e azzera la patch, solo se è dovuta: lunedì a
+- **La minor del canale stabile** (SPEC-DOMANDE.md §4.2): `releaseMinor {
+  passphrase }`, un indirizzo suo (un server di prima risponde 404 invece di
+  alzare una patch), alza la seconda cifra e azzera la patch, solo se è dovuta: lunedì a
   Roma, una a settimana (`routine-stabile/<lunedì>`, prenotata prima del commit
   e liberata se il commit non avviene), nessun feedback aperto marcato
   `sicurezza` a priorità 3. Se ce n'è uno la settimana si registra saltata e
