@@ -107,7 +107,7 @@ async function wikidata(q, lingua) {
   } catch (_) {}
   const nome = e?.labels?.[lingua]?.value || e?.labels?.en?.value || q;
   const testo = righeWikidata(dati, etichette);
-  return testo ? { titolo: `Wikidata: ${nome}`, sito: 'wikidata.org', url: `${WIKIDATA}/wiki/${q}`, data: '', testo } : null;
+  return testo ? { titolo: `Wikidata: ${nome}`, sito: new URL(WIKIDATA).hostname, url: `${WIKIDATA}/wiki/${q}`, data: '', testo } : null;
 }
 
 // Le due voci più vicine alla domanda, coi paragrafi che ne parlano, più i numeri di Wikidata della prima.
