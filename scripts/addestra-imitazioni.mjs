@@ -320,6 +320,7 @@ function costruisci() {
   const utili = conCandidati(etichetta);
   for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
   for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, 'mano', r.url);
+  for (const r of sinteticiCasuali()) if (!scritte.has(r.h)) aggiungi(r.h, 0, null, 'casuale', r.url);
   return gruppi;
 }
 
