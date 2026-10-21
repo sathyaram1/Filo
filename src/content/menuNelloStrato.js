@@ -266,6 +266,14 @@
     }
     locale.testoNascosto(labelEl, btnEl, s);
   };
-  // Con lo strato aperto sopra la scheda la barra laterale sta sotto di lui: un'icona non arriva da lì.
-  Menu.trascinaDaFuori = (d) => (acceso() ? false : locale.trascinaDaFuori(d));
+  // Un'icona portata dalla barra laterale sopra il menu aperto (#871): il gesto è della barra, lo strato la posa.
+  Menu.trascinaDaFuori = (d) => {
+    if (!acceso()) return locale.trascinaDaFuori(d);
+    if (!corrente || !d) return false;
+    aggiorna(corrente, 'fuori', {
+      fase: String(d.fase || ''), icona: String(d.id || ''), x: Number(d.x) || 0, y: Number(d.y) || 0,
+      svg: typeof d.icon === 'string' ? d.icon : '',
+    });
+    return true;
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
