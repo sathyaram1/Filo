@@ -193,6 +193,26 @@ test('tetto di spesa a 5 €, backup senza tetto: resta 5 € e la conferma offr
   }
 });
 
+test('tetto di spesa a 50 €, backup con 5 €: il più stretto entra e la conferma lo dice coi due numeri', async () => {
+  const userData = cartellaTemporanea('filo-imp-tetto-giu-');
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { monthlyLimitEur: 50 } }), 'utf8');
+  const zipPath = join(userData, 'tetto5.zip');
+  writeFileSync(zipPath, buildExportZip({ settings: { monthlyLimitEur: 5 } }));
+
+  const { app, shell } = await lancia(userData);
+  try {
+    const page = await apri(app, shell, 'filo://security/security.html');
+    const testo = await apriConferma(app, page, zipPath, 'tetto5.zip');
+    expect(testo).toContain('Il limite di spesa mensile scende da 50 € a 5 €, quello del backup.');
+    expect((await confirmState(page)).altroLabel).toBe('');
+    await clickConfirm(page, 'ok');
+    await expect.poll(() => disco(userData).settings?.monthlyLimitEur, { timeout: 10000 }).toBe(5);
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
 test('record finale dello zip rovinato: col numero di voci da 5 a 1 arrivano anteprime e chat, senza firma si importa lo stesso', async () => {
   const { conRecordFinale } = await import('./helpers/zipRovinato.mjs');
   const userData = cartellaTemporanea('filo-imp-fine-');
