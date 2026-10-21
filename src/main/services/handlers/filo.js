@@ -598,7 +598,8 @@ module.exports = function register(on, ctx) {
     let state = await FiloMem.getOnboarding();
     // `peek`: chi legge soltanto (Preferenze, per rileggere le interviste
     // conservate) non deve aprire niente né prenotare la ripresa di un turno.
-    if (msg?.peek) return { ok: true, onboarding: state, ready, resume: false };
+    // `fuori`: una pagina che l'intervista rifatta non l'ha chiesta; non la apre e non ne prenota il turno (#1297).
+    if (msg?.peek || (msg?.fuori === true && state.rifatta)) return { ok: true, onboarding: state, ready, resume: false };
     if (!ready) return { ok: true, onboarding: state, ready: false };
     if (!state.done && !state.thread.length) {
       state = await saveOnboarding(
