@@ -210,7 +210,9 @@ tratto vivo, e restituisce:
 3. il nuovo stato del sistema per la parte dell'utente.
 
 Dopo, la parte dell'utente si riscrive e il tratto vivo riparte dagli eventi
-recenti non compattati. Le due ultime ore di grezzo (o gli ultimi N turni,
+recenti non compattati. I turni rimasti perdono il ragionamento verso Claude
+(il loro prefisso è cambiato) e quelli nati dopo lo riportano: lo fa la regola
+del prefisso, senza codice in più (vedi «Da verificare»). Le due ultime ore di grezzo (o gli ultimi N turni,
 quale sia più corto) restano grezze: il modello deve vedere da vicino quello
 che è appena successo.
 
