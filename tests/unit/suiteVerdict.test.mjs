@@ -219,7 +219,7 @@ describe('le parti della suite e il tetto di tempo', () => {
     assert.deepEqual(partiSenzaEsito(3, undefined), [1, 2, 3]);
     assert.deepEqual(partiSenzaEsito(0, []), []);
     const rossi = rossiDellePartiMancanti([2, 4], 4);
-    assert.deepEqual(rossi.map(rigaRosso).map((r) => r.slice(0, 40)), ['parte 2 di 4 della suite senza esito: n', 'parte 4 di 4 della suite senza esito: n']);
+    assert.deepEqual(rossi.map(rigaRosso).map((r) => r.split(':')[0]), ['parte 2 di 4 della suite senza esito', 'parte 4 di 4 della suite senza esito']);
     assert.deepEqual(chiaviDelVerdetto({ nuovi: [...rossi, { spec: 'delta', titolo: 'x' }] }), ['suite:non-partita', 'suite:tests/delta.spec.mjs']);
   });
 });
