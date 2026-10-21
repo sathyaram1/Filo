@@ -316,7 +316,6 @@
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
   // Lo stato di adesso; una copia scaduta il main la rilegge in sottofondo e annuncia il cambio.
-  let inPausaVisibili = { bacheca: false, mazzi: false };
   function rifletteInPausa(r) {
     if (!r || !r.ok) return;
     inPausaVisibili = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
