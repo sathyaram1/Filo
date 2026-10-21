@@ -116,6 +116,10 @@
     $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
     $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
     $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
+    $('l-contesto-cache').textContent = I18n.t('admin_defaults_contesto_cache');
+    $('contestoCache5m').textContent = I18n.t('admin_defaults_contesto_cache_5m');
+    $('contestoCache1h').textContent = I18n.t('admin_defaults_contesto_cache_1h');
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_codice');
     $('h-lunghezza').textContent = I18n.t('admin_defaults_lunghezza');
     $('lunghezza-desc').textContent = I18n.t('admin_defaults_lunghezza_desc');
     for (const [f] of CAMPI_LUNGHEZZA) $(`l-lunghezza-${f}`).textContent = I18n.t(`admin_defaults_lunghezza_${f}`);
@@ -863,6 +867,9 @@
       $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
       $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
     }
+    $('contestoCache').value = contestoCaricato.cache === '5m' || contestoCaricato.cache === '1h' ? contestoCaricato.cache : '';
+    const serie = diSerie && diSerie.cache === '5m' ? 'admin_defaults_contesto_cache_5m' : 'admin_defaults_contesto_cache_1h';
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_serie', I18n.t(serie));
   }
   // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
   function collectContesto() {
@@ -871,6 +878,7 @@
       const v = $(id).value.trim();
       if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
     }
+    if ($('contestoCache').value) ora.cache = $('contestoCache').value;
     return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
   }
 

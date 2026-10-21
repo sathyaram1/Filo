@@ -11,6 +11,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Con un modello Claude la chat costa meno: le istruzioni fisse si pagano per intero una volta e poi si rileggono a prezzo basso. In Preferenze, sotto «Quanto ricorda la chat», scegli per quanto restano da parte, cinque minuti o un\'ora. Lo puoi chiedere anche a Filo.',
         'Mentre Filo lavora puoi già scrivergli il seguito e premere Invio. Il lavoro non si ferma, il messaggio compare in attesa e Filo lo legge al passo dopo, o appena ha finito di rispondere. Se lo fermi, il messaggio torna nella casella. Per fermarlo restano il quadrato e Invio con la casella vuota.',
         'Nelle Opzioni, sotto «Host dei modelli», scegli se i modelli rispondono dagli host più veloci, da quelli che cominciano a rispondere prima o dai più economici. Lo puoi chiedere anche a Filo, per esempio «voglio la chat più veloce». I fornitori esclusi restano esclusi.',
         'Il pulsante «Prova» dei modelli predefiniti misura il modello come lo useresti davvero e la misura resta: riapri la pagina e ritrovi latenza e velocità. Se cambi modello o host la misura sparisce, e se non è di oggi porta la sua data.',

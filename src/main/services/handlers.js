@@ -44,6 +44,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   rimedioDi: (s, action, err) => globalThis.SN_CHAT_ERRORS.rimedioNessunHost(doveSiSceglieIlModello(s, action), err, s),
   // Lo crea handlers/contatori.js, registrato più sotto: lo si chiede a ogni chiamata.
   contatore: () => globalThis.SN_CONTATORI_MAIN,
+  durataCache: (s) => globalThis.SN_FILO_CONTESTO.tetti(s && s.contestoFilo, Defaults.get().contestoFilo).cache,
 });
 // Più chiamate che per chi usa Filo sono una richiesta sola (un messaggio coi suoi giri di strumenti, una dettatura
 // coi suoi ripieghi) contano un uso, con l'attesa da quando è partita la richiesta (#969).

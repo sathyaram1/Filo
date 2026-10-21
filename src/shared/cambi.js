@@ -90,6 +90,11 @@
       valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
+    'contestoFilo.cache': {
+      nome: 'durata della cache della chat',
+      valore: (v) => (v === '1h' ? 'un\'ora' : (v === '5m' ? '5 minuti' : 'come i predefiniti')),
+      livello: 2,
+    },
     ...Object.fromEntries([
       ['conversazioni', 'della chat e delle conversazioni'],
       ['testi', 'di traduzioni, riscritture e riassunti'],

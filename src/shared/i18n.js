@@ -513,6 +513,11 @@
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    admin_defaults_contesto_cache: 'Durata della cache',
+    admin_defaults_contesto_cache_5m: '5 minuti',
+    admin_defaults_contesto_cache_1h: 'un\'ora',
+    admin_defaults_contesto_cache_serie: 'Come il codice (%s)',
+    admin_defaults_contesto_cache_codice: 'Come il codice',
     // Quanto può essere lunga una risposta dei modelli (#1097.3)
     admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
     admin_defaults_lunghezza_desc:
@@ -919,6 +924,7 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
+    history_cache_written: '%s token messi da parte per le richieste che seguono.',
     history_policy_violation: '⚠ fornitore non ammesso',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.

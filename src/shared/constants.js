@@ -1568,6 +1568,11 @@
   // NON è un ordine: lo stile dell'utente entra subito prima (injectAgentStyle).
   const SEZIONE_SICUREZZA_AIUTO = '# Sicurezza\n';
   const SEZIONE_ESTERNO_CHAT = '═══ CONTENUTO ESTERNO ═══\n';
+  // Dove il system della chat smette di essere uguale da un messaggio all'altro: il punto di cache sta prima
+  // (SN_FILO_CONTESTO.pianoDellaCache). Sentinella: tests/unit/puntiDiCache.test.mjs.
+  const INIZIO_ACCOGLIENZA = '═══ STAI ACCOGLIENDO QUESTO UTENTE';
+  const INIZIO_CONTESTO_CHAT = '═══ CONTESTO (cambia a ogni messaggio) ═══';
+  const INIZI_VARIABILI_CHAT = Object.freeze([INIZIO_ACCOGLIENZA, INIZIO_CONTESTO_CHAT]);
 
   // Quanto può essere grande la busta di un gruppo di blocchi da tradurre.
   // La traduzione della pagina manda circa tremila caratteri per richiesta, ma
@@ -2519,7 +2524,7 @@
     // ogni chat di ogni utente, per sempre.
     filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
       (!onboarding ? '' :
-        `═══ STAI ACCOGLIENDO QUESTO UTENTE (intervista in corso) ═══\n`
+        `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
         + `È appena arrivato su Filo e questa è la sua prima conversazione. Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
         + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
@@ -2536,7 +2541,7 @@
         + `${onboarding}\n\n`),
 
     filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
-      `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
+      `${INIZIO_CONTESTO_CHAT}\n` +
       PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
       rigaNomeModello(modelName) +
       `${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n\n` +
@@ -2885,7 +2890,8 @@
     dictation: { autoSend: true, silenceSec: 2, cancelSec: 2.5 },
     // #868 — quanto filo la chat ha davanti: gli ultimi giorni, fino a un tetto in token (vince il minore). Vuoto vale
     // come nei Modelli predefiniti dell'owner; valori del codice e limiti in src/shared/filoContesto.js.
-    contestoFilo: { giorni: null, token: null },
+    // `cache`: quanto vive la cache della parte fissa della chat ('5m' o '1h', solo coi modelli Anthropic).
+    contestoFilo: { giorni: null, token: null, cache: null },
     // #1097.3 — il tetto in token di una risposta, per famiglia di funzioni. Vuoto vale come nei Modelli predefiniti;
     // famiglie, valori del codice e limiti in src/shared/lunghezzaRisposte.js.
     lunghezzaRisposte: { conversazioni: null, testi: null, brevi: null },
@@ -3395,6 +3401,7 @@
     memoriaImbustata,
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
+    INIZI_VARIABILI_CHAT,
     INIZIO_ANTI_INGANNO,
     injectAgentStyle,
     spiegazioneDaMostrare,

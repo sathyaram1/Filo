@@ -509,6 +509,14 @@
             <span>Tetto in token</span>
             <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
           </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quanto il modello tiene da parte le istruzioni fisse della chat, per rileggerle a prezzo basso. Un'ora costa il doppio a metterle da parte e regge le pause lunghe. Vale coi modelli Anthropic.">
+            <span>Durata della cache</span>
+            <select id="contestoCache" style="width:240px;">
+              <option value="" id="contestoCachePredefinita">Come i predefiniti</option>
+              <option value="5m">5 minuti</option>
+              <option value="1h">Un'ora</option>
+            </select>
+          </label>
         </div>
       </section>
 

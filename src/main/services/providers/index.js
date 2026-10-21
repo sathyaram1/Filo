@@ -99,12 +99,13 @@
   // `tools` / `toolChoice` (tool calling nativo, vedi src/shared/actionTools.js)
   // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
   // streaming) passano tali e quali al provider.
-  async function complete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
+  // `cache`: il piano dei punti di cache (SN_FILO_CONTESTO.pianoDellaCache); ogni fornitore lo scrive nel suo formato.
+  async function complete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
+  async function streamComplete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
   }
 
   async function listModels({ provider, apiKey }) {
@@ -122,7 +123,7 @@
     try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '' }); } catch (_) {}
   }
 
-  async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
+  async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -130,7 +131,7 @@
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
           apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-          providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
+          providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
         }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
@@ -154,7 +155,7 @@
   // provider successivo emettiamo `onReset` così il chiamante butta il buffer
   // parziale e riparte pulito (#273). onReset viene chiamato SOLO se l'attempt
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
-  async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onTentativoFallito }) {
+  async function streamCompleteWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onTentativoFallito }) {
     let lastErr = null;
     // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
     const broken = [];
@@ -175,7 +176,7 @@
         const r = await withNetworkRetry(
           () => Promise.resolve(getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-            providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
+            providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
             onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
