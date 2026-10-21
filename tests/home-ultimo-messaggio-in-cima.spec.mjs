@@ -97,7 +97,7 @@ test('aprendo la home in cima c’è solo l’ultimo messaggio e sotto è vuoto;
 
   // Ieri c'è: la rotella lo riporta a vista, e la home non ci rimette le mani.
   await page.locator('#bubbles').hover();
-  for (let i = 0; i < 4; i++) await page.mouse.wheel(0, -300);
+  await page.mouse.wheel(0, -300);
   const ieri11 = async () => (await vista(page)).bolle.find((b) => b.testo === 'risposta di ieri 11');
   await expect.poll(async () => { const b = await ieri11(); return b.giu > 0 && b.su < v.alto; }).toBe(true);
   const risalito = (await ieri11()).su;
@@ -174,22 +174,49 @@ test('scrivo a home appena aperta: lo scambio continua sotto senza salti, e quan
   await expect.poll(async () => {
     const v = await vista(page);
     const ultima = v.bolle[v.bolle.length - 1];
-    return v.vuoto === '0px' && ultima.giu <= v.alto + 1 && ultima.giu > v.alto - 60;
+    return ['', '0px'].includes(v.vuoto) && ultima.giu <= v.alto + 1 && ultima.giu > v.alto - 60;
   }).toBe(true);
 });
 
-test('una home riaperta o ricaricata riparte dall’ultimo messaggio, anche se in un’altra avevo risalito', async ({ app, openTab }) => {
+// La scheda di `page` davanti, come un clic sulla sua linguetta.
+async function davanti(app, page) {
+  const segno = `s${Math.random()}`;
+  await page.evaluate((s) => { window.__segno = s; }, segno);
+  await app.evaluate(async ({ BrowserWindow }, s) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    for (const t of tm.tabs) {
+      if (await t.view.webContents.executeJavaScript('window.__segno || ""') === s) { tm.activate(t.id); return; }
+    }
+  }, segno);
+}
+async function risali(page) {
+  await page.locator('#bubbles').hover();
+  for (let i = 0; i < 4; i++) await page.mouse.wheel(0, -400);
+  await expect.poll(async () => (await vista(page)).bolle.at(-1).su).toBeGreaterThan(300);
+}
+
+test('una home riaperta o ricaricata riparte dall’ultimo messaggio; tornare su una scheda già aperta non la sposta', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await semina(app, [...ieri(), { id: 'oggi', messaggi: [{ role: 'filo', text: 'Sono arrivate due mail.', ts: pocoFa(3) }] }]);
   const prima = await openTab('filo://newtab/');
   await inCima(prima, 'Sono arrivate due mail.');
-  await prima.locator('#bubbles').hover();
-  for (let i = 0; i < 4; i++) await prima.mouse.wheel(0, -400);
-  await expect.poll(async () => (await vista(prima)).bolle.at(-1).su).toBeGreaterThan(300);
+  await risali(prima);
+  const risalita = (await vista(prima)).bolle.at(-1).su;
 
   const seconda = await openTab('filo://newtab/');
   await inCima(seconda, 'Sono arrivate due mail.');
+  // Tornare sulla prima non è aprirla: resta dove l'utente l'aveva lasciata.
+  await davanti(app, prima);
+  await prima.waitForTimeout(400);
+  expect(Math.abs((await vista(prima)).bolle.at(-1).su - risalita)).toBeLessThan(2);
   await prima.reload();
+  await inCima(prima, 'Sono arrivate due mail.');
+
+  // Ricaricata mentre stava dietro, la cima la prende appena torna davanti.
+  await risali(prima);
+  await davanti(app, seconda);
+  await prima.reload();
+  await davanti(app, prima);
   await inCima(prima, 'Sono arrivate due mail.');
 });
 
@@ -201,7 +228,7 @@ test('un ultimo messaggio più alto dello schermo comincia in cima, non finisce 
   const v = await inCima(page, 'Passo 1 della ricetta.');
   const ultima = v.bolle[v.bolle.length - 1];
   expect(ultima.giu).toBeGreaterThan(v.alto);
-  expect(v.vuoto).toBe('0px');
+  expect(['', '0px']).toContain(v.vuoto);
 });
 
 test.describe('con la home pronta per la scheda nuova', () => {

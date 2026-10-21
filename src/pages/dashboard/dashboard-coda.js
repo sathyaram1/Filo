@@ -329,6 +329,8 @@
       cima = sopra ? Math.max(0, Math.ceil(y(sopra.getBoundingClientRect().bottom))) : 0;
       const base = (parseFloat(getComputedStyle(a).paddingBottom) || 0) - vuoto;
       serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(fondo.getBoundingClientRect().bottom) - base));
+      // Uno scambio che ha riempito lo schermo ha consumato il vuoto: non torna se poi qualcosa si accorcia.
+      if (!serve && !inApertura()) ancora = null;
     }
     if (serve !== vuoto) {
       vuoto = serve;
