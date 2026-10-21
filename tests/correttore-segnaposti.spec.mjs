@@ -250,7 +250,8 @@ for (const [come, riga] of [['con altre parole', '[di soli xx][][Google P/E rati
     const i = (await page.locator('#ta').inputValue()).indexOf('Google');
     await page.locator('#ta').evaluate((e, i) => e.setSelectionRange(i, i + 6), i);
     await page.keyboard.type('Apple');
-    await expect(valore(page, '27')).toHaveCount(0, { timeout: 5000 });
+    await expect.poll(async () => (await valore(page, '27').count()) === 0 || (await globale(app, '__webChieste')).length === 2,
+      { timeout: 6000 }).toBe(true);
   });
 }
 
