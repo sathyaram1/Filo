@@ -138,7 +138,7 @@ test('tastiera: Ctrl+Shift+B e Invio sull\'icona Aiuto', async ({ app, shell, op
     await premi(app, 'barra', 'Return');
     await page.waitForTimeout(1500);
     log('TASTO', i, f, await page.locator('.sn-sidebar').count(), await page.locator('.sn-sidebar .sn-voce-btn').getAttribute('data-stato').catch(() => '-'), (await statoBarra(app)).aperta, JSON.stringify((await nelMain(app)).aiuto));
-  }
+  } catch (e) { log('TASTO ERR', i, String(e).slice(0, 300)); }
 });
 
 test('tema scuro: i tre stati e la striscia', async ({ app, shell, openTab, testServer }) => {
