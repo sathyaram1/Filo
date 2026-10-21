@@ -114,6 +114,22 @@ test('ferma senza richiesta e senza nota: dice che nessuna richiesta è aperta, 
   await expect(page.locator('#mgL5ArchiviaBtn')).toBeVisible();
 });
 
+test('ferma senza nota del cancello: un report o una domanda di prima non passano per il motivo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const notes = 'Report di chi ha risolto: ho messo il tasto in alto.\n\n'
+    + "--- Aggiornamento dell'agente del 19/10/26, 10:00 ---\nHo una domanda: il tasto lo preferisci a destra o a sinistra?\n\n"
+    + '--- La tua risposta del 19/10/26, 11:00 ---\nA destra.\n\n'
+    + "--- Aggiornamento dell'agente del 20/10/26, 09:00 ---\nReport: tasto spostato a destra, prove verdi.";
+  await apri(page, [pratica({ notes })]);
+  await apriQuadrato(page, 'fb-1556');
+  const pannello = page.locator('#mgSideBody');
+  await expect(pannello).toContainText('Nessuna richiesta di fusione è aperta');
+  await expect(pannello).not.toContainText('tasto spostato a destra');
+  await expect(pannello).not.toContainText('Quando');
+  await expect(page.locator('#mgL5RimandaBtn')).toBeVisible();
+  await expect(page.locator('#mgL5ArchiviaBtn')).toBeVisible();
+});
+
 test('con una richiesta aperta il quadrato resta quello di prima: Approva e Scarta, niente strade', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const richiesta = {
