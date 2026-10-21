@@ -7,12 +7,15 @@ sceglie il repository `sathyaram1/Filo` e incolla risposta e motivazione di ogni
 criterio. Le motivazioni diventano pubbliche sulla pagina del badge.
 
 Va inviata dopo i passi sulla sicurezza del repository (avvisi di Dependabot,
-CodeQL, segnalazione privata delle vulnerabilità): tre risposte contano su di
-loro. Ottenuto il numero del progetto, il badge si aggiunge al README.
+CodeQL, secret scanning, segnalazione privata delle vulnerabilità), perché
+quattro risposte dipendono da loro: `vulnerability_report_private`,
+`no_leaked_credentials`, `static_analysis`, `static_analysis_fixed`. Ottenuto
+il numero del progetto, il badge si aggiunge al README.
 
-Le righe con **Da decidere** sono le scelte che spettano all'owner. Finché un
-criterio MUST resta Unmet il badge non arriva a «passing»: sono `interact`,
-`contribution`, `discussion`, `report_archive`, `warnings` e
+Le righe con **Da decidere** spettano all'owner. Sono tutte MUST, e finché una
+resta Unmet il badge non arriva a «passing»: `interact`, `contribution`,
+`discussion`, `report_archive`, `vulnerability_report_response`, `warnings` (con
+`warnings_fixed`), `know_secure_design`, `know_common_errors`,
 `vulnerabilities_fixed_60_days`.
 
 ## Basics
