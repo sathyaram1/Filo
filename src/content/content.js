@@ -1006,9 +1006,13 @@
     const spento = isBlocked();
     if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
     self.__snFiloSpento = spento;
+    riferisciAiuto();
   }
 
-  function isBlocked() {
+  function isBlocked() { return !!motivoBlocco(); }
+
+  // 'pagina' dove Filo non c'è mai, 'sito' dove l'utente l'ha spento; '' altrimenti.
+  function motivoBlocco() {
     const url = location.href;
     // #405 — dentro un riquadro incorporato "about:blank" e "about:srcdoc" NON
     // sono pagine di sistema: sono contenuto scritto dalla pagina che ospita il
