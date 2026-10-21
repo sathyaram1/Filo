@@ -289,6 +289,18 @@
     return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
   }
 
+  // «Aspetta D-12», gemello del segno in Gestione (SPEC-DOMANDE §3.8): si risponde in un posto solo, e il clic ci porta.
+  function domandaChipHtml(f) {
+    const id = MR.aspettaDomanda(f);
+    if (!id) return '';
+    const titolo = `Aspetta la tua risposta alla domanda ${id}: aprila in Gestione`;
+    return `<button type="button" class="fb-attesa fb-domanda" data-domanda="${escapeHtml(id)}" title="${escapeHtml(titolo)}" aria-label="${escapeHtml(titolo)}">aspetta ${escapeHtml(id)}</button>`;
+  }
+
+  function apriDomandaInGestione(id) {
+    return sendToMain({ type: 'open_url', url: `filo://manage/manage.html#domanda=${encodeURIComponent(id)}` });
+  }
+
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
   function segnoFermataHtml(f) {
     const s = MR.segnoFermata(f, { fusioni });
@@ -1281,6 +1293,7 @@
             ${stateBadgeHtml(f)}
             ${fusioneChipHtml(f)}
             ${attesaChipHtml(f)}
+            ${domandaChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
@@ -1464,6 +1477,10 @@
     // Composer "Invia risposta" del tab Chiarimenti: appende la risposta
     // dell'utente come turno (conservando la domanda di Filo nello storico) e
     // rimette il feedback in "Da risolvere" perché una routine lo riprenda.
+    root.querySelectorAll('.fb-domanda[data-domanda]').forEach((b) => {
+      b.addEventListener('click', (e) => { e.stopPropagation(); apriDomandaInGestione(b.dataset.domanda); });
+    });
+
     root.querySelectorAll('.fb-reply-send').forEach((btn) => {
       const id = btn.dataset.id;
       const card = btn.closest('.fb-card');

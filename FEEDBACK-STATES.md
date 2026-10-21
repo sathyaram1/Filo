@@ -30,8 +30,8 @@ consumer ricalcola lo stato dai campi grezzi.
 | `suspicious_file` | **nero** | Ricevuti | gate deterministico file ha flaggato PRIMA dei giudici |
 | `attack` | rosso | Ricevuti | un livello di sicurezza ha flaggato come attacco |
 | `spam` | giallo | Ricevuti | flaggato come spam |
-| `design` | verde | Ricevuti | serve decisione owner (3 origini distinte via chat: verdetto design; domande routine ex-`clarify`; fix fallito 3× ex-`blocked/loop`) |
-| `aligned` | blu | Ricevuti | sicuro e sensato ma automatica OFF: aspetta approvazione manuale |
+| `design` | verde | Ricevuti, o In coda con `domandaId` (§5) | serve decisione owner (3 origini distinte via chat: verdetto design; domande routine ex-`clarify`; fix fallito 3× ex-`blocked/loop`) |
+| `aligned` | blu | Ricevuti, o In coda con `domandaId` (§5) | sicuro e sensato ma automatica OFF: aspetta approvazione manuale |
 | `todo` | — | In coda | approvato (a mano o auto): aspetta di essere lavorato |
 | `working` | — | In coda | un'istanza lo sta lavorando ORA (lock, §6) |
 | `revision_capability` | — | In coda | fix su branch, aspetta verifica comportamentale (verifier avversariale) |
@@ -46,8 +46,10 @@ DB3 esistente), poi "Risolti".
 
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
-`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
-`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
+`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `attesa_chiusa`, `guasto`, `locale`,
+`fidato` (§5, §4b), `worker` (attacco o spam giudicato da chi lavorava, §3),
+`attesa_origine`, `origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c),
+`legacy-ignored` (§8);
 il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
 storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
@@ -61,7 +63,10 @@ segnalato`, `ruolo`), un trade-off vero che decide l'owner, arrivata con
 scritto sempre, anche su pass, col testo di cosa è stato controllato; `saltato`
 lo mette l'owner (`by: owner`) quando, letto il fail, decide di andare avanti,
 e conserva il testo del fail; `testo` è cifrato come `notes`; in dashboard sono
-il rombo e il pentagono della fila delle forme).
+il rombo e il pentagono della fila delle forme; un attacco o spam segnato dal worker
+scrive `l3` con `esito: attacco|spam`), `domandaId` (dal #1358: `D-<n>`, la domanda
+dell'owner che sblocca un'attesa, SPEC-DOMANDE §3.8; la scrive SOLO il server, nella
+stessa transazione dello stato, e nessuna regola la lascia scrivere a un client).
 
 **Stati legacy da RITIRARE:** `new`, `review`, `blocked`, `clarify`, `verified`,
 `ignored` (mappatura in §8).
@@ -86,7 +91,7 @@ functions. Qui sotto il perché dei passaggi, per attore.
   lo scrive solo il server alla nascita) e la domanda come turno di Filo nella conversazione.
   Ogni esito che lo metterebbe in coda o ad aspettare l'origine (sicuro dei giudici, salto dei
   fidati, origine fusa, chiusa, sparita o non ancora fusa), e anche il verdetto `design` dei
-  giudici, diventa `design` (`statusReason: decisione`): nei Ricevuti, col rombo e la casella. Attacco, spam, origine bloccata e
+  giudici, diventa `design` (`statusReason: decisione`) con la sua domanda (`domandaId`): In coda col segno «aspetta D-n», e si risponde nella sezione Domande (§5). Attacco, spam, origine bloccata e
   giudizio incompleto vincono come per gli altri; con l'origine si blocca e si sblocca, ma la
   sua fusione non lo mette in coda. Dopo la risposta va in coda come un feedback normale (non
   ha un ramo da riprendere) e chi lo prende trova domanda e risposta (`decisioni`). Un
@@ -126,7 +131,7 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità uguale al livello (quello col `?` aspetta la risposta nei Ricevuti: sopra,
+  priorità uguale al livello (quello col `?` aspetta la risposta alla sua domanda: sopra,
   Pipeline); UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
   fra loro); —critica con rilievi
@@ -159,13 +164,26 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   rientro veniva rifiutato e la pratica restava ferma nei Ricevuti).
 - da todo/working/revision_* la routine con domande → `design` (+ domande nella chat,
   `statusReason: clarify`).
+- da todo/working/revision_* il worker che giudica il feedback un attacco o uno spam →
+  `attack` | `spam` (`statusReason: worker`, il perché cifrato in `livelli.l3` con `esito:
+  attacco|spam` e `ruolo`): Ricevuti, L3 (#1358, SPEC-DOMANDE §2.2). Lo consegnano chi
+  risolve, chi corregge e chi verifica, mai il controllo di sicurezza; da lì decide l'owner
+  come per i giudici (conferma, falso positivo → `todo`, archivia).
+- ogni fermata per l'owner (`clarify`, `decisione`, `loop`, `arenato`, `attesa_chiusa`, e
+  `locale` con la domanda di chi si ferma) apre una domanda nella stessa transazione dello
+  stato, e il feedback prende `domandaId` (§5, #1358). `design` + `locale` senza domanda
+  non torna più al PC: un feedback fidato prende il segno dei lavori server (`localOnly`)
+  e torna `todo` col segnalibro sul ramo; uno non fidato resta `design` col motivo
+  `fidato`, nei Ricevuti L3 come richiesta di renderlo fidato, e «Segna fidato» lo
+  rimette `todo` come lavoro server nello stesso gesto.
 
 **Regole dure:** da `unlabeled` il verdetto lo scrive solo la pipeline; l'owner lo mette in
 coda o lo archivia. Da `suspicious_file`, `done`, `archived` e `*_confirmed` esce solo
 l'owner; da `attack`, `spam`, `design`, `aligned` l'owner, e la pipeline nei soli casi dei
 mittenti fidati e dei derivati. L'iter `todo→working→revision_*→done` e `revision_*→design`
-lo muovono solo le routine; l'owner dall'iter può solo archiviare. Nessuna riga owner →
-`done`. Transizioni non elencate = illegali: il writer le rifiuta.
+lo muovono solo le routine, che dall'iter possono anche segnare `attack`/`spam`; l'owner
+dall'iter può solo archiviare. Nessuna riga owner → `done`. Transizioni non elencate =
+illegali: il writer le rifiuta.
 
 **La fiducia** (#1148, SPEC-DOMANDE.md §1): `fiducia` (`fidato`|`non_fidato`, in chiaro) la
 scrive solo il server, le regole la vietano a ogni client. Alla nascita: fidato l'owner
@@ -243,9 +261,11 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 - Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
   in Gestione, da riga di comando no), a pratica aperta, non segnalata come
   attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
-  solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
-  (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
-  --serve-locale`, e lì l'owner lo approva come lavoro locale (#913, sotto).
+  solo col sì dell'owner: da una sessione dell'owner un feedback torna nei Ricevuti (`design`,
+  motivo `locale` senza `domandaId`, nota «Richiede lavoro locale») con `owner-feedback.mjs
+  --serve-locale`, e lì l'owner lo approva (#913, sotto). Dalle routine `design`+`locale` senza
+  domanda non nasce più: il lavoro server va ai lavori server o chiede la fiducia (§3), e il
+  motivo `locale` con `domandaId` è un passo che solo l'owner può fare, chiesto con la domanda.
 - **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
   `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
   «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
@@ -314,11 +334,11 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
     (`priorityManual`, 3): il giudice di priorità non la riscrive.
   - un derivato col `?` fa eccezione: dove gli altri andrebbero in coda o ad aspettare, lui va nei
-    Ricevuti fermo sulla domanda (`design`, `decisione`: §3, Pipeline).
+    fermo sulla sua domanda (`design`, `decisione`, `domandaId`: §3, Pipeline; In coda col segno).
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
-  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi aspetta la sua domanda
   con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
   se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
   della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già
@@ -330,11 +350,14 @@ da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, l
 di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valutazione passa
 sempre dai giudici.
 
-Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
-`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un
-lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
---reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
-l'owner lo approva come lavoro locale (§4b, #913).
+Le routine non aprono lavoro locale: dentro una routine `claude-feedback.mjs` e
+`owner-feedback.mjs --solo-locale` si rifiutano. Dal #1358 nessun lavoro torna al PC
+dell'owner: `deliver status --status design --reason locale` vuol dire «serve il codice del
+server», e il server dà a un feedback fidato il segno dei lavori server (`localOnly`, `by:
+routine`) rimettendolo `todo`, mentre uno non fidato resta `design` col motivo `fidato`
+(Ricevuti L3, richiesta di renderlo fidato). Un passo che solo l'owner può fare (un segreto,
+un'automazione GitHub) arriva con la sua domanda (`--domanda`), e il feedback resta
+`design`/`locale` col `domandaId`, In coda (§5).
 
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
@@ -406,7 +429,7 @@ stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
 corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
 aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
-lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
+lavoro per regola: quello è `locale`, e la sua nota dice quale regola lo tiene
 fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
@@ -414,6 +437,24 @@ owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
 di fusione in attesa; conflitto → riallineamento). Non serve una transizione
 nuova: è `design` → `todo` con attore owner, e da lì il cancello.
+
+**Le attese con la loro domanda (#1358, SPEC-DOMANDE §3.8).** Ogni fermata dei casi (2),
+(2b), (3), (5), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
+o `origine_mancante` apre una domanda per l'owner e il feedback prende `domandaId`,
+restando nello stato e col motivo di prima: la macchina a stati non cambia. Dal canale la
+domanda nasce nella stessa transazione dello stato (quella scritta da chi si ferma con
+`--domanda`, o composta dal server dalle sue parole); dalle altre porte (la pipeline per i
+derivati e per l'origine, una migrazione) la crea il trigger del server appena il feedback
+entra nell'attesa. Una domanda aperta di un'attesa lasciata per un'altra strada diventa
+`superata`. In dashboard un `design`/`aligned` con `domandaId` e uno di quei motivi sta
+**In coda**, col segno «aspetta D-n» che apre la domanda nella sezione Domande; nel
+dettaglio la casella di risposta lascia il posto al tasto «Rispondi alla domanda»: si
+risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo testo) lo
+riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
+domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
+`domandaId`: `secaudit`, `l5`, `guasto`, `fidato`, attacchi, spam e file sospetti. Le
+attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti
+(`npm run domande:migra`, a secco; `-- --dal-vero` per creare).
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
 dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel

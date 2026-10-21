@@ -1,10 +1,11 @@
 // Componenti di conferma riusabili per i livelli di sicurezza delle azioni
 // di Filo (#146.2). Stile minimale, costruito sui token del tema (--sn-*).
 //
-//   SN_CONFIRM_UI.confirm({ title, text, parti, okLabel, cancelLabel }) → Promise<bool>
+//   SN_CONFIRM_UI.confirm({ title, text, parti, okLabel, cancelLabel, altroLabel }) → Promise<bool | 'altro'>
 //     Livello 2: popup che SPIEGA in chiaro la modifica, con OK e Annulla.
 //     `parti` (facoltativo, vince su `text`): stringhe di Filo e riquadri
 //     { citazione } / { elenco } col testo che non è suo (#592.7).
+//     `altroLabel`: un secondo sì, diverso da OK, che risolve 'altro'; solo nelle pagine di Filo.
 //
 //   SN_CONFIRM_UI.confirmTyped({ title, text, word, avviso }) → Promise<bool>
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
@@ -100,6 +101,7 @@
 .sn-confirm-input:focus { border-color: var(--sn-accent, #c45a3b); }
 .sn-confirm-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
 }
@@ -113,11 +115,13 @@
   cursor: pointer;
   text-align: center;
 }
-.sn-confirm-btn-cancel {
+.sn-confirm-btn-cancel,
+.sn-confirm-btn-altro {
   color: var(--sn-fg, #1a1918);
   border: 1px solid var(--sn-border, #e0dcd4);
 }
-.sn-confirm-btn-cancel:hover { background: var(--sn-hover, rgba(0,0,0,0.05)); }
+.sn-confirm-btn-cancel:hover,
+.sn-confirm-btn-altro:hover { background: var(--sn-hover, rgba(0,0,0,0.05)); }
 .sn-confirm-btn-ok {
   background: var(--sn-btn-bg, var(--sn-fg, #1a1918));
   color: var(--sn-btn-fg, var(--sn-bg, #fff));
@@ -458,20 +462,26 @@
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm(opts = {}, ospite = null) {
     if (daFuori(ospite)) return fuori('confirm', opts);
-    const { title = 'Conferma', text = '', parti = null, okLabel = 'OK', cancelLabel = 'Annulla' } = opts || {};
+    const { title = 'Conferma', text = '', parti = null, okLabel = 'OK', cancelLabel = 'Annulla', altroLabel = '' } = opts || {};
     return new Promise((resolve) => {
       const { box, done, troppoPresto } = buildOverlay(resolve, ospite, opts);
       header(box, { title, parti: partiDi(text, parti) });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
-      const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
-      const aggiorna = () => inAttesa(ok, !visto());
+      // Anche il secondo sì aspetta il testo letto e il mezzo secondo, come OK.
+      const si = [[okLabel, 'sn-confirm-btn-ok', true]];
+      if (altroLabel) si.unshift([String(altroLabel), 'sn-confirm-btn-altro', 'altro']);
+      const bottoni = si.map(([label, classe, esito]) => {
+        const b = makeBtn(row, label, classe);
+        b.addEventListener('click', (e) => {
+          if (!visto()) avanti();
+          else if (!troppoPresto(e)) done(esito);
+        });
+        return b;
+      });
+      const aggiorna = () => { for (const b of bottoni) inAttesa(b, !visto()); };
       const { visto, avanti } = tuttoVisto(box, aggiorna);
       cancel.addEventListener('click', () => done(false));
-      ok.addEventListener('click', (e) => {
-        if (!visto()) avanti();
-        else if (!troppoPresto(e)) done(true);
-      });
       aggiorna();
       // Mai il fuoco su OK, nemmeno se nessuno scriveva: il popup si apre anche
       // da solo, e il primo spazio o invio lo confermerebbe senza leggerlo (#592).
@@ -584,6 +594,7 @@
         hasInput: !!q('.sn-confirm-input'),
         copre: !!q('.sn-confirm-copre'),
         okLabel: (okBtn && okBtn.textContent) || '',
+        altroLabel: (q('.sn-confirm-btn-altro') && q('.sn-confirm-btn-altro').textContent) || '',
         cancelLabel: (q('.sn-confirm-btn-cancel') && q('.sn-confirm-btn-cancel').textContent) || '',
         // Un clic o un tasto veri adesso varrebbero: il primo fotogramma può
         // arrivare ben dopo che il riquadro sta nel DOM (#592.11).
@@ -594,7 +605,7 @@
         pronto: !!(active.pronto && active.pronto()),
       };
     },
-    // Clicca un bottone: which = 'ok' | 'cancel' | 'danger'.
+    // Clicca un bottone: which = 'ok' | 'cancel' | 'danger' | 'altro'.
     // Ritorna false se non c'è dialogo, bottone assente o disabilitato.
     click(which) {
       if (!active) return false;

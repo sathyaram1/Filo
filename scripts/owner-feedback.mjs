@@ -906,7 +906,7 @@ if (isMain) {
 
   // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
   if (argv.includes('--solo-locale') && isRoutineInstance(ROOT)) {
-    console.error('RIFIUTATO: una routine non segna lavoro locale. Rimandalo nei Ricevuti: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
+    console.error('RIFIUTATO: una routine non segna lavoro locale. Se serve il server, passalo ai lavori server: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
     process.exit(3);
   }
 

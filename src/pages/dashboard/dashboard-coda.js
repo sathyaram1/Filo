@@ -492,8 +492,11 @@
 
   // Pagine tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che il filo ha adesso. Un
   // gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga, e la vecchia se ne va.
-  function ripassaPagine() {
-    if (!d || !primo) return Promise.resolve();
+  // `importate`: un backup ha messo nel tratto già disegnato anche chat e pagine sue, che compaiono al loro posto (#1256).
+  function ripassaPagine({ importate = false } = {}) {
+    if (!d) return Promise.resolve();
+    // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
+    if (!primo) return importate && ultimo != null && !d.occupata() ? carica().then(() => {}) : Promise.resolve();
     const fai = async () => {
       const res = await d.send({ type: MSG.FILO_CODA, fino: primo });
       if (!res || !res.ok || !primo) return;
@@ -512,6 +515,14 @@
         disegnaGruppo(r, v);
       }
       for (const v of gruppi.values()) metti(v, { scorri: false });
+      if (importate) {
+        const qui = d.chatId();
+        for (const v of res.elementi || []) {
+          if (v.k === 'pagine' || ms(v.ts) < da || conChiave(v.key)) continue;
+          if (v.k === 'msg' && v.chat === qui) { riconosci(v); continue; }
+          metti(v, { scorri: false });
+        }
+      }
       segnaGiorni();
     };
     const p = coda.then(fai, fai);
@@ -716,6 +727,7 @@
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
         if (m && m.type === MSG.FILO_PAGINE_TOLTE) { ripassaPagine().catch(() => {}); return; }
+        if (m && m.type === MSG.DATI_IMPORTATI) { ripassaPagine({ importate: true }).catch(() => {}); return; }
         if (!m || m.type !== MSG.CAMBI_AGGIORNATI) return;
         clearTimeout(attesaCambi);
         attesaCambi = setTimeout(() => {

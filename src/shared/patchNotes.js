@@ -13,7 +13,9 @@
       features: [
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
       ],
-      fixes: [],
+      fixes: [
+        'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
+      ],
     },
     {
       version: '0.2.243', date: '2026-10-16',

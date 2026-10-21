@@ -362,15 +362,16 @@ test('un backup ricompresso tutto in bzip2 si rifiuta dicendo che è la compress
   }
 });
 
-test('indice rotto sulla voce del manifesto: la conferma conta le immagini che non si leggono, e al loro posto resta vuoto', async () => {
+test('indice rotto sulla riga dell\'immagine: la conferma conta il file e l\'immagine che non si leggono, e al suo posto resta vuoto', async () => {
   const { conIndiceRotto } = await import('./helpers/zipRovinato.mjs');
   const userData = cartellaTemporanea('filo-imp-manifesto-');
   const zip = buildExportZip({ clipboardHistory: [{ id: 'c1', type: 'image', description: 'logo', dataUrl: RED_PNG_URL }] });
   const zipPath = join(userData, 'manifesto-rotto.zip');
-  writeFileSync(zipPath, conIndiceRotto(zip, 'manifest.json'));
+  writeFileSync(zipPath, conIndiceRotto(zip, 'images/img-1.png'));
   const { app, page } = await importaDaSicurezza(zipPath, userData);
   try {
     await expect.poll(() => confirmText(page), { timeout: 10000 }).toContain('manifesto-rotto.zip');
+    expect(await confirmText(page)).toContain('File dentro l’archivio che non si leggono: 1.');
     expect(await confirmText(page)).toContain('Immagini che non si leggono: 1.');
     await clickConfirm(page, 'ok');
     await expect.poll(() => {

@@ -36,8 +36,10 @@
     // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
     // all'origine filo://: una pagina web non deve poter aprire un file dialog
     // né riscrivere lo storage (comprese le chiavi API).
-    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
-    IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, vociPerse, pagineFuori, appuntiFuori, downloadFuori, tettoSpesa, token }
+    IMPORT_DATA_APPLY: 'import_data_apply',       // { token, tettoDelBackup } → { ok, added, updated, images }
+    // Segnale senza contenuto alle pagine filo:// a importazione finita: chi mostra una lista la rilegge (#1256).
+    DATI_IMPORTATI: 'dati_importati',
     // Solo dalla pagina Sicurezza (#850): Filo si chiude e al riavvio svuota la cartella dei dati.
     CANCELLA_TUTTI_I_DATI: 'cancella_tutti_i_dati',             // { parola: 'conferma', ancheIdentita } → { ok } | { ok:false, error }
     CANCELLA_TUTTI_I_DATI_STATO: 'cancella_tutti_i_dati_stato', // → { ok, identita, inCorso }
