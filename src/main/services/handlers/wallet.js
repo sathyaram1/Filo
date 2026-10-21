@@ -580,7 +580,7 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(r.code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }), { invitesLocked: out.invitesLocked });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
     } else if (out && out.status === 'network_cap') {
       // L'invito resta in attesa e si riprova al prossimo avvio, ma chi l'ha scaricato apposta deve sapere perché non è entrato.
       await setNotice('failed', out.message);
@@ -606,7 +606,7 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }), { invitesLocked: out.invitesLocked });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
     } else {
       await setNotice('failed', (out && out.message) || W.redeemMessage('internal'));
     }

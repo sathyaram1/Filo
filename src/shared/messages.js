@@ -203,6 +203,9 @@
     //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits,
     //   canInvite, invitesLocked:'need_google'|'google_used'|null, … }|null, error? }
     WALLET_STATE: 'wallet_state',
+    // WALLET_SALDO_PREPARA (#1353): chi scrive nella chat della home manderà presto un turno: il main rilegge il
+    //   saldo in sottofondo se l'ultima lettura ha più di un minuto. Non aspetta la lettura. { } → { ok }
+    WALLET_SALDO_PREPARA: 'wallet_saldo_prepara',
     // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
     //   personale e la consegna UNA volta: il main la salva cifrata.
     //   { code } → { ok, status, message, credits?, inviteCodes?, invitesLocked?, state? }
