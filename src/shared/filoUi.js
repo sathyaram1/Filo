@@ -277,24 +277,44 @@
   }
   function guardaCasella(c) {
     if (caselle.has(c)) return;
-    const st = { buono: c.value, sel: selezioneDi(c), annuncio: null, inCorso: [], visto: false, gesto: false };
+    const st = { buono: c.value, sel: selezioneDi(c), annuncio: null, tasto: null, inCorso: [], visto: false, gesto: false };
     caselle.set(c, st);
     c.addEventListener('beforeinput', (e) => {
       if (!e.isTrusted) return;
       if (c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
-      st.annuncio = e;
-      setTimeout(() => { if (st.annuncio === e) st.annuncio = null; }, 0);
+      // Fra il tasto e il suo annuncio nessun gesto dell'utente sposta la selezione: chi l'ha spostata è il sito.
+      const t = st.tasto;
+      if (t && t.sel && !e.isComposing && e.inputType !== 'insertCompositionText' && c.value === st.buono) {
+        const ora = selezioneDi(c);
+        if (ora && (ora[0] !== t.sel[0] || ora[1] !== t.sel[1])) {
+          try { c.setSelectionRange(t.sel[0], t.sel[1]); } catch (_) {}
+        }
+      }
+      const a = { e, tipo: e.inputType, dato: e.data, valore: c.value, sel: selezioneDi(c) };
+      st.annuncio = a;
+      setTimeout(() => { if (st.annuncio === a) st.annuncio = null; }, 0);
     }, true);
     c.addEventListener('input', (e) => {
       const madre = inConsegna(st);
       const a = st.annuncio;
-      const dellUtente = !madre && e.isTrusted && !!a && a.eventPhase === 0 && !a.defaultPrevented;
+      const annunciato = !madre && e.isTrusted && !!a && a.e.eventPhase === 0 && !a.e.defaultPrevented && a.tipo === e.inputType;
+      const dellUtente = annunciato && combacia(a, c.value);
       const diFilo = madre ? nostraScrittura > madre.livello : nostraScrittura > 0;
       if (dellUtente || diFilo) {
         if (dellUtente) st.annuncio = null;
         st.inCorso.push({ e, livello: nostraScrittura });
         st.buono = c.value;
         st.sel = selezioneDi(c);
+        return;
+      }
+      // L'annuncio vero con un cambio del sito dentro: resta quello che l'utente ha scritto, applicato al suo testo.
+      const x = annunciato ? atteso(a) : null;
+      if (annunciato) st.annuncio = null;
+      if (x !== null && ESATTI.test(a.tipo)) {
+        const fine = a.sel[0] + (x.length - a.valore.length + (a.sel[1] - a.sel[0]));
+        c.value = x;
+        try { c.setSelectionRange(fine, fine); } catch (_) {}
+        st.inCorso.push({ e, livello: nostraScrittura });
         return;
       }
       if (c.value === st.buono) return;
@@ -304,6 +324,11 @@
     // Nei riquadri il tasto arriva al campo come copia nostra (tastoNelRiquadro): conta come vero.
     const muove = (e) => {
       if (!veroONostro(e)) return;
+      if (e.type === 'keydown') {
+        const t = { e, sel: selezioneDi(c) };
+        st.tasto = t;
+        setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
+      }
       if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
     };
     const fermo = (e) => {
