@@ -445,7 +445,7 @@ module.exports = function register(on, ctx) {
           // Il file parziale cresce nella cartella dove atterrerebbe un download
           // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
           // una rinomina istantanea invece della copia di un filmato intero.
-          partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
+          partPath = downloads.uniquePath(entry.cartella(), `${name}.filo-part`);
           return partPath;
         },
         onProgress: (received, total) => { if (entry) entry.progress(received, total); },
