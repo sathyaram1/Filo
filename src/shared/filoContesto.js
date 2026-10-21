@@ -7,8 +7,14 @@
 
   const ORA_MS = 60 * 60 * 1000;
   const GIORNO_MS = 24 * ORA_MS;
-  const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000 });
+  const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000, cache: '1h' });
   const LIMITI = Object.freeze({ giorni: Object.freeze([0.5, 365]), token: Object.freeze([2000, 2000000]) });
+  // Quanto vive la cache della parte fissa della chat (SPEC-CONTESTO § Le costanti): le sole due durate di Anthropic.
+  const DURATE_CACHE = Object.freeze(['5m', '1h']);
+  function durataIn(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return DURATE_CACHE.includes(s) ? s : null;
+  }
   // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando) e il ragionamento di una risposta,
   // finché l'owner non decide (#553.2): nella sua conversazione gli ultimi venti messaggi di quella, come prima del filo
   // unico; nelle altre schede al più gli ultimi venti del filo, così una conversazione ferma non lo tiene per giorni.
