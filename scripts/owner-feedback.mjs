@@ -836,6 +836,11 @@ export async function scrivi(id, to, nota, opts = {}) {
       return { ok: false, motivo: `la fiducia non si è tolta (${(t && t.motivo) || 'senza motivo'}): ${fiduciaTolta}, e su un feedback fidato la nota da qui non la scrivo. Non ho toccato niente`, from };
     }
     avviso(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta));
+    // Il passaggio è stato controllato sullo stato letto prima: se il server ha spostato la pratica, quel controllo non vale più.
+    const dopo = await getDoc(id, bearer, ['status']).then((d) => (d ? statoAttuale(d) : { leggibile: false })).catch(() => ({ leggibile: false }));
+    if (!dopo.leggibile || dopo.from !== from) {
+      return { ok: false, motivo: `fiducia tolta, ma la pratica ${dopo.leggibile ? `è passata da «${from}» a «${dopo.from}»` : 'non si rilegge'}: la nota non l'ho scritta, rilancia il comando`, from };
+    }
   }
 
   const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
