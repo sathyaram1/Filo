@@ -791,15 +791,23 @@ function conImmagini(ctx) {
 }
 
 // Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
-function testoDiffVuoto({ commitPropri = null } = {}) {
-  if (commitPropri === 0) return 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.';
-  const quanti = commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : '';
-  return `Il diff è vuoto davvero: il ramo ${quanti}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).`;
+// Con un diff del server da giudicare non dice «nessuna modifica»: farebbe passare il server senza leggerlo (#1418).
+function testoDiffVuoto({ commitPropri = null } = {}, diffServer = '') {
+  const perche = commitPropri === 0
+    ? 'il ramo non ha commit propri rispetto a main'
+    : `il ramo ${commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : ''}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda)`;
+  if (diffServer) return `Il diff dell'app è vuoto davvero, ma è vuoto solo lui: ${perche}. Il diff del server (diffServerFile) porta le modifiche del lavoro e resta da giudicare intero, come dice il paragrafo «Lavoro server»: il diff dell'app vuoto non fa passare il controllo.`;
+  return commitPropri === 0 ? `Il diff è vuoto davvero: ${perche}, quindi non porta nessuna modifica.` : `Il diff è vuoto davvero: ${perche}.`;
 }
 
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
-    case 'secaudit':
+    case 'secaudit': {
+      const server = ctx.diffServer && typeof ctx.diffServer === 'object' ? {
+        diffServer: String(ctx.diffServer.diff || ''),
+        diffServerBase: ctx.diffServer.base || null,
+        diffServerHead: String(ctx.diffServer.head || ''),
+      } : {};
       // NESSUN campo del feedback: solo branch + diff, con la base e la punta su cui è calcolato.
       return {
         branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num,
@@ -807,13 +815,10 @@ export function buildPayload(bucket, ctx = {}) {
           diffBase: ctx.diffBase,
           ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
-        ...(ctx.diffServer && typeof ctx.diffServer === 'object' ? {
-          diffServer: String(ctx.diffServer.diff || ''),
-          diffServerBase: ctx.diffServer.base || null,
-          diffServerHead: String(ctx.diffServer.head || ''),
-        } : {}),
-        ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto) } : {}),
+        ...server,
+        ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto, server.diffServer) } : {}),
       };
+    }
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
       // Lo STORICO delle critiche dei giri passati invece sì (è linguaggio

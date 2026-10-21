@@ -1316,6 +1316,38 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   assert.equal(app.diffServerHead, undefined);
 });
 
+test('secaudit di un lavoro solo server: il diff dell’app vuoto non dice «nessuna modifica» accanto al diff del server (#1418)', () => {
+  const bucket = { role: 'secaudit', id: 's', num: '#1418', branch: 'worker/s' };
+  const base = { ref: 'origin/main', sha: '2'.repeat(40) };
+  const busta = (diff) => ({ payload: { diffServer: { diff, base: { ref: 'main di filo-security', sha: '1'.repeat(40) }, head: 'a'.repeat(40) } } });
+  const vuotoApp = (commitPropri) => ({ diff: '', base, head: 'b'.repeat(40), vuoto: { commitPropri } });
+  const testo = (fromServer, commitPropri) => buildPayload(bucket, serverCtx(bucket, fromServer, vuotoApp(commitPropri))).diffVuoto;
+  const server = busta('diff --git a/functions/index.js b/functions/index.js\n+una riga del server\n');
+  for (const commitPropri of [0, 2, null]) {
+    const t = testo(server, commitPropri);
+    assert.doesNotMatch(t, /non porta nessuna modifica|Il diff è vuoto davvero/, `«${t}»`);
+    assert.match(t, /vuoto solo lui/, `dice di quale diff parla: «${t}»`);
+    assert.match(t, /diff del server \(diffServerFile\)[^]*resta da giudicare intero/, `e che quello del server resta da giudicare: «${t}»`);
+    assert.match(t, /non fa passare il controllo/, `«${t}»`);
+  }
+  assert.match(testo(server, 2), /2 commit propri/, 'il perché del diff dell’app vuoto resta');
+  // Vuoti tutti e due, o lavoro dell'app: il testo di sempre.
+  for (const fromServer of [busta(''), null]) {
+    assert.equal(testo(fromServer, 0), 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.');
+    assert.equal(testo(fromServer, 2), 'Il diff è vuoto davvero: il ramo ha 2 commit propri, ma ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).');
+  }
+});
+
+test('secaudit.md: «il controllo passa» col diff vuoto vale solo senza un diff del server da giudicare, nella stessa frase (#1418)', () => {
+  // Un modello piccolo si ferma alla prima regola che lo autorizza: la condizione sta lì, non in un paragrafo più sotto.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const frasi = t.split(/(?<=\.)\s+/).filter((f) => /il controllo passa/i.test(f));
+  assert.ok(frasi.length, 'la regola del diff vuoto deve dire quando il controllo passa');
+  for (const f of frasi) assert.match(f, /Senza un `diffServerFile` con del contenuto[^]*il controllo passa/, `la frase lega il via libera all'assenza del diff del server: «${f}»`);
+  const lavoroServer = t.match(/\*\*Lavoro server\.\*\*[^]*?## Passi/);
+  assert.ok(lavoroServer && /anche quando quello dell'app è vuoto/.test(lavoroServer[0]), 'il paragrafo del server vale anche col diff dell’app vuoto');
+});
+
 test('cleanup STATE_DIR temporanea', () => {
   togliCartella(TMP);
   assert.ok(!existsSync(TMP));
