@@ -82,8 +82,10 @@ class VisiteSchede {
 
   // Senza gesto frena un cambio a ridosso del precedente, o arrivato dopo `fila` visite senza gesto, purché la scheda
   // abbia una visita aperta. Un gesto vale per la navigazione che lo segue, non per quelle che la pagina fa dopo da
-  // sola; un gesto nuovo (anche senza navigazione dietro) rimette la fila a zero.
-  freno(wc, gesto) {
+  // sola; un gesto nuovo (anche senza navigazione dietro) rimette la fila a zero. Una pagina intera a ridosso di una
+  // visita già scritta (un rinvio fatto dal sito, un accesso che passa da tre indirizzi) è una visita sua, dentro la fila:
+  // assorbita, il filo perderebbe l'indirizzo dove l'utente è arrivato.
+  freno(wc, gesto, inPagina) {
     const ora = Date.now();
     let f = this.freni.get(wc);
     if (!f) { f = { ultima: -Infinity, fila: 0, gesto: 0 }; this.freni.set(wc, f); }
@@ -92,8 +94,10 @@ class VisiteSchede {
     const conGesto = g > 0 && ora - g <= FRENO.gesto && g >= f.ultima;
     const prima = f.ultima;
     f.ultima = ora;
-    const aperta = this.inAttesa.has(wc) || this.scritte.has(wc);
-    const frena = !conGesto && aperta && (ora - prima < FRENO.raffica || f.fila >= FRENO.fila);
+    const inAttesa = this.inAttesa.has(wc);
+    const aperta = inAttesa || this.scritte.has(wc);
+    const raffica = ora - prima < FRENO.raffica && (inPagina || inAttesa);
+    const frena = !conGesto && aperta && (raffica || f.fila >= FRENO.fila);
     return { frena, conGesto, f };
   }
 
