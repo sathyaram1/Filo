@@ -64,10 +64,10 @@ test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
   assert.ok(server.includes('`guasto: filo-security`'), 'il lavoro server usa lo stesso nome della lista');
 });
 
-test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando in locale), e il rimando non vieta più il server', () => {
+test('le istruzioni separano «è rotto» (domanda) da «per regola» (la sezione del lavoro locale), e quella non vieta più il server', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
   assert.match(piatto(pezzo), /«Non posso perché è rotto» è un guasto/);
-  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) è il rimando in locale/);
+  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) è la sezione «Se il lavoro si fa solo in locale»/);
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = piatto(readRoleInstructions(ruolo, opts));
     const locale = t.slice(t.indexOf('## Se il lavoro si fa solo in locale'), t.indexOf(ATTESA));
@@ -75,7 +75,10 @@ test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando i
     assert.doesNotMatch(locale, /non puoi[^.]*codice del server/i, `${ruolo}: il codice del server si tocca nei lavori server`);
     assert.match(locale, /per regola/);
     assert.ok(locale.includes('«Un guasto dell\'ambiente si dice con una domanda»'), `${ruolo}: un guasto rimanda alla sua sezione`);
-    assert.match(locale, /--reason locale \\ --notes "Lavoro locale per regola:/, `${ruolo}: la nota dice che è lavoro locale davvero`);
+    assert.match(locale, /--reason locale \\ --notes "Per regola:/, `${ruolo}: la nota dice che è una regola, non un guasto`);
+    // #1358: nessun lavoro va più alle sessioni sul PC dell'owner, e un passo suo è una domanda.
+    assert.doesNotMatch(locale, /approva come lavoro locale|chi lavora in locale|riparte una sessione/i, `${ruolo}: niente lavoro al PC`);
+    assert.match(locale, /--domanda <file\.json>/, `${ruolo}: un passo dell'owner si chiede con la domanda`);
   }
 });
 

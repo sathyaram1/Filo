@@ -24,6 +24,9 @@ function forme(status) {
     { fb: { status }, opts: {} },
     { fb: { status, localOnly: SEGNO_LOCALE, clientId: 'owner:me', senderProof: 'admin' }, opts: {} },
     { fb: { status, statusReason: 'locale', clientId: 'c-utente' }, opts: {} },
+    // Fermo su una domanda (#1358): sta In coda, ma da `design` e `aligned` non si arriva a done.
+    { fb: { status, statusReason: 'clarify', domandaId: 'D-1' }, opts: {} },
+    { fb: { status, statusReason: 'origine_chiusa', domandaId: 'D-2' }, opts: {} },
   ];
   if (status === 'done') {
     out.push({ fb: { status, resolvedInVersion: '1.0.0' }, opts: { releasedVersion: '1.0.0' } });

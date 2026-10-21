@@ -18,6 +18,14 @@ di Gestione, dove stanno i feedback da decidere.
   quadrato rosso, portata in cima ai Ricevuti; la richiesta si apre dal
   quadrato. Prima la pratica e il ramo che ne era uscito stavano in due posti
   che non si citavano.
+- **Una scelta di prodotto ha la sua domanda (#1358).** Un lavoro fermo su una
+  scelta dell'owner (domande, decisioni, verifiche che non convergono, arenati)
+  ha una domanda fra le Domande, e il posto dove si risponde è quello: la scheda
+  del feedback sta In coda col segno «aspetta una domanda» che porta lì, e nel
+  dettaglio il rimando prende il posto della casella di risposta. Nei Ricevuti
+  restano i giudizi di sicurezza, che si decidono leggendo il testo originale.
+  Dove: `domandaDellaPratica()` in `src/shared/manageReview.js`; prove
+  `tests/unit/attesaDomanda.test.mjs`, `tests/manage-attesa-domanda.spec.mjs`.
 - **Chi non ha una scheda non sparisce.** Una richiesta senza pratica (il
   lavoro locale di `npm run finish`, che il server apre senza numero) sta in
   cima ad Automazioni coi tasti di sempre: nasconderla sarebbe un ramo fermo

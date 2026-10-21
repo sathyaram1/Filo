@@ -59,9 +59,10 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
 
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
   const server = testoLavoroServer({ clone: '/home/user/filo-security' });
-  // Chi verifica non può consegnare uno stato: la sua strada è la critica con la segnalazione all'owner.
+  // Chi verifica non può consegnare uno stato: la sua strada è la critica con la segnalazione all'owner. L'unico
+  // stato che il server gli accetta è attacco o spam (#1358).
   const verifica = `${readRoleInstructions('verifier', { scope: 'pieno' })}\n\n${server}`;
-  assert.ok(!/deliver status/.test(verifica), 'al verificatore non si indica una consegna che il server gli rifiuta');
+  assert.ok(!/deliver status(?! --status (?:attack|spam)\b)/.test(verifica), 'al verificatore non si indica una consegna che il server gli rifiuta');
   assert.match(server, /se verifichi, non passare il lavoro[^]*--segnala/);
   const sezioni = [...server.matchAll(/sezione «([^»]+)»/g)].map((m) => m[1]);
   assert.ok(sezioni.length > 0);

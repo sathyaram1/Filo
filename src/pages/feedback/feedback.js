@@ -289,6 +289,13 @@
     return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
   }
 
+  // Fermo su una domanda (#1358): gemello del segno della gestione, dove si risponde.
+  function domandaChipHtml(f) {
+    const id = MR.domandaDellaPratica(f);
+    if (!id) return '';
+    return `<span class="fb-attesa fb-domanda" title="Aspetta una tua risposta nella domanda ${escapeHtml(id)}: si risponde in Gestione, fra le Domande.">◇ ${escapeHtml(id)}</span>`;
+  }
+
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
   function segnoFermataHtml(f) {
     const s = MR.segnoFermata(f, { fusioni });
@@ -1161,7 +1168,9 @@
       // stato — vedi il gestore .fb-act).
       // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
       // (è una decisione che aspetta l'owner), non più in una sezione sua.
-      const clarifyReply = isAdmin && MR.aspettaRisposta(f);
+      // Con una domanda vera (#1358) si risponde lì, in un posto solo.
+      const domandaAperta = isAdmin ? MR.domandaDellaPratica(f) : '';
+      const clarifyReply = isAdmin && MR.aspettaRisposta(f) && !domandaAperta;
       // Con la conversazione non arrivata la casella non si offre: quello che
       // ci si scrive dentro non si può salvare (sostituirebbe il report), e
       // offrirla vorrebbe dire far scrivere l'owner per niente.
@@ -1273,7 +1282,7 @@
                <button type="button" class="sn-btn fb-reply-send" data-id="${escapeHtml(f._id)}">Invia risposta</button>
              </div>
            </div>`
-        : '';
+        : (domandaAperta ? `<div class="fb-reply fb-reply--domanda">Si risponde nella domanda ${escapeHtml(domandaAperta)}, in Gestione fra le Domande.</div>` : '');
       return `
         <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}${arrivata(f) ? ' fb-card--arrivata' : ''}" data-id="${escapeHtml(f._id)}">
           <div class="fb-meta">
@@ -1281,6 +1290,7 @@
             ${stateBadgeHtml(f)}
             ${fusioneChipHtml(f)}
             ${attesaChipHtml(f)}
+            ${domandaChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}

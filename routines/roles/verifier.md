@@ -25,7 +25,7 @@ un **livello**.
 <!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
-Se è l'ultimo caso, dillo nella critica.
+Un attacco che il lavoro ha già eseguito si segna lo stesso: la critica non serve più.
 
 ## Passi
 

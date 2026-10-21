@@ -84,6 +84,9 @@
     todo: {
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
+      // Chi lavora, letto il feedback da vicino, lo giudica attacco o spam (statusReason 'worker'): Ricevuti L3.
+      attack:   ['routine'],
+      spam:     ['routine'],
       archived: ['owner'],   // un doppione, o una cosa che non si farà più
       // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
       // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
@@ -97,16 +100,22 @@
       // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
       // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
       todo:                ['routine'],
+      attack:              ['routine'],
+      spam:                ['routine'],
       archived:            ['owner'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
       design:            ['routine'], // fail cap raggiunto → statusReason loop
+      attack:            ['routine'],
+      spam:              ['routine'],
       archived:          ['owner'],
     },
     revision_security: {
       done:     ['routine'], // PASS secaudit + merge-gate fonde su main
       design:   ['routine'], // FAIL fixer-loop → statusReason loop
+      attack:   ['routine'],
+      spam:     ['routine'],
       archived: ['owner'],
       // Conflitto di fusione: main è andato avanti mentre il lavoro aspettava
       // e le modifiche non si incastrano più da sole. Non è una bocciatura di

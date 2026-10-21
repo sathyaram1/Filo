@@ -219,9 +219,10 @@ In testa alla colonna, cinque pulsanti **L1 L2 L3 L4 L5**:
 
 Ogni pulsante porta il suo conteggio.
 
-Se oggi un worker non può segnare un feedback come attacco o spam (solo
-`clarify`, `decisione`, `locale`), si aggiunge: è lo stesso giudizio dei
-giudici, dato da chi ha letto il feedback da vicino.
+Un worker (chi risolve, corregge o verifica) segna un feedback come attacco o
+spam (`deliver status --status attack|spam`, motivo `worker`, #1358): è lo
+stesso giudizio dei giudici, dato da chi ha letto il feedback da vicino. Mai su
+un feedback fidato.
 
 ## 3. Domande
 
@@ -347,15 +348,18 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 | Oggi | Dove va |
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
-| `design` + `locale` | domanda «lavoro server?» se il feedback è fidato; Ricevuti («rendere fidato») se non lo è |
+| `design` + `locale` | codice del server su un feedback fidato: nessuna domanda, prende il segno di lavoro server e lo fa la sua routine (§7, decisioni dell'owner del 14/10 e del 16/10); su uno non fidato Ricevuti L3, motivo `fidato` («rendere fidato», §2.2), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede un passo dell'owner (segreti, deploy, automazioni GitHub, prove sulla sua macchina), scritta da chi lavora |
 | `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
-| `attesa_chiusa`, `loop`, `arenato` | domanda, azioni `riprendi` / `archivia` |
-| `design` + `secaudit`, `l5`; attacchi, spam, sospetti | Ricevuti |
+| `attesa_chiusa`, `loop`, `arenato`, `aligned` con l'origine chiusa o sparita | domanda, azioni `riprendi` / `archivia` |
+| `design` + `secaudit`, `l5`; attacchi, spam, sospetti (anche segnati da chi lavora, motivo `worker`) | Ricevuti |
 
 Il feedback in attesa resta `design` col suo motivo e prende `domandaId`: la
 macchina a stati non cambia. Per l'owner, però, un `design` con una domanda
 aperta si vede nella scheda **In coda**, col segno «aspetta una domanda» che
-porta alla domanda, e non in Ricevuti.
+porta alla domanda, e non in Ricevuti. La domanda nasce nella stessa transazione
+del cambio di stato (#1358): quella scritta da chi lavora (`--domanda`), o quella
+che il server compone da ciò che ha scritto. Le attese di prima si migrano con
+`ownerDomande { op: 'migra' }`.
 
 ## 4. Compiti ricorrenti, pubblicazione, monitoraggio
 

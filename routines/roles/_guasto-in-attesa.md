@@ -17,7 +17,7 @@ per lui»:
       "azione": { "tipo": "riprendi", "feedbackId": "<payload.id>" } },
     { "testo": "Affidare la riparazione a un agente", "pro": "<cosa può riparare un agente col repo>", "contro": "<…>",
       "azione": { "tipo": "compito" } },
-    { "testo": "Farlo in locale", "pro": "<…>", "contro": "<…>",
+    { "testo": "Passarlo alla routine dei lavori server", "pro": "<se là il guasto non c'è>", "contro": "<…>",
       "azione": { "tipo": "approva_locale", "feedbackId": "<payload.id>" } },
     { "testo": "Archiviare il feedback", "pro": "<…>", "contro": "<…>",
       "azione": { "tipo": "archivia", "feedbackId": "<payload.id>" } }
@@ -31,8 +31,9 @@ per lui»:
 Le quattro strade sono un modello: tieni quelle che per questo guasto hanno un
 pro vero. La riparazione (azione `compito`, SPEC-DOMANDE § 3.3: la domanda passa
 a un agente col repo) si toglie quando la causa sta fuori dal repo, come una
-credenziale o un'impostazione dell'owner. `consiglio.opzione` è l'indice di
-quella che sceglieresti.
+credenziale o un'impostazione dell'owner. Nessuna strada manda il lavoro al PC
+dell'owner: lì non si lavora. `consiglio.opzione` è l'indice di quella che
+sceglieresti.
 
 Poi il feedback aspetta l'owner col motivo `guasto`, non `locale`:
 

@@ -31,13 +31,15 @@ credenziali. La parte del server da qui non si fa, e la strada dipende dal perch
   della sessione, la rete): per qualunque ruolo è la domanda della
   sezione «Un guasto dell'ambiente si dice con una domanda», col testo esatto di git e la riga su chi ha respinto il
   token in `notePerAgenti`. Il gruppo è `guasto: filo-security`;
-- **un no per regola** (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro):
-  - se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
-    sezione «Se il lavoro si fa solo in locale», e scrivi nelle note il motivo;
+- **un no per regola** (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro): non
+  c'è una sessione sul PC dell'owner a cui passarlo, lì non si lavora:
+  - se fai il primo lavoro o correggi, su un feedback non fidato usa la consegna della
+    sezione «Se il lavoro si fa solo in locale»: il server la trasforma nella richiesta all'owner di renderlo fidato.
+    Per gli altri motivi è un guasto da dichiarare, come sopra, col motivo stampato nel `contesto`;
   - se verifichi, non passare il lavoro guardando solo l'app. Registra la critica con un rilievo `[2i?]` che dice che
-    la parte del server non si è potuta verificare, col motivo, e allega con `--segnala` un file per l'owner con le due
-    strade: lavorarlo in locale, o ridarlo alle routine quando il motivo è sparito. Il lavoro si ferma finché non
-    risponde.
+    la parte del server non si è potuta verificare, col motivo, e allega con `--domanda` (o `--segnala`) la domanda
+    per l'owner con le due strade: ridarlo alle routine quando il motivo è sparito (`riprendi`), o archiviarlo. Il
+    lavoro si ferma finché non risponde.
 
 ### Il ramo
 
@@ -67,7 +69,7 @@ node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
   Il server legge la punta e la scrive nel registro dei rami. Senza questa riga il ramo del server non risulta fidato
   e il lavoro non arriva su main.
 - Mai: `main` di filo-security (né push né merge), `server:fondi`, deploy (`firebase`, `server:pubblica`),
-  `.github/workflows` (GitHub rifiuta le spinte che li toccano: quel lavoro si fa in locale).
+  `.github/workflows` (GitHub rifiuta le spinte che li toccano: è un passo dell'owner, e si chiede con una domanda).
 
 ### Dopo la verifica
 

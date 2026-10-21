@@ -492,6 +492,7 @@
   function classifyBlock(fb) {
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
+    if (domandaDellaPratica(fb)) return null;
     if (status === 'aligned') return worstVerdictBlock(fb);
     if (inAttesaOrigine(fb)) return null;
     const info = fs.STATUSES[status];
@@ -550,7 +551,16 @@
     // piccolo. Chi disegna mette al suo posto l'enum grossolano in chiaro.
     if (statusUnreadable(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
+    // Si risponde in un posto solo: la frase manda alla domanda, non a una casella qui sotto.
+    const domanda = domandaDellaPratica(fb);
+    if (domanda) {
+      const perche = FERMATA_IN_PAROLE[String(statusReason || '')] || 'Aspetta una tua scelta';
+      return { text: `${perche}: rispondi nella domanda ${domanda}.`, color: status === 'aligned' ? S.aligned.color : S.design.color };
+    }
     if (status === 'design') {
+      if (statusReason === 'fidato') {
+        return { text: 'Il lavoro ha bisogno del server e il feedback non è fidato: se lo è, segnalo fidato e torna in coda da solo.', color: LOCALE.color };
+      }
       if (statusReason === 'secaudit') {
         return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
       }
@@ -600,6 +610,9 @@
       }
       return { text: 'Tutti d’accordo: aspetta la tua approvazione.', color: S.aligned.color };
     }
+    if ((status === 'attack' || status === 'spam') && statusReason === MOTIVO_WORKER) {
+      return { text: `Chi ci lavorava l’ha segnalato come ${status === 'attack' ? 'attacco' : 'spam'}: il perché è nel rombo.`, color: S[status].color };
+    }
     if (status === 'attack') return { text: 'Segnalato come attacco.', color: S.attack.color };
     if (status === 'spam') return { text: 'Segnalato come spam.', color: S.spam.color };
     if (status === 'unlabeled') {
@@ -627,10 +640,26 @@
     return null;
   }
 
+  // Attacco o spam segnato da chi lavorava (#1358): Ricevuti L3, il perché in `livelli.l3`.
+  const MOTIVO_WORKER = 'worker';
+  // La fermata in parole, davanti a «rispondi nella domanda D-n».
+  const FERMATA_IN_PAROLE = Object.freeze({
+    clarify: 'La routine ha domande',
+    decisione: 'Il lavoro è fermo su una scelta che spetta a te',
+    loop: 'La verifica ha trovato un difetto che non si corregge più da soli',
+    arenato: 'La lavorazione si è arenata troppe volte',
+    attesa_chiusa: 'Aspettava un feedback che si è chiuso senza fusione',
+    locale: 'Aspetta un tuo passo',
+    origine_chiusa: 'Il feedback da cui nasce si è chiuso senza fusione',
+    origine_mancante: 'Il feedback da cui nasce non c’è più',
+  });
+
   // Motivo dello stato (statusReason) in parole: per tooltip e sottotesti. I
   // codici grezzi ('secaudit', 'clarify'…) non dicono niente a chi legge la
   // lista; un motivo sconosciuto passa invariato (meglio grezzo che muto).
   const REASON_TEXTS = {
+    fidato: 'chiede di renderlo fidato',
+    worker: 'segnalato da chi ci lavorava',
     secaudit: 'bloccato dalla sicurezza',
     l5: 'fermo al cancello di fusione',
     attesa_origine: 'aspetta la fusione del feedback da cui nasce',
@@ -682,12 +711,31 @@
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
+    // Fermo su una domanda (#1358): la decisione si prende fra le Domande, il lavoro aspetta In coda.
+    if (tab === 'inbox' && domandaDellaPratica(fb)) return 'queue';
     // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
     // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
     if (tab === 'queue' && isLocalOnly(fb)) return 'local';
     // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
     if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
+  }
+
+  // Le fermate che, con la loro domanda, aspettano l'owner fra le Domande e non nei Ricevuti (SPEC-DOMANDE.md §3.8).
+  // La sicurezza (secaudit, l5, attacchi, spam, sospetti) e «fidato» restano nei Ricevuti anche con un domandaId.
+  const FERMATE_CON_DOMANDA = Object.freeze({
+    design: Object.freeze(['clarify', 'decisione', 'loop', 'arenato', 'attesa_chiusa', 'locale']),
+    aligned: Object.freeze(['origine_chiusa', 'origine_mancante']),
+  });
+  const ID_DOMANDA_RE = /^D-[1-9]\d{0,9}$/;
+
+  /** La domanda che questa pratica aspetta («D-12»), o ''. PURA. */
+  function domandaDellaPratica(fb) {
+    const id = fb && typeof fb.domandaId === 'string' ? fb.domandaId.trim() : '';
+    if (!ID_DOMANDA_RE.test(id) || statusUnreadable(fb)) return '';
+    const { status, statusReason } = normalizeStatus(fb);
+    const motivi = Object.hasOwn(FERMATE_CON_DOMANDA, status) ? FERMATE_CON_DOMANDA[status] : null;
+    return motivi && motivi.includes(String(statusReason || '')) ? id : '';
   }
 
   // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
@@ -897,6 +945,14 @@
     if (statusUnreadable(fb)) return [];
     const { status } = normalizeStatus(fb);
     const tab = manageTabFor(fb, opts);
+    // Fermo su una domanda (#1358): si risponde lì. Da qui resta rimetterlo in coda senza risposta, o archiviarlo;
+    // «Risolto» no, perché `design` → `done` non è una mossa dell'owner.
+    if (tab === 'queue' && domandaDellaPratica(fb)) {
+      return [
+        { key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: false },
+        { key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false },
+      ];
+    }
     if (tab === 'inbox') {
       // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
       const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori server' : '→ In coda', primary: true }];
@@ -1511,6 +1567,13 @@
   }
 
   const L3_LOCALE = 'Richiede lavoro locale';
+  const L3_FIDATO = 'Chiede di renderlo fidato: il lavoro ha bisogno del server';
+  // Il giudizio di chi lavora (#1358): `livelli.l3.esito` → titolo e colore del rombo.
+  const L3_GIUDIZI = Object.freeze({
+    attacco: { titolo: 'Segnalato come attacco da chi ci lavorava', classe: 'attack' },
+    spam: { titolo: 'Segnalato come spam da chi ci lavorava', classe: 'spam' },
+    fidato: { titolo: L3_FIDATO, classe: 'locale' },
+  });
 
   // Il rombo azzurro (#1060): lo stato basta a dirlo, quindi si colora anche prima che arrivi il documento intero.
   function livelloL3Locale(fb, l, letto) {
@@ -1591,6 +1654,13 @@
     if (ruolo) righe.push(riga('Chi ha segnalato', L3_RUOLI[ruolo] || ruolo));
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim() || 'La segnalazione è arrivata senza testo.';
+    const esito = String(l.esito || '').trim();
+    const giudizio = Object.hasOwn(L3_GIUDIZI, esito) ? L3_GIUDIZI[esito] : null;
+    if (giudizio) {
+      return forma('l3', 'rombo', giudizio.titolo, giudizio.classe, 'segnalato', {
+        titolo: giudizio.titolo, righe, testo, illeggibile: valueUnreadable(l.testo), azioni: [],
+      });
+    }
     // Segnalazione registrata E domande in attesa: chi clicca il verde cerca
     // la cosa a cui rispondere adesso, quindi va per prima. Fermo per una
     // scelta, la segnalazione È la domanda (il server la appende anche alla
@@ -1810,6 +1880,7 @@
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
     guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
+    fidato:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_FIDATO },
   };
 
   /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
@@ -1836,9 +1907,9 @@
         : 'Fermo al cancello di fusione: aspetta il tuo via libera');
     }
     const { status, statusReason } = normalizeStatus(fb);
-    if (!isRicevutiStatus(status)) return null;
+    if (!isRicevutiStatus(status) || domandaDellaPratica(fb)) return null;
     if (status === 'design') {
-      const s = SEGNO_DESIGN[String(statusReason || '')];
+      const s = Object.hasOwn(SEGNO_DESIGN, String(statusReason || '')) ? SEGNO_DESIGN[String(statusReason || '')] : null;
       if (s) return out(s.forma, s.livello, s.classe, s.testo);
       if (aspettaRisposta(fb)) return out('rombo', 'l3', 'design', SEGNO_DESIGN.clarify.testo);
       return out('cerchio', 'l2', 'design', 'Per i giudici è una questione di design');
@@ -1847,6 +1918,7 @@
     if (status === 'suspicious_file') return out('triangolo', 'l1', 'attack', 'Il filtro d’ingresso ha trovato un file sospetto');
     if (status === 'attack' || status === 'spam') {
       const parola = status === 'attack' ? 'attacco' : 'spam';
+      if (statusReason === MOTIVO_WORKER) return out('rombo', 'l3', status, `Chi ci lavorava l’ha segnalata come ${parola}`);
       const dalFiltro = status === 'attack'
         ? (p.action === 'block_attack' || p.l1Category === 'dangerous')
         : (p.action === 'block_spam' || p.l1Category === 'spam');
@@ -2015,6 +2087,7 @@
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
+    domandaDellaPratica, FERMATE_CON_DOMANDA, MOTIVO_WORKER,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,

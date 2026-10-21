@@ -1348,6 +1348,21 @@
     /* Pronto e fermo per il PC (#1159): la tinta d'accento lo stacca dalle righe di chi sta lavorando. */
     .mg-attesa-server { color: var(--sn-accent, var(--sn-fg)); }
 
+    /* «Aspetta una domanda» (#1358): il rombo verde di chi chiede e il numero della domanda; un clic la apre. */
+    .mg-domanda-badge {
+      flex: none; display: inline-flex; align-items: center; gap: 4px;
+      font: inherit; font-size: 10.5px; line-height: 1;
+      padding: 3px 7px 3px 5px; border-radius: 999px; cursor: pointer;
+      border: 1px solid color-mix(in srgb, #2e9e5b 45%, transparent);
+      background: transparent; color: #2e9e5b; white-space: nowrap;
+      transition: background calc(0.12s * var(--sn-motion, 1)), transform calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-domanda-badge svg { width: 9px; height: 9px; flex: none; }
+    .mg-domanda-badge svg path { fill: currentColor; }
+    .mg-domanda-badge:hover { background: color-mix(in srgb, #2e9e5b 14%, transparent); }
+    .mg-domanda-badge:active { transform: scale(0.95); }
+    .mg-domanda-badge:focus-visible { outline: 2px solid #2e9e5b; outline-offset: 1px; }
+
     /* «Aspetta #N» (#903): la forma del segno locale, tinta d'accento solo sui numeri non ancora fusi. */
     /* Con tante attese va a capo fra un numero e l'altro invece di uscire dalla scheda: i numeri si leggono tutti. */
     .mg-attesa-badge {

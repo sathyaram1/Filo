@@ -2254,6 +2254,8 @@
   // Delegazione: un solo listener per tutta la lista. Il click sul pallino NON
   // deve aprire il dettaglio della card → stopPropagation.
   mgList.addEventListener('click', (e) => {
+    const domanda = e.target.closest('.mg-domanda-badge[data-domanda]');
+    if (domanda) { e.stopPropagation(); apriDomandaDellaPratica(domanda.dataset.domanda); return; }
     const dot = e.target.closest('.mg-dot[data-prio-id]');
     if (!dot) return;
     e.stopPropagation();
@@ -2792,6 +2794,7 @@
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         ${leggibile ? segnoFermataHtml(fb) : ''}
+        ${leggibile ? domandaBadgeHtml(fb) : ''}
         <span class="mg-item-title">${esc(title)}</span>
         ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
@@ -2803,9 +2806,9 @@
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
-        // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
-        // listener delegato di mgList).
-        if (e.target.closest('.mg-dot')) return;
+        // Il click su un pallino priorità o sul segno della domanda non apre il
+        // dettaglio (li gestisce il listener delegato di mgList).
+        if (e.target.closest('.mg-dot') || e.target.closest('.mg-domanda-badge')) return;
         openDetail(fb._id);
       });
       mgList.appendChild(item);
@@ -2819,6 +2822,15 @@
     const cls = 'mg-segno-fermata' + (s.classe ? ` mg-forma--${s.classe}` : ' mg-segno-fermata--vuoto');
     return `<span class="${cls}" data-forma="${esc(s.forma)}" data-livello="${esc(s.livello)}" title="${esc(s.testo)}" aria-label="${esc(s.testo)}" role="img">`
       + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG[s.forma]}"/></svg></span>`;
+  }
+
+  // «Aspetta una domanda» (#1358): la pratica ferma sta In coda, e il segno porta alla domanda dove si risponde.
+  function domandaBadgeHtml(fb) {
+    const id = MR.domandaDellaPratica(fb);
+    if (!id) return '';
+    const titolo = `Aspetta una tua risposta nella domanda ${id}: aprila`;
+    return `<button type="button" class="mg-domanda-badge" data-domanda="${esc(id)}" title="${esc(titolo)}" aria-label="${esc(titolo)}">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG.rombo}"/></svg>${esc(id)}</button>`;
   }
 
   // Aperta/Chiusa: quello che si sa di una segnalazione il cui stato fine è
@@ -3650,7 +3662,7 @@
     // Cambiando pratica si chiude, come sempre. Su una pratica che aspetta la
     // risposta dell'owner si apre invece il rombo verde: lì si risponde (#1061).
     const domandeGiaDisegnate = ridisegno && attesaDisegnata === fb._id;
-    attesaDisegnata = rispostaOfferta(fb) ? fb._id : null;
+    attesaDisegnata = rispostaOfferta(fb) || (isAdmin && MR.domandaDellaPratica(fb)) ? fb._id : null;
     if (ridisegno && livelloAperto) {
       quandoPannelloLibero(() => {
         if (selectedId !== fb._id || !livelloAperto) return;
@@ -3759,9 +3771,12 @@
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
       ora.fiducia = valore ? 'fidato' : 'non_fidato';
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
+      // Aspettava di diventare fidato per il lavoro server (#1358): il server l'ha già rimesso in coda come lavoro server.
+      if (r.inCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
       if (selectedId === id) reflectManage(ora);
       renderList();
-      setManageMsg(valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
+      setManageMsg(r.inCoda ? `Da ora${chi} è fidato, e torna in coda come lavoro server.`
+        : valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
       setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
     } finally {
@@ -4589,9 +4604,31 @@
 
   mgStarBtn.addEventListener('click', toggleStarred);
 
-  // La casella della risposta e il rombo verde della fila nascono dalla stessa domanda.
+  // La casella della risposta e il rombo verde della fila nascono dalla stessa domanda. Con una domanda vera (#1358)
+  // si risponde lì: un posto solo, e la casella lascia il posto al rimando.
   function rispostaOfferta(fb) {
-    return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb));
+    return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb) && !MR.domandaDellaPratica(fb));
+  }
+  function rimandoDomanda(fb) {
+    const id = MR.domandaDellaPratica(fb);
+    const box = document.createElement('div');
+    box.className = 'mg-liv-risposta mg-liv-domanda';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn';
+    btn.id = 'mgSideDomandaBtn';
+    btn.dataset.domanda = id;
+    btn.textContent = `Rispondi nella domanda ${id}`;
+    btn.title = 'Si risponde in un posto solo: la scelta fa ripartire il lavoro da dove si era fermato.';
+    btn.addEventListener('click', () => apriDomandaDellaPratica(id));
+    box.appendChild(btn);
+    return box;
+  }
+  // Il segno in lista e il rimando nel dettaglio portano alla stessa domanda, nella sua scheda di Domande.
+  async function apriDomandaDellaPratica(id) {
+    if (!DOMANDE || !id) return;
+    const tab = await DOMANDE.apriDomanda(id);
+    if (!tab) toast(`La domanda ${id} non si trova: forse non è ancora arrivata. Riprova fra poco.`, 'err');
   }
   function scriviBozzaRisposta(casella) {
     if (!selectedId) return;
@@ -5430,6 +5467,7 @@
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
+    else if (liv.key === 'l3' && isAdmin && MR.domandaDellaPratica(fb)) body.appendChild(rimandoDomanda(fb));
 
     // Un ridisegno a metà risposta non porta via il cursore a chi sta scrivendo.
     const prima = document.getElementById('mgSideRispostaText');

@@ -903,6 +903,18 @@
     alCambio(fn) { if (typeof fn === 'function') ascoltatori.push(fn); },
     // Quello che la pagina possiede: aprire un feedback nella sua scheda, accendere una scheda di Domande.
     collega(d) { Object.assign(dip, d || {}); },
+    // Una domanda per id, da fuori (il segno «aspetta una domanda» di un feedback, #1358): letta se manca, aperta nella
+    // sua scheda. La scheda dove sta, o '' se non c'è.
+    async apriDomanda(id) {
+      const chiave = String(id || '');
+      if (!trova(chiave) && !finte) await carica();
+      const d = trova(chiave);
+      if (!d) return '';
+      apri([d.id]);
+      const tab = MR.schedaDomanda(d);
+      if (tab && dip.apriScheda) dip.apriScheda(tab); else disegna();
+      return tab || '';
+    },
     // Solo per le prove: domande finte (o un guasto finto) al posto del main, che da lì non le rimpiazza più.
     imposta(lista, opts) {
       finte = true;

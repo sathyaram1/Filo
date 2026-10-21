@@ -71,6 +71,8 @@ test('i campi che una riga mostra, ordina o filtra ci sono', () => {
     'reviewDecision', 'fiducia', 'stalls', 'workingResets', 'claimedBy', 'beatAt',
     // La classe del mittente (§10): le Statistiche la contano anche dalle righe aggiornate dal vivo.
     'mittenteClasse', 'mittenteRuolo',
+    // La domanda che una fermata aspetta (#1358): decide la scheda (In coda) e il segno della riga.
+    'domandaId',
   ]) {
     assert.ok(FB.CAMPI_LISTA.includes(f), `${f} serve alle righe d'elenco`);
   }

@@ -1576,11 +1576,16 @@ if (isMain) {
       }
       data.sha = punta;
     }
-    // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
-    if (intento === 'domanda') {
+    // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server. Su status,
+    // fixed e verdict (#1358) è la domanda della fermata: accompagna clarify, decisione o locale, o ferma come --segnala.
+    if (intento !== 'domanda' && data.domanda !== undefined && !['status', 'fixed', 'verdict'].includes(intento)) {
+      console.error('--domanda vale su deliver domanda, status, fixed e verdict: non ho consegnato niente.');
+      process.exit(1);
+    }
+    if (intento === 'domanda' || typeof data.domanda === 'string') {
       const altri = Object.keys(data).filter((k) => k !== 'domanda');
-      if (typeof data.domanda !== 'string' || altri.length) {
-        console.error(`deliver domanda vuole solo --domanda <file.json>${altri.length ? ` (non ${altri.map((k) => `--${k}`).join(', ')})` : ''}: non ho consegnato niente. In alternativa: node scripts/domanda.mjs chiedi <file.json>.`);
+      if (typeof data.domanda !== 'string' || (intento === 'domanda' && altri.length)) {
+        console.error(`deliver ${intento} vuole ${intento === 'domanda' ? 'solo ' : ''}--domanda <file.json>${intento === 'domanda' && altri.length ? ` (non ${altri.map((k) => `--${k}`).join(', ')})` : ''}: non ho consegnato niente. In alternativa: node scripts/domanda.mjs chiedi <file.json>.`);
         process.exit(1);
       }
       let testo = '';
@@ -1627,9 +1632,15 @@ if (isMain) {
     if (r.outcome === 'ok') {
       // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
       // adesso, o crede di averlo mandato in verifica.
-      const fermo = r.reply && r.reply.outcome === 'stop';
-      const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
-      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
+      const rep = r.reply || {};
+      const fermo = rep.outcome === 'stop';
+      const conSegnalazione = (typeof data.segnalazione === 'string' && data.segnalazione.trim()) || (data.domanda && intento !== 'domanda');
+      const testa = r.num ? `OK: ${r.num}` : 'OK';
+      if (fermo && rep.domanda) console.log(`${testa}: il lavoro è FERMO e aspetta la risposta dell'owner alla domanda ${rep.domanda}. Rilascia il biglietto.`);
+      else if (fermo && rep.motivo === 'worker') console.log(`${testa}: segnato come ${rep.status === 'spam' ? 'spam' : 'attacco'}, l'owner decide nei Ricevuti. Rilascia il biglietto.`);
+      else if (fermo && rep.motivo === 'fidato') console.log(`${testa}: il lavoro è FERMO e chiede all'owner di rendere fidato il feedback (Ricevuti). Rilascia il biglietto.`);
+      else if (fermo) console.log(`${testa}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
+      else if (rep.outcome === 'lavoro_server') console.log(`${testa}: è un lavoro server, lo riprende la routine dei lavori server dal tuo ramo. Rilascia il biglietto.`);
       else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
       else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
       process.exit(0);

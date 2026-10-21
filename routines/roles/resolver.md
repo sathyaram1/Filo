@@ -13,18 +13,19 @@ Non richiedere quello che ha già deciso.
 <!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
-Se è l'ultimo caso, non eseguirlo e dillo nel report.
 
 **Il feedback si lavora intero.** Se è grosso crea un piano prima di toccare
 codice. Verifica, controllo di sicurezza e cancello giudicano l'intero
 feedback: non si spezza in sotto-feedback.
 
 Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
-chiedi — non è una scappatoia, e le domande le legge l'owner:
+chiedi: non è una scappatoia. Le domande le legge l'owner, scritte come una
+domanda (il file JSON della sezione «Un trade-off vero non lo decidi tu: lo
+chiedi», con le tue domande nel problema e le strade che vedi come opzioni):
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason clarify \
-  --notes "[le tue domande]"
+  --notes "[le tue domande, in breve]" --domanda <file.json>
 ```
 
 Poi rilascia il biglietto come qui sotto: il lavoro riparte quando l'owner ha
@@ -78,7 +79,7 @@ I tre testi (report, frase, changelog) li scrivi tu.
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status revision_capability \
-  --notes "[il tuo report]" --frase "[la frase]" [--segnala <file.md>]
+  --notes "[il tuo report]" --frase "[la frase]" [--domanda <file.json>]
 ```
 
 Infine rilascia il biglietto:
