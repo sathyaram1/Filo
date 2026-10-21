@@ -149,7 +149,7 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
   }
   const cmd = comando({ sessione, creato, registro: join(dir, FILE_REGISTRO) });
   const hooks = { ...(s.hooks || {}) };
-  const voci = { PreToolUse: 'Agent|Task', PostToolUse: 'Agent|Task', ConfigChange: 'user_settings' };
+  const voci = { PreToolUse: MATCHER_PRIMA, PostToolUse: 'Agent|Task', ConfigChange: 'user_settings' };
   for (const [ev, matcher] of Object.entries(voci)) {
     hooks[ev] = [...(hooks[ev] || []).filter((g) => !nostro(g)), { matcher, hooks: [{ type: 'command', command: cmd }] }];
   }
