@@ -50,11 +50,13 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
     return { decision: "block", reason: MOTIVO_IMPOSTAZIONI };
   }
   const strumento = input.tool_name;
+  const ti = input.tool_input || {};
+  const nega = (motivo) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: motivo } });
+  const notifica = strumento === "PushNotification" || (strumento === "SendUserFile" && ti.status === "proactive");
+  if (notifica && input.hook_event_name === "PreToolUse") return nega(MOTIVO_NOTIFICA);
   if (strumento !== "Agent" && strumento !== "Task") return null;
   if (input.agent_id) return null;
-  const ti = input.tool_input || {};
   if (input.hook_event_name === "PreToolUse") {
-    const nega = (motivo) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: motivo } });
     if (ti.run_in_background === true) return nega(MOTIVO_SOTTOFONDO);
     const visti = [...new Set([...String(ti.prompt || "").matchAll(/--ticket[^A-Za-z0-9_-]{1,3}([A-Za-z0-9_-]{32,})/g)].map((m) => m[1]))];
     if (visti.length !== 1) return nega(visti.length ? MOTIVO_DUE_BIGLIETTI : MOTIVO_SENZA_BIGLIETTO);
