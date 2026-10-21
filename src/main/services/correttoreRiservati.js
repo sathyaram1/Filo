@@ -14,7 +14,7 @@ const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
 const RICHIESTA = new RegExp([
   '(?:(?:(?:mand|invi|pass|gir|ricord)a|scriv[ei])r?|d[ai][rm])m(?:i|el[ao])',
   '(?:mi|ci|me\\s*l[aoe\'’]?|ce\\s*l[aoe\'’]?)\\s*(?:(?:mand|invi|scriv|gir|pass|ricord|prest|condivid|mostr|dett|incoll|cop)(?:i|ate|ete|eresti|ereste)|dic?i|dite|da[it]?e?|daresti|diresti)',
-  '(?:puoi|può|potresti|potete|potreste|riesci|riusciresti|sai|sapete|sapresti|hai|avete|conosci|ce\\s*l[\'’]?hai|qual[e\'’]?|com[\'’]|cos[\'’])',
+  '(?:puoi|può|potresti|potete|potreste|riesci|riusciresti|sai|sapete|sapresti|hai|avete|conosci|ce\\s*l[\'’]?hai|qual(?:e|[\'’]\\s*è)?|(?:com|cos)[\'’]\\s*è)',
   '(?:(?:mi|ci) serv(?:e|irebbe)|ho bisogno|per\\s*favore|perfavore|x\\s*favore|pls|plz|please)',
   '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
