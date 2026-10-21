@@ -307,3 +307,74 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
     for (const riga of testo.split('\n')) expect(riga.startsWith('(Sistema:'), riga).toBe(false);
   }
 });
+
+// #1396 — il caso dell'intervista di benvenuto: la lezione confermata nel popup torna al modello come «voce 1», e la
+// cornice gli dice che l'utente quell'etichetta non l'ha mai vista (nel popup ha letto il testo vero).
+test('lezione confermata nel popup: «voce 1» arriva al modello come segnaposto da non dire all\'utente', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configura(app);
+  // A Conservativo una lezione (costo 2) chiede l'OK anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
+  const lezione = 'L\'utente è lo sviluppatore di Filo.';
+
+  await app.evaluate(async (_e, { lezione, apreChat }) => {
+    globalThis.__calls = [];
+    const finto = async ({ attempts, messages, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
+      if (!String(messages[0]?.content || '').startsWith(apreChat)) {
+        return { ...base, text: 'NULLA DA IMPARARE', toolCalls: [], finishReason: 'stop' };
+      }
+      const n = globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
+      if (n === 1) {
+        return {
+          ...base, text: '', finishReason: 'tool_calls',
+          toolCalls: [{ id: 'l1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: lezione }) }],
+        };
+      }
+      const t = n === 2 ? 'Me lo segno, se mi dai l\'OK.' : 'Va bene.';
+      try { onDelta && onDelta(t); } catch (_) {}
+      return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
+    };
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+  }, { lezione, apreChat: APRE_CHAT });
+
+  await page.locator('#input').fill('ricordati che sviluppo Filo');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+  const popup = await confirmText(page);
+  expect(popup).toContain(lezione);
+  expect(popup).not.toMatch(/voce \d/);
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+  await expect.poll(() => app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    return JSON.stringify({ memoria: await M.getMemory(), lezioni: (await M.getLessonsBuffer()).map((l) => l.text) });
+  }), { timeout: 5_000 }).toContain('sviluppatore di Filo');
+
+  await page.locator('#input').fill('puoi non chiedere conferma per cosa tu debba ricordarti?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 15_000 });
+
+  const calls = await app.evaluate(() => globalThis.__calls);
+  expect(calls).toHaveLength(3);
+  const nota = /«voce 1» è un segnaposto tuo[^\n]*l'utente non lo vede da nessuna parte[^\n]*non scriverlo mai/;
+  // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
+  const esito = calls[1][calls[1].length - 1];
+  expect(esito.role).toBe('tool');
+  expect(esito.content).toMatch(/^In attesa della conferma/);
+  expect(esito.content).toMatch(nota);
+  // Al turno dopo, nel riepilogo della conferma arrivata a risposta già scritta.
+  const riepilogo = calls[2].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
+  expect(riepilogo).toContain('ha CONFERMATO');
+  expect(riepilogo).toMatch(/- Ricordato: «voce 1»\n/);
+  expect(riepilogo).toMatch(nota);
+  expect(riepilogo).toContain('il popup di conferma si è chiuso con quel sì');
+  const { volte, fuori } = await conta(app, riepilogo, 'sviluppatore di Filo');
+  expect(volte).toBe(1);
+  expect(fuori).toBe(0);
+});
