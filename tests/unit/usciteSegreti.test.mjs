@@ -814,7 +814,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const apre = corpo(tabs, '  apriDaCollegamento(url');
     for (const passo of ['fermaNavigazione(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
     assert.ok(corpo(tabs, 'function fermaNavigazione(').includes('openExternalScheme('), 'fermaNavigazione non passa la posta al sistema');
-    prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'safeFetch(', 'leggere un collegamento lo chiede al sito prima della porta');
+    prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'perContoDellaScheda(', 'leggere un collegamento lo chiede al sito prima della porta');
     const dash = src('pages', 'dashboard', 'dashboard.js');
     assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
     assert.match(corpo(dash, 'const apriDaCollegamento = (e) =>'), /mailto/);
