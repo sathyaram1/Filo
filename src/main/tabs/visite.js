@@ -58,7 +58,9 @@ class VisiteSchede {
       if (v) v.url = url;
       return;
     }
-    if (this.frenata(wc, gesto)) {
+    const freno = this.freno(wc, gesto);
+    // Frenata, la pagina resta quella della visita aperta: in attesa segue l'indirizzo, già scritta lo assorbe.
+    if (freno.frena) {
       if (!registrabile(url)) return;
       this.ultime.set(wc, url);
       const v = this.inAttesa.get(wc);
@@ -71,10 +73,27 @@ class VisiteSchede {
     if (prima && senzaFrammento(prima) === senzaFrammento(url)) return;
     this.lascia(wc);
     this.ultime.set(wc, url);
+    if (!freno.conGesto) freno.f.fila += 1;
     const v = { wc, url, scheda, ts: new Date().toISOString(), titolo: '', inPagina };
     v.timer = setTimeout(() => this.scrivi(wc), inPagina ? ATTESA_TITOLO_IN_PAGINA : TETTO_CARICAMENTO);
     if (v.timer && v.timer.unref) v.timer.unref();
     this.inAttesa.set(wc, v);
+  }
+
+  // Senza gesto recente frena un cambio a ridosso del precedente, o arrivato dopo `fila` visite senza gesto, purché la
+  // scheda abbia una visita aperta. Un gesto nuovo (anche senza navigazione dietro) rimette la fila a zero.
+  freno(wc, gesto) {
+    const ora = Date.now();
+    let f = this.freni.get(wc);
+    if (!f) { f = { ultima: -Infinity, fila: 0, gesto: 0 }; this.freni.set(wc, f); }
+    const g = Number(gesto) || 0;
+    if (g > f.gesto) { f.gesto = g; f.fila = 0; }
+    const conGesto = g > 0 && ora - g <= FRENO.gesto;
+    const prima = f.ultima;
+    f.ultima = ora;
+    const aperta = this.inAttesa.has(wc) || this.scritte.has(wc);
+    const frena = !conGesto && aperta && (ora - prima < FRENO.raffica || f.fila >= FRENO.fila);
+    return { frena, conGesto, f };
   }
 
   // Una scheda ripristinata dalla sessione di prima non è una visita: la sua pagina il filo l'ha già.
