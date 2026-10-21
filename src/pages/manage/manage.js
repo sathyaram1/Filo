@@ -4201,7 +4201,7 @@
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
           if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
-        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori server.${fiducia}`, fiducia ? 'err' : 'ok');
+        toast(`${num ? `#${num}` : 'Il feedback'} è In coda come lavoro server.${fiducia}`, fiducia ? 'err' : 'ok');
       }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
