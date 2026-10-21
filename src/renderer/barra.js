@@ -129,6 +129,14 @@
   }
 
   function aggiornaIcona(b, it) {
+    const detto = b.dataset.sugg || b.getAttribute('aria-label') || '';
+    aspettoIcona(b, it);
+    // Il clic ha cambiato cosa fa l'icona (Aiuto → Parla): il puntatore ancora sopra lo legge subito.
+    const ora = b.dataset.sugg || b.getAttribute('aria-label') || '';
+    if (detto && ora !== detto && b.isConnected && b.matches(':hover') && !trascina) programmaSuggerimento(b);
+  }
+
+  function aspettoIcona(b, it) {
     b.dataset.id = it.id;
     b.setAttribute('aria-label', it.etichetta);
     // Spenta, il suggerimento dice perché.
