@@ -1399,43 +1399,10 @@
       if (!r?.ok || !r.dataUrl) return null;
       const campi = prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista());
       if (!campi.length && !r.fattore) return r.dataUrl;
-      return await coperta(r.dataUrl, campi, r);
+      // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
+      return await Extract.fotoCoperta(r.dataUrl, campi, r);
     } catch (_) {}
     return null;
-  }
-
-  // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
-  async function coperta(dataUrl, campi, { fattore = 1, qualita = 85 } = {}) {
-    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
-    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
-    const img = await createImageBitmap(new Blob([byte]));
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    const sx = img.width / window.innerWidth;
-    const sy = img.height / window.innerHeight;
-    for (const c of campi) {
-      const x = c.left * sx, y = c.top * sy, w = c.width * sx, h = c.height * sy;
-      ctx.fillStyle = c.sfondo;
-      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(w + x - Math.floor(x)), Math.ceil(h + y - Math.floor(y)));
-      ctx.fillStyle = c.testo;
-      ctx.font = `${Math.round(Math.min(c.corpo * sy * 1.4, h * 0.9))}px sans-serif`;
-      ctx.textBaseline = 'middle';
-      ctx.fillText('••••••••', x + 3 * sx, y + h / 2, Math.max(1, w - 6 * sx));
-    }
-    const f = Number.isFinite(fattore) && fattore > 1 ? fattore : 1;
-    let uscita = canvas;
-    if (f > 1) {
-      uscita = document.createElement('canvas');
-      uscita.width = Math.max(1, Math.round(img.width / f));
-      uscita.height = Math.max(1, Math.round(img.height / f));
-      const u = uscita.getContext('2d');
-      u.imageSmoothingQuality = 'high';
-      u.drawImage(canvas, 0, 0, uscita.width, uscita.height);
-    }
-    return uscita.toDataURL('image/jpeg', Math.min(1, Math.max(0.1, qualita / 100)));
   }
 
   // Aspetta che la pagina si "stabilizzi" dopo un'azione utente: utile per
