@@ -398,7 +398,8 @@ function formaCerta(c) {
   // Davanti a un altro sito conta solo col finto suffisso dopo (paypal.com.altro.net): booking.hotel.com è una parola.
   if (c.tipo === 'esatto') return c.zona !== 'sotto' || (c.segue.length <= 3 && /^[a-z]+$/.test(c.segue));
   const lungo = c.mc.token.length >= 5;
-  if (c.tipo === 'typo') return lungo && c.d === 1 && c.zona === 'sld';
+  // Un refuso di un marchio che è una parola è spesso un'altra parola (apply, pose, team): lì decide il modello (#728).
+  if (c.tipo === 'typo') return lungo && !c.mc.parola && c.d === 1 && c.zona === 'sld';
   if (c.tipo !== 'esattodentro') return false;
   const prima = c.sk.crudo.slice(0, c.inizio);
   const dopo = c.sk.crudo.slice(c.fine);
