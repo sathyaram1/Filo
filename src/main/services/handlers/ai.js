@@ -181,6 +181,19 @@ module.exports = function register(on, ctx) {
     const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
     if (u.blocca) return { ok: false, code: 'RICERCA_BLOCCATA' };
     const F = globalThis.SN_FONTI_SEGNAPOSTO;
+    const sito = sitoDi(String(sender?.tab?.url || sender?.url || ''));
+    const ricorda = (fonti) => {
+      const k = chiaveLette(sito, sp.domanda, sp.dove);
+      fontiLette.delete(k);
+      fontiLette.set(k, { fonti, alle: Date.now() });
+      while (fontiLette.size > FONTI_LETTE_MAX) fontiLette.delete(fontiLette.keys().next().value);
+    };
+    const lette = sp.giaLette && fontiLette.get(chiaveLette(sito, sp.giaLette.domanda, sp.giaLette.dove));
+    if (lette && Date.now() - lette.alle < FONTI_LETTE_MS) {
+      const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti: lette.fonti }, origin });
+      const riga = F.ricomponi(r && r.text, lette.fonti);
+      if (riga) { ricorda(lette.fonti); return { ...r, text: riga }; }
+    }
     let ultima = null;
     let fallita = '';
     for (const giro of F.giri(sp.dove, corr.segnapostiWeb !== false)) {
