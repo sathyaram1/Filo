@@ -830,7 +830,8 @@ function finalizeManual(rec, state, savePath) {
   // già la sua conferma nella pagina (un secondo avviso sarebbe un doppione).
 }
 
-function beginManual({ url, filename, totalBytes, scope, servedFrom } = {}) {
+// `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
+function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents } = {}) {
   const id = uuid();
   const nome = safeName(filename || 'download');
   const indirizzo = String(url || '');
