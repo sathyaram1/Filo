@@ -573,7 +573,10 @@
     function rileggi() {
       const u = ultima();
       if (u && now() - Number(u.at) <= validoMs) return null;
-      if (!inVolo) inVolo = Promise.resolve().then(leggi).catch(() => null).finally(() => { inVolo = null; });
+      if (inVolo) return inVolo;
+      let p;
+      try { p = Promise.resolve(leggi()); } catch (_) { p = Promise.resolve(null); }
+      inVolo = p.catch(() => null).finally(() => { inVolo = null; });
       return inVolo;
     }
     return { rileggi };
