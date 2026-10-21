@@ -433,7 +433,7 @@
     // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
     // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
     seguiSpento();
-    SpellCheck.init(isBlocked() ? { ...settings, featureFlags: { ...(settings.featureFlags || {}), spellcheck: false } } : settings);
+    SpellCheck.init(impostazioniDelCorrettore());
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
@@ -1291,6 +1291,11 @@
     return true;
   }
 
+  // Sul sito dove Filo è spento il correttore tace e il browser torna a sottolineare da sé (#589.2, #1446).
+  function impostazioniDelCorrettore() {
+    return isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false }, sitoSpento: true } : settings;
+  }
+
   async function openNormalMenuAt(e, sito = null) {
     // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
     // se il broadcast `_spell:native` arrivato durante l'await sotto è già
@@ -2010,7 +2015,8 @@
         const scrivi = (s) => {
           el.textContent = '';
           const perche = document.createElement('div');
-          perche.textContent = s.motivo || I18n.t(s.segno === 'errore' ? 'spell_errore_forse' : 'spell_ocra_controlla');
+          const ripiego = s.segno !== 'errore' ? 'spell_ocra_controlla' : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+          perche.textContent = s.motivo || I18n.t(ripiego);
           el.appendChild(perche);
           if (s.citazione) {
             const prova = document.createElement('div');
@@ -2745,7 +2751,7 @@
       if (!IS_SUBFRAME) { try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {} }
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
-      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false } } : settings);
+      SpellCheck.updateSettings(impostazioniDelCorrettore());
       // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
       if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;

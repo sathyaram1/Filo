@@ -28,6 +28,7 @@
   const LUNGO = 20000;
   const RICALCOLO_LUNGO_MS = 300;
   const ESITI_MAX = 40;
+  const GIUDICATI_MAX = 12;
   const DIZIONARIO_MAX = 20000;
   const MIN_TESTO = 8;
 
@@ -50,13 +51,11 @@
   // ============================================================================
   // Impostazioni
   // ============================================================================
-  const flags = () => (settings && settings.featureFlags) || {};
-  const conf = () => (settings && settings.correttore) || {};
   const spentoQui = () => !settings || settings.sitoSpento === true;
-  function erroriAttivi() { return !spentoQui() && flags().spellcheck !== false; }
-  function suggerimentiAttivi() { return !spentoQui() && flags().spellcheckContext !== false && !!Coerenza(); }
-  function modelloErrori() { return erroriAttivi() && conf().modelloErrori !== false; }
-  function ripetizioniAttive() { return conf().ripetizioni !== false; }
+  function erroriAttivi() { return !spentoQui() && settings.featureFlags?.spellcheck !== false; }
+  function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
+  function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
+  function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
@@ -393,6 +392,8 @@
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
       rimandati: new Set(), luogo: null, luogoAlle: 0, inVista: [],
+      // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
+      giudicati: { rapido: new Map(), ragionato: new Map() },
     };
     monitored.set(el, state);
     return state;
@@ -1092,6 +1093,7 @@
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     if (d.testo.trim().length < 2) return;
+    if (tornaAGiudicato(state, 'rapido', d)) return;
     const scrive = ignoraScrittura ? null : inScritturaNelTesto(state, d);
     const regione = Rg.regioneNuova(state.baseRapido, d.testo);
     state.restaParola = !!(scrive && regione && scrive.start < regione.end && scrive.end > regione.start);
@@ -1137,6 +1139,7 @@
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     if (d.testo.trim().length < MIN_TESTO) return;
+    if (tornaAGiudicato(state, 'ragionato', d)) return;
     let finoA = null;
     if (fineFrase) {
       const pos = d.verso(cursoreNelCampo(state.el));
@@ -1219,8 +1222,33 @@
     state.modello = state.modello.filter((m) => m.fonte !== fonte
       || !((giudicato && tocca(m, giudicato)) || delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n))));
     state.modello.push(...delCampo);
+    const base = rapido ? state.baseRapido : state.baseRagionato;
+    const sigla = rapido ? 'r' : 'g';
+    if (base === d.testo && !state.inViaggio.some((v) => v.id[0] === sigla)) ricordaGiudicato(state, fonte);
     renderOverlayContent(state);
     avvisaAscoltatori(state);
+  }
+
+  // Il testo di adesso giudicato per intero, coi segni del modello che ne erano usciti.
+  function ricordaGiudicato(state, fonte) {
+    const m = state.giudicati[fonte];
+    const testo = getEditableText(state.el);
+    m.delete(testo);
+    m.set(testo, state.modello.filter((x) => x.fonte === fonte).map((x) => ({ ...x })));
+    while (m.size > GIUDICATI_MAX) m.delete(m.keys().next().value);
+  }
+
+  // Un annulla, o una correzione tolta, riporta a un testo già giudicato per intero: tornano i suoi segni, senza
+  // chiamata. Vero se ha fatto così.
+  function tornaAGiudicato(state, fonte, d) {
+    const testo = getEditableText(state.el);
+    const segni = state.giudicati[fonte].get(testo);
+    if (!segni) return false;
+    if (fonte === 'rapido') state.baseRapido = d.testo; else state.baseRagionato = d.testo;
+    state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni.map((x) => ({ ...x }))];
+    state.testo = testo;
+    renderOverlayContent(state);
+    return true;
   }
 
   // ============================================================================

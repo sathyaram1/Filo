@@ -236,8 +236,6 @@
     // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti.
     SPELLCHECK_SEMANTIC: 'spellcheck_semantic',
     SPELLCHECK_CONTEXT: 'spellcheck_context',
-    // Ritirato con #1446 (la correzione di una parola la dà il controllo rapido): resta per le voci di cronologia.
-    SPELLCHECK_WORD: 'spellcheck_word',
     EDIT_TEXT: 'edit_text',
     EXPLAIN_LINK: 'explain_link',
     // Pipeline di sanitizzazione per la raccolta path della sidebar Aiuto.
@@ -388,7 +386,8 @@
   // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
   // (per UTILIZZO, non per modello). Le azioni non mappate ricadono in "Altro".
   const CREDIT_USAGE_GROUPS = {
-    [ACTIONS.SPELLCHECK_WORD]: 'Correttore ortografico',
+    // La correzione di una parola al tasto destro, ritirata con #1446: le voci vecchie del diario restano del correttore.
+    spellcheck_word: 'Correttore ortografico',
     [ACTIONS.SPELLCHECK_SEMANTIC]: 'Correttore ortografico',
     [ACTIONS.SPELLCHECK_CONTEXT]: 'Correttore ortografico',
     [ACTIONS.EDIT_TEXT]: 'Riscrittura testo',
@@ -439,7 +438,7 @@
     [ACTIONS.TRANSCRIBE_AUDIO]: 'Dettatura',
     [ACTIONS.TTS]: 'Lettura ad alta voce',
     [ACTIONS.SPELLCHECK_SEMANTIC]: 'Correttore — errori',
-    [ACTIONS.SPELLCHECK_WORD]: 'Correttore ortografico',
+    spellcheck_word: 'Correttore ortografico',
     [ACTIONS.SPELLCHECK_CONTEXT]: 'Correttore — suggerimenti',
     [ACTIONS.EDIT_TEXT]: 'Modifica testo',
     [ACTIONS.EXPLAIN_LINK]: 'Spiega link',

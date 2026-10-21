@@ -434,17 +434,47 @@
           </label>
         </div>
         <div class="sn-toggle-row">
-          <label title="Le sottolineature blu mentre scrivi e le correzioni proposte col tasto destro.">
-            <input type="checkbox" id="correttoreAcceso" />
-            <span>Correttore ortografico</span>
-          </label>
-        </div>
-        <div class="sn-toggle-row">
           <label title="Ogni pagina che salvi per dopo prende una categoria scelta da un modello, e la lista si raggruppa per categoria.">
             <input type="checkbox" id="categorieAutomatiche" />
             <span>Categorie automatiche in «Aperti per dopo»</span>
           </label>
         </div>
+      </section>
+
+      <!-- #1446 — i due segni del correttore, la parte del modello degli errori, le ripetizioni, i tempi e i modelli. -->
+      <section id="sec-correttore">
+        <h2>Correttore</h2>
+        <div class="sn-toggle-row">
+          <label title="Quello che Filo sa sbagliato, con un'onda sottile sotto. Spento, sparisce anche la sottolineatura del browser.">
+            <input type="checkbox" id="correttoreAcceso" />
+            <span>Errori</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Quello che decidi tu, coi puntini sotto: frasi poco chiare, date che non tornano, cose diverse da quelle già dette nella pagina.">
+            <input type="checkbox" id="correttoreSuggerimenti" />
+            <span>Suggerimenti</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Spento, gli errori li trova solo Filo, senza modello e senza spendere: parole fuori dizionario, parole ripetute ed errori fissi, che restano sbiaditi.">
+            <input type="checkbox" id="correttoreModello" />
+            <span>Un modello controlla gli errori</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="correttoreRipetizioni" />
+            <span>Segna le parole ripetute per sbaglio, come «il il»</span>
+          </label>
+        </div>
+        <label for="correttorePausaRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo degli errori (millisecondi, da 200 a 5.000)</label>
+        <input type="number" id="correttorePausaRapido" min="200" max="5000" step="50" style="width:120px;" />
+        <label for="correttoreOgniRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Mentre scrivi senza pause, un controllo degli errori ogni (millisecondi, da 1.000 a 60.000)</label>
+        <input type="number" id="correttoreOgniRapido" min="1000" max="60000" step="500" style="width:120px;" />
+        <label for="correttorePausaRagionato" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo dei suggerimenti (millisecondi, da 1.000 a 30.000)</label>
+        <input type="number" id="correttorePausaRagionato" min="1000" max="30000" step="500" style="width:120px;" />
+        <p class="sn-muted" style="margin-top:12px;"><a id="correttoreModelli" href="filo://options/options.html">I modelli dei due controlli</a></p>
       </section>
 
       <section id="sec-barra">

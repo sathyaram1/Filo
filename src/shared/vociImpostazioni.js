@@ -70,6 +70,12 @@
         contatoriAttivi: 'contatori.attivi',
         aiutoAcceso: 'featureFlags.help',
         correttoreAcceso: 'featureFlags.spellcheck',
+        correttoreSuggerimenti: 'featureFlags.spellcheckContext',
+        correttoreModello: 'correttore.modelloErrori',
+        correttoreRipetizioni: 'correttore.ripetizioni',
+        correttorePausaRapido: 'correttore.pausaRapidoMs',
+        correttoreOgniRapido: 'correttore.ogniRapidoMs',
+        correttorePausaRagionato: 'correttore.pausaRagionatoMs',
         categorieAutomatiche: 'featureFlags.categorize',
       },
       gruppi: {
@@ -175,8 +181,8 @@
       titolo: 'Altro',
       campi: {
         blocklist: 'blocklist',
-        spellcheckBlu: 'featureFlags.spellcheck',
-        spellcheckOcra: 'featureFlags.spellcheckContext',
+        spellcheckErrori: 'featureFlags.spellcheck',
+        spellcheckSuggerimenti: 'featureFlags.spellcheckContext',
       },
       gruppi: {},
       fuori: {},

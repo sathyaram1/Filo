@@ -865,7 +865,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
-    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD && action !== ACTIONS.SPELLCHECK_CONTEXT
+    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
     // La ricerca fra i feedback è un passaggio interno di una ricerca, non una
     // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,
