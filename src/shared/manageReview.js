@@ -942,7 +942,7 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+    if (tab === 'queue' || tab === 'waiting') {
       // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
       if (aspettaDomanda(fb)) return [{ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false }];
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
