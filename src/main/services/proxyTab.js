@@ -189,5 +189,8 @@ module.exports = {
   endpointFor,
   resolve,
   setPartitionAuth,
+  registraRete,
   clearPartitionAuth,
+  credenzialiDellaSessione,
+  reteDellaSessione,
 };
