@@ -384,6 +384,10 @@
     if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
+    if (role === 'assistant' && (nascosto || (collapsed && ridottoDallUtente)) && !nonLetta) {
+      nonLetta = true;
+      cambiato();
+    }
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
     // #418 — le risposte di Filo (assistant) vanno rese con la stessa
