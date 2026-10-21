@@ -50,6 +50,7 @@
   <script src="filo://shared/wallet.js"></script>
   <script src="filo://shared/campoNumero.js"></script>
   <link rel="stylesheet" href="filo://credits/credits.css" />
+  <script src="filo://shared/compiti.js"></script>
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
@@ -1566,6 +1567,48 @@
     :root[data-sn-theme="light"] .mg-cr-data { color-scheme: light; }
     .mg-crediti h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--sn-fg); }
     .mg-cr-data:disabled, .mg-crediti .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Compiti: le tre parti affiancate finché c'è posto. Una riga = un compito, il dettaglio con le chiamate si apre
+       sotto; il bordo acceso segna chi ha un agente al lavoro. */
+    .mg-compiti { padding: 20px 0 32px; }
+    .mg-cp-testa { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+    .mg-cp-stato { flex: 1 1 auto; margin: 0; font-size: 12px; color: var(--sn-muted); min-height: 1.4em; }
+    .mg-cp-nuovo { display: flex; flex-direction: column; gap: 8px; margin: 0 0 20px; max-width: 760px; }
+    .mg-cp-nuovo[hidden] { display: none; }
+    .sn-page .mg-cp-campo {
+      font: inherit; font-size: 13px; padding: 7px 9px; border-radius: 8px;
+      border: 1px solid var(--sn-border); background: var(--sn-bg, transparent); color: var(--sn-fg);
+    }
+    .mg-cp-istruzioni { resize: vertical; min-height: 72px; }
+    .mg-cp-scelte { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+    .mg-cp-scelta { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sn-muted); }
+    .sn-page .mg-cp-scelta input.mg-auto-number { width: 64px; }
+    .mg-cp-parti { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px 28px; align-items: start; }
+    .mg-cp-parti[hidden] { display: none; }
+    .mg-cp-parte h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--sn-fg); }
+    .mg-cp-n { font-weight: 400; color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+    .mg-cp-vuoto { font-size: 13px; color: var(--sn-muted); margin: 6px 0; }
+    .mg-cp-vuoto[hidden] { display: none; }
+    .mg-cp-lista { list-style: none; margin: 0; padding: 0; }
+    .mg-cp-riga {
+      padding: 7px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      border-left: 3px solid transparent; transition: background calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-cp-riga:hover { background: var(--sn-hover); }
+    .mg-cp-riga:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-cp-riga[data-stato="in_corso"] { border-left-color: var(--sn-accent); }
+    .mg-cp-riga--aperta { background: var(--sn-hover); }
+    .mg-cp-sopra { display: flex; align-items: baseline; gap: 8px; }
+    .mg-cp-nome { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-weight: 600; color: var(--sn-fg); }
+    .mg-cp-urg { flex: 0 0 auto; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--sn-muted); }
+    .mg-cp-sotto { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; font-size: 12px; color: var(--sn-muted); }
+    .mg-cp-dettaglio { margin: 8px 0 4px; display: flex; flex-direction: column; gap: 6px; cursor: auto; }
+    .mg-cp-istr { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; color: var(--sn-fg); }
+    .mg-cp-chiamate { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .mg-cp-chiamata { font-size: 12px; color: var(--sn-fg); display: flex; flex-wrap: wrap; gap: 2px 10px; font-variant-numeric: tabular-nums; }
+    .mg-cp-guasto { color: var(--sn-error); overflow-wrap: anywhere; }
+    .mg-cp-azioni { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mg-cp-altri { margin-top: 10px; }
+    .sn-page button.mg-cp-altri[hidden] { display: none; }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
@@ -1717,6 +1760,7 @@
       <button type="button" class="mg-tab" data-tab="stats" role="tab"
         title="Red Team, Bacheca e Deck builder: chi li vede oltre a te">In pausa</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
+      <button type="button" class="mg-tab" data-tab="compiti" role="tab" hidden>Compiti</button>
       <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
       <button type="button" class="mg-tab" data-tab="utenti" role="tab" hidden>Inviti e utenti</button>
@@ -2128,6 +2172,51 @@
           </div>
         </section>
         <p class="mg-action-msg mg-cr-avviso" id="mgCrAvviso" role="status" hidden></p>
+      </div>
+    </section>
+
+    <!-- Routine → Compiti (SPEC-DOMANDE.md §6.5): ogni chiamata di un agente, letta dal server (ownerCompiti) e disegnata
+       da manageCompiti.js. Le tre parti restano nascoste finché l'elenco non è letto: un «nessuno» non letto è falso. -->
+    <section class="mg-panel" id="panel-compiti" data-panel="compiti">
+      <div class="mg-compiti" id="mgCpRoot">
+        <div class="mg-cp-testa">
+          <p class="mg-cp-stato" id="mgCpStato" role="status"></p>
+          <button type="button" class="sn-btn sn-btn-secondary" id="mgCpNuovoApri" title="Un compito senza feedback, per un agente delle routine">Nuovo compito</button>
+        </div>
+        <form class="mg-cp-nuovo" id="mgCpNuovo" hidden autocomplete="off" novalidate>
+          <input type="text" id="mgCpTitolo" class="mg-cp-campo" placeholder="Cosa deve fare" maxlength="300" aria-label="Titolo del compito" />
+          <textarea id="mgCpIstruzioni" class="mg-cp-campo mg-cp-istruzioni" rows="4" placeholder="Istruzioni" aria-label="Istruzioni"></textarea>
+          <div class="mg-cp-scelte">
+            <label class="mg-cp-scelta" title="Più alta passa prima. I feedback a priorità 3 stanno da 50 in su, «Gestisci la risposta» a 47.">Urgenza
+              <input type="number" id="mgCpUrgenza" class="mg-auto-number" min="0" max="99" step="1" value="45" />
+            </label>
+            <label class="mg-cp-scelta">Modello <select id="mgCpModello"></select></label>
+            <label class="mg-cp-scelta">Sforzo <select id="mgCpSforzo"></select></label>
+            <button type="submit" class="sn-btn" id="mgCpCrea">Crea</button>
+            <button type="button" class="sn-btn sn-btn-secondary" id="mgCpChiudi">Annulla</button>
+            <span class="mg-action-msg" id="mgCpMsg" role="status"></span>
+          </div>
+        </form>
+        <div class="mg-log-loading" id="mgCpCarica">Caricamento…</div>
+        <div class="mg-log-denied" id="mgCpNegato" hidden>Questa sezione è riservata all'owner.</div>
+        <div class="mg-cp-parti" id="mgCpParti" hidden>
+          <section class="mg-cp-parte" data-parte="inAttesa">
+            <h2>Aperti <span class="mg-cp-n"></span></h2>
+            <p class="mg-cp-vuoto">Nessun compito in attesa.</p>
+            <ul class="mg-cp-lista"></ul>
+          </section>
+          <section class="mg-cp-parte" data-parte="inCorso">
+            <h2>In corso <span class="mg-cp-n"></span></h2>
+            <p class="mg-cp-vuoto">Nessun agente al lavoro.</p>
+            <ul class="mg-cp-lista"></ul>
+          </section>
+          <section class="mg-cp-parte" data-parte="storico">
+            <h2>Storico <span class="mg-cp-n"></span></h2>
+            <p class="mg-cp-vuoto">Nessun compito chiuso.</p>
+            <ul class="mg-cp-lista"></ul>
+            <button type="button" class="sn-btn sn-btn-secondary mg-cp-altri" id="mgCpAltri" hidden>Mostra i più vecchi</button>
+          </section>
+        </div>
       </div>
     </section>
 
@@ -2744,5 +2833,6 @@
   <script src="manageCrediti.js"></script>
   <script src="manageUtenti.js"></script>
   <script src="managePredefiniti.js"></script>
+  <script src="manageCompiti.js"></script>
 </body>
 </html>

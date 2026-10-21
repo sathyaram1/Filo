@@ -46,12 +46,12 @@ test('la barra mostra le sezioni e ogni scheda si apre dalla sua', async ({ open
   }
   // I lavori server stanno nella scheda del loro stato (#1575): la loro scheda non c'è più.
   await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveCount(0);
-  for (const t of ['automation', 'log', 'domande', 'domande-lavoro', 'domande-archivio', 'utenti', 'predefiniti']) {
+  for (const t of ['automation', 'compiti', 'log', 'domande', 'domande-lavoro', 'domande-archivio', 'utenti', 'predefiniti']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeHidden();
   }
 
   const panelDi = {
-    automation: 'panel-automation', log: 'panel-log', fbstats: 'panel-fbstats', stats: 'panel-stats', queue: 'panel-list', domande: 'panel-domande',
+    automation: 'panel-automation', compiti: 'panel-compiti', log: 'panel-log', fbstats: 'panel-fbstats', stats: 'panel-stats', queue: 'panel-list', domande: 'panel-domande',
     utenti: 'panel-utenti', predefiniti: 'panel-predefiniti',
   };
   for (const [tab, panel] of Object.entries(panelDi)) {

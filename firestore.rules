@@ -201,6 +201,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // I compiti delle routine (#1196, SPEC-DOMANDE.md §6) e il loro indice (contatore, compito aperto per feedback):
+    // li scrive solo il server, che tiene «un compito aperto per feedback»; l'owner li legge da ownerCompiti.
+    match /compiti/{id} {
+      allow read, write: if false;
+    }
+    match /compiti-indice/{id} {
+      allow read, write: if false;
+    }
+
     // Allowlist routine. Gestita SOLO da console Firebase.
     match /routines/{email} {
       allow read: if isAdmin();

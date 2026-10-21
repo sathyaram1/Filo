@@ -168,16 +168,14 @@ lo può scrivere anche un agente pulito.
 - **Giudici alla nascita (L2):** restano per i soli non fidati.
 - **Ordine della coda:** fiducia e figli sono gradini dell'urgenza dentro la
   casella di priorità e fase (§ 6.3): prima i fidati, poi i principali prima
-  dei figli, poi l'età. Finché i compiti (§ 13, punto 5) non ci sono, lo
-  stesso ordine fa da spareggio provvisorio a pari priorità, al posto di
-  `senderClass` in `selectTodoWinner` (filo-security
-  `functions/src/routine/select.js`). I rami in revisione non hanno più la
-  precedenza assoluta (#1451): la priorità viene prima, rami e nuovi insieme;
-  a pari priorità i rami prima dei nuovi e fra i rami l'ordine per ruolo
-  (`REVIEW_RANK`); il controllo di sicurezza di un ramo finito passa a
-  qualunque priorità. Con i compiti spariscono spareggio e ordine per ruolo:
-  un feedback iniziato passa davanti a uno nuovo solo con un gradino di
-  priorità in più, e la priorità 3 passa sopra tutto.
+  dei figli, poi l'età. I rami in revisione non hanno più la precedenza
+  assoluta (#1451). Coi compiti (#1196) spariscono anche lo spareggio
+  provvisorio e l'ordine per ruolo (`REVIEW_RANK`): decide l'urgenza (§ 6.3),
+  quindi un feedback iniziato passa davanti a uno nuovo solo con un gradino di
+  priorità in più, e la priorità 3 passa sopra tutto. Il controllo di sicurezza
+  di un ramo finito non aspetta a nessuna priorità (#1451); gli altri lavori
+  aspettano solo chi li supera sia in priorità sia in urgenza (filo-security
+  `functions/src/routine/select.js`, `ordinaLavori`).
 
 ### 1.7 Dati
 
@@ -888,11 +886,10 @@ trigger ricalcola l'urgenza del suo compito aperto.
 - Ogni agente può lanciare sotto-agenti, fino a tre livelli sotto la sessione
   principale, e sceglierne il modello.
 
-Transizione: dal 12/10 il server manda modello e sforzo col biglietto (#1192)
-e li legge da `config/routines.roleModels` (la scelta per fase, scrivibile in
-Automazioni con #1193). Il gancio che li impone è #1189. Il server legge anche
-`model` ed `effort` sul feedback, per primo lavoro e correzione, ma nessuno li
-scrive: con i compiti quella lettura si toglie.
+Il server manda modello e sforzo col biglietto (#1192), presi dal compito
+(#1196), che per le fasi li prende da `config/routines.roleModels` (la scelta
+per fase, scrivibile in Automazioni con #1193). Il gancio che li impone è
+#1189. `model` ed `effort` sul feedback non li legge più nessuno.
 
 ### 6.5 Numerazione e dove si vedono
 
