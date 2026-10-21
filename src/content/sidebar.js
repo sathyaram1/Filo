@@ -727,21 +727,13 @@
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  // Etichetta breve (≤4 parole) per descrivere un'azione utente.
-  // Preferenza: testo dell'elemento → aria-label → tag.
+  // Etichetta breve (≤4 parole) per descrivere un'azione utente: va al modello, quindi passa da
+  // `nomeElemento`, che non legge mai il valore di un campo segreto (#810.7).
   function describeElementBriefly(el) {
     if (!el) return '';
-    const raw = (
-      el.getAttribute?.('aria-label')
-      || (el.innerText || el.textContent || '').trim()
-      || el.getAttribute?.('alt')
-      || el.getAttribute?.('placeholder')
-      || el.value
-      || el.tagName.toLowerCase()
-    ).replace(/\s+/g, ' ').trim();
+    const raw = (() => { try { return Extract?.nomeElemento?.(el) || ''; } catch (_) { return ''; } })();
     if (!raw) return el.tagName.toLowerCase();
-    const words = raw.split(' ');
-    return words.slice(0, 4).join(' ');
+    return raw.split(' ').slice(0, 4).join(' ');
   }
 
   // ---------- Parsing risposta AI ----------
@@ -1243,7 +1235,10 @@
   function resolveActionText(page) {
     const provided = String(page.text ?? page.testo ?? page.query ?? page.selection ?? '').trim();
     if (provided) return provided;
-    try { return (window.getSelection?.()?.toString() || '').trim(); } catch (_) { return ''; }
+    try {
+      if (Extract?.selezioneSegreta?.()) return '';
+      return (window.getSelection?.()?.toString() || '').trim();
+    } catch (_) { return ''; }
   }
 
   // Immagine bersaglio: per selettore, per src, altrimenti la più grande visibile.
@@ -1468,10 +1463,21 @@
     return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
   }
 
+  // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
+  // scatto, se la pagina scorre nel frattempo; quelli dei riquadri e dei componenti chiusi li misura il main, che
+  // con campi da coprire manda la foto piena: coperta prima di diventare leggera, il JPEG non sparge le cifre attorno.
+  // Se coprirli non riesce, l'immagine non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, leggera: true });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const prima = Extract.campiSegretiInVista();
+      const r = await chrome.runtime.sendMessage({
+        type: MSG.CAPTURE_VISIBLE_TAB, leggera: true, campiSegreti: true, campiNellaPagina: prima.length,
+      });
+      if (!r?.ok || !r.dataUrl) return null;
+      const campi = prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista());
+      if (!campi.length && !r.fattore) return r.dataUrl;
+      // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
+      return await Extract.fotoCoperta(r.dataUrl, campi, r);
     } catch (_) {}
     return null;
   }

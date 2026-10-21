@@ -1300,6 +1300,8 @@
     if (el.disabled || el.readOnly) return false;
     const t = (el.getAttribute('type') || 'text').toLowerCase();
     if (!['text', 'search', ''].includes(t)) return false;
+    // La correzione manda al modello la parola e tutto il campo: in una password resa visibile, no (#810.7).
+    if (Extract?.campoSegreto?.(el)) return false;
     // Rispetta la disabilitazione esplicita.
     const sc = el.getAttribute('spellcheck');
     if (sc === 'false') return false;
@@ -1953,6 +1955,7 @@
     const value = el.value || '';
     const selection = value.slice(start, end).trim();
     if (!selection) return null;
+    if (Extract.campoSegreto?.(el)) return { selection, sentence: selection, segreto: true };
     return { selection, sentence: value.trim() || selection };
   }
 
@@ -2475,6 +2478,7 @@
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
+      if (selInfo.segreto) return items;
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -2489,6 +2493,7 @@
     if (selInfo) {
       // Testo selezionato nella pagina (non editabile)
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      if (selInfo.segreto) return items;
       items.push({
         type: 'item',
         label: I18n.t('menu_search_text'),

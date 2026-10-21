@@ -96,6 +96,7 @@ require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
+require(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: il main li cerca anche nei riquadri
 require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
