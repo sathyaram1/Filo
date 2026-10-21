@@ -15,6 +15,9 @@ let saldo = 4321.5;
 let quota = 100;
 let grants = [];
 let tetto = 5;
+// #1353 — un server dei crediti lento (avvio a freddo) e quante letture del saldo gli arrivano.
+let ritardoMs = 0;
+let lettureSaldo = 0;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
