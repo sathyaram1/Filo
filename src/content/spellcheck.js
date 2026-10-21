@@ -1779,7 +1779,7 @@
   // ============================================================================
   // I segnaposti (#1448)
   // ============================================================================
-  // Il valore di un segnaposto da cercare, per segnaposto e frase: lo stesso segnaposto in un campo ripreso, o in un
+  // Il valore di un segnaposto da cercare, per segnaposto, frase e domanda: lo stesso segnaposto in un campo ripreso, o in un
   // testo tornato indietro, non ricerca. Una ricerca fallita non resta: «Cerca di nuovo» la rifà.
   const RICERCHE_MAX = 200;
   const ricerche = new Map();
