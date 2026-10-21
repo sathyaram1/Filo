@@ -42,7 +42,8 @@ const PESO_MANO = Number(arg('--peso-mano', 6));
 // perdeva le imitazioni con altre parole.
 const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
 const PESO_PAROLE = Number(arg('--peso-parole', 2));
-const SEME_PAROLE = Number(arg('--seme-parole', 1375));
+// Il seme che sceglie forme e suffissi: il modello scritto è quello di questo seme, sugli elenchi del 21/10/2026.
+const SEME_PAROLE = Number(arg('--seme-parole', 42));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
