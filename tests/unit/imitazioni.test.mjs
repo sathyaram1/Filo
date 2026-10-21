@@ -102,6 +102,26 @@ test('il marchio attaccato a una parola da truffa dà l’avviso, all’apertura
   assert.ok(senza.length / tutti.length < 0.04, `${senza.length}/${tutti.length} senza avviso: ${senza.slice(0, 20).join(', ')}`);
 });
 
+// Ogni forma che le regole di prima prendevano col nome intero del marchio resta presa: su un altro suffisso, come sito
+// di una piattaforma, davanti a un altro dominio, con un numero o «my». Suffissi e domini non tutti fra quelli addestrati.
+test('il nome intero di un marchio dove non è suo dà l’avviso, all’apertura e nel menu', () => {
+  const marchi = ['paypal', 'amazon', 'microsoft', 'google', 'apple', 'netflix', 'facebook', 'instagram', 'linkedin', 'ebay',
+    'yahoo', 'gmail', 'icloud', 'poste', 'unicredit', 'outlook', 'dropbox', 'binance', 'coinbase', 'intesasanpaolo'];
+  const forme = {
+    suffisso: (b) => ['xyz', 'top', 'shop', 'online', 'site', 'info', 'store', 'click', 'live', 'rest', 'bond'].map((t) => `${b}.${t}`),
+    piattaforma: (b) => ['wixsite.com', 'netlify.app', 'web.app', 'vercel.app', 'pages.dev', 'firebaseapp.com', 'herokuapp.com',
+      'weebly.com', 'blogspot.com', 'webflow.io', 'fly.dev'].map((p) => `${b}.${p}`),
+    davanti: (b) => [`${b}.com.secure-verify.net`, `${b}.com.account-check.top`, `login.${b}.com.verifica-utente.it`,
+      `www.${b}.it.sicurezza-conto.com`, `${b}.com.x7241.ru`, `${b}.net.area-clienti.info`],
+    numero: (b) => [`${b}24.com`, `${b}-2024.com`, `my${b}.com`, `${b}365.it`, `${b}2.net`],
+  };
+  for (const [nome, f] of Object.entries(forme)) {
+    const tutti = marchi.flatMap(f);
+    const senza = tutti.filter((h) => livello('https://' + h + '/') === 'safe' || !imitazioneNelMenu('https://' + h + '/'));
+    assert.ok(senza.length / tutti.length < 0.05, `${nome}: ${senza.length}/${tutti.length} senza avviso: ${senza.slice(0, 20).join(', ')}`);
+  }
+});
+
 test('un marchio corto caduto per caso in un nome generato (cloud, anteprime) non è un’imitazione', () => {
   const fissi = [
     'x1tuyb9bunqa2.esempio-ostile.com', 'xg2bukfvpsdh10.esempio-ostile.com', 'xr7in9n26zv16.esempio-ostile.com',
