@@ -2648,13 +2648,15 @@
     const isArchived = currentTab === 'archived';
     if (mgArchiveFilter) mgArchiveFilter.hidden = !isArchived;
 
-    // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
+    // Sottoinsieme della tab corrente, ordinato (logica pura condivisa). La fiducia si filtra dopo con la stessa
+    // funzione che conta le schede: la lista di prima serve al numero sul suo tasto.
+    let base;
     if (isArchived) {
       // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
       // Il filtro "Bloccati confermati" (solo attacchi/spam confermati) è dentro
       // listArchiveTab: la stessa funzione conta la scheda, così il numero non
       // può discostarsi dalla lista.
-      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
+      base = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
       mgListEmpty.textContent = confirmedOnly
         ? 'Nessun attacco o spam confermato.'
         : starredOnly
