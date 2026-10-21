@@ -11,6 +11,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadriInRitardo, apriConRiquadriInRitardo } from './helpers/riquadriInRitardo.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>sito</title></head>
 <body style="height:4000px"><h1>un sito qualunque</h1><p>testo</p></body></html>`;
