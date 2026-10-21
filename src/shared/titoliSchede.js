@@ -410,18 +410,24 @@
       if (letture.some((l) => e.re.test(l))) return fuori(e.famiglia, true);
     }
     const citate = letture.map(senzaCitazioni).filter(Boolean);
+    let pezzo = '';
     for (const e of c.espressioni) {
       if (e.forte) continue;
-      if (citate.some((l) => e.re.test(l))) { trovata = e.famiglia; break; }
+      for (const l of citate) {
+        const m = e.re.exec(l);
+        if (m) { trovata = e.famiglia; pezzo = frase(l, m.index, m[0].length); break; }
+      }
+      if (trovata) break;
     }
-    if (!trovata && attaccate.length && c.ricomposte.some((re) => attaccate.some((p) => re.test(p)))) trovata = 'rivolto';
+    // Lettere spaziate non le scrive nessuna notizia.
+    if (!trovata && attaccate.length && c.ricomposte.some((re) => attaccate.some((p) => re.test(p)))) return fuori('rivolto', true);
     if (!trovata) {
       const citata = c.espressioni.find((e) => !e.forte && letture.some((l) => e.re.test(l)));
       return citata ? fuori(citata.famiglia, false) : esito;
     }
     // Un indirizzo lo sceglie chi attacca: «attacker@…» o «example.com» non fanno del titolo una notizia.
-    const senzaIndirizzi = letture.map((l) => l.replace(INDIRIZZI, ' '));
-    return fuori(trovata, !c.innocui.some((re) => senzaIndirizzi.some((l) => re.test(l))));
+    const senzaIndirizzi = pezzo.replace(INDIRIZZI, ' ');
+    return fuori(trovata, !c.innocui.some((re) => re.test(senzaIndirizzi)));
   }
 
   // La lingua del titolo, a occhio, per i titoli condivisi: le parole più frequenti di ciascuna.
