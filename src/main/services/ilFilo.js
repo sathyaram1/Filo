@@ -361,11 +361,15 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   // Ogni pagina aperta in una scheda: dalla finestra incognito resta nel filo in memoria, mai su disco.
+  // Indirizzo e titolo li sceglie il sito: oltre la misura si tagliano, e la visita lo segna.
   function registraVisita({ url, titolo, scheda, ts } = {}, opts) {
     if (!url) return Promise.resolve(null);
+    const u = taglia(url, MISURA.url);
+    const tt = taglia(titolo || '', MISURA.titolo);
     return transazione(async (t) => {
       const ev = t.evento(E().TIPI.NAVIGAZIONE, {
-        url: String(url), titolo: String(titolo || ''), scheda: scheda == null ? undefined : scheda,
+        url: u.testo, titolo: tt.testo, scheda: scheda == null ? undefined : scheda,
+        urlTagliato: u.tagliato || undefined, titoloTagliato: tt.tagliato || undefined,
       }, { autore: 'utente', ts });
       await t.scrivi([ev]);
       return ev;
@@ -373,10 +377,11 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   // Il titolo che la pagina si dà dopo (un'app web, «Caricamento…» che diventa il nome vero) è un evento in coda.
-  function aggiornaTitolo({ visita, titolo } = {}, opts) {
-    if (!visita || typeof titolo !== 'string' || !titolo) return Promise.resolve(null);
+  function aggiornaTitolo({ visita, titolo: intero } = {}, opts) {
+    if (!visita || typeof intero !== 'string' || !intero) return Promise.resolve(null);
+    const { testo: titolo, tagliato } = taglia(intero, MISURA.titolo);
     return transazione(async (t) => {
-      const ev = t.evento(E().TIPI.TITOLO_PAGINA, { visita: String(visita), titolo }, { autore: 'utente' });
+      const ev = t.evento(E().TIPI.TITOLO_PAGINA, { visita: String(visita), titolo, titoloTagliato: tagliato || undefined }, { autore: 'utente' });
       const { scritti } = await t.scrivi([ev]);
       return scritti.length ? ev : null;
     }, opts);
