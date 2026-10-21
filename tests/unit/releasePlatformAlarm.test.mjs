@@ -135,7 +135,7 @@ describe('le release, lette da GitHub', () => {
     const fetchImpl = async (url, opz) => { chieste.push({ url, opz }); return risposta(pagine[chieste.length - 1] || []); };
     const r = await leggiRilasci({ repo: 'o/Filo', token: 'tok', api: 'https://api.x/', fetchImpl, log: zitto });
     assert.equal(r.length, 101);
-    assert.deepEqual(r[100], { tag: 'v0.2.0', bozza: true, anteprima: false, allegati: ['a', 'b'] });
+    assert.deepEqual(r[100], { tag: 'v0.2.0', bozza: true, anteprima: false, allegati: ['a', 'b'], impronte: {} });
     assert.equal(chieste.length, 2);
     assert.match(chieste[0].url, /^https:\/\/api\.x\/repos\/o\/Filo\/releases\?per_page=100&page=1$/);
     assert.match(chieste[1].url, /page=2$/);
