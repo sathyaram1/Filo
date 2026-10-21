@@ -442,6 +442,8 @@
         isKnown: makeKnownCheck(getRegistry),
         avvisoDi: typeof o.avvisoDi === 'function' ? (ref) => o.avvisoDi(action, ref) : null,
         costoDi: typeof o.costoDi === 'function' ? (ref) => o.costoDi(action, ref) : null,
+        // Una pagina con due liste di soprannomi (Gestione) dice quale è la sua.
+        readOptions: typeof o.readOptions === 'function' ? o.readOptions : null,
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);
