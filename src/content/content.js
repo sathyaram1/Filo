@@ -2389,9 +2389,11 @@
   }
 
   // «Valuta» (#1449): il campo di testo sotto il tasto destro, se c'è qualcosa da valutare. Mai una password né un pezzo
-  // di Filo, e solo nel frame principale: l'Aiuto vive lì, e il ponte fra i riquadri non porta testo.
+  // di Filo. L'Aiuto vive nella pagina: un riquadro dello stesso sito (gli editor dei CMS) le passa il campo, che lei
+  // legge e corregge da sé; in quello di un altro sito la pagina non arriva, e la voce non c'è.
   function campoDaValutare(target) {
-    if (IS_SUBFRAME || !target || !aiutoAcceso() || !Sidebar?.valuta || !SpellCheck?.testoDelCampo) return null;
+    if (!target || !aiutoAcceso() || !SpellCheck?.testoDelCampo) return null;
+    if (IS_SUBFRAME ? !paginaArrivaQui() : !Sidebar?.valuta) return null;
     if (self.SN_FILO_UI?.inside?.(target)) return null;
     let campo = target.closest?.('input, textarea') || null;
     if (campo) {
