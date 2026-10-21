@@ -1195,20 +1195,21 @@
     return best;
   }
 
-  // Link bersaglio: per selettore (anche su un figlio del link), per URL.
+  // Link bersaglio: per selettore (anche su un figlio del link), per URL. Collegamento e indirizzo come li vede il menu.
   function resolveLinkEl(page) {
+    const { SELETTORE_COLLEGAMENTO: LINK, indirizzoDelLink: indirizzo } = global.SN_ACTIONS;
     const sel = String(page.selector ?? page.css ?? '').trim();
     if (sel) {
       try {
         const el = document.querySelector(sel);
-        const a = el && (el.tagName === 'A' ? el : (el.closest?.('a[href]') || el.querySelector?.('a[href]')));
-        if (a && a.href) return a;
+        const a = el && (el.closest?.(LINK) || el.querySelector?.(LINK));
+        if (a && indirizzo(a)) return a;
       } catch (_) {}
     }
     const wanted = String(page.url ?? page.href ?? '').trim();
     if (wanted) {
-      const links = Array.from(document.querySelectorAll('a[href]'));
-      const hit = links.find((a) => a.href === wanted) || links.find((a) => a.href.includes(wanted));
+      const links = Array.from(document.querySelectorAll(LINK));
+      const hit = links.find((a) => indirizzo(a) === wanted) || links.find((a) => indirizzo(a).includes(wanted));
       if (hit) return hit;
     }
     return null;
@@ -1259,7 +1260,7 @@
         let detail = '';
         if (spec.target === 'text') detail = text;
         else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
-        else if (linkEl) detail = linkEl.href || '';
+        else if (linkEl) detail = Actions.indirizzoDelLink(linkEl);
         const perche = d && d.perche ? `\n\n${d.perche}` : '';
         const parti = [...(detail ? [`${label}:`, { citazione: detail, nuda: spec.target !== 'text' }] : [label]), ...(perche ? [perche] : [])];
         const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}`, parti };
@@ -1288,10 +1289,10 @@
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
           // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
-          const url = (linkEl && linkEl.href) || String(page.url ?? page.href ?? '').trim();
+          const url = Actions.indirizzoDelLink(linkEl) || String(page.url ?? page.href ?? '').trim();
           return await runFiloAction({ type: 'NAVIGA', url });
         }
-        case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
+        case 'copy_link': Actions?.copyUrlToClipboard(Actions.indirizzoDelLink(linkEl)); break;
         case 'save_link': await Actions?.saveLink(linkEl); break;
         case 'save_page': {
           if (!(await Actions?.savePage())) { appendActionLog(`${label}: non riuscita`); return false; }

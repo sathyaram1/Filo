@@ -136,6 +136,13 @@ test('il tasto destro su un link chiede da solo titolo e descrizione al sito e s
   legame(daSolo, privacy, 'Quando fai tasto destro su un link, Filo chiede subito a quel sito', 'il sito del link contattato al tasto destro');
   legame(false, privacy, 'Quando chiedi cos\'è un link', 'il sito del link contattato solo a richiesta');
   legame(/EXPLAIN_LINK/.test(azioni), privacy, '**I link.** Quando fai tasto destro su un link', 'il link spiegato da un modello');
+  // #1307 — la visita parte solo per i link puliti: l'avviso e la lista dei bloccati la fermano, anche a metà dei rinvii.
+  const misc = leggi('src', 'main', 'services', 'handlers', 'misc.js');
+  const ferma = /function anteprimaFerma\(url\) \{[^}]*shouldBlockNavigation\(url\)[\s\S]{0,200}SN_LINK_SOSPETTO\.analizza\(url\)\.length/.test(misc)
+    && /const ferma = anteprimaFerma\(url\);/.test(misc) && /redirectAmmesso: \(_da, prossimo\) => !\(rinvio = anteprimaFerma\(prossimo\.href\)\)/.test(misc);
+  legame(ferma, privacy, 'Non lo fa se Filo ti avvisa che il link è sospetto', 'niente visita ai link sospetti');
+  legame(ferma, privacy, 'Non lo fa se il sito, o uno a cui il link rimanda, è fra quelli che Filo blocca', 'niente visita ai siti bloccati');
+  legame(!/if \(!flags\.includes\('side_effect'\)\)/.test(azioni) && ferma, privacy, 'Se il sito è fra quelli che Filo blocca, al modello non va niente', 'il sito bloccato non va al modello');
 });
 
 test('il lavoro sui feedback va sul repository pubblico mentre si fa, e i due documenti lo dicono', () => {
