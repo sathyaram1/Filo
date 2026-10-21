@@ -2,7 +2,9 @@
 // giusta per la causa: rete assente, sessione chiusa, fix tornato in
 // lavorazione. Prima la pagina riceveva il messaggio grezzo (o niente) e il
 // conteggio tornava indietro senza spiegazioni. Stesso harness di
-// boardReopenRace.test.mjs: handler registrato con `on`/`ctx` finti.
+// boardReopenRace.test.mjs: handler registrato con `on`/`ctx` finti. Dal #1076
+// vota e riapre chi ha un portafoglio, con l'identità dell'installazione, e la
+// riapertura la fa il server.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,14 +28,20 @@ let tokenGuasto; // null | Error lanciato dal rinnovo del token
 auth.isSignedIn = () => signedIn;
 auth.getIdToken = async () => { if (tokenGuasto) throw tokenGuasto; return signedIn ? 'tok' : null; };
 auth.getUid = async () => (signedIn ? 'uid-1' : null);
+let owner;
+auth.isAdmin = () => owner;
+const identita = require(join(__dirname, '..', '..', 'src', 'main', 'auth', 'anon-auth.js'));
+identita.getIdToken = async () => { if (tokenGuasto) throw tokenGuasto; return 'tok-installazione'; };
+identita.getUid = async () => 'uid-installazione';
 
 let scheda;       // la scheda pubblica come la vede il server (null = tolta)
 let schedaGuasto; // Error lanciato dalla lettura della scheda
 let votoGuasto;   // Error lanciato dalla scrittura del voto
-let spese;
+let spese; // chiamate al server per riaprire
 
 beforeEach(() => {
   signedIn = true;
+  owner = false;
   tokenGuasto = null;
   scheda = { _id: 'fb-1', seq: 7, status: 'done', votes: {} };
   schedaGuasto = null;
@@ -42,9 +50,12 @@ beforeEach(() => {
 });
 
 globalThis.SN_CREDITS = {
-  spendIfAffordable: async () => { spese += 1; return { ok: true, balance: 80 }; },
-  award: async () => ({ balance: 100 }),
   awardVoteOnce: async () => ({ awarded: false, credits: 0, balance: 100 }),
+};
+globalThis.SN_WALLET_MAIN = {
+  haPortafoglio: () => true,
+  // Come la callable vera: il token dell'installazione si chiede lì dentro.
+  chiama: async () => { if (tokenGuasto) throw tokenGuasto; spese += 1; return { ok: true, feedbackId: 'fb-figlio', num: '#8', cost: 5, balance: 80 }; },
 };
 globalThis.SN_FEEDBACK = {
   castVote: async () => { if (votoGuasto) throw votoGuasto; return {}; },
@@ -98,11 +109,17 @@ test('rinnovo rifiutato (sessione chiusa dal server): sessione scaduta', async (
   assert.equal(r.code, 'auth');
 });
 
-test('token rifiutato dal database (401): sessione scaduta', async () => {
+test('token rifiutato dal database (401): per l\'owner è la sessione, per l\'installazione no', async () => {
   votoGuasto = new Error('firestore castVote fallito (401): UNAUTHENTICATED');
+  owner = true;
   const r = await vota();
   assert.equal(r.code, 'auth');
   assert.match(r.error, /accesso/);
+  // Rifare l'accesso Google non cambia il token dell'installazione: niente invito a rifarlo.
+  owner = false;
+  const r2 = await vota();
+  assert.notEqual(r2.code, 'auth');
+  assert.match(r2.error, /voto non è stato registrato/i);
 });
 
 test('voto su un fix tornato in lavorazione: lo dice, per il voto e per il ritiro', async () => {
@@ -116,11 +133,16 @@ test('voto su un fix tornato in lavorazione: lo dice, per il voto e per il ritir
 
 test('un 403 su una scheda ancora in bacheca non viene spacciato per «tornato in lavorazione»', async () => {
   votoGuasto = new Error('firestore castVote fallito (403): PERMISSION_DENIED');
+  // Le regole rifiutano chi vota: col portafoglio che il server non riconosce, lo si dice (#1076).
   const r = await vota();
   assert.equal(r.ok, false);
-  assert.notEqual(r.code, 'gone');
-  assert.match(r.error, /voto non è stato registrato/i);
+  assert.equal(r.code, 'portafoglio');
+  assert.match(r.error, /non risulta attivo/);
   assert.doesNotMatch(r.error, /firestore/);
+  owner = true;
+  const r2 = await vota();
+  assert.notEqual(r2.code, 'gone');
+  assert.match(r2.error, /voto non è stato registrato/i);
 });
 
 test('riapertura senza rete sulla verifica: frase sulla connessione, niente crediti spesi', async () => {
@@ -142,9 +164,10 @@ test('riapertura di un fix che non è più in bacheca: tornato in lavorazione, n
   assert.equal(spese, 0);
 });
 
-test('riapertura riuscita: torna il saldo, che la pagina mostra nella conferma', async () => {
+test('riapertura riuscita: torna la spesa e il saldo, che la pagina mostra nella conferma', async () => {
   const r = await riapri();
   assert.equal(r.ok, true);
+  assert.equal(r.cost, 5);
   assert.equal(r.balance, 80);
 });
 

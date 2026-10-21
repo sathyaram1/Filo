@@ -104,7 +104,6 @@ const COLLEZIONI = {
 };
 const CAMPI_PUBBLICI_SCRITTI = {
   'feedback-public.votes': { frase: 'Pubblici sono anche i voti' },
-  'feedback-public.reopenRequests': { frase: 'o chiedi di riaprirla' },
   'feedback-public.vote': { frase: 'con il voto e l\'ora' },
   'feedback-public.at': { frase: 'con il voto e l\'ora' },
   'feedback-public.credibilitySnapshot': { perche: 'un numero uguale per tutti i voti' },

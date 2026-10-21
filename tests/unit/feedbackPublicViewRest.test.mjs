@@ -226,23 +226,23 @@ test('un contatore che manca rinasce sul numero più alto in uso, chiesto al ser
   });
 });
 
-// ── Il travaso dei voti passa davvero per la rete ───────────────────────────
+// ── Voti e riaperture non li scrive mai il publisher (#1076) ────────────────
 
-test('la scheda che porta i voti storici li scrive, e la maschera li include', async () => {
+test('anche se l\'oggetto li porta, la ripubblicazione non scrive voti né riaperture', async () => {
   const card = {
     name: 'Fix', seq: 1, subSeq: 0, status: 'done', statusPublic: 'closed',
     resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdTag: 'c',
     userNote: 'u',
-    votes: { 'uid-a': { vote: 'works', at: 'x', credibilitySnapshot: 1 } },
+    votes: { 'uid-a': { vote: 'works', at: 'x', credibilitySnapshot: 1e9 } },
     reopenRequests: { 'uid-b': { at: 'y' } },
   };
   await withFetch(() => okJson({}), async (calls) => {
     await FB.publishPublicCard('fb-1', card, { idToken: 'tok' });
     const call = calls[0];
-    assert.match(call.url, /updateMask\.fieldPaths=votes/);
-    assert.match(call.url, /updateMask\.fieldPaths=reopenRequests/);
-    assert.ok(call.body.fields.votes, 'i voti devono arrivare nel documento');
-    assert.ok(call.body.fields.reopenRequests);
+    assert.ok(!/updateMask\.fieldPaths=votes/.test(call.url));
+    assert.ok(!/updateMask\.fieldPaths=reopenRequests/.test(call.url));
+    assert.ok(!('votes' in call.body.fields));
+    assert.ok(!('reopenRequests' in call.body.fields));
   });
 });
 

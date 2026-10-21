@@ -1,21 +1,15 @@
-// Unit test dell'handler BOARD_REOPEN (src/main/services/handlers/board.js) di
-// fronte a una RETE INSTABILE fra le due scritture Firestore della riapertura a
-// pagamento (feedback #269).
+// Unit test degli handler della bacheca (src/main/services/handlers/board.js): «Ancora rotto?» e il voto.
 //
-// Stesso harness di decksImportExportHandler.test.mjs: si registra l'handler con
-// `on`/`ctx` finti, si stubbano SN_CREDITS / SN_FEEDBACK / SN_MANAGE_REVIEW e la
-// sessione Google (google-auth) — niente rete, niente Electron.
+// #1076 — un utente qualunque non scrive più `reopenRequests`: la riapertura la fa il server (callable
+// `bachecaRiapri`), che scala i crediti del portafoglio, crea il feedback collegato e segna la scheda in una
+// transazione. Qui si prova cosa fa il main: senza portafoglio non parte niente; col portafoglio chiama il server con
+// l'identità dell'installazione e dice con la frase giusta i suoi rifiuti. Il voto usa la stessa identità.
 //
-// L'handler fa DUE scritture REST separate e non atomiche: (A) marca il guard
-// anti-doppia-riapertura sull'originale (reopenRequests.<uid>) e (B) crea il
-// feedback figlio collegato. Il bug: se (B) veniva PRIMA di (A) e la rete cadeva
-// fra le due, restava un feedback figlio orfano col guard MAI marcato → l'utente
-// poteva ripetere all'infinito creando duplicati gratis (crediti sempre
-// rimborsati), bypassando l'anti-spam. Il fix marca il guard PER PRIMO.
+// L'owner riapre ancora da sé, con la sua credenziale e senza spesa: per lui restano le prove di #269 e #602 (il
+// segnale scritto per primo, e tolto se la creazione non va, senza mai un figlio doppione).
 //
-// Asserzioni di COMPORTAMENTO (non "non crasha"): con la scrittura del guard che
-// fallisce ripetutamente NON deve mai nascere un feedback figlio; e una volta
-// che il guard è marcato, ogni ritentativo è bloccato → mai piu di un figlio.
+// Harness: `on`/`ctx` finti, SN_FEEDBACK / SN_MANAGE_REVIEW / SN_WALLET_MAIN finti, google-auth e anon-auth
+// patchati (board.js tiene gli stessi oggetti). Niente rete, niente Electron.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,214 +22,248 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'wallet.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'chatErrors.js'));
 
 const { MSG } = globalThis.SN_MSG;
-const { SN_CONST } = globalThis;
 
-// Sessione Google finta: patchiamo il singleton google-auth (board.js tiene un
-// riferimento allo STESSO oggetto, quindi mutarne i metodi basta).
-const auth = require(join(__dirname, '..', '..', 'src', 'main', 'auth', 'google-auth.js'));
-auth.isSignedIn = () => true;
-auth.getUid = async () => UID;
-auth.getIdToken = async () => 'fake-id-token';
-const UID = 'user-abc';
+const UID_GOOGLE = 'google-abc';
+const UID_INSTALLAZIONE = 'installazione-xyz';
 const ORIGINAL_ID = 'fb-original';
 
-// "Server" Firestore in-memory: lo stato che le due scritture toccano e che
-// fetchFeedback (via global fetch) rilegge per il gate d'idoneità.
+const auth = require(join(__dirname, '..', '..', 'src', 'main', 'auth', 'google-auth.js'));
+let owner = false;
+auth.isSignedIn = () => true;
+auth.isAdmin = () => owner;
+auth.getUid = async () => UID_GOOGLE;
+auth.getIdToken = async () => 'token-google';
+const identita = require(join(__dirname, '..', '..', 'src', 'main', 'auth', 'anon-auth.js'));
+identita.getIdToken = async () => 'token-installazione';
+identita.getUid = async () => UID_INSTALLAZIONE;
+
 let server;
-let failGuard;  // castReopenRequest (scrittura A) fallisce come rete instabile
-let failSubmit; // submit (scrittura B) fallisce come rete instabile
-let refunds;    // crediti rimborsati (compensazione best-effort)
-let spends;     // quante volte l'handler ha davvero scalato crediti
+let failGuard;
+let failSubmit;
+let portafoglio;
+let chiamate;
+let rispostaServer;
+let voti;
+let premi;
 
 beforeEach(() => {
   server = { reopenRequests: {}, feedbacks: [] };
   failGuard = false;
   failSubmit = false;
-  refunds = [];
-  spends = [];
+  owner = false;
+  portafoglio = true;
+  chiamate = [];
+  rispostaServer = async () => ({ ok: true, feedbackId: 'fb-figlio', num: '#201', cost: 5, balance: 4995 });
+  voti = [];
+  premi = [];
 });
 
 globalThis.SN_CREDITS = {
-  spendIfAffordable: async (amount, meta) => {
-    spends.push({ amount, meta });
-    return { ok: true, balance: 100 - amount };
-  },
-  award: async (entry) => { refunds.push(entry); return { balance: 100 }; },
+  awardVoteOnce: async (id, amount) => { premi.push({ id, amount }); return { awarded: true, credits: amount, balance: amount }; },
+  spendIfAffordable: async () => { throw new Error('il conteggio locale non paga più le riaperture'); },
+};
+
+globalThis.SN_WALLET_MAIN = {
+  haPortafoglio: () => portafoglio,
+  chiama: async (name, data) => { chiamate.push({ name, data }); return rispostaServer(name, data); },
 };
 
 let seq = 0;
 globalThis.SN_FEEDBACK = {
-  // Scrittura A: marca il guard sull'originale.
   castReopenRequest: async (id, uid) => {
     if (failGuard) throw new Error('firestore castReopenRequest fallito (503): network hiccup');
     server.reopenRequests[uid] = { at: new Date().toISOString() };
     return server.reopenRequests[uid];
   },
-  // Scrittura B: crea il feedback figlio collegato. Come il server vero
-  // (#370), un id d'invio gia' visto NON crea un secondo documento: torna
-  // quello di prima.
+  // Come il server vero (#370): un id d'invio già visto non crea un secondo documento.
   submit: async (fb) => {
     if (failSubmit === 'dopo-aver-scritto') {
-      // Il caso cattivo: il documento nasce, la risposta si perde per strada.
       server.feedbacks.push({ id: `fb-child-${++seq}`, ...fb });
       throw new Error('firestore submit fallito (503): risposta persa');
     }
     if (failSubmit) throw new Error('firestore submit fallito (503): network hiccup');
-    const gia = fb.submissionId
-      && server.feedbacks.find((f) => f.submissionId === fb.submissionId);
+    const gia = fb.submissionId && server.feedbacks.find((f) => f.submissionId === fb.submissionId);
     if (gia) return { id: gia.id, deduped: true };
     const id = `fb-child-${++seq}`;
     server.feedbacks.push({ id, ...fb });
     return { id };
   },
-  // Toglie la propria richiesta di riapertura: l'handler la usa per rimettere
-  // la porta com'era quando la creazione non e' andata in porto.
   clearReopenRequest: async (id, uid) => { delete server.reopenRequests[uid]; return true; },
-  // #583: l'idoneità si legge dalla SCHEDA PUBBLICA del fix — il documento
-  // feedback, da quando la collezione non è più pubblica, questa macchina non
-  // lo può nemmeno aprire. Copia viva del guard: se una scrittura precedente
-  // l'ha marcato, il gate d'idoneità (canReopen) deve vederlo.
-  getPublic: async () => ({
-    _id: ORIGINAL_ID,
-    seq: 42,
-    status: 'done',
-    reopenRequests: { ...server.reopenRequests },
-  }),
-  // Plumbing letto da fetchVotes dentro board.js.
+  getPublic: async () => ({ _id: ORIGINAL_ID, seq: 42, status: 'done', name: 'Condividi', reopenRequests: { ...server.reopenRequests } }),
+  castVote: async (id, entry, opts) => { voti.push({ id, entry, opts }); return entry; },
+  clearVote: async (id, uid, opts) => { voti.push({ id, uid, opts, via: true }); return true; },
   rest: { FIRESTORE_BASE: 'https://example.invalid/v1', API_KEY: 'k', VIEW_COLLECTION: 'feedback-public' },
   fsDocToObject: (doc) => doc,
 };
 
-// fetchVotes fa `fetch(...)` e mappa via fsDocToObject.
-globalThis.fetch = async () => ({
-  ok: true,
-  json: async () => ({ votes: {} }),
-});
+globalThis.fetch = async () => ({ ok: true, json: async () => ({ votes: {} }) });
 
-// SN_MANAGE_REVIEW: qui interessa SOLO il guard anti-doppia-riapertura, non le
-// regole di visibilità della board (coperte da manageReview.test.mjs). canReopen
-// consulta lo stesso reopenRequests che la scrittura A marca.
 globalThis.SN_MANAGE_REVIEW = {
-  hasReopenRequest: (fb) => {
-    const r = fb && fb.reopenRequests;
-    return !!(r && typeof r === 'object' && Object.keys(r).length > 0);
-  },
-  canReopen: (fb) => {
-    const r = fb && fb.reopenRequests;
-    return !(r && typeof r === 'object' && Object.keys(r).length > 0);
-  },
+  hasReopenRequest: (fb) => Object.keys((fb && fb.reopenRequests) || {}).length > 0,
+  canReopen: (fb) => Object.keys((fb && fb.reopenRequests) || {}).length === 0,
 };
 
-// Registra l'handler.
 const registerBoard = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers', 'board.js'));
 const handlers = new Map();
-registerBoard((type, fn) => handlers.set(type, fn), { MSG });
-// #583: l'handler guarda anche DA DOVE arriva la richiesta. La bacheca è una
-// pagina di Filo, e questi test sono la bacheca.
+registerBoard((type, fn) => handlers.set(type, fn), { MSG, broadcastToFiloPages: () => {} });
 const BACHECA = 'filo://board/board.html';
 const reopen = (msg, origin = BACHECA) => handlers.get(MSG.BOARD_REOPEN)(msg, null, origin);
+const vota = (msg, origin = BACHECA) => handlers.get(MSG.BOARD_CAST_VOTE)(msg, null, origin);
+const identitaBacheca = () => handlers.get(MSG.BOARD_IDENTITA)({}, null, BACHECA);
 
 const msgFor = () => ({ type: MSG.BOARD_REOPEN, id: ORIGINAL_ID, text: 'Ancora rotto, ho riprovato e si spacca uguale.' });
 
-test('happy path: guard marcato e UN feedback figlio creato, crediti scalati una volta', async () => {
+// ── Un utente: la riapertura la fa il server ───────────────────────────────
+
+test('col portafoglio la riapertura passa dal server, che dice spesa e saldo; il client non scrive il segnale', async () => {
   const r = await reopen(msgFor());
-  assert.equal(r.ok, true);
-  assert.equal(server.feedbacks.length, 1, 'esattamente un feedback figlio');
-  assert.ok(server.reopenRequests[UID], 'il guard è marcato sull\'originale');
-  assert.equal(spends.length, 1, 'crediti scalati una sola volta');
-  assert.equal(refunds.length, 0, 'nessun rimborso nel percorso riuscito');
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(chiamate, [{ name: 'bachecaRiapri', data: { id: ORIGINAL_ID, text: msgFor().text } }]);
+  assert.equal(r.feedbackId, 'fb-figlio');
+  assert.equal(r.cost, 5);
+  assert.equal(r.balance, 4995);
+  assert.deepEqual(server.reopenRequests, {}, 'reopenRequests non lo scrive il client');
+  assert.equal(server.feedbacks.length, 0, 'il feedback collegato lo crea il server');
 });
 
-test('rete instabile sul guard, ripetuta: MAI un feedback figlio orfano, MAI duplicati', async () => {
-  // Riproduce #269: la scrittura del guard cade "nello stesso punto" ad ogni
-  // tentativo. Prima del fix (feedback creato PRIMA del guard) ogni tentativo
-  // creava un nuovo figlio duplicato col guard mai marcato. Col guard PRIMA,
-  // il fallimento avviene prima di creare qualsiasi feedback.
-  failGuard = true;
-
-  const r1 = await reopen(msgFor());
-  assert.equal(r1.ok, false, 'primo tentativo fallisce (rete)');
-
-  const r2 = await reopen(msgFor());
-  assert.equal(r2.ok, false, 'secondo tentativo fallisce (rete)');
-
-  const r3 = await reopen(msgFor());
-  assert.equal(r3.ok, false, 'terzo tentativo fallisce (rete)');
-
-  // Il cuore del bug: nessun feedback figlio deve esistere. Prima del fix qui
-  // ce ne sarebbero TRE.
-  assert.equal(server.feedbacks.length, 0, 'nessun feedback figlio duplicato creato');
-  // Crediti scalati ad ogni tentativo ma sempre rimborsati: saldo netto zero.
-  assert.equal(refunds.length, spends.length, 'ogni addebito è stato rimborsato');
-  assert.ok(refunds.length >= 1, 'la compensazione crediti è scattata');
+test('senza portafoglio niente parte: la frase dice cosa serve', async () => {
+  portafoglio = false;
+  const r = await reopen(msgFor());
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'portafoglio');
+  assert.match(r.error, /crediti di Filo/);
+  assert.equal(chiamate.length, 0);
+  // Anche a testo vuoto la risposta è quella: è la prima cosa che manca.
+  assert.equal((await reopen({ ...msgFor(), text: '' })).code, 'portafoglio');
 });
 
-// #602, giro 2 — LA SPIEGAZIONE DI CHI RIAPRE NON SI PERDE.
-//
-// Il guard si scrive per primo (sopra, #269) e questo resta giusto: senza, una
-// rete che cade fra le due scritture lasciava figli orfani e duplicati gratis.
-// Ma quando e' la CREAZIONE a fallire, di duplicati non ce n'e' nessuno da
-// temere: c'e' solo chi ha appena scritto cosa non funziona ancora e si sente
-// rispondere che il fix e' «gia' stato segnalato». I crediti tornavano, la
-// spiegazione no, e non c'era modo di rimandarla.
-//
-// Adesso il guard torna indietro insieme ai crediti, e l'id d'invio stabile
-// tiene chiusa la porta ai duplicati anche se il primo tentativo era in realta'
-// arrivato. Senza il fix il primo di questi due test e' rosso.
-test('creazione fallita: il segnale torna indietro e si puo\' riprovare — il figlio resta UNO', async () => {
-  failSubmit = true;
-
-  const r1 = await reopen(msgFor());
-  assert.equal(r1.ok, false, 'la creazione del feedback fallisce');
-  assert.equal(server.feedbacks.length, 0, 'nessun feedback figlio creato');
-  assert.equal(refunds.length, 1, 'crediti rimborsati dopo il fallimento');
-  assert.deepEqual(server.reopenRequests, {},
-    'e il segnale torna indietro: chi ha scritto puo\' rimandare la sua spiegazione');
-
-  // Ritentativo con la rete tornata: adesso passa, e nasce UN figlio solo.
-  failSubmit = false;
-  const r2 = await reopen(msgFor());
-  assert.equal(r2.ok, true, 'il ritentativo va a buon fine');
-  assert.equal(server.feedbacks.length, 1, 'un solo feedback figlio');
-  assert.ok(server.reopenRequests[UID], 'e ora il guard e\' marcato');
-
-  // Da qui in poi il guard fa il suo mestiere: niente secondo figlio.
-  const r3 = await reopen(msgFor());
-  assert.equal(r3.ok, false, 'un terzo tentativo e\' respinto dal guard');
-  assert.equal(server.feedbacks.length, 1, 'ancora un solo feedback figlio');
+test('i rifiuti del server diventano la frase giusta, coi numeri', async () => {
+  const casi = [
+    [{ ok: false, reason: 'insufficient', cost: 5, balance: 3.5 }, (r) => assert.match(r.error, /Servono 5 crediti.*saldo: 3,5/)],
+    [{ ok: false, reason: 'already_reopened' }, (r) => assert.equal(r.code, 'gone')],
+    [{ ok: false, reason: 'not_on_board' }, (r) => assert.equal(r.code, 'gone')],
+    [{ ok: false, reason: 'no_wallet' }, (r) => assert.equal(r.code, 'portafoglio')],
+    [{ ok: false, reason: 'disabled' }, (r) => assert.equal(r.code, 'portafoglio')],
+    [{ ok: false, reason: 'text_too_long', max: 10000 }, (r) => assert.match(r.error, /10000/)],
+    [{ ok: false, reason: 'rate_limited' }, (r) => assert.match(r.error, /riprova fra un minuto/)],
+    [{ ok: false, reason: 'server_error' }, (r) => assert.match(r.error, /non è partita/)],
+  ];
+  for (const [risposta, controlla] of casi) {
+    rispostaServer = async () => risposta;
+    const r = await reopen(msgFor());
+    assert.equal(r.ok, false, JSON.stringify(risposta));
+    controlla(r);
+  }
 });
 
-test('la creazione era riuscita ma la risposta si e\' persa: il ritentativo non crea un doppione', async () => {
-  // Il caso che il guard-per-primo proteggeva: il documento e' nato, il
-  // chiamante ha visto un errore. Il segnale torna indietro, quindi si puo'
-  // riprovare — e il ritentativo NON deve creare un secondo figlio.
-  failSubmit = 'dopo-aver-scritto';
-
-  const r1 = await reopen(msgFor());
-  assert.equal(r1.ok, false, 'chi ha riaperto vede un errore');
-  assert.equal(server.feedbacks.length, 1, 'ma il documento era nato');
-  assert.deepEqual(server.reopenRequests, {}, 'il segnale e\' tornato indietro');
-
-  failSubmit = false;
-  const r2 = await reopen(msgFor());
-  assert.equal(r2.ok, true);
-  assert.equal(server.feedbacks.length, 1,
-    'il ritentativo riconosce l\'invio gia\' fatto: nessun doppione');
-  assert.ok(server.reopenRequests[UID], 'e il guard resta marcato');
+test('server irraggiungibile: si dice che manca la rete, e il gesto si può rifare', async () => {
+  rispostaServer = async () => { throw new TypeError('fetch failed'); };
+  const r = await reopen(msgFor());
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'offline');
 });
 
-// #583 — la stessa riapertura chiesta da una pagina di un SITO VISITATO.
-// Senza il confine d'origine bastava una sessione aperta: il sito spendeva i
-// crediti di chi sta usando Filo e gli apriva a suo nome una segnalazione col
-// testo che voleva. Il rifiuto arriva prima di toccare qualunque cosa, e porta
-// il motivo in una parola.
-test('da un sito visitato la riapertura non scala crediti e non scrive niente', async () => {
+test('un fix già segnalato non arriva nemmeno al server', async () => {
+  server.reopenRequests = { altro: { at: 'x' } };
+  const r = await reopen(msgFor());
+  assert.equal(r.code, 'gone');
+  assert.equal(chiamate.length, 0);
+});
+
+test('da un sito visitato la riapertura non chiama il server e non scrive niente', async () => {
   const r = await reopen(msgFor(), 'https://evil.example/pagina');
   assert.equal(r.ok, false);
   assert.equal(r.code, 'forbidden', 'rifiutato per provenienza, non per la sessione');
-  assert.equal(spends.length, 0, 'nessun credito scalato');
-  assert.equal(server.feedbacks.length, 0, 'nessuna segnalazione aperta a nome dell\'utente');
-  assert.deepEqual(server.reopenRequests, {}, 'nessun segnale scritto sul fix');
+  assert.equal(chiamate.length, 0);
+  assert.equal(server.feedbacks.length, 0);
+  assert.deepEqual(server.reopenRequests, {});
+});
+
+// ── Il voto: l'identità del portafoglio ────────────────────────────────────
+
+test('il voto parte con l\'identità dell\'installazione e il suo uid, senza premio locale col portafoglio', async () => {
+  const r = await vota({ type: MSG.BOARD_CAST_VOTE, id: ORIGINAL_ID, vote: 'works' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.uid, UID_INSTALLAZIONE);
+  assert.equal(voti[0].entry.uid, UID_INSTALLAZIONE);
+  assert.equal(voti[0].opts.idToken, 'token-installazione');
+  assert.equal(r.awarded, false);
+  assert.equal(premi.length, 0);
+  assert.deepEqual(await identitaBacheca(), { ok: true, uid: UID_INSTALLAZIONE, portafoglio: true });
+});
+
+test('senza portafoglio il voto non si scrive e la frase dice cosa serve', async () => {
+  portafoglio = false;
+  const r = await vota({ type: MSG.BOARD_CAST_VOTE, id: ORIGINAL_ID, vote: 'broken' });
+  assert.equal(r.code, 'portafoglio');
+  assert.equal(voti.length, 0);
+  const b = await identitaBacheca();
+  assert.equal(b.portafoglio, false);
+  assert.match(b.motivo, /crediti di Filo/);
+});
+
+test('un voto respinto dalle regole su una scheda ancora in bacheca: il portafoglio non risulta attivo', async () => {
+  globalThis.SN_FEEDBACK.castVote = async () => { const e = new Error('firestore castVote fallito (403): PERMISSION_DENIED'); throw e; };
+  globalThis.SN_MANAGE_REVIEW.listBoardTab = (cards) => cards;
+  try {
+    const r = await vota({ type: MSG.BOARD_CAST_VOTE, id: ORIGINAL_ID, vote: 'works' });
+    assert.equal(r.code, 'portafoglio');
+    assert.match(r.error, /non risulta attivo/);
+  } finally {
+    globalThis.SN_FEEDBACK.castVote = async (id, entry, opts) => { voti.push({ id, entry, opts }); return entry; };
+    delete globalThis.SN_MANAGE_REVIEW.listBoardTab;
+  }
+});
+
+test('l\'owner vota con la sua credenziale', async () => {
+  owner = true;
+  const r = await vota({ type: MSG.BOARD_CAST_VOTE, id: ORIGINAL_ID, vote: 'works' });
+  assert.equal(r.ok, true);
+  assert.equal(voti[0].opts.idToken, 'token-google');
+  assert.equal(r.uid, UID_GOOGLE);
+});
+
+// ── L'owner: riapre da sé, senza spesa (#269, #602) ────────────────────────
+
+test('owner: segnale e UN feedback figlio, niente server e niente crediti', async () => {
+  owner = true;
+  const r = await reopen(msgFor());
+  assert.equal(r.ok, true);
+  assert.equal(r.cost, 0);
+  assert.equal(chiamate.length, 0);
+  assert.equal(server.feedbacks.length, 1);
+  assert.ok(server.reopenRequests[UID_GOOGLE]);
+});
+
+test('owner, rete instabile sul segnale: MAI un figlio orfano, MAI doppioni', async () => {
+  owner = true;
+  failGuard = true;
+  for (let i = 0; i < 3; i++) assert.equal((await reopen(msgFor())).ok, false);
+  assert.equal(server.feedbacks.length, 0);
+});
+
+test('owner, creazione fallita: il segnale torna indietro e si può riprovare, il figlio resta UNO', async () => {
+  owner = true;
+  failSubmit = true;
+  assert.equal((await reopen(msgFor())).ok, false);
+  assert.deepEqual(server.reopenRequests, {});
+  failSubmit = false;
+  assert.equal((await reopen(msgFor())).ok, true);
+  assert.equal(server.feedbacks.length, 1);
+  assert.equal((await reopen(msgFor())).ok, false, 'un terzo tentativo è respinto dal segnale');
+  assert.equal(server.feedbacks.length, 1);
+});
+
+test('owner, la creazione era riuscita ma la risposta si è persa: il ritentativo non crea un doppione', async () => {
+  owner = true;
+  failSubmit = 'dopo-aver-scritto';
+  assert.equal((await reopen(msgFor())).ok, false);
+  assert.equal(server.feedbacks.length, 1);
+  failSubmit = false;
+  assert.equal((await reopen(msgFor())).ok, true);
+  assert.equal(server.feedbacks.length, 1);
 });

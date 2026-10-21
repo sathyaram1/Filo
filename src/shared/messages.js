@@ -150,34 +150,34 @@
     GET_FEEDBACK_REWARDS: 'get_feedback_rewards',
     // === Bacheca utente — voto funziona/non-funziona (DC2) ===================
     // BOARD_CAST_VOTE: l'utente loggato esprime/cambia il proprio voto su un
-    // feedback già in produzione (DB3). Il main allega il SUO Firebase ID token
-    // come Bearer (mai esposto al renderer) e scrive votes.<uid> via FB.castVote
-    // (DB4). Premia +10 crediti (CREDIT.BOARD_VOTE) UNA SOLA VOLTA per feedback
-    // per utente (anti-doppio-premio in creditStore — rewardedVotes), anche se
-    // l'utente cambia idea works↔broken o rivota lo stesso valore: niente
-    // timeout, niente penalità. { id, vote:'works'|'broken' } →
-    // { ok, votes, awarded, credits, balance } | { ok:false, error }.
+    // feedback già in produzione (DB3). Vota chi ha un portafoglio, con
+    // l'identità dell'installazione (l'owner con la sua, #1076): il main allega
+    // il token come Bearer (mai esposto al renderer) e scrive votes.<uid> via
+    // FB.castVote (DB4). Il premio locale (CREDIT.BOARD_VOTE, una volta per
+    // feedback) vale solo senza portafoglio, come gli altri premi (#816).
+    // { id, vote:'works'|'broken' } → { ok, uid, votes, awarded, credits, balance }
+    // | { ok:false, code?, error } (`code:'portafoglio'`: serve il portafoglio).
     // `votes` è il map aggiornato (per ridisegnare il conteggio reale lato UI).
     BOARD_CAST_VOTE: 'board_cast_vote',
-    // BOARD_CLEAR_VOTE: l'utente ritira il proprio voto (cancella votes.<uid>).
-    // NON revoca il premio già accreditato (non è una penalità, è solo ritiro
-    // del voto): rewardedVotes resta marcato, quindi un voto successivo sullo
-    // stesso feedback non ripaga. { id } → { ok, votes } | { ok:false, error }.
+    // BOARD_CLEAR_VOTE: l'utente ritira il proprio voto (cancella votes.<uid>),
+    // con la stessa identità del voto. NON revoca il premio già accreditato:
+    // rewardedVotes resta marcato, quindi un voto successivo sullo stesso
+    // feedback non ripaga. { id } → { ok, votes } | { ok:false, error }.
     BOARD_CLEAR_VOTE: 'board_clear_vote',
     // === Bacheca utente — riapertura a pagamento (DC4) =======================
     // BOARD_REOPEN: l'utente loggato segnala che un fix "Risolti" (DB3) è
-    // ancora rotto. Crea un NUOVO feedback collegato all'originale (campo
-    // `parentId`, stesso percorso di creazione anonimo di SN_FEEDBACK.submit —
-    // nasce in `new`, come ogni feedback utente, per il triage dell'owner) e
-    // scala CREDIT.BOARD_REOPEN crediti come anti-spam (rifiuta senza scrivere
-    // nulla se il saldo è insufficiente — niente saldo negativo). Scrive anche
-    // `reopenRequests.<uid>` SULL'ORIGINALE (stesso pattern non-admin di
-    // `votes`, vedi firestore.rules) come segnale per il percorso fidato
-    // (routine/owner) che deve flippare lo status dell'originale fuori da
-    // "Risolti" — un utente normale NON può scrivere `status` di un doc che
-    // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
-    // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
+    // ancora rotto. Lo fa il server (callable `bachecaRiapri`, #1076): scala
+    // CREDIT.BOARD_REOPEN crediti dal portafoglio, crea il NUOVO feedback
+    // collegato all'originale (`parentId`, nasce come ogni segnalazione di un
+    // utente) e segna `reopenRequests.<uid>` sulla scheda, tutto insieme; il
+    // client quel campo non lo scrive più. L'owner riapre con la sua
+    // credenziale e senza spesa, firmando come lui (#953).
+    // { id, text } → { ok, feedbackId, cost, balance } | { ok:false, code?, error }.
     BOARD_REOPEN: 'board_reopen',
+    // BOARD_IDENTITA: con quale identità questa installazione vota e riapre, e
+    // se può farlo (#1076). La bacheca ci riconosce il proprio voto. Solo da Filo.
+    // { } → { ok, uid|null, portafoglio?, motivo? } (senza accesso Google niente `portafoglio`).
+    BOARD_IDENTITA: 'board_identita',
     // #986 — la copia locale delle segnalazioni mandate da questo computer. Testi scritti dall'utente: solo dalle
     // superfici di Filo (soloFilo), mai da un sito. {} → { ok, voci } (in incognito { ok, voci: [], incognito: true })
     SEGNALAZIONI_MIE_LIST: 'segnalazioni_mie_list',

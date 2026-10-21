@@ -479,6 +479,8 @@
     gift: 'Regalo di Filo',
     feedback_sent: 'Segnalazione inviata',
     feedback_closed: 'Segnalazione risolta',
+    // Una spesa, non un'entrata: la voce porta crediti negativi (#1076).
+    board_reopen: 'Fix riaperto dalla bacheca',
   });
   function grantLabel(why) {
     const raw = String(why || '').trim();

@@ -1301,13 +1301,9 @@ module.exports = function register(on, ctx) {
       if (!card) {
         await FB.unpublishPublicCard(key, { idToken });
       } else {
-        // I voti e le riaperture stanno sulla scheda: la maschera di
-        // publishPublicCard non li tocca, ma quelli rimasti sul documento vanno
-        // portati dentro come fa il giro generale.
-        let before = null;
-        try { before = await FB.getPublic(key, { idToken }); } catch (_) {}
-        const carry = V.carryUserFields(fb, before);
-        await FB.publishPublicCard(key, Object.keys(carry).length ? { ...card, ...carry } : card, { idToken });
+        // Voti e riaperture stanno solo sulla scheda: la maschera di
+        // publishPublicCard non li tocca, e dal documento non si portano (#1076).
+        await FB.publishPublicCard(key, card, { idToken });
       }
       cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
       if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();

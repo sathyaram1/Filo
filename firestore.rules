@@ -539,8 +539,8 @@ service cloud.firestore {
             || request.resource.data.updatedAt is timestamp)
         // `reopenRequests` (DC4): l'admin può azzerarlo (es. {}) quando un fix
         // riaperto viene risistemato e rispedito, sbloccando una futura
-        // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
-        // ramo non-admin sotto resta l'unico modo per gli utenti di scriverlo.
+        // riapertura sullo stesso doc. Gli utenti non lo scrivono più da nessuna
+        // parte: la riapertura nasce sul server (#1076, sotto feedback-public).
         && request.resource.data.get('reopenRequests', {}) is map
         && livelliValidi(request.resource.data)
         && localOnlyValido(request.resource.data)
@@ -552,56 +552,10 @@ service cloud.firestore {
         && request.resource.data.get('capabilityGapId', '') is string
         && request.resource.data.get('capabilityGapId', '').size() <= 100;
 
-      // Voto di verifica della board utente (DB4): un utente LOGGATO scrive SOLO
-      // il proprio voto nel map `votes` (chiave = suo uid). Un voto per utente,
-      // cambiabile (ri-PATCH della stessa chiave) e ritirabile (cancellazione
-      // della chiave). La read del feedback è già pubblica. Il vincolo
-      // chiave==uid impedisce di toccare i voti altrui o qualunque altro campo:
-      // l'unica chiave del map che può cambiare è quella del richiedente.
-      // Entry: { vote: 'works'|'broken', at: <ISO>, credibilitySnapshot: <num> }.
-      // È il substrato che board (DC*) e archiviazione a punteggio (DC3) leggono.
-      allow update: if
-        request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
-        && request.resource.data.get('votes', {}) is map
-        && request.resource.data.get('votes', {})
-             .diff(resource.data.get('votes', {})).affectedKeys()
-             .hasOnly([request.auth.uid])
-        && (
-             !(request.auth.uid in request.resource.data.get('votes', {}))
-             || (
-                  request.resource.data.votes[request.auth.uid].keys()
-                    .hasOnly(['vote', 'at', 'credibilitySnapshot'])
-                  && request.resource.data.votes[request.auth.uid].vote in ['works', 'broken']
-                  && request.resource.data.votes[request.auth.uid].at is string
-                  && request.resource.data.votes[request.auth.uid].at.size() <= 40
-                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot is number
-                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot >= 0
-                )
-           );
-
-      // Riapertura a pagamento dalla board (DC4): un utente LOGGATO scrive SOLO
-      // la propria chiave nel map `reopenRequests` (stesso pattern di `votes`
-      // sopra — chiave==uid, nessun altro campo toccabile). È solo il SEGNALE
-      // "ho chiesto la riapertura": non tocca `status` (quello resta admin/
-      // routine, vedi i rami sopra) — il flip fuori da "Risolti" lo applica il
-      // percorso fidato leggendo questo campo. Entry: { at: <ISO> }.
-      allow update: if
-        request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reopenRequests'])
-        && request.resource.data.get('reopenRequests', {}) is map
-        && request.resource.data.get('reopenRequests', {})
-             .diff(resource.data.get('reopenRequests', {})).affectedKeys()
-             .hasOnly([request.auth.uid])
-        && (
-             !(request.auth.uid in request.resource.data.get('reopenRequests', {}))
-             || (
-                  request.resource.data.reopenRequests[request.auth.uid].keys()
-                    .hasOnly(['at'])
-                  && request.resource.data.reopenRequests[request.auth.uid].at is string
-                  && request.resource.data.reopenRequests[request.auth.uid].at.size() <= 40
-                )
-           );
+      // Voti e riaperture non si scrivono più qui da un utente (#1076): la
+      // bacheca li legge dalla scheda (feedback-public, sotto), e un voto o una
+      // riapertura lasciati qui il travaso li riportava sulla scheda senza
+      // nessun controllo. I vecchi restano leggibili all'owner.
 
       // Triage routine (limitato): può solo muovere l'ITER DI LAVORAZIONE della
       // macchina a stati (todo/working/revision_*/done/design) e scrivere
@@ -713,12 +667,17 @@ service cloud.firestore {
         && request.resource.data.get('reward', 0) >= 0
         && request.resource.data.get('reward', 0) <= 1000;
 
-      // Voto della bacheca: stesso identico pattern della collezione vera —
-      // un utente LOGGATO scrive SOLO la propria chiave nel map `votes`.
-      // I voti vivono anche qui perché è qui che la bacheca li legge: il
-      // documento vero non lo può più aprire.
+      // Voto della bacheca: chi vota scrive SOLO la propria chiave nel map
+      // `votes`, e solo se ha un portafoglio (#1076): un account anonimo non
+      // costa niente, e con un voto per uid uno script votava quante volte
+      // voleva. `credibilitySnapshot` lo dichiara chi vota, quindi il tetto è il
+      // peso di un voto qualunque (CREDIBILITY_MAX in src/shared/feedback.js):
+      // un peso diverso andrà calcolato sul server, non scritto dal client.
+      // Sentinella: tests/unit/firestoreRulesBacheca.test.mjs.
       allow update: if
         request.auth != null
+        && exists(/databases/$(database)/documents/wallet-accounts/$(request.auth.uid))
+        && get(/databases/$(database)/documents/wallet-accounts/$(request.auth.uid)).data.get('disabled', false) != true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
         && request.resource.data.get('votes', {}) is map
         && request.resource.data.get('votes', {})
@@ -734,27 +693,15 @@ service cloud.firestore {
                   && request.resource.data.votes[request.auth.uid].at.size() <= 40
                   && request.resource.data.votes[request.auth.uid].credibilitySnapshot is number
                   && request.resource.data.votes[request.auth.uid].credibilitySnapshot >= 0
+                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot <= 1
                 )
            );
 
-      // Riapertura a pagamento: stesso pattern, sul map `reopenRequests`. È il
-      // segnale che fa USCIRE la scheda dalla bacheca (DC4).
-      allow update: if
-        request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reopenRequests'])
-        && request.resource.data.get('reopenRequests', {}) is map
-        && request.resource.data.get('reopenRequests', {})
-             .diff(resource.data.get('reopenRequests', {})).affectedKeys()
-             .hasOnly([request.auth.uid])
-        && (
-             !(request.auth.uid in request.resource.data.get('reopenRequests', {}))
-             || (
-                  request.resource.data.reopenRequests[request.auth.uid].keys()
-                    .hasOnly(['at'])
-                  && request.resource.data.reopenRequests[request.auth.uid].at is string
-                  && request.resource.data.reopenRequests[request.auth.uid].at.size() <= 40
-                )
-           );
+      // `reopenRequests` è il segnale che fa USCIRE la scheda dalla bacheca
+      // (DC4): nessun ramo utente lo scrive. Lo scrive il server (callable
+      // `bachecaRiapri` di filo-security), che nella stessa transazione scala i
+      // crediti del portafoglio e crea il feedback collegato (#1076); l'owner
+      // lo azzera dal ramo sopra.
 
       // Spubblicazione: owner o server. Un fix che torna in lavorazione esce
       // dalla bacheca togliendo la sua scheda, non nascondendola in pagina.

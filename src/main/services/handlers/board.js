@@ -1,19 +1,11 @@
-// Handler di dominio: bacheca utente — voto funziona/non-funziona (DC2).
-//
-// Persiste il voto su Firestore (votes.<uid>, DB4) con l'ID token del votante
-// (mai esposto al renderer) e premia +10 crediti UNA SOLA VOLTA per feedback
-// per utente (anti-doppio-premio in creditStore.js — rewardedVotes, namespace
-// separato dal premio di risoluzione C5). Niente timeout, niente penalità: il
-// premio resta accreditato anche se l'utente ritira o cambia voto in seguito.
-//
-// Il renderer (src/pages/board/board.js) NON parla direttamente con FB.castVote:
-// passa sempre da qui, perché il voto richiede l'uid Firebase REALE (claim
-// dell'ID token: request.auth.uid nelle Firestore rules) — non l'email, che è
-// quanto il renderer vede di sé via AUTH_STATUS.
+// Handler di dominio: bacheca utente — voto funziona/non-funziona (DC2) e «Ancora rotto?» (DC4).
+// Vota e riapre chi ha un portafoglio, con l'identità dell'installazione; la riapertura la fa il server (#1076).
+// Il token non arriva mai al renderer. Regole della scheda: firestore.rules (feedback-public).
 
 const auth = require('../../auth/google-auth');
+const identita = require('../../auth/anon-auth');
 const Mittente = require('../feedbackMittente');
-// #583 — queste tre porte non sono del proprietario: valgono per chiunque
+// #583 — queste porte non sono del proprietario: valgono per chiunque
 // abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una
 // sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, una
 // pagina di un sito visitato votava al posto dell'utente, gli cancellava il
@@ -38,6 +30,20 @@ module.exports = function register(on, ctx) {
     ok: false, code: 'gone',
     error: 'Questo miglioramento è tornato in lavorazione: per ora non si può più votare né segnalare.',
   };
+  const GIA_SEGNALATO = {
+    ok: false, code: 'gone',
+    error: 'Qualcuno ha già segnalato che questo miglioramento non funziona ancora: è tornato in lavorazione.',
+  };
+  // #1076 — un account anonimo non costa niente: voto e riapertura chiedono i crediti di Filo.
+  const SENZA_PORTAFOGLIO = {
+    voto: { ok: false, code: 'portafoglio', error: 'Per votare servono i crediti di Filo: riscatta un invito nella pagina Crediti.' },
+    riapertura: { ok: false, code: 'portafoglio', error: 'Per segnalare che un fix è ancora rotto servono i crediti di Filo: riscatta un invito nella pagina Crediti.' },
+  };
+  const SENZA_PORTAFOGLIO_BACHECA = 'Per votare e per segnalare un fix ancora rotto servono i crediti di Filo: riscatta un invito nella pagina Crediti.';
+  const PORTAFOGLIO_NON_ATTIVO = {
+    ok: false, code: 'portafoglio',
+    error: 'Il portafoglio di questa installazione non risulta attivo: per ora non si può votare né segnalare.',
+  };
 
   function statoHttp(e) {
     const s = Number(e && e.status);
@@ -46,19 +52,35 @@ module.exports = function register(on, ctx) {
     return m ? Number(m[1]) : 0;
   }
 
-  // Il token si chiede fuori da getUid(), che inghiotte ogni errore: senza
-  // rete il rinnovo fallisce e «sessione scaduta» manderebbe a rifare un
-  // accesso che non serve.
-  async function credenziali() {
-    let idToken = null;
-    try { idToken = await auth.getIdToken(); } catch (e) { return { fallito: e }; }
-    if (!idToken) return { esito: SESSIONE_SCADUTA };
-    const uid = await auth.getUid();
-    if (!uid) return { esito: SESSIONE_SCADUTA };
-    return { uid, idToken };
+  const WM = () => globalThis.SN_WALLET_MAIN;
+  function haPortafoglio() {
+    try { return Boolean(WM()?.haPortafoglio?.()); } catch (_) { return false; }
   }
 
-  async function esitoFallito(e, id, generico) {
+  // Chi fa il gesto. L'owner con la sua credenziale: le regole lo lasciano scrivere da admin e la riapertura parte
+  // col suo nome (#953). Gli altri con l'identità dell'installazione, dove sta il portafoglio che regole e server
+  // pretendono (#1076): l'account Google collegato prima che il portafoglio esistesse è un altro uid.
+  // Il token si chiede fuori da getUid(), che inghiotte ogni errore: senza rete il rinnovo fallisce e «sessione
+  // scaduta» manderebbe a rifare un accesso che non serve.
+  async function credenziali(gesto) {
+    if (Mittente.dallOwner()) {
+      let idToken = null;
+      try { idToken = await auth.getIdToken(); } catch (e) { return { fallito: e }; }
+      if (!idToken) return { esito: SESSIONE_SCADUTA };
+      const uid = await auth.getUid();
+      if (!uid) return { esito: SESSIONE_SCADUTA };
+      return { uid, idToken, owner: true };
+    }
+    if (!haPortafoglio()) return { esito: SENZA_PORTAFOGLIO[gesto] };
+    let idToken = null;
+    try { idToken = await identita.getIdToken(); } catch (e) { return { fallito: e, installazione: true }; }
+    const uid = await identita.getUid().catch(() => null);
+    if (!idToken || !uid) return { fallito: new Error('identità dell\'installazione non disponibile'), installazione: true };
+    return { uid, idToken, owner: false, installazione: true };
+  }
+
+  // `installazione`: il token rifiutato non è l'accesso Google, e «rifai l'accesso» non servirebbe.
+  async function esitoFallito(e, id, generico, { installazione = false } = {}) {
     console.warn('[board] gesto non riuscito:', e?.message || e);
     const CE = globalThis.SN_CHAT_ERRORS;
     if (CE?.isTransientNetwork?.(e)) {
@@ -66,13 +88,15 @@ module.exports = function register(on, ctx) {
     }
     // Un rinnovo rifiutato chiude la sessione (signOut in google-auth).
     const st = statoHttp(e);
-    if (!auth.isSignedIn() || st === 401) return SESSIONE_SCADUTA;
+    if (!auth.isSignedIn() || (!installazione && st === 401)) return SESSIONE_SCADUTA;
     // Una scheda che non c'è più non si può scrivere: le regole rifiutano la
     // creazione, e la risposta è un 403 che da solo non dice perché.
     if (id && (st === 403 || st === 404)) {
       try {
         const card = await FB.getPublic(id);
         if (!inBacheca(card)) return TORNATO_IN_LAVORAZIONE;
+        // La scheda c'è: le regole hanno rifiutato chi vota, cioè il portafoglio (sospeso, o non più sul server).
+        if (installazione && st === 403) return PORTAFOGLIO_NON_ATTIVO;
       } catch (_) { /* la verifica non è riuscita: resta la frase generica */ }
     }
     return { ok: false, error: generico };
@@ -89,8 +113,18 @@ module.exports = function register(on, ctx) {
     return MR.listBoardTab([card], { releasedVersion: versioneRilasciata() }).length > 0;
   }
 
+  // Con quale identità vota questa installazione (la bacheca ci riconosce il proprio voto) e se può farlo. Senza
+  // portafoglio non si crea un'identità per chiederlo; senza accesso non si decide niente (il gesto chiede l'accesso).
+  on(MSG.BOARD_IDENTITA, soloFilo(async () => {
+    if (!auth.isSignedIn()) return { ok: true, uid: null };
+    if (Mittente.dallOwner()) return { ok: true, uid: await auth.getUid(), portafoglio: true };
+    if (!haPortafoglio()) return { ok: true, uid: null, portafoglio: false, motivo: SENZA_PORTAFOGLIO_BACHECA };
+    return { ok: true, uid: await identita.getUid().catch(() => null), portafoglio: true };
+  }));
+
   on(MSG.BOARD_CAST_VOTE, soloFilo(async (msg) => {
     const id = String(msg?.id || '').trim();
+    let installazione = false;
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, code: 'auth', error: 'Accedi per votare i miglioramenti.' };
@@ -100,24 +134,24 @@ module.exports = function register(on, ctx) {
       if (vote !== 'works' && vote !== 'broken') {
         return { ok: false, error: "Voto non valido: usa 'works' o 'broken'." };
       }
-      const cr = await credenziali();
+      const cr = await credenziali('voto');
       if (cr.esito) return cr.esito;
-      if (cr.fallito) return esitoFallito(cr.fallito, id, VOTO_NON_REGISTRATO);
+      installazione = Boolean(cr.installazione);
+      if (cr.fallito) return esitoFallito(cr.fallito, id, VOTO_NON_REGISTRATO, { installazione });
       const { uid, idToken } = cr;
       if (!FB?.castVote) throw new Error('SN_FEEDBACK non caricato nel main process');
 
       await FB.castVote(id, { uid, vote, credibilitySnapshot: 1 }, { idToken });
 
-      // Premio: +10 crediti, una sola volta per feedback per questo utente
-      // (idempotente — vedi creditStore.awardVoteOnce). Cambiare idea
-      // works↔broken o rivotare lo stesso valore NON ripaga.
-      const amount = SN_CONST.CREDIT.BOARD_VOTE;
-      const reward = await Credits.awardVoteOnce(id, amount);
+      // Il premio locale (+10 una volta per feedback, idempotente in creditStore.awardVoteOnce) vale solo senza
+      // portafoglio, come gli altri premi (#816): col portafoglio i crediti veri li dà il server, che per un voto
+      // non ne dà.
+      const reward = haPortafoglio()
+        ? { awarded: false, credits: 0 }
+        : await Credits.awardVoteOnce(id, SN_CONST.CREDIT.BOARD_VOTE);
 
       // Rilegge il documento per tornare il tally REALE (altri voti compresi),
       // così la UI non deve fidarsi solo dell'aggiornamento ottimistico locale.
-      // FB.list non filtra per id: leggiamo il singolo documento via REST diretto
-      // (fetchVotes sotto, stesso plumbing esposto da SN_FEEDBACK).
       const votes = await fetchVotes(id);
 
       return {
@@ -129,134 +163,116 @@ module.exports = function register(on, ctx) {
         balance: reward.balance,
       };
     } catch (e) {
-      return esitoFallito(e, id, VOTO_NON_REGISTRATO);
+      return esitoFallito(e, id, VOTO_NON_REGISTRATO, { installazione });
     }
   }));
 
-  // Riapertura a pagamento (DC4): l'utente loggato segnala che un fix
-  // "Risolti" è ancora rotto. Passi atomici-quanto-possibile:
-  //   1. verifica idoneità (è davvero in Risolti, nessuno l'ha già riaperto);
-  //   2. scala CREDIT.BOARD_REOPEN (anti-spam — rifiuta senza scrivere nulla
-  //      se il saldo non basta, applyConsumptionIfAffordable in creditStore.js);
-  //   3. marca `reopenRequests.<uid>` sull'originale (il GUARD anti-doppia-
-  //      riapertura — segnale per il triage: un utente normale non può scrivere
-  //      `status`, quindi il flip fuori da "Risolti" resta al percorso fidato —
-  //      vedi nota in messages.js);
-  //   4. crea il feedback collegato (parentId).
-  //
-  // ORDINE DELIBERATO (guard PRIMA del feedback): i passi 3 e 4 sono due
-  // scritture REST Firestore separate e NON atomiche. Se creassimo il feedback
-  // (4) prima di marcare il guard (3) e la rete cadesse fra le due, resteremmo
-  // con un feedback figlio orfano E il guard MAI marcato: canReopen()
-  // continuerebbe a dire "riapribile" e l'utente potrebbe ripetere all'infinito,
-  // creando ogni volta un nuovo feedback duplicato (crediti sempre rimborsati) —
-  // la coda si riempirebbe di segnalazioni gratis, bypassando l'anti-spam.
-  // Marcando il guard PER PRIMO: se (3) fallisce, non abbiamo ancora creato
-  // nulla (retry pulito, nessun orfano); se (3) riesce ma (4) fallisce, il guard
-  // blocca comunque ogni tentativo successivo → al più UN feedback figlio per
-  // utente, mai duplicati. In entrambi i rami di fallimento dopo aver scalato,
-  // restituiamo i crediti (compensazione best-effort).
+  // «Ancora rotto?» (DC4): chi è in bacheca segnala che un fix "Risolti" è ancora rotto. Il gesto lo fa il server
+  // (callable `bachecaRiapri`, #1076): scala i crediti del portafoglio, crea il feedback collegato e segna la scheda
+  // in una transazione sola, quindi qui niente compensazioni. Il controllo d'idoneità qui sotto serve solo a
+  // rispondere subito: decide il server.
   on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
     const id = String(msg?.id || '').trim();
+    let installazione = false;
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, code: 'auth', error: 'Accedi per segnalare che un fix è ancora rotto.' };
       }
       const text = String(msg?.text || '').trim();
       if (!id) return { ok: false, error: 'Feedback non valido.' };
+      const owner = Mittente.dallOwner();
+      if (!owner && !haPortafoglio()) return SENZA_PORTAFOGLIO.riapertura;
       if (!text) return { ok: false, error: 'Descrivi cosa non funziona ancora.' };
       if (text.length > 10000) return { ok: false, error: 'Testo troppo lungo.' };
-
-      const cr = await credenziali();
-      if (cr.esito) return cr.esito;
-      if (cr.fallito) return esitoFallito(cr.fallito, id, RIAPERTURA_NON_PARTITA);
-      const { uid, idToken } = cr;
-      if (!FB?.castReopenRequest || !FB?.submit || !FB?.getPublic) throw new Error('SN_FEEDBACK non caricato nel main process');
-
+      if (!FB?.getPublic) throw new Error('SN_FEEDBACK non caricato nel main process');
       const MR = globalThis.SN_MANAGE_REVIEW;
       if (!MR?.canReopen) throw new Error('SN_MANAGE_REVIEW non caricato nel main process');
 
-      // Idoneità: rilegge il documento originale (non fidarsi dello stato che
-      // il renderer aveva in cache) e applica lo stesso gate "Risolti, niente
-      // red-team" della board + il guard anti-doppia-riapertura.
       // Un guasto di rete qui non è «fix non trovato»: sale a esitoFallito.
       const original = await FB.getPublic(id);
       if (!original) return TORNATO_IN_LAVORAZIONE;
       if (!MR.canReopen(original, { releasedVersion: versioneRilasciata() })) {
-        return MR.hasReopenRequest(original)
-          ? { ok: false, code: 'gone', error: 'Qualcuno ha già segnalato che questo miglioramento non funziona ancora: è tornato in lavorazione.' }
-          : TORNATO_IN_LAVORAZIONE;
+        return MR.hasReopenRequest(original) ? GIA_SEGNALATO : TORNATO_IN_LAVORAZIONE;
       }
+      if (owner) return await riapriDaOwner(id, text, original);
 
-      // Anti-spam: scala i crediti SOLO se il saldo basta (nessun saldo
-      // negativo, nessun tentativo "gratis" se insufficiente).
-      const amount = SN_CONST.CREDIT.BOARD_REOPEN;
-      const spend = await Credits.spendIfAffordable(amount, { kind: 'board_reopen', ref: id });
-      if (!spend.ok) {
-        return { ok: false, error: `Servono ${amount} crediti per riaprire un fix (saldo: ${spend.balance}).` };
-      }
-
-      let created;
-      try {
-        // Guard PRIMA (vedi nota d'ordine sopra): marcare reopenRequests.<uid>
-        // chiude la porta a duplicati anche se la creazione del feedback qui
-        // sotto fallisce a metà.
-        await FB.castReopenRequest(id, uid, { idToken });
-        // Dall'owner parte con la sua prova come dal riquadro (#953), mai col ripiego anonimo.
-        const firmato = Mittente.firma(`uid:${uid}`);
-        created = await FB.submit({
-          // Un id d'invio STABILE per questa coppia (fix, persona): se la
-          // risposta si perde per strada ma il documento è nato lo stesso, un
-          // secondo tentativo non crea un doppione — il server lo riconosce e
-          // torna quello di prima. È ciò che rende sicuro rimettere a posto il
-          // segnale qui sotto quando la creazione fallisce: la porta si riapre
-          // per chi deve riprovare, e resta chiusa ai duplicati.
-          submissionId: `reopen-${id}-${uid}`,
-          text: `[Riapertura #${original.seq || id}] ${text}`,
-          // #583: l'URL e il titolo della pagina del feedback originale non
-          // arrivano più fin qui — sono di chi l'aveva mandato, e la scheda
-          // pubblica non li porta. Il collegamento all'originale resta
-          // `parentId` (più il numero nel testo), che è ciò che serve al triage.
-          url: '',
-          title: '',
-          userAgent: '',
-          clientId: firmato.clientId,
-          parentId: id,
-          name: '',
-        }, firmato.dallOwner ? { idToken, soloAdmin: true } : undefined);
-        // #678 — la riapertura è una segnalazione di questa installazione:
-        // entra nel registro, e la prossima apertura della home va a vedere
-        // subito se c'è una ricompensa da dare (l'attesa si azzera).
-        try { await globalThis.SN_FEEDBACK_MINE?.ricordaId?.(created?.id); } catch (_) {}
-        try {
-          await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({
-            id: created?.id, feedbackId: created?.id, testo: text, stato: 'inviata',
-            num: FB.formatNum ? FB.formatNum(created?.seq, 0) : '',
-            titolo: original.name ? `Ancora rotto: ${original.name}` : 'Ancora rotto',
-          });
-        } catch (_) {}
-      } catch (e) {
-        // Compensazione best-effort: il segnale/feedback non è andato a buon
-        // fine dopo aver già scalato — restituiamo i crediti invece di
-        // lasciare l'utente scalato senza nulla in cambio.
-        try { await Credits.award({ kind: 'board_reopen_refund', credits: amount, ref: id }); } catch (_) {}
-        // E torna indietro anche il SEGNALE di riapertura. Lo scriviamo per
-        // primo apposta, perché chiude la porta ai duplicati (#269); ma se la
-        // segnalazione collegata non è nata, di duplicati non ce n'è nessuno —
-        // c'è solo chi ha scritto cosa non funziona ancora e, con quel segnale
-        // rimasto lì, si sentiva rispondere che il fix era «già stato
-        // segnalato»: i crediti tornavano, la spiegazione no, e non poteva più
-        // mandarla. Adesso può riprovare, e l'id d'invio stabile qui sopra
-        // impedisce che da un ritentativo nasca un doppione.
-        try { await FB.clearReopenRequest(id, uid, { idToken }); } catch (_) {}
-        throw e;
-      }
-
-      return { ok: true, feedbackId: created.id, balance: spend.balance };
+      installazione = true;
+      const chiama = WM()?.chiama;
+      if (typeof chiama !== 'function') throw new Error('SN_WALLET_MAIN non caricato nel main process');
+      const r = await chiama('bachecaRiapri', { id, text });
+      if (!r || r.ok !== true) return rifiutoRiapertura(r);
+      await ricordaSegnalazione(r.feedbackId, String(r.num || '').replace(/^#/, ''), text, original);
+      // La spesa è un movimento del portafoglio: la pagina Crediti aperta lo mostra subito.
+      try { ctx.broadcastToFiloPages?.({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+      return { ok: true, feedbackId: r.feedbackId, cost: r.already ? 0 : r.cost, balance: r.balance };
     } catch (e) {
-      return esitoFallito(e, id, RIAPERTURA_NON_PARTITA);
+      return esitoFallito(e, id, RIAPERTURA_NON_PARTITA, { installazione });
     }
   }));
+
+  // Il server ha detto no: la frase giusta per la scheda, coi numeri quando ci sono.
+  function rifiutoRiapertura(r) {
+    const motivo = r && r.reason;
+    if (motivo === 'no_wallet') return SENZA_PORTAFOGLIO.riapertura;
+    if (motivo === 'disabled') return PORTAFOGLIO_NON_ATTIVO;
+    if (motivo === 'already_reopened') return GIA_SEGNALATO;
+    if (motivo === 'not_on_board') return TORNATO_IN_LAVORAZIONE;
+    if (motivo === 'insufficient') {
+      const W = globalThis.SN_WALLET;
+      const saldo = W?.formatCredits ? W.formatCredits(r.balance) : String(r.balance ?? 0);
+      return { ok: false, error: `Servono ${r.cost} crediti per riaprire un fix (saldo: ${saldo}).` };
+    }
+    if (motivo === 'empty_text') return { ok: false, error: 'Descrivi cosa non funziona ancora.' };
+    if (motivo === 'text_too_long') return { ok: false, error: `Testo troppo lungo (al massimo ${r.max} caratteri).` };
+    if (motivo === 'rate_limited') return { ok: false, error: 'Troppi tentativi di fila: riprova fra un minuto.' };
+    return { ok: false, error: RIAPERTURA_NON_PARTITA };
+  }
+
+  // L'owner riapre con la sua credenziale (admin nelle regole) e senza spesa: è il gesto di chi i fix li chiude.
+  // Il segnale per primo, così un figlio orfano non lascia la porta aperta ai doppioni (#269); se la creazione non
+  // va il segnale torna indietro, e l'id d'invio stabile tiene chiusa la porta a un secondo figlio (#602).
+  async function riapriDaOwner(id, text, original) {
+    const cr = await credenziali('riapertura');
+    if (cr.esito) return cr.esito;
+    if (cr.fallito) return esitoFallito(cr.fallito, id, RIAPERTURA_NON_PARTITA);
+    const { uid, idToken } = cr;
+    if (!FB?.castReopenRequest || !FB?.submit) throw new Error('SN_FEEDBACK non caricato nel main process');
+    let created;
+    try {
+      await FB.castReopenRequest(id, uid, { idToken });
+      // Dall'owner parte con la sua prova come dal riquadro (#953), mai col ripiego anonimo.
+      const firmato = Mittente.firma(`uid:${uid}`);
+      created = await FB.submit({
+        submissionId: `reopen-${id}-${uid}`,
+        text: `[Riapertura #${original.seq || id}] ${text}`,
+        // #583: URL e titolo della pagina originale non arrivano fin qui: il collegamento è `parentId`.
+        url: '',
+        title: '',
+        userAgent: '',
+        clientId: firmato.clientId,
+        parentId: id,
+        name: '',
+      }, firmato.dallOwner ? { idToken, soloAdmin: true } : undefined);
+    } catch (e) {
+      try { await FB.clearReopenRequest(id, uid, { idToken }); } catch (_) {}
+      throw e;
+    }
+    await ricordaSegnalazione(created?.id, FB.formatNum ? FB.formatNum(created?.seq, 0) : '', text, original);
+    return { ok: true, feedbackId: created.id, cost: 0 };
+  }
+
+  // #678 — la riapertura è una segnalazione di questa installazione: entra nel
+  // registro, e la prossima apertura della home va a vedere subito se c'è una
+  // ricompensa da dare (l'attesa si azzera).
+  async function ricordaSegnalazione(feedbackId, num, text, original) {
+    try { await globalThis.SN_FEEDBACK_MINE?.ricordaId?.(feedbackId); } catch (_) {}
+    try {
+      await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({
+        id: feedbackId, feedbackId, testo: text, stato: 'inviata', num,
+        titolo: original.name ? `Ancora rotto: ${original.name}` : 'Ancora rotto',
+      });
+    } catch (_) {}
+  }
 
   // #986 — le segnalazioni mandate da qui: le legge e le toglie solo una pagina di Filo.
   const Mie = () => globalThis.SN_SEGNALAZIONI_MIE;
@@ -268,14 +284,16 @@ module.exports = function register(on, ctx) {
 
   on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
     const id = String(msg?.id || '').trim();
+    let installazione = false;
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, code: 'auth', error: 'Accedi per votare i miglioramenti.' };
       }
       if (!id) return { ok: false, error: 'Feedback non valido.' };
-      const cr = await credenziali();
+      const cr = await credenziali('voto');
       if (cr.esito) return cr.esito;
-      if (cr.fallito) return esitoFallito(cr.fallito, id, VOTO_NON_REGISTRATO);
+      installazione = Boolean(cr.installazione);
+      if (cr.fallito) return esitoFallito(cr.fallito, id, VOTO_NON_REGISTRATO, { installazione });
       const { uid, idToken } = cr;
       if (!FB?.clearVote) throw new Error('SN_FEEDBACK non caricato nel main process');
 
@@ -285,7 +303,7 @@ module.exports = function register(on, ctx) {
       const votes = await fetchVotes(id);
       return { ok: true, uid, votes };
     } catch (e) {
-      return esitoFallito(e, id, VOTO_NON_REGISTRATO);
+      return esitoFallito(e, id, VOTO_NON_REGISTRATO, { installazione });
     }
   }));
 

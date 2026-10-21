@@ -139,12 +139,13 @@ test('un caricamento PARZIALE non svuota la bacheca; uno completo toglie gli orf
   assert.deepEqual(V.planSync([orfana], [PULITO], { complete: true }).remove, ['fb-vecchio']);
 });
 
-test('i voti della scheda si riuniscono al feedback senza cancellare quelli storici', () => {
-  const rows = [{ _id: 'fb-1', votes: { vecchio: { vote: 'works' } } }];
-  const cards = [{ _id: 'fb-1', votes: { nuovo: { vote: 'broken' } }, reopenRequests: { tizio: { at: 'x' } } }];
+test('per i conti dell\'owner voti e riaperture vengono solo dalla scheda (#1076)', () => {
+  // Sul documento chiunque poteva scrivere voti e riaperture: con una scheda, quelli non contano.
+  const rows = [{ _id: 'fb-1', votes: { finto: { vote: 'works', credibilitySnapshot: 1e9 } }, reopenRequests: { finto: { at: 'x' } } }];
+  const cards = [{ _id: 'fb-1', votes: { nuovo: { vote: 'broken' } } }];
   const [out] = V.mergeUserFields(rows, cards);
-  assert.deepEqual(Object.keys(out.votes).sort(), ['nuovo', 'vecchio']);
-  assert.deepEqual(Object.keys(out.reopenRequests), ['tizio']);
+  assert.deepEqual(Object.keys(out.votes), ['nuovo']);
+  assert.equal('reopenRequests' in out, false);
   // Senza schede, i feedback tornano com'erano.
   assert.deepEqual(V.mergeUserFields(rows, []), rows);
 });
@@ -152,69 +153,39 @@ test('i voti della scheda si riuniscono al feedback senza cancellare quelli stor
 test('il publisher non scrive mai i campi che scrivono gli utenti', () => {
   for (const f of V.USER_FIELDS) {
     assert.ok(!V.CARD_FIELDS.includes(f),
-      `"${f}" lo scrivono gli utenti: se il publisher lo elencasse, una ripubblicazione cancellerebbe i voti di tutti`);
+      `"${f}" non è del publisher: se lo elencasse, una ripubblicazione cancellerebbe i voti di tutti`);
   }
 });
 
-// ── Il travaso dei voti e delle riaperture (#583, giro 1 di verifica) ────────
+// ── Niente più travaso dal documento alla scheda (#1076) ─────────────────────
 //
-// Prima di questa vista i voti della bacheca e il segnale «ancora rotto» si
-// scrivevano sul feedback, e la bacheca li leggeva da lì. Adesso li legge dalla
-// scheda: senza portarli dentro, il giorno in cui le regole vanno in produzione
-// ogni conteggio riparte da zero e un fix già segnalato come rotto torna in
-// bacheca riapribile una seconda volta, cioè il doppione che quel segnale
-// doveva impedire.
+// Il travaso del passaggio #583 portava sulla scheda voti e riaperture rimasti
+// sul documento. Il documento però lo scriveva chiunque avesse un account
+// anonimo: con il travaso, un voto gonfiato o una riapertura mai pagata
+// arrivavano sulla scheda dalla mano dell'owner, e la scheda spariva dalla
+// bacheca senza che nessun feedback fosse riaperto.
 
 const VOTATO = {
   ...PULITO,
   _id: 'fb-votato',
-  votes: { 'uid-a': { vote: 'works', at: '2026-06-23T10:00:00Z', credibilitySnapshot: 1 } },
+  votes: { 'uid-a': { vote: 'works', at: '2026-06-23T10:00:00Z', credibilitySnapshot: 1e9 } },
   reopenRequests: { 'uid-b': { at: '2026-06-24T10:00:00Z' } },
 };
 
-test('i voti rimasti sul documento entrano nella scheda al primo passaggio', () => {
+test('voti e riaperture del documento non entrano nella scheda', () => {
   const plan = V.planSync([], [VOTATO], { complete: true });
   assert.equal(plan.upsert.length, 1);
   const { card } = plan.upsert[0];
-  assert.deepEqual(Object.keys(card.votes), ['uid-a']);
-  assert.deepEqual(Object.keys(card.reopenRequests), ['uid-b']);
-});
-
-test('il segnale «ancora rotto» arrivato nella scheda blocca una seconda riapertura', () => {
+  assert.equal('votes' in card, false);
+  assert.equal('reopenRequests' in card, false);
   const MR = globalThis.SN_MANAGE_REVIEW;
-  const { card } = V.planSync([], [VOTATO], { complete: true }).upsert[0];
-  const scheda = { _id: VOTATO._id, ...card };
-  assert.equal(MR.canReopen(scheda, { releasedVersion: '0.2.71' }), false,
-    'senza il travaso la scheda nasce senza segnale e il fix si potrebbe ripagare');
+  assert.equal(MR.hasReopenRequest({ _id: VOTATO._id, ...card }), false, 'la scheda resta in bacheca');
 });
 
-test('chi ha votato DOPO il passaggio non si vede cancellare il voto', () => {
-  const scheda = {
-    _id: VOTATO._id,
-    ...V.cardFor(VOTATO),
-    votes: { 'uid-c': { vote: 'broken', at: '2026-07-01T10:00:00Z', credibilitySnapshot: 1 } },
-  };
+test('una scheda già pubblicata non si riscrive per i campi del documento', () => {
+  const scheda = { _id: VOTATO._id, ...V.cardFor(VOTATO), votes: { 'uid-c': { vote: 'broken' } } };
   const plan = V.planSync([scheda], [VOTATO], { complete: true });
-  assert.equal(plan.upsert.length, 1, 'c\'è ancora un voto storico da portare dentro');
-  const { card } = plan.upsert[0];
-  assert.deepEqual(Object.keys(card.votes).sort(), ['uid-a', 'uid-c']);
-  assert.equal(card.votes['uid-c'].vote, 'broken', 'il voto nuovo vince su quello storico');
-});
-
-test('a travaso finito la scheda non si riscrive più a vuoto', () => {
-  const primo = V.planSync([], [VOTATO], { complete: true }).upsert[0];
-  const scheda = { _id: VOTATO._id, ...primo.card };
-  const secondo = V.planSync([scheda], [VOTATO], { complete: true });
-  assert.equal(secondo.upsert.length, 0);
-});
-
-test('un voto già sulla scheda e cancellato da chi l\'aveva dato non torna dal documento', () => {
-  // Il documento porta ancora il voto storico, ma la scheda ha già la chiave:
-  // «ritirato» è una decisione, e il travaso non la deve annullare.
-  const scheda = { _id: VOTATO._id, ...V.cardFor(VOTATO), votes: { 'uid-a': null } };
-  const plan = V.planSync([scheda], [VOTATO], { complete: true });
-  const daPortare = plan.upsert.filter((u) => u.card.votes);
-  assert.equal(daPortare.length, 0, 'la chiave c\'è già sulla scheda: niente da portare');
+  assert.equal(plan.upsert.length, 0);
 });
 
 // ── La ricompensa di chi ha segnalato (#583, giro 2 di verifica) ─────────────

@@ -65,12 +65,25 @@ test('normalizeVotes: input non valido → map vuoto', () => {
 
 test('tallyVotes: conteggi e punteggio pesato per credibilità', () => {
   const t = FB.tallyVotes({
-    a: { vote: 'works', credibilitySnapshot: 2 },
+    a: { vote: 'works', credibilitySnapshot: 0.5 },
     b: { vote: 'works', credibilitySnapshot: 1 },
     c: { vote: 'broken', credibilitySnapshot: 1 },
   });
-  // works: 2+1 = 3 ; broken: 1 ; score = 3 − 1 = 2
-  assert.deepEqual(t, { works: 2, broken: 1, total: 3, score: 2 });
+  // works: 0,5+1 = 1,5 ; broken: 1 ; score = 1,5 − 1 = 0,5
+  assert.deepEqual(t, { works: 2, broken: 1, total: 3, score: 0.5 });
+});
+
+// #1076: il peso lo scrive chi vota. Un voto da 1e9, scritto prima che le regole
+// avessero un tetto, contava un miliardo: ora vale quanto gli altri.
+test('tallyVotes: un peso oltre il tetto conta quanto il tetto', () => {
+  assert.equal(FB.CREDIBILITY_MAX, 1);
+  const t = FB.tallyVotes({
+    gonfio: { vote: 'works', credibilitySnapshot: 1e9 },
+    a: { vote: 'broken', credibilitySnapshot: 1 },
+    b: { vote: 'broken', credibilitySnapshot: 1 },
+  });
+  assert.deepEqual(t, { works: 1, broken: 2, total: 3, score: -1 });
+  assert.equal(FB.normalizeVotes({ x: { vote: 'works', credibilitySnapshot: Infinity } }).x.credibilitySnapshot, 1);
 });
 
 test('tallyVotes: voti opposti pari → score 0', () => {
@@ -102,7 +115,7 @@ test('userVote: ritorna il voto del singolo utente o null', () => {
 test('round-trip: un map di voti sopravvive a toFsValue → fromFsValue', () => {
   const votes = {
     u1: { vote: 'works', at: '2026-06-24T10:00:00.000Z', credibilitySnapshot: 1 },
-    u2: { vote: 'broken', at: '2026-06-24T11:00:00.000Z', credibilitySnapshot: 3 },
+    u2: { vote: 'broken', at: '2026-06-24T11:00:00.000Z', credibilitySnapshot: 0.5 },
   };
   const encoded = FB.toFsValue(votes);
   // È un mapValue annidato (la forma con cui finisce nel doc feedback).
@@ -110,7 +123,7 @@ test('round-trip: un map di voti sopravvive a toFsValue → fromFsValue', () => 
   const decoded = FB.fromFsValue(encoded);
   assert.deepEqual(decoded, votes);
   // E il tally calcolato dal valore decodificato è coerente.
-  assert.deepEqual(FB.tallyVotes(decoded), { works: 1, broken: 1, total: 2, score: -2 });
+  assert.deepEqual(FB.tallyVotes(decoded), { works: 1, broken: 1, total: 2, score: 0.5 });
 });
 
 // ── #602, giro 2: togliere la PROPRIA richiesta di riapertura ───────────────

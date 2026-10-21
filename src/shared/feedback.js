@@ -1906,8 +1906,9 @@
   }
 
   // Scrive (o aggiorna) la scheda pubblica di un feedback. La maschera elenca
-  // SOLO i campi della scheda: `votes` e `reopenRequests` li scrivono gli
-  // utenti e non devono essere cancellati da una ripubblicazione.
+  // SOLO i campi della scheda: `votes` (di chi vota) e `reopenRequests` (del
+  // server, #1076) non li scrive mai una ripubblicazione, né per cancellarli né
+  // portandoceli dal documento.
   // Serve il token dell'owner (o del server): le regole non ammettono altri.
   async function publishPublicCard(id, card, opts = {}) {
     const key = String(id || '');
@@ -1924,18 +1925,6 @@
     }
     fields.publishedAt = toFsValue(new Date().toISOString());
     mask.push('publishedAt');
-    // I voti e le riaperture li scrivono gli UTENTI, quindi di norma non
-    // entrano nella maschera: una ripubblicazione li cancellerebbe. L'unica
-    // volta che ci entrano è il travaso dal documento alla scheda (#583,
-    // SN_FEEDBACK_PUBLIC_VIEW.carryUserFields), e in quel caso il valore che
-    // arriva qui ha già dentro anche quello che c'era sulla scheda.
-    const userFields = (V && V.USER_FIELDS) ? V.USER_FIELDS : ['votes', 'reopenRequests'];
-    for (const f of userFields) {
-      const v = (card || {})[f];
-      if (!v || typeof v !== 'object') continue;
-      fields[f] = toFsValue(v);
-      mask.push(f);
-    }
     const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
     const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
@@ -2193,9 +2182,12 @@
 
   // Credibilità di default di un votante: 1 "per ora" (DC3 — il substrato
   // credibilità per-utente arriva con DC5; finché non c'è, ogni voto pesa 1).
+  // Il peso lo scrive chi vota: oltre il tetto delle regole (#1076) non conta,
+  // nemmeno nei voti scritti prima che il tetto ci fosse.
+  const CREDIBILITY_MAX = 1;
   function normalizeCredibility(v) {
     const c = Number(v);
-    return Number.isFinite(c) && c >= 0 ? c : 1;
+    return Number.isFinite(c) && c >= 0 ? Math.min(c, CREDIBILITY_MAX) : 1;
   }
 
   // PURA: ripulisce un map di voti grezzo (es. da fsDocToObject) tenendo solo le
@@ -2285,14 +2277,11 @@
     return true;
   }
 
-  // ---- riapertura a pagamento (DC4) ----
-  // RETE: marca SUL FEEDBACK ORIGINALE che l'uid ha chiesto la riapertura.
-  // Scrive solo `reopenRequests.<uid>` (updateMask mirato, stesso pattern non-
-  // admin di castVote): un utente normale NON può toccare `status` di un doc
-  // che non ha creato (ramo admin delle regole, vedi firestore.rules) — flippare
-  // l'originale fuori da "Risolti" resta al percorso fidato (routine/owner) che
-  // legge questo campo. Qui scriviamo solo il SEGNALE + (nel chiamante) creiamo
-  // il feedback collegato: è la parte che un utente può fare da solo.
+  // ---- riapertura (DC4) ----
+  // RETE: marca sulla scheda che l'uid ha chiesto la riapertura (solo
+  // `reopenRequests.<uid>`, updateMask mirato). La scrive solo l'owner, col ramo
+  // admin delle regole: per tutti gli altri lo fa il server, che fa pagare il
+  // portafoglio (callable `bachecaRiapri`, #1076).
   async function castReopenRequest(id, uid, opts = {}) {
     if (!id) throw new Error('id mancante');
     if (!uid) throw new Error('uid mancante');
@@ -2409,6 +2398,7 @@
     tallyVotes,
     userVote,
     VOTE_VALUES,
+    CREDIBILITY_MAX,
     // Riapertura a pagamento (DC4).
     castReopenRequest,
     clearReopenRequest,

@@ -277,7 +277,8 @@ I feedback non sono l'unica cosa che arriva al server. Ci sono anche:
   (`src/main/services/handlers/wallet.js`, regole `wallet-usage` in
   `firestore.rules`);
 - i **voti** e le richieste di riapertura che lasci sulla bacheca
-  (`firestore.rules`, `feedback-public`);
+  (`firestore.rules`, `feedback-public`; la riapertura passa dal server, che
+  scala i crediti del portafoglio, nella funzione `bachecaRiapri`);
 - se partecipi al **red team**, i tuoi tentativi
   (`src/main/services/handlers/redteam.js`);
 - se accedi con Google, **email e nome** dell'account e quanto usi ogni
@@ -321,9 +322,12 @@ Le regole (Firebase Security Rules) dicono:
   **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
   cancellarli. Gli agenti autorizzati possono solo farli avanzare di stato e
   scriverci le note di lavorazione: niente priorità, niente archivio, niente
-  cancellazioni. Un utente qualunque, su un feedback altrui, può solo
-  aggiungere il proprio voto o chiedere che un problema risolto venga
-  riaperto; lo stato lo cambia solo chi gestisce i feedback.
+  cancellazioni. Chi ha un portafoglio di crediti, su un feedback altrui, può
+  solo aggiungere il proprio voto, con un peso uguale per tutti, o chiedere che
+  un problema risolto venga riaperto: la richiesta la scrive il server, dopo
+  aver scalato i crediti e aperto la segnalazione collegata. Un account anonimo
+  senza portafoglio non scrive niente sulla bacheca; lo stato lo cambia solo
+  chi gestisce i feedback.
 - La lista degli amministratori è una raccolta dedicata sul server: per
   aggiungere un collaboratore basta aggiungere la sua email, senza modificare
   il codice dell'app.

@@ -864,7 +864,7 @@
     const movimenti = (d.grants || []).slice()
       .sort((a, b) => String(b && b.at || '').localeCompare(String(a && a.at || '')))
       .slice(0, 50)
-      .map((g) => [`${W.grantLabel(g.why)} · ${formatDate(g.at)}`, `+${formatInt(g.credits)}`]);
+      .map((g) => [`${W.grantLabel(g.why)} · ${formatDate(g.at)}`, `${Number(g.credits) < 0 ? '−' : '+'}${formatInt(Math.abs(Number(g.credits)))}`]);
     wrap.appendChild(bloccoScheda('Movimenti', elencoSemplice(movimenti, 'Nessun movimento.')));
 
     // I suoi inviti, con chi è entrato: stessa forma dei propri codici.

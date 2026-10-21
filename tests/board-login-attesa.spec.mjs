@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { googleFinto, schedeSu, indirizzoDellAccesso, rispondiAlLoopback } from './helpers/googleFinto.mjs';
+import { portafoglioFinto } from './helpers/portafoglioFinto.mjs';
 
 const INDIRIZZO = 'filo://board/board.html';
 const FIX_A = {
@@ -17,6 +18,8 @@ const FIX_B = { ...FIX_A, _id: 'fb-b', name: 'Fix B', seq: 78 };
 let paginaAccesso = '';
 async function apriBacheca(app, openTab, testServer, { browserRotto = false, rifiuta = false } = {}) {
   paginaAccesso = await googleFinto(app, testServer, { rifiuta });
+  // Votare e riaprire chiedono i crediti di Filo (#1076): qui si prova l'accesso, da un'installazione che li ha.
+  await portafoglioFinto(app);
   if (browserRotto) await app.evaluate(({ shell }) => { shell.openExternal = async () => { throw new Error('Failed to open'); }; });
   const page = await openTab(INDIRIZZO);
   await page.waitForFunction(() => window.__boardTest && window.SN_MANAGE_REVIEW, null, { timeout: 15_000 });

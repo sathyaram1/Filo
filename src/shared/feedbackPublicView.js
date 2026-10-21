@@ -76,8 +76,8 @@
     'publishedAt',       // quando questa scheda è stata scritta (diagnostica)
   ]);
 
-  // I campi della scheda che NON scrive il publisher: li scrivono gli utenti
-  // (un voto, una riapertura) con le regole chiave==uid. Il publisher scrive
+  // I campi della scheda che NON scrive il publisher: i voti li scrive chi vota
+  // (regole chiave==uid), le riaperture il server (#1076). Il publisher scrive
   // sempre con una maschera sui soli CARD_FIELDS, o il primo aggiornamento di
   // una scheda cancellerebbe i voti di tutti.
   const USER_FIELDS = Object.freeze(['votes', 'reopenRequests']);
@@ -222,35 +222,6 @@
     return card;
   }
 
-  /**
-   * I voti e le riaperture che stanno ancora sul DOCUMENTO e che la scheda non
-   * ha. PURA.
-   *
-   * Serve una volta sola, al passaggio: prima di questa vista i voti della
-   * bacheca e il segnale «ancora rotto» si scrivevano sul feedback, e la
-   * bacheca li leggeva da lì. Adesso li legge dalla scheda — e senza portarli
-   * dentro, il giorno in cui le regole vanno in produzione ogni conteggio
-   * riparte da zero e un fix già segnalato come rotto torna in bacheca
-   * riapribile una seconda volta, cioè il doppione che quel segnale doveva
-   * impedire.
-   *
-   * Si portano solo le chiavi che la scheda NON ha: chi ha votato dopo il
-   * passaggio ha ragione lui, e una ripubblicazione non gli cancella il voto.
-   * Quando non c'è più niente da portare torna `{}`, e il travaso smette da sé.
-   */
-  function carryUserFields(fb, before) {
-    const out = {};
-    for (const f of USER_FIELDS) {
-      const fromDoc = (fb && typeof fb[f] === 'object' && fb[f]) || null;
-      if (!fromDoc) continue;
-      const fromCard = (before && typeof before[f] === 'object' && before[f]) || {};
-      const mancanti = Object.keys(fromDoc).filter((k) => !(k in fromCard));
-      if (!mancanti.length) continue;
-      out[f] = { ...fromDoc, ...fromCard };
-    }
-    return out;
-  }
-
   /** Le due schede dicono la stessa cosa? PURA (confronto campo per campo). */
   function sameCard(a, b) {
     if (!a || !b) return false;
@@ -291,15 +262,10 @@
       if (!card) continue;
       wanted.add(id);
       const before = now.get(id);
-      // I voti e le riaperture rimasti sul documento vanno portati nella
-      // scheda: è l'unico posto da cui la bacheca li legge (vedi
-      // carryUserFields). Sono un motivo per riscrivere la scheda anche quando
-      // i campi della scheda non sono cambiati.
-      const carry = carryUserFields(fb, before);
-      const daPortare = Object.keys(carry).length > 0;
-      if (!before || !sameCard(before, card) || daPortare) {
-        upsert.push({ id, card: daPortare ? { ...card, ...carry } : card });
-      }
+      // Voti e riaperture rimasti sul documento NON si portano più sulla scheda
+      // (#1076): il travaso del passaggio #583 ha finito il suo lavoro, e quello
+      // che compare lì adesso l'ha scritto chiunque, senza portafoglio né spesa.
+      if (!before || !sameCard(before, card)) upsert.push({ id, card });
     }
     // Una scheda che non deve più esserci si TOGLIE: un fix riaperto o
     // riclassificato non resta in bacheca perché nessuno l'ha cancellato.
@@ -326,9 +292,9 @@
    * vota può aprire. PURA.
    *
    * Chi fa i conti dal lato dell'owner (la dashboard, l'archiviazione a
-   * punteggio) continua così a leggere `fb.votes` come ha sempre fatto. Quello
-   * che sta solo sul documento — i voti dati prima del passaggio — non si
-   * perde: la scheda vince chiave per chiave, non cancella il resto.
+   * punteggio) continua così a leggere `fb.votes` come ha sempre fatto. Con la
+   * scheda vale solo la scheda (#1076): sul documento chiunque poteva scrivere
+   * voti e riaperture, e quelli buoni del passaggio #583 stanno già sulla scheda.
    *
    * @param {Array<object>} rows feedback (con `_id`)
    * @param {Array<object>} cards schede pubbliche (con `_id`)
@@ -345,10 +311,9 @@
       if (!card) return r;
       const out = { ...r };
       for (const f of USER_FIELDS) {
-        const fromDoc = (r && typeof r[f] === 'object' && r[f]) || {};
-        const fromCard = (typeof card[f] === 'object' && card[f]) || {};
-        const merged = { ...fromDoc, ...fromCard };
-        if (Object.keys(merged).length) out[f] = merged;
+        const fromCard = (card[f] && typeof card[f] === 'object') ? card[f] : null;
+        if (fromCard && Object.keys(fromCard).length) out[f] = { ...fromCard };
+        else delete out[f];
       }
       return out;
     });
@@ -362,7 +327,6 @@
     isFlagged,
     rewardFor,
     cardFor,
-    carryUserFields,
     sameCard,
     planSync,
     mergeUserFields,

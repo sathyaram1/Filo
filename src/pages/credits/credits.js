@@ -695,9 +695,10 @@
     // rovesciarli li metterebbe dal più vecchio, cioè al contrario di come si
     // legge un elenco di movimenti. Il conteggio locale è un'altra lista, e
     // quella arriva in ordine di scrittura: lì il rovesciamento serve.
+    // Col portafoglio anche le spese fatte dal server (una riapertura dalla bacheca, #1076): crediti negativi.
     const items = conPortafoglio
       ? (Array.isArray(server.grants) ? server.grants : [])
-        .filter((g) => (g && g.credits) > 0)
+        .filter((g) => Number(g && g.credits) !== 0 && Number.isFinite(Number(g && g.credits)))
         .map((g) => ({ credits: g.credits, testo: W.grantLabel(g.why), ts: g.at }))
       : rewards.slice().reverse()
         .filter((m) => (m && m.credits) > 0)
@@ -709,8 +710,9 @@
       const li = document.createElement('li');
 
       const gain = document.createElement('span');
-      gain.className = 'sn-credits-move-gain';
-      gain.textContent = `+${formatInt(m.credits)}`;
+      const spesa = Number(m.credits) < 0;
+      gain.className = spesa ? 'sn-credits-move-gain sn-credits-move-spesa' : 'sn-credits-move-gain';
+      gain.textContent = `${spesa ? '−' : '+'}${formatInt(Math.abs(Number(m.credits)))}`;
 
       const label = document.createElement('span');
       label.className = 'sn-credits-move-label';

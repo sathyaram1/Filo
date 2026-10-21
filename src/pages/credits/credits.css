@@ -69,6 +69,8 @@
 }
 .sn-credits-moves-list li:last-child { border-bottom: none; }
 .sn-credits-move-gain { color: var(--sn-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Una spesa non è un premio: il colore del testo, non quello dell'accento. */
+.sn-credits-move-spesa { color: var(--sn-fg); }
 .sn-credits-move-label { flex: 1 1 auto; }
 .sn-credits-move-date { color: var(--sn-muted); font-size: 12px; }
 

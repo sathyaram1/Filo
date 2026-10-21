@@ -113,10 +113,9 @@ export async function publishPublicView({ dryRun = false } = {}) {
   // TUTTE le schede già pubblicate, paginate: con una finestra sui 500 più
   // recenti per data d'invio, le schede oltre quel tetto non le poteva togliere
   // più nessuno, e non servivano nemmeno a ripescare i feedback fuori pagina.
-  // I campi della scheda più quelli degli utenti: `planSync` confronta i primi,
-  // e `carryUserFields` ha bisogno dei voti già sulla scheda per non ricopiarci
-  // sopra quelli vecchi. Sono tutti i campi che servono e nessuno di più (#680).
-  const CAMPI_SCHEDA = [...PV.CARD_FIELDS, ...PV.USER_FIELDS];
+  // I campi della scheda: `planSync` confronta quelli, e voti e riaperture non
+  // li tocca (#1076). Sono tutti i campi che servono e nessuno di più (#680).
+  const CAMPI_SCHEDA = [...PV.CARD_FIELDS];
   const published = typeof FB.listAllPublic === 'function'
     ? await FB.listAllPublic({ fields: CAMPI_SCHEDA })
     : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, fields: CAMPI_SCHEDA });

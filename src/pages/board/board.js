@@ -77,6 +77,9 @@
   // ── Stato ──────────────────────────────────────────────────────────────
   let signedIn = false;
   let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
+  // Se questa installazione può votare e riaprire (#1076): null finché il main non l'ha detto.
+  let portafoglio = null;
+  let motivoSenzaPortafoglio = '';
   let allFeedbacks = [];
   // Dove riprendere lo scorrimento, se c'è altro, e se una pagina è in volo.
   let cursore = null;
@@ -132,7 +135,8 @@
   // `uid` è il claim Firebase REALE (request.auth.uid nelle Firestore rules),
   // non l'email: è la chiave con cui i voti sono salvati in `votes.<uid>` (DB4).
   // Senza questo, dopo un reload "il mio voto" non si riconoscerebbe più
-  // (i voti salvati sono sempre per uid reale, mai per email).
+  // (i voti salvati sono sempre per uid reale, mai per email). Si vota con
+  // l'identità dell'installazione (#1076), che il main dice con board_identita.
   const CODICI_ACCESSO = new Set(['auth', 'accesso', 'accesso-ko', 'lasciato']);
   async function refreshAuth() {
     try {
@@ -141,6 +145,17 @@
       uid = (r && r.uid) || null;
     } catch (_) {
       signedIn = false; uid = null;
+    }
+    portafoglio = null;
+    if (signedIn) {
+      try {
+        const b = await sendToMain({ type: 'board_identita' });
+        if (b && b.ok) {
+          if (b.uid) uid = b.uid;
+          portafoglio = typeof b.portafoglio === 'boolean' ? b.portafoglio : null;
+          motivoSenzaPortafoglio = typeof b.motivo === 'string' ? b.motivo : '';
+        }
+      } catch (_) { /* decide il main al gesto */ }
     }
     if (signedIn) {
       for (const [id, a] of avvisi) if (CODICI_ACCESSO.has(a.code)) avvisi.delete(id);
@@ -156,7 +171,10 @@
     bdAuthLascia.hidden = !inCorso;
     bdAuthMsg.classList.toggle('bd-auth-ko', !!fallito);
     if (signedIn) {
-      bdAuthMsg.textContent = 'Sei connesso: vota i miglioramenti qui sotto.';
+      // Connesso ma senza portafoglio: votare non riuscirebbe, e la riga lo dice al posto dell'invito a votare.
+      bdAuthMsg.textContent = portafoglio === false && motivoSenzaPortafoglio
+        ? motivoSenzaPortafoglio
+        : 'Sei connesso: vota i miglioramenti qui sotto.';
       bdSignIn.hidden = true;
       return;
     }
@@ -339,7 +357,7 @@
     if (!a) return null;
     const p = document.createElement('p');
     // Un fix ritirato non è un errore di chi ha votato: tono neutro.
-    p.className = a.code === 'gone' || a.code === 'accesso' || a.code === 'lasciato' ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
+    p.className = ['gone', 'accesso', 'lasciato', 'portafoglio'].includes(a.code) ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
     p.setAttribute('role', 'status');
     p.textContent = a.testo;
     return p;
@@ -397,13 +415,17 @@
   // sola per fix (vedi guard SN_MANAGE_REVIEW.canReopen), non per voto.
   function renderReopen(fb) {
     if (riaperteOra.has(fb._id)) {
-      const { saldo } = riaperteOra.get(fb._id) || {};
+      const { saldo, costo } = riaperteOra.get(fb._id) || {};
       const ok = document.createElement('p');
       ok.className = 'bd-reopen-ok';
       ok.setAttribute('role', 'status');
-      const costo = SN_CONST.CREDIT.BOARD_REOPEN;
-      const resto = saldo != null && Number.isFinite(Number(saldo)) ? `, te ne restano ${Number(saldo)}` : '';
-      ok.textContent = `Segnalazione inviata: il miglioramento torna in lavorazione. Hai speso ${costo} crediti${resto}.`;
+      // Il saldo del portafoglio ha un decimale: scritto alla italiana, come la pagina Crediti.
+      const crediti = (n) => new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(Number(n));
+      const resto = saldo != null && Number.isFinite(Number(saldo)) ? `, te ne restano ${crediti(saldo)}` : '';
+      // Il main dice quanto è costata (0: l'owner, o una riapertura ritrovata); senza il numero vale la tariffa.
+      const quanto = costo === undefined || costo === null ? SN_CONST.CREDIT.BOARD_REOPEN : Number(costo);
+      const speso = quanto > 0 ? ` Hai speso ${crediti(quanto)} crediti${resto}.` : '';
+      ok.textContent = `Segnalazione inviata: il miglioramento torna in lavorazione.${speso}`;
       return ok;
     }
     if (MR.hasReopenRequest(fb)) {
@@ -467,10 +489,18 @@
     link.addEventListener('click', () => {
       if (!signedIn || !uid) {
         accedi(fb._id, 'modulo', 'poi scrivi qui cosa non va', (ok) => {
-          if (ok) openReopenAfterLogin = fb._id;
+          if (ok && portafoglio === false) {
+            avvisi.set(fb._id, { testo: motivoSenzaPortafoglio || 'Per segnalare servono i crediti di Filo.', code: 'portafoglio' });
+          } else if (ok) openReopenAfterLogin = fb._id;
           renderList();
           openReopenAfterLogin = null;
         });
+        return;
+      }
+      // Senza portafoglio la segnalazione non può partire: lo si dice prima che la scriva.
+      if (portafoglio === false) {
+        avvisi.set(fb._id, { testo: motivoSenzaPortafoglio || 'Per segnalare servono i crediti di Filo.', code: 'portafoglio' });
+        renderList();
         return;
       }
       form.hidden = !form.hidden;
@@ -523,7 +553,7 @@
           fb.reopenRequests = { ...(fb.reopenRequests || {}), [uid]: { at: new Date().toISOString() } };
           bozzeRiapertura.delete(id);
           avvisi.delete(id);
-          riaperteOra.set(id, { saldo: r.balance });
+          riaperteOra.set(id, { saldo: r.balance, costo: r.cost });
           salvaCache(); // la riapertura appena chiesta non torna indietro
           renderList();
         } else if (r && (r.code === 'gone' || r.code === 'auth')) {

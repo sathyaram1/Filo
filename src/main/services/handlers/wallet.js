@@ -961,6 +961,8 @@ module.exports = function register(on, ctx) {
     haPortafoglio, saldoPerChat,
     // L'avviso prima che i crediti finiscano (#818) legge l'ultimo stato senza chiederne uno nuovo.
     ultimaLettura: () => ultimaLettura,
+    // Le funzioni del server che pagano col portafoglio, con l'identità dell'installazione: la riapertura (#1076).
+    chiama: (name, data) => callable(name, data),
     redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi

@@ -32,6 +32,7 @@
         'In alto a destra, accanto ai tasti della finestra, non c\'è più il tasto dei download. I download li trovi nella home e nella pagina Download, dal menu App. Mentre un file scende, l\'avanzamento lo vedi sull\'icona di Filo nella barra delle applicazioni (nel Dock su Mac). Quando un programma aspetta la tua risposta il pannello si apre da solo sopra la pagina, e lo chiudi con la ×.',
       ],
       fixes: [
+        'Sulla bacheca, «Ancora rotto?» paga coi crediti di Filo e la spesa la ritrovi fra i movimenti della pagina Crediti. Per votare e per riaprire un fix serve un invito riscattato.',
         'Un doppio clic sul tasto d\'invio, o su «riprendi», non ferma più il lavoro appena partito, e un doppio clic sul pulsante di una conferma non la chiude più. Quando fermi Filo nella prima conversazione, ricaricare la pagina non lo fa ripartire, e una conversazione nuova risponde subito anche se l\'azione fermata prima non è ancora finita.',
         'Il menu del tasto destro aperto su un avviso in basso a destra, o lì accanto, ora sta sopra l\'avviso e lo vedi intero.',
         'Se chiedi a Filo dove finiscono le tue chat, adesso ti dice come stanno le cose: restano salvate sul tuo computer, ma per risponderti e per dare un nome a ogni chat le legge un modello, come tutto quello che gli chiedi. Lo stesso vale per il quaderno delle memorie e per l\'Aiuto. Prima diceva che nessuna chat usciva dal computer.',
