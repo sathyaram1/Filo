@@ -74,9 +74,14 @@ function leggiTsv(file) {
 // Fra i candidati di una truffa, quello che la truffa imita: il marchio scritto a mano se c'è, se no il più evidente.
 const ORDINE = ['omografo', 'sosia', 'esatto', 'dentro', 'sosiadentro', 'typo', 'typodentro'];
 function principale(es, marchio) {
-  if (marchio) return es.find((e) => e.c.mc.token === marchio) || es.find((e) => e.c.mc.brand.display === (es.find((x) => x.c.mc.token === marchio) || {}).display) || null;
+  if (marchio) return es.find((e) => e.c.mc.token === marchio) || es.find((e) => e.c.mc.brand.display === displayDi(marchio)) || null;
   return [...es].sort((a, b) => ORDINE.indexOf(a.c.tipo) - ORDINE.indexOf(b.c.tipo)
     || b.c.mc.token.length - a.c.mc.token.length || (a.c.zona === 'sld' ? -1 : 1))[0];
+}
+
+function displayDi(token) {
+  const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
+  return (BRANDS.find((b) => b.token === token) || {}).display;
 }
 
 function rng(seme) {
@@ -171,6 +176,19 @@ function misura(punti, soglia) {
   return { presi, truffe: pos.length, falsi, noti: neg.length, richiamo: presi / Math.max(1, pos.length), tassoFalsi: falsi / Math.max(1, neg.length) };
 }
 
+// Gli host degli elenchi che portano almeno un marchio: rifarli tutti a ogni prova costa minuti, e dipendono solo
+// dall'elenco dei marchi.
+function conCandidati(etichetta) {
+  const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
+  const chiave = IM.impronta(JSON.stringify(BRANDS) + fs.readFileSync(require.resolve('./src/main/services/safebrowse/imitazioni.js'), 'utf8').length).toString(16);
+  const cache = path.join(DATI, `con-candidati-${chiave}.txt`);
+  if (fs.existsSync(cache)) return new Set(fs.readFileSync(cache, 'utf8').split('\n').filter(Boolean));
+  const out = new Set();
+  for (const h of etichetta.keys()) if (IM.esempi(normalize('https://' + h + '/')).length) out.add(h);
+  fs.writeFileSync(cache, [...out].join('\n'));
+  return out;
+}
+
 function costruisci() {
   const prova = new Set(leggiTsv(PROVA).map((r) => r.h));
   const scritte = new Map(leggiTsv(ETICHETTE).map((r) => [r.h, r]));
@@ -209,7 +227,8 @@ function costruisci() {
       gruppi.push({ h, y, fonte, ix: [indici(e.feats, mask)], marchio: e.c.mc.token });
     } else gruppi.push({ h, y, fonte, ix: es.map((e) => indici(e.feats, mask)) });
   };
-  for (const [h, y] of etichetta) if (!scritte.has(h)) aggiungi(h, y, null, 'elenco');
+  const utili = conCandidati(etichetta);
+  for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
   for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, 'mano');
   return gruppi;
 }
@@ -221,7 +240,7 @@ function provaModello() {
     const v = IM.giudica(normalize('https://' + r.h + '/'));
     if (r.marchio) {
       m.truffe++;
-      if (v) { m.presi++; if (v.brand.token !== r.marchio && v.brand.display !== (require('./src/main/services/safebrowse/brands.js').BRANDS.find((b) => b.token === r.marchio) || {}).display) m.marchioSbagliato.push(`${r.h} ${r.marchio}→${v.brand.token}`); } else m.persi.push(r.h);
+      if (v) { m.presi++; if (v.brand.token !== r.marchio && v.brand.display !== displayDi(r.marchio)) m.marchioSbagliato.push(`${r.h} ${r.marchio}→${v.brand.token}`); } else m.persi.push(r.h);
     } else {
       m.noti++;
       if (v) m.falsi.push(`${r.h} (${v.brand.token} ${v.tipo} ${v.punteggio.toFixed(2)})`);
@@ -257,7 +276,6 @@ async function principale_() {
   const mq = quantizza(addestra(esempiDi(gruppi)));
   scrivi(mq, soglia, sogliaForte, { esempi: { imitazioni: gruppi.filter((g) => g.y === 1).length, noti: gruppi.filter((g) => g.y === 0).length } });
   console.log(`scritto ${path.relative(RADICE, IM.FILE_MODELLO)} (${fs.statSync(IM.FILE_MODELLO).size} byte)`);
-  delete require.cache[require.resolve('./src/main/services/safebrowse/imitazioni.js')];
   provaModello();
 }
 

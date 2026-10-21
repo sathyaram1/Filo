@@ -74,6 +74,14 @@ function distanza(a, b) {
 function dentroConErrori(s, t, max) {
   const n = s.length, m = t.length;
   if (n < m - max) return null;
+  if (!max) { const i = s.indexOf(t); return i < 0 ? null : { d: 0, inizio: i, fine: i + m }; }
+  // Con `max` errori almeno uno di 2·max+1 pezzi del marchio resta intero (uno scambio di vicine ne rompe due).
+  let intatto = false;
+  for (let k = 0, parti = 2 * max + 1; k < parti && !intatto; k++) {
+    const a = Math.floor((k * m) / parti), b = Math.floor(((k + 1) * m) / parti);
+    intatto = b > a && s.includes(t.slice(a, b));
+  }
+  if (!intatto) return null;
   let p2 = null;
   let p = new Array(n + 1).fill(0);
   for (let i = 1; i <= m; i++) {
