@@ -5,7 +5,7 @@
 'use strict';
 
 const netNode = require('node:net');
-const { assertPublicHost } = require('./safe-fetch');
+const { assertPublicHost, isPrivateAddr } = require('./safe-fetch');
 
 // ── Referer ────────────────────────────────────────────────────────────────
 
