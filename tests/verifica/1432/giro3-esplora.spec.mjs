@@ -1,7 +1,8 @@
 // Verifica #1432 giro 3: esplorazione (pagine di Filo, clic in fretta, × mentre detta, tema scuro, tastiera).
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, appendFileSync } from 'node:fs';
+const log = (...a) => appendFileSync('/tmp/claude-0/-home-user-Filo/ea101c14-5296-5ff6-bc24-01d3dcd21a26/scratchpad/probe.log', a.join(' ') + '\n');
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from '../../helpers/barra.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
 
@@ -68,19 +69,19 @@ test('pagine di Filo: Preferenze e Cronologia', async ({ app, openTab }) => {
     await page.waitForTimeout(2500);
     const barra = await barraAperta(app);
     const help = icona(barra);
-    console.log('PAGINA', url, JSON.stringify(await leggi(help)), JSON.stringify(await nelMain(app)));
+    log('PAGINA', url, JSON.stringify(await leggi(help)), JSON.stringify(await nelMain(app)));
     await comandaBarra(app, 'chiudi');
     await page.mouse.click(300, 300, { button: 'right' });
     await page.waitForTimeout(800);
     const m = menuDi(page);
-    console.log('MENU', url, await m.voci.count(), JSON.stringify(await m.voci.allInnerTexts().catch(() => [])), await m.locator('.sn-menu [data-sn-icon-id="help"]').count());
+    log('MENU', url, await m.voci.count(), JSON.stringify(await m.voci.allInnerTexts().catch(() => [])), await m.locator('.sn-menu [data-sn-icon-id="help"]').count());
     await page.keyboard.press('Escape');
     await comandaBarra(app, 'clic');
     await pannelloFermo(barra);
     if ((await help.getAttribute('aria-disabled')) === 'false') {
       await help.click();
       await page.waitForTimeout(1200);
-      console.log('DOPO CLIC', url, await page.locator('.sn-sidebar').count(), JSON.stringify(await leggi(help)));
+      log('DOPO CLIC', url, await page.locator('.sn-sidebar').count(), JSON.stringify(await leggi(help)));
     }
     await comandaBarra(app, 'chiudi');
   }
@@ -99,16 +100,16 @@ test('tre clic in fretta e × mentre detta', async ({ app, shell, openTab, testS
   await help.click({ delay: 0 });
   await page.waitForTimeout(2500);
   const mic = page.locator('.sn-sidebar .sn-voce-btn');
-  console.log('FRETTA', await mic.getAttribute('data-stato'), JSON.stringify(await leggi(help)), JSON.stringify((await nelMain(app)).aiuto));
+  log('FRETTA', await mic.getAttribute('data-stato'), JSON.stringify(await leggi(help)), JSON.stringify((await nelMain(app)).aiuto));
   // Ora dettatura e ×.
   if ((await mic.getAttribute('data-stato')) !== 'ascolta') await help.click();
   await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
   await page.waitForTimeout(800);
   await page.locator('.sn-sidebar-close').click();
   await page.waitForTimeout(1500);
-  console.log('CHIUSO', await page.locator('.sn-sidebar').count(), JSON.stringify(await leggi(help)), JSON.stringify((await nelMain(app)).aiuto));
+  log('CHIUSO', await page.locator('.sn-sidebar').count(), JSON.stringify(await leggi(help)), JSON.stringify((await nelMain(app)).aiuto));
   const tracce = await shell.evaluate(() => 0);
-  console.log('tracce', tracce);
+  log('tracce', tracce);
   // Riapre e detta di nuovo.
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
@@ -119,7 +120,7 @@ test('tre clic in fretta e × mentre detta', async ({ app, shell, openTab, testS
   // Esc nella pagina mentre detta.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
-  console.log('ESC', await page.locator('.sn-sidebar').count(), await page.locator('.sn-sidebar .sn-voce-btn').getAttribute('data-stato').catch(() => 'nessuno'), JSON.stringify(await leggi(help)));
+  log('ESC', await page.locator('.sn-sidebar').count(), await page.locator('.sn-sidebar .sn-voce-btn').getAttribute('data-stato').catch(() => 'nessuno'), JSON.stringify(await leggi(help)));
 });
 
 test('tastiera: Ctrl+Shift+B e Invio sull\'icona Aiuto', async ({ app, shell, openTab, testServer }) => {
@@ -129,14 +130,14 @@ test('tastiera: Ctrl+Shift+B e Invio sull\'icona Aiuto', async ({ app, shell, op
   const page = await testServer.openReady(openTab, SITO);
   await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 8_000 }).toBe('chiuso');
   const barra = await barraPage(app);
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 3; i++) try {
     await comandaBarra(app, 'tasto');
     await pannelloFermo(barra).catch(() => {});
     const f = await barra.evaluate(() => document.activeElement && (document.activeElement.dataset.id || document.activeElement.id));
     await barra.locator('#nav .ico[data-id="help"]').focus();
     await premi(app, 'barra', 'Return');
     await page.waitForTimeout(1500);
-    console.log('TASTO', i, f, await page.locator('.sn-sidebar').count(), await page.locator('.sn-sidebar .sn-voce-btn').getAttribute('data-stato').catch(() => '-'), (await statoBarra(app)).aperta, JSON.stringify((await nelMain(app)).aiuto));
+    log('TASTO', i, f, await page.locator('.sn-sidebar').count(), await page.locator('.sn-sidebar .sn-voce-btn').getAttribute('data-stato').catch(() => '-'), (await statoBarra(app)).aperta, JSON.stringify((await nelMain(app)).aiuto));
   }
 });
 
@@ -159,7 +160,6 @@ test('tema scuro: i tre stati e la striscia', async ({ app, shell, openTab, test
   await barra.screenshot({ path: `${SHOTS}/scuro-aperto.png` });
   await help.click();
   await expect(page.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
-  await page.mouse.move(600, 400);
   await page.waitForTimeout(600);
   await barra.screenshot({ path: `${SHOTS}/scuro-ascolta.png` });
   await help.click();
