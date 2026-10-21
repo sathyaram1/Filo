@@ -1424,7 +1424,9 @@
         correzioni: v.correzioni && v.correzioni.length ? v.correzioni : c.correzioni, citazione: v.citazione || c.citazione,
       });
     }
-    const delModello = state.modello.filter((m) => (m.fonte === 'rapido' ? modelloErrori() : suggerimentiAttivi()));
+    const delModello = state.modello
+      .filter((m) => (m.fonte === 'rapido' ? modelloErrori() : (m.tipo === 'segnaposto' ? segnapostiAttivi() : suggerimentiAttivi())))
+      .map(conRicerca);
     const valido = (x) => x.start >= 0 && x.end <= testo.length && x.end > x.start && testo.slice(x.start, x.end) === x.segment;
     const tieni = (x) => valido(x) && !ignorato(state, x, testo)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
