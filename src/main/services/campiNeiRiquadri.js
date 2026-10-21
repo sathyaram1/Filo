@@ -202,7 +202,7 @@ async function misuraComponentiChiusi(webContents) {
   try {
     attese.push(segui(''));
     while (attese.length) await Promise.all(attese.splice(0));
-    const conCampi = await Promise.all(sessioni.map((s) => campoScrittoInUnChiuso(cmd, s.sid)));
+    const conCampi = await Promise.all(sessioni.map((s) => campoInUnChiuso(cmd, s.sid)));
     if (!conCampi.some(Boolean)) return { campi: [], nonCoperti: false };
     const alberi = await Promise.all(sessioni.map(async (s) => {
       try { return { ...s, ...radiciChiuse((await cmd('DOM.getDocument', { depth: -1, pierce: true }, s.sid)).root) }; }
