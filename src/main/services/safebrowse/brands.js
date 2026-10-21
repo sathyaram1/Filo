@@ -358,4 +358,4 @@ function isLegitBrandDomain(registrable) {
   return LEGIT_DOMAINS.has(registrable);
 }
 
-module.exports = { BRANDS, LEGIT_DOMAINS, isLegitBrandDomain, MARCHI_PAROLA, soloTruffa };
+module.exports = { BRANDS, LEGIT_DOMAINS, isLegitBrandDomain, MARCHI_PAROLA, PAROLE_TRUFFA, soloTruffa };
