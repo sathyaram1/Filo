@@ -157,6 +157,22 @@ describe('le release, lette da GitHub', () => {
     assert.equal(pagine, PAGINE_MAX);
   });
 
+  test('le impronte di ogni pagina le legge lo strumento che le scrive, per piattaforma', async () => {
+    const { aggiornaCorpo } = await import('../../scripts/release-impronte.mjs');
+    const riga = (nome) => ({ nome, sha256: 'a'.repeat(64), commit: 'b'.repeat(40), corsa: 'https://github.com/o/Filo/actions/runs/7' });
+    const soloMac = aggiornaCorpo('Note della versione.', [riga('Filo-Mac.dmg'), riga('Filo-Mac.zip')]).corpo;
+    const meta = aggiornaCorpo('', [riga('Filo-Mac.dmg')]).corpo;
+    const impronteDi = await lettoreImpronte();
+    assert.equal(typeof impronteDi, 'function');
+    const lotto = [grezza('v0.2.3', [], { body: soloMac }), grezza('v0.2.2', [], { body: meta }), grezza('v0.2.1', [], { body: null })];
+    const r = await leggiRilasci({ repo: 'o/Filo', fetchImpl: async () => risposta(lotto), log: zitto, impronteDi });
+    assert.deepEqual(r.map((x) => x.impronte), [
+      { Windows: false, Mac: true, Linux: false },
+      { Windows: false, Mac: false, Linux: false },
+      { Windows: false, Mac: false, Linux: false },
+    ]);
+  });
+
   test('la pagina della versione: trovata coi suoi allegati, assente, o non letta', () => {
     const storia = [R('v0.2.300', ['x']), R('v0.2.301', ['y', 'z'])];
     assert.deepEqual(paginaDellaVersione(storia, ' v0.2.301 '), { esiste: true, allegati: ['y', 'z'] });
