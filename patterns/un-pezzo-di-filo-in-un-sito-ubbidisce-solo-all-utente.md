@@ -300,7 +300,10 @@ Scrivere nella casella il sito non può più (#1071.1), ma può spostarne la
 selezione (un `selectAll` fra due tasti), e il tasto dopo dell'utente scrive
 sopra quello che il sito ha selezionato. Dalla pagina non lo si distingue dal
 Cmd+A che su Mac prende la barra dei menu (la pagina non vede il tasto) o da un
-lettore di schermo. Il testo di una voce si può rendere come
+lettore di schermo. Dentro un tasto la selezione invece torna (#1340); restano
+aperti solo i tasti che non si prevedono: dentro un Ctrl+Backspace (o
+Cmd+Backspace) il sito può allargare quello che il tasto toglie fino al cursore,
+dentro un Annulla cambiare il testo. Il testo di una voce si può rendere come
 contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi
