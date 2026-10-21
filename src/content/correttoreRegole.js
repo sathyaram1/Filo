@@ -432,17 +432,59 @@
     return { da: p, a: pezzo.length - s, sostituto: correzione.slice(p, correzione.length - s) };
   }
 
-  // Le tolleranze della lettura valgono anche per il giudizio: una correzione che cambia solo spazi o la forma degli apici
-  // è uguale al pezzo, e non è un errore da correggere.
-  const formaLetta = (s) => String(s ?? '').replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim();
+  // Le x dentro il pezzo che il modello ha copiato («di soli xx» → «xx»): { da, a } nel pezzo, o null.
+  function xDelPezzo(pezzo) {
+    for (const m of String(pezzo).matchAll(GRUPPO_X)) {
+      if ((m[0].match(/x/gi) || []).length >= 2 && !/x\d/i.test(m[0])) return { da: m.index, a: m.index + m[0].length };
+    }
+    return null;
+  }
+  const DOVE_CERCARE = /^(?:wiki(?::([a-z]{2,3}))?|web)$/;
 
-  const soloPiuMaiuscole = (scritto, correzione) => scritto !== correzione && scritto.length === correzione.length
-    && [...scritto].every((c, i) => c === correzione[i] || c === correzione[i].toLowerCase());
+  // Un segnaposto riempito ([pezzo][valore][motivo][segnaposto]) o da cercare ([pezzo][][ricerca][cerca][dove]): il
+  // segno sta sulle sole x, e una riga che non le ha non è un segnaposto.
+  function segnoDelSegnaposto(r, testo, dove, fonte) {
+    const base = { segno: 'suggerimento', dubbio: false, fonte, tipo: 'segnaposto', citazione: '' };
+    if (r.tipo === 'segnaposto') {
+      const stretto = r.correzione.trim() ? restringi(r.pezzo, r.correzione.trim()) : null;
+      if (!stretto) return null;
+      const start = dove.start + stretto.da;
+      const end = dove.start + stretto.a;
+      const valore = stretto.sostituto.trim();
+      if (end <= start || !/x/i.test(testo.slice(start, end)) || !valore || /xx/i.test(valore)) return null;
+      return { ...base, start, end, segment: testo.slice(start, end), motivo: corta(r.motivo, MOTIVO_MAX), correzioni: [valore] };
+    }
+    const x = xDelPezzo(r.pezzo);
+    const dc = DOVE_CERCARE.exec(r.citazione.toLowerCase());
+    const domanda = corta(r.motivo, 200);
+    if (!x || !dc || !domanda) return null;
+    const start = dove.start + x.da;
+    const end = dove.start + x.a;
+    return {
+      ...base, start, end, segment: testo.slice(start, end), motivo: '', correzioni: [],
+      cerca: { domanda, dove: dc[0].startsWith('web') ? 'web' : `wiki:${dc[1] || 'en'}` },
+    };
+  }
 
-  // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `senzaTipo`: quello di una
-  // riga che l'ha perso; `citata(c)`: la prova di una contraddizione, che deve stare nella pagina; `inScrittura`: la
-  // parola che non si segna; `nuovo`: il testo nuovo della chiamata, per un pezzo citato che compare più volte.
-  function segniDaRisposta(raw, testo, { tipi = ['errore'], senzaTipo = 'errore', citata = () => false, inScrittura = null, fonte = 'rapido', nuovo = null } = {}) {
+  // La risposta della ricerca di un segnaposto, una riga [valore][motivo][fonte][data][indirizzo] che il main ha
+  // ricomposto: { valore, motivo, fonte, data, url }, o null se il dato non si è trovato.
+  function valoreTrovato(raw) {
+    for (const riga of String(raw == null ? '' : raw).split(/\r?\n/)) {
+      const r = riga.trim();
+      if (!r.startsWith('[') || !r.endsWith(']')) continue;
+      const [valore = '', motivo = '', fonte = '', data = '', url = ''] = r.slice(1, -1).split(/\]\s*\[/).map((x) => x.trim());
+      if (!valore || /^nessuno$/i.test(valore) || /^nessuno$/i.test(data) || /xx/i.test(valore)) return null;
+      return {
+        valore: corta(valore, 80), motivo: corta(motivo, MOTIVO_MAX), fonte: corta(fonte, 120), data: corta(data, 40),
+        url: /^https:\/\/[^\s]+$/i.test(url) ? url.slice(0, 500) : '',
+      };
+    }
+    return null;
+  }
+
+  // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `citata(c)`: la prova di
+  // una contraddizione, che deve stare nella pagina; `inScrittura`: la parola che non si segna.
+  function segniDaRisposta(raw, testo, { tipi = ['errore'], citata = () => false, inScrittura = null, fonte = 'rapido' } = {}) {
     const ammessi = new Set(tipi);
     const segni = [];
     const giusti = [];
