@@ -101,6 +101,8 @@
       funzioneDi = () => '',
       rimedioDi = () => '',
       contatore = () => null,
+      // La durata della cache della parte fissa della chat, dalle impostazioni ('5m' o '1h'); null = quella di serie.
+      durataCache = () => null,
     } = deps;
 
     // I contatori giornalieri (#969): ogni chiamata è un uso della sua funzione, con l'attesa fino alla prima cosa
