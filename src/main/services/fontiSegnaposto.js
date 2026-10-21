@@ -176,6 +176,14 @@ function ricomponi(raw, fonti, oggi = new Date()) {
   return '';
 }
 
-const API = { wikipedia, web, passaggi, datiWikidata, righeWikidata, dataWikidata, ricomponi, giorno, LINGUE };
+// Dove si cerca, in ordine: prima le fonti gratuite, il web (che costa) solo se è acceso e quelle non bastano. Un dato di
+// adesso va dritto al web; col web spento si prova lo stesso Wikipedia.
+function giri(dove, webAcceso) {
+  const wiki = /^wiki:[a-z]{2,3}$/.test(String(dove)) ? dove : 'wiki:en';
+  if (dove === 'web') return [webAcceso ? 'web' : 'wiki:en'];
+  return webAcceso ? [wiki, 'web'] : [wiki];
+}
+
+const API = { wikipedia, web, passaggi, datiWikidata, righeWikidata, dataWikidata, ricomponi, giorno, giri, LINGUE };
 globalThis.SN_FONTI_SEGNAPOSTO = API;
 module.exports = API;
