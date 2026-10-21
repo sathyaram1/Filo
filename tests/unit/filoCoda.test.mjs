@@ -68,6 +68,17 @@ test('le righe stanno in ordine di tempo: messaggi di più chat, una riga per ch
   assert.ok(!el.some((x) => x.key === 'c:c1'), 'un cambio chiesto in chat ha il segno sulla bolla, non una riga');
 });
 
+test('#1490: un cambio ritoccato resta all’ora del primo ritocco, e chi allinea dopo l’ultimo lo riceve riscritto', () => {
+  const cambi = [{ id: 'z', ts: fa(30), agg: fa(29), via: 'interfaccia', tipo: 'zoom', frase: 'zoom di youtube.com: 125% → 100%', provenienza: 'con un gesto sulla pagina', annullabile: true }];
+  const pagine = [{ id: 'p', ts: fa(29.5), url: 'https://www.youtube.com/watch?v=2', titolo: 'jazz' }];
+  const el = C.elementi({ pagine, cambi });
+  assert.deepEqual(el.map((x) => x.key), ['c:z', 'p:p']);
+  assert.equal(el[0].ts, fa(30));
+  assert.equal(el[0].fine, fa(29));
+  assert.deepEqual(C.pezzo(el, { dopo: fa(29.5) }).elementi.map((x) => x.key), ['c:z'], 'il ritocco dopo l’ultima lettura riscrive la riga');
+  assert.equal(C.siFonde({ chats: [chat('h', [m('filo', 'Buongiorno.', fa(29.7), { spontaneo: true })])], cambi }, 'h', { ora: ORA }), false, 'il ritocco è venuto dopo il messaggio di Filo');
+});
+
 test('un gruppo di pagine non sta a cavallo di due giorni', () => {
   const ieri = new Date(2026, 9, 17, 23, 50).toISOString();
   const oggi = new Date(2026, 9, 18, 0, 10).toISOString();

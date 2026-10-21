@@ -153,12 +153,13 @@ async function leggi(ids) {
 }
 
 // Tutti, con lo stato di adesso, per la home (#869): vista() rilegge gli annulli una volta per tutti.
+// `ts` è il primo ritocco, `agg` l'ultimo: la riga resta dov'è nata e si riscrive.
 async function tutti() {
   await attesa();
   const lista = await leggiLista();
   const chiusi = K().annullati(lista);
   return lista.map((e) => ({
-    id: e.id, ts: e.agg || e.ts, tipo: e.tipo, via: e.via || 'filo', frase: K().frase(e), provenienza: K().provenienza(e),
+    id: e.id, ts: e.ts, ...(e.agg && e.agg !== e.ts ? { agg: e.agg } : {}), tipo: e.tipo, via: e.via || 'filo', frase: K().frase(e), provenienza: K().provenienza(e),
     annulla: e.annulla || null, annullatoDa: chiusi.get(e.id) || null, annullabile: K().annullabile(daRimettere(e, lista)),
   }));
 }

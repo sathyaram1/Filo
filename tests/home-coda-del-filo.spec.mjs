@@ -294,6 +294,83 @@ test('un cambio fatto dall’interfaccia è una riga sottile nel filo, e da lì 
   await expect(riga).toHaveClass(/dash-cambi-annullato/);
 });
 
+// Lo zoom vero di una scheda, come lo tiene Chromium.
+async function zoomDi(app, page) {
+  const url = await page.evaluate(() => location.href);
+  return app.evaluate(({ webContents }, u) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let qui = '';
+      try { qui = wc.getURL(); } catch (_) {}
+      if (qui === u) return Math.round(wc.getZoomFactor() * 100);
+    }
+    return null;
+  }, url);
+}
+const cambiDelRegistro = (app) => app.evaluate(async () => (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi || []);
+
+test('#1490 — lo zoom ritoccato a più riprese è una riga sola, da com’era a com’è, e da lì torna com’era', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><head><meta charset="utf-8"><title>jazz</title></head><body><h1>jazz</h1><p>musica</p></body></html>');
+  await page.locator('h1').click();
+  for (let i = 0; i < 2; i++) await page.keyboard.press('Control+Equal');
+  await expect.poll(async () => (await cambiDelRegistro(app)).filter((e) => e.tipo === 'zoom').length).toBe(1);
+  // Il ripensamento qualche secondo dopo: prima era una riga sua.
+  await page.waitForTimeout(5_000);
+  await page.keyboard.press('Control+Minus');
+  await expect.poll(async () => {
+    const z = await zoomDi(app, page);
+    const ev = (await cambiDelRegistro(app)).filter((e) => e.tipo === 'zoom');
+    return ev.length === 1 && ev[0].cambi[0].dopo === z ? ev[0].cambi[0].prima : `${ev.length} eventi, zoom ${z}`;
+  }, { timeout: 8_000 }).toBe(100);
+  const z = await zoomDi(app, page);
+  expect(z).toBeGreaterThan(100);
+
+  const casa = await openTab('filo://newtab/');
+  const righe = casa.locator('.dash-cambio', { hasText: 'zoom di' });
+  await expect(righe).toHaveCount(1);
+  await expect(righe.locator('.dash-cambio-testo')).toHaveText(new RegExp(`^zoom di .+: 100% → ${z}% · con un gesto sulla pagina$`));
+  await righe.hover();
+  await righe.locator('.dash-cambio-annulla', { hasText: 'annulla' }).click();
+  await expect.poll(() => zoomDi(app, page)).toBe(100);
+  await expect(righe).toHaveClass(/dash-cambi-annullato/);
+});
+
+test('#1490 — con la home aperta il ritocco riscrive la riga che c’è già, le righe sottili stanno strette, e tornato a com’era la riga se ne va', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const zoom = (prima, dopo) => app.evaluate(async (_e, d) => {
+    const R = globalThis.SN_REGISTRO_CAMBI;
+    R.con({ via: 'interfaccia', dove: 'zoom' }, () => R.registraZoom({ host: 'youtube.com', ...d }));
+    await R.attesa();
+  }, { prima, dopo });
+  await semina(app, { pagine: [{ url: 'https://www.youtube.com/watch?v=j', titolo: 'jazz music - YouTube', ts: new Date(Date.now() - 120_000).toISOString() }] });
+  await zoom(125, 114);
+  // Il primo ritocco è di mezzo minuto fa: oltre i passi di un cursore trascinato, dentro i ritocchi di chi cerca il valore.
+  await app.evaluate(async () => {
+    const lista = (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi;
+    lista[lista.length - 1].ts = new Date(Date.now() - 30_000).toISOString();
+    await globalThis.chrome.storage.local.set({ filo_cambi: lista });
+  });
+  const casa = await openTab('filo://newtab/');
+  const righe = casa.locator('.dash-cambio', { hasText: 'zoom di youtube.com' });
+  await expect(righe).toHaveCount(1);
+  await expect(righe).toContainText('125% → 114%');
+  await zoom(114, 87);
+  await zoom(87, 100);
+  await expect(righe).toContainText('zoom di youtube.com: 125% → 100% · con un gesto sulla pagina');
+  await expect(righe).toHaveCount(1);
+
+  const sopra = await casa.locator('.dash-pagine').last().boundingBox();
+  const sotto = await righe.boundingBox();
+  expect(sotto.y - (sopra.y + sopra.height)).toBeLessThanOrEqual(3);
+  await casa.screenshot({ path: `${SHOTS}/home-coda-zoom-ritoccato.png` });
+
+  await casa.reload();
+  await expect(righe).toHaveCount(1);
+  await expect(righe).toContainText('125% → 100%');
+  await zoom(100, 125);
+  await expect(righe).toHaveCount(0);
+});
+
 test('il saluto di oggi non si fonde col messaggio spontaneo di ieri: quello resta sotto «ieri», il saluto sta sotto «oggi»', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await app.evaluate(async (_e, ts) => {
