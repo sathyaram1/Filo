@@ -1882,10 +1882,15 @@
       percorso: 'security.pagineDelicate.enabled',
       nome: 'Pagine delicate tenute lontane dai modelli',
       stati: ['sì', 'no'],
-      aiuto: 'true | false (posta, banche, sanità, pagine con un campo password o carta e i siti delicati scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli; acceso di serie)',
-      risk: 'Decide se il riassunto delle schede chiuse e la pulizia automatica delle schede mandano ai modelli anche il '
-        + 'testo delle pagine delicate: posta, banca, sanità, pagine dove hai visto un campo password o carta. Spegnerlo '
-        + 'fa arrivare al modello saldi, movimenti, mail e referti delle schede che chiudi.',
+      aiuto: 'true | false (posta, banche, sanità, pubblica amministrazione, pagine con un campo password o carta e i siti delicati '
+        + 'scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli, la chat ne vede '
+        + 'solo il nome del sito, screenshot e immagini copiate da lì non vanno al modello delle immagini neanche incollati '
+        + 'altrove, la spiegazione parte solo dal tasto destro; acceso di serie)',
+      risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
+        + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
+        + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '
+        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, e la '
+        + 'spiegazione si prepara anche lì appena selezioni un testo.',
     }),
     elenco({
       keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
