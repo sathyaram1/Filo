@@ -474,6 +474,10 @@ test('i tempi sono dell\'utente: la pausa più lunga non chiude chi si ferma a p
   await expect(page.locator('.dash-bubble-user', { hasText: DETTO })).toBeVisible({ timeout: 3_000 });
 });
 
+// I caratteri di sistema più larghi (Linux, Mac) mandano a capo prima: la prova li mette lei, così l'esito non dipende
+// da quelli della macchina che la corre (#256.4).
+const CARATTERE_LARGO = `.ed-chat-input textarea { font-family: 'DejaVu Sans', Verdana, sans-serif !important; }`;
+
 test('editor: col microfono accanto, la casella della chat mostra tutto il suggerimento e cresce col testo invece di scorrere', async ({ shell, openTab }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
