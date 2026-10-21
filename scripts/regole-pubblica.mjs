@@ -126,9 +126,12 @@ export async function main(argv, { leggiStato = stato, esegui = lancia, env = pr
   const s = leggiStato();
   const d = decidi(s);
   if (!d.ok) { err(`RIFIUTATO: ${d.motivo}.`); return 3; }
-  if (controlla) { log(`Guardia della pubblicazione: main = origin/main (${s.testa.slice(0, 9)}), file intatti.`); return 0; }
+  const dove = s.testa === s.origine
+    ? `main = origin/main (${s.testa.slice(0, 9)})`
+    : `main (${s.testa.slice(0, 9)}) non è origin/main (${s.origine.slice(0, 9)}), ma ciò che si pubblica è identico`;
+  if (controlla) { log(`Guardia della pubblicazione: ${dove}, file intatti.`); return 0; }
   const p = passo({ radice: ROOT, progetto: s.progetto });
-  log(`main = origin/main (${s.testa.slice(0, 9)}), ${s.file.join(', ')} intatti.`);
+  log(`${dove}, ${s.file.join(', ')} intatti.`);
   log(`  in ${p.cwd}\n  $ ${p.cmd} ${p.args.join(' ')}`);
   if (dryRun) { log('(prova a vuoto: non ho pubblicato niente)'); return 0; }
   const codice = esegui(p);
