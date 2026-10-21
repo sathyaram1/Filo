@@ -402,6 +402,8 @@ export async function main(argvIn) {
   const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
+    const daNpmSparito = r.uso && /mancante$/.test(r.motivo) ? avvisoTrattinoDaNpm(process.env) : '';
+    if (daNpmSparito) console.error(daNpmSparito);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
