@@ -74,7 +74,8 @@ test('streaming: le chiamate spezzate in più delta vengono ricomposte, e il nom
   ]);
   // Avviso una volta per chiamata, appena c'è il nome.
   assert.deepEqual(started, [{ id: 'call_a', name: 'CERCA_WEB' }, { id: 'call_b', name: 'TIMER' }]);
-  assert.deepEqual(r.reasoningDetails, [{ index: 0, type: 'reasoning.text', text: 'Penso.' }]);
+  assert.deepEqual(r.reasoningDetails.slice(0, -1), [{ index: 0, type: 'reasoning.text', text: 'Penso.' }]);
+  assert.equal(r.reasoningDetails.at(-1).type, 'filo.impronta', 'il ragionamento porta l\'impronta della richiesta (#1552)');
   assert.equal(r.finishReason, 'tool_calls');
   assert.equal(r.servedBy, 'DeepInfra');
   assert.equal(r.usage.promptTokens, 10);
