@@ -1684,7 +1684,11 @@
   function openFeedbackByNum(num) {
     const cerca = String(num || '').trim();
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
-    const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
+    apriFeedback(allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca));
+  }
+
+  // Un feedback nominato da un'altra scheda (Domande, Compiti) si apre nella sua.
+  function apriFeedback(fb) {
     if (!fb) return;
     // Aprire una pratica precisa spegne il filtro dei livelli se la nasconderebbe.
     mostraNelFiltro(fb);
@@ -2338,6 +2342,7 @@
   }
   // Lo stesso menu per le schede che vivono in un file loro (manageRedteam.js).
   window.SN_MANAGE_MENU = { apri: apriMenu };
+  window.SN_MANAGE_FEEDBACK = { apri: (id) => apriFeedback(allFeedbacks.find((f) => f._id === String(id || ''))) };
   // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta: l'esito si legge lì.
   function approvaDalMenu(fb, azione) {
     if (selectedId !== fb._id) openDetail(fb._id);

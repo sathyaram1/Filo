@@ -717,6 +717,11 @@
     // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).
     // Solo pagine `filo://`, solo il proprietario. Callable non ancora pubblicata → errore che lo dice.
     FIDUCIA_SEGNA: 'fiducia_segna', // { feedbackId, fidato?: false per toglierla } → { ok, fiducia } | { ok:false, error }
+    // I compiti delle routine (SPEC-DOMANDE.md §6), dalla callable ownerCompiti: quelli delle fasi li scrive solo il
+    // server; a mano se ne crea e annulla uno senza feedback. Solo pagine `filo://`, solo il proprietario.
+    COMPITI_ELENCO: 'compiti_elenco',   // { storico?:<n>, prima?:<ms> } → { ok, aperti:[…], storico:[…], altri, adesso } | { ok:false, error }
+    COMPITO_CREA: 'compito_crea',       // { compito:{ titolo, istruzioni?, urgenza, modello?, sforzo?, ambito? } } → { ok, id } | { ok:false, error }
+    COMPITO_ANNULLA: 'compito_annulla', // { id:'C-n' } → { ok, id } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
