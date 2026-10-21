@@ -108,7 +108,8 @@
       // 'manual' per la chiusura dell'utente, altri valori dall'auto-archiviazione (§2.1).
       reason: meta.reason || 'manual',
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
-      coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
+      coOpenUrls: insieme.map((x) => x.testo),
+      ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
       // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
       // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
