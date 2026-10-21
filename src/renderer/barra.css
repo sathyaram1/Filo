@@ -168,6 +168,9 @@ html.aperta .pannello {
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--tab-active);
 }
+@media (prefers-color-scheme: dark) {
+  .ico.risposta::after { box-shadow: 0 0 0 2px var(--tab-bg, var(--tab-active)); }
+}
 .ico.nuova { animation: posa calc(320ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1); }
 .ico.trascinata { opacity: 0.3; }
 .ico svg { width: 18px; height: 18px; display: block; pointer-events: none; }
