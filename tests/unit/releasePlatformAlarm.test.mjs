@@ -19,7 +19,7 @@ const PKG = require('./package.json');
 
 const {
   PIATTAFORME, PASSI, PAGINE_MAX, passoFallito, leggiEsiti, componiAllarme, casella, chiaviAllarme,
-  leggiRilasci, paginaDellaVersione, ultimaUscita, ultimaPubblicata,
+  leggiRilasci, paginaDellaVersione, ultimaUscita, ultimaPubblicata, lettoreImpronte,
 } = await import('../../scripts/release-platform-alarm.mjs');
 
 // Una release come la legge l'avviso; `con` sono i file attaccati.
