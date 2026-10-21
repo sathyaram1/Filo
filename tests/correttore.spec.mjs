@@ -14,6 +14,8 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
   <div id="ce" contenteditable="true" lang="it" style="width:760px;min-height:90px;font:22px monospace;border:1px solid #999;margin-top:12px"></div>
   <textarea id="nos" lang="it" spellcheck="false" style="display:block;width:760px;height:60px;font:22px monospace;margin-top:12px"></textarea>
   <div class="cm-editor"><div class="cm-content" id="codice" contenteditable="true" style="width:760px;min-height:40px;font:22px monospace;border:1px solid #999;margin-top:12px"></div></div>
+  <input id="riga" lang="it" style="width:300px">
+  <textarea id="gramm" lang="it" data-gramm="false" style="display:block;width:300px;height:40px"></textarea>
 </main>
 </body>`;
 
@@ -168,7 +170,7 @@ test('una risposta arrivata dopo un cambio del testo si posa sul pezzo giusto, o
     const s = document.querySelector('.sn-spell-overlay .sn-errore').getBoundingClientRect();
     return { segno: s.left - t.getBoundingClientRect().left };
   });
-  expect(dov.segno).toBeGreaterThan(150);
+  expect(dov.segno, 'sei caratteri più a destra di dove stava, «oggi » finito alla posizione 5').toBeGreaterThan(120);
 
   await app.evaluate(() => { globalThis.__trattieni = true; globalThis.__rapide = []; });
   await page.keyboard.press('Control+End');
@@ -224,7 +226,7 @@ test('«quasi quasi» non è segnato, «il il» sì', async ({ app, openTab, tes
 test('«Correggi tutti gli errori» corregge gli errori e non tocca i suggerimenti', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {
     errori: { quseta: ['questa', 'Refuso.'], 'oggi sonno andato': ['oggi sono andato', 'Verbo essere.'] },
-    suggerimenti: { 'alle 18': ['alle 19', 'Alle 18 di quale giorno?'] },
+    suggerimenti: { 'alle 18': ['', 'Alle 18 di quale giorno?'] },
   });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi sonno andato a vedere quseta casa alle 18. ');
@@ -267,10 +269,11 @@ test('spenta la parte del modello restano i candidati del codice, sbiaditi, e no
 
 test('lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori» spento anche nelle caselle di una riga', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {});
-  expect(await page.evaluate(() => document.documentElement.dataset.snCorrettore)).toBe('errori');
-  const regola = await page.evaluate(() => [...document.styleSheets].flatMap((s) => { try { return [...s.cssRules]; } catch (_) { return []; } })
-    .map((r) => r.cssText).find((t) => t.includes('::spelling-error') && t.includes('data-sn-correttore')) || '');
-  expect(regola).toMatch(/text-decoration: none/);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ featureFlags: { spellcheck: false } }));
+  const zigzag = () => page.evaluate(() => Object.fromEntries(['ta', 'ce', 'riga', 'gramm'].map((id) => [id,
+    getComputedStyle(document.getElementById(id), '::spelling-error').textDecorationLine])));
+  expect(await zigzag()).toEqual({ ta: 'none', ce: 'none', riga: 'spelling-error', gramm: 'spelling-error' });
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { featureFlags: { spellcheck: false } } },
+    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snCorrettore)).toBe('senza-errori');
+  await expect.poll(zigzag).toEqual({ ta: 'none', ce: 'none', riga: 'none', gramm: 'none' });
 });

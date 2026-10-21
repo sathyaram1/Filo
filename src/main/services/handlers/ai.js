@@ -121,6 +121,9 @@ module.exports = function register(on, ctx) {
   // correttore (#1446) partono col solo testo di chi scrive e il nome del sito, e lo dicono alla pagina, che allora non
   // ha citazioni da confrontare.
   const DEL_CORRETTORE = new Set([SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC, SN_CONST.ACTIONS.SPELLCHECK_CONTEXT]);
+  const sitoDi = (url) => {
+    try { const u = new URL(url); return u.protocol === 'filo:' ? 'Filo' : (u.hostname || ''); } catch (_) { return ''; }
+  };
   async function senzaPaginaDelicata(msg, sender) {
     if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
     const url = String(sender?.tab?.url || sender?.url || '');
@@ -155,8 +158,12 @@ module.exports = function register(on, ctx) {
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
     const senzaContesto = await senzaPaginaDelicata(msg, sender);
-    // Chiavi, password e carte scritte nel campo restano sul computer (#1446).
-    if (msg && DEL_CORRETTORE.has(msg.action)) msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
+    // Chiavi, password e carte scritte nel campo restano sul computer (#1446); il sito lo dice chi ha mandato, non la pagina.
+    if (msg && DEL_CORRETTORE.has(msg.action) && msg.payload && typeof msg.payload === 'object') {
+      msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
+      const sito = sitoDi(String(sender?.tab?.url || sender?.url || ''));
+      msg.payload.luogo = { ...(msg.payload.luogo && typeof msg.payload.luogo === 'object' ? msg.payload.luogo : {}), sito };
+    }
     // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
     const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
     if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {

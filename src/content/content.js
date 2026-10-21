@@ -1245,6 +1245,14 @@
             await openSpellMarksMenu(editableEl, sotto, e, sito);
             return;
           }
+          // Una parola che il browser segna e Filo no (il dizionario non ancora pronto, un campo mai entrato col fuoco):
+          // la proposta del browser, come nelle caselle di una riga.
+          const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
+          if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
+            && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
+            await openSpellWordMenu(editableEl, wordCtx, e, sito);
+            return;
+          }
         }
         const inputEl = SpellCheck.erroriAttivi() ? rt?.closest?.('input') : null;
         if (inputEl && isTextLikeInput(inputEl) && !SpellCheck.campoEscluso(inputEl)) {
@@ -1334,10 +1342,10 @@
     // applyNativeCorrection, che agisce sul campo a fuoco senza doverlo
     // identificare dalla pagina. Resta appeso al correttore: se l'utente lo ha
     // spento, niente slot e niente suggerimenti.
-    // Nei campi dove i segni li disegna Filo (#1446) decide il correttore: una parola che il modello ha giudicato giusta
-    // (un cognome) non riprende dal browser la sua «correzione».
+    // Nei campi dove i segni li disegna Filo (#1446) decide il correttore: una parola che sa giusta (un cognome scartato
+    // dal modello, una parola ignorata) non riprende dal browser la sua «correzione».
     const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
-    const wantCorrection = !!SpellCheck && SpellCheck.erroriAttivi() && !campoDiFilo;
+    const wantCorrection = !!SpellCheck && SpellCheck.erroriAttivi();
     let updateCorrection = null;
     const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
     if (tutti) items.unshift(tutti, { type: 'separator' });
@@ -1380,7 +1388,7 @@
       // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
       // spellcheck ce lo consegna subito invece di lasciarci aspettare.
       SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
-        if (!suggestions?.length) return;
+        if (!suggestions?.length || (campoDiFilo && SpellCheck.parolaGiusta(campoDiFilo, word))) return;
         revealNativeCorrection(word, suggestions);
       }, { since: openedAt });
     }
@@ -1965,7 +1973,8 @@
   }
 
   // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
-  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = []) {
+  // `parola`: il segno è una parola sola, e allora si può aggiungere al dizionario o correggere da sé d'ora in poi.
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true) {
     const items = [];
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
@@ -1981,16 +1990,16 @@
       if (items.length >= 4) break;
     }
     if (items.length) items.push({ type: 'separator' });
-    items.push(
-      {
+    if (parola) {
+      items.push({
         label: I18n.t('spell_add_dict'),
         onClick: () => {
           SpellCheck.addToDictionary(wordCtx.word);
           Popup.showToast(I18n.t('toast_added_to_dict'));
         },
-      },
-    );
-    if (correction && !/\s/.test(String(wordCtx.word).trim())) {
+      });
+    }
+    if (parola && correction) {
       items.push({
         label: I18n.t('spell_autocorrect'),
         onClick: async () => {
@@ -2004,7 +2013,8 @@
     return items;
   }
 
-  const unaParola = (s) => !!s && !/\s/.test(String(s).trim());
+  // Una parola sola, senza spazi intorno: « il» ripetuto non è una parola da mettere nel dizionario.
+  const unaParola = (s) => /^[^\s]+$/.test(String(s || ''));
 
   // Il perché di un segno, col bordo del suo colore; per un suggerimento con la frase della pagina che lo motiva.
   function rigaDelPerche(segno, cambia) {
@@ -2036,7 +2046,11 @@
   // aggiorna la riga nel menu aperto.
   function vociErrore(editableEl, errore) {
     const parola = { word: errore.segment, start: errore.start, end: errore.end };
-    const native = unaParola(errore.segment) ? SpellCheck.proposteDelBrowser(errore.segment.trim()) : [];
+    // Le proposte del dizionario: quelle che il browser ha mandato col tasto destro, o chieste adesso; arrivate dopo
+    // l'apertura del menu, prendono il posto di quelle chieste.
+    const mandate = unaParola(errore.segment) ? SpellCheck.getNativeSuggestions(errore.segment) : [];
+    let native = mandate.length ? mandate : (unaParola(errore.segment) ? SpellCheck.proposteDelBrowser(errore.segment) : []);
+    let giudicato = null;
     const proposta = (s) => (s.correzioni && s.correzioni.length ? s.correzioni[0] : (s.dubbio ? native[0] : undefined));
     const etichetta = (s, c) => (c === '' ? I18n.t('spell_togli', s.segment.trim()) : c);
     const riga = (s) => {
@@ -2046,7 +2060,7 @@
         label: c === undefined ? '' : etichetta(s, c),
         loading: false,
         onClick: c === undefined ? null : () => SpellCheck.correggi(editableEl, s, c),
-        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native),
+        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment)),
       };
     };
     const ascolti = [];
@@ -2062,9 +2076,19 @@
       {
         type: 'correction', ...riga(errore),
         onMount: (_root, update) => {
-          if (errore.dubbio) segui((nuovo) => update(riga(nuovo)));
+          let stacca = null;
+          if (errore.dubbio) {
+            segui((nuovo) => { giudicato = nuovo; update(riga(nuovo)); });
+            if (!mandate.length && unaParola(errore.segment)) {
+              stacca = SpellCheck.onNativeSuggestions(errore.segment, (sugg) => {
+                if (giudicato || !sugg || !sugg.length) return;
+                native = sugg;
+                update(riga(errore));
+              });
+            }
+          }
           avvia();
-          return () => { if (staccato) staccato(); };
+          return () => { if (staccato) staccato(); if (stacca) stacca(); };
         },
       },
       { type: 'separator', hidden: proposta(errore) === undefined },
@@ -2131,9 +2155,8 @@
   // nascosta, o la proposta del dizionario se il dizionario non la conosce.
   async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
-    const sbagliata = SpellCheck.sbagliataPerIlBrowser(wordCtx.word);
-    let native = sbagliata ? SpellCheck.proposteDelBrowser(wordCtx.word) : [];
-    if (!native.length) native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
+    let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
+    if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
     let updateCorrection = null;
     const applyAt = (corr) => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
     const riga = (corr, alts) => ({

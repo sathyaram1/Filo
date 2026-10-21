@@ -217,6 +217,8 @@ test('il prompt del controllo rapido: il luogo e il testo già controllato prima
   assert.ok(prefisso.includes('mail.example') && prefisso.includes('Caro Marco,'));
   assert.ok(due.startsWith(prefisso));
   assert.ok(uno.includes('[pezzo da sostituire][correzione][motivo][errore]'));
+  // La correzione resta nella lingua di chi scrive: un tempo il modello ripiegava sull'inglese.
+  assert.match(uno, /correzione: il pezzo come va scritto, nella lingua del testo/);
 });
 
 test('il prompt regge una pagina ostile', () => {

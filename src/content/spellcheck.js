@@ -344,11 +344,15 @@
 
   // Da un riquadro chiuso di Filo (feedback, spiegazione) il focus arriva all'host: il campo vero lo sa SN_FILO_UI,
   // e l'overlay sta dentro lo stesso riquadro, perché ripete il testo e nel documento del sito lo leggerebbe (#1071).
+  // Dentro il componente aperto di un sito il fuoco arriva all'host: il campo vero è il primo del cammino dell'evento.
   function editabileDellEvento(e) {
     const UI = global.SN_FILO_UI;
     const tg = e && e.target;
     const riquadro = !!(UI && UI.bersaglio && tg && tg.hasAttribute && tg.hasAttribute(UI.RIQUADRO));
-    return findSupportedEditable(riquadro ? UI.bersaglio(e) : tg);
+    if (riquadro) return findSupportedEditable(UI.bersaglio(e));
+    let vero = tg;
+    try { const via = typeof e.composedPath === 'function' ? e.composedPath() : null; if (via && via[0] && via[0].nodeType === 1) vero = via[0]; } catch (_) {}
+    return findSupportedEditable(vero);
   }
   function radiceDi(el) {
     try {
@@ -448,7 +452,11 @@
     // gesto (un tasto tenuto premuto) si sposta soltanto: resta una, sul testo finale.
     const gesto = prendeGesto(state);
     const nuovo = aggiornaCodice(state);
-    programmaRapido(state, { gesto, subito: nuovo });
+    // Il controllo che non aspetta la pausa lo paga solo il tasto che chiude una parola, come una volta quello della
+    // parola: una pagina che a ogni lettera scrive una parola sbagliata ne otterrebbe uno per tasto (#1070).
+    const G = global.SN_GESTO;
+    const chiude = nuovo && !!G && G.prendi('parola', G.CHIUDE, G.dentro(state.el));
+    programmaRapido(state, { gesto: gesto || chiude, subito: chiude });
     programmaRagionato(state, { gesto: prendeGesto(state, null, 'coerenza'), fineFrase: chiudeFrase(state, evento) });
     programmaFine(state);
   }
@@ -870,7 +878,7 @@
         state.timerCodice = setTimeout(() => {
           state.timerCodice = null;
           if (!state.attivo) return;
-          if (calcolaCodice(state) && state.timerRapido) programmaRapido(state, { gesto: true, subito: true });
+          if (calcolaCodice(state) && state.timerRapido) programmaRapido(state, { subito: true });
           renderOverlayContent(state);
         }, RICALCOLO_LUNGO_MS);
       }
@@ -986,7 +994,7 @@
     const ora = Date.now();
     if (!state.cambioDa) state.cambioDa = ora;
     const resto = Math.max(0, T.ogniRapidoMs - (ora - state.cambioDa));
-    const attesa = subito && gesto ? 0 : Math.min(T.pausaRapidoMs, resto);
+    const attesa = subito ? 0 : Math.min(T.pausaRapidoMs, resto);
     state.timerRapido = setTimeout(() => {
       state.timerRapido = null;
       state.cambioDa = 0;
@@ -1068,18 +1076,14 @@
     return testo.slice(da, start);
   }
 
-  // Dove si scrive: il sito, il titolo e la coda del testo della pagina prima del campo (in una chat, gli ultimi
-  // messaggi). Si rilegge ogni LUOGO_VALE_MS: la conversazione cambia, ma non a ogni tasto.
+  // Dove si scrive: il sito e la coda del testo della pagina prima del campo (in una chat, gli ultimi messaggi). Si
+  // rilegge ogni LUOGO_VALE_MS: la conversazione cambia, ma non a ogni tasto. Il sito lo rimette il main.
   function luogoDi(state) {
     if (state.luogo && Date.now() - state.luogoAlle < LUOGO_VALE_MS) return state.luogo;
     let sito = '';
     try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
     const contesto = contestoDelCampo(state.el);
-    state.luogo = {
-      sito,
-      titolo: String(document.title || '').slice(0, 160),
-      conversazione: contesto.prima ? contesto.prima.slice(-CONVERSAZIONE_MAX) : '',
-    };
+    state.luogo = { sito, conversazione: contesto.prima ? contesto.prima.slice(-CONVERSAZIONE_MAX) : '' };
     state.luogoAlle = Date.now();
     return state.luogo;
   }
@@ -1317,6 +1321,18 @@
     const ig = chiaveIgnora(segno);
     state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
     renderOverlayContent(state);
+  }
+
+  // Una parola che Filo sa giusta in quel campo: nel dizionario personale, scartata dal modello o ignorata. Lì la
+  // proposta del browser (che la segna comunque) non va in cima al menu.
+  function parolaGiusta(el, parola) {
+    const w = String(parola || '').trim();
+    if (!w) return false;
+    if (isInDictionary(w)) return true;
+    const state = el && monitored.get(el);
+    if (!state) return false;
+    if (verdetto(state, { fonte: 'dizionario', segment: w })?.stato === 'scartato') return true;
+    return ignorato(state, { segno: 'errore', segment: w, start: 0, end: w.length }, w);
   }
 
   async function aggiungiAlDizionario(el, segno) {
@@ -2023,6 +2039,7 @@
     correggi,
     ignora,
     aggiungiAlDizionario,
+    parolaGiusta,
     erroriDaCorreggere,
     correggiTutti,
     controlloSuRichiesta,

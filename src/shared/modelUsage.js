@@ -72,8 +72,8 @@
     user('describe-image', 'Descrivi un\'immagine', 'Pagine web', A.DESCRIBE_IMAGE,
       'Lo stesso modello legge le finestre che Filo guarda quando glielo chiedi in chat.'),
     user('transcribe-image', 'Leggi il testo di un\'immagine', 'Pagine web', A.TRANSCRIBE_IMAGE),
-    user('spellcheck-semantic', 'Correttore — errori (controllo rapido)', 'Scrittura', A.SPELLCHECK_SEMANTIC),
-    user('spellcheck-context', 'Correttore — suggerimenti (controllo ragionato)', 'Scrittura', A.SPELLCHECK_CONTEXT),
+    user('spellcheck-semantic', 'Errori del correttore (controllo rapido)', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-context', 'Suggerimenti del correttore (controllo ragionato)', 'Scrittura', A.SPELLCHECK_CONTEXT),
     user('transcribe-audio', 'Dettatura dal microfono', 'Scrittura', A.TRANSCRIBE_AUDIO),
     user('tts', 'Lettura ad alta voce', 'Scrittura', A.TTS),
 
