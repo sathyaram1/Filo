@@ -56,6 +56,11 @@ chiede, ma **far decidere l'owner su ciò che non viene da lui**:
   stampa — si dice cosa significa).
 - **Un'eccezione lascia traccia** dove l'owner la può guardare (chi, cosa,
   quando, quali blocchi scavalcati), non solo nei log del server.
+- **Un blocco dice dove** (#1404): l'elenco intero, ogni riga col suo file e
+  numero che apre il diff su GitHub, tre righe di contesto a richiesta, e le
+  guardie toccate separate dalle capacità nuove. Un tetto di righe o di
+  caratteri sull'elenco che si approva fa dire sì a quello che non si è letto;
+  dove il documento non basta, quante mancano si dice.
 - **Dove:** decisione pura + I/O in `filo-security/functions/src/routine/
   mergeApprovals.js`; lavoro locale in `functions/src/routine/ownerMerge.js` e
   `functions/src/localWork.js`, lato sessione `scripts/lib/owner-merge.mjs`;
@@ -65,4 +70,5 @@ chiede, ma **far decidere l'owner su ciò che non viene da lui**:
   `functions/test/routine-merge-approvals.test.js`,
   `functions/test/lavori-locali-908.test.js`, `tests/unit/ownerMerge.test.mjs`,
   `tests/unit/mergeApprovals.test.mjs`,
-  `tests/unit/mergeApprovalSignal.test.mjs`, `tests/merge-approvals.spec.mjs`.
+  `tests/unit/mergeApprovalSignal.test.mjs`, `tests/merge-approvals.spec.mjs`,
+  `tests/merge-approvals-voci.spec.mjs`.
