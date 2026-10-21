@@ -333,18 +333,42 @@
     };
   }
 
-  // Marcatura esplicita della parte riusabile: NON serve per i modelli che Filo
-  // usa davvero (#422). I modelli Gemini — sia via questo router sia via l'API
-  // diretta — riconoscono da soli il prefisso identico a una richiesta
-  // precedente, e lo stesso vale per OpenAI/DeepSeek/Grok/Moonshot. Fanno
-  // eccezione i modelli Anthropic, che vogliono un marcatore esplicito nel corpo
-  // della richiesta: oggi qui sono configurati solo su funzioni dal prompt corto
-  // (spiegazione approfondita, riscrittura di un testo), dove non ci sarebbe
-  // comunque nulla da riusare. Se un domani si mettesse un modello Anthropic
-  // sulla chat o sull'assistente di pagina, il riordino da solo non basterebbe:
-  // andrebbe aggiunto il marcatore in fondo alla parte immutabile — e si
-  // vedrebbe subito, perché il riuso resterebbe a zero nella cronologia.
-  //
+  // I punti di cache del piano (SN_FILO_CONTESTO.pianoDellaCache) li vogliono espliciti solo i modelli Anthropic: gli
+  // altri riconoscono da soli il prefisso ripetuto e ricevono i messaggi tali e quali. Anthropic ne accetta al più 4.
+  const MAX_PUNTI_CACHE = 4;
+  function vuoleCacheEsplicita(model) {
+    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  }
+
+  function partiConPunto(content, caratteri, cacheControl) {
+    if (typeof content === 'string') {
+      const n = Number.isInteger(caratteri) && caratteri > 0 && caratteri < content.length ? caratteri : content.length;
+      if (!content.slice(0, n).trim()) return null;
+      const parti = [{ type: 'text', text: content.slice(0, n), cache_control: cacheControl }];
+      if (n < content.length) parti.push({ type: 'text', text: content.slice(n) });
+      return parti;
+    }
+    if (!Array.isArray(content)) return null;
+    let k = -1;
+    content.forEach((p, i) => { if (p && p.type === 'text' && String(p.text || '').trim()) k = i; });
+    return k < 0 ? null : content.map((p, i) => (i === k ? { ...p, cache_control: cacheControl } : p));
+  }
+
+  // Il testo resta lo stesso, carattere per carattere: cambia solo la forma (parti di testo) dei messaggi col punto.
+  function conPuntiDiCache(model, messages, piano) {
+    const punti = piano && Array.isArray(piano.punti) ? piano.punti : [];
+    if (!punti.length || !Array.isArray(messages) || !vuoleCacheEsplicita(model)) return messages;
+    const out = messages.slice();
+    for (const p of punti.slice(0, MAX_PUNTI_CACHE)) {
+      const m = out[p && p.indice];
+      if (!m || typeof m !== 'object') continue;
+      const cc = p.durata === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' };
+      const parti = partiConPunto(m.content, p.caratteri, cc);
+      if (parti) out[p.indice] = { ...m, content: parti };
+    }
+    return out;
+  }
+
   // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
   // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
   // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
