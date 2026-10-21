@@ -3017,8 +3017,8 @@
         trustedSites: [],
         righeScartate: [],
       },
-      // #1004 — le pagine delicate (posta, banche, sanità, quelle che hanno mostrato un campo password o carta, e
-      // `siti` scritti dall'utente) non mandano testo ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
+      // #1004 — le pagine delicate (posta, banche, sanità, pubblica amministrazione, quelle con un campo password o carta,
+      // e `siti` scritti dall'utente) non mandano niente ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
       pagineDelicate: {
         enabled: true,
         siti: [],
