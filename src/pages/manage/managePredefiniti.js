@@ -747,6 +747,7 @@
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
       getRegistry: () => collectModelRegistry().registry,
+      readOptions: leggiSoprannomi,
       // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
       avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref], collectExcluded()),
       costoDi: costoModello,
