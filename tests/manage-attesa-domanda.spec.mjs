@@ -124,3 +124,17 @@ test('tema scuro: il segno resta leggibile', async ({ openTab }) => {
   const colore = await segno.evaluate((el) => getComputedStyle(el).color);
   expect(colore).not.toBe('rgba(0, 0, 0, 0)');
 });
+
+test('pagina dei feedback: stessa scheda In coda, e il segno «aspetta D-n» accanto alla data', async ({ openTab }) => {
+  const fb = await openTab('filo://feedback/feedback.html');
+  await fb.waitForLoadState('domcontentloaded');
+  await fb.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
+  await fb.evaluate((items) => window.__fbTest.setData(items), [ATTESA, SICUREZZA]);
+  await fb.locator('#tabs [data-tab="queue"]').click();
+  const card = fb.locator('.fb-card', { hasText: 'Colore del tema' });
+  await expect(card).toHaveCount(1);
+  await expect(card.locator('.fb-domanda')).toHaveText('aspetta D-7');
+  await fb.locator('#tabs [data-tab="inbox"]').click();
+  await expect(fb.locator('.fb-card', { hasText: 'Bloccato dalla sicurezza' })).toHaveCount(1);
+  await expect(fb.locator('.fb-card', { hasText: 'Colore del tema' })).toHaveCount(0);
+});
