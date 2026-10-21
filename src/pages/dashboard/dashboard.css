@@ -1361,6 +1361,25 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   padding: 8px 0 4px 14px;
   background: var(--dash-paper);
 }
+/* Su una finestra bassa la colonna scorre sotto l'orologio: quello che resta sotto sfuma invece di uscire tagliato a
+   metà, e la sfumatura c'è solo finché sotto c'è altro (senza scorrimento la timeline è spenta e l'opacità resta 0). */
+.dash-sistema::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--dash-paper) 85%);
+  pointer-events: none;
+  opacity: 0;
+  animation: dash-sotto-c-e-altro linear both;
+  animation-timeline: scroll(nearest block);
+}
+@keyframes dash-sotto-c-e-altro {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
 .dash-sis-icone {
   display: flex;
   flex-wrap: wrap;
