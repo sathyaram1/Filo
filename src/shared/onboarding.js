@@ -405,7 +405,7 @@
     const { autonomiaInSospeso: _sospesa, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
     const fine = thread[thread.length - 1];
     const riaperta = {
-      ...resto, done: false, closedAt: null, notice: '', thread,
+      ...resto, done: false, closedAt: null, notice: '', thread, rifatta: true,
       ...(fine && fine.role === 'filo' && fine.autonomia ? { autonomiaInSospeso: true } : {}),
     };
     return prima > 0 ? { ...riaperta, scambiPrima: prima } : riaperta;
