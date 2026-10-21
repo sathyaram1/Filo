@@ -1046,6 +1046,8 @@ class TabManager {
       isInternal,
       // Quando la tab è stata aperta — metadato dell'archivio (§3.1).
       openedAt: new Date().toISOString(),
+      // Aperta da Filo, non dalla pagina che l'ha chiesta con window.open: per il filo è un gesto (#1525).
+      _gestoFiloAt: adotta ? 0 : Date.now(),
       // Da quando c'è la pagina in vista: dopo un collegamento seguito nella stessa scheda non è più l'apertura (#826).
       paginaDal: null,
       _paginaUrl: senzaAncora(url),
