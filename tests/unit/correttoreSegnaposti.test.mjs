@@ -30,7 +30,8 @@ test('le false piste restano senza segni: «x te», «3x4», i baci, la matemati
   for (const t of ['x te lo prendo io', 'una stanza 3x4', 'a domani xx', 'ti voglio bene xx', 'Grazie! xx', 'baci, xx',
     'love you xx', 'risolvi 2x + 3 = 7', 'x = 5', 'gioco alla Xbox', 'il XX secolo', 'XXX', 'zoom 10x', 'xxxtentacion',
     'il valore 0x1f', 'scrivi a xx@posta.it', 'https://esempio.it/xx/pagina', 'versione 2.x', 'tre x', '`nel 14xx`',
-    'un 3xx4 strano', 'xx']) {
+    'un 3xx4 strano', 'xx', 'ti voglio bene xx grazie', 'a presto xx baci', 'ci siamo divertiti xx ciao', 'l\'ho visto xx Marco',
+    'tante cose xx baci', 'made it xx love']) {
     assert.deepEqual(trovati(t), [], t);
   }
 });
