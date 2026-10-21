@@ -259,10 +259,9 @@ test.describe('utente già accolto', () => {
     await queueChat(app, { text: 'Piacere Anna. Come vuoi che ti scriva?', actions: [] });
     await scrivi(intervista, 'sono Anna, insegno lettere');
     await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Come vuoi che ti scriva' })).toBeVisible({ timeout: 30_000 });
-    await intervista.close();
-
-    await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
-    const home = await newtabPage(app, 1);
+    // Il tasto Casa porta la scheda alla home semplice.
+    await intervista.goto('filo://newtab/');
+    const home = intervista;
     await expect(home.locator('#onbNotice')).toContainText('La presentazione è rimasta a metà', { timeout: 15_000 });
     await expect(home.locator('body')).not.toHaveAttribute('data-state', 'thread');
     await home.locator('#onbNoticeRedo').click();
