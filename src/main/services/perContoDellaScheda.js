@@ -1,6 +1,6 @@
 // Le richieste che il main fa per conto di una scheda (anteprima di un link, llms.txt, byte di un'immagine): escono come
 // uscirebbero da lei, dalla sua sessione (proxy, certificati, cache, identità, protezioni), mai verso la rete interna e
-// col Referer ridotto all'origine. Regole: patterns/una-richiesta-per-conto-della-scheda-esce-dalla-scheda.md
+// col Referer ridotto all'origine. Prove: tests/unit/perContoDellaScheda.test.mjs, tests/proxy-tab.spec.mjs.
 
 'use strict';
 
@@ -84,12 +84,19 @@ async function passaDalProxy(ses, url) {
   }
 }
 
-// Gli indirizzi letterali e i nomi di casa si giudicano sempre; un nome qualsiasi col DNS solo se la richiesta va diretta.
+// Gli indirizzi letterali e i nomi di casa si giudicano sempre; un nome qualsiasi col DNS solo se la richiesta va diretta,
+// e col risolutore della sessione: è quello con cui la richiesta si collegherà, non un altro che può rispondere diverso.
 async function controllaHost(ses, u) {
   const nudo = String(u.hostname || '').replace(/^\[(.*)\]$/, '$1').toLowerCase();
   const diCasa = netNode.isIP(nudo) || nudo === 'localhost' || nudo.endsWith('.localhost') || nudo.endsWith('.local');
-  if (!diCasa && nudo && await passaDalProxy(ses, u.href)) return;
-  await assertPublicHost(u.hostname);
+  if (diCasa || !nudo) { await assertPublicHost(u.hostname); return; }
+  if (await passaDalProxy(ses, u.href)) return;
+  if (!ses || typeof ses.resolveHost !== 'function') { await assertPublicHost(u.hostname); return; }
+  let risolto;
+  try { risolto = await ses.resolveHost(nudo); } catch (_) { throw new Error('dns-failed'); }
+  const indirizzi = ((risolto && risolto.endpoints) || []).map((x) => x && x.address).filter(Boolean);
+  if (!indirizzi.length) throw new Error('dns-empty');
+  if (indirizzi.some(isPrivateAddr)) throw new Error('blocked-private-address');
 }
 
 async function inReteInterna(ses, url) {
