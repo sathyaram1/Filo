@@ -2215,6 +2215,8 @@ if (isMainModule) {
     process.exit(s.fromChannel ? 4 : 3);
   };
 
+  // Da quando il giro ha preso il biglietto, un errore imprevisto esce come guasto (emitFatale).
+  let giroDelBiglietto = false;
   try {
     if (flag === '--record-verifier') {
       const [, id, ...rest] = conBiglietto(argv);
@@ -2444,6 +2446,7 @@ if (isMainModule) {
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
       // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
+      giroDelBiglietto = true;
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
@@ -2466,11 +2469,11 @@ if (isMainModule) {
       run().then((r) => {
         process.exit(r?.exit ?? 0);
       }).catch((e) => {
-        process.stderr.write(`[dispatch] errore fatale: ${e.message}\n`);
-        process.exit(1);
+        process.exit(emitFatale(e).exit);
       });
     }
   } catch (e) {
+    if (giroDelBiglietto) process.exit(emitFatale(e).exit);
     console.error('[dispatch] errore:', e.message);
     process.exit(1);
   }
