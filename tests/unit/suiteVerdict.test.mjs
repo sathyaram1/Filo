@@ -414,7 +414,7 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
     togliCartella(dir);
     mkdirSync(join(dir, 'prove'), { recursive: true });
     writeFileSync(join(dir, 'playwright.config.mjs'), "export default { testDir: './prove', workers: 1, fullyParallel: false, retries: 0 };\n", 'utf8');
-    writeFileSync(join(dir, 'prove', 'a.spec.mjs'), "import { test } from '@playwright/test';\ntest('lento', async () => { await new Promise((r) => setTimeout(r, 4000)); });\ntest('dopo il lento', () => {});\n", 'utf8');
+    writeFileSync(join(dir, 'prove', 'a.spec.mjs'), "import { test } from '@playwright/test';\ntest('lento', async () => { await new Promise(() => {}); });\ntest('dopo il lento', () => {});\n", 'utf8');
     writeFileSync(join(dir, 'prove', 'b.spec.mjs'), "import { test, expect } from '@playwright/test';\ntest('rosso', () => { expect(1).toBe(2); });\ntest('verde', () => {});\n", 'utf8');
     const tutti = join(dir, 'blob-tutti');
     mkdirSync(tutti, { recursive: true });
