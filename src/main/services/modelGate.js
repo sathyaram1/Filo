@@ -150,9 +150,11 @@
     }
 
     // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
-    function pianoCache(action, messages) {
+    function pianoCache(action, messages, s) {
       const FC = global.SN_FILO_CONTESTO;
-      try { return FC && typeof FC.pianoDellaCache === 'function' ? FC.pianoDellaCache(action, messages) : null; } catch (_) { return null; }
+      let durata = null;
+      try { durata = durataCache(s); } catch (_) { durata = null; }
+      try { return FC && typeof FC.pianoDellaCache === 'function' ? FC.pianoDellaCache(action, messages, { durata }) : null; } catch (_) { return null; }
     }
 
     async function ensureUnderLimit(settings) {
