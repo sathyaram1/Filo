@@ -11,7 +11,9 @@
 (function (global) {
   'use strict';
 
-  const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+  const Ragionamento = require('./ragionamentoRimandato');
+
+  const ENDPOINT ='https://openrouter.ai/api/v1/chat/completions';
   const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
   const SPEECH_ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
   const TRANSCRIPTIONS_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
