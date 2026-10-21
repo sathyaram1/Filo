@@ -4878,8 +4878,11 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // La home chiesta da chi è già nella home: non è stato ricaricato niente, e
   // il modello non deve dire di averlo portato da qualche parte.
   if (type === 'COMANDO_FINESTRA' && res.output && res.output.already) {
+    // Il bottone chiude e non svuota (#869, #831.1): se il modello promette di svuotare, l'utente preme e trova tutto lì.
     return 'La home È la pagina da cui l\'utente ti sta scrivendo: non ho ricaricato niente, perché ricaricarla '
-      + 'cancellerebbe questa conversazione. Diglielo in una riga; sotto la tua risposta trova un bottone per svuotarla lui.';
+      + 'interromperebbe questa risposta. Diglielo in una riga. Sotto la tua risposta l\'utente ha il bottone «Chiudi la '
+      + 'conversazione»: lo scambio resta nella home e il suo messaggio dopo ne comincia una nuova. Non promettergli che la '
+      + 'home si svuota o si ricarica.';
   }
   if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
     const A = globalThis.SN_AUTONOMIA;
