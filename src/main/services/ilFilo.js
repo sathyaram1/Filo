@@ -293,7 +293,8 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   function transazione(fn, opts) {
     const incog = inIncognito(opts);
     return inCoda(async () => {
-      await carica();
+      // L'incognito ha il filo in memoria: un file che non si legge non lo tocca.
+      if (incog) await caricaPerLeggere(); else await carica();
       const v = incog ? incognito : normale;
       return fn({
         incognito: incog,
