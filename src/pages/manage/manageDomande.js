@@ -189,7 +189,7 @@
   function scudo(d) {
     const s = MR.segnoFiducia(d);
     const span = el('span', `mg-fiducia-segno mg-fiducia-segno--${s.classe}`);
-    span.title = `${s.parola}: ${s.classe === 'fidata' ? TITOLO_FIDATA : TITOLO_NON_FIDATA}`;
+    span.title = s.classe === 'fidata' ? SCUDO_FIDATA : SCUDO_NON_FIDATA;
     span.setAttribute('aria-label', s.parola);
     span.setAttribute('role', 'img');
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
