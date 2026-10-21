@@ -345,11 +345,21 @@ fanno ~5 $ al giorno, compattazioni comprese.
 
 ## Da decidere (owner)
 
-1. **Chiave Anthropic**: un proxy sulle functions del server (la chiave non
-   lascia mai il server, i limiti per utente li applica il sistema crediti che
-   c'è già; costa un passaggio in più nelle risposte), oppure chiavi per
-   utente nello stesso workspace (non so ancora se l'API di amministrazione
-   permetta di crearle).
+1. **Chiave Anthropic della chat** (domanda aperta insieme a #1412):
+   - **la chiave dell'owner dentro OpenRouter** (BYOK, consigliata): il
+     trasporto non cambia, le richieste ai modelli Anthropic partono con la
+     chiave dell'owner e quindi coi suoi crediti, con una cache sola per tutti.
+     Va provato che i punti di cache e la compattazione lato server passino
+     attraverso OpenRouter;
+   - **un proxy sulle functions del server**: la chiave non lascia mai il
+     server e i limiti per utente li applica il sistema crediti che c'è già;
+     servono un fornitore diretto nell'app e la funzione sul server, e ogni
+     risposta fa un passaggio in più.
+
+   Finché la domanda è aperta, della fase 1 si fa solo la parte che non
+   dipende dalla chiave. Le chiavi per utente nello stesso workspace sono
+   uscite dalle strade: non è detto che l'API di amministrazione permetta di
+   crearle.
 
 ## Rimandato
 
