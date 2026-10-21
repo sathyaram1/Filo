@@ -304,7 +304,7 @@ test('una password scritta dopo una pausa e una carta scritta in due tempi non p
   await page.waitForTimeout(400);
   await page.keyboard.type('1111 1111 grazie');
   await expect.poll(quante, { timeout: 5000 }).toBe(3);
-  const partiti = await app.evaluate(() => globalThis.__partiti);
+  const partiti = await tutti();
   expect(partiti.some((t) => t.includes('[dato riservato]'))).toBe(true);
   for (const t of partiti) {
     expect(t).not.toContain('Gatto2024');
@@ -313,16 +313,6 @@ test('una password scritta dopo una pausa e una carta scritta in due tempi non p
 });
 
 // #1446.1 — chi risponde a chi chiede la password la scrive senza annunciarla: l'annuncio è la domanda sopra il campo.
-async function spiaPartiti(app) {
-  await app.evaluate(() => {
-    const vero = globalThis.SN_PROVIDERS.completeWithFallback;
-    globalThis.__partiti = [];
-    const spia = async (req) => { globalThis.__partiti.push(String(req.messages[req.messages.length - 1].content)); return vero(req); };
-    globalThis.SN_PROVIDERS.completeWithFallback = spia;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = spia;
-  });
-  return () => app.evaluate(() => globalThis.__partiti);
-}
 
 test('una password scritta in chat come risposta a chi la chiede non parte, anche con la domanda appena arrivata', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, {});
