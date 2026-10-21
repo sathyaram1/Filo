@@ -2118,6 +2118,8 @@
     getWordAt,
     getInputWordAt,
     applyFix,
+    testoDelCampo,
+    sostituisciNelCampo,
     sostituisciComeBattuta,
     riallineaIssues,
     addToDictionary,
