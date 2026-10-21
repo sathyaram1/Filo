@@ -1874,7 +1874,7 @@ class TabManager {
   _showTriageToast(_n) {
     try {
       this.win.webContents.send('shell:toast', {
-        text: 'Schede riordinate: quelle chiuse restano nel filo della home',
+        text: 'Schede riordinate. Quelle chiuse restano nel filo della home',
       });
     } catch (_) {}
   }
