@@ -10,8 +10,10 @@ test('Conservativo: dimentica dopo una ricerca, confermato, nasconde la riga e s
   await home(app);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Vive a Bologna.\nHa un gatto.', PREFERENZE: '' }));
+  const prima = await execAction(app, { type: 'DIMENTICA', testo: 'Bologna' }, { contesto: [ricercaFatta] });
+  expect(prima.needsConfirm).toBe(2);
   const r = await execAction(app, { type: 'DIMENTICA', testo: 'Bologna' }, { contesto: [ricercaFatta], confirmed: true });
-  expect(r.executed).toBe(true);
+  expect(r, JSON.stringify(r)).toMatchObject({ executed: true });
   const nascoste = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).nascoste.map((n) => n.testo));
   expect(nascoste).toEqual(['Vive a Bologna.']);
   const mem = await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()));
