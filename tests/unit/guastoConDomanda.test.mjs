@@ -209,3 +209,18 @@ test('il controllo di sicurezza salta la domanda di guasto e rilascia col guasto
     assert.match(t, /1\. La domanda, coi campi di SPEC-DOMANDE/, `${ruolo2}: la domanda resta il primo passo`);
   }
 });
+
+// #1482: «Riprendi» su un feedback che non è fermo lo rimetteva in coda da capo (D-90 su un fuso, D-91 su uno in
+// verifica). Lo offre solo chi mette il feedback in attesa; chi verifica lo lascia tornare in coda da sé.
+test('la domanda di guasto offre «Riprendi» solo a chi mette il feedback in attesa', () => {
+  for (const [ruolo, opts] of GLI_ALTRI.filter(([r]) => r !== 'secaudit')) {
+    const t = piatto(readRoleInstructions(ruolo, opts));
+    const chi = `${ruolo} ${JSON.stringify(opts)}`;
+    assert.doesNotMatch(t, /"tipo": "riprendi"/, `${chi}: nessun modello gli mette davanti «Riprendi»`);
+    assert.match(t, /Per gli altri il feedback torna in coda da sé, e la loro domanda non offre «Riprendi»/, chi);
+    assert.match(t, /Le opzioni restano quelle con un effetto vero/, chi);
+  }
+  for (const [ruolo, opts] of CHI_RISOLVE) {
+    assert.match(readRoleInstructions(ruolo, opts), /"tipo": "riprendi"/, `${ruolo} ${opts.caso || ''}: chi lo mette in attesa lo riprende`);
+  }
+});
