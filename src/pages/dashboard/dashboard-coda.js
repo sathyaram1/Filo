@@ -591,6 +591,8 @@
     for (const ev of ['wheel', 'touchstart', 'pointerdown', 'keydown']) d.bubblesEl.addEventListener(ev, () => { fissa = false; }, { passive: true });
     d.bubblesEl.addEventListener('scroll', () => {
       const a = d.bubblesEl;
+      // Uno scorrimento che non è quello dell'ancora (barra, tasti, un'altra pagina che porta qui) la lascia andare.
+      if (fissa && Math.abs(a.scrollTop - voluto) > 1) fissa = false;
       if (a.scrollTop < 40 && a.scrollHeight > a.clientHeight + 40 && !finito && primo) sali().catch(() => {});
     }, { passive: true });
     document.addEventListener('visibilitychange', () => {
