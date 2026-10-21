@@ -200,6 +200,21 @@ faceva spendere una chiamata.
   l'Aiuto manda lo legge `SN_FILO_UI.valoreVero`. Insieme al testo torna la
   selezione che aveva lasciato l'utente: dopo un `selectAll` e un `delete` del
   sito, il tasto seguente non cancella tutto.
+
+  L'annuncio non basta da solo (#1340): il sito agisce **dentro** il tasto, nei
+  suoi ascolti di `beforeinput` che girano dopo il nostro (riscrive il `value`,
+  seleziona tutto), oppure subito **dopo un annuncio che non ha scritto niente**
+  (Backspace in testa alla casella). Quindi un cambio vale come dell'utente solo
+  se ha lo stesso tipo dell'annuncio **e combacia** con l'annuncio applicato al
+  testo e alla selezione di quel momento: un inserimento mette il suo `data` al
+  posto della selezione (composizione compresa, che seleziona il pezzo che
+  compone), Backspace e Canc tolgono un solo carattere come lo vede l'utente
+  (`Intl.Segmenter`), le altre cancellazioni tolgono e basta, attaccate al
+  cursore. Se non combacia, Filo rimette il tasto dell'utente sul suo testo.
+  La selezione spostata fra il tasto e il suo annuncio torna dov'era (lo scatto
+  del tasto la fotografa; i tasti del metodo di scrittura no). Annulla, rifai,
+  rilascio di un trascinamento e sostituzione del correttore non si prevedono:
+  passano come prima.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
   l'origine (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in
   `impostazioniPerOrigine.js`), concessa solo al riquadro che ha davvero
