@@ -801,6 +801,7 @@
     fermaTimer(state, ['timerRapido', 'timerFine', 'timerRagionato', 'timerCodice', 'timerPassaggio']);
     state.rimandati.clear();
     if (state.overlay) { state.overlay.remove(); state.overlay = null; }
+    if (state.valori) { state.valori.remove(); state.valori = null; state.badge.clear(); }
     if (state.ro) { try { state.ro.disconnect(); } catch (_) {} state.ro = null; }
     state.attivo = false;
     if (activeEl === el) activeEl = null;
