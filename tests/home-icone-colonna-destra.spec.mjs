@@ -125,6 +125,12 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
     ga.getProfile = () => ({ name: 'Mario Rossi', email: 'mario@example.it' });
     ga.isRemembered = () => true;
   });
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.webContents.send('filo:broadcast', {
+      type: 'auth_changed', signedIn: true, profile: { name: 'Mario Rossi', email: 'mario@example.it' },
+    });
+  });
   const page = await home(openTab);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
