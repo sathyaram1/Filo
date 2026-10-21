@@ -58,7 +58,7 @@ class VisiteSchede {
       if (v) v.url = url;
       return;
     }
-    const freno = this.freno(wc, gesto);
+    const freno = this.freno(wc, gesto, inPagina);
     // Frenata, la pagina resta quella della visita aperta: in attesa segue l'indirizzo, già scritta lo assorbe.
     if (freno.frena) {
       if (!registrabile(url)) return;

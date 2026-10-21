@@ -645,3 +645,27 @@ for (const tema of ['light', 'dark']) {
   });
 }
 
+
+// #1525 — un indirizzo tagliato alla misura porterebbe altrove: dalla home si apre il suo sito, detto come tale.
+test('una pagina con l’indirizzo tagliato alla misura si apre dal suo sito, non da un indirizzo a metà', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await home(app);
+  const base = testServer.html('<title>Lunga</title><p>lunga</p>');
+  const origine = new URL(base).origin;
+  await app.evaluate(async (_e, u) => {
+    await globalThis.SN_IL_FILO.registraVisita({ url: u, titolo: 'Pagina lunghissima' });
+  }, `${base}?q=${'x'.repeat(10_000)}`);
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').last();
+  await riga.locator('.dash-pagine-testa').click();
+  const pagina = riga.locator('.dash-pagina', { hasText: 'Pagina lunghissima' });
+  await expect(pagina).toHaveAttribute('href', `${origine}/`);
+  await pagina.click({ button: 'right' });
+  const menu = menuDi(page).locator('.sn-menu');
+  await expect(menu.getByText('Apri il sito', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Riapri la pagina', { exact: true })).toHaveCount(0);
+  await menu.getByText('Apri il sito', { exact: true }).click();
+  const schede = async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.map((t) => String(t.url));
+  await expect.poll(async () => (await schede()).some((u) => u.replace(/^https?:\/\//, '').replace(/\/$/, '') === new URL(origine).host)).toBe(true);
+  expect((await schede()).some((u) => u.includes('xxxx'))).toBe(false);
+});

@@ -577,3 +577,43 @@ test('una pagina che cambia indirizzo in ciclo senza input lascia al più 30 vis
   await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
   expect(visite().length).toBe(prima + 1);
 });
+
+// #1525 — sopra 256 MB il filo si fa notare una volta per avvio, e l'avviso porta dove le pagine si cancellano per periodo.
+test('il filo pesante si fa notare, e l’avviso porta alla cancellazione delle pagine per periodo', async ({ app, shell, avvisi }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Il filo vero, con la misura del file finta: scrivere 256 MB in una prova costerebbe più di tutto il resto.
+  await app.evaluate(async () => {
+    const rq = process.mainModule.require;
+    const path = rq('path');
+    const fsp = rq('node:fs/promises');
+    const { creaFilo } = rq(path.join(rq('electron').app.getAppPath(), 'src', 'main', 'services', 'ilFilo.js'));
+    const cartella = path.join(process.env.FILO_USER_DATA, 'filo-pesante');
+    const file = path.join(cartella, 'eventi.jsonl');
+    await creaFilo({ cartella }).registraVisita({ url: 'https://pesante.example/', titolo: 'Pesante' });
+    const stat = fsp.stat;
+    fsp.stat = async (p, ...resto) => {
+      const s = await stat.call(fsp, p, ...resto);
+      return String(p) === file ? { ...s, size: 300 * 1024 * 1024 } : s;
+    };
+    try {
+      const f = creaFilo({ cartella });
+      await f.pagine();
+      await new Promise((r) => setTimeout(r, 200));
+    } finally { fsp.stat = stat; }
+  });
+  const vista = await avvisi();
+  const notifica = vista.locator('.shell-notif', { hasText: 'occupano 300 MB sul disco' });
+  await expect(notifica).toBeVisible({ timeout: 10_000 });
+  await vista.screenshot({ path: 'tests/.shots/1525/avviso-filo-pesante.png' });
+  await notifica.locator('.shell-notif-action', { hasText: 'Cancella pagine' }).click();
+  let sicurezza = null;
+  await expect.poll(() => {
+    sicurezza = app.windows().find((w) => w.url().startsWith('filo://security/security.html'));
+    return Boolean(sicurezza);
+  }, { timeout: 10_000 }).toBe(true);
+  await sicurezza.waitForLoadState('domcontentloaded');
+  await expect(sicurezza.locator('#sec-visite-ora')).toBeFocused({ timeout: 10_000 });
+  await expect(sicurezza.locator('#sec-visite')).toBeInViewport();
+  await sicurezza.screenshot({ path: 'tests/.shots/1525/sicurezza-pagine.png' });
+});
