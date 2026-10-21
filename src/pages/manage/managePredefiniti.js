@@ -1,4 +1,4 @@
-// Pagina admin "Modelli predefiniti".
+// Gestione → Impostazioni predefinite → «Modelli predefiniti» (#1414: era la pagina admin-defaults, spostata intera).
 //
 // Editor della config condivisa (registry modelli, modelli per azione, chiavi
 // API predefinite) che si propaga a TUTTI gli utenti via
