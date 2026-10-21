@@ -234,7 +234,7 @@
 
     // Click fuori dal pannello → collassa (se l'AI non ha richiesto chat aperta)
     docClickHandler = (e) => {
-      if (!root || collapsed) return;
+      if (!root || collapsed || nascosto) return;
       if (root.contains(e.target)) return;
       if (aiPrefersOpen) return;
       collapse({ ai: false });
