@@ -86,8 +86,9 @@
   }
 
   // `campo`: la casella; `invia()`: quello che fa la chat col tasto d'invio; `contenitore`/`prima`: dove va il tasto;
-  // `occupato()`: la chat sta ancora rispondendo (l'invio aspetta); `ambito`: dove vale la scorciatoia (di serie la casella).
-  function collega({ campo, invia, contenitore, prima = null, occupato = null, ambito = null } = {}) {
+  // `occupato()`: la chat sta ancora rispondendo (l'invio aspetta); `ambito`: dove vale la scorciatoia (di serie la casella);
+  // `suStato(stato)`: chi mostra il microfono anche altrove (l'icona Aiuto della barra laterale).
+  function collega({ campo, invia, contenitore, prima = null, occupato = null, ambito = null, suStato = null } = {}) {
     if (!campo || !contenitore || typeof invia !== 'function') return null;
     const gia = perCampo(campo);
     if (gia) return gia.api;
