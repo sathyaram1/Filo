@@ -17,6 +17,7 @@
         'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
         'Nei riquadri incorporati dello stesso sito, come un blocco commenti, Alt+E e il tasto destro di Filo funzionano sempre. Prima, se il riquadro finiva di caricare dopo la pagina o ci passavi sopra col puntatore mentre caricava, lì dentro Filo non rispondeva più.',
         'La Cronologia AI resta svelta anche con migliaia di voci. Mentre scrivi nella ricerca la pagina non si blocca più, e scorrendo verso le voci vecchie non scatta.',
+        'Il tasto destro su un link non visita più i siti che Filo ti segnala come sospetti né quelli della tua lista dei siti bloccati. Per un sito in lista il menu ti dice che è bloccato. Le zone cliccabili di un\'immagine e i link dentro un disegno ora hanno le voci del link e l\'avviso giusto quando imitano un sito noto.',
       ],
     },
     {
