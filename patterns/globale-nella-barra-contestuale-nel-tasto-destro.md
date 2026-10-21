@@ -84,10 +84,11 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
 ## L'Aiuto nella barra, e la risposta che accende la striscia (#1432)
 
 - **L'icona Aiuto dice cosa farà il clic**: punto di domanda ad Aiuto chiuso o ridotto (lo apre), microfono ad Aiuto
-  aperto (detta, lo stesso microfono della casella), microfono acceso mentre ascolta (ferma). Col mouse la barra
-  resta aperta: due clic nello stesso punto e si parla. Lo stato lo riferisce la pagina (`MSG.AIUTO_STATO`), il clic
-  lo decide lei sul suo stato vero; l'aspetto sta in `aspettoAiuto` (`src/shared/disposizioneIcone.js`), lo stesso
-  per la barra e per la riga del tasto destro. Dove la voce «Aiuto» non c'è l'icona è spenta e il suggerimento dice
+  aperto (detta, lo stesso microfono della casella), microfono acceso mentre ascolta (ferma, anche ad Aiuto ridotto).
+  Col mouse la barra resta aperta: due clic nello stesso punto e si parla. Lo stato lo riferisce la pagina
+  (`MSG.AIUTO_STATO`), il clic lo decide lei sul suo stato vero; aspetto e clic escono dalla stessa `aspettoAiuto`
+  (`src/shared/disposizioneIcone.js`), per la barra e per la riga del tasto destro: due regole separate avevano
+  già divergito sul pannello ridotto (giro 1 di #1432). Dove la voce «Aiuto» non c'è l'icona è spenta e il suggerimento dice
   perché; sotto l'avviso del sito fa la domanda a Filo su quel sito, come la scorciatoia.
 - **Una risposta arrivata a pannello ridotto o chiuso dall'utente non si apre da sola e non si perde**: la striscia
   si accende ferma, d'accento, e l'icona che apre il pannello porta un punto, finché la risposta non si apre. Chi
