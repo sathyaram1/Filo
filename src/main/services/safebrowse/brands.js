@@ -259,7 +259,7 @@ const ALTRI_INDIRIZZI = {
   instagram: ['instagram.github.io'],
   whatsapp: ['whatsapp.github.io', 'whatsapp.net'],
   twitter: ['twitter.github.io'],
-  linkedin: ['linkedin.github.io', 'linkedin.cn'],
+  linkedin: ['linkedin.github.io', 'linkedin.cn', 'linkedinlearning.com'],
   tiktok: ['tiktok.github.io', 'tiktokcdn.com', 'tiktokv.com'],
   telegram: ['telegram.me', 'telegram.dog'],
   discord: [
