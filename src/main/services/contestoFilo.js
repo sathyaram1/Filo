@@ -248,7 +248,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     osserva,
     immagini: immagini ? (m) => foto.get(FC().chiave(m)) || null : null,
   });
-  ancore[lato] = f.ancora;
+  if (!solo) ancore[lato] = f.ancora;
   return {
     messaggi: f.messaggi,
     visti: f.visti,
