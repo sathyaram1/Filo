@@ -3,8 +3,7 @@
 // e la lista di esclusione viaggia identica per i modelli con e senza ordinamento.
 
 import { test, expect } from './fixtures/electron.mjs';
-
-const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const REGISTRY = {
   'deepseek-flash': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash', weights: 'open', reasoning: 'low' },
@@ -14,7 +13,7 @@ const REGISTRY = {
 // La pagina vuole un admin loggato, che nei test non c'è: il main è finto, e ricorda
 // l'ultimo salvataggio nella scheda così una riapertura ritrova quello che è stato scritto.
 async function openEditor(openTab) {
-  const page = await openTab(ADMIN_URL);
+  const page = await openTab(GESTIONE);
   await page.addInitScript((registry) => {
     const salvato = () => {
       try { return JSON.parse(sessionStorage.getItem('__registry') || 'null'); } catch (_) { return null; }
@@ -47,7 +46,7 @@ async function openEditor(openTab) {
       window.chrome.runtime.sendMessage = stub;
     } else window.chrome = { runtime: { sendMessage: stub } };
   }, REGISTRY);
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   return page;
 }
@@ -91,7 +90,7 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
   expect(upd.config.modelRegistry['deepseek-flash'].reasoning).toBe('low');
   expect('sort' in upd.config.modelRegistry['gemma-lite']).toBe(false);
 
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   await expect((await riga(page, 'deepseek-flash')).locator('.sn-model-sort')).toHaveValue('throughput');
   await expect((await riga(page, 'gemma-lite')).locator('.sn-model-sort')).toHaveValue('auto');
@@ -263,7 +262,7 @@ test('la misura del «Prova» resta dopo il ricaricamento, e una riga mai provat
   await prima().locator('button').last().click();
   await expect(prima().locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
 
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   await expect(prima().locator('.sn-model-row-status'), 'la misura è sparita col ricaricamento')
     .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });

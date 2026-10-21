@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -201,7 +202,7 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
   test.setTimeout(60_000);
   // Chi non è owner riceve un no, anche se chiede dalla pagina giusta.
   const negato = await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
-    { type: globalThis.SN_MSG.MSG.CONTATORI_INSTALLAZIONI }, { isShell: true }, 'filo://credits/owner.html'));
+    { type: globalThis.SN_MSG.MSG.CONTATORI_INSTALLAZIONI }, { isShell: true }, 'filo://manage/manage.html'));
   expect(negato).toMatchObject({ ok: false, error: 'not_admin' });
   const daUnSito = await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
     { type: globalThis.SN_MSG.MSG.CONTATORI_INSTALLAZIONI }, {}, 'https://esempio.test/'));
@@ -224,7 +225,7 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     ga.getIdToken = async () => 'token-finto';
   });
   try {
-    const page = await openTab('filo://credits/owner.html');
+    const page = await openTab(`${GESTIONE}#utenti`);
     await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
     const riquadri = page.locator('#ownerInstallazioni .sn-wallet-numero');
     await expect(riquadri).toHaveCount(2, { timeout: 10_000 });
@@ -247,7 +248,7 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-nome')).toHaveText(`installazioni attive a ${meseDiOggi}`);
     await expect(riquadri.nth(1)).toHaveAttribute('title', /npm run regole:pubblica/);
     await page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { theme: 'dark' } }));
-    await page.reload();
+    await ricaricaSu(page, 'utenti');
     await page.waitForFunction(() => document.querySelectorAll('#ownerInstallazioni .sn-wallet-numero').length === 2, null, { timeout: 10_000 });
     await page.screenshot({ path: `${SHOTS}/contatori-owner-scuro-guasto.png`, fullPage: true });
   } finally {

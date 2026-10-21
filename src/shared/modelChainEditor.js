@@ -174,9 +174,9 @@
   }
 
   // Sorgente delle opzioni per il dropdown: i nickname del registry, esposti
-  // nella <datalist id="nicknames-list"> da entrambe le pagine (Opzioni e
-  // Modelli predefiniti). Restano l'unica sorgente di verità: il dropdown
-  // custom la legge, non la duplica.
+  // nella <datalist id="nicknames-list"> della pagina (Gestione ne ha due: i
+  // Modelli predefiniti passano la loro con `readOptions`). Restano l'unica
+  // sorgente di verità: il dropdown custom la legge, non la duplica.
   function readNicknameOptions() {
     const dl = document.getElementById('nicknames-list');
     if (!dl) return [];
@@ -442,6 +442,8 @@
         isKnown: makeKnownCheck(getRegistry),
         avvisoDi: typeof o.avvisoDi === 'function' ? (ref) => o.avvisoDi(action, ref) : null,
         costoDi: typeof o.costoDi === 'function' ? (ref) => o.costoDi(action, ref) : null,
+        // Una pagina con due liste di soprannomi (Gestione) dice quale è la sua.
+        readOptions: typeof o.readOptions === 'function' ? o.readOptions : null,
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);

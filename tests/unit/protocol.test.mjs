@@ -98,3 +98,23 @@ test('lo schema filo chiede la cache del codice V8, insieme a standard', () => {
   assert.equal(filo.privileges.codeCache, true);
   assert.equal(filo.privileges.standard, true);
 });
+
+// #1414: le pagine dell'owner sono entrate in Gestione; il vecchio indirizzo, da qualunque strada arrivi, porta lì.
+test('i vecchi indirizzi delle pagine dell\'owner rimandano alla loro sezione di Gestione', async () => {
+  const casi = {
+    'filo://admin-defaults/admin-defaults.html': 'filo://manage/manage.html#predefiniti',
+    'filo://admin-defaults/': 'filo://manage/manage.html#predefiniti',
+    'filo://ADMIN-DEFAULTS/Admin-Defaults.html?x=1': 'filo://manage/manage.html#predefiniti',
+    'filo://credits/owner.html': 'filo://manage/manage.html#utenti',
+    'filo://credits/OWNER.html#qualcosa': 'filo://manage/manage.html#utenti',
+  };
+  for (const [da, a] of Object.entries(casi)) {
+    const res = await filoHandler({ url: da });
+    assert.equal(res.status, 302, `${da} non rimanda`);
+    assert.equal(res.headers.get('location'), a, `${da} rimanda nel posto sbagliato`);
+  }
+  // La pagina Crediti dell'utente resta dov'è, e così Gestione.
+  for (const resta of ['filo://credits/credits.html', 'filo://manage/manage.html']) {
+    assert.equal((await filoHandler({ url: resta })).status, 200, `${resta} non si apre più`);
+  }
+});

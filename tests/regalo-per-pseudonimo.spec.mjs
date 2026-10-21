@@ -231,10 +231,11 @@ test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il mo
   await expect(movimento).toContainText('+500');
   await expect(movimento).toContainText('Regalo di Filo');
 
-  // La vista owner lo conta: la riga di quella persona è salita. (Le due pagine
-  // hanno lo stesso host: ci si arriva dal rimando, come fa l'owner.)
+  // La vista owner lo conta: la riga di quella persona è salita. Ci si arriva dal
+  // rimando della pagina Crediti, come fa l'owner: porta in Gestione (#1414).
   await crediti.click('#ownerLink a');
-  await crediti.waitForURL(/owner\.html/);
+  await crediti.waitForURL(/manage\/manage\.html/);
+  await expect(crediti.locator('.mg-tab--active[data-tab="utenti"]')).toBeVisible({ timeout: 15_000 });
   const rigaOwner = crediti.locator('#ownerUsers tbody tr.sn-wallet-user')
     .filter({ has: crediti.locator('td.sn-wallet-pseudonym', { hasText: MIO }) });
   await expect(rigaOwner).toContainText(await fmt(5500), { timeout: 15_000 });

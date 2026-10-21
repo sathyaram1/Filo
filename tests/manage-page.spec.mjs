@@ -44,9 +44,10 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 9 schede: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni
-  // (#1110); più le tre della sezione Domande (#1150), «Aspettano» (#903) e «Crediti» fra le Routine (#1356).
-  await expect(page.locator('.mg-tab')).toHaveCount(14);
+  // 16 schede: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni
+  // (#1110); più le tre della sezione Domande (#1150), «Aspettano» (#903), «Crediti» fra le Routine (#1356), e le pagine
+  // dell'owner entrate in Gestione, «Inviti e utenti» e «Modelli predefiniti» (#1414).
+  await expect(page.locator('.mg-tab')).toHaveCount(16);
   // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -65,6 +66,8 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
   await expect(page.locator('.mg-tab[data-tab="crediti"]')).toHaveText('Crediti');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
+  await expect(page.locator('.mg-tab[data-tab="utenti"]')).toHaveText('Inviti e utenti');
+  await expect(page.locator('.mg-tab[data-tab="predefiniti"]')).toHaveText('Modelli predefiniti');
 
   // La vecchia tab "Revisione" non esiste più (assorbita in "In coda").
   await expect(page.locator('.mg-tab[data-tab="review"]')).toHaveCount(0);

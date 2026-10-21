@@ -762,11 +762,11 @@
   // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
   // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
   const AVVISO_OWNER = 'crediti-owner';
-  const PAGINA_OWNER = 'filo://credits/owner.html';
+  const PAGINA_OWNER = 'filo://manage/manage.html#utenti';
   const SOGLIE_TETTO = Object.freeze([80, 95]);
   const INVITI_POCHI = 2;
   const PSEUDONIMI_DETTI = 3;
-  const DOVE = 'nella pagina Inviti e utenti';
+  const DOVE = 'in Gestione, sezione Utenti';
   const TITOLI_OWNER = Object.freeze({
     tetto: 'Tetto dei regali', giornaliera: 'Quota del giorno', inviti: 'Ingressi con invito', scarto: 'Registro d’uso',
   });

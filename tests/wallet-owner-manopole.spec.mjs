@@ -20,6 +20,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
@@ -232,12 +233,11 @@ async function dirottaFirestore(app, b) {
   }, b);
 }
 
-// La pagina dell'owner NON si apre con openTab: quello sceglie la finestra per
-// host, e owner.html ha lo stesso host di credits.html.
+// «Inviti e utenti» sta in Gestione (#1414): l'indirizzo ne apre la scheda, poi torna pulito.
 async function apriOwner(app) {
-  const url = 'filo://credits/owner.html';
+  const url = GESTIONE;
   const shell = await primaFinestra(app);
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `${url}#utenti`);
   const deadline = Date.now() + 15_000;
   let page = null;
   while (Date.now() < deadline && !page) {
@@ -413,7 +413,7 @@ test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre ma
   await page.click('#knob-invitesRemaining-salva');
   await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
   expect(configDoc.invitesRemaining).toBe(20);
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
   await expect(page.locator('#knob-invitesRemaining')).toHaveValue('20', { timeout: 15_000 });
   expect(patch.length).toBe(3);
@@ -603,7 +603,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
   expect(patch.length).toBe(0);
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await expect.poll(() => configDoc.dailyCredits, { timeout: 10_000 }).toBe(500);
   expect(patch.map((p) => p.valori)).toEqual([{ dailyCredits: 500 }]);
   // La pagina ricaricata mostra il numero che il server ha adesso.
@@ -614,7 +614,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-entryCredits');
   const shell = await primaFinestra(app);
   const chiusa = await shell.evaluate(async () => {
-    const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => String(x.url || '').includes('owner.html'));
+    const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => String(x.url || '').includes('manage/manage.html'));
     if (!t) return false;
     await window.filoShell.tabs.close(t.id);
     return true;
@@ -623,7 +623,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   await expect.poll(() => configDoc.entryCredits, { timeout: 10_000 }).toBe(4200);
   // Spedito il numero, la pagina chiusa se ne va davvero.
   await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents()
-    .some((w) => !w.isDestroyed() && w.getURL().includes('owner.html'))), { timeout: 5000 }).toBe(false);
+    .some((w) => !w.isDestroyed() && w.getURL().includes('manage/manage.html'))), { timeout: 5000 }).toBe(false);
 });
 
 // Il tasto destro è centrale in Filo: su una riga della tabella deve offrire
@@ -737,7 +737,7 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
       const s = (await globalThis.__filoStorage.get('settings')).settings || {};
       await globalThis.__filoStorage.set({ settings: { ...s, theme: t } });
     }, tema);
-    await page.reload();
+    await ricaricaSu(page, 'utenti');
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
       return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11;
