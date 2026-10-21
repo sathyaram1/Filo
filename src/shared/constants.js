@@ -3544,6 +3544,7 @@
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,
+    VALUTA_MAX_CARATTERI,
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     INIZI_VARIABILI_CHAT,
