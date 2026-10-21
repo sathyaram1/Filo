@@ -330,7 +330,7 @@
       if (i >= 0) return { tipo: 'messaggio', chat: c.id, i, ts: c.messages[i].ts, role: c.messages[i].role, app: c.app || null };
     }
     const p = stato.pagine.get(id);
-    if (p) return { tipo: 'pagina', id: p.id, ts: p.ts, url: p.url, titolo: p.titolo };
+    if (p) return { tipo: 'pagina', id: p.id, ts: p.ts, url: p.url, titolo: p.titolo, ...(p.urlTagliato ? { urlTagliato: true } : {}) };
     return null;
   }
 
