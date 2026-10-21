@@ -104,11 +104,35 @@
     collapsed = false;
     aiPrefersOpen = false;
     session = null;
+    nascosto = false;
+    ridottoDallUtente = false;
+    nonLetta = false;
+    voce = null;
+    statoVoce = 'pronto';
+    cambiato();
+  }
+
+  function nascondi() {
+    nascosto = true;
+    Highlight.clear();
+    try { Highlight.clearForceHover?.(); } catch (_) {}
+    try { voce?.ferma(); } catch (_) {}
+    root.classList.add('sn-sidebar-nascosta');
+    cambiato();
+  }
+
+  // Già lì, ridotto o nascosto: «Aiuto» lo mostra intero, con la risposta arrivata nel frattempo.
+  function mostra() {
+    nascosto = false;
+    root.classList.remove('sn-sidebar-nascosta');
+    expand({ ai: false });
+    try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+    cambiato();
   }
 
   function open(context) {
-    if (isOpen()) return;
-    if (root) close();
+    if (isOpen()) { mostra(); return; }
+    if (root) close({ davvero: true });
     history = [];
     documenti = null;
     ripiegoDetto = false;
