@@ -187,6 +187,13 @@ test('con 3000 voci la pagina si apre e cerca senza bloccarsi, e scorrendo e cer
     return performance.now() - t;
   });
   expect(ms, `un tasto nella ricerca ha bloccato la pagina per ${Math.round(ms)} ms`).toBeLessThan(500);
+  // Il tempo dipende dalla macchina; quello che lo tiene basso su tutte no: le voci fuori schermo non si impaginano (#1115.1).
+  const impaginate = await page.evaluate(() => {
+    const voci = [...document.querySelectorAll('.sn-history-item .sn-history-output')];
+    return { tutte: voci.length, viste: voci.filter((v) => v.checkVisibility({ contentVisibilityAuto: true })).length };
+  });
+  expect(impaginate.tutte).toBeGreaterThanOrEqual(100);
+  expect(impaginate.viste, `${impaginate.viste} voci su ${impaginate.tutte} impaginate a ogni tasto`).toBeLessThan(25);
 
   // La più vecchia si trova cercandola, e cancellando la ricerca si arriva in fondo scorrendo.
   await page.locator('#search').fill('domanda 0');
