@@ -1553,6 +1553,41 @@ test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenc
   assert.equal(l5.colore, MR.REASONS.attack.color);
 });
 
+test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le strade sono rifare o archiviare', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+  const nota = 'Il cancello non fonde il ramo del server. Decidi tu: archiviarlo, o farlo rifare.';
+  const fb = {
+    status: 'design', statusReason: 'l5',
+    notes: `Report di chi ha risolto.\n\n--- Aggiornamento dell'agente del 21/10/26, 15:43 ---\n${nota}`,
+  };
+  const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
+  const l5 = MR.livelloL5(fb, lette);
+  assert.equal(l5.esito, 'bloccato', 'resta una decisione dell’owner');
+  assert.equal(l5.pannello.testo, nota);
+  assert.deepEqual(l5.pannello.azioni, ['rimanda', 'archivia']);
+  assert.equal(l5.fusione, 'senza');
+  assert.ok(l5.pannello.righe.some((r) => r.etichetta === 'Quando'));
+  assert.doesNotMatch(MR.segnoFermata(fb, lette).testo, /via libera/);
+
+  // Senza nota: lo dice, senza far credere che una richiesta stia arrivando.
+  const muta = MR.livelloL5({ status: 'design', statusReason: 'l5' }, lette);
+  assert.match(muta.pannello.testo, /senza aprire una richiesta/);
+  assert.doesNotMatch(muta.pannello.testo, /ancora/);
+  assert.deepEqual(muta.pannello.azioni, ['rimanda', 'archivia']);
+  // Elenchi non letti: «nessuna richiesta» sarebbe un'ipotesi, e la lista non lo afferma.
+  const presto = MR.livelloL5({ status: 'design', statusReason: 'l5' }, { fusioni: {} });
+  assert.match(presto.pannello.testo, /non sono ancora arrivate/);
+  assert.equal(presto.fusione, null);
+  // Conversazione cifrata: niente blob, e le strade restano.
+  const cifrata = MR.livelloL5({ status: 'design', statusReason: 'l5', notes: 'FENC1:abc' }, lette);
+  assert.doesNotMatch(cifrata.pannello.testo, /FENC/);
+  assert.match(cifrata.pannello.testo, /cifrata/);
+  // Con una richiesta aperta il quadrato resta quello di prima: niente strade.
+  const conRichiesta = MR.livelloL5({ ...fb, _id: 'x1' }, { ...lette, fusioni: { pending: [{ id: 'r', feedbackId: 'x1' }] } });
+  assert.deepEqual(conRichiesta.pannello.azioni, []);
+  assert.equal(conRichiesta.richiesta.id, 'r');
+});
+
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
   const fb = { status: 'design', statusReason: 'l5' };
   assert.equal(MR.classifyBlock(fb).reason, 'l5');
