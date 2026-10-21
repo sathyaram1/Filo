@@ -154,6 +154,8 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
 // La prova del mittente nasce col documento: dopo non la scrive nessuno strumento (le regole: firestoreRulesSenderProof.test.mjs).
 // La migrazione chiede al server la sua regola fissa sui feedback senza fiducia: non sceglie chi diventa fidato.
 const SOLO_MIGRAZIONE = new Set(['fiducia-migra.mjs']);
+// Toglierla sì (#1428): la chiede una nota scritta senza biglietto pulito. Darla resta dell'owner.
+const SOLO_TOGLIE = new Set(['togli-fiducia.mjs']);
 test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
   const file = [];
   const giro = (dir) => {

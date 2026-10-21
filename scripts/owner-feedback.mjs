@@ -57,6 +57,7 @@
 //   tasto «💻 Lavoro server» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
 //   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
+//   E una nota nuova su un feedback fidato, da una sessione senza biglietto pulito, gliela toglie prima (#1428).
 //   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
@@ -1049,7 +1050,7 @@ if (isMain) {
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, priorita, dryRun, attore, bearer });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, priorita, dryRun, attore, bearer, rif: riferimento });
   if (!r.ok) {
     console.error(r.utente || r.senzaSegno ? rifiutoPratica(riferimento, r) : `RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
