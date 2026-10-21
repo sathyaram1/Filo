@@ -2521,7 +2521,7 @@
     // ogni chat di ogni utente, per sempre.
     filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
       (!onboarding ? '' :
-        `═══ STAI ACCOGLIENDO QUESTO UTENTE (intervista in corso) ═══\n`
+        `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
         + `È appena arrivato su Filo e questa è la sua prima conversazione. Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
         + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
