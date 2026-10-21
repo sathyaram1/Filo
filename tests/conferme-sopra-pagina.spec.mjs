@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, puntatoreCheSegue } from './helpers/barra.mjs';
 
 test.setTimeout(60_000);
 
@@ -393,6 +393,7 @@ test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla 
   await expect.poll(async () => (await geometria(app)).visibile).toBe(true);
   expect(await chiPrende(app, 1, y), 'la striscia sul bordo sinistro').toBe('barra');
   expect(await chiPrende(app, 640, y), 'il resto della scheda').toBe('conferma');
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
   await pannelloFermo(barra);

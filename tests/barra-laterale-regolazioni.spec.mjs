@@ -2,7 +2,7 @@
 // dell'azione IMPOSTA_PREFERENZA). Attesa sul bordo, chiusura dopo l'uscita, striscia, apertura dal bordo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, puntatoreCheSegue } from './helpers/barra.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 const SITO = `<!doctype html><html><body style="margin:0;padding:40px;font:16px sans-serif;height:1400px">
@@ -33,11 +33,20 @@ test('da Preferenze: l\'attesa sul bordo, la chiusura, la striscia e l\'apertura
   const sito = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await expect(barra.locator('html.senza-striscia')).toHaveCount(1);
-  // Con 900 ms di attesa, dopo mezzo secondo sul bordo è ancora chiusa; poco dopo si apre.
+  // Con 900 ms di attesa, dopo mezzo secondo sul bordo è ancora chiusa; poco dopo si apre, e resta aperta
+  // anche dove il pannello dice «dentro» in ritardo (una macchina carica: #1216.2).
+  await app.evaluate(({ BrowserWindow }) => {
+    const b = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.barra;
+    const m = b._messaggio.bind(b);
+    b._messaggio = (c, d) => (c === 'barra:dentro' ? setTimeout(() => m(c, d), 300) : m(c, d));
+  });
+  await puntatoreCheSegue(app);
   await barra.mouse.move(1, 300);
   await pausa(500);
   expect((await statoBarra(app)).aperta).toBe(false);
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(true);
+  await pausa(400);
+  expect(await statoBarra(app)).toMatchObject({ aperta: true, motivo: 'spinta' });
   // Con 100 ms di chiusura, uscito sulla pagina si chiude subito.
   await barra.mouse.move(40, 300);
   await sito.mouse.move(600, 300);

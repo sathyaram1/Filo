@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, puntatoreCheSegue } from './helpers/barra.mjs';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -59,6 +59,7 @@ test('a barra chiusa si vede la striscia; spingere sul bordo la apre, passarci d
   await pausa(100);
 
   // La spinta: il puntatore resta contro il bordo.
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(() => aperta(app)).toBe(true);
   const s1 = await statoBarra(app);
@@ -319,6 +320,7 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   expect(s.bounds.y).toBe(0);
   await expect(barra.locator('#striscia')).toBeVisible();
   // L'icona dice come uscire.
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(() => aperta(app)).toBe(true);
   await expect(barra.locator('#nav .ico[data-id="fullscreen"]')).toHaveAttribute('aria-label', 'Esci da schermo intero');
@@ -498,6 +500,7 @@ test('chiesta a Filo in chat la barra si apre e resta aperta mentre il mouse gir
 test('aperta col mouse, il puntatore che torna sulla pagina la chiude', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(() => aperta(app)).toBe(true);
   await pannelloFermo(barra);
