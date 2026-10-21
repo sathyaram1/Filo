@@ -313,7 +313,7 @@
       const x = annunciato ? atteso(a) : null;
       if (annunciato) st.annuncio = null;
       if (x !== null && ESATTI.test(a.tipo)) {
-        const fine = a.sel[0] + (x.length - a.valore.length + (a.sel[1] - a.sel[0]));
+        const fine = x.length - a.valore.length + a.sel[1];
         c.value = x;
         try { c.setSelectionRange(fine, fine); } catch (_) {}
         st.inCorso.push({ e, livello: nostraScrittura });
