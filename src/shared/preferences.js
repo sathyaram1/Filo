@@ -1810,8 +1810,8 @@
         if (predefinito(v)) return { partial: { contestoFilo: { cache: null } }, label: 'Durata della cache della chat → come i predefiniti' };
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const cache = contestoFilo().durataIn(s)
-          || (/\b(1|un|una)\s*(h|or[ae])\b|^un'ora$|\bun'ora\b|^60\s*(m|min)/.test(s) ? '1h' : null)
-          || (/^5\s*(m|min|minuti)?$|\bcinque\s*minuti\b|\b5\s*minuti\b/.test(s) ? '5m' : null);
+          || (/\b(1|un|una)\s*(h|or[ae])\b|un'ora|\b60\s*(m|min)/.test(s) ? '1h' : null)
+          || (/\b5\s*(m|min|minuti)?\b|cinque\s*minuti/.test(s) ? '5m' : null);
         if (!cache) return null;
         return { partial: { contestoFilo: { cache } }, label: `Durata della cache della chat → ${cache === '1h' ? 'un\'ora' : '5 minuti'}` };
       },
