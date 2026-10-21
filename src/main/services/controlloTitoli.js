@@ -130,7 +130,7 @@ async function filtro(settingsIn) {
     const r = risposta(k);
     if (r === 'no') return null;
     if (r === 'si') return 'sospetto';
-    return sospetto(titolo, k) ? 'sospetto' : null;
+    return sospetto(titolo, k);
   };
   f.modo = m;
   return f;
