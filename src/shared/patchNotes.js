@@ -11,7 +11,7 @@
     {
       version: '0.2.244', date: '2026-10-21',
       features: [
-        'In cima alla barra laterale c\'è l\'icona Aiuto: un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare, e un altro ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo sta rispondendo, la risposta non si perde: la striscia sul bordo sinistro si accende finché non la apri. L\'icona la sposti o la togli come le altre.',
+        'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
       ],
       fixes: [],
     },
