@@ -310,6 +310,7 @@
     clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
+    clipboard_image_senza_descrizione: 'Immagine',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -501,10 +502,11 @@
     // Pagine delicate (#1004)
     admin_defaults_delicate: 'Pagine delicate',
     admin_defaults_delicate_desc:
-      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+      'I siti di posta, banche, sanità e pubblica amministrazione da cui le funzioni automatiche non mandano niente ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    admin_defaults_delicate_pa: 'Pubblica amministrazione',
     // Quanto filo ha davanti la chat (#868)
     admin_defaults_contesto: 'Quanto ricorda la chat',
     admin_defaults_contesto_desc:
@@ -645,8 +647,11 @@
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:
-      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
-      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+      'Posta, banca, sanità, pubblica amministrazione e le pagine dove hai visto un campo password o carta. ' +
+      'Quando chiudi queste schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a ' +
+      'nessun modello. La chat ne vede solo il nome del sito, i loro screenshot e le immagini copiate da lì non ' +
+      'vanno al modello delle immagini, nemmeno incollati altrove, e la spiegazione di quello che selezioni parte ' +
+      'solo dal tasto destro.',
     options_security_delicate_sites_label:
       'Altri siti delicati, uno per riga',
     options_security_delicate_sites_invalid:

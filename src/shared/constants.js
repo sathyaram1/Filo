@@ -136,6 +136,9 @@
     // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
     // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
     SITI_CON_CAMPI: 'filo_siti_con_campi',
+    // L'impronta dei pixel di screenshot e immagini copiate su una pagina delicata: incollate altrove, dopo anche un
+    // riavvio, non vanno al modello che le descrive (#1274). Mai l'immagine.
+    IMMAGINI_DELICATE: 'filo_immagini_delicate',
     // { versione } su cui l'utente ha premuto «Installa» da spento (#786): vale anche dopo un riavvio a metà scaricamento.
     AGGIORNAMENTO_CHIESTO: 'filo_aggiornamento_chiesto',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
@@ -3014,8 +3017,8 @@
         trustedSites: [],
         righeScartate: [],
       },
-      // #1004 — le pagine delicate (posta, banche, sanità, quelle che hanno mostrato un campo password o carta, e
-      // `siti` scritti dall'utente) non mandano testo ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
+      // #1004 — le pagine delicate (posta, banche, sanità, pubblica amministrazione, quelle con un campo password o carta,
+      // e `siti` scritti dall'utente) non mandano niente ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
       pagineDelicate: {
         enabled: true,
         siti: [],
@@ -3080,6 +3083,9 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // #1274 — la descrizione che un modello scrive da sé per ogni screenshot e immagine copiata: dà il nome del file e la
+    // riga della cronologia appunti. Spenta, l'immagine resta qui e il file prende data e ora.
+    descriviImmagini: { enabled: true },
     // #969 — i contatori giornalieri anonimi (decisione dell'owner D52: accesi di serie). Spenti, non si conta niente
     // e non parte niente: src/main/services/contatori.js.
     contatori: { attivi: true },

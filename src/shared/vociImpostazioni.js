@@ -65,6 +65,7 @@
         avvisoCreditiGiorni: 'avvisoCrediti.giorni',
         avvisoCreditiPercento: 'avvisoCrediti.percento',
         spiegaAnticipata: 'spiegaAnticipata.enabled',
+        descriviImmagini: 'descriviImmagini.enabled',
         contatoriAttivi: 'contatori.attivi',
         aiutoAcceso: 'featureFlags.help',
         correttoreAcceso: 'featureFlags.spellcheck',

@@ -446,9 +446,11 @@
   // finché una descrizione può davvero arrivare, altrimenti dice che manca il
   // modello (un'attesa che non finirà mai è una bugia).
   let imageDescNoModel = false;
-  let ultimaDaDelicata = null;
+  // L'ultima immagine che non avrà descrizione, e perché: pagina delicata o descrizione spenta (#1004, #1274).
+  let ultimaSenza = { dataUrl: null, etichetta: '' };
+  const SENZA_DESCRIZIONE = { PAGINA_DELICATA: 'clipboard_image_delicata', DESCRIZIONE_SPENTA: 'clipboard_image_senza_descrizione' };
   function imagePlaceholderLabel(dataUrl) {
-    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
+    if (dataUrl && dataUrl === ultimaSenza.dataUrl) return I18n.t(ultimaSenza.etichetta);
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
@@ -469,13 +471,14 @@
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
     }
-    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
-    if (res?.code === 'PAGINA_DELICATA') {
-      ultimaDaDelicata = dataUrl;
+    // Nata su una pagina delicata, o con la descrizione spenta, l'immagine non va al modello: lo screenshot prende data e ora.
+    const senza = res && SENZA_DESCRIZIONE[res.code];
+    if (senza) {
+      ultimaSenza = { dataUrl, etichetta: senza };
       chrome.runtime.sendMessage({
         type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
         dataUrl,
-        description: I18n.t('clipboard_image_delicata'),
+        description: I18n.t(senza),
       }).catch(() => {});
       return null;
     }
@@ -633,7 +636,8 @@
       ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
     }).then(
       (res) => {
-        if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
+        if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
@@ -660,12 +664,15 @@
     };
     const pre = prefetchedExplain;
     if (pre && pre.key === key && !pre.fermata) {
-      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
-      if (pre.anticipata && !pre.usata) {
-        pre.usata = true;
-        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
-      }
-      return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
+      return pre.promise.then((res) => {
+        if (pre.fermata) return chiedi();
+        // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
+        if (pre.anticipata && !pre.usata) {
+          pre.usata = true;
+          Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+        }
+        return { ...res, giaChiesta: true };
+      });
     }
     return chiedi();
   }
