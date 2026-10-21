@@ -66,4 +66,4 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
 - Non disegnare una riga del filo con markup arrivato dal filo: le risposte di Filo passano dal markdown che escapa,
   tutto il resto è testo.
 
-Sentinella: `tests/unit/filoCoda.test.mjs`. Prove dell'app: `tests/home-coda-del-filo.spec.mjs`.
+Sentinella: `tests/unit/filoCoda.test.mjs`. Prove dell'app: `tests/home-coda-del-filo.spec.mjs`, `tests/home-ultimo-messaggio-in-cima.spec.mjs`.

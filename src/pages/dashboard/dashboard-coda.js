@@ -318,14 +318,15 @@
     if (ancora && a.clientHeight > 0) {
       const box = a.getBoundingClientRect();
       const y = (v) => v - box.top - a.clientTop + a.scrollTop;
-      const st = getComputedStyle(a);
-      // Il segno del giorno subito sopra va su con lei: dice di quando è.
+      // Il segno del giorno subito sopra va su con lei: dice di quando è. Quello che c'è prima esce intero dalla vista.
       const prima = ancora.previousElementSibling;
       const testa = prima && prima.classList.contains('dash-giorno') ? prima : ancora;
+      let sopra = testa.previousElementSibling;
+      while (sopra && !aSchermo(sopra)) sopra = sopra.previousElementSibling;
       let fondo = ancora;
       for (let n = a.lastElementChild; n && n !== ancora; n = n.previousElementSibling) if (aSchermo(n)) { fondo = n; break; }
-      cima = Math.max(0, y(testa.getBoundingClientRect().top) - (parseFloat(st.paddingTop) || 0));
-      const base = (parseFloat(st.paddingBottom) || 0) - vuoto;
+      cima = sopra ? Math.max(0, Math.ceil(y(sopra.getBoundingClientRect().bottom))) : 0;
+      const base = (parseFloat(getComputedStyle(a).paddingBottom) || 0) - vuoto;
       serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(fondo.getBoundingClientRect().bottom) - base));
     }
     if (serve !== vuoto) {
