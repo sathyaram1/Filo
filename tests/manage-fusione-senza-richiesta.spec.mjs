@@ -13,6 +13,8 @@ function pratica(over = {}) {
     seq: 1255, subSeq: 0, status: 'design', statusReason: 'l5', statusPublic: 'open',
     clientId: 'owner:test', createdAt: '2026-10-20T08:00:00Z', images: [],
     notes: `Report di chi ha risolto: fatto.\n\n--- Aggiornamento dell'agente del 21/10/26, 15:43 ---\n${NOTA}`,
+    // L'audit è passato poco prima della nota del cancello (ora locale, come la legge il marcatore).
+    livelli: { l4: { esito: 'pass', at: new Date(2026, 9, 21, 15, 40).toISOString() } },
   }, over);
 }
 
