@@ -173,6 +173,28 @@ test.describe('utente già accolto', () => {
     expect(JSON.stringify((await onbState(app)).thread)).toContain('sono Anna');
   });
 
+  // #1398: davanti alle chat degli ultimi giorni e a un prompt che dice «prima conversazione», l'intervista rifatta
+  // rispondeva «buona fortuna col test!» a chi non ne aveva parlato. L'intervista ha davanti solo sé stessa.
+  test('l’intervista rifatta non ha davanti le altre chat; la carbonara, dopo, sì', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    const carb = await carbonara(app, shell);
+    const intervista = await intervistaRifattaAltrove(app, shell, openTab);
+    await queueChat(app, { text: 'Piacere. Come vuoi che ti scriva?', actions: [] });
+    await scrivi(intervista, 'sono il creatore di Filo, ci lavoro con Claude Code');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Come vuoi che ti scriva' })).toBeVisible({ timeout: 30_000 });
+    const prompt = await app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1]);
+    expect(prompt).toContain('DA SCOPRIRE');
+    expect(prompt).toContain('Ciao, sono Filo');
+    expect(prompt, 'l’intervista ha davanti la chat della carbonara').not.toMatch(/carbonara|Guanciale/);
+
+    await queueChat(app, { text: 'Per quattro: 400 g di spaghetti.', actions: [] });
+    await carb.locator('#sendBtn').click();
+    await expect(carb.locator('.dash-bubble-filo', { hasText: 'Per quattro' })).toBeVisible({ timeout: 30_000 });
+    const dopo = await app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1]);
+    expect(dopo).toContain('Guanciale, uova');
+    expect(dopo).toContain('sono il creatore di Filo');
+  });
+
   test('con l’intervista rifatta aperta altrove, «stop» nella chat della carbonara va al modello e non chiude l’intervista', async ({ app, shell, openTab }) => {
     test.setTimeout(150_000);
     const carb = await carbonara(app, shell);
