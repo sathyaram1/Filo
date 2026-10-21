@@ -181,7 +181,7 @@ html[data-chrome-compact="1"] .addr {
 .tab.inked .proxy-ind { color: inherit; }
 .tab.inked .close:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
 /* Un favicon del colore del suo sito sparirebbe sulla sua scheda a tinta piena: un filo d'inchiostro ne tiene la sagoma. */
-.tab.inked .favicon:not(.favicon-audible) { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--tab-ink) 60%, transparent)); }
+.tab.inked .favicon:not(.favicon-audible):not(.senza-icona) { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--tab-ink) 60%, transparent)); }
 .tab.inked .spinner {
   border-color: color-mix(in srgb, currentColor 30%, transparent);
   border-top-color: currentColor;
