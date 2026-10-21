@@ -19,8 +19,18 @@ test('preferenze: tendina chiusa, scelta, ritorno al predefinito, temi', async (
   await sel.selectOption('');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.cache)).toBe(null);
   await expect(vis).toHaveText(/un'ora/);
-  // Cambio fatto altrove (la chat) con la pagina aperta: la tendina lo segue.
-  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ contestoFilo: { cache: '5m' } }));
+  // Cambio fatto altrove (la chat) con la pagina aperta e il campo non toccato: la tendina lo segue.
+  await pref.reload();
+  await expect(vis).toHaveText(/un'ora/, { timeout: 10_000 });
+  await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { cache: '5m' } });
+    const t = globalThis.SN_CONST.MSG.SETTINGS_UPDATED;
+    if (globalThis.broadcastToTabs) globalThis.broadcastToTabs({ type: t, settings: await globalThis.SN_STORAGE.getSettings() });
+    return !!s;
+  });
+  await pref.waitForTimeout(1500);
+  console.log('dopo cambio esterno:', await vis.textContent(), await sel.inputValue());
+  await pref.reload();
   await expect(vis).toHaveText('5 minuti', { timeout: 5_000 });
   await pref.locator('#theme').selectOption('dark');
   await pref.waitForTimeout(400);
