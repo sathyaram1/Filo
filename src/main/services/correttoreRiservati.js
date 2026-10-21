@@ -45,18 +45,30 @@ function richieste(l) {
   return out;
 }
 
-// Le parole della risposta contano come quelle che seguono la parola che presenta il dato (segretiDetti): per una
-// password anche di sole lettere, per un codice se ha cifre.
+// Le parole della risposta (già minuscola) contano come quelle dopo la parola che presenta il dato (segretiDetti): con
+// cifre o simboli nelle prime PAROLE_RISPOSTA; di sole lettere, per una password, fino alla frase che ne porta uno.
 function valoriRisposta(risposta, tipo) {
   const X = globalThis.SN_URL_EXFIL;
   if (!X || !X.segretiDetti) return [];
   const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`));
   const out = [];
-  for (const w of risposta.split(/\s+/).filter(Boolean).slice(0, PAROLE_RISPOSTA)) {
-    const t = w.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  let lettere = tipo === 'password';
+  let saluto = false;
+  let trovato = false;
+  let n = 0;
+  for (const [, w, spazio] of risposta.matchAll(/(\S+)(\s*)/g)) {
+    if (++n > PAROLE_RISPOSTA) break;
+    const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    // «Ciao Marco!» non è la password: la frase del saluto non conta per le parole di sole lettere.
+    if (!trovato && SALUTO.test(t)) saluto = true;
     // «Marco:», «eccola:» presentano, non sono il dato.
-    if (!t || w.endsWith(':') || AVVII.has(t) || presentata.some((re) => re.test(t))) continue;
-    out.push(...X.segretiDetti(`${tipo} ${t}`));
+    const candidata = t && !w.endsWith(':') && !AVVII.has(t) && !presentata.some((re) => re.test(t));
+    if (candidata && (/[^\p{L}'’]/u.test(t) || (lettere && !saluto))) {
+      const v = X.segretiDetti(`${tipo} ${t}`);
+      if (v.length) trovato = true;
+      out.push(...v);
+    }
+    if (/[.!?]$/.test(w) || spazio.includes('\n')) { if (saluto) saluto = false; else if (trovato) lettere = false; }
   }
   return out;
 }
