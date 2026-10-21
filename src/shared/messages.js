@@ -321,6 +321,9 @@
     // come «Salva immagine come…», con Referer e cookie della scheda. Restituisce solo immagini.
     // { url } → { ok, dataUrl } | { ok:false, error, tooBig?, notImage? }
     IMAGE_BYTES: 'image_bytes',
+    // #1307 — se Filo non contatterebbe il sito di un link (sospetto, o in lista), senza contattarlo.
+    // { url } → { bloccato?: 'blacklist'|'lists', host?, sospetto? } | {}
+    LINK_FERMATO: 'link_fermato',
     // #946 — «Copia immagine» appena scritta negli appunti: gli appunti la ricodificano
     // e ne perdono le etichette, quindi il main ricorda l'esito letto sull'originale
     // per i pixel della copia, e la chat lo ritrova quando la si incolla.

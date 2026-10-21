@@ -286,9 +286,9 @@
     // ─────────────────────────────── Link ────────────────────────────────────
     {
       id: 'explain-link', title: 'Spiega un link', category: 'links',
-      desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing).',
+      desc: 'Spiega dove porta un link senza aprirlo in una scheda, e segnala se sembra sospetto (phishing). Vale anche per le zone cliccabili di un’immagine e per i link dentro un disegno.',
       invoke: 'Clic destro su un link: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Se l’indirizzo ha qualcosa che non torna, sopra la spiegazione compare un avviso che dice cosa.',
-      doesNot: 'Non apre il link; l’analisi di sicurezza è basata su indizi nell’indirizzo, non su un database in tempo reale.',
+      doesNot: 'Per un link pulito Filo legge titolo e descrizione della pagina, quindi il sito vede una visita. Non lo fa per un link sospetto né per un sito della tua lista dei siti bloccati. Di un sito bloccato il menu ti dice solo che è in lista. L’analisi di sicurezza è basata su indizi nell’indirizzo, non su un database in tempo reale.',
     },
     {
       id: 'save-link', title: 'Salva un link per dopo', category: 'links',

@@ -2,6 +2,8 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const siteBlock = require('../siteBlock');
+require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
@@ -842,20 +844,34 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // L'anteprima di un link è una visita al suo sito: mai a un indirizzo che l'avviso giudica sospetto, mai a un sito della
+  // lista dei bloccati, nemmeno a metà dei rinvii (#1307). Per il bloccato si dice chi lo ferma, e il menu lo scrive.
+  function anteprimaFerma(url) {
+    const b = siteBlock.shouldBlockNavigation(url);
+    if (b.block) return { bloccato: b.reason, host: b.host };
+    if (globalThis.SN_LINK_SOSPETTO.analizza(url).length) return { sospetto: true };
+    return null;
+  }
+
+  on(MSG.LINK_FERMATO, async (msg) => anteprimaFerma(String((msg && msg.url) || '')) || {});
+
   on('fetch_link_meta', async (msg, sender) => {
+    let rinvio = null;
     try {
-      const url = msg.url;
+      const url = String(msg.url || '');
       if (!url) return { ok: false, error: 'url mancante' };
+      const ferma = anteprimaFerma(url);
+      if (ferma) return { ok: false, ...ferma };
       // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
       // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
-      const porta = await controllaUscita({ type: 'NAVIGA', url: String(url) }, { sender });
+      const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
       // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando
       // ogni redirect. Evita che una pagina usi questa fetch del main per
       // sondare/leggere servizi locali o interni (SSRF).
-      const r = await safeFetch(url, { signal: controller.signal });
+      const r = await safeFetch(url, { signal: controller.signal, redirectAmmesso: (_da, prossimo) => !(rinvio = anteprimaFerma(prossimo.href)) });
       clearTimeout(t);
       let html = '';
       const reader = r.body?.getReader?.();
@@ -880,6 +896,7 @@ module.exports = function register(on, ctx) {
                             pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
       return { ok: true, ogTitle, ogDescription };
     } catch (e) {
+      if (rinvio) return { ok: false, ...rinvio };
       return { ok: false, error: e.message || String(e) };
     }
   });
