@@ -20,7 +20,7 @@
       version: '0.2.244', date: '2026-10-21',
       features: [
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
-        'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta»: l\'Aiuto legge tutto il testo e ti dice cosa va e cosa no, dagli errori al tono ai fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
+        'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta». L\'Aiuto legge tutto il testo e ti segnala errori, frasi poco chiare, un tono sbagliato e fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
       ],
       fixes: [
         'Se in chat qualcuno ti chiede la password del wifi o un pin e tu rispondi, il correttore non manda più al modello la password o il pin. Il resto del messaggio lo controlla come sempre.',
