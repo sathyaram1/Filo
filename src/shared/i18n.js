@@ -505,6 +505,7 @@
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    admin_defaults_delicate_pa: 'Pubblica amministrazione',
     // Quanto filo ha davanti la chat (#868)
     admin_defaults_contesto: 'Quanto ricorda la chat',
     admin_defaults_contesto_desc:
