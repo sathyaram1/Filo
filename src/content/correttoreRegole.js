@@ -481,6 +481,15 @@
     return [String(segment || '').toLowerCase(), domanda, cerca?.dove || ''].join('\u0000');
   }
 
+  // Chi è un segnaposto nel testo: la sua frase fino alle x, senza maiuscole né punteggiatura. Un valore trovato resta suo
+  // finché questa non cambia, qualunque parole usi il modello rileggendo la frase, o se quella volta tace (#1448).
+  function identitaSegnaposto(testo, start, end) {
+    testo = String(testo ?? '');
+    if (!(end > start) || end > testo.length) return '';
+    const f = aFrasiIntere(testo, start, end);
+    return testo.slice(f.start, end).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  }
+
   // La risposta della ricerca di un segnaposto, una riga [valore][motivo][fonte][data][indirizzo] che il main ha
   // ricomposto: { valore, motivo, fonte, data, url }, o null se il dato non si è trovato.
   function valoreTrovato(raw) {
