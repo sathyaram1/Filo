@@ -189,7 +189,7 @@
     },
     {
       id: 'fonti-segnaposti', nome: 'Wikipedia e Wikidata, per i segnaposti del correttore',
-      base: ['https://www.wikidata.org/'], indirizzo: 'la Wikipedia della lingua del dato (it.wikipedia.org, en.wikipedia.org…)',
+      base: ['https://www.wikidata.org'], indirizzo: 'la Wikipedia della lingua del dato (it.wikipedia.org, en.wikipedia.org…)',
       quando: 'funzione',
       occasione: 'quando scrivi delle x al posto di un dato che non ricordi («nel 14xx») e il dato va cercato',
       riceve: 'la ricerca che il correttore ha formulato per quel dato, mai il resto del testo',

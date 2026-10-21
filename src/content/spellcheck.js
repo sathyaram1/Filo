@@ -64,7 +64,7 @@
   function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
   function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
   function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
-  function automaticaAttiva() { return !spentoQui() && !!A() && settings.correttore?.automatica !== false; }
+  function segnapostiAttivi() { return suggerimentiAttivi() && settings.correttore?.segnaposti !== false; }
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
