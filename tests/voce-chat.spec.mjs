@@ -608,7 +608,7 @@ test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ult
   await expect(chat.locator('.ed-chat-msg.assistant').last()).toHaveText('Ultima risposta del documento.');
   const vuota = await casella.evaluate((i) => i.offsetHeight);
   await casella.fill(Array.from({ length: 40 }, (_, i) => `frase numero ${i + 1} della richiesta lunga`).join(', '));
-  const m = await ed.evaluate(() => {
+  const misure = () => ed.evaluate(() => {
     const mod = document.querySelector('.ed-module[data-type="chat"]');
     const t = mod.querySelector('[data-chat="input"]');
     const l = mod.querySelector('[data-chat="log"]');
@@ -620,12 +620,14 @@ test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ult
       ultimaInVista: r(ultima).bottom <= r(l).bottom + 1 && r(ultima).top >= r(l).top - 1,
     };
   });
+  // Il registro torna in fondo al frame dopo che la casella è cresciuta: si legge quello che vede l'utente.
+  await expect.poll(async () => (await misure()).ultimaInVista, { timeout: 3_000 }).toBe(true);
+  const m = await misure();
   expect(m.sh).toBeGreaterThan(m.ch);
   expect(m.h).toBeGreaterThan(vuota);
   expect(m.h).toBeGreaterThan(m.chat * 0.5);
   expect(m.fondoCasella).toBeLessThanOrEqual(m.fondoModulo);
   expect(m.log).toBeGreaterThan(20);
-  expect(m.ultimaInVista).toBe(true);
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-tetto.png` });
   await casella.fill('');
