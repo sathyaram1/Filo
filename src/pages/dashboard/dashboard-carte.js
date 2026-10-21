@@ -249,6 +249,12 @@
   // Gli avvisi di un aggiornamento da prendere a mano (#1039) portano dove si scarica: il tipo lo scrive solo il main.
   const AVVISI_AGGIORNAMENTO = ['aggiornamento-mac', 'aggiornamento-linux', 'aggiornamento-windows'];
   const URL_SCARICA_FILO = 'https://filo.red';
+  // Sul canale stabile il main ci mette la pagina della minor (il sito dà l'ultima patch): solo una release di Filo.
+  const RELEASE_DI_FILO = /^https:\/\/github\.com\/sathyaram1\/Filo\/releases\/tag\/v\d+\.\d+\.\d+$/;
+  function paginaDaScaricare(n) {
+    const u = n.action && n.action.scarica;
+    return typeof u === 'string' && RELEASE_DI_FILO.test(u) ? u : URL_SCARICA_FILO;
+  }
   function cartaAvviso(n) {
     const allarme = n.kind === 'alert';
     const chiudi = () => d.send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(() => d.refreshLive());
@@ -259,7 +265,7 @@
     const pagina = C.paginaDiAvviso(n);
     let principale = { etichetta: 'Chiudi', fai: chiudi };
     if (pagina) principale = { etichetta: pagina.etichetta, forte: true, fai: () => apri(pagina.url) };
-    if (scarica) principale = { etichetta: 'Scarica Filo', forte: true, fai: () => apri(URL_SCARICA_FILO) };
+    if (scarica) principale = { etichetta: 'Scarica Filo', forte: true, fai: () => apri(paginaDaScaricare(n)) };
     if (pronto) principale = { etichetta: 'Riavvia e aggiorna', forte: true, fai: () => d.send({ type: MSG.AGGIORNAMENTO_INSTALLA, avvisa: true }) };
     const titolo = n.action && typeof n.action.titolo === 'string' && n.action.titolo.trim();
     const carta = {

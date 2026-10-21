@@ -964,7 +964,7 @@
         'canale stabile', 'canale veloce', 'aggiornamenti stabili', 'versione stabile', 'aggiornamenti settimanali',
         'quali versioni'],
       costo: 1,
-      build(v) {
+      build(v, chiave) {
         const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
         const map = {
           veloce: 'veloce', rapido: 'veloce', subito: 'veloce', 'ogni versione': 'veloce', tutte: 'veloce', frequente: 'veloce',
@@ -972,9 +972,10 @@
           stabile: 'stabile', settimanale: 'stabile', 'una a settimana': 'stabile', lunedì: 'stabile', lunedi: 'stabile',
           'il lunedì': 'stabile', tranquillo: 'stabile', 'meno spesso': 'stabile',
         };
-        // «canale stabile: sì» / «aggiornamenti stabili: no».
-        const stabile = parsePrefBool(v);
-        const canale = map[s] || map[s.replace(/^canale /, '')] || (stabile === null ? null : (stabile ? 'stabile' : 'veloce'));
+        // Il sì o il no vale per il canale che la chiave nomina: «canale veloce: sì» è il veloce, «canale stabile: sì» lo stabile.
+        const si = parsePrefBool(v);
+        const chiedeVeloce = /veloc|rapid/.test(String(chiave == null ? '' : chiave).toLowerCase());
+        const canale = map[s] || map[s.replace(/^canale /, '')] || (si === null ? null : (si !== chiedeVeloce ? 'stabile' : 'veloce'));
         if (!canale) return null;
         return {
           partial: { aggiornamenti: { canale } },
@@ -2211,7 +2212,7 @@
       };
     }
     const setter = r.setter;
-    const b = setter.build(rawVal);
+    const b = setter.build(rawVal, rawKey);
     if (b && b.rifiuto) return b.perModello ? { rifiuto: b.rifiuto, perModello: b.perModello } : { rifiuto: b.rifiuto };
     if (!b) return null;
     let allenta = false;

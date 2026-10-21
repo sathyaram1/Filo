@@ -134,3 +134,21 @@ test('«passa agli aggiornamenti stabili» in chat sceglie lo stabile, e le Pref
   await expect.poll(() => canale(app), { timeout: 5_000 }).toBe('stabile');
   await expect(pref.locator('#aggiornamentiCanale input[value="stabile"]')).toBeChecked({ timeout: 5_000 });
 });
+
+test('sullo stabile «Scarica Filo» dell’avviso apre la pagina della minor, non il sito che dà l’ultima patch', async ({ app }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ aggiornamenti: { canale: 'stabile' } });
+    globalThis.__filoUpdater.seguiImpostazioni(await globalThis.SN_STORAGE.getSettings());
+    await globalThis.__filoUpdater.avvisaInstallazioneFallita('0.4.0');
+  });
+  const page = await homeDi(app);
+  await page.reload();
+  const carta = page.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: '0.4.0' });
+  await expect(carta).toBeVisible({ timeout: 10_000 });
+  await expect(carta.locator('.dash-carta-stato')).toContainText('releases/tag/v0.4.0');
+  await carta.locator('.dash-carta-az.principale', { hasText: 'Scarica Filo' }).click();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    return tm.tabs.map((t) => String(t.url || '')).find((u) => /releases\/tag\/v0\.4\.0|filo\.red/.test(u)) || '';
+  })).toBe('https://github.com/sathyaram1/Filo/releases/tag/v0.4.0');
+});

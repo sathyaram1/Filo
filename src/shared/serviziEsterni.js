@@ -264,10 +264,11 @@
       id: 'aggiornamenti', nome: 'GitHub, per gli aggiornamenti',
       base: ['https://github.com/sathyaram1/Filo/releases'],
       quando: 'avvio',
-      occasione: 'all’avvio e quando chiedi se c’è una versione nuova; il file dell’aggiornamento arriva dall’archivio di GitHub',
+      occasione: 'all’avvio e quando chiedi se c’è una versione nuova; il file dell’aggiornamento arriva dall’archivio di GitHub. '
+        + 'Sul canale stabile, dove l’aggiornamento si scarica a mano, anche quando apri la pagina della versione',
       riceve: 'la richiesta della versione più recente',
       frase: "All'avvio GitHub riceve la richiesta della versione più recente",
-      dove: ['src/main/updater.js'], prova: "require('electron-updater')", nellaLibreria: true,
+      dove: ['src/main/updater.js', 'src/main/aggiornamentoRegole.js'], prova: "require('electron-updater')", nellaLibreria: true,
     },
     {
       id: 'liste-pubblicita', nome: 'EasyList, StevenBlack e le liste nazionali, per bloccare la pubblicità',
@@ -386,7 +387,7 @@
       occasione: 'quando apri la pagina per scaricare Filo, o qualcuno apre un tuo link d’invito',
       riceve: 'la visita; dal link d’invito anche il codice',
       frase: "Se apri un link d'invito sul sito di Filo",
-      dove: ['src/main/updater.js', 'src/pages/dashboard/dashboard-carte.js', 'src/shared/wallet.js'],
+      dove: ['src/main/aggiornamentoRegole.js', 'src/pages/dashboard/dashboard-carte.js', 'src/shared/wallet.js'],
     },
   ];
 

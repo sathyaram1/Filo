@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const R = require('./aggiornamentoRegole');
 
-const PAGINA_DOWNLOAD = 'https://filo.red';
+const PAGINA_DOWNLOAD = R.PAGINA_DOWNLOAD;
 const FILE_RICORDO = 'aggiornamento-pronto.json';
 const CHIAVE_AVVISO = 'aggiornamento-pronto';
 const ETICHETTA_PULSANTE = 'Riavvia e aggiorna';
@@ -713,8 +713,11 @@ function conStatoAggiornamento(lista) {
 
 // ── «Riavvia e aggiorna»: dall'avviso, dalla carta, dalla chat ──
 
-const FRASE_NON_RIUSCITO = 'Non sono riuscito ad avviare l\'installazione: Filo resta aperto com\'era. '
-  + `Puoi scaricarlo da ${PAGINA_DOWNLOAD.replace('https://', '')} e installarlo sopra.`;
+// Dove si prende a mano la versione `v` sul canale scelto: sullo stabile non è il sito, che dà l'ultima patch.
+const doveScaricare = (v) => R.doveScaricare(v, stato.canale);
+
+const fraseNonRiuscito = (v) => 'Non sono riuscito ad avviare l\'installazione: Filo resta aperto com\'era. '
+  + `Puoi scaricarlo da ${doveScaricare(v).nome} e installarlo sopra.`;
 
 async function riavviaEAggiorna() {
   if (riavvioInCorso) return { ok: true };
@@ -742,13 +745,13 @@ async function riavvia() {
   if (!puoInstallare()) return { ok: false, frase: fraseSoloAMano(sis, p.versione) };
   if (sis === 'win32') {
     const conto = R.contaTentativo(p);
-    if (!scriviRicordo(conto)) return { ok: false, frase: FRASE_NON_RIUSCITO };
+    if (!scriviRicordo(conto)) return { ok: false, frase: fraseNonRiuscito(p.versione) };
     // L'installazione silenziosa alla chiusura non deve partire anche lei.
     try { updater.autoInstallOnAppQuit = false; } catch (_) {}
     if (!(await lanciaInstallatore(conto))) {
       scriviRicordo(p);
       regola();
-      return { ok: false, frase: FRASE_NON_RIUSCITO };
+      return { ok: false, frase: fraseNonRiuscito(p.versione) };
     }
     stato.pronto = conto;
     dip.chiudi();
@@ -766,7 +769,7 @@ async function riavvia() {
 }
 
 function fraseSoloAMano(sis, v) {
-  const dove = PAGINA_DOWNLOAD.replace('https://', '');
+  const dove = doveScaricare(v).nome;
   if (sis === 'darwin') return `C'è Filo ${v}, ma su Mac non riesce a installarsi da solo: scaricalo da ${dove} e sostituisci l'app.`;
   if (sis === 'linux') return `C'è Filo ${v}, ma qui non riesce a installarsi da solo: scaricalo da ${dove} e sostituisci il file di Filo.`;
   return `C'è Filo ${v}: scaricalo da ${dove}.`;
@@ -954,21 +957,24 @@ function togliCarte(via, { acted = false, tipi = [TIPO_DISPONIBILE] } = {}) {
 const AGGIORNAMENTO_BLOCCATO = {
   darwin: {
     tipo: 'aggiornamento-mac',
-    testo: (v) => `C'è la versione ${v} di Filo, ma su Mac non riesce a installarsi da sola.\n`
-      + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
+    scarica: true,
+    testo: (v, dove) => `C'è la versione ${v} di Filo, ma su Mac non riesce a installarsi da sola.\n`
+      + `Scaricala da ${dove} e sostituisci l'app. Ci vuole un minuto.`,
   },
   linux: {
     tipo: 'aggiornamento-linux',
     // Il file nuovo arriva senza il permesso di esecuzione, come il primo: se l'avviso non lo dice, il doppio clic non parte.
-    testo: (v) => `C'è la versione ${v} di Filo, ma su Linux non riesce a installarsi da sola.\n`
-      + 'Scaricala da filo.red, sostituisci il file di Filo con quello nuovo e ridagli il permesso '
+    scarica: true,
+    testo: (v, dove) => `C'è la versione ${v} di Filo, ma su Linux non riesce a installarsi da sola.\n`
+      + `Scaricala da ${dove}, sostituisci il file di Filo con quello nuovo e ridagli il permesso `
       + 'di esecuzione (tasto destro, Proprietà, «Consenti l\'esecuzione»). Ci vuole un minuto.',
   },
 };
 const INSTALLAZIONE_FALLITA = {
   tipo: 'aggiornamento-windows',
-  testo: (v) => `La versione ${v} di Filo non è riuscita a installarsi, per due volte.\n`
-    + 'Scaricala da filo.red e aprila: si installa sopra quella che hai, e le tue cose restano.',
+  scarica: true,
+  testo: (v, dove) => `La versione ${v} di Filo non è riuscita a installarsi, per due volte.\n`
+    + `Scaricala da ${dove} e aprila: si installa sopra quella che hai, e le tue cose restano.`,
 };
 // La carta della home con «Riavvia e aggiorna»: l'avviso a tempo se ne va in cinque secondi, lei finché serve.
 const PRONTO = { tipo: 'aggiornamento-pronto', kind: 'info' };
@@ -982,7 +988,10 @@ async function scriviAvviso(caso, versione) {
     if (!FiloMem?.addNotification) return;
     const gia = await FiloMem.listNotifications({ includeDismissed: true });
     if (gia.some((n) => n.action?.tipo === caso.tipo && n.action?.versione === versione)) return;
-    await FiloMem.addNotification({ kind: caso.kind || 'alert', action: { tipo: caso.tipo, versione }, text: caso.testo(versione) });
+    const dove = doveScaricare(versione);
+    // `scarica`: la pagina della versione, quando non è il sito; il pulsante della carta porta lì.
+    const action = { tipo: caso.tipo, versione, ...(caso.scarica && dove.url !== PAGINA_DOWNLOAD ? { scarica: dove.url } : {}) };
+    await FiloMem.addNotification({ kind: caso.kind || 'alert', action, text: caso.testo(versione, dove.nome) });
     annunciaHome();
   } catch (e) {
     console.error('[updater] avviso aggiornamento non scritto:', e?.message || e);

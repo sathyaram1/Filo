@@ -214,3 +214,57 @@ test('le novità: chi arriva alla minor dallo stabile legge insieme le righe di 
   // La minor successiva, dalla fotografia della prima: solo il nuovo della settimana.
   assert.deepEqual(PN.recap('0.3.0', '0.4.0', PN.fotografia('0.3.0')), []);
 });
+
+// ── a mano: il sito dà l'ultima uscita, sullo stabile si porta alla pagina della minor ─────────────────────────────
+
+const avvisoA = async (piattaforma, canale, fai) => {
+  dati = cartellaTemporanea('filo-canale-dati-');
+  U.seguiImpostazioni({ aggiornamenti: { canale } });
+  U.perProva({ piattaforma, versione: '0.3.4', cartella: dati, avvisoVero: false });
+  await fai();
+  return carte[0];
+};
+
+test('su Mac e Linux, sullo stabile, l’avviso da scaricare a mano porta alla pagina della minor e non al sito', async () => {
+  for (const sis of ['darwin', 'linux']) {
+    carte.length = 0;
+    const n = await avvisoA(sis, 'stabile', () => U.avvisaSeAggiornamentoBloccato('0.4.0'));
+    assert.equal(n.action.scarica, 'https://github.com/sathyaram1/Filo/releases/tag/v0.4.0', sis);
+    assert.match(n.text, /github\.com\/sathyaram1\/Filo\/releases\/tag\/v0\.4\.0/, sis);
+    assert.doesNotMatch(n.text, /filo\.red/, sis);
+  }
+  carte.length = 0;
+  const w = await avvisoA('win32', 'stabile', () => U.avvisaInstallazioneFallita('0.4.0'));
+  assert.equal(w.action.scarica, 'https://github.com/sathyaram1/Filo/releases/tag/v0.4.0');
+  // Sul veloce resta il sito, che dà proprio l'ultima.
+  carte.length = 0;
+  const v = await avvisoA('darwin', 'veloce', () => U.avvisaSeAggiornamentoBloccato('0.4.3'));
+  assert.equal(v.action.scarica, undefined);
+  assert.match(v.text, /filo\.red/);
+  U.seguiImpostazioni({ aggiornamenti: { canale: 'veloce' } });
+});
+
+test('la regola: solo una X.Y.0 sullo stabile ha la sua pagina; il resto è il sito', () => {
+  assert.deepEqual(R.doveScaricare('0.4.0', 'stabile'), {
+    url: 'https://github.com/sathyaram1/Filo/releases/tag/v0.4.0', nome: 'github.com/sathyaram1/Filo/releases/tag/v0.4.0',
+  });
+  assert.equal(R.doveScaricare('0.4.3', 'stabile').url, 'https://filo.red');
+  assert.equal(R.doveScaricare('0.4.0', 'veloce').url, 'https://filo.red');
+  assert.equal(R.doveScaricare('boh', 'stabile').nome, 'filo.red');
+});
+
+test('in chat il sì o il no vale per il canale che la chiave nomina', () => {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  const P = globalThis.SN_PREF;
+  const canale = (k, v) => P.buildPreferencePartial(k, v)?.partial?.aggiornamenti?.canale;
+  for (const si of ['sì', true, 'on']) {
+    assert.equal(canale('canale veloce', si), 'veloce', `canale veloce: ${si}`);
+    assert.equal(canale('canale stabile', si), 'stabile', `canale stabile: ${si}`);
+    assert.equal(canale('aggiornamenti stabili', si), 'stabile');
+  }
+  assert.equal(canale('canale veloce', 'no'), 'stabile');
+  assert.equal(canale('canale stabile', 'no'), 'veloce');
+  assert.equal(canale('canale_aggiornamenti', 'veloce'), 'veloce');
+  assert.equal(canale('canale veloce', 'stabile'), 'stabile', 'il nome del canale scritto vince sulla chiave');
+});
