@@ -87,7 +87,7 @@
     SEGNO: R`\s*(?:[:,;!.\-–—|)\]>=~*]+|$)`,
     QUI: R`(?:questa|questo|this|esta|este|cette|ce|diese|dieser|dieses)\s+(?:pagina|page|sito|site|website|testo|text|titolo|title|documento|document|scheda|tab|pestana|onglet|seite|webseite|texte|titre|post|articolo|article)`,
     LEGGE: R`(?:leggono|leggete|legge|leggi|leggera|leggeranno|stanno leggendo|sta leggendo|read|reads|are reading|is reading|will read|lee|leen|lea|lean|leyendo|estan leyendo|lit|lisent|lisez|lirez|lesen|liest|lest|visitano|visit|visits|visiting|scan|scansiona|scansionano|analizzano|analizza|analyze|analyse|analyzing|crawl|crawls|crawling|process|processes|riassumono|riassume|summarize|summarizes|summarizing)`,
-    ISTRUZIONI: R`(?:consignes|directions|indicazioni|instructions?|istruzion[ei]|instrucciones|anweisungen|directives?|direttive|prompts?|system prompt|prompt di sistema|guidelines|linee guida|vorgaben)`,
+    ISTRUZIONI: R`(?:consignes|directions|indicazioni|instructions?|istruzion[ei]|instrucciones|anweisungen|directives?|direttive|prompts?|system prompt|prompt di sistema|guidelines|guidance|linee guida|vorgaben)`,
     REGOLE: R`(?:rules|regole|reglas|regles|regeln|commands?|comandi|orders|ordini|ordres)`,
     PRIMA: R`(?:ogni|every|qualsiasi|qualunque|any|cualquier|toute|jede|every|cada|chaque|all|tutt[ei]|todas?|toutes?|tous|alle|{{PRIMA_FORTE}})`,
     PRIMA_FORTE: R`(?:your|tue|tus|tes|deine|vos|vostre|previous|prior|above|earlier|preceding|precedenti|anteriores|precedentes|vorherigen|bisherigen|obigen|di prima|ricevute|original[ei]|originales?)`,
