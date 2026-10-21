@@ -22,7 +22,7 @@ function pratica(id, { fiducia = 'fidato', status = 'todo', notes = '' } = {}) {
     seq: { integerValue: '553' }, clientId: { stringValue: 'local:claude' }, senderProof: { stringValue: 'admin' },
     status: { stringValue: status }, statusPublic: { stringValue: 'open' }, notes: { stringValue: notes }, localOnly: SEGNO,
   };
-  if (fiducia !== undefined) fields.fiducia = { stringValue: fiducia };
+  if (fiducia !== null) fields.fiducia = { stringValue: fiducia };
   return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields };
 }
 
@@ -117,7 +117,7 @@ test('senza biglietto, in attesa, illeggibile o col lettore guasto: tutti la tol
 
 test('un feedback già non fidato (o senza fiducia) non chiede nemmeno il biglietto', async () => {
   biglietto = SPORCO;
-  for (const fiducia of ['non_fidato', undefined]) {
+  for (const fiducia of ['non_fidato', null]) {
     await conRete(pratica('f1', { fiducia }), async (scritture) => {
       const r = await of.scrivi('f1', 'todo', 'Decisione', { ...OPTS, avviso: () => assert.fail('niente da dire') });
       assert.equal(r.ok, true, r.motivo);
