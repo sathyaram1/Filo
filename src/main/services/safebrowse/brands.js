@@ -337,7 +337,7 @@ const MARCHI_PAROLA = new Map([
 // classificatore. Le radici italiane prendono la desinenza (rimborso, notifiche).
 const PAROLE_TRUFFA = [
   'login', 'logon', 'signin', 'accedi', 'accesso', 'access', 'auth', 'verify', 'verifica', 'verification', 'secure',
-  'security', 'sicurezza', 'account', 'conto', 'support', 'supporto', 'assistenza', 'help', 'service', 'servizi',
+  'security', 'sicurezza', 'account', 'check', 'conto', 'support', 'supporto', 'assistenza', 'help', 'service', 'servizi',
   'refund', 'rimbors', 'gift', 'nitro', 'promo', 'bonus', 'reward', 'premi', 'claim', 'giveaway', 'airdrop',
   'wallet', 'bank', 'banca', 'pay', 'pagament', 'billing', 'fattur', 'invoice', 'card', 'carta', 'online', 'update',
   'aggiorna', 'aggiornament', 'unlock', 'sblocc', 'recover', 'restore', 'recuper', 'confirm', 'conferm', 'alert',
