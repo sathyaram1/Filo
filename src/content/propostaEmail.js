@@ -421,8 +421,8 @@
   function riceviSegno(segno, sorgente) {
     if (typeof segno !== 'string' || !SEGNO.test(segno) || !sorgente || sorgente === window) return;
     const R = global.SN_RIQUADRI_IN_ARRIVO;
-    let ifr = attivo();
     if (!R) return;
+    let ifr = attivo();
     if (!ifr || R.finestra(ifr) !== sorgente) ifr = R.riquadroDi(sorgente, document);
     if (!ifr) return;
     let q = riquadri.get(segno);
