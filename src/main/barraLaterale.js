@@ -8,6 +8,7 @@ const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
 const { tastoPremuto } = require('./tastoDelMouse');
+const RisposteInAttesa = require('./risposteInAttesa');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
