@@ -2824,6 +2824,7 @@
         ${attesaBadgeHtml(fb)}
         ${leggibile ? domandaBadgeHtml(fb) : ''}
         ${priorityDotsHtml(fb)}
+        ${fiduciaSegnoHtml(fb)}
       `;
       item.innerHTML = progress
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
