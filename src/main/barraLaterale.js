@@ -681,6 +681,7 @@ class BarraLaterale {
       }
       if (pagine.length) voci.push({ type: 'separator' });
       else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
+      else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
       voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);
