@@ -34,6 +34,7 @@ export const TURNI = [
 ];
 
 const GIRI_PER_TURNO = 4;
+const ATTESA_MASSIMA_MS = 180_000;
 
 // Il testo come l'ha mandato il fornitore, letto dai byte interi in un colpo solo: nessun taglio di rete in mezzo.
 export function testoGrezzo(byte) {
@@ -48,23 +49,35 @@ export function testoGrezzo(byte) {
   return testo;
 }
 
-// Ogni risposta passa da qui: i byte si copiano mentre Filo li legge, e il corpo della richiesta prende `corpo`.
-function fetchCheRegistra(fetchVero, corpo, registro) {
-  return async (url, init = {}) => {
+// Il fornitore legge `fetch` globale: uno solo per tutti i modelli in parallelo, che smista i byte per modello.
+const registri = new Map();
+export async function conFetchRegistrato(fetchVero, corpo, fn) {
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
     let body = init.body;
-    if (corpo && typeof body === 'string') {
-      const b = JSON.parse(body);
-      const { provider, ...resto } = corpo;
-      body = JSON.stringify({ ...b, ...resto, ...(provider ? { provider: { ...(b.provider || {}), ...provider } } : {}) });
+    let model = '';
+    if (typeof body === 'string') {
+      try {
+        const b = JSON.parse(body);
+        model = String(b.model || '');
+        if (corpo) {
+          const { provider, ...resto } = corpo;
+          body = JSON.stringify({ ...b, ...resto, ...(provider ? { provider: { ...(b.provider || {}), ...provider } } : {}) });
+        }
+      } catch (_) {}
     }
     const res = await fetchVero(url, { ...init, body });
-    if (!res.body || typeof res.body.getReader !== 'function') return res;
+    const registro = registri.get(model);
+    if (!registro || !res.ok || !res.body || typeof res.body.getReader !== 'function') return res;
     const pezzi = [];
     registro.push(pezzi);
-    const lettore = res.body.getReader();
-    const legge = { read: async () => { const r = await lettore.read(); if (!r.done && r.value) pezzi.push(r.value); return r; } };
-    return { ok: res.ok, status: res.status, headers: res.headers, text: () => res.text(), clone: () => res.clone(), body: { getReader: () => legge } };
+    const getReader = () => {
+      const lettore = res.body.getReader();
+      return { read: async () => { const r = await lettore.read(); if (!r.done && r.value) pezzi.push(r.value); return r; } };
+    };
+    return { ok: res.ok, status: res.status, headers: res.headers, text: () => res.text(), clone: () => res.clone(), body: { getReader } };
   };
+  try { return await fn(); } finally { globalThis.fetch = orig; }
 }
 
 function unisci(pezzi) {
@@ -74,43 +87,63 @@ function unisci(pezzi) {
   return out;
 }
 
-function esitoStrumento(call, stato) {
+function esitoStrumento(call, s) {
   const nome = String(call.name || '').toUpperCase();
   let args = {};
   try { args = JSON.parse(call.arguments || '{}') || {}; } catch (_) {}
   if (nome === 'ONBOARDING') {
-    const spunte = Array.isArray(args.spunta) ? args.spunta.filter((id) => Onb.ITEM_IDS.includes(id)) : [];
-    stato.ticked = [...new Set([...stato.ticked, ...spunte])];
-    if (args.fine === true) stato.fine = true;
+    if (args.spunta) s.onb = Onb.tick(s.onb, args.spunta).state;
+    if (args.fine === true) s.onb = Onb.close(s.onb);
     return 'Fatto.';
   }
   if (Tools.haRisultato(nome)) return 'Esito non disponibile in questa prova: rispondi all\'utente con quello che sai già.';
   return `Azione ${nome} eseguita.`;
 }
 
-// Una conversazione intera su un modello. `fetchImpl` esiste per la prova senza rete.
-export async function provaModello({ model, apiKey, turni = TURNI, corpo = null, ordine = null, fetchImpl = globalThis.fetch }) {
+async function unGiro(opts) {
+  for (let tentativo = 0; ; tentativo++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ATTESA_MASSIMA_MS);
+    try {
+      return await OpenRouter.streamComplete({ ...opts, signal: ctrl.signal });
+    } catch (e) {
+      if (tentativo >= 1) throw e;
+      await new Promise((r) => setTimeout(r, 3000));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+// Una conversazione intera su un modello: dentro `conFetchRegistrato`.
+export async function provaModello({ model, apiKey, turni = TURNI, ordine = null }) {
   const registro = [];
-  const stato = { ticked: [], fine: false };
+  registri.set(model, registro);
+  const s = { onb: Onb.emptyState() };
   const sistema = 'win32';
   const capacita = globalThis.SN_CAPABILITIES.renderIndexForPrompt([]);
   const filo = [{ role: 'assistant', content: Onb.WELCOME_MESSAGE }];
   const esito = { model, turni: [], costoUsd: 0, tokenIngresso: 0, tokenUscita: 0, host: [], diversi: 0, errore: null };
   const routing = { ignore: excludedProviders, ...(ordine ? { sort: ordine } : {}) };
-  const orig = globalThis.fetch;
-  globalThis.fetch = fetchCheRegistra(fetchImpl, corpo, registro);
   try {
     for (let n = 0; n < turni.length; n++) {
-      const intervista = !stato.fine;
-      const p = {
-        sistema, capacita, modelName: model,
-        onboarding: intervista ? Onb.renderChecklistForPrompt({ ticked: stato.ticked }) : '',
-        onboardingTurns: n, onboardingMax: Onb.MAX_EXCHANGES,
-      };
-      const tools = Tools.definitions({ sistema, onboarding: intervista });
+      const intervista = !Onb.normalize(s.onb).done;
       const turno = { utente: turni[n], intervista, giri: [] };
       esito.turni.push(turno);
       filo.push({ role: 'user', content: turni[n] });
+      // La parola di stop la gestisce l'app, senza modello: qui come lì.
+      if (intervista && Onb.isStopRequest(turni[n])) {
+        s.onb = Onb.close(s.onb);
+        turno.giri.push({ testo: Onb.CLOSING_MESSAGE, grezzo: Onb.CLOSING_MESSAGE, identico: true, fisso: true, strumenti: [] });
+        filo.push({ role: 'assistant', content: Onb.CLOSING_MESSAGE });
+        continue;
+      }
+      const p = {
+        sistema, capacita, modelName: model,
+        onboarding: intervista ? Onb.renderChecklistForPrompt(s.onb) : '',
+        onboardingTurns: n, onboardingMax: Onb.MAX_EXCHANGES,
+      };
+      const tools = Tools.definitions({ sistema, onboarding: intervista });
       const domanda = filo.length - 1;
       for (let g = 0; g < GIRI_PER_TURNO; g++) {
         const messages = [
@@ -124,11 +157,12 @@ export async function provaModello({ model, apiKey, turni = TURNI, corpo = null,
         ];
         const prima = registro.length;
         let ragionamento = '';
-        const r = await OpenRouter.streamComplete({
+        const r = await unGiro({
           apiKey, model, messages, tools, providerRouting: routing, maxTokens: 4096,
           onReasoning: (t) => { ragionamento += t; }, onDelta: () => {},
         });
-        const grezzo = testoGrezzo(unisci(registro.slice(prima).flat()));
+        // Solo l'ultima risposta riuscita: un tentativo fallito prima non è testo che Filo terrebbe.
+        const grezzo = testoGrezzo(unisci(registro.slice(prima).slice(-1).flat()));
         const host = r.servedBy || '';
         if (host && C.isProviderExcluded(host, excludedProviders)) throw new Error(`servito da un fornitore escluso: ${host}`);
         if (host && !esito.host.includes(host)) esito.host.push(host);
@@ -140,20 +174,21 @@ export async function provaModello({ model, apiKey, turni = TURNI, corpo = null,
         turno.giri.push(giro);
         filo.push(Tools.assistantMessage({ text: r.text, toolCalls: r.toolCalls, reasoningDetails: r.reasoningDetails }));
         if (!r.toolCalls.length) break;
-        for (const c of r.toolCalls) filo.push(Tools.toolMessage(c.id, esitoStrumento(c, stato)));
+        for (const c of r.toolCalls) filo.push(Tools.toolMessage(c.id, esitoStrumento(c, s)));
       }
     }
   } catch (e) {
-    esito.errore = String(e && e.message || e);
+    esito.errore = String((e && e.message) || e);
   } finally {
-    globalThis.fetch = orig;
+    registri.delete(model);
   }
   return esito;
 }
 
-export function rapporto(esiti) {
+export function rapporto(esiti, { corpo = null, ordine = null } = {}) {
   const righe = ['# Italiano della chat: intervista di benvenuto e chat', ''];
-  righe.push('| modello | costo USD | token in / out | host | grezzo ≠ tenuto | errore |', '|---|---|---|---|---|---|');
+  if (corpo || ordine) righe.push(`Richiesta modificata: ${JSON.stringify({ corpo, ordine })}`, '');
+  righe.push('| modello | costo USD | token in / out | host | grezzo diverso dal tenuto | errore |', '|---|---|---|---|---|---|');
   for (const e of esiti) {
     righe.push(`| ${e.model} | ${e.costoUsd.toFixed(4)} | ${e.tokenIngresso} / ${e.tokenUscita} | ${e.host.join(', ') || '?'} | ${e.diversi} | ${e.errore || ''} |`);
   }
@@ -162,8 +197,8 @@ export function rapporto(esiti) {
     for (const t of e.turni) {
       righe.push(`**Utente${t.intervista ? ' (intervista)' : ''}:** ${t.utente}`, '');
       for (const g of t.giri) {
-        if (g.testo) righe.push(`**Filo:** ${g.testo}`, '');
-        for (const s of g.strumenti) righe.push(`- strumento ${s.nome} ${s.argomenti}`);
+        if (g.testo) righe.push(`**Filo${g.fisso ? ' (testo fisso dell\'app)' : ''}:** ${g.testo}`, '');
+        for (const x of g.strumenti) righe.push(`- strumento ${x.nome} ${x.argomenti}`);
         if (g.strumenti.length) righe.push('');
         if (!g.identico) righe.push('**GREZZO DIVERSO DAL TENUTO.** Grezzo:', '', '```', g.grezzo, '```', '');
       }
@@ -183,7 +218,7 @@ function argomenti(argv) {
 
 async function main() {
   const a = argomenti(process.argv.slice(2));
-  const modelli = String(a.modelli || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const modelli = [...new Set(String(a.modelli || '').split(',').map((x) => x.trim()).filter(Boolean))];
   if (!modelli.length) {
     console.error('Uso: node tests/agent/italiano-chat.mjs --modelli <id>,<id> [--turni N] [--ordine latency|throughput|price] [--corpo \'{"temperature":0.6}\']');
     process.exit(2);
@@ -191,16 +226,18 @@ async function main() {
   const apiKey = getApiKey();
   const turni = TURNI.slice(0, Number(a.turni) || TURNI.length);
   const corpo = a.corpo ? JSON.parse(a.corpo) : null;
-  const esiti = await Promise.all(modelli.map((model) => provaModello({ model, apiKey, turni, corpo, ordine: a.ordine || null })));
+  const ordine = typeof a.ordine === 'string' ? a.ordine : null;
+  const esiti = await conFetchRegistrato(globalThis.fetch, corpo,
+    () => Promise.all(modelli.map((model) => provaModello({ model, apiKey, turni, ordine }))));
   const cartella = join(__dirname, '.out');
   mkdirSync(cartella, { recursive: true });
   const nome = `italiano-chat-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-  writeFileSync(join(cartella, `${nome}.md`), rapporto(esiti));
-  writeFileSync(join(cartella, `${nome}.json`), JSON.stringify({ corpo, ordine: a.ordine || null, esiti }, null, 2));
+  writeFileSync(join(cartella, `${nome}.md`), rapporto(esiti, { corpo, ordine }));
+  writeFileSync(join(cartella, `${nome}.json`), JSON.stringify({ corpo, ordine, esiti }, null, 2));
   for (const e of esiti) console.log(`${e.model}: ${e.costoUsd.toFixed(4)} USD, grezzo diverso in ${e.diversi} giri${e.errore ? `, ERRORE ${e.errore}` : ''}`);
   console.log(`Trascrizioni: ${join(cartella, `${nome}.md`)}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((e) => { console.error(e && e.message || e); process.exit(1); });
+  main().catch((e) => { console.error((e && e.message) || e); process.exit(1); });
 }
