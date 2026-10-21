@@ -68,9 +68,9 @@
     } catch (_) {}
   }
 
-  function runInTopFrame(iconId) {
+  function runInTopFrame(iconId, surface = null) {
     try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
+      Promise.resolve(chrome.runtime.sendMessage(surface ? { type: MSG.RUN_IN_TOP_FRAME, surface } : { type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
     } catch (_) {}
   }
 
