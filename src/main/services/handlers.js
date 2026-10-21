@@ -237,9 +237,14 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       url: payload.url, title: payload.title, outline: payload.outline,
       viewport: payload.viewport, siteKnowledge, knownPaths,
       apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(),
+      valuta: payload.valuta === true ? await memoriaPerValuta() : null,
     }) };
     const parts = [];
-    const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
+    // «Valuta» (#1449): il testo del campo arriva grezzo, e qui diventa la richiesta (o la coda della domanda) imbustata.
+    const campo = payload.esterno && payload.esterno.testoDaValutare;
+    const userText = campo && typeof campo.testo === 'string'
+      ? PROMPTS.richiestaValuta({ testo: campo.testo, domanda: payload.userMessage || '' })
+      : (payload.userMessage || testoDelTurnoAutomatico(payload));
     if (userText) parts.push({ type: 'text', text: userText });
     const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
     if (origine) parts.push({ type: 'text', text: origine });
