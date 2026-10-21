@@ -36,9 +36,11 @@ test('il menu App mostra Feedback e Gestione solo all\'owner', () => {
     assert.ok(!new RegExp(`label: '${riservata}'`).test(perTutti),
       `«${riservata}» apre una pagina che solo l'owner può leggere: non va nel ramo visibile a tutti`);
   }
-  // E la bacheca, che invece è di tutti, deve restarci.
-  assert.match(perTutti, /label: 'Bacheca'/,
-    'la bacheca è la superficie pubblica dei miglioramenti: non va nascosta');
+  // La Bacheca segue il suo interruttore (#1592); in pausa, al suo posto, le segnalazioni che l'utente ha mandato.
+  assert.match(perTutti, /inPausaVisibili\.bacheca\s*\?\s*\{ label: 'Bacheca'[^}]*\}\s*:\s*\{ label: 'Le tue segnalazioni'[^}]*#segnalazioni/,
+    'con la Bacheca in pausa le segnalazioni mandate devono restare raggiungibili dal menu App');
+  assert.match(perTutti, /inPausaVisibili\.mazzi\s*\?\s*\[\{ label: 'Deck builder MTG'/,
+    'il Deck builder segue il suo interruttore');
 });
 
 test('l\'icona «Feedback» del menu del tasto destro esiste solo per l\'owner', () => {
