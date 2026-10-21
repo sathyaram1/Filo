@@ -1,5 +1,5 @@
 // I cambi di stato come eventi del filo (#867): il nome di ogni impostazione, il confronto fra due
-// scritture, la frase in parole, la fusione dei passi di un cursore e cosa scrivere per annullare.
+// scritture, la frase in parole, la fusione dei ritocchi ripetuti e cosa scrivere per annullare.
 // Logica pura: chi osserva le scritture è src/main/services/registroCambi.js; regole in tests/unit/cambi.test.mjs.
 
 (function (global) {
