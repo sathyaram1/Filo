@@ -139,7 +139,15 @@ function radiciChiuse(radice) {
 
 // Una sessione d'ispezione per ogni processo dei riquadri (sessione '' = la pagina): i riquadri di un altro sito
 // vivono in un processo loro, e il loro albero non sta in quello della pagina.
-async function campiSegretiNeiComponentiChiusi(webContents) {
+// In fila per pagina: chi trova l'ispettore già attaccato da una misura in corso non deve vederselo staccare sotto.
+const inFila = new WeakMap();
+function campiSegretiNeiComponentiChiusi(webContents) {
+  const ora = (inFila.get(webContents) || Promise.resolve()).then(() => misuraComponentiChiusi(webContents));
+  inFila.set(webContents, ora.catch(() => {}));
+  return ora;
+}
+
+async function misuraComponentiChiusi(webContents) {
   const dbg = webContents.debugger;
   const nostro = !dbg.isAttached();
   if (nostro) { try { dbg.attach('1.3'); } catch (_) { return { campi: [], nonCoperti: false }; } }

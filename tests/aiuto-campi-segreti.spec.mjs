@@ -364,6 +364,56 @@ test('nell’immagine è coperto il numero di carta scritto in un campo dentro u
     'il numero scritto nel componente si legge nell’immagine').toBe(0);
 });
 
+// Un componente chiuso non lo vedono né la pagina né il content script di Filo, ma a schermo si vede come gli altri.
+const componenteChiuso = `<carta-chiusa></carta-chiusa><script>
+  customElements.define('carta-chiusa', class extends HTMLElement { constructor() { super();
+    const r = this.attachShadow({ mode: 'closed' }); window.__radice = r;
+    r.innerHTML = '<label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" '
+      + 'style="width:280px;font-size:18px;outline:0;caret-color:transparent">'; } });
+</script>`;
+
+async function scriviNelComponente(frame, valore) {
+  await frame.evaluate((v) => { window.__radice.querySelector('input').value = v; }, valore);
+}
+
+async function campoNelComponente(frame, scostamento = { x: 0, y: 0 }) {
+  const b = await frame.evaluate(() => {
+    const r = window.__radice.querySelector('input').getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  });
+  return { left: b.left + scostamento.x + 3, top: b.top + scostamento.y + 3, width: b.width - 6, height: b.height - 6 };
+}
+
+test('nell’immagine è coperto il numero di carta scritto in un campo dentro un componente chiuso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, modulo(componenteChiuso));
+  await superaAvvisoSeCe(page);
+  const immagini = await immaginiConDueCarte(app, shell, page, (v) => scriviNelComponente(page, v));
+  expect(await pixelDiversi(page, immagini, await campoNelComponente(page)),
+    'il numero scritto nel componente chiuso si legge nell’immagine').toBe(0);
+});
+
+// Lo stesso componente in un riquadro del sito stesso e in uno di un altro sito, che vive in un processo suo.
+test('nell’immagine è coperto il numero di carta del componente chiuso anche dentro i riquadri', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const doc = `<!doctype html><html><body style="margin:0;background:#fff">${componenteChiuso}</body></html>`;
+  const fuori = testServer.html(doc, { pubblico: true });
+  const stile = 'width:420px;height:60px;border:3px solid #888;padding:5px';
+  const page = await testServer.openReady(openTab, modulo(`<iframe name="stesso" srcdoc="${doc.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" style="${stile}"></iframe>`
+    + `<iframe name="altro" src="${fuori}" style="${stile}"></iframe>`));
+  await superaAvvisoSeCe(page);
+  const riquadri = ['stesso', 'altro'];
+  await expect.poll(() => Promise.all(riquadri.map((n) => page.frame({ name: n })?.evaluate(() => Boolean(window.__radice)).catch(() => false))),
+    { timeout: 10_000 }).toEqual([true, true]);
+  const immagini = await immaginiConDueCarte(app, shell, page,
+    (v) => Promise.all(riquadri.map((n) => scriviNelComponente(page.frame({ name: n }), v))));
+  for (const n of riquadri) {
+    const f = await page.locator(`iframe[name="${n}"]`).boundingBox();
+    const r = await campoNelComponente(page.frame({ name: n }), { x: f.x + 3 + 5, y: f.y + 3 + 5 });
+    expect(await pixelDiversi(page, immagini, r), `il numero del componente chiuso nel riquadro «${n}» si legge nell’immagine`).toBe(0);
+  }
+});
+
 // Una password che il sito rende visibile resta una password anche se il campo ha un nome qualunque e la scritta
 // accanto non è legata né dice «password» in una lingua che Filo conosce.
 test('la password resa visibile dal sito non arriva al modello, né nella descrizione né nell’immagine', async ({ app, shell, openTab, testServer }) => {
