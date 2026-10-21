@@ -143,7 +143,7 @@ const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
 function tipoImmagine(b) {
   const fourcc = (i) => b.toString('latin1', i, i + 4);
   if (b.length < 4) return '';
-  if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
+  if (b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG') return 'image/png';
   if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
   if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
   if (fourcc(0) === 'GIF8') return 'image/gif';

@@ -72,13 +72,14 @@ function paginaDi(sender) {
 const ATTESA_PROXY_MS = 3000;
 
 // Dietro un proxy il nome lo risolve lui: chiederlo al DNS di casa direbbe dove va la scheda a chi la scheda evita.
+// Una configurazione che può ripiegare su DIRECT («PROXY x; DIRECT») conta come diretta: il ripiego si collega da qui.
 async function passaDalProxy(ses, url) {
   if (!ses || typeof ses.resolveProxy !== 'function') return false;
   let t = null;
   const tardi = new Promise((ok) => { t = setTimeout(() => ok(''), ATTESA_PROXY_MS); });
   try {
     const r = await Promise.race([Promise.resolve(ses.resolveProxy(url)).catch(() => ''), tardi]);
-    return !!r && !/^\s*DIRECT\s*;?\s*$/i.test(String(r));
+    return !!String(r || '').trim() && !/\bDIRECT\b/i.test(String(r));
   } finally {
     clearTimeout(t);
   }

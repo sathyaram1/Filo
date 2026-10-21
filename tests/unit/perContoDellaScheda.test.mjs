@@ -135,3 +135,18 @@ test('senza una scheda viva non parte niente', async () => {
   }
   assert.equal(passi.length, 0);
 });
+
+test('una richiesta diretta chiede il nome al risolutore della sessione, quello con cui poi si collega', async () => {
+  const chiesti = [];
+  const risolutore = (mappa) => ({
+    resolveProxy: async () => 'DIRECT',
+    resolveHost: async (h) => { chiesti.push(h); if (!mappa[h]) throw new Error('net::ERR_NAME_NOT_RESOLVED'); return { endpoints: mappa[h].map((address) => ({ address, family: 'ipv4' })) }; },
+  });
+  const ses = risolutore({ 'cdn.dalla-sessione.example': ['93.184.216.40'], 'rimappato.example': ['10.0.0.5'] });
+  await P.perContoDellaScheda(scheda('https://pagina.example/', ses), 'https://cdn.dalla-sessione.example/f.jpg');
+  await assert.rejects(() => P.perContoDellaScheda(scheda('https://pagina.example/', ses), 'https://rimappato.example/f.jpg'), /blocked-private-address/);
+  await assert.rejects(() => P.perContoDellaScheda(scheda('https://pagina.example/', ses), 'https://sconosciuto.example/f.jpg'), /dns-failed/);
+  assert.deepEqual(chiesti, ['cdn.dalla-sessione.example', 'rimappato.example', 'sconosciuto.example']);
+  assert.deepEqual(chiestiAlDns, [], 'il DNS di Node non c\'entra');
+  assert.deepEqual(passi.map((p) => p.url), ['https://cdn.dalla-sessione.example/f.jpg']);
+});
