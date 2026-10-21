@@ -61,6 +61,8 @@
     PRIMA_FORTE: R`(?:your|tue|tus|tes|deine|vos|vostre|previous|prior|above|earlier|preceding|precedenti|anteriores|precedentes|vorherigen|bisherigen|obigen|di prima|ricevute|original[ei]|originales?)`,
     // Qualcosa che finisce un ordine, non un titolo che prosegue («ignore previous estimates», «le regole precedenti del fantacalcio»).
     FINE_FRASE: R`(?=\s*(?:$|[.!,;:|\-–—)\]]|(?:and|e|y|et|und)\b|(?:this|questa|questo|esta|este|cette|ce|diese[rs]?)\s+(?:line|riga|linea|message|messaggio|sentence|frase|point|punto|text|testo|mensaje|ligne|zeile)\b))`,
+    // Dove finisce la frase di un titolo: la fine, o un separatore prima del nome del sito («… , Filo - Reddit»).
+    FINE_SEGMENTO: R`(?=\s*(?:$|[|•·]|[-–—]\s))`,
     PRECEDENTI: R`(?:precedenti|di prima|anteriores|precedentes|previous|above|earlier|vorherigen|ricevute|originali|originales|bisherigen)`,
     // Senza un indirizzo a cui mandarli, «i file dell'utente» sono una guida per chi amministra: qui solo i segreti.
     SEGRETI_VERI: R`(?:password|passwords|credenziali|credentials|credenciales|identifiants|zugangsdaten|codici|codes|codigos|cookies?|token|tokens|chiavi|keys|api keys?|pin|iban)`,
@@ -73,7 +75,7 @@
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!?]\s*)(?:{{SALUTO}}[\s,!]+filo\s*[,:;!]*|filo\s*[,;!]+|filo\s+(?=(?:please|per favore|por favor|bitte|s'il te plait)\b))\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA_FORTE}})\b` },
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·\-–—.!?]\s*)filo\s*:+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{PARLA}}|{{RICHIESTA}}|{{CONDOTTA_FORTE}}|disattiva|disabilita|invia|inoltra|manda|elimina|cancella|esegui|disable|send|forward|delete|execute|desactiva|envia|desactive|envoie|deaktiviere|sende|(?:apri|open|abre|ouvre|offne)\s+(?:le |the |la |les |die )?(?:impostazioni|settings|configuracion|parametres|einstellungen))\b` },
     { famiglia: 'rivolto', forte: true, re: R`^filo\s*-+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}{{PARLA}}\b` },
-    { famiglia: 'rivolto', forte: true, re: R`^(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}{{ORDINE}}\b.{0,120},\s*(?:{{SALUTO}}\s+)?filo\s*[.!?]*$` },
+    { famiglia: 'rivolto', forte: true, re: R`^(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}{{ORDINE}}\b.{0,120},\s*(?:{{SALUTO}}\s+)?filo\s*[.!?]*{{FINE_SEGMENTO}}` },
     { famiglia: 'rivolto', forte: true, re: R`^(?:per|for|to|para|pour|an|fur)\s+filo\s*[:,]+\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA}})\b` },
     { famiglia: 'rivolto', forte: true, re: R`(?:^|[|•·:\-–—.!?]\s*){{SALUTO}}\s+filo\s+(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}{{ORDINE}}\b` },
     { famiglia: 'rivolto', forte: true, re: R`\b{{DESTINO}}\s*{{PER}}\s+filo{{SEGNO}}\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{CONDOTTA}})\b` },
@@ -81,8 +83,8 @@
     { famiglia: 'rivolto', re: R`(?:^|[|•·\-–—.!?]\s*){{AIVOC}}\s*[,:;!]+\s*{{GUARDIA}}(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}})\b` },
     { famiglia: 'rivolto', re: R`^(?:per|for|to|para|pour|an|fur|a|ai|agli|alle|al|alla|aux|au)\s+{{ART}}{{AI}}\s*[:,]+\s*{{GUARDIA}}(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA}})\b` },
     { famiglia: 'rivolto', re: R`\b{{DESTINO}}\s*{{PER}}\s+{{ART}}{{AI}}{{SEGNO}}.{0,100}?\b(?:{{ORDINE}}|{{RICHIESTA}}|{{CONDOTTA}})\b` },
-    { famiglia: 'rivolto', re: R`^(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}{{ORDINE}}\b.{0,120}\b{{DESTINO}}\s*{{PER}}\s+{{ART}}{{AI}}\s*[.!]*$` },
-    { famiglia: 'rivolto', re: R`^(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}{{ORDINE}}\b.{0,120},\s*{{ART}}{{AIVOC}}\s*[.!]*$` },
+    { famiglia: 'rivolto', re: R`^(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}{{ORDINE}}\b.{0,120}\b{{DESTINO}}\s*{{PER}}\s+{{ART}}{{AI}}\s*[.!]*{{FINE_SEGMENTO}}` },
+    { famiglia: 'rivolto', re: R`^(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}{{ORDINE}}\b.{0,120},\s*{{ART}}{{AIVOC}}\s*[.!]*{{FINE_SEGMENTO}}` },
     { famiglia: 'rivolto', re: R`(?:^|[|•·.!?]\s*)(?:assistant|asistente)\s*,\s*{{GUARDIA}}(?:{{RIEMPI}}[\s,:;!.\-]+){0,4}(?:{{PARLA}}|navigate|open|visit|click|buy|purchase|forward|delete|disable|execute|tell|say|reveal|go to|abre|visita|compra|envia|borra)\b` },
     { famiglia: 'rivolto', re: R`(?:^|[|•·\-–—.!?]\s*)(?:to|a|para|pour|an|fur|for)\s+(?:all|every|any|tutti gli|tutte le|ogni|todos los|todas las|tous les|toutes les|alle|jeden|jede)\s+{{AI}}\s*[:,]` },
     // Prefissi di ruolo: «system:», «[AI]», «<|im_start|>», «### Instruction».
