@@ -51,7 +51,7 @@ for (const caso of CASI) {
     await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => {
       const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.url === u);
       return t ? t.title : '';
-    }, url), { timeout: 10_000 }).not.toBe('');
+    }, url), { timeout: 10_000 }).toContain(caso.titolo.slice(0, 12));
 
     await chat.locator('#input').fill('che schede ho aperto?');
     await chat.locator('#sendBtn').click();
