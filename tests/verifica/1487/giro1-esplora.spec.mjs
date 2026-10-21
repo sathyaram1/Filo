@@ -119,9 +119,14 @@ test('cercare nel filo e scegliere un risultato di ieri porta lì e ci resta', a
   await inCima(page, 'Il treno parte');
   await page.locator('#cercaInput').click();
   await page.locator('#cercaInput').fill('domanda di ieri 3');
-  const voce = page.locator('.dash-cerca-voce').first();
+  const voce = page.locator('.dash-cerca-voce.dash-cerca-msg', { hasText: 'domanda di ieri 3' }).first();
   await expect(voce).toBeVisible({ timeout: 10_000 });
+  console.log('voci', JSON.stringify(await page.locator('.dash-cerca-voce').allTextContents()));
   await voce.click();
+  await page.waitForTimeout(1000);
+  const v = await vista(page);
+  console.log('dopo', JSON.stringify(v.bolle.filter((b) => b.giu > -50 && b.su < v.alto + 50)), v.alto,
+    await page.evaluate(() => { const a = document.getElementById('bubbles'); return [a.scrollTop, a.scrollHeight, a.clientHeight, getComputedStyle(a).getPropertyValue('--dash-vuoto')]; }));
   const visibile = async () => {
     const v = await vista(page);
     const b = v.bolle.find((x) => x.testo === 'domanda di ieri 3');
