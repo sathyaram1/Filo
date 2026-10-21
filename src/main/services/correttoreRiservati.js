@@ -35,7 +35,7 @@ const SOPRA_MAX = 1500;
 
 function presenta() {
   const P = globalThis.SN_URL_EXFIL && globalThis.SN_URL_EXFIL.PRESENTA;
-  return P ? [[new RegExp(P.password, 'g'), 'password'], [new RegExp(P.codice, 'g'), 'codice']] : [];
+  return P ? [[new RegExp(P.password, 'gu'), 'password'], [new RegExp(CHIESTA_IN_CHAT, 'gu'), 'password'], [new RegExp(P.codice, 'gu'), 'codice']] : [];
 }
 
 // Dove finisce ogni richiesta di una password o di un codice nel testo (già minuscolo), e di quale dei due.
