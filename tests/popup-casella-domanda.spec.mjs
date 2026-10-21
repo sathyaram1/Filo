@@ -168,3 +168,15 @@ test('#853.1 pagina web: la riga per la domanda dopo sta in una riga, senza frec
   await apriRiquadroDaMenu(app, page);
   await provaLaCasella(app, page, 'web');
 });
+
+test('#853.1 Traduci da tastiera: stessa riga, senza frecce', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app);
+  const page = await testServer.openReady(openTab, PAGINA_WEB);
+  await page.locator('#bersaglio').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__filoShortcuts.dispatch('translate-selection', BrowserWindow.getAllWindows().find((w) => w._filoTabs));
+  });
+  await expect.poll(() => misura(app, page), { timeout: 15_000 }).not.toBeNull();
+  await provaLaCasella(app, page, 'traduci');
+});
