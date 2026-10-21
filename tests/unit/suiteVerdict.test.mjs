@@ -418,7 +418,9 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
     const tutti = join(dir, 'blob-tutti');
     mkdirSync(tutti, { recursive: true });
     for (const [k, extra] of [[1, ['--global-timeout=1500']], [2, []]]) {
-      const r = pw(['test', '--config', 'playwright.config.mjs', `--shard=${k}/2`, ...extra, '--reporter=blob'], { PLAYWRIGHT_BLOB_OUTPUT_NAME: nomeEsitoParte(k) });
+      // Senza la cartella l'esito andrebbe accanto al package.json del repo, come in GitHub: qui resta nella prova.
+      const r = pw(['test', '--config', 'playwright.config.mjs', `--shard=${k}/2`, ...extra, '--reporter=blob'],
+        { PLAYWRIGHT_BLOB_OUTPUT_NAME: nomeEsitoParte(k), PLAYWRIGHT_BLOB_OUTPUT_DIR: join(dir, 'blob-report') });
       const fatti = existsSync(join(dir, 'blob-report')) ? readdirSync(join(dir, 'blob-report')) : [];
       assert.ok(fatti.includes(nomeEsitoParte(k)), `parte ${k}: nessun ${nomeEsitoParte(k)} (${fatti.join(', ')})\n${r.stdout}${r.stderr}`);
       copyFileSync(join(dir, 'blob-report', nomeEsitoParte(k)), join(tutti, nomeEsitoParte(k)));
