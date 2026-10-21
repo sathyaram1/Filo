@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { valutaCondizione, scriptDelPasso, usciteDelLavoro, eseguiPasso, haBash } from '../helpers/azioniGithub.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -396,6 +397,93 @@ describe('il comando del contenitore è scritto intero, dovunque compaia', () =>
   });
 });
 
+// ─── L'ultima rete delle metà di piattaforma, fatta girare ───────────────────
+const PIATTAFORMA_DI = { 'release-mac': 'Mac', 'release-linux': 'Linux' };
+const LAVORI_PIATTAFORMA = Object.keys(PIATTAFORMA_DI);
+const nomiLavori = (testo) => [...testo.slice(testo.search(/^jobs:\s*$/m)).matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
+const needsDi = (nome, testo) => ((job(nome, testo).match(/^ {4}needs:\s*(.+)$/m) || [])[1] || '')
+  .replace(/[[\]]/g, '').split(',').map((x) => x.trim()).filter(Boolean);
+const condizioneDi = (nome, testo) => (job(nome, testo).match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
+
+const AVVISO_FINTO = [
+  "import { appendFileSync } from 'node:fs';",
+  "appendFileSync(new URL('./tentativi.txt', import.meta.url), 'x');",
+  'process.exit(Number(process.env.INVIO_ESITO || 0));',
+].join('\n');
+
+/** Le uscite che un lavoro di piattaforma lascia agli altri: riuscito, o fallito con l'invio dell'avviso che va o non va. */
+function esitiDelLavoro(nomeJob, testo) {
+  const t = senzaCommenti(job(nomeJob, testo));
+  const elenco = passi(t);
+  const dichiarate = usciteDelLavoro(t);
+  const avviso = elenco.find((p) => /node\s+\S*release-platform-alarm\.mjs(?![^\n]*--attesi)/.test(p.corpo));
+  const uscitePer = (eseguiti) => Object.fromEntries(Object.entries(dichiarate)
+    .map(([nome, { passo, chiave }]) => [nome, (eseguiti[passo] || {})[chiave] ?? '']));
+  const esegui = (p, opzioni) => eseguiPasso((scriptDelPasso(p.corpo) || '').replace(/\$\{\{[^}]*\}\}/g, ''), opzioni);
+
+  // Riuscito: girano i passi senza `if:` da cui il lavoro prende le sue uscite.
+  const riusciti = {};
+  for (const { passo } of Object.values(dichiarate)) {
+    const p = elenco.find((x) => x.id === passo);
+    if (p && p !== avviso && !/^ {8}if:/m.test(p.corpo) && !(passo in riusciti)) riusciti[passo] = esegui(p).uscite;
+  }
+  const fallito = (invioOk) => {
+    if (!avviso) return { uscite: {}, tentativi: 0, riepilogo: '' };
+    const r = esegui(avviso, {
+      env: { ALLARME: '{{dir}}/allarme', INVIO_ESITO: invioOk ? '0' : '1' },
+      file: { 'allarme/release-platform-alarm.mjs': AVVISO_FINTO },
+      leggi: ['allarme/tentativi.txt'],
+    });
+    return { uscite: uscitePer({ [avviso.id]: r.uscite }), tentativi: r.letti['allarme/tentativi.txt'].length, riepilogo: r.riepilogo };
+  };
+  return { avviso, riuscito: uscitePer(riusciti), fallito };
+}
+
+/**
+ * Cosa non regge nell'ultima rete: per ogni metà, con l'altra finita bene, la rete scatta quando la metà non è
+ * finita e il suo avviso non risulta aperto (fallita, stroncata, scaduta), e tace quando è finita o ha avvisato.
+ * Senza bash i passi non girano: restano le prove sui lavori stroncati, con l'altra metà saltata.
+ */
+function problemiDellaRete(testo, { esegui = haBash } = {}) {
+  const problemi = [];
+  const reti = nomiLavori(testo).filter((n) => !LAVORI_PIATTAFORMA.includes(n)
+    && needsDi(n, testo).some((x) => LAVORI_PIATTAFORMA.includes(x)));
+  if (!reti.length) return ['nessun lavoro guarda le metà di piattaforma: un guasto senza feedback resterebbe verde'];
+  for (const n of reti) {
+    if (/^ {4}continue-on-error:\s*true\s*$/m.test(job(n, testo))) problemi.push(`\`${n}\` è continue-on-error: anche lui lascerebbe la corsa verde`);
+    if (!/exit 1/.test(senzaCommenti(job(n, testo)))) problemi.push(`\`${n}\` non fa diventare rossa la corsa`);
+  }
+  const scatta = (needs) => reti.filter((n) => valutaCondizione(condizioneDi(n, testo), {
+    needs: Object.fromEntries(needsDi(n, testo).map((x) => [x, needs[x] || { result: 'skipped', outputs: {} }])),
+  }));
+  const esiti = esegui ? Object.fromEntries(LAVORI_PIATTAFORMA.map((j) => [j, esitiDelLavoro(j, testo)])) : null;
+  for (const j of LAVORI_PIATTAFORMA) {
+    const P = PIATTAFORMA_DI[j];
+    const altro = LAVORI_PIATTAFORMA.find((x) => x !== j);
+    const base = esiti ? { [altro]: { result: 'success', outputs: esiti[altro].riuscito } } : {};
+    const prova = (stato, deve, caso) => {
+      const accese = scatta({ ...base, [j]: stato });
+      if (deve && !accese.length) problemi.push(`${P}: ${caso}, e la corsa resta verde`);
+      if (!deve && accese.length) problemi.push(`${P}: ${caso}, e la corsa diventa rossa lo stesso (${accese.join(', ')})`);
+    };
+    // `continue-on-error` può far leggere «success» anche a un lavoro fallito: la rete non deve fidarsi dell'esito.
+    for (const result of ['failure', 'cancelled', 'success']) {
+      prova({ result, outputs: {} }, true, `lavoro stroncato prima dell'avviso (esito «${result}»)`);
+    }
+    if (!esiti) continue;
+    if (!esiti[j].avviso) { problemi.push(`${P}: manca il passo che apre il feedback`); continue; }
+    prova({ result: 'success', outputs: esiti[j].riuscito }, false, 'lavoro finito bene');
+    prova({ result: 'skipped', outputs: {} }, false, 'lavoro che non doveva girare');
+    const muto = esiti[j].fallito(false);
+    if (!muto.tentativi) problemi.push(`${P}: il passo dell'avviso non chiama lo strumento che lo spedisce`);
+    for (const result of ['failure', 'success']) prova({ result, outputs: muto.uscite }, true, `avviso non consegnato (esito «${result}»)`);
+    if (muto.tentativi && !muto.riepilogo.trim()) problemi.push(`${P}: avviso non consegnato, e il riepilogo della corsa non lo dice`);
+    const aperto = esiti[j].fallito(true);
+    for (const result of ['failure', 'success']) prova({ result, outputs: aperto.uscite }, false, `feedback aperto (esito «${result}»)`);
+  }
+  return problemi;
+}
+
 // ─── #733: una meta' di piattaforma che fallisce non tace ────────────────────
 // `release-mac` e `release-linux` sono `continue-on-error` perche' un guasto su
 // Linux non deve togliere l'aggiornamento a chi sta su Windows. Il prezzo era il
@@ -454,34 +542,33 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
         assert.doesNotMatch(elenco[iAllarme].corpo, /node scripts\/release-platform-alarm\.mjs/,
           'l\'avviso usa ancora lo strumento della copia di lavoro: su un tag vecchio non c\'è');
       });
-
-      // Il feedback è l'unica cosa che fa sapere il guasto a qualcuno, perché il
-      // lavoro è continue-on-error e la corsa resta verde comunque.
-      test('un avviso che non è partito non finisce verde, e lo dice a chi guarda', () => {
-        const allarme = elenco[iAllarme];
-        assert.doesNotMatch(allarme.corpo, /\|\|\s*echo/,
-          'il passo che apre il feedback inghiotte il proprio esito: se il feedback non parte resta verde');
-        assert.match(allarme.corpo, /esito=\$\{ESITO\}" >> "\$GITHUB_OUTPUT"/,
-          'l\'esito dell\'avviso non esce dal passo: fuori nessuno può sapere che è rimasto muto');
-        assert.match(allarme.corpo, /GITHUB_STEP_SUMMARY/, 'chi apre la corsa deve leggere che il feedback non si è aperto');
-        assert.match(senzaCommenti(job(nomeJob)), /^ {4}outputs:\s*$[\s\S]{0,120}?allarme: \$\{\{ steps\.allarme\.outputs\.esito \}\}/m,
-          'il lavoro non espone se l\'avviso è partito: nessun altro lavoro può accorgersene');
-      });
     });
   }
 
-  // Ultima rete. Se l'avviso non è partito, la corsa verde è l'unico posto in
-  // cui il guasto poteva ancora vedersi: va fatta diventare rossa.
-  test('se l\'avviso non è partito la corsa non resta verde', () => {
-    const jobs = YML.slice(YML.search(/^jobs:\s*$/m));
-    const nomi = [...jobs.matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
-    const rete = nomi.filter((n) => /needs\.release-(mac|linux)\.outputs\.allarme == 'muto'/.test(job(n)));
-    assert.ok(rete.length, 'nessun lavoro si accorge di un avviso rimasto muto: il guasto non lo saprebbe nessuno');
-    for (const n of rete) {
-      assert.doesNotMatch(job(n), /^ {4}continue-on-error:\s*true\s*$/m,
-        `\`${n}\` è l'ultimo segnale rimasto: se anche lui lascia la corsa verde non segnala niente`);
-      assert.match(job(n), /exit 1/, `\`${n}\` deve far diventare rossa la corsa`);
+  // L'ultima rete si fa GIRARE (#733.4, #733.6): la condizione del lavoro di rete si valuta con gli esiti di ogni
+  // scenario, e il passo dell'avviso si esegue con un invio che fallisce. Letta come forma di una riga restava verde
+  // con la rete che guardava solo il Mac, o con un invio che non può fallire seguito da «aperto».
+  test('una metà non finita senza feedback fa rossa la corsa, per tutte e due le piattaforme', () => {
+    assert.deepEqual(problemiDellaRete(YML), []);
+  });
+
+  test('la sentinella della rete diventa rossa se la rete smette di guardare Linux', () => {
+    const rete = job('avviso-mancato');
+    const soloMac = rete.replace(/needs\.release-linux\./g, 'needs.release-mac.');
+    assert.notEqual(soloMac, rete, 'la mutazione «la rete guarda solo il Mac» non si applica più: aggiornala alla rete nuova');
+    for (const esegui of haBash ? [false, true] : [false]) {
+      assert.ok(problemiDellaRete(YML.replace(rete, () => soloMac), { esegui }).some((x) => /^Linux:/.test(x)),
+        'con la rete che guarda solo il Mac la sentinella resta verde: un guasto Linux senza feedback tornerebbe muto');
     }
+  });
+
+  test('la sentinella della rete diventa rossa se l\'invio dell\'avviso non può fallire', { skip: !haBash && 'serve bash' }, () => {
+    const linux = job('release-linux');
+    const sordo = linux.replace(/^( *)if node "\$ALLARME\/release-platform-alarm\.mjs"; then ESITO=aperto; break; fi$/m,
+      '$1node "$ALLARME/release-platform-alarm.mjs" || true; ESITO=aperto; break');
+    assert.notEqual(sordo, linux, 'la mutazione «invio che non può fallire» non si applica più: aggiornala al passo nuovo');
+    assert.ok(problemiDellaRete(YML.replace(linux, () => sordo)).some((x) => /^Linux: avviso non consegnato/.test(x)),
+      'con un invio che non può fallire e l\'esito segnato riuscito la sentinella resta verde');
   });
 });
 
