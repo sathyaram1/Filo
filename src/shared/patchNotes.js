@@ -77,6 +77,7 @@
         'Su una finestra bassa, per esempio un portatile con lo schermo ingrandito, la colonna a destra della home non taglia più a metà le voci sotto l\'ora. Quello che resta sotto sfuma, e scorrendo lo ritrovi.',
         'Se rifai l\'intervista di benvenuto, resta nella sua scheda: le altre chat restano come sono, anche ricaricate o riaperte dalla Cronologia, e quello che ci scrivi nel frattempo resta lì. Se la lasci a metà, la home te lo ricorda. «Riprendiamola» sulla home riparte dalla domanda a cui eri arrivato, non dall\'inizio. In Preferenze togli con la × ogni intervista conservata, e alla prima risposta quello che Filo ricorderà di te compare in una riga con «Annulla», senza riquadri da confermare.',
         'Nel riquadro delle risposte di Approfondisci e Traduci la riga per la domanda successiva è alta quanto il tasto d\'invio. Il suggerimento si legge intero, senza frecce di scorrimento accanto.',
+        'In chat Filo non aspetta più il server dei crediti prima di risponderti. Usa l\'ultimo saldo letto, lo aggiorna mentre scrivi e, se il server è solo lento, non ti dice più che non risponde. Se paghi con la tua chiave OpenRouter, la pagina Crediti e la chat ti dicono che le richieste le paga la chiave e che quei crediti sono di prova, non soldi che spendi. Quando riscatti un invito, la conferma dice che i crediti di prova lasciano il posto a quelli d\'ingresso.',
       ],
     },
     {

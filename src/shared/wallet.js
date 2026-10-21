@@ -256,9 +256,11 @@
   }
   // La frase del riscatto riuscito dice solo i crediti d'ingresso: il conteggio
   // locale non passa (#1138), e «nessuno dei 1.000 che avevi» si leggeva come un furto.
-  function redeemOkMessage({ entryCredits } = {}) {
+  // `conteggioLocale`: era a schermo come saldo, e la frase dice dove va, senza contarlo (#1353).
+  function redeemOkMessage({ entryCredits, conteggioLocale = false } = {}) {
     const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
-    return entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    const frase = entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
   // Il codice dentro quello che l'utente incolla. Il codice arriva per
@@ -526,6 +528,67 @@
     return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
 
+  // ── Il saldo che dice la chat (#816, #1353) ───────────────────────────────
+  // Il turno non aspetta mai il server: vale l'ultima lettura finita, e una più vecchia di un minuto si rifà in
+  // sottofondo. «Il server non risponde» solo se quella lettura è fallita: un server lento non lo diventa.
+  const SALDO_CHAT_VALIDO_MS = 60 * 1000;
+
+  // `lettura`: l'ultima finita, { at, state } (lo stato della pagina Crediti), o null; `disco`: l'ultimo stato del
+  // server salvato qui. null = nessun portafoglio, e vale il conteggio locale.
+  function saldoPerChat({ lettura = null, disco = null, now = Date.now() } = {}) {
+    const st = lettura && lettura.state ? lettura.state : null;
+    let lettaIl = st ? Number(lettura.at) || null : null;
+    if (st && st.identity && st.identity.lost) return null;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
+      // Una lettura finita senza lo stato del server è fallita; senza nessuna lettura il disco è solo vecchio.
+      if (!disco || !disco.hasWallet) return { balance: null, nonRisponde: Boolean(st) };
+      server = { ...disco, cached: Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
+    }
+    const b = server.balance || {};
+    // Perché non è il saldo di adesso: la lettura fallita, il servizio dei modelli che non ha detto il consumo (come
+    // la pagina), o una lettura solo vecchia.
+    const lastKnown = server.cached ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || now - lettaIl > SALDO_CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
+    const numero = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+    return {
+      balance: numero(b.credits),
+      dailyCredits: numero(server.dailyCredits),
+      lastKnown, readAt: readAt || null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
+  }
+
+  // Le riletture per la chat: una alla volta, solo se l'ultima finita (`ultima()`, { at } o null) ha più di un
+  // minuto, e chi le chiede non le aspetta. `leggi` è la lettura vera, che aggiorna l'ultima da sé.
+  function rilettoreSaldo({ leggi, ultima, now = () => Date.now(), validoMs = SALDO_CHAT_VALIDO_MS } = {}) {
+    let inVolo = null;
+    function rileggi() {
+      const u = ultima();
+      if (u && now() - Number(u.at) <= validoMs) return null;
+      if (inVolo) return inVolo;
+      let p;
+      try { p = Promise.resolve(leggi()); } catch (_) { p = Promise.resolve(null); }
+      inVolo = p.catch(() => null).finally(() => { inVolo = null; });
+      return inVolo;
+    }
+    return { rileggi };
+  }
+
+  // Il conteggio locale sta a schermo come saldo solo senza portafoglio e con una chiave che parte davvero, la
+  // propria o quella di fabbrica (#1138). Chi lo vedeva, al riscatto sente dire dove va (#1353).
+  function conteggioLocaleInVista({ hasWallet = false, keySource = '', identityLost = false } = {}) {
+    return !hasWallet && !identityLost && (keySource === 'own' || keySource === 'factory');
+  }
+  const CONTEGGIO_LOCALE_LASCIA = 'Prendono il posto dei crediti di prova che Filo teneva su questo computer.';
+
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
   // Il premio vero lo accredita il server, e solo a una segnalazione RISOLTA
   // (`done`) mandata col portafoglio. Il riquadro annuncia la cifra del
@@ -585,11 +648,12 @@
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
   // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
   // il suo pseudonimo con lo stato del portafoglio.
-  function entryNoticeText({ credits } = {}) {
+  function entryNoticeText({ credits, conteggioLocale = false } = {}) {
     const n = Math.max(0, Math.floor(Number(credits) || 0));
-    return n > 0
+    const frase = n > 0
       ? `Sei entrato con un invito: hai ${fmtInt(n)} crediti.`
       : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
   // ── Chi usa Filo e se il conto OpenRouter regge (#820) ───────────────────
@@ -835,6 +899,8 @@
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
     formatCredits, PREMIO_ATTESA_MS, resolutionReward, premioInvio, premioInvioEsauritoTesto,
+    // Il saldo della chat senza attese, e il conteggio locale che il riscatto sostituisce (#1353)
+    SALDO_CHAT_VALIDO_MS, saldoPerChat, rilettoreSaldo, conteggioLocaleInVista,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)

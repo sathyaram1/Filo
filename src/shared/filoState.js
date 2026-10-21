@@ -85,10 +85,16 @@
       if (!Credits || typeof Credits.getPublic !== 'function') return null;
       const pub = await Credits.getPublic();
       if (!pub || typeof pub.balance !== 'number') return null;
-      return { balance: pub.balance };
+      return { balance: pub.balance, chiavePropria: await pagaLaSuaChiave() };
     } catch (_) {
       return null;
     }
+  }
+
+  // Con la chiave propria il conteggio locale non paga niente (#1353): la chat non lo deve dare come soldi suoi.
+  async function pagaLaSuaChiave() {
+    const WM = global.SN_WALLET_MAIN;
+    try { return Boolean(WM && typeof WM.keySource === 'function' && (await WM.keySource()) === 'own'); } catch (_) { return false; }
   }
 
   // Batteria, rete e Bluetooth di adesso (#873): li legge il main, senza modello. `undefined` dove il lettore
@@ -118,8 +124,6 @@
     } catch (_) { return []; }
   }
 
-  // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
-  // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
   // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
   async function readCambi() {
     try {
@@ -155,6 +159,7 @@
   // `sistema: false`: il messaggio della home resta in cache per ore, e una batteria citata lì invecchierebbe.
   // `conversazioni`: i messaggi del filo, per chi non li ha già davanti (vedi conversazioniRecenti).
   // `soloSiti`: delle schede aperte arriva il nome del sito, non il titolo che scrive la pagina (#1297, benvenuto).
+  // `creditiFreschi`: la chiede un turno di chat, che non aspetta il saldo ma ne fa rileggere uno vecchio (#1353).
   async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null, soloSiti = false } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
@@ -254,15 +259,18 @@
     const fmt = (n) => (W && W.formatCredits ? W.formatCredits(n) : String(n));
     const out = [];
     if (c.balance == null) {
-      out.push('Saldo: non riesco a leggerlo adesso (il server dei crediti non risponde): lo trovi nella pagina Crediti. Non dare una cifra.');
+      out.push(c.nonRisponde
+        ? 'Saldo: non riesco a leggerlo adesso (il server dei crediti non risponde): lo trovi nella pagina Crediti. Non dare una cifra.'
+        : 'Saldo: non è ancora arrivato dal server: lo trovi nella pagina Crediti. Non dare una cifra.');
     } else if (c.lastKnown) {
       let quando = '';
       const d = c.readAt ? new Date(c.readAt) : null;
       if (d && !Number.isNaN(d.getTime())) {
         quando = `, letto il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
       }
+      // Una lettura solo vecchia (lenta, o la home che non ne chiede un'altra) non è un server muto (#1353).
       if (c.lastKnown === 'old') {
-        out.push(`Saldo: ${fmt(c.balance)} crediti (lo tiene il server${quando ? `; ${quando.slice(2)}` : ''})`);
+        out.push(`Saldo: ${fmt(c.balance)} crediti (lo tiene il server${quando ? `; ${quando.slice(2)}` : ''}). È l'ultimo saldo noto: se dai la cifra dillo, altrimenti non serve.`);
       } else {
         const perche = c.lastKnown === 'models' ? 'il servizio dei modelli non dice il consumo' : 'il server dei crediti non risponde';
         out.push(`Saldo: ${fmt(c.balance)} crediti. È l'ultimo saldo noto${quando}: adesso ${perche}, e se dai la cifra va detto.`);
@@ -329,7 +337,12 @@
     } else if (state.credits) {
       const refill = global.SN_CONST?.CREDIT?.DAILY_REFILL ?? 100;
       lines.push('CREDITI');
-      lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
+      if (state.credits.chiavePropria) {
+        lines.push('L\'utente paga i modelli con la sua chiave OpenRouter: le richieste le paga quella chiave, sul suo conto OpenRouter (spesa e residuo nella pagina Crediti).');
+        lines.push(`Filo tiene anche un conteggio di crediti di prova su questo computer: ${state.credits.balance}, +${refill} ogni giorno a mezzanotte. Non sono soldi che l'utente spende e non sono il suo saldo: se ne parli, dillo così.`);
+      } else {
+        lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
+      }
       lines.push('');
     }
     // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non

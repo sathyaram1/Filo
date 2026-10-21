@@ -236,13 +236,20 @@ module.exports = function register(on, ctx) {
   // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
   // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
   let ultimaLettura = null; // { at, state }
+  // Vale la lettura partita per ultima: una partita prima e finita dopo (un server lento) non prende il posto della
+  // nuova, né in memoria né su disco, e non passa per fresca (#1353).
+  let letturePartite = 0;
+  let letturaValida = 0;
   async function readState() {
-    const state = await leggiStato();
+    const mia = ++letturePartite;
+    const state = await leggiStato(() => mia > letturaValida);
+    if (mia <= letturaValida) return state;
+    letturaValida = mia;
     ultimaLettura = { at: Date.now(), state };
     try { globalThis.SN_AVVISO_CREDITI_MAIN?.dopoLettura(state); } catch (_) {}
     return state;
   }
-  async function leggiStato() {
+  async function leggiStato(piuNuova = () => true) {
     const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
@@ -274,7 +281,7 @@ module.exports = function register(on, ctx) {
     }
     try {
       out.server = await callable('walletState');
-      if (out.server && out.server.hasWallet) {
+      if (out.server && out.server.hasWallet && piuNuova()) {
         lastServer = out.server;
         if (!out.pseudonym && out.server.pseudonym && out.hasPersonalKey) {
           walletStore.save({ ...walletStore.load(), pseudonym: out.server.pseudonym });
@@ -320,50 +327,18 @@ module.exports = function register(on, ctx) {
     return esito.esaurito ? W.premioInvioEsauritoTesto(esito.perDay) : '';
   }
 
-  // Il saldo che la chat dice (#816): quello della pagina Crediti. `null` =
-  // nessun portafoglio, e vale il conteggio locale. `fresco`: la domanda viene
-  // da un turno di chat, e una lettura più vecchia di un minuto si rifà
-  // (aspettandola al più poco: poi vale l'ultima nota, dichiarata tale).
-  const CHAT_VALIDO_MS = 60 * 1000;
-  const CHAT_ATTESA_MS = 2500;
+  // Il saldo che la chat dice (#816): quello della pagina Crediti, mai aspettato (#1353; regola in SN_WALLET.saldoPerChat).
+  // `fresco`: la domanda viene da un turno di chat, e una lettura più vecchia di un minuto si rifà in sottofondo.
+  const rilettore = W.rilettoreSaldo({ leggi: () => readState(), ultima: () => ultimaLettura });
+  function rileggiSaldo() {
+    if (haPortafoglio()) rilettore.rileggi();
+  }
   async function saldoPerChat({ fresco = false } = {}) {
     if (!haPortafoglio()) return null;
-    let st = ultimaLettura ? ultimaLettura.state : null;
-    let lettaIl = ultimaLettura ? ultimaLettura.at : null;
-    let muto = false; // la lettura di adesso non è arrivata in tempo
-    if (fresco && (!ultimaLettura || Date.now() - ultimaLettura.at > CHAT_VALIDO_MS)) {
-      const letta = await Promise.race([
-        readState().catch(() => null),
-        new Promise((r) => setTimeout(() => r(null), CHAT_ATTESA_MS)),
-      ]);
-      if (letta) { st = letta; lettaIl = Date.now(); } else muto = true;
-    }
-    if (st && st.identity && st.identity.lost) return null;
-    if (st && st.server && st.server.hasWallet === false) return null;
-    let server = st && st.server && st.server.hasWallet ? st.server : null;
-    if (!server) {
-      const disco = walletStore.lastServer() || lastServer;
-      if (!disco || !disco.hasWallet) return { balance: null };
-      server = { ...disco, cached: muto || Boolean(st) };
-      lettaIl = Date.parse(String(disco.readAt || '')) || null;
-    }
-    const b = server.balance || {};
-    // Perché non è il saldo di adesso: il server dei crediti muto, il servizio
-    // dei modelli che non ha detto il consumo (come la pagina), o una lettura
-    // solo vecchia, che la home usa senza chiederne un'altra.
-    const lastKnown = server.cached || muto ? 'server'
-      : server.stale ? 'models'
-        : !lettaIl || Date.now() - lettaIl > CHAT_VALIDO_MS ? 'old' : '';
-    const readAt = server.cached ? server.readAt
-      : server.stale ? server.usageReadAt
-        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
-    return {
-      balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
-      dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
-      lastKnown, readAt: readAt || null,
-      usingOwnKey: Boolean(st && st.usingOwnKey),
-      keyMissing: Boolean(st && st.hasPersonalKey === false),
-    };
+    if (fresco) rilettore.rileggi();
+    let disco = null;
+    try { disco = walletStore.lastServer() || lastServer; } catch (_) { disco = lastServer; }
+    return W.saldoPerChat({ lettura: ultimaLettura, disco });
   }
 
   // Cancello sull'origine (pattern «nuovo tipo di messaggio»): saldo, codici
@@ -376,6 +351,9 @@ module.exports = function register(on, ctx) {
   };
 
   on(MSG.WALLET_STATE, filoOnly(async () => readState()));
+
+  // Chi scrive nella chat manderà presto un turno: il saldo si rilegge adesso, così all'invio è pronto (#1353).
+  on(MSG.WALLET_SALDO_PREPARA, filoOnly(async () => { rileggiSaldo(); return { ok: true }; }));
 
   // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
   // zittire per dieci minuti un avviso che ripete una frase.
@@ -412,6 +390,7 @@ module.exports = function register(on, ctx) {
     walletStore.metteDaParte();
     lastServer = null;
     ultimaLettura = null;
+    letturaValida = letturePartite;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     return { ok: true, state: await readState() };
@@ -440,6 +419,8 @@ module.exports = function register(on, ctx) {
     // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
     // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
     const localCredits = 0;
+    // Chi lo vedeva come saldo deve sentire dove va (#1353): si guarda prima che la chiave personale arrivi.
+    const conteggioLocale = W.conteggioLocaleInVista({ hasWallet: Boolean(lastServer && lastServer.hasWallet), keySource: await keySource() });
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
     // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
@@ -466,7 +447,10 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     const state = await readState();
-    return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, invitesLocked: r.invitesLocked || null, state };
+    return {
+      ok: true, status, message: W.redeemOkMessage({ ...r, conteggioLocale }), conteggioLocale,
+      credits: r.credits, inviteCodes: r.inviteCodes, invitesLocked: r.invitesLocked || null, state,
+    };
   }
 
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => doRedeem((msg && msg.code) || '')));
@@ -604,7 +588,7 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(r.code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }), { invitesLocked: out.invitesLocked });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
     } else if (out && out.status === 'network_cap') {
       // L'invito resta in attesa e si riprova al prossimo avvio, ma chi l'ha scaricato apposta deve sapere perché non è entrato.
       await setNotice('failed', out.message);
@@ -630,7 +614,7 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }), { invitesLocked: out.invitesLocked });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
     } else {
       await setNotice('failed', (out && out.message) || W.redeemMessage('internal'));
     }
