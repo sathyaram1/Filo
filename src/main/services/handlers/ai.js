@@ -563,7 +563,10 @@ module.exports = function register(on, ctx) {
           error: `Nessun modello ${provider} impostato per la prova: scegline uno in «Prova di un fornitore», fra le funzioni delle Opzioni.`,
         };
       }
-      if (!apiKey) return { ok: false, error: 'API key mancante' };
+      // La riga delle Opzioni senza chiave scritta si prova con la chiave con cui la funzione pagherebbe davvero, cioè
+      // i crediti di Filo (#598, #830); la sceglie il main, e solo per le pagine di Filo: un sito non spende crediti.
+      if (!apiKey && msg.chiaveDellUso === true && daFilo(origin, sender)) apiKey = String((s.apiKeys && s.apiKeys[provider]) || '').trim();
+      if (!apiKey) return { ok: false, code: 'NO_API_KEY', error: 'API key mancante' };
       // Modello indicato dalla riga (registry personale): se è proprietario la
       // prova non parte, altrimenti l'unica richiesta che l'interruttore non
       // ferma sarebbe proprio quella che si lancia dalla pagina dove lo si
