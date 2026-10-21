@@ -892,8 +892,7 @@
       yield doc;
       if (n >= 4) return;
       for (const r of radici(doc)) for (const f of r.querySelectorAll('iframe, frame')) {
-        let d = null;
-        try { d = f.contentDocument; } catch (_) {}
+        const d = globalThis.SN_RIQUADRI_IN_ARRIVO?.documento(f);
         if (d) yield* documenti(d, n + 1);
       }
     }
