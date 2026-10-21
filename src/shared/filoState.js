@@ -124,8 +124,6 @@
     } catch (_) { return []; }
   }
 
-  // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
-  // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
   // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
   async function readCambi() {
     try {
