@@ -189,6 +189,19 @@ test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente'
   assert.match(T.asText('security'), /SHA-256/, 'il documento sulla sicurezza non dice come controllare il file scaricato');
 });
 
+// #1407: la sezione diceva solo dove gira il codice, e chi leggeva credeva in Europa anche i dati.
+test('la privacy dice dove sta ogni parte del server', () => {
+  const { T } = loadModules();
+  const t = T.get('privacy').text;
+  const sezione = t.slice(t.indexOf('\nIl server di Filo\n'), t.indexOf('\nI feedback\n'));
+  const dove = { 'Il codice': /Belgio/, 'Il database': /Stati Uniti|Europa/, 'Le identità': /Stati Uniti/ };
+  for (const [parte, posto] of Object.entries(dove)) {
+    const voce = sezione.split('\n').find((r) => r.startsWith(`- ${parte} `));
+    assert.ok(voce, `la sezione sul server non ha la voce «${parte}»`);
+    assert.match(voce, posto, `«${parte}»: la voce non dice dove sta`);
+  }
+});
+
 test('un comando fra apici inversi si legge come codice sulla pagina e senza segni per l\'agente', () => {
   const { tmp, leggi } = generaCopia({
     'zz-codice.md': [
