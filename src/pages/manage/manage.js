@@ -2899,7 +2899,7 @@
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Lavoro server: le routine normali non lo prendono. Lo prendono quelle del server se in Automazioni i lavori server sono accesi.'
+    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Lavoro server. Lo prendono le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.'
       : MR.isPrivateLocalWork(fb) ? 'Era un lavoro server: per questo non sta nella bacheca pubblica.'
         : 'Era un lavoro server: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
