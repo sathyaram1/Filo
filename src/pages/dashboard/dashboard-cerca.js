@@ -130,7 +130,7 @@
       .filter((t) => t && /^https?:\/\//i.test(String(t.url || '')) && !gia.has(t.url));
     const i = voci.indexOf(b);
     if (i >= 0) voci.splice(i, 1);
-    const dopo = nuove.map((t) => voce({ k: 'pagina', url: t.url, titolo: t.title || '', ts: t.closedAt || t.openedAt || '', estratto: t.summary || t.snippet || '', ...(t.id ? { archivio: t.id } : {}) }));
+    const dopo = nuove.map((t) => voce({ k: 'pagina', url: t.url, titolo: t.title || '', ts: t.closedAt || t.openedAt || '', estratto: t.summary || t.snippet || '', ...(t.id ? { archivio: t.id } : {}), ...(t.urlTagliato ? { urlTagliato: true } : {}) }));
     if (dopo.length) {
       b.replaceWith(...dopo);
       voci.splice(i >= 0 ? i : voci.length, 0, ...dopo);
