@@ -1365,10 +1365,10 @@
     }
     if (!wrap.childElementCount && !(hasAck && onAck)) return;
     // Per l'appunto salvato (già eseguito server-side) aggiungiamo un tasto ✓
-    // che torna alla dashboard (spec). Timer e sveglie non lo hanno più: la
-    // loro riga nel blocco di attività dice già tutto.
+    // che chiude la conversazione. Timer e sveglie non lo hanno più: la loro
+    // riga nel blocco di attività dice già tutto.
     if (hasAck && onAck) {
-      const ok = bottoneChiudi(onAck, '✓', 'Chiudi e torna alla dashboard');
+      const ok = bottoneChiudi(onAck, '✓', 'Chiudi la conversazione');
       ok.classList.add('dash-action-btn-primary');
       wrap.appendChild(ok);
     }
@@ -2176,8 +2176,8 @@
     }
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already && onAck) {
       // La home era già questa pagina: ricaricarla porterebbe via lavoro e risposta, quindi la conversazione la chiude
-      // l'utente, dopo aver letto.
-      return bottoneChiudi(onAck, 'Chiudi e torna alla home', 'Chiude questa conversazione');
+      // l'utente, dopo aver letto. Il nome non promette un ritorno: lo scambio resta nel filo (#831.1).
+      return bottoneChiudi(onAck, 'Chiudi la conversazione', 'Lo scambio resta nel filo: il prossimo messaggio ne comincia una nuova');
     }
     return null;
   }

@@ -384,8 +384,11 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
 
   // E chiudere la conversazione resta a un click, quando l'utente ha finito di leggere: lo scambio resta nel filo
   // (#869), il messaggio dopo ne comincia un'altra.
-  const torna = page.locator('.dash-action-btn', { hasText: 'Chiudi e torna alla home' });
+  // Il nome non promette un ritorno alla home: l'utente è già lì, e premendolo resta tutto com'è (#831.1).
+  const torna = page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' }).locator('.dash-action-btn');
   await expect(torna).toHaveCount(1);
+  await expect(torna).toHaveText('Chiudi la conversazione');
+  await expect(torna).not.toContainText(/torna alla home/i);
   await torna.click();
   await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
   await expect(page.locator('#input')).toBeFocused();
@@ -427,7 +430,7 @@ test('F2 — la conversazione chiusa col bottone resta chiusa nella scheda nuova
   await page.locator('#input').fill('portami alla home');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible({ timeout: 10_000 });
-  await page.locator('.dash-action-btn', { hasText: 'Chiudi e torna alla home' }).click();
+  await page.locator('.dash-action-btn', { hasText: 'Chiudi la conversazione' }).click();
   await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
   const [chiusa] = await chatDi(app, 'portami alla home');
   await expect.poll(() => app.evaluate(async (_electron, id) => (await globalThis.SN_IL_FILO.chats()).find((c) => c.id === id)?.finita, chiusa)).toBe(true);
@@ -510,7 +513,7 @@ test('F4 — la home chiesta insieme a un timer: lavoro e risposta restano, anch
   await expect(activity.locator('.dash-activity-label')).toContainText('avviato un timer');
   await expect(activity.locator('.dash-activity-label')).not.toContainText('azionato un comando della finestra');
 
-  await page.locator('.dash-action-btn', { hasText: 'Chiudi e torna alla home' }).click();
+  await page.locator('.dash-action-btn', { hasText: 'Chiudi la conversazione' }).click();
   await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
   await expect(page.locator('#input')).toBeFocused();
   await expect(page.locator('.dash-bubble-user', { hasText: 'metti un timer di 5 minuti' })).toHaveCount(1);
