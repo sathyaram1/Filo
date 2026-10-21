@@ -214,10 +214,46 @@
     if (!st) return;
     st.buono = c.value;
     st.sel = selezioneDi(c);
+    fotografa(c, st);
   }
   function selezioneDaFilo(c) {
     const st = caselle.get(c);
-    if (st && c.value === st.buono) st.sel = selezioneDi(c);
+    if (st && c.value === st.buono) { st.sel = selezioneDi(c); fotografa(c, st); }
+  }
+  // Una mossa di Filo mentre un tasto o un annuncio dell'utente sono in volo è il punto da cui l'utente riparte.
+  function fotografa(c, st) {
+    if (st.tasto) st.tasto.sel = selezioneDi(c);
+    if (st.annuncio) { st.annuncio.valore = c.value; st.annuncio.sel = selezioneDi(c); }
+  }
+  // Un inserimento dell'utente è l'annuncio applicato al testo e alla selezione di quel momento (#1340): un cambio
+  // del sito fatto dentro l'annuncio (il valore riscritto, la selezione allargata), o dopo uno che non ha scritto
+  // niente, non combacia. Le cancellazioni tolgono soltanto, attaccate al cursore; annulla e gli altri non si prevedono.
+  const ESATTI = /^(insertText|insertCompositionText|insertFromPaste|insertFromPasteAsQuotation|insertLineBreak|insertParagraph)$/;
+  const PASSO_MAX = 32;
+  function atteso(a) {
+    const [s, e] = a.sel;
+    const d = typeof a.dato === 'string' ? a.dato.replace(/\r\n?/g, '\n') : (/^insert(LineBreak|Paragraph)$/.test(a.tipo) ? '\n' : null);
+    return d === null ? null : a.valore.slice(0, s) + d + a.valore.slice(e);
+  }
+  function combacia(a, n) {
+    const v = a.valore;
+    const [s, e] = a.sel || [];
+    if (typeof s !== 'number' || typeof e !== 'number') return true;
+    const testa = v.slice(0, s);
+    const coda = v.slice(e);
+    if (ESATTI.test(a.tipo)) {
+      const x = atteso(a);
+      return x !== null ? n === x : (n.length >= s + coda.length && n.startsWith(testa) && n.endsWith(coda));
+    }
+    if (!/^delete/.test(a.tipo)) return true;
+    const tolti = v.length - n.length;
+    if (tolti < 0) return false;
+    if (/^deleteContent(Backward|Forward)$/.test(a.tipo) && s === e && tolti > PASSO_MAX) return false;
+    if (s !== e) return n === testa + coda;
+    if (/Backward$/.test(a.tipo)) return tolti <= s && n === v.slice(0, s - tolti) + coda;
+    if (/Forward$/.test(a.tipo)) return n === testa + v.slice(e + tolti);
+    for (let da = Math.max(0, s - tolti); da <= s; da++) if (n === v.slice(0, da) + v.slice(da + tolti)) return true;
+    return false;
   }
   // La selezione da rimettere con il testo è l'ultima mossa dall'utente (mouse, frecce, Ctrl+A) o da Filo: un `selectAll`
   // del sito prima del suo inserimento lascerebbe tutto selezionato, e il tasto dopo dell'utente lo cancellerebbe.
