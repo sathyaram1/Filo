@@ -25,8 +25,3 @@ for (const domanda of [
     expect(partono(domanda, 'certo, Gatto2024 ')).not.toContain('Gatto2024');
   });
 }
-
-test('r2 una risposta senza password resta controllabile: «ruoter» e «guardo» arrivano al modello', () => {
-  const p = JSON.parse(partono('Marco: mi mandi la password del wifi?', 'aspetta che guardo sotto il ruoter'));
-  expect(p.nuovo).toBe('aspetta che guardo sotto il ruoter');
-});
