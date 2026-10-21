@@ -2923,6 +2923,8 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: il pannello Aiuto e le risposte da leggere erano di quello vecchio (#1432).
+      if (tab.view && tab.view.webContents === wc) { tab.aiuto = null; RisposteInAttesa.dimentica(tab); }
       segnaPagina(tab, url);
       // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
       tab._giroIcona = (tab._giroIcona || 0) + 1;
