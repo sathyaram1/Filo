@@ -42,6 +42,7 @@ const PESO_MANO = Number(arg('--peso-mano', 6));
 // perdeva le imitazioni con altre parole.
 const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
 const PESO_PAROLE = Number(arg('--peso-parole', 2));
+const SEME_PAROLE = Number(arg('--seme-parole', 1375));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
