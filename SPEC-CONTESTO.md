@@ -334,15 +334,20 @@ fanno ~5 $ al giorno, compattazioni comprese.
 
 ## Da verificare prima di scrivere codice
 
-- **Se Haiku 5.5 supporta la compattazione lato server** di Anthropic
-  (`compact-2026-01-12`). Se sì, va valutata contro la compattazione propria;
-  quella propria resta comunque per i livelli del filo.
-- **Il prefisso minimo che Haiku 5.5 mette in cache.** Non è nella
-  documentazione consultata il 10/10. Sotto il minimo la cache non scatta,
-  senza errori.
-- **Come si comporta il ragionamento di Haiku 5.5** nei turni con strumenti, e
-  se il ragionamento rimandato va tenuto (oggi Filo lo rimanda e conta come
-  entrata).
+Quello che segue è la documentazione dell'API al 06/10/2026: va confermato con
+una chiamata vera.
+
+- **La compattazione lato server** di Anthropic (`compact-2026-01-12`) c'è
+  anche su Haiku 5.5; attraverso OpenRouter va provata. Va valutata contro la
+  compattazione propria; quella propria resta comunque per i livelli del filo.
+- **Il prefisso minimo che Haiku 5.5 mette in cache** è di 512 token. Sotto il
+  minimo la cache non scatta e nessuno lo segnala.
+- **Il ragionamento di Haiku 5.5** è adattivo e acceso di serie (sforzo
+  predefinito medio). I blocchi di ragionamento si rimandano intatti (oggi
+  Filo lo fa, e contano come entrata); riscrivere o togliere turni già mandati
+  li invalida, e sugli account nati dal 31/08/2026 è un errore 400: la
+  compattazione di Filo deve aggiungere, non riscrivere la storia. Resta da
+  vedere come si comporta nei turni con strumenti.
 
 ## Da decidere (owner)
 
