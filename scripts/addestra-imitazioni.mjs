@@ -126,6 +126,11 @@ function sinteticiRefusi(etichetta) {
     ];
     const simile = SIMILI.find(([da]) => t.indexOf(da, 1) > 0);
     if (simile) varianti.push(t.replace(new RegExp('(?<=.)' + simile[0]), simile[1]));
+    // I refusi in coda e quelli col tasto accanto: gli elenchi di siti noti contano anche le visite sbagliate
+    // (googlee.com, gmaill.com), e senza questi il modello imparava che una lettera in fondo è un altro sito.
+    const ultima = t[t.length - 1];
+    varianti.push(t + ultima, t + 's', t + (ACCANTO[ultima] || 'e')[0], t.slice(0, -1));
+    if (ACCANTO[t[m]]) varianti.push(t.slice(0, m) + ACCANTO[t[m]][0] + t.slice(m + 1), t.slice(0, m) + ACCANTO[t[m]][1] + t[m] + t.slice(m + 1));
     const nomi = [...new Set(varianti)].filter((v) => v !== t).map((v) => v + suff);
     // E il suffisso sbagliato di una lettera (github.co, paypal.cm), dove il marchio non l'ha preso per sé.
     if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h)));
