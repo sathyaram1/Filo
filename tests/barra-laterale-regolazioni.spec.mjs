@@ -2,7 +2,7 @@
 // dell'azione IMPOSTA_PREFERENZA). Attesa sul bordo, chiusura dopo l'uscita, striscia, apertura dal bordo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, puntatoreCheSegue } from './helpers/barra.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 const SITO = `<!doctype html><html><body style="margin:0;padding:40px;font:16px sans-serif;height:1400px">
