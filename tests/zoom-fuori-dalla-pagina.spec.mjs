@@ -384,15 +384,7 @@ for (const [nome, { cornice, quanti }] of Object.entries(casiRiquadri)) {
   test(nome, async ({ app, openTab }) => {
     const sito = await riquadriInRitardo(cornice);
     try {
-      const page = await openTab(sito.url);
-      await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 15_000 });
-      expect(sito.serviti(), 'i riquadri devono essere ancora in volo quando Filo si monta nella pagina').toBe(0);
-      sito.apri();
-      await expect.poll(async () => {
-        const pronti = await Promise.all(page.frames().filter((f) => f.url().includes('/riquadro'))
-          .map((f) => f.evaluate(() => document.readyState).catch(() => '')));
-        return pronti.filter((s) => s === 'complete').length;
-      }).toBe(quanti);
+      const page = await apriConRiquadriInRitardo(openTab, sito, quanti);
       await manda(app, page, clicIn(300, 300));
       await manda(app, page, clicIn(300, 300, 'middle'));
       await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
