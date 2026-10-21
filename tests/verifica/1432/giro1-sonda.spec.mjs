@@ -91,11 +91,15 @@ test('sonda: tema scuro, le icone e la striscia', async ({ app, shell, openTab, 
   await prepara(app);
   await microfonoFinto(shell);
   await imposta(app, { theme: 'dark' });
+  await shell.emulateMedia({ colorScheme: 'dark' });
   const page = await sito(app, openTab, testServer);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   mkdirSync(SHOTS, { recursive: true });
+  await shell.screenshot({ path: `${SHOTS}/scuro-shell.png` });
+  console.log('tema shell', await shell.evaluate(() => [document.documentElement.dataset.snTheme, getComputedStyle(document.documentElement).getPropertyValue('--bg')]));
+  console.log('tema barra', await barra.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg')));
   const help = icona(barra);
   await barra.screenshot({ path: `${SHOTS}/scuro-chiuso.png` });
   await help.click();
