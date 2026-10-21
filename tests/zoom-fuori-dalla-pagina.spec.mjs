@@ -379,9 +379,9 @@ async function riquadriInRitardo(cornice) {
   let aperti = false;
   let serviti = 0;
   const server = createServer((req, res) => {
-    const manda = (html) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(html); };
-    if (!req.url.startsWith('/riquadro')) { manda(cornice); return; }
-    const servi = () => { serviti += 1; manda('<!doctype html><html><body style="margin:0;height:3000px"><h2>riquadro</h2></body></html>'); };
+    const rispondi = (html) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(html); };
+    if (!req.url.startsWith('/riquadro')) { rispondi(cornice); return; }
+    const servi = () => { serviti += 1; rispondi('<!doctype html><html><body style="margin:0;height:3000px"><h2>riquadro</h2></body></html>'); };
     if (aperti) servi(); else attese.push(servi);
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));

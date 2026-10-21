@@ -321,7 +321,13 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
 
 // #1396 — il caso dell'intervista di benvenuto: la lezione confermata nel popup torna al modello come «voce 1», e la
 // cornice gli dice che l'utente quell'etichetta non l'ha mai vista (nel popup ha letto il testo vero).
-test('lezione confermata nel popup: «voce 1» arriva al modello come segnaposto da non dire all\'utente', async ({ app, shell }) => {
+// Le due strade di #1130: col testo scritto insieme il modello rivede l'esito «in attesa»; la lezione da sola chiude
+// il turno sul popup, e il segnaposto arriva solo nel riepilogo del turno dopo.
+const stradeLezione = {
+  'lezione confermata nel popup: «voce 1» arriva al modello come segnaposto da non dire all\'utente': { testo: 'Te lo segno.' },
+  'lezione da sola, il turno si chiude sul popup: confermata, «voce 1» arriva al turno dopo come segnaposto': { testo: '' },
+};
+for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) test(nome, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -330,8 +336,9 @@ test('lezione confermata nel popup: «voce 1» arriva al modello come segnaposto
   // A Conservativo una lezione (costo 2) chiede l'OK anche a compito pulito (#530).
   await livelloAutonomia(app, 'conservativo');
   const lezione = 'L\'utente è lo sviluppatore di Filo.';
+  const rivedeEsito = !!testoDelGiro;
 
-  await app.evaluate(async (_e, { lezione, apreChat }) => {
+  await app.evaluate(async (_e, { lezione, apreChat, testoDelGiro, rivedeEsito }) => {
     globalThis.__calls = [];
     const finto = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
@@ -340,18 +347,19 @@ test('lezione confermata nel popup: «voce 1» arriva al modello come segnaposto
       }
       const n = globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
       if (n === 1) {
+        try { if (testoDelGiro) onDelta && onDelta(testoDelGiro); } catch (_) {}
         return {
-          ...base, text: '', finishReason: 'tool_calls',
+          ...base, text: testoDelGiro, finishReason: 'tool_calls',
           toolCalls: [{ id: 'l1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: lezione }) }],
         };
       }
-      const t = n === 2 ? 'Me lo segno, se mi dai l\'OK.' : 'Va bene.';
+      const t = rivedeEsito && n === 2 ? 'Me lo segno, se mi dai l\'OK.' : 'Va bene.';
       try { onDelta && onDelta(t); } catch (_) {}
       return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
-  }, { lezione, apreChat: APRE_CHAT });
+  }, { lezione, apreChat: APRE_CHAT, testoDelGiro, rivedeEsito });
 
   await page.locator('#input').fill('ricordati che sviluppo Filo');
   await page.locator('#sendBtn').click();
