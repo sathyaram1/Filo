@@ -294,7 +294,14 @@
   max-height: 120px;
   min-height: 30px;
 }
-.sn-popup-input::placeholder { color: var(--sn-muted); opacity: 1; }
+/* Il suggerimento sta su una riga: a capo dentro una casella alta una riga si taglia e accende la barra. */
+.sn-popup-input::placeholder {
+  color: var(--sn-muted);
+  opacity: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Alcune pagine ospite applicano un focus ring blu a tutti gli elementi, e i nostri input sono veri
    nodi del DOM ospite: lo ereditavano. Da qui l'!important. */
 .sn-popup-input:focus {
