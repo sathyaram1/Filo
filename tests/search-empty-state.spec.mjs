@@ -1,7 +1,7 @@
 // Feedback #217: una ricerca senza risultati NON deve mostrare il testo di
-// "archivio realmente vuoto" ("Nessuna tab archiviata, per ora." /
-// "Nessuna interazione AI registrata." / "Nessuna scheda salvata…"), che fa
-// credere all'utente di aver perso i propri dati.
+// "archivio realmente vuoto" ("Nessuna interazione AI registrata." / "Nessuna
+// scheda salvata…"), che fa credere all'utente di aver perso i propri dati.
+// La ricerca del filo nella home dice «Niente nel filo per …» (dashboard-cerca.js).
 //
 // ASSERISCE il successo: con contenuti presenti e una query che non matcha
 // nulla, lo stato vuoto dice "Nessun risultato…" (e svuotando la query i
@@ -9,48 +9,6 @@
 // archivio/cronologia vuoti — questi assert diventano rossi.
 
 import { test, expect } from './fixtures/electron.mjs';
-
-const PAGE = `<!doctype html><html><head><title>Sito Ricerca</title></head>
-<body style="margin:0"><div style="height:600px">contenuto</div></body></html>`;
-
-test('archivio: ricerca senza risultati dice "Nessun risultato", non "archivio vuoto"', async ({ shell, openTab, testServer }) => {
-  // Archivia una scheda chiudendola.
-  await testServer.openReady(openTab, PAGE);
-  const tabId = await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    return snap.activeId;
-  });
-  await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
-
-  const archive = await openTab('filo://archive/archive.html');
-  await archive.waitForLoadState('domcontentloaded');
-  const chip = archive.locator('.arc-tab', { hasText: 'Sito Ricerca' });
-  await expect(chip).toBeVisible({ timeout: 8_000 });
-
-  // Query che non matcha nulla → messaggio "nessun risultato", con la query.
-  await archive.fill('#search', 'zzzznomatch');
-  const empty = archive.locator('#empty');
-  await expect(empty).toBeVisible();
-  await expect(empty).toHaveText(/Nessun risultato per "zzzznomatch"/);
-  await expect(empty).not.toContainText('Nessuna tab archiviata');
-
-  // Svuotando la ricerca l'archivio ricompare: nulla è stato cancellato.
-  await archive.fill('#search', '');
-  await expect(chip).toBeVisible();
-  await expect(empty).toBeHidden();
-});
-
-test('archivio davvero vuoto: resta il testo di default anche con una query', async ({ openTab }) => {
-  const archive = await openTab('filo://archive/archive.html');
-  await archive.waitForLoadState('domcontentloaded');
-  const empty = archive.locator('#empty');
-  await expect(empty).toBeVisible({ timeout: 8_000 });
-  await expect(empty).toHaveText('Nessuna tab archiviata, per ora.');
-  // Con l'archivio vuoto la query non deve trasformare il messaggio in un
-  // fuorviante "nessun risultato": il problema è che non c'è nulla, punto.
-  await archive.fill('#search', 'qualcosa');
-  await expect(empty).toHaveText('Nessuna tab archiviata, per ora.');
-});
 
 test('cronologia AI: ricerca/filtro senza risultati non dicono "nessuna interazione registrata"', async ({ openTab }) => {
   const history = await openTab('filo://history/history.html');
@@ -74,21 +32,20 @@ test('cronologia AI: ricerca/filtro senza risultati non dicono "nessuna interazi
   await expect(empty).toBeVisible();
   await expect(empty).toHaveText('Nessun risultato per la ricerca.');
 
-  // Il menu "filtra per tipo" offre SOLO i tipi realmente presenti in
-  // cronologia: con la sola voce "explain" NON esiste un'opzione "help", quindi
-  // l'utente non può nemmeno filtrare fino a svuotare la lista mostrando un
-  // messaggio fuorviante. È proprio questa la garanzia contro lo stato vuoto
-  // ingannevole del filtro.
+  // Il menu "filtra per tipo" offre SOLO i nomi dei tipi presenti (le opzioni
+  // sono per etichetta, #481): con la sola voce "explain" non c'è il nome di
+  // "help", quindi nessun filtro può svuotare la lista col messaggio sbagliato.
   await history.fill('#search', '');
-  const filterValues = await history.locator('#filter option').evaluateAll(
-    (opts) => opts.map((o) => o.value),
+  const [spiega, aiuto] = await history.evaluate(
+    () => ['explain', 'help'].map((a) => window.SN_CONST.actionLabel(a)),
   );
-  expect(filterValues).toContain('explain');
-  expect(filterValues).not.toContain('help');
+  const filterLabels = (await history.locator('#filter option').allTextContents()).slice(1);
+  expect(filterLabels).toEqual([spiega]);
+  expect(filterLabels).not.toContain(aiuto);
 
   // Filtrando per un tipo che ESISTE, la sua voce resta visibile (nessun falso
   // "cronologia vuota").
-  await history.selectOption('#filter', 'explain');
+  await history.selectOption('#filter', { label: spiega });
   await expect(history.locator('.sn-history-item')).toHaveCount(1);
   await expect(empty).toBeHidden();
 

@@ -23,36 +23,71 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
 
 ## In breve (per chi usa Filo)
 
-- **Accedi con Google.** Non creiamo né conserviamo password per il tuo
-  account Filo: l'accesso passa per Google, che gestisce 2FA e recupero.
-- **Le tue credenziali di accesso restano sul tuo dispositivo**, cifrate dal
-  sistema operativo. Non vengono mai mandate a pagine web che visiti.
-- **I tuoi dati personali (le "memorie" di Filo, gli appunti) restano sul
-  dispositivo.** Per ora non li sincronizziamo da nessuna parte: nemmeno noi
-  possiamo vederli. Quando attiveremo la sincronizzazione multi-dispositivo,
-  lo faremo in modo che restino cifrati e illeggibili per noi.
-- **I feedback che invii** (testo + eventuali screenshot) vengono salvati sui
-  nostri server per permetterci di correggere i bug. Non includere in un
-  feedback informazioni che non vuoi condividere.
+- **L'accesso è facoltativo.** Filo funziona anche senza account: crea da sé
+  un'identità anonima per la tua installazione, ed è su quella che poggiano
+  crediti e portafoglio. Se vuoi, puoi accedere con Google: non creiamo né
+  conserviamo password, e 2FA e recupero li gestisce Google (§1).
+- **Le tue credenziali restano sul tuo dispositivo**, cifrate dal sistema
+  operativo: l'accesso Google, l'identità anonima e la chiave personale dei
+  modelli. Non vengono mai mandate alle pagine web che visiti (§2, §3).
+- **Memorie, appunti e cronologia sono salvati solo sul tuo dispositivo**, e
+  i server di Filo non li ricevono. Ai modelli invece arrivano: quando Filo
+  usa un modello gli manda quello che serve per rispondere, per esempio le
+  conversazioni, le memorie, gli appunti, il testo delle pagine e dei
+  documenti che legge, quello che stampa il terminale, lo screenshot della
+  pagina su cui ti guida l'Aiuto. Quei messaggi vanno a OpenRouter e al
+  fornitore che serve il modello (§4).
+- **Alcuni servizi esterni ricevono pezzi della tua navigazione**: Google Safe
+  Browsing un frammento dell'impronta degli indirizzi che apri, non gli
+  indirizzi, e i registri dei domini il nome dei siti che sembrano sospetti
+  (`src/main/services/safebrowse/net.js`); il motore di ricerca dell'agente
+  le ricerche che formula (`src/main/services/webSearch.js`); il servizio di
+  icone di Google il nome dei siti che la home ti suggerisce
+  (`src/pages/dashboard/dashboard.js`). L'elenco intero sta nel documento
+  sulla privacy (`transparency/privacy.md`, «Gli altri servizi»).
+- **Il server di Filo riceve** i feedback che mandi, l'identità anonima
+  dell'installazione, il portafoglio dei crediti con una riga per ogni
+  chiamata ai modelli (funzione, modello, token e costo, senza il testo), i
+  voti della bacheca, il nome del sito su cui usi l'Aiuto e, se partecipi al
+  red team, i tuoi tentativi. Se accedi con Google, anche email, nome e quanto
+  usi ogni funzione (§6).
+- **I feedback che invii** (testo, indirizzo della pagina, allegati) partono
+  cifrati per l'owner del progetto. Li leggono lui, gli agenti che lavorano
+  la segnalazione e i giudici automatici, cioè dei modelli che la
+  classificano. Non includere in un feedback informazioni che non vuoi
+  condividere (§6).
 - **Quando l'Aiuto ti guida su un sito**, i passi che fai restano sul tuo
   computer: per ora Filo non li raccoglie e non li manda a nessuno (vedi §8).
-- **Trasparenza:** questa pagina elenca esattamente cosa raccogliamo e cosa
-  no. Se qualcosa cambia, cambia anche qui.
+- **Trasparenza:** questa pagina dice come Filo protegge i tuoi dati e cosa
+  esce dal tuo computer. L'elenco completo di cosa raccogliamo, campo per
+  campo, sta nel documento sulla privacy (`transparency/privacy.md`, lo stesso
+  della pagina Trasparenza dentro Filo). Se qualcosa cambia, cambia anche qui.
 
 ---
 
 ## 1. Identità e accesso (account)
 
-**Stato: 🔜 (in implementazione)**
+**Stato: ✅ (attivo)**
 
-L'accesso a Filo avviene tramite **"Accedi con Google"** (Google OAuth 2.0).
-Le ragioni:
+Per usare Filo non serve un account. Al primo bisogno Filo crea da sé
+un'**identità anonima per la tua installazione**: un account Firebase senza
+email né password, su cui poggiano crediti e portafoglio
+(`src/main/auth/anon-auth.js`).
+
+L'accesso con **"Accedi con Google"** (Google OAuth 2.0) è facoltativo. Se lo
+fai, Filo collega l'account Google all'identità della tua installazione, così
+crediti e portafoglio restano dove sono. Se quell'account è già collegato a
+un'altra installazione, per esempio su un secondo computer, l'accesso riesce
+lo stesso, ma le due installazioni restano due identità distinte
+(`src/main/auth/google-auth.js`).
+
+Perché l'accesso passa da Google:
 
 - Non gestiamo password: niente database di password da proteggere, niente
   reset, niente furti di credenziali lato nostro.
 - Google fornisce già autenticazione a due fattori e recupero account.
-- Un unico account funziona su tutti i dispositivi (oggi desktop; in futuro
-  telefono, TV…), che è il modello "una super-app per tutti i tuoi
+- Un unico account potrà valere su tutti i dispositivi (oggi desktop; in
+  futuro telefono, TV…), che è il modello "una super-app per tutti i tuoi
   dispositivi" verso cui Filo va.
 
 ### Come avviene il login (flusso tecnico)
@@ -61,33 +96,55 @@ Filo è un'app **desktop**, e le app desktop hanno regole OAuth diverse da un
 sito web. Seguiamo lo standard **RFC 8252 ("OAuth 2.0 for Native Apps")**:
 
 - **Authorization Code Flow con PKCE** (Proof Key for Code Exchange). Le app
-  native non possono custodire un "client secret", quindi non ne usiamo uno:
-  PKCE lega la richiesta di login alla risposta tramite un segreto generato
-  al volo (`code_verifier`), impedendo l'intercettazione del codice di
-  autorizzazione.
-- **Consenso nel browser di sistema, non in una webview interna.** La
-  schermata di login Google si apre nel tuo browser predefinito. Non la
-  mostriamo dentro una finestra di Filo: le webview embeddate sono un classico
-  vettore di phishing (e Google stesso le blocca). Così puoi sempre verificare
-  nella barra degli indirizzi del browser che stai parlando davvero con Google.
+  native non possono custodire un "client secret": quello che Google dà ai
+  client desktop sta dentro l'app e non è un segreto, quindi non ci contiamo.
+  A proteggere il login è PKCE, che lega la richiesta alla risposta tramite
+  un segreto generato al volo (`code_verifier`), impedendo l'intercettazione
+  del codice di autorizzazione (`src/main/auth/pkce.js`,
+  `src/main/auth/config.js`).
+- **Consenso in una scheda di Filo, non in una webview incorporata (#1123).**
+  Filo è un browser completo: la schermata di login Google si apre in una
+  scheda normale, la stessa in cui apriresti accounts.google.com a mano, con
+  lo user agent di sempre. Così l'accesso a Google vale anche per YouTube,
+  Gmail e Drive nelle schede. Se Google rifiuta l'accesso lì dentro («browser
+  non sicuro», `disallowed_useragent`, una sua pagina d'errore), Filo lo
+  riconosce, chiude la scheda e apre lo stesso indirizzo nel browser di
+  sistema: l'accesso a Filo riesce lo stesso. Il controllo di Google non si
+  aggira.
 - **Redirect su loopback locale** (`http://127.0.0.1:<porta>`): Filo apre un
-  micro-server temporaneo solo su `localhost` per ricevere il codice di
-  autorizzazione, poi lo chiude. Niente di questo è esposto in rete.
+  micro-server temporaneo solo su `127.0.0.1` per ricevere il codice di
+  autorizzazione, poi lo chiude. Niente di questo è esposto in rete
+  (`src/main/auth/google-auth.js`). Il micro-server ascolta solo la risposta
+  che porta il codice casuale (`state`) creato per quell'accesso. Un altro
+  programma del computer che gli scrive riceve un rifiuto, e l'accesso continua.
 
 ---
 
 ## 2. Dove vengono salvati i token di accesso
 
-**Stato: 🔜 (in implementazione)**
+**Stato: ✅ (attivo)**
 
 Dopo il login, Filo conserva i token che dimostrano la tua identità. **Non**
 li mettiamo in un file di testo o in `localStorage` (sarebbero leggibili da
 qualsiasi programma sul computer). Usiamo invece **`safeStorage` di Electron**,
-che cifra i dati con le API del sistema operativo:
+che cifra i dati con le API del sistema operativo
+(`src/main/auth/token-store.js`). Allo stesso modo, ognuna nel suo file,
+stanno cifrate l'identità anonima dell'installazione
+(`src/main/auth/anon-auth.js`) e la chiave personale dei modelli che ricevi
+quando riscatti un invito (`src/main/auth/wallet-store.js`).
 
 - **Windows:** DPAPI (legata al tuo account utente Windows)
 - **macOS:** Keychain
-- **Linux:** il keyring di sistema (libsecret), quando disponibile
+- **Linux:** KWallet su KDE; sugli altri desktop, sway, i3 e Hyprland
+  compresi, il portachiavi del sistema attraverso libsecret
+  (`src/main/portachiavi.js`, scelta in `src/main/main.js`)
+
+Senza un portachiavi Filo non scrive niente di tutto questo su disco: l'accesso
+resta solo in memoria e vale fino alla chiusura di Filo
+(`src/main/auth/token-store.js`). Filo te lo dice appena accedi, e dove può
+spiega cosa installare; nel menu dell'account compare «Accesso valido fino
+alla chiusura di Filo» (`src/main/services/handlers/auth.js`,
+`src/renderer/shell.js`).
 
 Non implementiamo crittografia "fatta in casa": ci appoggiamo ai meccanismi
 del sistema operativo, che sono quelli che proteggono già le altre credenziali
@@ -97,32 +154,50 @@ della tua macchina.
 
 ## 3. Isolamento: i token non toccano mai le pagine web
 
-**Stato: ✅ (principio già in vigore nell'architettura)**
+**Stato: ✅ per i token; 🔜 per il resto del canale fra le pagine e Filo, che
+stiamo restringendo**
 
 Filo è un browser, quindi carica siti web di terze parti. Una pagina web
 **non deve mai poter leggere** i tuoi token o i tuoi dati di Filo. Per questo:
 
 - L'autenticazione e i token vivono **solo nel processo principale** (il
-  "cervello" dell'app, in Node.js), mai nel contesto delle pagine web.
+  "cervello" dell'app, in Node.js), mai nel contesto delle pagine web
+  (`src/main/auth/`).
 - Le pagine web esterne girano con `contextIsolation` attivo e senza accesso a
-  Node, e comunicano con Filo solo attraverso un canale ristretto e
-  controllato (preload). Quel canale non espone né i token né le funzioni di
-  amministrazione.
+  Node (`src/main/tabs.js`), e comunicano con Filo attraverso il preload
+  (`src/preload/page-preload.js`). Quel canale non consegna i token, e le
+  funzioni che leggono e gestiscono i feedback rispondono solo alle pagine di
+  Filo (`src/main/services/handlers/origine.js`).
 
-In pratica: anche un sito malevolo che gira in una scheda non può chiedere a
-Filo "dammi il token dell'utente" né eseguire azioni privilegiate.
+Cosa un sito possa chiedere a Filo attraverso quel canale, oltre a questo, lo
+stiamo ancora restringendo: finché il lavoro è aperto, questa sezione promette
+solo quello che c'è scritto qui sopra.
 
 ---
 
 ## 4. I tuoi dati personali (memorie, appunti, cronologia)
 
-**Stato: 💭 (local-first ora; sincronizzazione cifrata in futuro)**
+**Stato: ✅ salvati solo sul tuo dispositivo; 💭 sincronizzazione cifrata fra
+dispositivi, rimandata**
 
 Le "memorie" che Filo raccoglie su di te, gli appunti copiati e la cronologia
 sono i dati **più sensibili** che l'app tocca. La nostra posizione:
 
-- **Oggi restano sul tuo dispositivo.** Non c'è sincronizzazione attiva:
-  questi dati non lasciano il computer, quindi nemmeno noi possiamo vederli.
+- **Oggi sono salvati solo sul tuo dispositivo.** Non c'è sincronizzazione, e
+  i server di Filo non li ricevono.
+- **Ai modelli invece arrivano.** Filo funziona con modelli linguistici, e
+  quando ne usa uno gli manda quello che serve per rispondere: le memorie
+  (`src/shared/filoMemory.js`, `renderMemoryForPrompt`), gli appunti e i
+  titoli delle schede aperte nel messaggio della home
+  (`src/shared/constants.js`), il testo delle pagine su cui lavori (l'elenco
+  funzione per funzione sta in `transparency/privacy.md`, «I modelli»), i
+  candidati di una ricerca fra i tuoi documenti
+  (`src/main/services/documentiIndice.js`), il testo delle schede che chiudi,
+  per il riassunto con cui la cronologia le ritrova
+  (`src/main/services/handlers.js`, `enrichArchivedTab`). Quei messaggi vanno
+  a OpenRouter, che li passa al fornitore che serve il modello
+  (`src/main/services/providers/openrouter.js`). Cosa ne fanno lo dicono le
+  loro condizioni: questo documento non promette niente al posto loro.
 - **Quando attiveremo il multi-dispositivo** (telefono, TV…), il principio
   guida sarà la **cifratura end-to-end**: i dati verranno cifrati sul tuo
   dispositivo prima di partire, e i nostri server custodiranno solo blocchi
@@ -160,28 +235,76 @@ Filo permette di inviare feedback (col tasto destro, da qualsiasi pagina). Un
 feedback contiene:
 
 - il **testo** che scrivi;
-- eventuali **screenshot** che alleghi;
+- eventuali **screenshot** e file che alleghi;
 - l'**URL** e il titolo della pagina da cui scrivi, lo **user agent** (per
-  riprodurre il bug) e un **identificativo anonimo del dispositivo**
-  (`clientId`, un codice casuale che **non** è collegato alla tua identità).
+  riprodurre il bug) e un **identificativo del dispositivo** (`clientId`, un
+  codice casuale dell'installazione);
+- un **titolo breve**, che un modello scrive partendo dal testo.
+
+Testo, indirizzo della pagina, identificativo e allegati partono **cifrati**
+con una chiave che apre solo l'owner del progetto; se la cifratura non è
+disponibile, il feedback non parte (`src/shared/feedback.js`, `submit`).
+Accanto viaggiano l'impronta dell'identificativo (`clientIdHash`), che serve a
+riconoscere i tuoi feedback senza decifrarli, e, se questa copia di Filo ha un
+portafoglio, il suo pseudonimo, che serve a darti il premio per la
+segnalazione. Restano in chiaro anche il titolo breve, il titolo della
+pagina, lo user agent e i nomi dei file allegati. "In chiaro" vuol dire non
+cifrato, non pubblico: chi può leggere il documento lo dicono le regole del
+§7.
 
 Questi dati vengono salvati su Google Firebase (Firestore + Storage) e ci
-servono solo per correggere bug e migliorare l'app. **Non includere in un
-feedback dati che non vuoi condividere.**
+servono solo per correggere bug e migliorare l'app. Oltre alle persone il
+testo lo leggono i **giudici automatici**, modelli scelti fra quelli ammessi
+dalla politica sui modelli, che decidono se un feedback è legittimo, spam o un
+attacco (`FEEDBACK-STATES.md`, `filo-model-policy.md`), e gli **agenti** che
+lavorano la segnalazione. **Non includere in un feedback dati che non vuoi
+condividere.**
+
+Filo stesso, quando si accorge di non saper fare una cosa che gli chiedi o
+che qualcosa non ha funzionato, può mandare da solo una segnalazione
+generica: senza le tue parole e senza l'indirizzo della pagina, con un avviso
+che ti lascia annullarla. Si spegne in Sicurezza, «Segnalazione automatica dei
+problemi» (`src/shared/autoFeedback.js`).
+
+### Cos'altro riceve il server di Filo
+
+I feedback non sono l'unica cosa che arriva al server. Ci sono anche:
+
+- l'**identità anonima** dell'installazione (§1) e, se usi i crediti, il
+  **portafoglio**, con una riga per ogni chiamata ai modelli fatta con la
+  chiave personale: funzione, modello, chi l'ha servita, token e costo, senza
+  il testo della richiesta né della risposta
+  (`src/main/services/handlers/wallet.js`, regole `wallet-usage` in
+  `firestore.rules`);
+- i **voti** e le richieste di riapertura che lasci sulla bacheca
+  (`firestore.rules`, `feedback-public`);
+- se partecipi al **red team**, i tuoi tentativi
+  (`src/main/services/handlers/redteam.js`);
+- se accedi con Google, **email e nome** dell'account e quanto usi ogni
+  funzione (`src/main/services/handlers/credits.js`);
+- quando usi l'Aiuto, il **nome del sito** di cui chiede i percorsi (§8,
+  `src/shared/paths.js`).
+
+L'elenco completo, campo per campo, con cosa ne facciamo e per quanto lo
+teniamo, sta nel documento sulla privacy (`transparency/privacy.md`).
 
 ---
 
 ## 7. Permessi: chi può fare cosa sui feedback
 
-**Stato: 🔜 (regole pronte, attivazione subordinata ai prerequisiti sotto)**
+**Stato: ✅ per le regole di Firestore (`firestore.rules`), pubblicate e
+confrontate col progetto il 22/09/2026. Per gli allegati le regole sono nel
+repo (`storage.rules`) e valgono da quando si pubblicano col comando qui sotto.**
 
-I server applicano regole precise (Firebase Security Rules):
+Le regole (Firebase Security Rules) dicono:
 
 - **Chiunque** può **inviare** un nuovo feedback (in forma anonima). Non serve
   loggarsi: vogliamo abbassare al massimo l'attrito per ricevere segnalazioni.
 - **Nessuno può LEGGERE i feedback**, a parte chi li gestisce: gli
-  amministratori e il server che li lavora. Quello che invii non è consultabile
-  da un altro utente, e nemmeno da chi conoscesse l'indirizzo del documento.
+  amministratori, il server che li lavora e gli agenti autorizzati che
+  risolvono le segnalazioni (un elenco a parte, sul server). Quello che invii
+  non è consultabile da un altro utente, e nemmeno da chi conoscesse
+  l'indirizzo del documento.
 - Lo stesso vale per gli **screenshot e i file** che alleghi: non si possono
   elencare e non si aprono conoscendone l'indirizzo. L'unica chiave è il codice
   di scarico che sta nel link, e quel link non esce dalle mani di chi gestisce i
@@ -189,15 +312,18 @@ I server applicano regole precise (Firebase Security Rules):
   vecchio link non apre più niente.
 - Quello che tutti possono vedere è la **bacheca dei miglioramenti**, e sono
   solo i campi pensati per stare lì: il titolo breve di un problema già
-  risolto, il suo numero, la versione in cui è uscito, la frase scritta per chi
-  l'aveva segnalato, i voti. Non il testo, non l'indirizzo della pagina, non
-  gli screenshot, non le note di lavorazione. Quei campi vivono in una raccolta
-  separata — una vetrina — riempita da chi gestisce i feedback: la raccolta
-  vera resta chiusa.
-- **Solo gli amministratori** (un elenco ristretto di email autorizzate)
-  possono **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
-  cancellarli. Un utente normale non può toccare i feedback altrui né mettere
-  in coda lavoro.
+  risolto, il suo numero, le date, lo stato, la versione in cui è uscito, la
+  frase scritta per chi l'aveva segnalato, il premio, i voti e le richieste di
+  riapertura. Non il testo, non l'indirizzo della pagina, non gli screenshot,
+  non le note di lavorazione. Quei campi vivono in una raccolta separata, una
+  vetrina che riempie chi gestisce i feedback. La raccolta vera resta chiusa.
+- **Gli amministratori** (un elenco ristretto di email autorizzate) possono
+  **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
+  cancellarli. Gli agenti autorizzati possono solo farli avanzare di stato e
+  scriverci le note di lavorazione: niente priorità, niente archivio, niente
+  cancellazioni. Un utente qualunque, su un feedback altrui, può solo
+  aggiungere il proprio voto o chiedere che un problema risolto venga
+  riaperto; lo stato lo cambia solo chi gestisce i feedback.
 - La lista degli amministratori è una raccolta dedicata sul server: per
   aggiungere un collaboratore basta aggiungere la sua email, senza modificare
   il codice dell'app.
@@ -230,14 +356,18 @@ tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
 **interamente nelle regole** descritte sopra, che sono il vero confine.
 
 Da qui segue una cosa che non è ovvia: **aver fatto il login non è un
-permesso**. La chiave è pubblica e per entrare basta un account Google
-qualunque, quindi una regola che chiede solo di essere autenticati lascia
-passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
+permesso**. La chiave è pubblica e per entrare basta un account qualunque,
+anche uno anonimo creato al momento (è così che nasce l'identità di ogni
+installazione, §1), quindi una regola che chiede solo di essere autenticati
+lascia passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
 condivise, cioè le chiavi dei servizi AI che Filo usa per conto tuo, le legge
-**solo un amministratore**. Le chiavi che fanno funzionare Filo appena
-installato non le scarica il tuo computer. Arrivano già dentro l'applicazione,
-messe lì quando la versione viene costruita, e si rinnovano con l'aggiornamento
-automatico.
+**solo un amministratore**. Le chiavi di default, quelle che fanno funzionare
+Filo appena installato, il tuo computer non le scarica: arrivano già dentro
+l'applicazione, messe lì quando la versione viene costruita, e si rinnovano
+con l'aggiornamento automatico (`src/main/config/default-keys.js`). Chi
+riscatta un invito usa invece una chiave dei modelli personale: la crea il
+server, l'app la riceve e la conserva cifrata come le credenziali di accesso
+(`src/main/auth/wallet-store.js`, vedi §2).
 
 ### Le regole cambiano solo quando le pubblichi
 
@@ -247,7 +377,7 @@ automatismo le pubblica: si fa a mano, da main allineato a origin/main (la
 guardia rifiuta un ramo o una modifica non fusa), con
 
 ```bash
-npm run regole:pubblica    # regole e indici di Firestore, regole dello storage
+npm run regole:pubblica    # regole e indici di Firestore, regole dello storage, pagina delle approvazioni
 ```
 
 La guardia sta anche dentro `firebase.json` (predeploy): un `firebase deploy`
@@ -263,7 +393,7 @@ rompa niente di visibile: il caso peggiore, perché nessuno se ne accorge.
 
 **L'ordine conta**, e sbagliarlo costa il lavoro due volte. Prima si pubblicano
 le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
-chiavi nuove finiscono in un documento che chiunque legge ancora, e la
+chiavi nuove finiscono in un documento che chiunque può ancora leggere, e la
 rotazione è da rifare da capo.
 
 **Poi vanno ruotati i codici di scarico degli allegati vecchi.** Le regole nuove
@@ -452,22 +582,41 @@ pagina ostile.
 
 ## 9. Aggiornamenti automatici
 
-**Stato: 🔜**
+**Stato: ✅ (attivo)**
 
 Filo si aggiorna da solo: a ogni avvio controlla se c'è una versione più
-recente, la scarica e la applica alla chiusura. Gli aggiornamenti vengono
-pubblicati come release ufficiali del progetto. Potrai disattivare gli
-aggiornamenti automatici dalle impostazioni se preferisci controllarli a mano.
+recente e la scarica (`src/main/updater.js`). Su Windows la installa la volta
+dopo che apri Filo, con la barra di avanzamento, oppure in silenzio quando lo
+chiudi, se lo scegli in Preferenze → Impostazioni avanzate → «Quando
+installarla» (`src/main/aggiornamentoRegole.js`). Su Mac e su Linux prova a
+installarla quando chiudi Filo, ma lì l'installazione può fermarsi: in quel
+caso Filo te lo dice con una notifica, che spiega come installare la versione
+nuova a mano. Gli aggiornamenti vengono pubblicati come release ufficiali del
+progetto. Puoi disattivare gli
+aggiornamenti automatici dalle impostazioni (Preferenze → Impostazioni
+avanzate → «Installa gli aggiornamenti da solo»), o chiedendolo a Filo, se
+preferisci controllarli a mano. Filo continua a controllare e ti avvisa
+quando c'è una versione nuova, che si installa solo quando premi «Installa».
 
 ---
 
 ## Come segnalare un problema di sicurezza
 
-Se pensi di aver trovato una vulnerabilità, **non aprirla come feedback
-pubblico**. Scrivi direttamente al maintainer del progetto. Trattiamo le
-segnalazioni di sicurezza con priorità.
+Se pensi di aver trovato una vulnerabilità, **non scriverla in pubblico**, per
+esempio in una issue o in un commento su GitHub. Questi canali restano privati:
+
+- la **segnalazione privata di GitHub**, dalla scheda Security del repository
+  («Report a vulnerability»):
+  [github.com/sathyaram1/Filo/security/advisories/new](https://github.com/sathyaram1/Filo/security/advisories/new);
+- l'**email** a [hello@filo.red](mailto:hello@filo.red);
+- dall'app, il **canale dei feedback**: il testo parte cifrato (§6).
+
+Scrivi cosa hai trovato, come si riproduce e su quale versione di Filo.
+Trattiamo le segnalazioni di sicurezza con priorità. La correzione però si
+scrive sul repository pubblico, e lì si legge qualche ora prima che arrivi a
+chi usa Filo. È uno dei punti deboli descritti in `transparency/security.md`.
 
 ---
 
-*Ultimo aggiornamento: 2026-09-14. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-10-21. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*

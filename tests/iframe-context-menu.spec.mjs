@@ -10,6 +10,8 @@
 // montaggio pigro nel page-preload) tornano tutti rossi.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi, conta } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const INNER = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
   <p id="inner-text">Testo dentro il riquadro incorporato, lungo abbastanza da poterlo selezionare e spiegare.</p>
@@ -29,7 +31,7 @@ test('tasto destro DENTRO il riquadro incorporato: compare il menu di Filo', asy
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-text').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
+  const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // Non un menu vuoto: dentro il riquadro ci sono le stesse voci di sempre.
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
@@ -42,7 +44,7 @@ test('il riquadro di un ALTRO sito (origine diversa) ha comunque il menu', async
   const page = await testServer.openReady(openTab, outer(innerUrl));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-text').click({ button: 'right' });
-  await expect(frame.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(frame).locator('.sn-menu')).toBeVisible();
 });
 
 test('nel riquadro il menu porta le azioni sul testo selezionato (Copia, Cerca, Spiegazione)', async ({ openTab, testServer }) => {
@@ -59,7 +61,7 @@ test('nel riquadro il menu porta le azioni sul testo selezionato (Copia, Cerca, 
     sel.addRange(range);
   });
   await frameLoc.locator('#inner-text').click({ button: 'right' });
-  const menu = frameLoc.locator('.sn-menu');
+  const menu = menuDi(frameLoc).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // La zona contestuale del testo selezionato: Copia + Cerca + la spiegazione
   // inline (la sezione AI). Senza content script nel riquadro non esisteva
@@ -73,7 +75,7 @@ test('nel riquadro il menu sul collegamento porta le azioni del collegamento', a
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-link').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
+  const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   const txt = (await menu.textContent()) || '';
   expect(txt).toContain('Copia URL');
@@ -85,7 +87,7 @@ test('in un riquadro basso il menu resta tutto raggiungibile (scorre, non viene 
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER), { width: 420, height: 180 }));
   const frame = page.frameLocator('#embed');
   await frame.locator('#inner-text').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
+  const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   const fits = await menu.evaluate((el) => {
     const r = el.getBoundingClientRect();
@@ -99,7 +101,7 @@ test('in un riquadro basso il menu resta tutto raggiungibile (scorre, non viene 
 test('la pagina attorno al riquadro continua a funzionare come prima', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   await page.locator('#outer-text').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 });
 
 test('un riquadro mai toccato non carica nulla (il costo si paga solo all\'uso)', async ({ openTab, testServer }) => {
@@ -110,7 +112,7 @@ test('un riquadro mai toccato non carica nulla (il costo si paga solo all\'uso)'
   expect(readyBefore).toBe('');
   // …ma appena lo si tocca, Filo c'è.
   await page.frameLocator('#embed').locator('#inner-text').click({ button: 'right' });
-  await expect(page.frameLocator('#embed').locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page.frameLocator('#embed')).locator('.sn-menu')).toBeVisible();
   const readyAfter = await frame.evaluate(() => document.documentElement.dataset.filoReady || '');
   expect(readyAfter).toBe('1');
 });
@@ -136,15 +138,16 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
   });
   // La spiegazione si apre DENTRO il riquadro, sul testo selezionato lì.
   // Prima la scorciatoia finiva sempre nel frame principale, che non ha
-  // nessuna selezione: non succedeva nulla.
-  await expect(frameLoc.locator('.sn-popup')).toBeVisible({ timeout: 8000 });
+  // nessuna selezione: non succedeva nulla. Sui siti il riquadro sta in uno shadow root chiuso (#1071).
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup', frame))?.visibile, { timeout: 8000 }).toBe(true);
+  expect(await conta(app, page, '.sn-popup')).toBe(0);
 });
 
 test('un solo menu alla volta: aprirlo nel riquadro chiude quello della pagina', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER)));
   await page.locator('#outer-text').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.frameLocator('#embed').locator('#inner-text').click({ button: 'right' });
-  await expect(page.frameLocator('#embed').locator('.sn-menu')).toBeVisible();
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page.frameLocator('#embed')).locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });

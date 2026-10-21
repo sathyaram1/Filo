@@ -4,10 +4,11 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rigaSporco } from './lib/biglietto-locale.mjs';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
-const SLOT = 'orchestrator, worker, new-work, fixer, verifier, secaudit, prober';
+const SLOT = 'orchestrator, worker, new-work, fixer, verifier, secaudit';
 const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
   + `\nslot: ${SLOT}`;
 
@@ -167,7 +168,10 @@ async function main() {
     return;
   }
   const n = a.n || 50;
-  console.log(formattaRisposte(await chiama({ op: 'answers', limit: n }), { n }));
+  const risposte = await chiama({ op: 'answers', limit: n });
+  // Le risposte le scrivono le routine, che leggono testo d'utente: chi le stampa si sporca prima (#1148).
+  console.error(await rigaSporco('risposte delle routine alla domanda di fine sessione', ['testo scritto dalle routine']));
+  console.log(formattaRisposte(risposte, { n }));
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));

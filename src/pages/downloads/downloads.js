@@ -62,7 +62,7 @@
       el.id = 'dl-flash';
       el.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);'
         + 'background:var(--sn-fg);color:var(--sn-bg);padding:8px 14px;border-radius:8px;'
-        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity .15s ease;pointer-events:none;'
+        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity calc(.15s * var(--sn-motion, 1)) ease;pointer-events:none;'
         + 'max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       document.body.appendChild(el);
     }
@@ -90,7 +90,7 @@
     // popup lo chiede qui, con le parole che il main ha scritto per l'utente.
     if (res.needsConfirm) {
       const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : window.confirm(res.text);
       if (ok) await openFile(r, true);
       return;
@@ -160,6 +160,26 @@
     reload();
   }
 
+  // #950 — nome sensato: la voce c'è solo se Filo sa leggere quel file e ha un modello per farlo.
+  const Rinomina = window.SN_RINOMINA_UI;
+  let nomiDisponibili = false;
+  function aggiornaDisponibilita() {
+    if (!Rinomina) return;
+    Rinomina.disponibile().then((v) => { nomiDisponibili = v; }).catch(() => {});
+  }
+  const rigaDi = (r) => Array.from(document.querySelectorAll('.dl-item')).find((x) => x.dataset.id === r.id);
+  function daiNome(r) {
+    const ancora = rigaDi(r);
+    if (!Rinomina || !ancora) return;
+    Rinomina.apri({ ancora, downloadId: r.id, nome: r.filename, suRinominato: reload, suRimesso: reload });
+  }
+  async function rimettiNome(r) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_RIMETTI_NOME, id: r.id });
+    if (res && res.ok) flash(res.cambiato ? `Il nome di prima era preso: ora è ${res.nome}` : `Nome di prima rimesso: ${res.nome}`);
+    else flash((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima');
+    reload();
+  }
+
   // ─── menu contestuale (tasto destro) — set completo di azioni ──────────────
   let openMenu = null;
   function closeCtxMenu() {
@@ -196,6 +216,10 @@
       // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
       if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
+      if (!r.missing && !r.exe && nomiDisponibili && Rinomina && Rinomina.tipoSupportato(r.filename)) {
+        acts.push([Rinomina.VOCE, () => daiNome(r)]);
+      }
+      if (!r.missing && r.nomeOriginale) acts.push(['Rimetti il nome di prima', () => rimettiNome(r)]);
     } else {
       // interrupted / cancelled: il file completo non c'è, ma la cartella e la
       // sorgente restano utili.
@@ -230,9 +254,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     openMenu = menu;
+    document.addEventListener('keydown', onMenuKeydown, true);
     setTimeout(() => {
+      if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      document.addEventListener('keydown', onMenuKeydown, true);
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
@@ -266,7 +291,7 @@
       name.appendChild(tag);
     }
     name.appendChild(document.createTextNode(r.filename || 'download'));
-    name.title = r.filename || '';
+    name.title = r.nomeOriginale ? `${r.filename || ''}\nArrivato come: ${r.nomeOriginale}` : (r.filename || '');
     row.appendChild(name);
 
     const meta = document.createElement('div');
@@ -280,7 +305,7 @@
       // Da quale sito arriva è la cosa su cui si decide: sta nella riga, non
       // solo nell'avviso che l'utente può aver già chiuso.
       let da = r.site ? ` · da ${r.site}` : '';
-      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); da = t ? ` · ${t}` : ''; } catch (_) {}
+      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); da = t ? ` · ${t}` : ''; } catch (_) {}
       meta.textContent = `${stateLabel(r)}${da} · ${formatDate(r.startedAt)}`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
@@ -346,10 +371,12 @@
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
-    // Tasto destro = menu completo (centralità del tasto destro in Filo).
+    // Tasto destro = menu completo (centralità del tasto destro in Filo). La riga può restare in pagina a più
+    // ridisegni (SN_RIGHE_VIVE): il menu si costruisce sulla voce di ADESSO, non su quella che l'ha creata.
+    const attuale = () => items.find((x) => x.id === r.id) || r;
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openCtxMenu(e.clientX, e.clientY, r);
+      openCtxMenu(e.clientX, e.clientY, attuale());
     });
     // Tastiera: Invio/Spazio = primaria (apri se completato); Menu/Shift+F10 = menu.
     row.addEventListener('keydown', (e) => {
@@ -358,7 +385,7 @@
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const rect = row.getBoundingClientRect();
-        openCtxMenu(rect.left, rect.bottom, r);
+        openCtxMenu(rect.left, rect.bottom, attuale());
       }
     });
     return row;
@@ -372,7 +399,7 @@
     let filtered = items;
     if (q) {
       filtered = filtered.filter((r) => {
-        const hay = [r.filename, r.url, r.savePath].filter(Boolean).join(' ').toLowerCase();
+        const hay = [r.filename, r.nomeOriginale, r.url, r.savePath].filter(Boolean).join(' ').toLowerCase();
         return hay.includes(q);
       });
     }
@@ -386,7 +413,7 @@
     if (!filtered.length) {
       const empty = $('empty');
       empty.textContent = (items.length && q)
-        ? 'Nessuno scaricamento corrisponde alla ricerca.'
+        ? 'Nessun download corrisponde alla ricerca.'
         : 'Non hai ancora scaricato nulla.';
       empty.hidden = false;
       list.textContent = '';
@@ -409,7 +436,15 @@
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+    aggiornaDisponibilita();
     await reload();
+    // Il tasto destro del pannello degli scaricamenti in alto porta qui, col riquadro aperto su quel file.
+    const daRinominare = new URLSearchParams(location.search).get('rinomina');
+    if (daRinominare) {
+      try { history.replaceState(null, '', location.pathname); } catch (_) {}
+      const r = items.find((x) => x.id === daRinominare);
+      if (r) daiNome(r);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -419,8 +454,8 @@
       // Una voce in attesa di conferma NON è conclusa: "Svuota" non deve
       // promettere di toglierla (il main la tiene, e giustamente) (#588).
       const hasTerminal = items.some((r) => !isActive(r) && r.state !== 'pending');
-      if (!hasTerminal) { flash('Nessuno scaricamento concluso da rimuovere'); return; }
-      const text = 'Rimuovere dall’elenco tutti gli scaricamenti conclusi? Gli scaricamenti in corso restano.';
+      if (!hasTerminal) { flash('Nessun download concluso da rimuovere'); return; }
+      const text = 'Rimuovere dall’elenco tutti i download conclusi? Quelli in corso restano.';
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({ title: 'Svuota elenco', text, okLabel: 'Svuota' })
         : window.confirm(text);
@@ -435,9 +470,9 @@
     // cartella svuotata da fuori, e senza rilettura le voci resterebbero
     // "aperibili" pur non avendo più un file dietro.
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) scheduleReload();
+      if (!document.hidden) { scheduleReload(); aggiornaDisponibilita(); }
     });
-    window.addEventListener('focus', scheduleReload);
+    window.addEventListener('focus', () => { scheduleReload(); aggiornaDisponibilita(); });
 
     // Aggiornamenti live: il main pusha un segnale contentless quando parte/
     // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.
@@ -446,7 +481,7 @@
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
         // Il ritorno sulla scheda: in una scheda di Filo `visibilitychange`
         // non arriva, lo annuncia il main.
-        if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) scheduleReload();
+        if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { scheduleReload(); aggiornaDisponibilita(); }
       });
     }
   });

@@ -39,6 +39,9 @@
   // ricompare com'era: l'ultima bolla di Filo È la domanda in sospeso. Questa
   // riga la introduce, così non sembra un déjà vu.
   const RESUME_NOTE = 'Bentornato. Eravamo rimasti qui.';
+  // Il clic su «Riprendiamola» detto con le parole del pulsante, quando a chiudere era stato il modello: è la risposta
+  // dell'utente al congedo, e Filo prosegue da lì.
+  const RESUME_REPLY = 'Riprendiamola.';
 
   // Quando a chiudere l'intervista è l'APP e non il modello (parola di stop,
   // pulsante «Salta l'accoglienza»), l'ultima bolla di Filo è questa: fissa,
@@ -51,8 +54,8 @@
     + 'Se cambi idea la rifacciamo quando vuoi, da Preferenze → «Rifai '
     + 'l’intervista di benvenuto».';
 
-  // Cinque scambi in tutto, non di più, salvo che sia l'utente ad allungare.
-  const MAX_EXCHANGES = 5;
+  // Sei scambi in tutto, non di più, salvo che sia l'utente ad allungare: uno per voce da scoprire più le cose da dire.
+  const MAX_EXCHANGES = 6;
   // Tetto duro: l'intervista non può diventare infinita nemmeno se il modello
   // si dimentica di chiuderla. Oltre questo, la chiude il codice.
   const HARD_MAX_EXCHANGES = 12;
@@ -70,14 +73,22 @@
       kind: 'scoprire',
       label: 'Chi è l’utente e a cosa gli serve il computer',
       detail: 'Lavoro, studio, svago, quali siti frequenta.',
-      applica: 'Appena lo sai, emetti SALVA_LEZIONE con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO.',
+      applica: 'Appena lo sai, emetti SALVA_LEZIONE con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO. Si salva subito e l’utente vede cosa ricorderai con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       id: 'stile',
       kind: 'scoprire',
       label: 'Come vuole che Filo gli parli',
       detail: 'Breve o dettagliato, «tu» o «lei», formale o no.',
-      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così.',
+      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
+    },
+    {
+      // #1188: il livello di autonomia si sceglie qui e in Preferenze, non più dalla casella della home.
+      id: 'autonomia',
+      kind: 'scoprire',
+      label: 'Quanto vuole che Filo faccia da solo',
+      detail: 'Se preferisce che gli chieda prima di quasi tutto, che faccia da solo quello che si rimedia, o anche di più.',
+      applica: 'Chiediglielo con parole tue e nello stesso turno emetti ONBOARDING con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic, che ti arriva come suo messaggio. Il livello lo cambia solo lui, tu non hai un’azione per farlo: non dire di averlo cambiato. Se risponde a parole, rimostra la scelta e digli quale livello corrisponde a quello che ha detto. Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'estetica',
@@ -89,7 +100,7 @@
       id: 'privacy',
       kind: 'dire',
       label: 'La privacy è protetta già così',
-      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa.',
+      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa. Se ti chiede quali dati escono dal suo computer e verso chi, leggi il documento con LEGGI_TRASPARENZA doc "privacy" prima di rispondere.',
     },
     {
       id: 'modelli',
@@ -101,7 +112,7 @@
       id: 'crediti',
       kind: 'dire',
       label: 'I crediti, in due righe',
-      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare, non per i crediti.',
+      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare e per dare inviti ad altri, non per usare i crediti.',
     },
   ];
 
@@ -230,11 +241,22 @@
     return Array.isArray(thread) && thread.some((m) => m && m.role === 'user');
   }
 
+  // `daFuori`: nel turno è entrato testo di altri. `autonomia`: sotto quel turno di Filo c'era la scelta del
+  // livello, e chi riprende l'intervista la ritrova lì.
+  // `congedo`: è il congedo scritto dall'app, che «Riprendiamola» toglie.
+  function segni(m) {
+    return {
+      ...(m && m.daFuori === true ? { daFuori: true } : {}),
+      ...(m && m.role === 'filo' && m.autonomia === true ? { autonomia: true } : {}),
+      ...(m && m.role === 'filo' && m.congedo === true ? { congedo: true } : {}),
+    };
+  }
+
   function normalizeThread(raw) {
     return Array.isArray(raw)
       ? raw
         .filter((m) => m && typeof m === 'object')
-        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || '') }))
+        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || ''), ...segni(m) }))
         .filter((m) => m.text)
         .slice(-THREAD_CAP)
       : [];
@@ -273,7 +295,21 @@
       // 'early' = chiusa prima di aver finito: la home lo dice, con la strada
       // per rifarla. Si spegne appena l'utente l'ha letto.
       notice: s.notice === 'early' ? 'early' : '',
+      ...(s.fermato ? { fermato: true } : {}),
+      ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
+      ...(Number(s.scambiPrima) > 0 ? { scambiPrima: Math.floor(Number(s.scambiPrima)) } : {}),
+      // Rifatta o ripresa: non è più il primo avvio, e la home la mostra solo nelle pagine che l'hanno chiesta (#1297).
+      ...(s.rifatta === true ? { rifatta: true } : {}),
     };
+  }
+
+  // #1188 — la scelta dell'autonomia è a schermo e l'utente non ha ancora scritto: finché è così l'intervista
+  // non si chiude e la voce non si spunta, da qualunque azione arrivi. Il primo messaggio dell'utente la scioglie.
+  function mostraSceltaAutonomia(state) {
+    return { ...normalize(state), autonomiaInSospeso: true };
+  }
+  function autonomiaInSospeso(state) {
+    return normalize(state).autonomiaInSospeso === true;
   }
 
   function isActive(state) {
@@ -344,7 +380,64 @@
         thread: cur.thread,
       }].slice(-PAST_CAP)
       : cur.past;
-    return { ...emptyState(), past, startedAt: at };
+    return { ...emptyState(), past, startedAt: at, rifatta: true };
+  }
+
+  // «Riprendiamola» (#1297): l'intervista chiusa a metà si riapre dov'era, con le spunte e la stessa targa. Il congedo
+  // dell'app e la frase che l'ha chiesto escono, così l'ultima battuta torna la domanda in sospeso; se a chiudere era
+  // stato il modello, il clic diventa la risposta dell'utente e Filo prosegue. Il tetto degli scambi riparte da qui.
+  function riprendi(state) {
+    const cur = normalize(state);
+    if (!cur.done) return cur;
+    const thread = cur.thread.slice();
+    const last = thread[thread.length - 1];
+    const congedoApp = !!last && last.role === 'filo' && (last.congedo === true || last.text.trim() === CLOSING_MESSAGE);
+    if (congedoApp) {
+      thread.pop();
+      const chiesto = thread[thread.length - 1];
+      if (chiesto && chiesto.role === 'user' && (isStopRequest(chiesto.text) || isDecline(chiesto.text))) thread.pop();
+    }
+    const prima = thread.filter((m) => m.role === 'user').length;
+    const ultimo = thread[thread.length - 1];
+    if (!congedoApp && ultimo && ultimo.role === 'filo' && prima > 0) {
+      thread.push({ role: 'user', text: RESUME_REPLY });
+    }
+    const { autonomiaInSospeso: _sospesa, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
+    const fine = thread[thread.length - 1];
+    const riaperta = {
+      ...resto, done: false, closedAt: null, notice: '', thread, rifatta: true,
+      ...(fine && fine.role === 'filo' && fine.autonomia ? { autonomiaInSospeso: true } : {}),
+    };
+    return prima > 0 ? { ...riaperta, scambiPrima: prima } : riaperta;
+  }
+
+  // Ogni intervista conservata ha una chiave sua, per toglierla da Preferenze senza toccare le altre.
+  function chiaveConversazione(conv) {
+    const c = conv && typeof conv === 'object' ? conv : {};
+    return `${c.startedAt || ''}|${c.closedAt || ''}|${Array.isArray(c.thread) ? c.thread.length : 0}`;
+  }
+
+  // La × in Preferenze (#1297). Quella in corso non si toglie da qui: finché è aperta è ancora la conversazione in
+  // corso, e si chiude dalla home. Tolta quella corrente, la riga «abbiamo chiuso a metà» non ha più niente da riprendere.
+  function togliConversazione(state, chiave) {
+    const cur = normalize(state);
+    const k = String(chiave || '');
+    if (cur.done && cur.thread.length && chiaveConversazione(cur) === k) {
+      return { state: { ...cur, thread: [], notice: '' }, tolta: true };
+    }
+    const past = cur.past.filter((p) => chiaveConversazione(p) !== k);
+    return past.length === cur.past.length
+      ? { state: cur, tolta: false }
+      : { state: { ...cur, past }, tolta: true };
+  }
+
+  // «Dimentica tutto» passa anche di qui: le parole dell'intervista sono memoria quanto il profilo. Resta solo il segno
+  // «già accolto», così Filo non ricomincia a presentarsi.
+  function dimentica(state) {
+    const cur = normalize(state);
+    return cur.done
+      ? { ...emptyState(), done: true, closedAt: cur.closedAt }
+      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}) };
   }
 
   // Le interviste conservate, dalla più recente: quella corrente (appena ha una
@@ -392,21 +485,33 @@
   }
 
   function appendTurn(state, turn) {
-    const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
     const text = String((turn && turn.text) || '');
-    if (!text) return cur;
+    if (!text) return normalize(state);
+    const tutto = togliFermato(state);
+    const { autonomiaInSospeso: _sospesa, ...senza } = tutto;
+    const cur = role === 'user' ? senza : tutto;
     const last = cur.thread[cur.thread.length - 1];
+    const nuovi = segni({ ...turn, role });
     if (last && last.role === role && last.text.trim() === text.trim()) {
-      return { ...cur, startedAt: cur.startedAt || new Date().toISOString() };
+      const mancanti = Object.keys(nuovi).some((k) => !last[k]);
+      const segnato = mancanti ? { thread: [...cur.thread.slice(0, -1), { ...last, ...nuovi }] } : {};
+      return { ...cur, ...segnato, startedAt: cur.startedAt || new Date().toISOString() };
     }
-    const thread = [...cur.thread, { role, text }].slice(-THREAD_CAP);
+    const thread = [...cur.thread, { role, text, ...nuovi }].slice(-THREAD_CAP);
     return { ...cur, thread, startedAt: cur.startedAt || new Date().toISOString() };
   }
 
-  // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto.
+  // Nella conversazione è entrato testo di altri (incollato, trascinato, un'immagine, una pagina o un file letto
+  // da Filo): da lì lo stile proposto torna a passare dal riquadro di conferma (#592.2).
+  function haTestoDiAltri(state) {
+    return normalize(state).thread.some((m) => m.daFuori === true);
+  }
+
+  // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto. Dopo una ripresa si conta da lì.
   function userTurns(state) {
-    return normalize(state).thread.filter((m) => m.role === 'user').length;
+    const cur = normalize(state);
+    return Math.max(0, cur.thread.filter((m) => m.role === 'user').length - (cur.scambiPrima || 0));
   }
 
   // C'è un turno rimasto a metà: l'ultima cosa nella conversazione è un
@@ -415,7 +520,19 @@
   function hasPendingTurn(state) {
     const cur = normalize(state);
     const last = cur.thread[cur.thread.length - 1];
-    return !cur.done && !!last && last.role === 'user';
+    return !cur.done && !cur.fermato && !!last && last.role === 'user';
+  }
+
+  // Il turno a metà l'ha fermato l'utente col quadrato (#578): non riparte da solo, aspetta «riprendi» o un messaggio
+  // nuovo (appendTurn lo toglie). Sentinella: tests/unit/onboarding.test.mjs.
+  function segnaFermato(state) {
+    const cur = normalize(state);
+    const last = cur.thread[cur.thread.length - 1];
+    return !cur.done && last && last.role === 'user' ? { ...cur, fermato: true } : cur;
+  }
+  function togliFermato(state) {
+    const { fermato: _fermato, ...cur } = normalize(state);
+    return cur;
   }
 
   // Oltre il tetto duro l'intervista si chiude da sé, qualunque cosa faccia il
@@ -423,7 +540,7 @@
   function shouldForceClose(state) {
     const cur = normalize(state);
     if (cur.done) return false;
-    return isComplete(cur) || userTurns(cur) >= HARD_MAX_EXCHANGES;
+    return (isComplete(cur) && !cur.autonomiaInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
   }
 
   // Elenco per il prompt: che cosa resta da scoprire e da dire, con la spunta
@@ -440,11 +557,13 @@
   }
 
   global.SN_ONBOARDING = {
-    WELCOME_MESSAGE, RESUME_NOTE, CLOSING_MESSAGE,
+    WELCOME_MESSAGE, RESUME_NOTE, RESUME_REPLY, CLOSING_MESSAGE,
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
-    emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
-    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
+    emptyState, normalize, isActive, isTicked, tick, close, restart, riprendi, conversations,
+    chiaveConversazione, togliConversazione, dimentica,
+    remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
+    mostraSceltaAutonomia, autonomiaInSospeso,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };

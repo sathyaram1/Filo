@@ -8,6 +8,8 @@
 //      sempre visibile (custom SVG ad alto contrasto sopra la maschera).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -21,11 +23,11 @@ async function newtabPage(app) {
 
 async function openOverflowGrid(page, selector = 'h1') {
   await page.locator(selector).click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }
@@ -55,7 +57,9 @@ test('newtab: l\'input si svuota subito al submit (non aspetta la risposta)', as
 const HTML_A = '<!doctype html><html><body><h1>A</h1></body></html>';
 const HTML_B = '<!doctype html><html><body><h1>B</h1></body></html>';
 
-test('menu: back/forward disabilitati quando la history non lo consente', async ({ openTab, testServer }) => {
+test('menu: back/forward disabilitati quando la history non lo consente', async ({ app, openTab, testServer }) => {
+  // Da #871 indietro e avanti stanno nella barra laterale: qui la strada di chi li ha rimessi nel menu.
+  await mettiNelMenu(app, ['back', 'forward']);
   const page = await openTab(testServer.html(HTML_A));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
@@ -82,7 +86,8 @@ test('menu: back/forward disabilitati quando la history non lo consente', async 
   await expect(grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toHaveClass(/sn-menu-btn-disabled/);
 });
 
-test('menu: back/forward disabilitati sono visibilmente grigi (opacity ridotta)', async ({ openTab, testServer }) => {
+test('menu: back/forward disabilitati sono visibilmente grigi (opacity ridotta)', async ({ app, openTab, testServer }) => {
+  await mettiNelMenu(app, ['back', 'forward']);
   // In parità con .nav-btn:disabled della shell, i bottoni back/forward del
   // menu tasto-destro disabilitati devono apparire sbiaditi (opacity < 1),
   // non solo testualmente "muted". Senza questa regola l'utente non capisce

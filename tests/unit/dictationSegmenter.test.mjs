@@ -130,3 +130,26 @@ test('downsample: 48 kHz → 16 kHz conserva la durata; il WAV ha intestazione e
   const b64 = Seg.bytesToBase64(wav);
   assert.equal(Buffer.from(b64, 'base64').length, wav.length);
 });
+
+// Il tasto microfono delle chat smette di ascoltare da solo quando chi parla ha finito: la fine si
+// misura su tutta la registrazione, perché fra una frase e l'altra lo spezzone si azzera.
+test('fine del parlato: dopo una pausa lunga ha finito; una pausa fra due frasi no; il silenzio non è parlare', () => {
+  const fine = (parts, o) => Seg.endOfSpeech(run(parts).seg.state(), o);
+  const opz = { silenceMs: 2000, waitMs: 8000 };
+  assert.equal(fine([noise(1200, 0.2), silence(900)], opz), '', 'la pausa che chiude la frase non chiude il discorso');
+  assert.equal(fine([noise(1200, 0.2), silence(900), noise(800, 0.2, 7), silence(1200)], opz), '', 'la seconda frase riparte da zero');
+  assert.equal(fine([noise(1200, 0.2), silence(2100)], opz), 'done');
+  assert.equal(fine([silence(3000)], opz), '', 'presto per dire che non parlerà');
+  assert.equal(fine([silence(8100)], opz), 'nothing');
+  assert.equal(fine([noise(150, 0.2), silence(8100)], opz), 'nothing', 'un colpo di tosse non è aver parlato');
+  assert.equal(Seg.endOfSpeech(null, opz), '');
+});
+
+test('livello: zero nel silenzio, pieno con la voce, sempre fra 0 e 1', () => {
+  const zitto = run([silence(500)]).seg.state().level;
+  const voce = run([noise(500, 0.2)]).seg.state().level;
+  const piano = run([silence(500), noise(500, 0.02, 9)]).seg.state().level;
+  assert.equal(zitto, 0);
+  assert.equal(voce, 1);
+  assert.ok(piano > 0 && piano < 1, `una voce piana sta in mezzo: ${piano}`);
+});

@@ -97,20 +97,33 @@
   //            in chat con lui. È la provenienza di chi apre un feedback da lì.
   const MODEL_PREFIXES = ['agent:', 'routine:', 'local:'];
 
+  // Un nome riservato vale solo con la prova che scrivono l'admin o il server (#595, #912): senza, è un utente nello
+  // spazio `non-provato:`. Gemelli: effectiveClientId in manageReview.js e in filo-security (data/identities.js);
+  // la sentinella tests/unit/mittentiProvati.test.mjs li tiene uguali.
+  const RESERVED_SENDER_RE = /^(owner|routine|agent|local):/i;
+  const SENDER_PROOFS = ['admin', 'server'];
+  // Le funzioni di classificazione qui sotto prendono il FEEDBACK (si legge la prova) o una stringa che è già un
+  // mittente efficace o una firma scritta dall'admin; il `clientId` grezzo di un feedback non va passato.
+  function senderOf(x) {
+    if (!x || typeof x !== 'object') return String(x || '');
+    const c = String(x.clientId || '');
+    return RESERVED_SENDER_RE.test(c) && SENDER_PROOFS.indexOf(x.senderProof) === -1 ? 'non-provato:' + c : c;
+  }
+
   // true se il feedback è stato inviato da un modello (issue d'agente,
   // sub-feedback creato da una routine, ritrovamento di una sessione locale):
   // in quel caso anche la segnalazione originale è "lato Filo", non
   // "lato utente".
-  function isFromModel(clientId) {
-    const c = String(clientId || '');
+  function isFromModel(fb) {
+    const c = senderOf(fb);
     return MODEL_PREFIXES.some(function (p) { return c.indexOf(p) === 0; });
   }
 
   // true se il feedback è un invio MANUALE dell'owner (admin loggato). L'identità
   // owner viene applicata nel main process al momento dell'invio (vedi
   // ownerize): il content script non sa di esserlo.
-  function isFromOwner(clientId) {
-    return String(clientId || '').startsWith('owner:');
+  function isFromOwner(fb) {
+    return senderOf(fb).startsWith('owner:');
   }
 
   // Classifica l'ORIGINE di un feedback dal prefisso del clientId. Serve alla
@@ -120,8 +133,8 @@
   //   routine:<slug> → 'routine'  audit automatico delle routine cloud (blu)
   //   local:<slug>   → 'local'    sessione locale di Claude (viola)
   //   <altro>        → 'user'     alpha tester esterno (arancione)
-  function originOf(clientId) {
-    const c = String(clientId || '');
+  function originOf(fb) {
+    const c = senderOf(fb);
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
     if (c.startsWith('routine:')) return 'routine';
@@ -164,6 +177,10 @@
   //                                      prober e NON verifier: spacciarlo per uno
   //                                      dei due falserebbe la lettura di dove
   //                                      nascono i ritrovamenti
+  //   agent:costruzione     → 'costruzione' l'allarme della pubblicazione (#1002): lo
+  //                                      apre il SERVER quando costruzione o suite di
+  //                                      una versione sono rosse; non è un'istanza di
+  //                                      Claude e il testo è una coda di registro
   //   agent:/routine:<altro>→ 'claude'   automazione di ruolo ignoto (storico: fino
   //                                      al 2026-08-08 nessuno si firmava)
   //   <altro>               → 'user'     un utente / alpha tester esterno
@@ -182,9 +199,10 @@
     verifier: 'verifier',
     secaudit: 'verifier',
     residuo: 'residuo',
+    costruzione: 'costruzione',
   };
-  function authorKind(clientId) {
-    var c = String(clientId || '');
+  function authorKind(fb) {
+    var c = senderOf(fb);
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
     // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
@@ -197,79 +215,56 @@
     return 'user';
   }
 
+  // Scritto da Filo (chat o segnalazione automatica), per conto di chi: 'owner' se porta la prova dell'admin, 'user'
+  // se lo dichiara soltanto, '' se non è di Filo. Solo per l'etichetta: categoria e fiducia restano di authorKind (#953).
+  function filoPerConto(fb) {
+    const c = senderOf(fb);
+    const resto = c.indexOf('owner:') === 0 ? c.slice('owner:'.length) : c;
+    if (resto.indexOf('filo:') !== 0 && resto.indexOf('auto:') !== 0) return '';
+    return fb && typeof fb === 'object' && fb.senderProof === 'admin' ? 'owner' : 'user';
+  }
+
   // ── Chi può entrare in coda da solo ────────────────────────────────────────
-  // La modalità automatica non è più un sì/no per tutti: l'owner sceglie QUALI
-  // mittenti si fida di far entrare in coda senza passare da lui.
-  //
-  // UN INTERRUTTORE PER OGNI AUTORE CHE LA DASHBOARD MOSTRA. Fino a oggi le
-  // cinque istanze di Claude (esplorazione, sviluppo, verifica, rilievi
-  // residui, sessione locale) stavano dietro un interruttore solo: la coda le
-  // distingueva con cinque icone diverse ma la fiducia era una sola, quindi
-  // per non far entrare da solo l'esploratore bisognava fermare anche la
-  // sessione locale. I due assi ora coincidono: chi si vede separato si regola
-  // separato.
-  //
-  // `filo` resta SEPARATO dalle automazioni: un feedback che nasce da Filo è
-  // la voce di un utente vero filtrata da un modello, non un processo
-  // dell'owner. Metterli insieme farebbe entrare in coda del contenuto scritto
-  // da un utente sotto l'etichetta "automazioni".
-  //
-  // L'ordine è quello della dashboard (AUTHOR_RANK in manage.js): prima le
-  // persone, poi le istanze di Claude dalla più vicina all'owner, in fondo Filo.
-  var AUTO_APPROVE_GROUPS = [
-    'owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo',
-  ];
+  // L'automatica ha un sottointerruttore per livello di fiducia, mai per mittente (SPEC-DOMANDE.md §10: il mittente
+  // non dà permessi). SPECCHIO di filo-security functions/src/autoApprove.js, che decide davvero: stessi casi in
+  // tests/unit/autoApprove.test.mjs e nel gemello del server.
+  var AUTO_APPROVE_GROUPS = ['fidato', 'non_fidato'];
 
-  // Le istanze di Claude. Servono al ripiego sul vecchio interruttore unico
-  // (vedi resolveAutoApprove): un documento salvato prima di oggi ha solo
-  // `claude`, e quel "no" deve continuare a valere per tutte e cinque finché
-  // l'owner non sceglie diversamente. Senza questo, spezzare l'interruttore
-  // riaprirebbe da solo cinque porte che l'owner aveva chiuso.
-  var CLAUDE_GROUPS = ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude'];
+  // Le mappe salvate prima del §10 avevano un interruttore per mittente: non riaprono da sole ciò che l'owner aveva
+  // chiuso. All'automatica arrivano fidati solo i ritrovamenti delle routine e gli allarmi; non fidato chiunque.
+  var LEGACY_GROUPS = {
+    fidato: ['worker', 'verifier', 'residuo', 'prober', 'claude'],
+    non_fidato: ['owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo'],
+  };
 
-  // Il gruppo di fiducia di un mittente = la sua categoria d'autore, quella che
-  // la dashboard mostra come icona. Una funzione sola per i due assi.
-  function autoApproveGroup(clientId) {
-    return authorKind(clientId);
+  // Il gruppo è la fiducia del feedback: assente o ignota vale non fidato.
+  function autoApproveGroup(fiducia) {
+    return fiducia === 'fidato' ? 'fidato' : 'non_fidato';
   }
 
   /**
-   * La mappa salvata → la mappa completa, un valore per ogni gruppo. PURA.
-   *
-   * Due ripieghi, in quest'ordine:
-   *   · gruppo assente e mappa con il vecchio `claude` → eredita quel valore
-   *     (solo per le istanze di Claude: è l'interruttore che le teneva tutte);
-   *   · tutto il resto assente → ammesso, che è la semantica che l'automatica
-   *     aveva prima che i sottointerruttori esistessero.
-   *
-   * Mappa assente del tutto ⇒ `null`: il chiamante sa che non c'è scelta
-   * registrata e ammette tutti.
+   * La mappa salvata → un valore per ogni gruppo. Un gruppo assente eredita dai vecchi interruttori per mittente (uno
+   * spento lo chiude); senza nemmeno quelli è ammesso. Mappa assente ⇒ `null`: il chiamante ammette tutti. PURA.
    */
   function resolveAutoApprove(map) {
     if (!map || typeof map !== 'object') return null;
-    var legacy = map.claude;
     var out = {};
     for (var i = 0; i < AUTO_APPROVE_GROUPS.length; i++) {
       var g = AUTO_APPROVE_GROUPS[i];
-      if (typeof map[g] === 'boolean') out[g] = map[g];
-      else if (legacy === false && CLAUDE_GROUPS.indexOf(g) >= 0) out[g] = false;
-      else out[g] = true;
+      out[g] = typeof map[g] === 'boolean'
+        ? map[g]
+        : !LEGACY_GROUPS[g].some(function (k) { return map[k] === false; });
     }
     return out;
   }
 
-  // Decide se un feedback SICURO (giudicato allineato) può entrare in coda da
-  // solo. PURA: la config arriva già letta.
-  //   cfg = { enabled: bool, autoApprove?: { <gruppo>: bool, … } }
-  // Interruttore master spento ⇒ mai, qualunque cosa dicano i sottointerruttori
-  // (è lo stato sicuro: uno solo da spegnere per fermare tutto).
-  // Mappa assente ⇒ tutti ammessi: è la semantica che l'automatica aveva prima
-  // che i sottointerruttori esistessero, e non deve cambiare da sola.
-  function autoApproveAllowed(clientId, cfg) {
+  // Un feedback giudicato sicuro può entrare in coda da solo? Master spento ⇒ mai (uno solo da spegnere per fermare
+  // tutto); mappa assente ⇒ tutti ammessi. PURA.
+  function autoApproveAllowed(fiducia, cfg) {
     if (!cfg || cfg.enabled !== true) return false;
     var map = resolveAutoApprove(cfg.autoApprove);
     if (!map) return true;
-    return map[autoApproveGroup(clientId)] !== false;
+    return map[autoApproveGroup(fiducia)] !== false;
   }
 
   // Marca un clientId come invio dell'owner. Idempotente: non raddoppia il
@@ -335,7 +330,7 @@
     const text = String(f.text || '').trim();
     if (text) {
       turns.push({
-        role: isFromModel(f.clientId) ? 'model' : 'user',
+        role: isFromModel(f) ? 'model' : 'user',
         kind: 'report',
         body: text,
         ts: f.createdAt || f._createTime || null,
@@ -386,6 +381,27 @@
   function modelTurnMarker(ts, label) {
     const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
     return `--- ${label || "Aggiornamento dell'agente del"} ${when} ---`;
+  }
+
+  // L'istante scritto in un marcatore, in ISO, o null. I marcatori sono scritti in italiano (giorno/mese, anno a due
+  // o quattro cifre, ora locale di chi scrive): `new Date()` li legge mese/giorno e sbaglia o li scarta (#764).
+  const DATA_MARCATORE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:,?\s+(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?)?$/;
+  function istanteDelMarcatore(ts) {
+    const s = String(ts == null ? '' : ts).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t).toISOString();
+    }
+    const m = DATA_MARCATORE_RE.exec(s);
+    if (!m) return null;
+    const [g, me, a, h, mi, se] = [m[1], m[2], m[3], m[4] || 0, m[5] || 0, m[6] || 0].map(Number);
+    const anno = m[3].length === 2 ? 2000 + a : a;
+    const d = new Date(anno, me - 1, g, h, mi, se);
+    // Un 31/02 o un 25:00 non è una data: Date li farebbe scivolare in avanti in silenzio.
+    if (d.getFullYear() !== anno || d.getMonth() !== me - 1 || d.getDate() !== g
+      || d.getHours() !== h || d.getMinutes() !== mi) return null;
+    return d.toISOString();
   }
 
   // Appende un turno dell'agente al blob note esistente, conservando lo storico.
@@ -491,8 +507,15 @@
   // respinta dalle regole subito dopo: il feedback diventava immobile (nessun
   // cambio di stato, nessun commento) mentre il server, che le regole le
   // bypassa, continuava a gonfiarlo — cioè il guaio che questo tetto esiste per
-  // impedire. 44.000 byte diventano 58.798 cifrati: ci stanno.
-  const NOTES_MAX = 44000;
+  // impedire. 400.000 byte diventano 533.465 cifrati: le regole ne ammettono
+  // 540.000, e il documento intero resta sotto il MiB di Firestore.
+  //
+  // Dimensionato sul caso peggiore realistico (#1333): dieci giri di bocciatura
+  // con critica al suo tetto (anch'esso in byte, scripts/lib/tetto-critica.mjs)
+  // e report lunghi, più segnalazioni e domande, in qualunque lingua, devono
+  // lasciare leggibile il primo turno. La sentinella è
+  // tests/unit/tettiConversazione.test.mjs.
+  const NOTES_MAX = 400000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
 
   // Spezza il blob in blocchi grezzi: il primo è il testo prima di qualsiasi
@@ -537,12 +560,19 @@
     if (byteLen(s) <= limit) return s;
     const blocks = rawBlocks(s);
     // Toglie i blocchi più vecchi finché il resto (+ la riga che dichiara il
-    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno.
-    while (blocks.length > 1) {
-      blocks.shift();
-      const candidate = `${TRIM_MARK}\n\n${blocks.join('\n').replace(/^\n+/, '')}`;
+    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno. Le misure
+    // si sommano una volta sola: col tetto a centinaia di KB, ricomporre il
+    // testo a ogni turno tolto costava secondi a ogni scrittura.
+    const misure = blocks.map(byteLen);
+    const testa = byteLen(`${TRIM_MARK}\n\n`);
+    let resto = misure.reduce((a, b) => a + b, 0) + blocks.length - 1;
+    for (let i = 1; i < blocks.length; i++) {
+      resto -= misure[i - 1] + 1;
+      if (testa + resto > limit) continue;
+      const candidate = `${TRIM_MARK}\n\n${blocks.slice(i).join('\n').replace(/^\n+/, '')}`;
       if (byteLen(candidate) <= limit) return candidate;
     }
+    blocks.splice(0, blocks.length - 1);
     // Un turno solo, più lungo del tetto: tiene l'inizio (marcatore compreso) e
     // taglia la coda. Si taglia a byte e si arretra finché non si è spezzato un
     // carattere a metà: un troncamento in mezzo a una lettera accentata
@@ -612,21 +642,22 @@
     isFromOwner,
     originOf,
     authorKind,
+    senderOf,
+    filoPerConto,
     // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
     // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
     // possano divergere su una stringa copiata a mano.
     LOCAL_CLIENT_ID: 'local:claude',
     MODEL_PREFIXES,
-    // Auto-approvazione per mittente (#446). La LOGICA è specchiata nel backend
-    // di sicurezza (filo-security: functions/src/autoApprove.js), che è l'unico
-    // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
+    // L'automatica per fiducia (§10): specchio di filo-security functions/src/autoApprove.js.
     autoApproveGroup,
     autoApproveAllowed,
     resolveAutoApprove,
     AUTO_APPROVE_GROUPS,
-    CLAUDE_GROUPS,
+    LEGACY_GROUPS,
     ownerize,
     userTurnMarker,
+    istanteDelMarcatore,
     appendUserTurn,
     modelTurnMarker,
     appendModelTurn,

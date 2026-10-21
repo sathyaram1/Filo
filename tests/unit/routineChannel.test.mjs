@@ -8,11 +8,12 @@
 //     bug, non un dettaglio di stile.
 //   - call: ritenta i guasti che possono passare da soli, NON i rifiuti.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const mod = await import('../../scripts/routine-channel.mjs');
-const { readTicketReply, call, release, merge } = mod;
+const { readTicketReply, call, release } = mod;
 
 const reply = (status, body) => ({
   status,
@@ -126,58 +127,21 @@ test('release normale: NESSUN campo fault nel corpo (un rilascio pulito non è u
   assert.equal('fault' in sent, false);
 });
 
-// ── La fusione la fa il SERVER (SPEC-RIDISEGNO-MAX.md §10) ──────────────────
-
-test('merge: nel corpo viaggiano SOLO biglietto e ramo — nessun verdetto', async () => {
-  // È il contratto che chiude il buco del push diretto: il verdetto L4 il
-  // server ce l'ha già registrato, e da qui non si può nemmeno esprimere.
-  let sent = null; let url = '';
-  const fetchImpl = async (u, init) => { url = u; sent = JSON.parse(init.body); return reply(200, { ok: true, result: 'merged', sha: 'abc' }); };
-  const r = await merge('tkt-1', 'worker/42', { fetchImpl, sleep: async () => {} });
-  assert.deepEqual(r, { ok: true, result: 'merged', reason: '', sha: 'abc', approval: '' });
-  assert.match(url, /\/routineMerge$/);
-  assert.deepEqual(Object.keys(sent).sort(), ['branch', 'ticket']);
-});
-
-test('merge: blocked e conflict arrivano col motivo; una risposta senza esito è un guasto', async () => {
-  const blocked = await merge('t', 'worker/1', {
-    fetchImpl: async () => reply(200, { ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }),
-    sleep: async () => {},
-  });
-  assert.equal(blocked.result, 'blocked');
-  assert.match(blocked.reason, /firestore\.rules/);
-
-  // Su un blocco il server dice anche che ha aperto la richiesta per l'owner:
-  // se quel campo si perdesse per strada, chi legge il registro crederebbe che
-  // il ramo sia perduto proprio quando invece basta un via libera.
-  const conRichiesta = await merge('t', 'worker/1', {
-    fetchImpl: async () => reply(200, { ok: true, result: 'blocked', reason: 'guard_the_guards', approval: 'req-7' }),
-    sleep: async () => {},
-  });
-  assert.equal(conRichiesta.approval, 'req-7');
-  const conflict = await merge('t', 'worker/1', {
-    fetchImpl: async () => reply(200, { ok: true, result: 'conflict' }), sleep: async () => {},
-  });
-  assert.equal(conflict.result, 'conflict');
-  // "ok" senza result non è una fusione: è una busta vuota, mai un successo.
-  const vuota = await merge('t', 'worker/1', {
-    fetchImpl: async () => reply(200, { ok: true }), sleep: async () => {},
-  });
-  assert.equal(vuota.ok, false);
-});
-
-test('merge: un rifiuto del server non si ritenta (il no è una risposta)', async () => {
-  let calls = 0;
-  const fetchImpl = async () => { calls += 1; return reply(401, { ok: false, reason: 'not_approved' }); };
-  const r = await merge('t', 'worker/1', { fetchImpl, sleep: async () => {}, attempts: 3 });
-  assert.equal(calls, 1);
-  assert.deepEqual(r, { ok: false, reason: 'not_approved' });
-});
-
-// Sforzo per ruolo (2026-09-03): il ruolo viaggia col biglietto, se il server lo manda.
 test('biglietto con ruolo → il ruolo passa; senza ruolo → nessuna chiave in più', () => {
   assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: 'secaudit' }),
     { outcome: 'work', ticket: 'abc', role: 'secaudit' });
   assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: '' }),
     { outcome: 'work', ticket: 'abc' });
+});
+
+// #1189: modello e sforzo decisi dal server viaggiano col biglietto; assenti, vuoti o non stringhe non ci sono.
+test('biglietto con model ed effort → passano; vuoti o non stringhe → nessuna chiave in più', () => {
+  assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: 'new-work', model: 'haiku', effort: 'low' }),
+    { outcome: 'work', ticket: 'abc', role: 'new-work', model: 'haiku', effort: 'low' });
+  assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', model: ' fable ', effort: 'max' }),
+    { outcome: 'work', ticket: 'abc', model: 'fable', effort: 'max' });
+  for (const [model, effort] of [['', '   '], [null, undefined], [5, { x: 1 }]]) {
+    assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', model, effort }), { outcome: 'work', ticket: 'abc' });
+  }
+  assert.equal(readTicketReply(200, { ok: true, work: false, model: 'opus' }).model, undefined, 'niente lavoro, niente decisione');
 });

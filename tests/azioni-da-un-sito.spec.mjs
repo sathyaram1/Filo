@@ -27,8 +27,9 @@ async function chiediEConferma(manda, action) {
 const impostazioni = async (shell) => (await shell.evaluate(() => window.filoShell.message({ type: 'get_settings' }))).settings;
 
 test('un sito non si conferma da solo le preferenze che Filo chiede di confermare', async ({ shell, app, openTab, testServer }) => {
+  // Il terminale è acceso di serie (#892): spento qui, perché si veda se il sito lo riaccende.
   await shell.evaluate(() => window.filoShell.message({
-    type: 'update_settings', settings: { monthlyLimitEur: 5, apiKeys: { openrouter: 'sk-or-v1-DELL-UTENTE' } },
+    type: 'update_settings', settings: { monthlyLimitEur: 5, apiKeys: { openrouter: 'sk-or-v1-DELL-UTENTE' }, terminal: { enabled: false } },
   }));
   const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
   const manda = dalSito(app, new URL(web.url()).host);

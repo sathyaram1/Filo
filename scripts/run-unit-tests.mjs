@@ -1,12 +1,13 @@
 // Lanciatore degli unit test: trova da sé i *.test.mjs (un glob sul runner Node 20 non lo espande nessuno) e li passa a
 // `node --test` relativi alla root e, se la riga supera il tetto di Windows, a gruppi con un riepilogo unico (#765).
-// Zero file = uscita rossa. `--list` stampa i file; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
+// Zero file = uscita rossa. `--list` stampa i file, `--solo` fa girare solo i file dati; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
 
-import { readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import path, { resolve, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { spawn, spawnSync } from 'node:child_process';
 import { lottiPerRigaDiComando, costoArgomentoWindows } from './lib/riga-di-comando.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Da QUESTO file, mai da dove è stato lanciato il comando. */
 export const REPO_ROOT = resolve(__dirname, '..');
 
-/** `FILO_UNIT_DIR` e `FILO_UNIT_TETTO_RIGA` esistono solo per i test di questo lanciatore, non sono opzioni d'uso. */
+/** `FILO_UNIT_DIR`, `FILO_UNIT_TETTO_RIGA` e `FILO_UNIT_TETTO_FERMO_MS` esistono solo per i test di questo lanciatore. */
 export const UNIT_DIR = process.env.FILO_UNIT_DIR
   ? resolve(process.env.FILO_UNIT_DIR)
   : resolve(REPO_ROOT, 'tests', 'unit');
@@ -23,8 +24,12 @@ export const UNIT_DIR = process.env.FILO_UNIT_DIR
 export const TETTO_WINDOWS = 32767;
 export const TETTO_RIGA = Number(process.env.FILO_UNIT_TETTO_RIGA) || 30000;
 
-// Relativo alla root, che è la cartella corrente del lancio: un percorso assoluto qui allungherebbe la riga.
+// Relativi alla root, che è la cartella corrente del lancio: un percorso assoluto qui allungherebbe la riga.
 const REPORTER_RIEPILOGO = './scripts/lib/riepilogo-unit.mjs';
+const REPORTER_AVANZAMENTO = './scripts/lib/avanzamento-unit.mjs';
+
+/** Solo i file dati, con la stessa guardia della corsa intera: la riprova dei rossi sulla fusione (#1063). */
+export const SOLO = '--solo';
 
 /** PURA. */
 export function isTestFile(name) {
@@ -54,12 +59,13 @@ export function collectTestFiles(dir = UNIT_DIR) {
 
 /**
  * Relativo alla root, così la riga non cresce col nome della cartella di lavoro; barre normali perché Node 22 legge
- * gli argomenti di `--test` come glob. Un file fuori dalla root resta assoluto. PURA.
+ * gli argomenti di `--test` come glob. Un file fuori dalla root resta assoluto. `p`: i percorsi del sistema, o
+ * quelli dell'altra piattaforma scelti da una prova. PURA.
  */
-export function perLaRiga(file, root = REPO_ROOT) {
-  const r = relative(root, file);
-  if (!r || r === '..' || r.startsWith(`..${sep}`) || isAbsolute(r)) return file;
-  return r.split(sep).join('/');
+export function perLaRiga(file, root = REPO_ROOT, p = path) {
+  const r = p.relative(root, file);
+  if (!r || r === '..' || r.startsWith(`..${p.sep}`) || p.isAbsolute(r)) return file;
+  return r.split(p.sep).join('/');
 }
 
 // Da Node 21 `node --test` legge ogni argomento come un modello: un file con quadre o tonde nel nome non girava,
@@ -175,11 +181,11 @@ export function chiedeCopertura(flags) {
 }
 
 /**
- * I flag di un gruppo col reporter del riepilogo aggiunto su file, senza togliere a stdout quello che ci sarebbe
- * andato: dichiarare un reporter spegne quello predefinito (spec al terminale, tap altrove). `null` se nei flag
- * dati reporter e destinazioni sono in numero diverso: lì non si sa a chi tocchi stdout. PURA.
+ * I flag con un reporter nostro aggiunto su file, senza togliere a stdout quello che ci sarebbe andato: dichiarare un
+ * reporter spegne quello predefinito (spec al terminale, tap altrove). `null` se nei flag dati reporter e
+ * destinazioni sono in numero diverso: lì non si sa a chi tocchi stdout. PURA.
  */
-export function flagsConRiepilogo(flags, destinazione, { tty = false } = {}) {
+export function flagsConReporter(flags, nostro, destinazione, { tty = false } = {}) {
   const conta = (nome) => flags.filter((a) => a === nome || a.startsWith(`${nome}=`)).length;
   const reporter = conta('--test-reporter');
   const destinazioni = conta('--test-reporter-destination');
@@ -187,7 +193,17 @@ export function flagsConRiepilogo(flags, destinazione, { tty = false } = {}) {
   const visibili = reporter
     ? [...flags, ...Array(reporter - destinazioni).fill('--test-reporter-destination=stdout')]
     : [`--test-reporter=${tty ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout', ...flags];
-  return [...visibili, `--test-reporter=${REPORTER_RIEPILOGO}`, `--test-reporter-destination=${destinazione}`];
+  return [...visibili, `--test-reporter=${nostro}`, `--test-reporter-destination=${destinazione}`];
+}
+
+/** I flag di un gruppo col riepilogo che somma i gruppi. PURA. */
+export function flagsConRiepilogo(flags, destinazione, opzioni) {
+  return flagsConReporter(flags, REPORTER_RIEPILOGO, destinazione, opzioni);
+}
+
+/** I flag col reporter che dice al lanciatore se la corsa va avanti. PURA. */
+export function flagsConAvanzamento(flags, destinazione, opzioni) {
+  return flagsConReporter(flags, REPORTER_AVANZAMENTO, destinazione, opzioni);
 }
 
 /**
@@ -264,35 +280,315 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
 // titoli dei gruppi finirebbero sotto l'uscita del gruppo stesso.
 let canale = process.stdout;
 const scrivi = (s) => new Promise((ok) => canale.write(`${s}\n`, ok));
-const lancia = (args) => new Promise((ok) => {
-  // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
-  // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
-  const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, ...env } = process.env;
-  const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
-  c.on('error', (error) => ok({ error }));
-  c.on('close', (status, signal) => ok({ status, signal }));
-});
 
 function leggiTesto(file) {
   try { return readFileSync(file, 'utf8'); } catch (_) { return ''; }
 }
 
-function leggiRighe(file) {
-  try {
-    return readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => {
-      try { return [JSON.parse(l)]; } catch (_) { return []; }
-    });
-  } catch (_) { return []; }
+function righeJson(testo) {
+  return testo.split('\n').filter(Boolean).flatMap((l) => {
+    try { return [JSON.parse(l)]; } catch (_) { return []; }
+  });
 }
+
+function leggiRighe(file) {
+  try { return righeJson(readFileSync(file, 'utf8')); } catch (_) { return []; }
+}
+
+// Il codice provato scrive nella temporanea anche senza chiederla ai test (#717): ogni corsa gliene dà una sua, che se ne
+// va con la corsa, e i resti delle corse uccise li toglie chi la crea. Le regole stanno col modulo che le crea, importato
+// qui e non in testa perché la copia di questo lanciatore che vive fuori dal repo non ha i test.
+// Sentinella: tests/unit/cartelleTemporaneeSiTolgono.test.mjs.
+async function temporaneaDellaCorsa() {
+  const modulo = join(REPO_ROOT, 'tests', 'helpers', 'percorsi.mjs');
+  return existsSync(modulo) ? (await import(pathToFileURL(modulo).href)).temporaneaDellaCorsa() : null;
+}
+
+// Un file appeso (col disco pieno, #717; un pacchetto mancante, #1231) è un rosso col suo nome: si chiude lui e la corsa
+// va avanti. Il tetto conta il tempo in cui il file non va avanti, non la sua durata: sotto carico un file sano è lento
+// ma avanza (#1063).
+export const TETTO_FERMO_MS = Number(process.env.FILO_UNIT_TETTO_FERMO_MS) || 20 * 60 * 1000;
+const controlloPer = (tetto) => Math.min(5000, Math.max(100, Math.floor(tetto / 20)));
+
+/** Il tetto di node, che conta la durata del file: solo dove il lanciatore non può guardare l'avanzamento. PURA. */
+export function conTettoDiTempo(opzioni) {
+  return opzioni.some((a) => a === '--test-timeout' || String(a).startsWith('--test-timeout='))
+    ? opzioni : [`--test-timeout=${TETTO_FERMO_MS}`, ...opzioni];
+}
+
+/**
+ * Un worker in parallelo (#1157) prende la sua parte di CPU: N `node --test` a tutte le CPU insieme fanno rossi i test
+ * sensibili ai tempi. `n` = file insieme (0 = decide node); chi lancia con un `--test-concurrency` suo decide lui. PURA.
+ */
+export function conConcorrenza(opzioni, n = 0) {
+  if (opzioni.some((a) => a === '--test-concurrency' || String(a).startsWith('--test-concurrency='))) return opzioni;
+  return n > 0 ? [`--test-concurrency=${n}`, ...opzioni] : opzioni;
+}
+
+// Importato qui e non in testa per la stessa ragione di temporaneaDellaCorsa: le copie di questo lanciatore che
+// portano con sé solo i suoi file (le prove di unit-sulla-fusione) non hanno il modulo, e lì vale node.
+async function concorrenzaDelWorker() {
+  const modulo = join(__dirname, 'lib', 'dati-worker.mjs');
+  if (!existsSync(modulo)) return 0;
+  const { datiWorker, concorrenzaUnit } = await import(pathToFileURL(modulo).href);
+  const w = datiWorker({ root: REPO_ROOT });
+  return w ? concorrenzaUnit(w.paralleli) : 0;
+}
+
+/**
+ * I file partiti e non finiti, nell'ordine di partenza. Node scrive l'esito dei file in quell'ordine: il primo è quello
+ * che tiene ferma l'uscita, gli altri aspettano lui. PURA.
+ */
+export function fileInCorso(righe) {
+  const finiti = new Set(righe.filter((r) => r.fine).map((r) => r.fine));
+  return righe.filter((r) => r.via && !finiti.has(r.via)).map((r) => r.via);
+}
+
+/**
+ * Dice, a ogni sguardo sul file dell'avanzamento, se la corsa è ferma da oltre il tetto. Il tempo parte dal primo
+ * evento: prima node sta ancora partendo, e su una macchina carica partire è lento ma non è un file appeso. PURA.
+ */
+export function guardiaFermo(tetto = TETTO_FERMO_MS) {
+  let visto = 0;
+  let dal = null;
+  return (dimensione, ora) => {
+    if (dimensione !== visto) { visto = dimensione; dal = ora; return false; }
+    return dal !== null && ora - dal >= tetto;
+  };
+}
+
+/**
+ * Il tetto per file. Node lascia passare in diretta solo i passi del primo file partito e non finito (degli altri dice
+ * solo quando partono e finiscono): l'avanzamento che si vede è il suo. Riceve le righe nuove del reporter
+ * dell'avanzamento e dice `{ file }`, i file da chiudere, o `{ tutto: true }`, la corsa da chiudere. PURA.
+ * - Il primo si chiude dopo un tetto senza un suo passo.
+ * - Se nello stesso tetto non è finito nessun file, con lui si chiudono i partiti da almeno un tetto: in fila dietro
+ *   di lui costerebbero un tetto ciascuno (#1231).
+ * - Se dopo una chiusura non finisce più nessun file per un altro tetto, è ferma la corsa (il disco pieno, #717), o
+ *   chiudere non è servito: ma solo se il fermo è un chiuso o è partito qualcosa dopo. Altrimenti la corsa sta finendo
+ *   e il fermo è un altro appeso di prima, che si chiude da solo: chiusa la corsa, gli esiti dietro di lui sparivano (#1235).
+ */
+export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
+  const partenza = new Map();
+  const finiti = new Set();
+  const chiusi = new Set();
+  let primo = null;
+  let dal = null;
+  let ultimaFine = null;
+  let chiusiSenzaFine = false;
+  let partitiAllaChiusura = 0;
+  return (righe, ora) => {
+    for (const r of righe) {
+      if (r.via) { if (!partenza.has(r.via)) partenza.set(r.via, ora); }
+      else if (r.fine) {
+        finiti.add(r.fine);
+        if (!chiusi.has(r.fine)) { ultimaFine = ora; chiusiSenzaFine = false; }
+      } else dal = ora;
+    }
+    const inCorso = [...partenza.keys()].filter((f) => !finiti.has(f));
+    const adesso = inCorso[0] ?? null;
+    if (adesso !== primo) { primo = adesso; dal = ora; }
+    if (primo === null || ora - dal < tetto) return null;
+    dal = ora;
+    if (chiusiSenzaFine && (chiusi.has(primo) || partenza.size > partitiAllaChiusura)) return { tutto: true };
+    const muta = ultimaFine === null || ora - ultimaFine >= tetto;
+    const file = muta ? inCorso.filter((f) => f === primo || ora - partenza.get(f) >= tetto) : [primo];
+    for (const f of file) chiusi.add(f);
+    chiusiSenzaFine = true;
+    partitiAllaChiusura = partenza.size;
+    return { file };
+  };
+}
+
+/** Un lavoro fisso per il processore: quanto ci mette dice quanto la macchina è carica adesso. */
+export function misuraLavoro() {
+  const t = performance.now();
+  let x = 0;
+  for (let i = 0; i < 2e6; i++) x += Math.sqrt(i);
+  return performance.now() - t + (x < 0 ? 1 : 0);
+}
+
+/**
+ * Un orologio che va alla velocità della macchina: il tempo passato si divide per quanto il lavoro fisso è più lento
+ * del più veloce visto. Sulla macchina carica un file sano rallenta con lei, uno appeso no (#1063). PURA salvo `misura`.
+ */
+export function orologioMacchina({ misura = misuraLavoro, ora = () => performance.now() } = {}) {
+  let migliore = Infinity;
+  let prima = null;
+  let tempo = 0;
+  return () => {
+    const d = Math.max(misura(), 1e-3);
+    migliore = Math.min(migliore, d);
+    const adesso = ora();
+    if (prima !== null) tempo += (adesso - prima) / (d / migliore);
+    prima = adesso;
+    return tempo;
+  };
+}
+
+/** PURA. */
+function durataDetta(ms) {
+  const minuti = Math.round(ms / 60000);
+  return minuti >= 1 ? `${minuti} minut${minuti === 1 ? 'o' : 'i'}` : `${Math.round(ms / 1000)} secondi`;
+}
+
+/** PURA. */
+export function testoFermo(inCorso, fermoMs, root = REPO_ROOT) {
+  const tempo = durataDetta(fermoMs);
+  if (!inCorso.length) return `[test:unit] ROSSO: per ${tempo} non è andato avanti niente, e la corsa è stata chiusa.`;
+  const [fermo, ...altri] = inCorso.map((f) => perLaRiga(f, root));
+  const righe = [`[test:unit] ROSSO: ${fermo} non è andato avanti per ${tempo}, e la corsa è stata chiusa.`];
+  if (altri.length) righe.push(`[test:unit] chiusi insieme, senza esito: ${altri.join(', ')}.`);
+  return righe.join('\n');
+}
+
+/** I file chiusi dal tetto per file, uno per riga; la corsa intanto è andata avanti. PURA. */
+export function testoFileChiusi(chiusi, fermoMs, root = REPO_ROOT) {
+  const tempo = durataDetta(fermoMs);
+  return chiusi.map((f) => `[test:unit] ROSSO: ${perLaRiga(f, root)} non è andato avanti per ${tempo} ed è stato chiuso; gli altri file sono andati avanti.`).join('\n');
+}
+
+function chiudiAlbero(c) {
+  // Chiuso da solo, il genitore di node --test lascerebbe vivi i figli appesi: va tolto l'albero intero.
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(c.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+  } else {
+    // node --test chiude i suoi figli al SIGTERM; il SIGKILL resta per un genitore che non risponde più.
+    c.kill('SIGTERM');
+    setTimeout(() => { try { c.kill('SIGKILL'); } catch (_) { /* già uscito */ } }, 30_000).unref();
+  }
+}
+
+/** Le righe «pid ppid riga di comando» dell'elenco dei processi, in { pid, ppid, riga }. PURA. */
+export function leggiProcessi(testo) {
+  return String(testo || '').split(/\r?\n/).flatMap((l) => {
+    const m = l.match(/^\s*(\d+)\s+(\d+)(?:\s(.*))?$/);
+    return m ? [{ pid: Number(m[1]), ppid: Number(m[2]), riga: m[3] || '' }] : [];
+  });
+}
+
+/**
+ * I processi da chiudere per fermare `file`: il figlio di `padre` (il `node --test`) che lo esegue, riconosciuto dal
+ * percorso intero sulla sua riga di comando, e i suoi discendenti. Coi percorsi di Windows barre e maiuscole non
+ * contano. PURA.
+ */
+export function processiDelFile(lista, padre, file, { root = REPO_ROOT, p = path } = {}) {
+  const win = p.sep === '\\';
+  const norma = (s) => (win ? String(s).replace(/\\/g, '/').toLowerCase() : String(s));
+  const nomi = [...new Set([file, perLaRiga(file, root, p)])].map(norma);
+  const nomina = (riga) => {
+    const r = norma(riga);
+    return nomi.some((n) => {
+      for (let i = r.indexOf(n); i !== -1; i = r.indexOf(n, i + 1)) {
+        const fine = i + n.length;
+        if ((i === 0 || ' "\'/'.includes(r[i - 1])) && (fine === r.length || ' "\''.includes(r[fine]))) return true;
+      }
+      return false;
+    });
+  };
+  const out = [];
+  const coda = lista.filter((x) => x.ppid === padre && nomina(x.riga)).map((x) => x.pid);
+  while (coda.length) {
+    const pid = coda.shift();
+    if (out.includes(pid)) continue;
+    out.push(pid);
+    for (const x of lista) if (x.ppid === pid) coda.push(x.pid);
+  }
+  return out;
+}
+
+/** Chiude il solo processo che esegue `file`, coi suoi figli: node lo dà rosso e va avanti. false se non l'ha chiuso. */
+function chiudiFile(c, file) {
+  if (process.platform === 'win32') {
+    // Solo i figli diretti del node --test: i loro discendenti li chiude /T.
+    const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '[Console]::OutputEncoding = [Text.Encoding]::UTF8; '
+      + `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${c.pid}' | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, $_.CommandLine }`],
+    { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+    const figli = r.status === 0 ? processiDelFile(leggiProcessi(r.stdout), c.pid, file) : [];
+    return figli.filter((pid) => spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).status === 0).length > 0;
+  }
+  // -ww: righe di comando intere, anche quando l'uscita non va a un terminale.
+  const r = spawnSync('ps', ['-A', '-ww', '-o', 'pid=,ppid=,command='], { encoding: 'utf8', timeout: 60_000 });
+  const pids = r.status === 0 ? processiDelFile(leggiProcessi(r.stdout), c.pid, file) : [];
+  return pids.filter((pid) => { try { process.kill(pid, 'SIGKILL'); return true; } catch (_) { return false; } }).length > 0;
+}
+
+/**
+ * Chi è la sessione che lancia i test: non arriva ai test. In una routine li faceva misurare il consumo vero, che finiva
+ * nei corpi confrontati e nelle cartelle di prova: rossi anche su main, solo lì (#949.1). Chi serve un test lo mette lui.
+ */
+export const IDENTITA_SESSIONE = Object.freeze(['FILO_ROUTINE', 'FILO_ROUTINE_TICKET', 'FILO_ROUTINE_ROLE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID']);
+
+/** L'ambiente dei test. PURA. */
+export function ambientePerITest(base, temp = '') {
+  // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
+  const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, FILO_UNIT_TETTO_FERMO_MS: _f, ...env } = base || {};
+  for (const k of IDENTITA_SESSIONE) delete env[k];
+  // Senza variabili la sessione si trova lo stesso: col biglietto in cartella vale il transcript più recente nella
+  // cartella di Claude (#730.6). I test ne hanno una loro, vuota, che se ne va con la corsa.
+  if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp, CLAUDE_CONFIG_DIR: join(temp, 'claude-dei-test') });
+  return env;
+}
+
+/**
+ * Con `avanzamento` (il file del suo reporter) un file fermo per `tetto` si chiude da solo, e la corsa prosegue; se
+ * chiuderlo non riesce, o non va avanti niente, si chiude la corsa e `fermo` dice chi era fermo. Ci passa anche una
+ * prova che fa girare altri file (#1214). `raccogli`: l'uscita torna nell'esito invece che al terminale.
+ */
+export const lanciaSorvegliato = (args, { env, avanzamento = null, tetto = TETTO_FERMO_MS, raccogli = false } = {}) => new Promise((ok) => {
+  // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
+  const c = spawn(process.execPath, args, { stdio: raccogli ? 'pipe' : 'inherit', cwd: REPO_ROOT, env });
+  const uscita = { stdout: [], stderr: [] };
+  if (raccogli) for (const k of Object.keys(uscita)) c[k].on('data', (d) => uscita[k].push(d));
+  const raccolto = () => (raccogli ? { stdout: Buffer.concat(uscita.stdout).toString('utf8'), stderr: Buffer.concat(uscita.stderr).toString('utf8') } : {});
+  let fermo = null;
+  const chiusi = [];
+  let eFermo = guardiaFermo(tetto);
+  const fileFermo = guardiaPerFile(tetto);
+  const tempo = avanzamento && orologioMacchina();
+  let letti = 0;
+  const guardia = avanzamento && setInterval(() => {
+    let testo = '';
+    try { testo = readFileSync(avanzamento, 'utf8'); } catch (_) { /* il reporter non ha ancora scritto niente */ }
+    const intere = testo.lastIndexOf('\n') + 1;
+    const nuove = intere > letti ? righeJson(testo.slice(letti, intere)) : [];
+    letti = Math.max(letti, intere);
+    const ora = tempo();
+    const giudizio = fileFermo(nuove, ora);
+    const tutto = eFermo(testo.length, ora);
+    const daChiudere = giudizio?.file?.filter((f) => !chiusi.includes(f)) || [];
+    if (daChiudere.length) {
+      // Tutti provati, anche dopo un no: chi è chiuso è un rosso col suo nome comunque vada.
+      const riusciti = daChiudere.filter((f) => chiudiFile(c, f));
+      chiusi.push(...riusciti);
+      if (riusciti.length === daChiudere.length) {
+        // Node scrive l'esito dei file chiusi fra un attimo: fino ad allora la corsa non è ferma.
+        eFermo = guardiaFermo(tetto);
+        return;
+      }
+    }
+    if (!giudizio && !tutto) return;
+    clearInterval(guardia);
+    fermo = fileInCorso(leggiRighe(avanzamento));
+    chiudiAlbero(c);
+  }, controlloPer(tetto));
+  const fine = (esito) => { if (guardia) clearInterval(guardia); ok({ ...esito, chiusi: chiusi.filter((f) => !(fermo || []).includes(f)), ...raccolto() }); };
+  c.on('error', (error) => fine({ error }));
+  c.on('close', (status, signal) => fine({ status, signal, fermo }));
+});
+
+const lancia = (args, temp, avanzamento = null) => lanciaSorvegliato(args, { env: ambientePerITest(process.env, temp), avanzamento });
 
 async function main() {
   const argv = process.argv.slice(2);
   const listOnly = argv.includes('--list');
-  const flags = argv.filter((a) => a !== '--list');
+  const solo = argv.includes(SOLO);
+  const flags = argv.filter((a) => a !== '--list' && a !== SOLO);
 
-  const files = collectTestFiles();
+  const files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
   if (!files.length) {
-    console.error(`[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
+    console.error(solo ? `[test:unit] ${SOLO} senza file da lanciare: mi fermo.` : `[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
     console.error('[test:unit] zero test eseguiti non è un successo — controlla la cartella.');
     process.exitCode = 1;
     return;
@@ -316,18 +612,31 @@ async function main() {
     }
   }
 
+  const temp = await temporaneaDellaCorsa();
+
+  // Dentro la temporanea della corsa: interrotta, il suo nome è l'unico che la pulizia del giorno dopo riconosce.
+  const cartella = mkdtempSync(join(temp || tmpdir(), 'filo-unit-'));
   // I gruppi si contano coi flag del riepilogo già dentro: sono i più lunghi che la riga potrà portare.
-  const cartella = mkdtempSync(join(tmpdir(), 'filo-unit-'));
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
   const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
-  const { opzioni, posizionali } = separaArgomenti(flags);
+  const avanzamento = (i) => join(cartella, `avanzamento-${String(i + 1).padStart(4, '0')}.jsonl`);
+  const { opzioni: dateDaChiLancia, posizionali } = separaArgomenti(flags);
+  const date = conConcorrenza(dateDaChiLancia, await concorrenzaDelWorker());
+  const tty = !!process.stdout.isTTY;
   // Un file dato a mano che è già fra i trovati girerebbe due volte.
   const trovati = new Set(files.map((f) => resolve(f)));
   const extra = posizionali.filter((p) => !trovati.has(resolve(REPO_ROOT, p)));
-  const utente = (i) => rapportiDaRiunire(opzioni, copia(i));
-  const flagsGruppo = (i) => flagsConRiepilogo(utente(i).flags, destinazione(i), { tty: !!process.stdout.isTTY });
-  const flagsDi = (i) => flagsGruppo(i) || utente(i).flags;
-  const gruppi = gruppiDiLancio(files, { flags: flagsDi(0), extra });
+  const utente = (i) => rapportiDaRiunire(date, copia(i));
+  const flagsGruppo = (i) => flagsConRiepilogo(utente(i).flags, destinazione(i), { tty });
+  // Con --watch la corsa sta ferma apposta; coi reporter che non si sanno appaiare, o in una copia del lanciatore senza
+  // il suo reporter, resta il tetto di node.
+  const guarda = !chiedeWatch(flags) && existsSync(join(REPO_ROOT, REPORTER_AVANZAMENTO));
+  const lancioDi = (i, base) => {
+    const conGuardia = guarda && flagsConAvanzamento(base, avanzamento(i), { tty });
+    return conGuardia ? { flags: conGuardia, avanzamento: avanzamento(i) } : { flags: conTettoDiTempo(base), avanzamento: null };
+  };
+  const flagsDi = (i) => lancioDi(i, flagsGruppo(i) || utente(i).flags);
+  const gruppi = gruppiDiLancio(files, { flags: flagsDi(0).flags, extra });
   const tanti = gruppi.length > 1;
   const rapporti = utente(0).rapporti;
   // Con un documento su stdout, stdout porta solo quello: le nostre righe vanno su stderr.
@@ -336,10 +645,17 @@ async function main() {
   try {
     if (!tanti) {
       // Un gruppo solo: l'uscita è quella di un `node --test` qualunque, riepilogo compreso.
-      const r = await lancia(['--test', ...opzioni, ...gruppi[0]]);
+      const l = lancioDi(0, date);
+      const r = await lancia(['--test', ...l.flags, ...gruppi[0]], temp, l.avanzamento);
+      if (r.chiusi.length) await scrivi(`\n${testoFileChiusi(r.chiusi, TETTO_FERMO_MS)}`);
+      if (r.fermo) {
+        await scrivi(testoFermo(r.fermo, TETTO_FERMO_MS));
+        process.exitCode = 1;
+        return;
+      }
       if (r.error) console.error(`[test:unit] non sono riuscito a lanciare node: ${r.error.message}`);
       // Ucciso da un segnale: non è un successo, e `status` in quel caso è null.
-      process.exitCode = r.error || r.status === null ? 1 : r.status;
+      process.exitCode = r.error || r.status === null ? 1 : r.status || (r.chiusi.length ? 1 : 0);
       return;
     }
 
@@ -354,7 +670,11 @@ async function main() {
     let interrotto = false;
     for (const [i, gruppo] of gruppi.entries()) {
       await scrivi(`\n[test:unit] gruppo ${i + 1} di ${gruppi.length} (${gruppo.length} file)`);
-      const r = await lancia(['--test', ...flagsDi(i), ...gruppo]);
+      const l = flagsDi(i);
+      const r = await lancia(['--test', ...l.flags, ...gruppo], temp, l.avanzamento);
+      if (r.chiusi.length) await scrivi(`\n${testoFileChiusi(r.chiusi, TETTO_FERMO_MS)}`);
+      // Un file fermo è un rosso del suo gruppo, non un'interruzione: i gruppi dopo partono.
+      if (r.fermo) { await scrivi(testoFermo(r.fermo, TETTO_FERMO_MS)); esiti.push(1); continue; }
       if (r.error) {
         console.error(`[test:unit] non sono riuscito a lanciare node per il gruppo ${i + 1}: ${r.error.message}`);
         esiti.push(1);
@@ -362,7 +682,7 @@ async function main() {
       }
       // Ucciso da un segnale (Ctrl+C, timeout): non è un successo, e i gruppi dopo non partono.
       if (r.status === null) { esiti.push(1); interrotto = i + 1 < gruppi.length; break; }
-      esiti.push(r.status);
+      esiti.push(r.status || (r.chiusi.length ? 1 : 0));
     }
     // Relative alla root come per node, che gira lì.
     const rapportiPersi = [];
@@ -384,7 +704,9 @@ async function main() {
     // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
     process.exitCode = esiti.find((e) => e !== 0) ?? (rapportiPersi.length ? 1 : 0);
   } finally {
-    rmSync(cartella, { recursive: true, force: true });
+    // Su Windows un figlio appena uscito tiene ancora la cartella dei rapporti: resta nella temporanea della corsa, che
+    // se ne va con lei, e l'esito della suite non cambia (#1063).
+    try { rmSync(cartella, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* vedi sopra */ }
   }
 }
 

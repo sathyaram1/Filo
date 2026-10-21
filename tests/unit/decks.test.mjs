@@ -18,7 +18,7 @@ const D = globalThis.SN_DECKS;
 
 test('decks si registra su globalThis con la sua API', () => {
   assert.ok(D);
-  for (const fn of ['newDeck', 'sanitizeDeck', 'addCard', 'removeCard', 'importCards', 'renameDeck', 'setCommander', 'duplicateDeck', 'deckCount', 'sortForLibrary', 'setGroupOverride', 'addTagToCard', 'replaceCardTags']) {
+  for (const fn of ['newDeck', 'sanitizeDeck', 'addCard', 'removeCard', 'importCards', 'renameDeck', 'setCommander', 'replaceCommander', 'duplicateDeck', 'deckCount', 'sortForLibrary', 'setGroupOverride', 'addTagToCard', 'replaceCardTags']) {
     assert.equal(typeof D[fn], 'function', `manca ${fn}`);
   }
 });
@@ -133,6 +133,46 @@ test('setCommander con id vuoto RIMUOVE il commander (feedback #302)', () => {
 test('newDeck: nomeAuto è true senza nome, false con nome scelto', () => {
   assert.equal(D.newDeck().nomeAuto, true);
   assert.equal(D.newDeck({ nome: 'Mono Blu' }).nomeAuto, false);
+});
+
+test('replaceCommander: il nuovo esce dall\'elenco, quello di prima ci rientra come carta normale (#789)', () => {
+  let d = D.setCommander(D.newDeck(), 'scry-a', { name: 'Atraxa', colors: ['W', 'U', 'B', 'G'] });
+  d = D.addCard(d, 'scry-b').deck;
+  d = D.addCard(d, 'scry-x').deck;
+  const v = d.versione;
+  const r = D.replaceCommander(d, 'scry-b', { name: 'Krenko', colors: ['R'] });
+  assert.equal(r.deck.commander, 'scry-b');
+  assert.deepEqual(r.deck.commanderMeta.colors, ['R']);
+  assert.deepEqual(r.deck.carte.map((c) => c.scryfall_id).sort(), ['scry-a', 'scry-x']);
+  assert.deepEqual(r.deck.carte.find((c) => c.scryfall_id === 'scry-a'), { scryfall_id: 'scry-a', qty: 1, tags: [] });
+  assert.equal(r.previousId, 'scry-a');
+  assert.equal(r.previousName, 'Atraxa');
+  assert.equal(r.deck.nome, 'Krenko', 'il nome automatico segue il commander');
+  assert.equal(r.deck.versione, v + 1, 'una modifica sola, una versione sola');
+});
+
+test('replaceCommander: togliere rimette il commander nel mazzo; stesso commander o niente da togliere = invariato', () => {
+  const d = D.setCommander(D.newDeck(), 'scry-a', { name: 'Atraxa', colors: ['W', 'U', 'B', 'G'] });
+  const off = D.replaceCommander(d, '', null);
+  assert.equal(off.deck.commander, '');
+  assert.equal(off.deck.commanderMeta, null);
+  assert.deepEqual(off.deck.carte.map((c) => c.scryfall_id), ['scry-a']);
+  assert.equal(off.previousId, 'scry-a');
+  const same = D.replaceCommander(d, 'scry-a', { name: 'Atraxa', colors: ['W', 'U', 'B', 'G'] });
+  assert.equal(same.deck, d);
+  assert.equal(same.previousId, '');
+  const none = D.replaceCommander(D.newDeck(), '', null);
+  assert.equal(none.previousId, '');
+});
+
+test('replaceCommander: il commander di prima già fra le carte non si duplica; senza commander non rientra niente', () => {
+  let d = D.setCommander(D.newDeck(), 'scry-a', { name: 'Atraxa', colors: [] });
+  d = D.addCard(d, 'scry-a', { qty: 1, tags: ['ramp'] }).deck;
+  const r = D.replaceCommander(d, 'scry-b', { name: 'Krenko', colors: ['R'] });
+  assert.deepEqual(r.deck.carte, [{ scryfall_id: 'scry-a', qty: 1, tags: ['ramp'] }]);
+  const first = D.replaceCommander(D.addCard(D.newDeck(), 'scry-b').deck, 'scry-b', { name: 'Krenko', colors: ['R'] });
+  assert.deepEqual(first.deck.carte, []);
+  assert.equal(first.previousId, '');
 });
 
 test('setCommander su mazzo con nome automatico lo rinomina col commander', () => {

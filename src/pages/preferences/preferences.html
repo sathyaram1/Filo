@@ -17,8 +17,71 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/onboarding.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/nomiSito.js"></script>
+  <script src="filo://shared/tasti.js"></script>
+  <script src="filo://shared/vociImpostazioni.js"></script>
+  <script src="filo://shared/filoContesto.js"></script>
+  <script src="filo://shared/lunghezzaRisposte.js"></script>
+  <script src="filo://shared/creditiAvviso.js"></script>
   <style>
+    /* Le scorciatoie di Filo (#842): i tasti hanno la forma di tasti veri, e la riga in ascolto si accende. */
+    .sc-lista { display: flex; flex-direction: column; gap: 2px; max-width: 620px; }
+    .sc-riga {
+      display: grid;
+      grid-template-columns: 150px auto 28px;
+      justify-content: start;
+      align-items: center;
+      column-gap: 10px;
+      padding: 4px 0;
+    }
+    .sc-nome { color: var(--sn-fg); }
+    .sc-riga.sc-cambiata .sc-nome { color: var(--sn-accent); font-weight: 600; }
+    .sc-tasti {
+      justify-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 30px;
+      padding: 3px 8px;
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius);
+      background: var(--sn-bg);
+      color: var(--sn-fg);
+      font: inherit;
+      cursor: pointer;
+      transition: border-color calc(120ms * var(--sn-motion, 1)), background calc(120ms * var(--sn-motion, 1)), box-shadow calc(120ms * var(--sn-motion, 1));
+    }
+    .sc-tasti:hover, .sc-tasti:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
+    .sc-kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      padding: 1px 7px;
+      border: 1px solid var(--sn-border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--sn-hover);
+    }
+    .sc-piu { color: var(--sn-muted); font-size: 11px; }
+    .sc-riga.sc-registra .sc-tasti {
+      border-color: var(--sn-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-accent) 22%, transparent);
+    }
+    .sc-attesa { color: var(--sn-muted); font-style: italic; }
+    .sc-ripristina {
+      background: transparent;
+      border: none;
+      color: var(--sn-muted);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      padding: 3px 5px;
+      border-radius: 4px;
+    }
+    .sc-ripristina:hover { color: var(--sn-fg); background: var(--sn-hover); }
+    .sc-errore { grid-column: 2 / -1; color: var(--sn-error); font-size: 12px; margin-top: 2px; }
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
     .onb-conv > summary {
@@ -31,11 +94,13 @@
       gap: 10px;
     }
     .onb-conv > summary::-webkit-details-marker { display: none; }
-    .onb-conv > summary::before { content: '▸'; opacity: 0.6; transition: transform 0.15s ease; }
+    .onb-conv > summary::before { content: '▸'; opacity: 0.6; transition: transform calc(0.15s * var(--sn-motion, 1)) ease; }
     .onb-conv[open] > summary::before { content: '▾'; }
     .onb-conv > summary:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
     .onb-conv-when { font-weight: 600; }
     .onb-conv-turns { opacity: 0.65; font-size: 0.9em; }
+    .onb-via { margin-left: auto; align-self: center; }
+    .onb-conv > summary:hover .onb-via { opacity: 0.85; }
     .onb-lines { padding: 6px 10px 12px 26px; display: flex; flex-direction: column; gap: 8px; }
     .onb-line { display: flex; gap: 8px; line-height: 1.45; }
     .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
@@ -44,17 +109,23 @@
     .agent-style-note { margin: 6px 0 0; font-size: 12px; color: var(--sn-muted); text-align: right; }
     .agent-style-note.agent-style-over { color: var(--sn-error); text-align: left; }
     #agentStyleText.agent-style-over { border-color: var(--sn-error); }
-    /* Memoria di Filo: una riga per cosa imparata, ognuna si toglie da sola (#592). */
+    /* Righe che si tolgono una alla volta (cartelle dei documenti): la × si accende al passaggio. */
     .mem-box { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
-    .mem-gruppo { margin: 12px 0 4px; font-size: 13px; font-weight: 600; opacity: 0.8; }
-    .mem-gruppo:first-child { margin-top: 0; }
-    .mem-riga { display: flex; align-items: flex-start; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background 0.15s ease; }
+    .mem-riga { display: flex; align-items: flex-start; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background calc(0.15s * var(--sn-motion, 1)) ease; }
     .mem-riga:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
     .mem-testo { flex: 1 1 auto; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .mem-via { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 6px; opacity: 0.35; transition: opacity 0.15s ease, background 0.15s ease; }
+    .mem-via { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 6px; opacity: 0.35; transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease; }
     .mem-riga:hover .mem-via, .mem-via:focus-visible { opacity: 0.85; }
     .mem-via:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.18)); color: var(--sn-error); }
     .mem-via:disabled { cursor: default; opacity: 0.2; }
+    /* Ricerca nei documenti (#947): cartelle come righe della memoria; quelle di serie tolte restano sbiadite. */
+    .doc-dove { display: block; font-size: 12px; color: var(--sn-muted); overflow-wrap: anywhere; }
+    .doc-tolta .mem-testo { opacity: 0.55; }
+    .doc-dove.doc-negata { color: var(--sn-error); }
+    .doc-rimetti { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 13px; padding: 2px 8px; border-radius: 6px; opacity: 0.6; transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease; }
+    .doc-rimetti:hover, .doc-rimetti:focus-visible { opacity: 1; background: var(--sn-hover, rgba(127, 127, 127, 0.18)); }
+    .doc-cercate { margin-top: 2px; }
+    .doc-piede { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -84,19 +155,69 @@
     </section>
 
     <section>
-      <h2>Commento nella home</h2>
-      <p class="sn-muted">Il messaggio proattivo di Filo al centro della pagina Nuova scheda.</p>
+      <h2>Filo scrive per primo</h2>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="showHomeMessage" />
-          <span>Mostra il commento di Filo al centro della home</span>
+          <span>Quando suona un timer, finisce un download, arriva un avviso o comincia la giornata, Filo lo scrive nella home</span>
         </label>
       </div>
     </section>
 
     <section>
+      <h2>Ora, batteria, rete, Bluetooth e volume nella home</h2>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisOra" />
+          <span>Ora</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisBatteria" />
+          <span>Batteria</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisRete" />
+          <span>Rete</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisBluetooth" />
+          <span>Bluetooth</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisVolume" />
+          <span>Volume</span>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Anteprima delle schede</h2>
+      <p class="sn-muted">Passando il mouse su una scheda vedi cosa contiene, senza aprirla.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="tabPreviewEnabled" />
+          <span>Mostra l'anteprima al passaggio del mouse</span>
+        </label>
+      </div>
+      <label for="tabPreviewSize" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dimensione</label>
+      <select id="tabPreviewSize">
+        <option value="piccola">Piccola</option>
+        <option value="media">Media</option>
+        <option value="grande">Grande</option>
+      </select>
+    </section>
+
+    <section>
       <h2>Gestione automatica delle schede</h2>
-      <p class="sn-muted">Filo riordina e archivia da sé le schede che non ti servono più, decidendo su tutte insieme. <strong>Archiviare non è perdere</strong>: le schede chiuse restano sempre riapribili da <em>Tab archiviate</em> (cronologia), con lo scroll dov'eri rimasto.</p>
+      <p class="sn-muted">Filo riordina e archivia da sé le schede che non ti servono più, decidendo su tutte insieme. <strong>Archiviare non è perdere</strong>: le schede chiuse restano nel filo della home, e da lì le riapri con un clic.</p>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="autoArchiveEnabled" />
@@ -111,6 +232,12 @@
       </div>
       <label for="autoArchiveIdleHours" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Archivia dopo questo periodo di inattività di Filo (ore)</label>
       <input type="number" id="autoArchiveIdleHours" min="1" max="168" step="1" style="width:120px;" />
+      <div class="sn-toggle-row" style="margin-top:12px">
+        <label>
+          <input type="checkbox" id="riassuntoSchede" />
+          <span>Riassumi le schede chiuse, per ritrovarle nel filo della home anche per significato</span>
+        </label>
+      </div>
     </section>
 
     <section>
@@ -121,11 +248,17 @@
       <p id="agentStyleNote" class="agent-style-note" aria-live="polite" hidden></p>
     </section>
 
+    <section id="autonomia">
+      <h2 id="autonomiaTitolo">Autonomia di Filo</h2>
+      <p class="sn-muted">Filo fa da solo quello che può disfare. Quando legge cose scritte da altri, fa meno. Tu scegli con un livello quanto si fida.</p>
+      <div class="sn-cookie-modes" id="autonomiaLivelli" role="radiogroup" aria-labelledby="autonomiaTitolo"></div>
+      <span id="autonomiaHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
     <section>
       <h2>Memoria di Filo</h2>
-      <p class="sn-muted">Quello che Filo ha imparato su di te mentre parlavate. Entra in ogni conversazione: se una riga non ti torna, toglila.</p>
-      <div id="memoria" class="mem-box"></div>
-      <span id="memoriaHint" class="sn-saved-indicator" aria-live="polite">Dimenticato</span>
+      <p class="sn-muted">Quello che Filo ha imparato su di te entra in ogni conversazione. Nel quaderno lo rileggi, lo correggi e vedi da dove viene.</p>
+      <button type="button" class="sn-btn sn-btn-secondary" id="apriQuaderno">Apri il quaderno delle memorie</button>
     </section>
 
     <section>
@@ -166,20 +299,38 @@
     </section>
 
     <section>
+      <h2>Microfono delle chat</h2>
+      <label for="dictationAutoSend" class="sn-muted" style="display:block;margin-bottom:4px;">Finito di parlare</label>
+      <select id="dictationAutoSend">
+        <option value="si">Invia da solo</option>
+        <option value="no">Lascia il testo da correggere</option>
+      </select>
+      <label for="dictationSilence" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa che chiude: <span id="dictationSilenceVal">2 s</span></label>
+      <input type="range" id="dictationSilence" min="1" max="8" step="0.5" value="2" style="width:100%;max-width:360px;display:block;" />
+      <label for="dictationCancel" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Tempo per annullare l'invio: <span id="dictationCancelVal">2,5 s</span></label>
+      <input type="range" id="dictationCancel" min="0" max="10" step="0.5" value="2.5" style="width:100%;max-width:360px;display:block;" />
+    </section>
+
+    <section>
       <h2>Notifiche</h2>
-      <p class="sn-muted">I messaggi che Filo mostra in basso a destra (schede riordinate, blocchi di siti, ecc.).</p>
-      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata (secondi) — <strong>0 = resta finché non la chiudi</strong></label>
+      <p class="sn-muted">Gli avvisi in basso a destra, nella barra e dentro le pagine.</p>
+      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata in secondi, <strong>0 = restano finché non li chiudi</strong></label>
       <input type="number" id="notifDuration" min="0" max="120" step="1" style="width:120px;" />
       <div class="sn-toggle-row" style="margin-top:12px;">
         <label>
           <input type="checkbox" id="notifSoundEnabled" />
-          <span>Riproduci un suono quando compare una notifica</span>
+          <span>Suono quando arriva un avviso</span>
         </label>
       </div>
       <label for="notifSound" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Suono</label>
       <div class="sn-row" style="align-items:center;gap:10px;">
         <select id="notifSound"></select>
         <button type="button" class="sn-btn sn-btn-secondary" id="notifSoundPreview">Prova</button>
+      </div>
+      <label for="notifSoundVolume" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Volume</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <input type="range" id="notifSoundVolume" min="0" max="100" step="5" style="width:220px;" />
+        <span id="notifSoundVolumeVal" class="sn-muted"></span>
       </div>
     </section>
 
@@ -196,15 +347,20 @@
         </select>
         <button type="button" class="sn-btn sn-btn-secondary" id="timerRingtonePreview">Prova</button>
       </div>
+      <label for="timerRingtoneVolume" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Volume</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <input type="range" id="timerRingtoneVolume" min="0" max="100" step="5" style="width:220px;" />
+        <span id="timerRingtoneVolumeVal" class="sn-muted"></span>
+      </div>
     </section>
 
-    <section>
+    <section id="sec-terminal">
       <h2>Modalità terminale</h2>
-      <p class="sn-muted">Quando è attiva, nella dashboard i comandi che iniziano con <code>/</code> (e che non sono comandi di Filo) vengono eseguiti da una shell di sistema, con l'output mostrato in tempo reale. Sopra la barra di scrittura compare la cartella in cui ti trovi. <strong>Esegue comandi reali sul tuo computer</strong>: attivala solo se sai cosa stai facendo.</p>
+      <p class="sn-muted">Filo usa il terminale del computer per le richieste che lo vogliono, come «quanto spazio ho sul disco?». Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, e per cancellare o per un comando che non riconosce devi scrivere «conferma». Nella home, un messaggio che inizia con <code>/</code> va dritto alla shell, se non è un comando di Filo.</p>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="terminalEnabled" />
-          <span>Attiva la modalità terminale nella dashboard</span>
+          <span>Attiva la modalità terminale</span>
         </label>
       </div>
       <label for="terminalShell" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Shell da usare</label>
@@ -217,13 +373,144 @@
       </select>
     </section>
 
+    <section id="sec-schermo">
+      <h2>Guardare lo schermo</h2>
+      <p class="sn-muted">Chiedi in chat «cosa mi sta chiedendo questa finestra?» o «leggimi l'errore di Word». Filo cattura quella finestra, la fa leggere a un modello che vede le immagini e ti risponde. La prima volta che guarda una finestra di un'altra app ti chiede l'OK. Non clicca, non scrive e non salva l'immagine.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="schermoGuarda" />
+          <span>Filo può guardare lo schermo</span>
+        </label>
+      </div>
+    </section>
+
+    <section id="sec-nomi-file">
+      <h2>Nomi dei file scaricati</h2>
+      <p class="sn-muted">Un file che arriva con un nome che non dice niente («scan_00231.pdf», «IMG_2026…», «documento (3)») prende un nome che dice cosa contiene, come «Bolletta luce marzo 2026.pdf». Filo ne legge l'inizio o una miniatura, l'estensione resta quella, e l'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com'erano, e nelle finestre in incognito non succede.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="nomiSensatiScaricamenti" />
+          <span>Dai da solo un nome sensato ai file scaricati</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label title="L'immagine va intera al modello delle immagini, che ne scrive il nome del file e la riga nella cronologia degli appunti. Spento, lo screenshot si chiama con data e ora. Da una pagina delicata non parte mai.">
+          <input type="checkbox" id="descriviImmagini" />
+          <span>Dai un nome a screenshot e immagini copiate guardandole</span>
+        </label>
+      </div>
+    </section>
+
+    <section id="sec-documenti">
+      <h2>Ricerca nei documenti</h2>
+      <p class="sn-muted">Chiedi a Filo un tuo documento a parole, come «la bolletta della luce di marzo»: lo cerca in queste cartelle leggendone il testo, anche se il file si chiama «scan_00231.pdf». Il testo resta sul computer, e a un modello arrivano solo i pochi documenti candidati di una ricerca.</p>
+      <div id="documentiCartelle" class="mem-box"></div>
+      <div id="documentiCercate" class="mem-box doc-cercate" hidden></div>
+      <div class="doc-piede">
+        <button type="button" class="sn-btn sn-btn-secondary" id="documentiAggiungi">Aggiungi una cartella</button>
+        <span id="documentiStato" class="sn-muted" aria-live="polite"></span>
+      </div>
+      <span id="documentiHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
+    <section id="sec-menu-siti">
+      <h2>Siti col loro menu del tasto destro</h2>
+      <p class="sn-muted">Su questi siti il tasto destro apre il menu del sito; quello di Filo resta a <span id="menuDelSitoTasto"></span> + tasto destro.</p>
+      <div id="menuDelSitoSiti" class="mem-box"></div>
+      <span id="menuDelSitoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
 
+      <!-- #841 — gli interruttori di funzione che prima si cambiavano solo a parole. -->
+      <section id="sec-funzioni">
+        <h2>Funzioni</h2>
+        <div class="sn-toggle-row">
+          <label title="L'assistente che vede la pagina: la voce «Aiuto» del tasto destro, sulla pagina e sulla linguetta, e la sua scorciatoia.">
+            <input type="checkbox" id="aiutoAcceso" />
+            <span>Aiuto nelle pagine</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Ogni pagina che salvi per dopo prende una categoria scelta da un modello, e la lista si raggruppa per categoria.">
+            <input type="checkbox" id="categorieAutomatiche" />
+            <span>Categorie automatiche in «Aperti per dopo»</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- #1446 — i due segni del correttore, la parte del modello degli errori, le ripetizioni, i tempi e i modelli. -->
+      <section id="sec-correttore">
+        <h2>Correttore</h2>
+        <div class="sn-toggle-row">
+          <label title="Quello che Filo sa sbagliato, con un'onda sottile sotto. Spento, sparisce anche la sottolineatura del browser.">
+            <input type="checkbox" id="correttoreAcceso" />
+            <span>Errori</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Quello che decidi tu, coi puntini sotto: frasi poco chiare, date che non tornano, cose diverse da quelle già dette nella pagina.">
+            <input type="checkbox" id="correttoreSuggerimenti" />
+            <span>Suggerimenti</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Spento, gli errori li trova solo Filo, senza modello e senza spendere: parole fuori dizionario, parole ripetute ed errori fissi, che restano sbiaditi.">
+            <input type="checkbox" id="correttoreModello" />
+            <span>Un modello controlla gli errori</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="correttoreRipetizioni" />
+            <span>Segna le parole ripetute per sbaglio, come «il il»</span>
+          </label>
+        </div>
+        <label for="correttorePausaRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo degli errori (millisecondi, da 200 a 5.000)</label>
+        <input type="number" id="correttorePausaRapido" min="200" max="5000" step="50" style="width:120px;" />
+        <label for="correttoreOgniRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Mentre scrivi senza pause, un controllo degli errori ogni (millisecondi, da 1.000 a 60.000)</label>
+        <input type="number" id="correttoreOgniRapido" min="1000" max="60000" step="500" style="width:120px;" />
+        <label for="correttorePausaRagionato" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo dei suggerimenti (millisecondi, da 1.000 a 30.000)</label>
+        <input type="number" id="correttorePausaRagionato" min="1000" max="30000" step="500" style="width:120px;" />
+        <p class="sn-muted" style="margin-top:12px;"><a id="correttoreModelli" href="filo://options/options.html">I modelli dei due controlli</a></p>
+      </section>
+
+      <section id="sec-barra">
+        <h2>Barra laterale</h2>
+        <p class="sn-muted">La barra che si apre dal bordo sinistro con indietro, avanti, ricarica e home. Resta sempre raggiungibile dalla linguetta a sinistra delle schede e con la scorciatoia.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="barraSpinta" />
+            <span>Aprila quando il mouse si ferma contro il bordo sinistro</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="barraStriscia" />
+            <span>Mostra la striscia sottile sul bordo sinistro</span>
+          </label>
+        </div>
+        <label for="barraAttesa" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Attesa sul bordo prima che si apra (millisecondi, da 100 a 3.000)</label>
+        <input type="number" id="barraAttesa" min="100" max="3000" step="50" style="width:120px;" />
+        <label for="barraUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5.000)</label>
+        <input type="number" id="barraUscita" min="100" max="5000" step="50" style="width:120px;" />
+      </section>
+
+      <!-- #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto: le righe le scrive preferences.js. -->
+      <section id="sec-scorciatoie">
+        <h2>Scorciatoie da tastiera</h2>
+        <div id="scorciatoieFilo" class="sc-lista" role="group" aria-label="Scorciatoie di Filo"></div>
+        <div class="sn-row" style="margin-top:12px;">
+          <button class="sn-btn sn-btn-secondary" id="scorciatoieRipristina" type="button">Ripristina i tasti di serie</button>
+          <span id="scorciatoieHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+        </div>
+      </section>
+
       <section id="sec-tokens">
         <h2>Aspetto: token estetici</h2>
-        <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1.</p>
+        <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1; le durate come <code>450ms</code>.</p>
         <div class="sn-token-code" id="tokenCode" role="group" aria-label="Token estetici"></div>
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-secondary" id="resetAllTokens" type="button">Ripristina tutti i predefiniti</button>
@@ -238,6 +525,122 @@
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-secondary" id="resetAllTabColor" type="button">Ripristina tutti i predefiniti</button>
           <span id="tabColorSavedHint" class="sn-saved-indicator">Salvato</span>
+        </div>
+      </section>
+
+      <section id="sec-contesto">
+        <h2>Quanto ricorda la chat</h2>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Gli ultimi giorni di conversazioni, di tutte le schede, che Filo ha davanti a ogni messaggio. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
+            <span>Giorni</span>
+            <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di quello che Filo ha davanti. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
+            <span>Tetto in token</span>
+            <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quanto il modello tiene da parte le istruzioni fisse della chat, per rileggerle a prezzo basso. Un'ora costa il doppio a metterle da parte e regge le pause lunghe. Vale coi modelli Anthropic.">
+            <span>Durata della cache</span>
+            <select id="contestoCache" style="width:240px;">
+              <option value="" id="contestoCachePredefinita">Come i predefiniti</option>
+              <option value="5m">5 minuti</option>
+              <option value="1h">Un'ora</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section id="sec-lunghezza">
+        <h2>Quanto può essere lunga una risposta</h2>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di una risposta della chat (anche quella delle app e dell'Aiuto). Oltre si ferma e te lo dice, con «Continua». Vuoto: il valore predefinito.">
+            <span>Chat</span>
+            <input type="number" id="lunghezzaConversazioni" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di traduzioni, riscritture e riassunti. Vuoto: il valore predefinito.">
+            <span>Traduzioni e riassunti</span>
+            <input type="number" id="lunghezzaTesti" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token delle risposte brevi: spiegazioni, titoli, correttore. Vuoto: il valore predefinito.">
+            <span>Risposte brevi</span>
+            <input type="number" id="lunghezzaBrevi" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+        </div>
+      </section>
+
+      <!-- #818 — quando Filo avvisa che i crediti stanno per finire, e il pre-calcolo che li consuma senza che si veda. -->
+      <section id="sec-crediti">
+        <h2>Crediti</h2>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="avvisoCreditiAttivo" />
+            <span>Avvisami prima che i crediti finiscano</span>
+          </label>
+        </div>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Avvisa quando, al ritmo di questi giorni e contando la quota che arriva ogni notte, i crediti durano al più questi giorni. 0 spegne questa condizione.">
+            <span>Quando durano al più (giorni)</span>
+            <input type="number" id="avvisoCreditiGiorni" min="0" max="30" step="0.5" style="width:120px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Avvisa quando il saldo scende sotto questa parte dei crediti che avevi all'ingresso. 0 spegne questa condizione.">
+            <span>O sotto (% di quelli d'ingresso)</span>
+            <input type="number" id="avvisoCreditiPercento" min="0" max="100" step="1" style="width:120px;" />
+          </label>
+        </div>
+        <div class="sn-toggle-row" style="margin-top:12px">
+          <label title="Al tasto destro la spiegazione è già pronta, ma la paghi anche le volte che non la apri.">
+            <input type="checkbox" id="spiegaAnticipata" />
+            <span>Prepara la spiegazione appena selezioni un testo</span>
+          </label>
+        </div>
+      </section>
+
+      <section id="sec-proposta-email">
+        <h2>La tua email nei siti</h2>
+        <p class="sn-muted">Quando entri in un campo che chiede l'email o il nome utente, Filo ti propone quella del tuo account. Il sito la riceve solo quando la scegli.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="propostaEmailAttiva" />
+            <span>Proponi l'email del tuo account nei campi di accesso</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="propostaEmailIncognito" />
+            <span>Anche nelle finestre in incognito</span>
+          </label>
+        </div>
+      </section>
+
+      <section id="sec-aggiornamenti">
+        <h2>Aggiornamenti</h2>
+        <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="aggiornamentiAutomatici" />
+            <span>Installa gli aggiornamenti da solo</span>
+          </label>
+        </div>
+        <!-- Solo su Windows: su Mac e Linux all'apertura non si installa niente (src/main/aggiornamentoRegole.js). -->
+        <div id="aggiornamentiQuando" hidden>
+          <p class="sn-muted" style="margin-top:12px;">Installata alla chiusura non si vede: se riapri Filo in quei dieci secondi, Windows dice che il collegamento non funziona.</p>
+          <label for="aggiornamentiInstalla" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Quando installarla</label>
+          <select id="aggiornamentiInstalla">
+            <option value="avvio">La prossima volta che apro Filo, con la barra di avanzamento</option>
+            <option value="chiusura">In silenzio, quando chiudo Filo</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- #969 — i contatori giornalieri: cosa esce lo dice la pagina Privacy, che dice anche come spegnerli. -->
+      <section id="sec-contatori">
+        <h2>Contatori anonimi</h2>
+        <p class="sn-muted">Una volta al giorno Filo manda a chi lo sviluppa solo dei numeri: quante volte usi ogni funzione, quanto aspetti la risposta, quante chiamate falliscono. Niente testi, indirizzi o nomi di file, con un codice che cambia ogni mese. In incognito non conta niente. <a id="contatoriPrivacy" href="filo://transparency/transparency.html?doc=privacy">Cosa esce, nel dettaglio</a></p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="contatoriAttivi" />
+            <span>Manda i contatori anonimi</span>
+          </label>
         </div>
       </section>
 

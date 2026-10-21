@@ -168,9 +168,10 @@
 
     // I campi segreti compilati che a schermo si leggono (un numero di carta, una password resa visibile), con
     // quanto serve a ridisegnarli coperti nell'immagine della pagina. Coordinate della finestra di questo documento.
-    function campiInVista() {
+    // `radice`: un componente chiuso, che solo il main sa raggiungere.
+    function campiInVista(radice = doc) {
       const out = [];
-      for (const el of tuttiICampi(doc)) {
+      for (const el of tuttiICampi(radice)) {
         if (!el.value || !campoSegreto(el) || copertoAschermo(el)) continue;
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0 || r.top >= win.innerHeight || r.left >= win.innerWidth) continue;

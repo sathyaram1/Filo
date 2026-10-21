@@ -19,8 +19,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, rmSync, readFileSync, mkdirSync, realpathSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { writeFileSync, readFileSync, mkdirSync, realpathSync } from 'node:fs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -29,15 +29,22 @@ const ROOT = join(__dirname, '..', '..');
 const T = require(join(ROOT, 'src', 'main', 'services', 'terminal.js'));
 
 // Da solo un comando qui dura pochi secondi; fra gli unit test in parallelo PowerShell sulla macchina dell'owner
-// ne ha presi 61 e il tetto di 60 faceva un rosso finto. Le prove misurano l'esito, non la velocità.
+// ne ha presi 61 e il tetto di 60 faceva un rosso finto. Le prove misurano l'esito, non la velocità: vale anche per
+// le sessioni del terminale della dashboard, che col loro tetto di 30 s cadevano allo stesso modo (#1063).
 const ATTESA = 300_000;
+// La shell appena uscita può tenere ancora la cartella in cui girava: chi la toglie per provare aspetta che la lasci.
+const PAZIENZA = { tentativi: 20 };
+// Ogni riga stampata è un giro fra la shell e Filo, e sotto carico un giro costa un decimo di secondo: duemila righe
+// corte portavano il file oltre il tetto del lanciatore. Lo stesso output enorme si fa con poche righe lunghe (#1063).
+const RIGA_LUNGA = 'riga-di-elenco-'.repeat(64);
+const RIGHE_OLTRE_IL_TETTO = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / RIGA_LUNGA.length);
 
 // Il nome che rompeva tutto: un trattino lungo e una «à». Entrambi assenti
 // dalla tabella OEM di Windows.
 const NOME_DIFFICILE = 'RELAZIONE — attività finale.txt';
 
 const TMP = cartellaTemporanea('filo-codifica-');
-process.on('exit', () => { try { rmSync(TMP, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(TMP); } catch (_) {} });
 
 // ───────────────────────── il preludio, per shell ────────────────────────────
 // Le costanti si controllano su OGNI piattaforma: il preludio di PowerShell
@@ -83,8 +90,26 @@ test('il preludio precede il comando dell\'utente, non lo segue', () => {
   // L'ORDINE si controlla sul codice, uguale su ogni sistema. Se il preludio
   // finisse dopo il comando, la console avrebbe già scritto l'output con la
   // codifica sbagliata e il nome sarebbe perso.
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'terminal.js'), 'utf8');
-  assert.match(src, /const toRun = encodingPrelude\(usedShell\) \+ \(/);
+  // Si guarda quello che parte davvero, fingendo Windows per vederne i rami anche altrove.
+  const prima = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  try {
+    const comando = 'Write-Output ciao';
+    // cmd non passa da qui ma dalla sessione (#719), dove il preludio è la riga di pronto: la prova sta in terminaleCmd.
+    assert.ok(T.viaSessione('cmd'));
+    for (const shell of ['powershell']) {
+      for (const trackCwd of [false, true]) {
+        const inv = T.invocazione(shell, comando, { trackCwd, mark: 'SEGNO' });
+        const testo = inv.stdin != null ? inv.stdin : inv.args[inv.args.length - 1];
+        const preludio = T.encodingPrelude(shell);
+        const dove = testo.includes(comando) ? testo.indexOf(comando) : testo.indexOf('FromBase64String');
+        assert.ok(preludio && testo.includes(preludio), `${shell}, cartella tracciata ${trackCwd}: manca il preludio`);
+        assert.ok(dove > testo.indexOf(preludio), `${shell}, cartella tracciata ${trackCwd}: il preludio segue il comando`);
+      }
+    }
+  } finally {
+    Object.defineProperty(process, 'platform', prima);
+  }
 });
 
 test('il preludio è quello della shell che gira, non di quella chiesta', () => {
@@ -116,28 +141,24 @@ test('il comando digitato dall\'utente non arriva a PowerShell con byte fuori da
   // dalla parte opposta. La cura è non far viaggiare caratteri non ASCII.
   const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
 
-  // Un comando di soli caratteri ASCII parte identico a prima: `exit`, `cd`,
-  // le variabili e tutto quello che un utente digita di solito non cambiano.
-  for (const c of ['exit', 'cd ..', '$x = 5', 'Get-ChildItem -Name', '']) {
-    assert.equal(S.comandoPerPowerShell(c), c);
-  }
-
-  // Un comando accentato parte in una forma che sul filo è solo ASCII…
+  // Ogni comando, accentato o no, parte in una forma che sul filo è solo ASCII (anche come dato per l'esito, #718)…
   const comando = 'Get-Content "RELAZIONE — attività finale.txt"';
+  for (const c of [comando, 'exit', 'cd ..', '']) {
+    const sulFilo = S.comandoPerPowerShell(c);
+    assert.ok(
+      // eslint-disable-next-line no-control-regex
+      /^[\x00-\x7F]*$/.test(sulFilo),
+      `sul filo ci sono ancora byte fuori dall'ASCII: ${sulFilo}`,
+    );
+    // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha digitato.
+    const espressione = (sulFilo.match(/\$__filo_t=\(-join @\(((?:'(?:[^']|'')*'|\[char\]\d+)(?:,(?:'(?:[^']|'')*'|\[char\]\d+))*)\)\);/) || [])[1];
+    assert.ok(espressione, 'il comando deve viaggiare codificato, non interpolato');
+    const ricomposto = espressione.match(/'(?:[^']|'')*'|\[char\]\d+/g)
+      .map((p) => (p[0] === "'" ? p.slice(1, -1).replace(/''/g, "'") : String.fromCharCode(Number(p.slice(6)))))
+      .join('');
+    assert.equal(ricomposto, c);
+  }
   const sulFilo = S.comandoPerPowerShell(comando);
-  assert.ok(sulFilo !== comando, 'un comando accentato non può partire così com\'è');
-  assert.ok(
-    // eslint-disable-next-line no-control-regex
-    /^[\x00-\x7F]*$/.test(sulFilo),
-    `sul filo ci sono ancora byte fuori dall'ASCII: ${sulFilo}`,
-  );
-
-  // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha
-  // digitato. Qui si rifà il giro che farebbe lui: si ripesca il testo
-  // codificato e lo si riporta a caratteri.
-  const b64 = (sulFilo.match(/FromBase64String\('([A-Za-z0-9+/=]+)'\)/) || [])[1];
-  assert.ok(b64, 'il comando deve viaggiare codificato, non interpolato');
-  assert.equal(Buffer.from(b64, 'base64').toString('utf8'), comando);
   // Niente del comando dell'utente finisce dritto nella riga: se ci finisse,
   // una virgoletta basterebbe a uscire dalla stringa e a farsi eseguire altro.
   assert.ok(!sulFilo.includes('attività'));
@@ -267,10 +288,9 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
   // valeva per il comando dopo e un comando FALLITO risultava riuscito.
   // È lo scenario di ogni ricerca dentro una cartella grande, cioè quello che
   // Filo fa quando non sa ancora dove sta il file che gli hanno chiesto.
-  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
   const comando = process.platform === 'win32'
-    ? `1..${righe} | ForEach-Object { "riga-di-elenco" }; cmd /c exit 3`
-    : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; exit 3`;
+    ? `1..${RIGHE_OLTRE_IL_TETTO} | ForEach-Object { "${RIGA_LUNGA}" }; cmd /c exit 3`
+    : `for i in $(seq 1 ${RIGHE_OLTRE_IL_TETTO}); do echo ${RIGA_LUNGA}; done; exit 3`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
   assert.equal(out.timedOut, false, `il comando non è finito in ${ATTESA / 1000} s: macchina bloccata, non l'esito`);
   assert.equal(out.truncated, true, 'l\'output doveva sfondare il tetto');
@@ -284,11 +304,10 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
 
 test('la cartella in cui il comando è finito torna anche con un output enorme', async () => {
   const sotto = join(TMP, 'sottocartella');
-  try { rmSync(sotto, { recursive: true, force: true }); } catch (_) {}
-  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
+  try { togliCartella(sotto); } catch (_) {}
   const comando = process.platform === 'win32'
-    ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${righe} | ForEach-Object { "riga-di-elenco" }`
-    : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${righe}); do echo riga-di-elenco; done`;
+    ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${RIGHE_OLTRE_IL_TETTO} | ForEach-Object { "${RIGA_LUNGA}" }`
+    : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${RIGHE_OLTRE_IL_TETTO}); do echo ${RIGA_LUNGA}; done`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
   assert.equal(out.timedOut, false, `il comando non è finito in ${ATTESA / 1000} s: macchina bloccata, non l'esito`);
   assert.equal(out.cwd, sotto, `dopo un output lungo Filo crede di essere altrove: ${out.cwd}`);
@@ -305,7 +324,7 @@ test('se la cartella di prima non c\'è più, il comando gira lo stesso e lo dic
   mkdirSync(sparita, { recursive: true });
   const prima = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.ok(prima.stdout.includes('ciao'), 'il comando non gira nemmeno a cartella viva');
-  rmSync(sparita, { recursive: true, force: true });
+  assert.ok(togliCartella(sparita, PAZIENZA), 'la cartella di prima è ancora tenuta da qualcuno');
 
   const dopo = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.ok(
@@ -321,7 +340,7 @@ test('da una cartella sparita si può ancora andare altrove', async () => {
   // terminale è finito finché l'utente non la chiude, e nessuno glielo dice.
   const sparita = join(TMP, 'cartella-senza-uscita');
   mkdirSync(sparita, { recursive: true });
-  rmSync(sparita, { recursive: true, force: true });
+  assert.ok(togliCartella(sparita, PAZIENZA), 'la cartella è ancora tenuta da qualcuno');
   const dove = process.platform === 'win32' ? `Set-Location "${TMP}"` : `cd "${TMP}"`;
   const out = await T.runCommand(dove, { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.cwd, TMP, `non si riesce ad andarsene: ${out.cwd} (${out.stderr.slice(0, 120)})`);
@@ -349,10 +368,14 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
 
   // Il file scaricato, con dentro la vecchia riga di servizio e abbastanza
   // lungo da far cadere quella vera.
-  const riga = 'riga di testo qualunque, scaricata da internet\n';
+  // Righe lunghe e poche, per il costo di ogni riga sotto carico (vedi RIGA_LUNGA): la finta sta dentro l'uscita
+  // mostrata, quella vera finisce oltre il tetto.
+  const riga = `${'riga di testo qualunque, scaricata da internet '.repeat(40)}\n`;
+  const prima = riga.repeat(5);
+  assert.ok(prima.length < T.MAX_OUTPUT_CHARS, 'la riga finta deve stare nell\'uscita mostrata');
   const finto = `${T.CWD_MARK_PREFIX}8b9cb__:0:${altrove}\n`;
   const file = join(dir, 'scaricato.txt');
-  writeFileSync(file, riga.repeat(200) + finto + riga.repeat(6000), 'utf8');
+  writeFileSync(file, prima + finto + riga.repeat(Math.ceil((T.MAX_OUTPUT_CHARS * 3) / riga.length)), 'utf8');
 
   const leggi = process.platform === 'win32' ? `Get-Content "${file}"` : `cat "${file}"`;
   const out = await T.runCommand(leggi, { cwd: dir, trackCwd: true, timeoutMs: ATTESA });
@@ -368,7 +391,7 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
   assert.notEqual(ko.code, 0, 'un comando fallito viene riportato come riuscito');
   assert.notEqual(ko.cwd, altrove, 'e intanto si sposta dove dice il file');
 
-  rmSync(dir, { recursive: true, force: true });
+  togliCartella(dir);
 });
 
 // ── #714: l'esito che arriva all'assistente è quello vero ───────────────────
@@ -432,7 +455,7 @@ test('nel terminale della dashboard un comando fallito risulta fallito', async (
   const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
   const esegui = (comando) => new Promise((risolvi, rifiuta) => {
     let uscita = '';
-    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto in ${ATTESA / 1000} s: ${comando}`)), ATTESA);
     sessione.exec(comando, {
       onData: ({ chunk, stream }) => { if (stream === 'stdout') uscita += chunk; },
       onExit: ({ code }) => { clearTimeout(stop); risolvi({ code, uscita }); },
@@ -477,7 +500,7 @@ test('un programma esterno riuscito che scrive su stderr resta riuscito anche co
   const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
   const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
   const esegui = (comando) => new Promise((risolvi, rifiuta) => {
-    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto in ${ATTESA / 1000} s: ${comando}`)), ATTESA);
     sessione.exec(comando, {
       onExit: ({ code }) => { clearTimeout(stop); risolvi(code); },
       onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },

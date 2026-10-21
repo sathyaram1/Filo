@@ -1,15 +1,13 @@
 // Persistenza del sistema di memoria di Filo.
 //
-// Tre livelli (vedi filo-architettura.md sezione 4):
-//   - raw_log: storico completo di interazioni utente/Filo. Volume previsto
-//     ~1MB/anno → niente retention policy stringente, basta un cap difensivo.
+// Due livelli (vedi filo-architettura.md sezione 4; lo storico delle interazioni è il filo, #866):
 //   - lessons buffer: lezioni estratte dall'agente Creatore Lezioni, in attesa
 //     di compattazione (svuotato dal Compattatore quando supera 3000 char).
 //   - moduli: PROFILO, PREFERENZE, e N espansioni dinamiche. Sempre persistenti.
 //
 // In aggiunta gestiamo qui anche due store legati alla dashboard:
 //   - timers: countdown attivi (azione TIMER).
-//   - notifications: voci della colonna destra.
+//   - notifications: avvisi, carte della colonna sinistra della home.
 //
 // Gli appunti NON stanno più qui: l'azione SALVA_APPUNTO li scrive nei file
 // dell'editor (src/main/services/editorFiles.js), che è anche l'unico posto che
@@ -23,9 +21,6 @@
 
   const KEYS = global.SN_CONST.STORAGE_KEYS;
 
-  // Limite difensivo sul raw log per non saturare chrome.storage (~10MB totali).
-  // 5000 entry ≈ pochi MB con messaggi corti.
-  const RAW_LOG_CAP = 5000;
   // Quando il buffer di lezioni supera questa soglia in caratteri, il
   // Compattatore va eseguito (vedi spec sezione 4.2).
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
@@ -69,7 +64,7 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
-    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER) && onMemoriaCambiata) {
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER || key === KEYS.FILO_KEEP_OPEN || key === KEYS.FILO_MEMORY_FONTI) && onMemoriaCambiata) {
       try { onMemoriaCambiata(); } catch (_) {}
     }
   }
@@ -78,42 +73,269 @@
   let onMemoriaCambiata = null;
   function setOnMemoryChange(fn) { onMemoriaCambiata = typeof fn === 'function' ? fn : null; }
 
-  // ===== Raw log =====
-
-  async function appendRaw(entry) {
-    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
-    list.unshift({
-      ts: entry.ts || new Date().toISOString(),
-      type: entry.type || 'unknown', // 'chat_user', 'chat_filo', 'dismiss', 'click', ...
-      summary: entry.summary || '',
-      extra: entry.extra || null,
-    });
-    if (list.length > RAW_LOG_CAP) list.length = RAW_LOG_CAP;
-    await setRaw(KEYS.FILO_RAW_LOG, list);
-    return list[0];
-  }
-
-  async function listRaw({ since, limit = 100 } = {}) {
-    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
-    let out = list;
-    if (since) {
-      const cutoff = new Date(since).getTime();
-      out = out.filter((e) => new Date(e.ts).getTime() >= cutoff);
-    }
-    return out.slice(0, limit);
-  }
-
   // ===== Lessons buffer =====
 
   async function getLessonsBuffer() {
     return getRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
 
-  async function appendLesson(lesson) {
+  const Q = () => global.SN_QUADERNO;
+
+  // Lezioni, righe e fonti si rileggono e riscrivono intere: le scritture vanno in fila, o la lezione arrivata mentre
+  // l'utente toglie una riga se la mangia (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+  let codaMemoria = Promise.resolve();
+  function inCodaMemoria(fn) {
+    const r = codaMemoria.then(fn, fn);
+    codaMemoria = r.then(() => {}, () => {});
+    return r;
+  }
+  const inFila = (fn) => (...a) => inCodaMemoria(() => fn(...a));
+
+  // `fonti`: gli eventi del filo da cui la lezione è nata (#872). Una lezione che ridice una riga tolta dall'utente,
+  // dallo stesso tratto del filo, non entra.
+  async function appendLesson(lesson, { fonti = [] } = {}) {
     const buf = await getLessonsBuffer();
-    buf.push({ ts: new Date().toISOString(), text: String(lesson || '').trim() });
+    const text = String(lesson || '').trim();
+    const f = Q() ? Q().unisci(fonti) : [];
+    if (f.length && Q() && Q().tornaDaTolta(text, f, (await getFonti()).nascoste)) return buf;
+    buf.push({ ts: new Date().toISOString(), text, ...(f.length ? { fonti: f } : {}) });
     await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
     return buf;
+  }
+
+  // ===== Quaderno delle memorie (#872) =====
+
+  async function getFonti() {
+    const m = await getRaw(KEYS.FILO_MEMORY_FONTI, null);
+    return Q() ? Q().normaMeta(m) : { righe: {}, nascoste: [] };
+  }
+
+  async function setFonti(meta) {
+    await setRaw(KEYS.FILO_MEMORY_FONTI, meta);
+  }
+
+  // Ogni cambio dell'utente (correggere, togliere, rimettere, svuotare) sale di versione: un compattatore partito prima
+  // non scrive sopra quello che l'utente ha fatto mentre il modello lavorava (applicaCompattazione).
+  function toccata(meta) {
+    meta.versione = (Number.isFinite(meta.versione) ? meta.versione : 0) + 1;
+    return meta;
+  }
+
+  // Le lezioni ancora da riordinare che ridicono una riga appena tolta o corretta, dallo stesso tratto, se ne vanno con
+  // lei: il compattatore la riscriverebbe com'era.
+  async function togliLezioniSimili(testo, fonti) {
+    if (!Q() || !Array.isArray(fonti) || !fonti.length) return;
+    const buf = await getLessonsBuffer();
+    const resta = buf.filter((l) => !(l && Q().tornaDaTolta(l.text, Q().unisci(l.fonti), [{ testo, fonti }])));
+    if (resta.length !== buf.length) await setRaw(KEYS.FILO_LESSONS_BUFFER, resta);
+  }
+
+  // Toglie una riga dalla memoria senza buttarla: finisce fra le nascoste del quaderno, con le sue fonti, e da lì si
+  // rimette o si cancella per sempre. Il prompt non la vede più dal messaggio dopo. Torna l'id della nascosta, o null.
+  // `fonti`: come per editLine, per ritrovare la riga sotto un campo rimasto aperto mentre il compattatore la riordinava.
+  async function hideLine(via, { fonti = [] } = {}) {
+    const ora = new Date().toISOString();
+    if (via && via.lezione && typeof via.lezione === 'object') {
+      const buf = await getLessonsBuffer();
+      const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? hideLine(e) : null;
+      }
+      const [l] = buf.splice(i, 1);
+      await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+      const meta = await getFonti();
+      const n = { id: uuid(), testo: l.text, lezione: true, fonti: Q() ? Q().unisci(l.fonti) : [], nata: l.ts || null, tolta: ora };
+      meta.nascoste.push(n);
+      await setFonti(toccata(meta));
+      await togliLezioniSimili(n.testo, n.fonti);
+      return n.id;
+    }
+    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
+      const mem = await getMemory();
+      const testo = typeof mem[via.modulo] === 'string' ? mem[via.modulo] : null;
+      if (!via.riga.trim()) return null;
+      const righe = testo == null ? [] : testo.split(/\r?\n/);
+      const i = righe.findIndex((r) => r.trim() === via.riga.trim());
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? hideLine(e) : null;
+      }
+      const [tolta] = righe.splice(i, 1);
+      await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
+      const meta = await getFonti();
+      const m = Q() ? Q().metaDi(meta, via.modulo, tolta) : null;
+      if (m) meta.righe[via.modulo] = meta.righe[via.modulo].filter((x) => x !== m);
+      const n = { id: uuid(), testo: tolta.trim(), modulo: via.modulo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, tolta: ora };
+      meta.nascoste.push(n);
+      await setFonti(toccata(meta));
+      await togliLezioniSimili(n.testo, n.fonti);
+      return n.id;
+    }
+    return null;
+  }
+
+  // Una nascosta torna dov'era: nel suo modulo, o fra le lezioni da riordinare.
+  async function restoreHidden(id) {
+    const meta = await getFonti();
+    const n = meta.nascoste.find((x) => x.id === id);
+    if (!n || !n.testo) return false;
+    meta.nascoste = meta.nascoste.filter((x) => x !== n);
+    if (n.lezione) {
+      const buf = await getLessonsBuffer();
+      buf.push({ ts: n.nata || new Date().toISOString(), text: n.testo, ...(n.fonti.length ? { fonti: n.fonti } : {}) });
+      await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+    } else {
+      const nome = n.modulo || 'PREFERENZE';
+      const mem = await getMemory();
+      const prima = typeof mem[nome] === 'string' ? mem[nome].trim() : '';
+      await setMemory({ ...mem, [nome]: prima ? `${prima}\n${n.testo}` : n.testo });
+      meta.righe[nome] = [...(meta.righe[nome] || []), { testo: n.testo, fonti: n.fonti, nata: n.nata || null }];
+    }
+    await setFonti(toccata(meta));
+    return true;
+  }
+
+  // Per sempre: il testo se ne va dal disco. Restano solo gli id del tratto da cui era nata, perché da lì non ritorni.
+  async function forgetHiddenForever(id) {
+    const meta = await getFonti();
+    const n = meta.nascoste.find((x) => x.id === id);
+    if (!n) return false;
+    meta.nascoste = n.fonti.length
+      ? meta.nascoste.map((x) => (x === n ? { id: n.id, fonti: n.fonti, tolta: n.tolta, perSempre: true } : x))
+      : meta.nascoste.filter((x) => x !== n);
+    await setFonti(meta);
+    return true;
+  }
+
+  // La riga che il compattatore ha appena fatto da una lezione o da una riga sotto un campo ancora aperto: stesse fonti
+  // e stesso senso, e una sola. Senza fonti non si indovina.
+  async function erede(vecchio, fonti) {
+    const f = Q() ? Q().unisci(fonti) : [];
+    if (!f.length || !vecchio) return null;
+    const mem = await getMemory();
+    const meta = await getFonti();
+    const trovate = [];
+    for (const [nome, v] of Object.entries(mem || {})) {
+      if (typeof v !== 'string') continue;
+      for (const riga of Q().righeDi(v)) {
+        const m = Q().metaDi(meta, nome, riga);
+        if (m && Q().contenute(f, m.fonti) && Q().stessoSenso(riga, vecchio)) trovate.push({ modulo: nome, riga });
+      }
+    }
+    return trovate.length === 1 ? trovate[0] : null;
+  }
+
+  // La correzione dell'utente prende il posto della riga e tiene le sue fonti: vale dal messaggio dopo, e il
+  // compattatore la riporta com'è. `testo` arriva già controllato (tetto e caratteri, SN_PREF.lezioneDaAzione).
+  // `fonti`: gli eventi che il quaderno mostrava per la riga, per ritrovarla se nel frattempo è stata riordinata.
+  async function editLine(via, testo, { fonti = [] } = {}) {
+    const nuovo = String(testo || '').trim();
+    if (!nuovo || /[\r\n]/.test(nuovo)) return false;
+    const ora = new Date().toISOString();
+    if (via && via.lezione && typeof via.lezione === 'object') {
+      const buf = await getLessonsBuffer();
+      const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? editLine(e, nuovo) : false;
+      }
+      const vecchia = buf[i];
+      buf[i] = { ...vecchia, text: nuovo, corretta: ora };
+      await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+      await setFonti(toccata(await getFonti()));
+      return true;
+    }
+    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
+      const mem = await getMemory();
+      const testoMod = typeof mem[via.modulo] === 'string' ? mem[via.modulo] : null;
+      if (testoMod == null) return false;
+      const righe = testoMod.split(/\r?\n/);
+      const i = righe.findIndex((r) => r.trim() === via.riga.trim());
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? editLine(e, nuovo) : false;
+      }
+      const meta = await getFonti();
+      const m = Q() ? Q().metaDi(meta, via.modulo, via.riga) : null;
+      const lista = (meta.righe[via.modulo] || []).filter((x) => x !== m);
+      // Corretta in una riga che c'è già: ne resta una, con le fonti di tutte e due (due righe uguali il quaderno non
+      // le sa distinguere).
+      const doppia = righe.findIndex((r, j) => j !== i && Q().norma(r) && Q().norma(r) === Q().norma(nuovo));
+      let riga;
+      if (doppia >= 0) {
+        const altra = Q().metaDi(meta, via.modulo, righe[doppia]);
+        const nate = [altra && altra.nata, m && m.nata].filter(Boolean).sort();
+        riga = { testo: righe[doppia].trim(), fonti: Q().unisci(altra ? altra.fonti : [], m ? m.fonti : []), nata: nate[0] || null, corretta: ora };
+        righe.splice(i, 1);
+        meta.righe[via.modulo] = [...lista.filter((x) => x !== altra), riga];
+      } else {
+        righe[i] = nuovo;
+        riga = { testo: nuovo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, corretta: ora };
+        meta.righe[via.modulo] = [...lista, riga];
+      }
+      await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
+      await setFonti(toccata(meta));
+      await togliLezioniSimili(via.riga, riga.fonti);
+      return true;
+    }
+    return false;
+  }
+
+  // Il quaderno come lo legge l'utente: ogni riga col suo `via`, la data in cui è nata e gli eventi del filo da cui
+  // viene; le nascoste a parte (quelle cancellate per sempre non hanno più niente da mostrare).
+  async function quaderno() {
+    const mem = await getMemory();
+    const meta = await getFonti();
+    const moduli = Object.entries(mem || {}).filter(([, v]) => typeof v === 'string').map(([nome, v]) => ({
+      nome,
+      righe: v.split(/\r?\n/).map((r) => r.trim()).filter(Boolean).map((riga) => {
+        const m = Q() ? Q().metaDi(meta, nome, riga) : null;
+        return { testo: riga, via: { modulo: nome, riga }, nata: m ? m.nata : null, fonti: m ? m.fonti : [], corretta: (m && m.corretta) || null };
+      }),
+    }));
+    const lezioni = (await getLessonsBuffer()).filter((l) => l && typeof l.text === 'string' && l.text.trim())
+      .map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } }, nata: l.ts || null, fonti: Q() ? Q().unisci(l.fonti) : [], corretta: l.corretta || null }));
+    const keep = await listKeepOpen();
+    const sempreAperte = Object.keys(keep).sort().map((host) => ({ host, ts: keep[host] && keep[host].ts ? keep[host].ts : null }));
+    const nascoste = meta.nascoste.filter((n) => n.testo).map((n) => ({
+      id: n.id, testo: n.testo, modulo: n.modulo || null, lezione: !!n.lezione, nata: n.nata || null, tolta: n.tolta || null, fonti: n.fonti,
+    }));
+    return { moduli, lezioni, sempreAperte, nascoste };
+  }
+
+  async function svuotaQuaderno() {
+    const { versione } = await getFonti();
+    await setFonti(toccata({ righe: {}, nascoste: [], versione }));
+  }
+
+  // Quello che il compattatore deve sapere delle righe tolte: testo (se c'è ancora) e fonti.
+  async function righeTolte() {
+    return (await getFonti()).nascoste.map((n) => ({ testo: n.testo || '', fonti: n.fonti }));
+  }
+
+  // Dopo il compattatore: i moduli toccati prendono testo e righe del quaderno insieme, e dal buffer escono solo le
+  // lezioni che ha letto (quelle arrivate mentre lavorava aspettano il giro dopo). Se mentre il modello scriveva
+  // l'utente ha corretto, tolto o rimesso una riga (`versione` letta all'inizio), l'uscita non si applica: memoria e
+  // lezioni restano come le ha lasciate lui, e il giro dopo riparte da lì. Torna se l'ha applicata.
+  async function applicaCompattazione({ patch, righe, usate = [], versione }) {
+    const meta = await getFonti();
+    if (Number.isFinite(versione) && (meta.versione || 0) !== versione) return false;
+    if (patch && Object.keys(patch).length) {
+      const testi = {};
+      for (const [nome, testo] of Object.entries(patch)) {
+        const l = (righe && righe[nome]) || Q().righeDi(testo).map((t) => ({ testo: t, fonti: [], nata: null }));
+        testi[nome] = l.map((r) => r.testo).join('\n');
+        meta.righe[nome] = l;
+      }
+      await patchMemory(testi);
+      await setFonti(meta);
+    }
+    const via = new Set((Array.isArray(usate) ? usate : []).map((l) => `${l && l.ts}|${l && l.text}`));
+    const buf = await getLessonsBuffer();
+    const resta = buf.filter((l) => !via.has(`${l && l.ts}|${l && l.text}`));
+    if (resta.length !== buf.length) await setRaw(KEYS.FILO_LESSONS_BUFFER, resta);
+    return true;
   }
 
   async function lessonsBufferShouldCompact() {
@@ -146,8 +368,23 @@
     return { PROFILO: '', PREFERENZE: '' };
   }
 
+  // Una riga detta due volte nello stesso modulo è una riga sola: il quaderno riconosce le righe dal testo.
+  function senzaDoppie(testo) {
+    const viste = new Set();
+    return testo.split(/\r?\n/).filter((r) => {
+      const k = Q() ? Q().norma(r) : r.trim();
+      if (!k) return true;
+      if (viste.has(k)) return false;
+      viste.add(k);
+      return true;
+    }).join('\n');
+  }
+
   async function setMemory(memory) {
-    await setRaw(KEYS.FILO_MEMORY, memory);
+    const pulita = memory && typeof memory === 'object'
+      ? Object.fromEntries(Object.entries(memory).map(([k, v]) => [k, typeof v === 'string' ? senzaDoppie(v) : v]))
+      : memory;
+    await setRaw(KEYS.FILO_MEMORY, pulita);
   }
 
   // Toglie UNA riga da un modulo, riconosciuta dal testo esatto. Torna se c'era.
@@ -164,7 +401,7 @@
   }
 
   // La memoria come la rilegge l'utente nelle Preferenze (#592): i moduli in
-  // righe, e le lezioni ancora da riordinare.
+  // righe, le lezioni ancora da riordinare e i siti da tenere aperti (#823).
   async function viewForUser() {
     const mem = await getMemory();
     const moduli = Object.entries(mem || {})
@@ -173,17 +410,21 @@
     const lezioni = (await getLessonsBuffer())
       .filter((l) => l && typeof l.text === 'string' && l.text.trim())
       .map((l) => ({ ts: l.ts, text: l.text }));
-    return { moduli, lezioni };
+    const sempreAperte = Object.keys(await listKeepOpen()).sort();
+    return { moduli, lezioni, sempreAperte };
   }
+
+  const fraseSempreAperta = (host) => `Tieni sempre aperto ${host}`;
 
   // Le righe che una frase detta a voce indica (#592): quelle uguali, se ce ne
   // sono, altrimenti quelle che la contengono. Ognuna porta il `via` di
   // FILO_MEMORY_FORGET, così la voce toglie esattamente quello che toglie la ×.
   async function tutteLeRighe() {
-    const { moduli, lezioni } = await viewForUser();
+    const { moduli, lezioni, sempreAperte } = await viewForUser();
     return [
       ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
       ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
+      ...sempreAperte.map((host) => ({ testo: fraseSempreAperta(host), via: { sempreAperta: host } })),
     ];
   }
 
@@ -203,10 +444,11 @@
     return (await tutteLeRighe()).filter((r) => visti.has(r.testo));
   }
 
+  // Dimenticare una riga la nasconde (decisione dell'owner, #872): esce dal prompt e resta nel quaderno, da dove si
+  // rimette o si cancella per sempre. Un sito tenuto aperto è una regola, non un ricordo: si toglie e basta.
   async function forgetLine(via) {
-    if (via && via.lezione && typeof via.lezione === 'object') return forgetLesson(via.lezione);
-    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') return forgetModuleLine(via.modulo, via.riga);
-    return false;
+    if (via && typeof via.sempreAperta === 'string') return (await removeKeepOpen(via.sempreAperta)).length > 0;
+    return !!(await hideLine(via));
   }
 
   // Aggiorna alcuni moduli senza toccare gli altri (semantica patch).
@@ -309,7 +551,10 @@
     return getRaw(KEYS.FILO_TIMERS, []);
   }
 
-  async function addTimer({ label, seconds }) {
+  // `chat`: la conversazione che l'ha chiesto, se c'è; la carta nella home ci riporta lì (#870).
+  const chatValida = (c) => (typeof c === 'string' && c.length > 0 && c.length <= 200 ? c : null);
+
+  async function addTimer({ label, seconds, chat }) {
     // Una durata non interpretabile o non positiva (0, negativa, NaN) NON crea un
     // timer: torniamo null e i chiamanti non lo trasmettono né lo segnano eseguito
     // (`if (t) broadcastLiveUpdate()`, `executed: !!entry`). Stessa filosofia di
@@ -326,6 +571,7 @@
       endsAt: new Date(Date.now() + sec * 1000).toISOString(),
       paused: false,
     };
+    if (chatValida(chat)) entry.chat = chat;
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
     return entry;
@@ -538,7 +784,7 @@
 
   // Dicitura leggibile della ricorrenza: "ogni giorno", "feriali", "weekend"
   // oppure l'elenco dei giorni ("lun+mer"). Unica per stato dell'agente e
-  // colonna destra: se cambia, cambia in un posto solo.
+  // carte della home: se cambia, cambia in un posto solo.
   function formatRepeat(days) {
     const d = normalizeRepeat(days);
     if (!d.length) return '';
@@ -548,7 +794,7 @@
     return d.join('+');
   }
 
-  async function addAlarm({ label, time, repeat, nowMs }) {
+  async function addAlarm({ label, time, repeat, nowMs, chat }) {
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     const days = normalizeRepeat(repeat);
     const clock = days.length ? parseClock(time) : null;
@@ -567,6 +813,7 @@
       entry.repeat = days;
       entry.atTime = fmtClock(clock);
     }
+    if (chatValida(chat)) entry.chat = chat;
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
     return entry;
@@ -789,7 +1036,19 @@
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
+    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869).
+    try { global.SN_FILO_PARLA?.segnala({ tipo: 'avviso', testo: entry.text }); } catch (_) {}
     return entry;
+  }
+
+  // Un avviso che descrive uno stato si riscrive quando lo stato cambia, invece di restare con una frase non più vera.
+  async function setNotificationText(id, text) {
+    const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
+    const n = list.find((x) => x.id === id);
+    if (!n || n.dismissed || n.text === String(text || '')) return false;
+    n.text = String(text || '');
+    await setRaw(KEYS.FILO_NOTIFICATIONS, list);
+    return true;
   }
 
   async function dismissNotification(id, { acted = false } = {}) {
@@ -865,6 +1124,46 @@
     return rules[normProxyDomain(domain)] || null;
   }
 
+  // ===== Siti sempre aperti (#823) =====
+  // La pulizia delle schede li legge senza passare dal modello. La voce (host) la calcola il main.
+
+  async function listKeepOpen() {
+    const r = await getRaw(KEYS.FILO_KEEP_OPEN, {});
+    return r && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  }
+
+  // Rilegge e riscrive la chiave intera: le scritture in fila, o due insieme si mangiano a vicenda
+  // (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+  let codaKeepOpen = Promise.resolve();
+  function inCodaKeepOpen(fn) {
+    const r = codaKeepOpen.then(fn, fn);
+    codaKeepOpen = r.then(() => {}, () => {});
+    return r;
+  }
+
+  function addKeepOpen(host) {
+    const h = normProxyDomain(host);
+    if (!h) return Promise.resolve(null);
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      voci[h] = { ts: (voci[h] && voci[h].ts) || new Date().toISOString() };
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return h;
+    });
+  }
+
+  // Torna le voci tolte davvero.
+  function removeKeepOpen(hosts) {
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      const tolte = (Array.isArray(hosts) ? hosts : [hosts]).map(normProxyDomain).filter((h) => h && h in voci);
+      if (!tolte.length) return [];
+      for (const h of tolte) delete voci[h];
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return tolte;
+    });
+  }
+
   // ===== Session =====
 
   async function getSession() {
@@ -896,13 +1195,15 @@
 
   global.SN_FILO_MEMORY = {
     // raw log
-    appendRaw, listRaw,
     // lessons
-    getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
+    getLessonsBuffer, appendLesson: inFila(appendLesson), lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
-    setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine,
+    setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine: inFila(forgetLine),
+    // quaderno delle memorie (#872)
+    getFonti, quaderno, righeTolte, svuotaQuaderno: inFila(svuotaQuaderno), hideLine: inFila(hideLine), restoreHidden: inFila(restoreHidden),
+    forgetHiddenForever: inFila(forgetHiddenForever), editLine: inFila(editLine), applicaCompattazione: inFila(applicaCompattazione),
     // onboarding (#524)
     getOnboarding, setOnboarding,
     // timer + sveglie (#322)
@@ -911,11 +1212,13 @@
     normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
-    listNotifications, addNotification, dismissNotification,
+    listNotifications, addNotification, dismissNotification, setNotificationText,
     // dashboard cache
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)
     listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
+    // siti sempre aperti (#823)
+    listKeepOpen, addKeepOpen, removeKeepOpen, fraseSempreAperta,
     // session
     getSession, setSession, touchSession,
   };

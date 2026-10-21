@@ -1,13 +1,15 @@
-// Popup menu custom: BrowserWindow frameless + trasparente che mostra un menu
-// stilizzato come il menu tasto destro. Risolve il problema per cui i dropdown
-// HTML nella shell non possono apparire sopra una WebContentsView nativa.
+// Il menu a comparsa di Filo (tasto destro su una scheda, Impostazioni/App/Profilo, avvisi, barra laterale): una
+// finestra figlia per finestra madre, perché l'HTML della shell non sta sopra le schede. Non decide le voci.
+// Regole: patterns/una-finestra-a-comparsa-nasce-una-volta-e-si-riusa.md
 
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
 const { collegaScorciatoie } = require('./shortcuts');
 
-let activePopup = null;
+const stati = new WeakMap();
+// Un menu solo in tutta l'app: aprirne uno in un'altra finestra chiude questo.
+let inVista = null;
 
 // ── SVG icon paths (viewBox 0 0 24 24, stroke-based) ──────────────────────
 const ICON_PATHS = {
@@ -47,10 +49,20 @@ const ICON_PATHS = {
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
 
+  // Freccia indietro: COPIA di `back` in src/shared/icons.js. Voce «Torna indietro» del menu dell'avviso del sito.
+  back:
+    '<path d="M19 12H5"/>' +
+    '<path d="M11 6l-6 6 6 6"/>',
+
   // Biscotto morsicato — righe del banner dei cookie nel menu della scheda (#754).
   cookie:
     '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
     '<path d="M8.5 9.5h.01"/><path d="M15.5 15h.01"/><path d="M9.5 15.5h.01"/><path d="M12.5 12h.01"/>',
+
+  // Chiave — «Resta connesso qui» / «Non restare connesso» (#759).
+  key:
+    '<circle cx="8" cy="15" r="4"/>' +
+    '<path d="M10.8 12.2L20 3"/><path d="M16.5 6.5l2.5 2.5"/><path d="M14 9l2 2"/>',
 
   // Occhio — «Mostra il banner dei cookie».
   eye:
@@ -80,6 +92,13 @@ const ICON_PATHS = {
 
   user:
     '<circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+
+  // Moneta forata col filo nel foro: COPIA di `credits` in src/shared/icons.js. Voce «Crediti» del menu Profilo.
+  credits:
+    '<circle cx="12" cy="13.5" r="7"/>' +
+    '<rect x="9.75" y="11.25" width="4.5" height="4.5" rx="0.5"/>' +
+    '<path d="M12 11.25V5.5"/>' +
+    '<path d="M12 5.5a2 2 0 1 0 0.01 0"/>',
 
   incognito:
     '<path d="M3 13h18"/>' +
@@ -131,6 +150,9 @@ const ICON_PATHS = {
   // stessa icona con cui la si riempie dal menu del tasto destro.
   saveForLater:
     '<path d="M7 4h10a1 1 0 0 1 1 1v15.2l-6-3.8-6 3.8V5a1 1 0 0 1 1-1z"/>',
+  memory:
+    '<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/>' +
+    '<path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>',
 };
 
 function iconSvg(name, size) {
@@ -153,7 +175,7 @@ function computeMenuWidth(entries) {
   const ICON_COL = 28;    // icona (18px) + gap (10px) quando presente
   let needed = MENU_MIN_W;
   for (const e of entries || []) {
-    if (e.type === 'separator') continue;
+    if (!e || e.type === 'separator') continue;
     const label = String(e.label || '');
     // L'email (voce disabled senza icona) usa font 12px, le altre 13px. Stima
     // generosa (~0.6 * font-size per carattere) per non troncare mai.
@@ -168,49 +190,60 @@ function computeMenuWidth(entries) {
   return Math.min(MENU_MAX_W, needed);
 }
 
-// ── Mostra il menu ────────────────────────────────────────────────────────
-function showPopupMenu(parentWin, entries, x, y, onSelect) {
-  // Chiudi un eventuale popup precedente
-  if (activePopup && !activePopup.isDestroyed()) {
-    activePopup.close();
-    activePopup = null;
-  }
+// ── Geometria ─────────────────────────────────────────────────────────────
+const ITEM_H = 36;
+const SEP_H = 9;
+const PAD = 8;
+// Gutter trasparente che contiene INTERA l'ombra CSS (0 4px 20px): più stretto, l'ombra finiva di colpo (feedback alpha).
+const MARGIN = 26;
 
-  const isDark = nativeTheme.shouldUseDarkColors;
-
-  // Misure
-  const ITEM_H = 36;
-  const SEP_H = 9;
-  const PAD = 8;
+// Dove sta la finestra del menu, in coordinate schermo: il menu ancorato a `x`, il bordo alto ~6px sotto `y`.
+function posizione(parentWin, entries, x, y) {
   const WIDTH = computeMenuWidth(entries);
-  // Gutter trasparente attorno al menu, dimensionato per contenere INTERAMENTE
-  // l'ombra CSS (box-shadow:0 4px 20px → si estende ~24px in basso, ~20px ai
-  // lati, ~16px in alto). Con un gutter troppo stretto l'ombra veniva tagliata
-  // dal bordo della finestra e finiva "di colpo" (feedback alpha).
-  const MARGIN = 26;
   let contentH = PAD * 2;
-  for (const e of entries) contentH += e.type === 'separator' ? SEP_H : ITEM_H;
-
+  for (const e of entries) contentH += e && e.type === 'separator' ? SEP_H : ITEM_H;
   const WIN_W = WIDTH + MARGIN * 2;
   const WIN_H = contentH + MARGIN * 2;
-
-  // Posizione in coordinate schermo. Il menu visibile (dentro il gutter) deve
-  // restare ancorato vicino al pulsante: il suo bordo sinistro a `x`, il bordo
-  // superiore ~6px sotto `y`.
   const cb = parentWin.getContentBounds();
   let popX = cb.x + x - MARGIN;
   let popY = cb.y + y + 6 - MARGIN;
-  // Non uscire dal bordo destro
-  if (popX + WIN_W > cb.x + cb.width) {
-    popX = cb.x + cb.width - WIN_W;
-  }
+  if (popX + WIN_W > cb.x + cb.width) popX = cb.x + cb.width - WIN_W;
   // Sotto non c'è posto (un tasto destro in fondo alla finestra, sugli avvisi): si apre sopra il punto.
   if (popY + WIN_H - MARGIN > cb.y + cb.height) {
     popY = Math.max(cb.y - MARGIN, cb.y + y - 6 - contentH - MARGIN);
   }
+  return { x: Math.round(popX), y: Math.round(popY), width: WIN_W, height: WIN_H };
+}
 
-  const popup = new BrowserWindow({
-    parent: parentWin,
+// ── La finestra, una per finestra madre ───────────────────────────────────
+// Un blur entro questo tempo dalla comparsa può essere quello, in ritardo, della chiusura di prima (X11):
+// conta solo se il fuoco non è tornato al menu.
+const GRAZIA_BLUR_MS = 150;
+// Se la pagina non conferma il vuoto disegnato, la finestra si nasconde lo stesso.
+const TETTO_SVUOTA_MS = 120;
+
+function statoDi(parent) {
+  let s = stati.get(parent);
+  if (!s) {
+    s = { parent, win: null, pronta: false, attesa: null, aperto: false, giro: 0, scelta: null, richiesta: null, posa: null, mostratoAlle: 0, tetto: null, dopo: [] };
+    stati.set(parent, s);
+  }
+  return s;
+}
+
+function invia(s, dati) {
+  if (!s.win || s.win.isDestroyed()) return;
+  if (!s.pronta) { s.attesa = dati; return; }
+  try { s.win.webContents.send('popup-menu:voci', dati); } catch (_) {}
+}
+
+// Nasce nascosta col documento e il preload già caricati: all'apertura arrivano solo le voci.
+function finestraDi(parent) {
+  if (!parent || parent.isDestroyed()) return null;
+  const s = statoDi(parent);
+  if (s.win && !s.win.isDestroyed()) return s;
+  const win = new BrowserWindow({
+    parent,
     frame: false,
     transparent: true,
     resizable: false,
@@ -221,50 +254,172 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
     focusable: true,
     show: false,
     hasShadow: false,
-    width: WIN_W,
-    height: WIN_H,
-    x: Math.round(popX),
-    y: Math.round(popY),
+    width: MENU_MIN_W + MARGIN * 2,
+    height: 120,
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, '..', 'preload', 'popup-preload.js'),
+      // Da nascosta risponde come da visibile: la prima comparsa non aspetta un processo messo in secondo piano.
+      backgroundThrottling: false,
     },
   });
-
-  activePopup = popup;
+  s.win = win;
+  s.pronta = false;
+  s.attesa = null;
+  // Nei test la finestra madre è invisibile: il menu è una finestra a sé e comparirebbe da solo (test-window-mode.js).
+  hideForTests(win);
+  const wc = win.webContents;
   // Il menu prende il fuoco: senza, le scorciatoie di Filo lì dentro morirebbero.
-  collegaScorciatoie(popup.webContents, parentWin);
-
-  const html = buildHTML(entries, isDark, MARGIN);
-  popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-
-  // Nei test la finestra madre è invisibile: il menu è una finestra a sé e
-  // altrimenti comparirebbe da solo sullo schermo (vedi test-window-mode.js).
-  hideForTests(popup);
-  popup.once('ready-to-show', () => popup.show());
-
-  popup.on('blur', () => {
-    if (!popup.isDestroyed()) popup.close();
+  collegaScorciatoie(wc, parent);
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wc.on('will-navigate', (e) => e.preventDefault());
+  wc.once('did-finish-load', () => {
+    if (s.win !== win) return;
+    s.pronta = true;
+    const d = s.attesa;
+    s.attesa = null;
+    if (d) invia(s, d);
   });
-  popup.on('closed', () => {
-    if (activePopup === popup) activePopup = null;
+  wc.on('ipc-message', (_e, canale, a, b) => { if (s.win === win) dalMenu(s, canale, a, b); });
+  // Un processo morto non risponde più: tenuta, la finestra lascerebbe la finestra madre senza menu fino al riavvio.
+  // Si butta; il prossimo clic ne fa una nuova, e il menu che stava per comparire si riapre una volta sola.
+  wc.on('render-process-gone', () => {
+    if (s.win !== win) return;
+    const r = s.aperto && !win.isVisible() && s.richiesta && !s.richiesta.ripresa ? s.richiesta : null;
+    clearTimeout(s.tetto);
+    s.win = null;
+    s.pronta = false;
+    s.attesa = null;
+    chiudi(s);
+    if (!win.isDestroyed()) win.destroy();
+    if (r && !parent.isDestroyed()) apri(parent, { ...r, ripresa: true });
   });
-
-  // Ricezione della scelta (scoped al webContents del popup)
-  popup.webContents.on('ipc-message', (_event, channel, url) => {
-    if (channel === 'popup-menu:select') {
-      onSelect(url);
-      if (!popup.isDestroyed()) popup.close();
-    }
-    if (channel === 'popup-menu:close' && !popup.isDestroyed()) popup.close();
+  win.on('blur', () => sfocato(s, win));
+  win.on('closed', () => {
+    if (s.win !== win) return;
+    clearTimeout(s.tetto);
+    s.win = null;
+    s.pronta = false;
+    s.attesa = null;
+    chiudi(s);
   });
+  win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(buildHTML([], false)));
+  return s;
 }
 
-// Il menu prende la tastiera appena si apre: Esc lo chiude, le frecce scelgono
-// la voce e Invio la esegue, come in un menu del sistema.
-const TASTIERA_MENU = `(() => {
-  const voci = () => [...document.querySelectorAll('button.item')];
+function dalMenu(s, canale, a, b) {
+  if (canale === 'popup-menu:pronto') {
+    if (s.aperto && a === s.giro) mostra(s);
+  } else if (canale === 'popup-menu:vuoto') {
+    if (!s.aperto && a === s.giro) nascondi(s);
+  } else if (canale === 'popup-menu:select') {
+    // Una voce del menu di prima (cliccata mentre arrivava quello nuovo) non sceglie per lui.
+    if (!s.aperto || b !== s.giro) return;
+    const scelta = s.scelta;
+    // Prima si chiude: chi sceglie può riaprire subito il menu (il secondo livello di una voce a due zone).
+    chiudi(s);
+    if (scelta) { try { scelta(typeof a === 'string' ? a : ''); } catch (_) {} }
+  } else if (canale === 'popup-menu:close') {
+    if (s.aperto && a === s.giro) chiudi(s);
+  }
+}
+
+function mostra(s) {
+  const win = s.win;
+  if (!win || win.isDestroyed() || !s.posa) return;
+  clearTimeout(s.tetto);
+  win.setBounds(s.posa);
+  s.mostratoAlle = Date.now();
+  win.show();
+  try { win.webContents.focus(); } catch (_) {}
+}
+
+function nascondi(s) {
+  clearTimeout(s.tetto);
+  const win = s.win;
+  if (win && !win.isDestroyed() && win.isVisible()) win.hide();
+}
+
+function chiudi(s) {
+  if (!s.aperto) return;
+  s.aperto = false;
+  s.scelta = null;
+  const n = ++s.giro;
+  if (inVista === s) inVista = null;
+  const win = s.win;
+  if (win && !win.isDestroyed()) {
+    // Si nasconde col vuoto già disegnato: nascosta col menu dentro, alla prossima comparsa lo rimostrerebbe per un istante.
+    invia(s, { n, html: '' });
+    clearTimeout(s.tetto);
+    if (win.isVisible()) s.tetto = setTimeout(() => { if (!s.aperto && s.giro === n) nascondi(s); }, TETTO_SVUOTA_MS);
+  }
+  // Per ultimi: chi aspettava la chiusura può riaprire un menu, e non va svuotato.
+  const dopo = s.dopo.splice(0);
+  for (const fn of dopo) { try { fn(); } catch (_) {} }
+}
+
+function sfocato(s, win) {
+  if (!s.aperto || s.win !== win) return;
+  const giro = s.giro;
+  const resta = GRAZIA_BLUR_MS - (Date.now() - s.mostratoAlle);
+  if (resta <= 0) { chiudi(s); return; }
+  setTimeout(() => {
+    if (s.aperto && s.giro === giro && !win.isDestroyed() && win.isVisible() && !win.isFocused()) chiudi(s);
+  }, resta);
+}
+
+// ── Mostra il menu ────────────────────────────────────────────────────────
+function showPopupMenu(parentWin, entries, x, y, onSelect) {
+  if (!parentWin || parentWin.isDestroyed()) return;
+  const voci = (Array.isArray(entries) ? entries : []).filter((e) => e && typeof e === 'object');
+  // Senza voci non c'è niente da mostrare: la pagina risponderebbe col vuoto e il menu resterebbe «aperto» senza comparire.
+  if (!voci.length) return;
+  apri(parentWin, { voci, x: Number(x) || 0, y: Number(y) || 0, scelta: typeof onSelect === 'function' ? onSelect : null, ripresa: false });
+}
+
+function apri(parentWin, r) {
+  if (inVista && inVista.parent !== parentWin) chiudi(inVista);
+  const s = finestraDi(parentWin);
+  if (!s) return;
+  if (s.aperto) chiudi(s);
+  const { voci } = r;
+  s.richiesta = r;
+  s.posa = posizione(parentWin, voci, r.x, r.y);
+  s.giro++;
+  s.aperto = true;
+  s.scelta = r.scelta;
+  s.mostratoAlle = Date.now();
+  inVista = s;
+  // La finestra compare quando la pagina conferma le voci nuove (popup-menu:pronto), mai con quelle di prima.
+  invia(s, { n: s.giro, html: vociHTML(voci), scuro: !!nativeTheme.shouldUseDarkColors, vars: require('./movimento').variabili() });
+}
+
+// La finestra madre è pronta: il menu nasce adesso, così il primo clic lo trova già caricato.
+function preparaMenu(parentWin) {
+  finestraDi(parentWin);
+}
+
+// Il menu aperto sopra questa finestra, se c'è: la carta di anteprima delle schede non gli si apre sotto.
+function menuAperto(parentWin) {
+  const s = parentWin ? stati.get(parentWin) : null;
+  return s && s.aperto && s.win && !s.win.isDestroyed() ? s.win : null;
+}
+
+// `fn` alla chiusura del menu di questa finestra (subito, se non è aperto).
+function quandoChiuso(parentWin, fn) {
+  const s = parentWin ? stati.get(parentWin) : null;
+  if (!s || !s.aperto) { fn(); return; }
+  s.dopo.push(fn);
+}
+
+// ── Il documento ──────────────────────────────────────────────────────────
+// Il menu prende la tastiera appena si apre: Esc lo chiude, le frecce scelgono la voce e Invio la esegue.
+// Le voci arrivano dal main (popup-menu:voci); `giro` accompagna ogni scelta, così il main scarta quelle di un menu passato.
+const SCRIPT_MENU = `(() => {
+  const api = window.popupApi;
+  let giro = 0;
   let i = -1;
+  const voci = () => [...document.querySelectorAll('button.item')];
   const segna = (n) => {
     const v = voci();
     if (!v.length) return;
@@ -273,6 +428,10 @@ const TASTIERA_MENU = `(() => {
     if (i >= 0) v[i].focus();
     else if (document.activeElement) document.activeElement.blur();
   };
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-v]');
+    if (b && api) api.select(b.dataset.v, giro);
+  });
   document.addEventListener('mousemove', (e) => {
     const b = e.target.closest && e.target.closest('button.item');
     const k = b ? voci().indexOf(b) : -1;
@@ -281,7 +440,7 @@ const TASTIERA_MENU = `(() => {
   document.addEventListener('keydown', (e) => {
     const n = voci().length;
     const passo = { ArrowDown: i + 1, ArrowUp: (i < 0 ? n : i) - 1 + n, Home: 0, End: n - 1 }[e.key];
-    if (e.key === 'Escape') popupApi.close();
+    if (e.key === 'Escape') { if (api) api.close(giro); }
     else if (passo !== undefined) segna(passo);
     else if (e.key === 'ArrowRight' && i >= 0) {
       const sotto = voci()[i].parentElement.querySelector('.subarrow');
@@ -290,78 +449,83 @@ const TASTIERA_MENU = `(() => {
     } else return;
     e.preventDefault();
   });
+  if (!api || !api.onVoci) return;
+  api.onVoci((d) => {
+    giro = (d && Number(d.n)) || 0;
+    i = -1;
+    document.documentElement.classList.toggle('scuro', !!(d && d.scuro));
+    for (const [k, v] of Object.entries((d && d.vars) || {})) {
+      if (/^--sn-[a-z-]+$/.test(k) && /^[0-9.]+$/.test(String(v))) document.documentElement.style.setProperty(k, String(v));
+    }
+    const prima = document.querySelector('.menu');
+    if (prima) prima.remove();
+    if (d && d.html) {
+      const m = document.createElement('div');
+      m.className = 'menu';
+      m.innerHTML = d.html;
+      document.body.prepend(m);
+      api.pronto(giro);
+      return;
+    }
+    const n = giro;
+    requestAnimationFrame(() => requestAnimationFrame(() => api.vuoto(n)));
+  });
 })();`;
 
-// ── Genera l'HTML inline ──────────────────────────────────────────────────
-function buildHTML(entries, isDark, margin = 26) {
-  const c = isDark
-    ? { bg: 'rgba(30,29,27,0.98)', fg: '#e5e3dc', muted: '#8a8780',
-        border: '#3a3835', ar: '196,90,59' }
-    : { bg: 'rgba(248,246,240,0.98)', fg: '#1a1918', muted: '#6e6b63',
-        border: '#e0dcd4', ar: '196,90,59' };
+const ESCAPE = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' };
+const testoHTML = (v) => String(v == null ? '' : v).replace(/[<>&"']/g, (ch) => ESCAPE[ch]);
 
+function vociHTML(entries) {
   let items = '';
-  for (const e of entries) {
+  for (const e of entries || []) {
+    if (!e) continue;
     if (e.type === 'separator') {
       items += '<div class="sep"></div>';
+      continue;
+    }
+    const ico = iconSvg(e.icon, 16);
+    // Niente colonna icona vuota: spingeva a destra le voci senza icona (l'email dell'account, feedback alpha).
+    const icoSpan = ico ? `<span class="ico">${ico}</span>` : '';
+    const label = testoHTML(e.label || '');
+    if (e.disabled) {
+      const cls = ico ? 'item disabled' : 'item disabled centered';
+      items += `<div class="${cls}">${icoSpan}<span class="lbl">${label}</span></div>`;
+      continue;
+    }
+    // `url` apre una scheda, `action` torna al chiamante: il prefisso le tiene distinte.
+    const valore = e.action ? '@action:' + String(e.action) : String(e.url || '');
+    const main = `<button class="item" data-v="${testoHTML(valore)}">${icoSpan}<span class="lbl">${label}</span></button>`;
+    if (e.subAction) {
+      // Voce a due zone: il corpo esegue `action`, la freccia manda `subAction` e il chiamante riapre col secondo livello.
+      items += `<div class="row">${main}` +
+        `<button class="subarrow" aria-label="Altre opzioni" data-v="${testoHTML('@action:' + String(e.subAction))}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
+        `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ` +
+        `stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
     } else {
-      const ico = iconSvg(e.icon, 16);
-      // Mostra la colonna icona solo se l'icona esiste davvero: una colonna
-      // vuota spingeva il testo a destra e faceva sembrare le voci senza icona
-      // (es. l'email dell'account) "non centrate" (feedback alpha).
-      const icoSpan = ico ? `<span class="ico">${ico}</span>` : '';
-      // Escape HTML nel label per sicurezza
-      const label = (e.label || '').replace(/[<>&"]/g, (ch) =>
-        ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch]);
-      if (e.disabled) {
-        // Voce informativa non cliccabile (es. l'email dell'account loggato).
-        // Senza icona la centriamo nel suo campo per evitare l'indent fantasma.
-        const cls = ico ? 'item disabled' : 'item disabled centered';
-        items += `<div class="${cls}">` +
-          `${icoSpan}` +
-          `<span class="lbl">${label}</span></div>`;
-      } else {
-        // Le voci possono trasportare un `url` (apre un tab) oppure una
-        // `action` custom (instradata al renderer chiamante). Codifichiamo
-        // l'action con un prefisso sentinella per non confonderla con un url.
-        const value = e.action ? ('@action:' + e.action) : (e.url || '');
-        const escVal = value.replace(/'/g, "\\'");
-        const main = `<button class="item" onclick="popupApi.select('${escVal}')">` +
-          `${icoSpan}` +
-          `<span class="lbl">${label}</span></button>`;
-        if (e.subAction) {
-          // Voce a due zone di click: il corpo esegue `action`, la freccia a
-          // destra manda `subAction` (il chiamante riapre il menu col secondo
-          // livello — es. la lista paesi di "Apri da un altro paese").
-          const escSub = ('@action:' + e.subAction).replace(/'/g, "\\'");
-          items += `<div class="row">${main}` +
-            `<button class="subarrow" aria-label="Altre opzioni" ` +
-            `onclick="popupApi.select('${escSub}')">` +
-            `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" ` +
-            `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ` +
-            `stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
-        } else {
-          items += main;
-        }
-      }
+      items += main;
     }
   }
+  return items;
+}
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-*{margin:0;padding:0;box-sizing:border-box}
+function stile(margin) {
+  return `*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:rgba(248,246,240,0.98);--fg:#1a1918;--muted:#6e6b63;--border:#e0dcd4;--sn-ombra:calc(var(--sn-shadow-opacity, 0.18) / 0.18)}
+:root.scuro{--bg:rgba(30,29,27,0.98);--fg:#e5e3dc;--muted:#8a8780;--border:#3a3835}
 html,body{background:transparent;overflow:hidden;height:100%}
 .menu{
   margin:${margin}px;
-  background:${c.bg};
-  border:1px solid ${c.border};
+  background:var(--bg);
+  border:1px solid var(--border);
   border-radius:8px;
-  box-shadow:0 4px 20px rgba(0,0,0,0.20);
+  box-shadow:0 4px 20px rgba(0,0,0,calc(0.20 * var(--sn-ombra, 1)));
   padding:4px 0;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   font-size:13px;
-  color:${c.fg};
+  color:var(--fg);
   backdrop-filter:blur(8px);
-  animation:fadeIn 100ms ease-out;
+  animation:fadeIn calc(100ms * var(--sn-motion, 1)) ease-out;
 }
 @keyframes fadeIn{
   from{opacity:0;transform:translateY(-3px)}
@@ -371,30 +535,36 @@ html,body{background:transparent;overflow:hidden;height:100%}
   all:unset;box-sizing:border-box;
   display:flex;align-items:center;gap:10px;
   width:100%;padding:8px 14px;
-  cursor:pointer;color:${c.fg};
+  cursor:pointer;color:var(--fg);
   font-family:inherit;font-size:13px;line-height:1.2;
 }
-.item:hover,.item.attiva{background:rgba(${c.ar},0.12)}
-.item.disabled{color:${c.muted};cursor:default;font-size:12px}
+.item:hover,.item.attiva{background:rgba(196,90,59,0.12)}
+.item.disabled{color:var(--muted);cursor:default;font-size:12px}
 .item.disabled:hover{background:transparent}
 .item.centered{justify-content:center;text-align:center}
 .ico{
   width:18px;height:18px;flex:0 0 18px;
   display:inline-flex;align-items:center;justify-content:center;
-  color:rgba(${c.ar},0.85);
+  color:rgba(196,90,59,0.85);
 }
 .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item.centered .lbl{flex:0 1 auto}
-.sep{height:1px;background:${c.border};margin:4px 8px}
+.sep{height:1px;background:var(--border);margin:4px 8px}
 .row{display:flex;align-items:stretch}
 .row .item{flex:1;min-width:0}
 .subarrow{
   all:unset;box-sizing:border-box;
   display:inline-flex;align-items:center;justify-content:center;
-  flex:0 0 30px;cursor:pointer;color:${c.muted};
+  flex:0 0 30px;cursor:pointer;color:var(--muted);
 }
-.subarrow:hover{background:rgba(${c.ar},0.12);color:rgba(${c.ar},0.95)}
-</style></head><body><div class="menu">${items}</div><script>${TASTIERA_MENU}</script></body></html>`;
+.subarrow:hover{background:rgba(196,90,59,0.12);color:rgba(196,90,59,0.95)}`;
 }
 
-module.exports = { showPopupMenu, buildHTML, computeMenuWidth };
+// Lo stesso documento della finestra riusata, già con le voci: lo usano gli spec che ne misurano il layout.
+function buildHTML(entries, isDark, margin = MARGIN) {
+  const voci = entries && entries.length ? `<div class="menu">${vociHTML(entries)}</div>` : '';
+  return `<!DOCTYPE html><html${isDark ? ' class="scuro"' : ''}><head><meta charset="utf-8"><style>${stile(margin)}</style></head>` +
+    `<body>${voci}<script>${SCRIPT_MENU}</script></body></html>`;
+}
+
+module.exports = { showPopupMenu, preparaMenu, buildHTML, computeMenuWidth, menuAperto, quandoChiuso };

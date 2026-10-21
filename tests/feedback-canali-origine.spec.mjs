@@ -22,9 +22,11 @@
 // Il secondo test guarda le ALTRE porte del proprietario che vivono nello
 // stesso canale: i modelli predefiniti (che valgono per tutte le installazioni
 // di Filo), l'automazione, i bilanci dei giri, i modelli dei giudici, i
-// registri del lavoro e delle routine. Sono la stessa famiglia e vanno chiuse
+// registri del lavoro e delle routine, i codici del red team, le prove e i
+// cataloghi dei modelli predefiniti. Sono la stessa famiglia e vanno chiuse
 // insieme: una difesa messa su quattro porte su nove è una porta aperta con
-// accanto un cartello che dice dove.
+// accanto un cartello che dice dove. Il test che segue le bussa con la
+// sessione del proprietario aperta, cioè là dove passerebbero.
 //
 // Il terzo guarda le porte VICINE, che non sono del proprietario ma di
 // chiunque abbia fatto l'accesso: uscire dall'account, votare in bacheca,
@@ -49,6 +51,19 @@ const SITO = { url: 'https://evil.example/pagina' };
 const SITO_CON_SCHEDA = { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' };
 const PAGINA_DI_FILO = { url: 'filo://manage/manage.html' };
 
+// I codici d'invito del red team e le prove coi modelli predefiniti (#784.2): spendono le chiavi di Filo
+// o aprono il red team a chi vuole il sito. Nome della costante e resto del messaggio: `app.evaluate` vuole dati.
+const PORTE_784 = {
+  redteamGeneraCodici: ['REDTEAM_GEN_CODES', { count: 5 }],
+  redteamElencoCodici: ['REDTEAM_LIST_CODES', {}],
+  redteamRevocaCodice: ['REDTEAM_REVOKE_CODE', { code: 'ABCD-EFGH' }],
+  redteamApertoLettura: ['REDTEAM_OPEN_GET', {}],
+  redteamApertoScrittura: ['REDTEAM_OPEN_SET', { openToAll: true }],
+  provaModelloScelto: ['TEST_DEFAULT_MODEL', { provider: 'openrouter', model: 'qualsiasi/modello' }],
+  catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
+  elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],
+};
+
 test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', async ({ app, shell }) => {
   void shell; // attende il boot: il dispatcher dev'essere montato
 
@@ -61,6 +76,13 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       decifraTesto: { type: MSG.FEEDBACK_DECRYPT_FIELDS, fields: { text: 'FENC1:qualcosa' } },
       decifraAllegato: { type: MSG.FEEDBACK_DECRYPT_IMAGE, url: 'https://storage.googleapis.com/altro/allegato' },
       rivaluta: { type: MSG.FEEDBACK_REEVALUATE, feedbackIds: ['fb-uno'] },
+      // Iscriversi al giro è farsi mandare i feedback dell'owner a ogni
+      // cambiamento: la porta più golosa di tutte per un sito visitato.
+      giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
+      // L'avviso della segnalazione automatica: Annulla scrive `ignored` col token di chi è dentro (#784.3), la
+      // chiusura la fa partire (#784.6).
+      annullaSegnalazioneAutomatica: { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-uno' },
+      partenzaSegnalazioneAutomatica: { type: MSG.AUTO_FEEDBACK_PARTI, id: 'fb-uno' },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {
@@ -111,6 +133,12 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       expect(String(r.error || ''), `filo/${porta}: l'indirizzo va guardato per primo`).toContain('url allegato non valido');
       continue;
     }
+    // L'annullo lo usa chiunque abbia visto il toast, ma solo per la segnalazione partita da qui: «fb-uno» no.
+    if (porta === 'annullaSegnalazioneAutomatica' || porta === 'partenzaSegnalazioneAutomatica') {
+      expect(String(r.code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
+      expect(String(r.error || ''), `filo/${porta}`).toContain('partita da qui');
+      continue;
+    }
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
 });
@@ -134,6 +162,18 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       fusioniElenco: { type: MSG.MERGE_APPROVALS_GET },
       fusioniApprova: { type: MSG.MERGE_APPROVAL_APPROVE, id: 'ab12cd34ef56ab12cd34ef56' },
       fusioniScarta: { type: MSG.MERGE_APPROVAL_DISCARD, id: 'ab12cd34ef56ab12cd34ef56' },
+      domandeElenco: { type: MSG.DOMANDE_ELENCO },
+      domandaMostra: { type: MSG.DOMANDA_MOSTRA, id: 'D-1' },
+      domandaRispondi: { type: MSG.DOMANDA_RISPONDI, id: 'D-1', scelta: 0 },
+      domandeConsiglio: { type: MSG.DOMANDE_CONSIGLIO, ids: ['D-1', 'D-2'] },
+      domandaArchivia: { type: MSG.DOMANDA_ARCHIVIA, id: 'D-1' },
+      domandaRiapri: { type: MSG.DOMANDA_RIAPRI, id: 'D-1' },
+      segnaFidato: { type: MSG.FIDUCIA_SEGNA, feedbackId: 'f1' },
+      togliFiducia: { type: MSG.FIDUCIA_SEGNA, feedbackId: 'f1', fidato: false },
+      // Il classificatore della ricerca spende la chiave dell'owner leggendo tutti i feedback (#1118).
+      ricercaClassificatore: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'start', query: 'x', candidates: [{ id: 'a', title: 't', text: 'x' }] },
+      ricercaClassificatoreStato: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'status', jobId: 'r1' },
+      ...Object.fromEntries(Object.entries(mittenti.porte784).map(([nome, [k, resto]]) => [nome, { type: MSG[k], ...resto }])),
     });
     const esegui = async (mittente) => {
       const res = {};
@@ -147,7 +187,7 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       sitoConScheda: await esegui(mittenti.sitoConScheda),
       filo: await esegui(mittenti.filo),
     };
-  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO, porte784: PORTE_784 });
 
   for (const provenienza of ['sito', 'sitoConScheda']) {
     for (const [porta, r] of Object.entries(out[provenienza])) {
@@ -174,6 +214,101 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
   }
 });
 
+test('con la sessione del proprietario aperta, un sito visitato non genera codici del red team né spende le chiavi predefinite (#784.2)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    ga.isAdmin = () => true;
+    ga.isSignedIn = () => true;
+    ga.getIdToken = async () => 'token-finto-dell-owner';
+    // Ogni uscita verso il red team o verso il catalogo dei modelli si conta e non parte.
+    const uscite = [];
+    const fetchVera = globalThis.fetch;
+    globalThis.fetch = async (url, ...resto) => {
+      const u = String((url && url.url) || url || '');
+      if (/cloudfunctions\.net\/redteam|openrouter\.ai\/api\//.test(u)) { uscite.push(u); throw new Error('rete finta'); }
+      return fetchVera(url, ...resto);
+    };
+    const MSG = globalThis.SN_MSG.MSG;
+    const porte = {
+      ...Object.fromEntries(Object.entries(mittenti.porte784).map(([nome, [c, resto]]) => [nome, { type: MSG[c], ...resto }])),
+      provaModelloPredefinito: { type: MSG.TEST_DEFAULT_MODEL, nickname: 'qualsiasi' },
+    };
+    const esegui = async (mittente, nomi = Object.keys(porte)) => {
+      const res = {};
+      for (const nome of nomi) res[nome] = await globalThis.SN_HANDLE_MESSAGE(porte[nome], mittente);
+      return res;
+    };
+    const sito = await esegui(mittenti.sito);
+    const sitoConScheda = await esegui(mittenti.sitoConScheda);
+    const usciteDaiSiti = uscite.splice(0);
+    // Da Filo solo le porte che non scrivono niente fuori di qui (l'interruttore del red team sì).
+    const filo = await esegui(mittenti.filo, mittenti.daFilo);
+    return { sito, sitoConScheda, usciteDaiSiti, usciteDaFilo: uscite.splice(0), filo };
+  }, {
+    sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: { url: 'filo://redteam/redteam.html' }, porte784: PORTE_784,
+    daFilo: ['redteamGeneraCodici', 'redteamElencoCodici', 'redteamRevocaCodice', 'catalogoModelli', 'elencoFornitori'],
+  });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    for (const [porta, r] of Object.entries(out[provenienza])) {
+      expect(r, `${provenienza}/${porta}: nessuna risposta`).toBeTruthy();
+      expect(r, `${provenienza}/${porta}: con l'owner dentro la richiesta di un sito passa`).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+    }
+  }
+  expect(out.usciteDaiSiti, 'una richiesta di un sito è uscita verso il red team o verso il catalogo dei modelli').toEqual([]);
+
+  // Da una pagina di Filo, con l'owner dentro, le stesse porte si aprono: la richiesta arriva fino alla rete.
+  expect(Object.keys(out.filo)).toHaveLength(5);
+  for (const porta of Object.keys(out.filo)) {
+    expect(String(out.filo[porta].code || ''), `filo/${porta}`).not.toMatch(/forbidden|not_admin/);
+    expect(String(out.filo[porta].error || ''), `filo/${porta}: doveva arrivare alla rete`).toContain('rete finta');
+  }
+  expect(out.usciteDaFilo.some((u) => /redteamGenerateCodes$/.test(u)), 'da Filo la generazione dei codici non è partita').toBe(true);
+});
+
+test('con la sessione del proprietario aperta, un feedback preso dalla bacheca non lo annulla né un sito né la barra (#784.3)', async ({ app, shell, openTab, testServer }) => {
+  void shell;
+  await testServer.openReady(openTab, '<html><head><title>Sito</title></head><body><p>sito</p></body></html>', { pubblico: true });
+
+  const out = await app.evaluate(async ({ BrowserWindow }, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    ga.isAdmin = () => true;
+    ga.isSignedIn = () => true;
+    ga.getIdToken = async () => 'token-finto-dell-owner';
+    const scritture = [];
+    globalThis.SN_FEEDBACK.updateStatus = async (id, campi) => { scritture.push({ id, status: campi && campi.status }); };
+    const MSG = globalThis.SN_MSG.MSG;
+    const annulla = { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-della-bacheca' };
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const b = tm.tabs.find((t) => /sito-pubblico\.test/.test(t.url || ''));
+    const dalCanaleDelSito = await b.view.webContents.executeJavaScriptInIsolatedWorld(999, [{
+      code: `chrome.runtime.sendMessage(${JSON.stringify(annulla)})`,
+    }]);
+    return {
+      dalCanaleDelSito,
+      sito: await globalThis.SN_HANDLE_MESSAGE(annulla, mittenti.sito),
+      sitoConScheda: await globalThis.SN_HANDLE_MESSAGE(annulla, mittenti.sitoConScheda),
+      barra: await globalThis.SN_HANDLE_MESSAGE(annulla, mittenti.barra),
+      scritture,
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, barra: { url: 'filo://shell/shell.html', isShell: true } });
+
+  for (const provenienza of ['dalCanaleDelSito', 'sito', 'sitoConScheda']) {
+    expect(out[provenienza], `${provenienza}: con l'owner dentro un sito segna «ignorato» un feedback qualunque`)
+      .toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  }
+  // La barra passa la provenienza, ma annulla solo quello che questo Filo ha appena mandato.
+  expect(out.barra.ok).toBe(false);
+  expect(String(out.barra.error || '')).toContain('partita da qui');
+  expect(out.scritture, 'un feedback non partito da qui è stato segnato «ignorato»').toEqual([]);
+});
+
 test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza', async ({ app, shell }) => {
   void shell;
 
@@ -184,8 +319,6 @@ test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza',
       vota: { type: MSG.BOARD_CAST_VOTE, id: 'fb-uno', vote: 'works' },
       ritiraIlVoto: { type: MSG.BOARD_CLEAR_VOTE, id: 'fb-uno' },
       riapriAPagamento: { type: MSG.BOARD_REOPEN, id: 'fb-uno', text: 'scritto da un sito' },
-      elencoDiChiUsaFilo: { type: MSG.OWNER_LIST_USERS },
-      regaloDiCrediti: { type: MSG.OWNER_GIFT_CREDITS, email: 'chiunque@example.com', amount: 1000 },
     });
     const esegui = async (mittente) => {
       const res = {};
@@ -254,6 +387,38 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
 });
 
+test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    const profilo = { email: 'chi-usa-filo@example.com', name: 'Chi Usa Filo' };
+    ga.signIn = async () => profilo;
+    ga.isSignedIn = () => true;
+    ga.isRemembered = () => true;
+    ga.getProfile = () => profilo;
+    const MSG = globalThis.SN_MSG.MSG;
+    const accedi = (m) => globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNIN }, m);
+    return {
+      sito: await accedi(mittenti.sito),
+      sitoConScheda: await accedi(mittenti.sitoConScheda),
+      filo: await accedi(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    const r = out[provenienza];
+    expect(r.ok, `${provenienza}: l'esito dell'accesso arriva anche al sito`).toBe(true);
+    expect(r.signedIn).toBe(true);
+    expect(JSON.stringify(r), `${provenienza}: l'email di chi usa Filo è arrivata al sito`).not.toContain('chi-usa-filo@example.com');
+    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  }
+  expect(out.filo.ok).toBe(true);
+  expect(out.filo.profile && out.filo.profile.email).toBe('chi-usa-filo@example.com');
+});
+
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
   // La stessa porta vista dal verso opposto: se un sito non può CHIEDERE chi
   // sta usando Filo, non glielo si manda nemmeno da soli. L'avviso di cambio
@@ -286,4 +451,107 @@ test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e po
   for (const c of web) {
     expect(c.avvisi.length, `${c.url}: l'avviso con dentro il profilo è arrivato a un sito visitato`).toBe(0);
   }
+});
+
+test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dalle pagine di Filo', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const a = await A.archive({ url: 'https://banca.example/estratto', title: 'Banca online, estratto conto' });
+    const porte = () => ({
+      elenco: { type: MSG.GET_ARCHIVED_TABS },
+      ricerca: { type: MSG.SEARCH_ARCHIVED_TABS, query: 'banca' },
+      daCancellare: { type: MSG.ARCHIVIO_DA_CANCELLARE, query: 'banca' },
+      eliminaGruppo: { type: MSG.DELETE_ARCHIVED_TABS, ids: [a.id] },
+      eliminaUna: { type: MSG.REMOVE_ARCHIVED_TAB, id: a.id },
+      svuota: { type: MSG.CLEAR_ARCHIVED_TABS },
+    });
+    const res = {};
+    for (const [prov, mittente] of Object.entries(mittenti)) {
+      res[prov] = {};
+      for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+    }
+    const rimaste = (await A.list()).map((x) => x.title);
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://quaderno/quaderno.html' });
+    return { res, rimaste, daFilo };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
+
+  for (const [prov, porte] of Object.entries(out.res)) {
+    for (const [porta, r] of Object.entries(porte)) {
+      expect(r.ok, `${prov}/${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+      expect(String(r.code || ''), `${prov}/${porta}`).toBe('forbidden');
+      expect(JSON.stringify(r), `${prov}/${porta}: il titolo è uscito verso il sito`).not.toContain('Banca online');
+    }
+  }
+  expect(out.rimaste, 'un sito ha cancellato schede dall\'archivio').toEqual(['Banca online, estratto conto']);
+  expect(out.daFilo.ok).toBe(true);
+  expect(out.daFilo.tabs.map((x) => x.title)).toEqual(['Banca online, estratto conto']);
+});
+
+test('il riordino delle schede, e la chiusura di una scheda per id, li chiede solo una pagina di Filo (#589.15)', async ({ app, shell, openTab, testServer }) => {
+  // Dal codice di Filo dentro un sito qualunque: senza il confine una delle due
+  // schede doppie finiva nell'archivio e, con un modello, partiva una chiamata pagata.
+  test.setTimeout(60_000);
+  const doppia = testServer.html('<html><head><title>Doppia</title></head><body><p>doppia</p></body></html>');
+  await openTab(doppia);
+  await openTab(doppia);
+  await testServer.openReady(openTab, '<html><head><title>Sito B</title></head><body><p>B</p></body></html>', { pubblico: true });
+
+  const stato = () => app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const archivio = (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title);
+    return {
+      doppie: tm.tabs.filter((t) => t.title === 'Doppia').map((t) => t.id),
+      ordine: tm.tabs.map((t) => t.id),
+      archivio,
+      chiamate: globalThis.__chiamateTriage,
+    };
+  });
+  await expect.poll(async () => (await stato()).doppie.length, { timeout: 10_000 }).toBe(2);
+
+  await app.evaluate(() => {
+    globalThis.__chiamateTriage = 0;
+    // Il modello configurato: tiene tutto, ma ogni giro è una chiamata.
+    globalThis.SN_TAB_TRIAGE_DECIDE = async () => { globalThis.__chiamateTriage += 1; return { decisions: [] }; };
+  });
+  const prima = await stato();
+
+  // Dal mondo isolato del sito B, cioè dallo stesso canale che usano i content script di Filo.
+  const dalSito = await app.evaluate(async ({ BrowserWindow }, bersaglio) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const b = tm.tabs.find((t) => /sito-pubblico\.test/.test(t.url || ''));
+    const manda = (m) => b.view.webContents.executeJavaScriptInIsolatedWorld(999, [{
+      code: `chrome.runtime.sendMessage(${JSON.stringify(m)})`,
+    }]);
+    return {
+      riordino: await manda({ type: 'run_tab_triage' }),
+      riordinoColori: await manda({ type: 'reorder_tabs' }),
+      chiudi: await manda({ type: '_tabs:remove', id: bersaglio }),
+      confermaAFreddo: await manda({ type: 'filo_confirm_action', action: { type: 'PULISCI_TAB' } }),
+    };
+  }, prima.doppie[0]);
+
+  for (const porta of ['riordino', 'riordinoColori', 'chiudi']) {
+    expect(dalSito[porta] && dalSito[porta].ok, `${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+    expect(String(dalSito[porta].code || ''), porta).toBe('forbidden');
+  }
+  expect(dalSito.confermaAFreddo.executed, 'una conferma mai chiesta ha lanciato il riordino').toBe(false);
+  const dopo = await stato();
+  expect(dopo.doppie, 'un sito ha chiuso una scheda dell\'utente').toEqual(prima.doppie);
+  expect(dopo.ordine).toEqual(prima.ordine);
+  expect(dopo.archivio).not.toContain('Doppia');
+  expect(dopo.chiamate, 'un sito ha fatto partire una chiamata al modello').toBe(0);
+
+  // Il bottone della home funziona come prima: la doppia va nell'archivio.
+  const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  const r = await home.evaluate(() => chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+  expect(r).toMatchObject({ ok: true, archived: 1 });
+  const fine = await stato();
+  expect(fine.doppie.length).toBe(1);
+  expect(fine.archivio).toContain('Doppia');
+  expect(fine.chiamate).toBe(1);
+  expect((await home.evaluate(() => chrome.runtime.sendMessage({ type: 'reorder_tabs' }))).ok).toBe(true);
+  void shell;
 });

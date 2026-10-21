@@ -21,34 +21,57 @@
   let bubblesEl = null;
   let threadView = null;
   let inputEl = null;
-  let homeMessageEl = null;
   let makeBubble = null;
   let stepTrace = null;
   let goHome = null;
   let goThread = null;
   let resetHistory = null;
   let pushHistory = null;
+  let segnaFermato = null;
   let isSending = null;
+  let giaAschermo = null;
   let beginSending = null;
   let runTurnAndContinue = null;
-  let isHomeMessageVisible = null;
+  let nienteInCorso = null;
+  let chatInCorso = null;
+  let allApertura = null;
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
+  let rispondi = null;
 
   // Lo stato lo tiene il main (una chiave sola): all'apertura chiediamo se
   // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
   // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
   let onboardingActive = false;
 
+  // Rifatta o ripresa, l'intervista sta solo nelle pagine che l'hanno chiesta (Preferenze, «Riprendiamola»): le altre,
+  // ricaricate o aperte da un collegamento, restano il filo dell'utente (#1297). Il segno sta nell'indirizzo.
+  const SEGNO = 'accoglienza';
+  function paginaDellIntervista() {
+    if (onboardingActive) return true;
+    try { return new URLSearchParams(global.location.search).has(SEGNO); } catch (_) { return false; }
+  }
+  function segnaPagina(si) {
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has(SEGNO) === si) return;
+      if (si) u.searchParams.set(SEGNO, '1');
+      else u.searchParams.delete(SEGNO);
+      global.history.replaceState(global.history.state, '', u.href);
+    } catch (_) {}
+  }
+
   async function fetchOnboarding() {
     try {
-      const r = await send({ type: MSG.FILO_GET_ONBOARDING });
+      const fuori = !paginaDellIntervista();
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING, ...(fuori ? { fuori: true } : {}) });
       // `ready: false` = nessun modello disponibile ancora (niente accesso,
       // niente chiave): l'intervista aspetta e la home spiega come attivare
       // Filo, invece di accoglierlo con una chat che non può rispondere.
       if (!r?.ok || !r.onboarding || !r.ready) return null;
       if (r.onboarding.done) return null;
+      if (r.onboarding.rifatta && fuori) return null;
       // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
       // il turno rimasto a metà lo deve riprendere UNA sola.
       return { ...r.onboarding, resume: !!r.resume };
@@ -60,6 +83,9 @@
   // un'altra scheda fa avanzare la stessa intervista.
   function renderOnboardingThread(state) {
     const thread = Array.isArray(state?.thread) ? state.thread : [];
+    // I segni dei cambi chiesti durante l'intervista sopravvivono al ridisegno (#867).
+    const Cambi = global.SN_DASH_CAMBI;
+    const segni = Cambi ? Cambi.fotografa(bubblesEl) : [];
     bubblesEl.innerHTML = '';
     // Lo stato viaggia con l'azzeramento: la home lo usa per legare TUTTA
     // l'intervista a una sola chat in archivio (#525), anche quando si svolge
@@ -69,8 +95,19 @@
     for (const m of thread) {
       const role = m.role === 'filo' ? 'filo' : 'user';
       pushHistory({ role, text: m.text });
-      bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
+      const bolla = makeBubble({ role, text: m.text, markdown: role === 'filo' });
+      bubblesEl.appendChild(bolla);
+      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia() : null;
+      if (scelta) {
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-bubble-actions';
+        wrap.appendChild(scelta);
+        bolla.appendChild(wrap);
+      }
     }
+    const ultimo = thread[thread.length - 1];
+    if (state.fermato && ultimo && ultimo.role !== 'filo' && segnaFermato) segnaFermato();
+    if (Cambi && segni.length) Cambi.rimetti(bubblesEl, segni);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
@@ -80,6 +117,8 @@
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    segnaPagina(!!state.rifatta);
+    if (allApertura) allApertura();
     goThread();
     renderOnboardingThread(state);
     showSkipOnboarding();
@@ -95,12 +134,135 @@
   // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
   // stiamo scrivendo noi — le bolle in corso sono già la verità.
   function onboardingUpdated(state) {
-    if (!state || state.done) return;
-    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
-    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
-    if (!onboardingActive) { hideOnboardingNotice(); return; }
+    if (!state) return;
+    // Qui l'intervista non è a schermo: la riga segue l'intervista com'è adesso, anche tolta o letta altrove.
+    if (!onboardingActive) { if (!closingShownAt) aggiornaRiga(state); return; }
+    if (state.done) return;
     if (isSending()) return;
+    // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
+    // butterebbe via il blocco di attività e i bottoni delle azioni.
+    if (giaAschermo && giaAschermo(state)) return;
     renderOnboardingThread(state);
+  }
+
+  // ── La scelta dell'autonomia (#1188) ──────────────────────────────────────
+  // Filo la mostra sotto la sua domanda, il livello lo sceglie l'utente con le regole di Preferenze (alzarlo vuole
+  // «conferma»). Finché la domanda è in sospeso il clic è anche la risposta, e la conversazione va avanti.
+  async function livelloSalvato() {
+    try {
+      const s = await global.SN_STORAGE.getSettings();
+      return (s && s.autonomia && s.autonomia.livello) || '';
+    } catch (_) { return ''; }
+  }
+
+  function mostraFrase(box, id) {
+    const A = global.SN_AUTONOMIA;
+    const frase = box.querySelector('.dash-autonomia-frase');
+    if (frase) frase.textContent = A.infoLivello(id || box.dataset.livello).frase;
+  }
+
+  function segnaLivello(box, livello) {
+    box.dataset.livello = livello;
+    for (const b of box.querySelectorAll('.dash-autonomia-livello')) {
+      const scelto = b.dataset.livello === livello;
+      b.classList.toggle('scelto', scelto);
+      b.setAttribute('aria-pressed', scelto ? 'true' : 'false');
+    }
+    if (!box.matches(':hover') && !box.contains(document.activeElement)) mostraFrase(box);
+  }
+
+  function aggiornaSceltaAutonomia(livello) {
+    const A = global.SN_AUTONOMIA;
+    if (!A) return;
+    for (const box of document.querySelectorAll('.dash-autonomia-scelta')) segnaLivello(box, A.livelloAttivo(livello));
+  }
+
+  // Solo se è ancora la domanda in sospeso: dopo un messaggio dell'utente il clic cambia il livello e basta.
+  function rispondiConScelta(box, livello) {
+    if (!onboardingActive || isSending() || box.dataset.risposto === '1' || !rispondi) return;
+    const dopo = [...bubblesEl.querySelectorAll('.dash-bubble-user')]
+      .some((u) => box.compareDocumentPosition(u) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if (dopo) return;
+    if (rispondi(`Scelgo ${global.SN_AUTONOMIA.infoLivello(livello).nome}.`)) box.dataset.risposto = '1';
+  }
+
+  async function scegliLivello(box, nuovo) {
+    const A = global.SN_AUTONOMIA;
+    if (box.dataset.occupato === '1') return;
+    box.dataset.occupato = '1';
+    try {
+      const attuale = A.livelloAttivo((await livelloSalvato()) || box.dataset.livello);
+      const serve = A.richiestaCambioLivello(attuale, nuovo);
+      if (serve === 'no') return;
+      if (serve === 'conferma') {
+        const Ui = global.SN_CONFIRM_UI;
+        if (!Ui || !(await Ui.confirmTyped(A.confermaAlzata(nuovo)))) return;
+      }
+      if (nuovo !== attuale) {
+        const r = await send({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
+        if (!r || r.ok === false) return;
+      }
+      aggiornaSceltaAutonomia(nuovo);
+      rispondiConScelta(box, nuovo);
+    } catch (_) {
+    } finally {
+      delete box.dataset.occupato;
+    }
+  }
+
+  function sceltaAutonomia(livello) {
+    const A = global.SN_AUTONOMIA;
+    if (!A) return null;
+    const box = document.createElement('div');
+    box.className = 'dash-autonomia-scelta';
+    const gruppo = document.createElement('div');
+    gruppo.className = 'dash-autonomia-livelli';
+    gruppo.setAttribute('role', 'group');
+    gruppo.setAttribute('aria-label', 'Quanto Filo fa da solo');
+    const livelli = A.livelliSelezionabili();
+    livelli.forEach((l, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-autonomia-livello';
+      b.dataset.livello = l.id;
+      const tacche = document.createElement('span');
+      tacche.className = 'dash-autonomia-tacche';
+      tacche.setAttribute('aria-hidden', 'true');
+      for (let j = 0; j < livelli.length; j++) {
+        const t = document.createElement('span');
+        t.className = `dash-autonomia-tacca${j <= i ? ' piena' : ''}`;
+        tacche.appendChild(t);
+      }
+      const nome = document.createElement('span');
+      nome.textContent = l.nome;
+      b.append(tacche, nome);
+      b.addEventListener('click', () => { scegliLivello(box, l.id); });
+      b.addEventListener('mouseenter', () => mostraFrase(box, l.id));
+      b.addEventListener('focus', () => mostraFrase(box, l.id));
+      b.addEventListener('mouseleave', () => mostraFrase(box));
+      b.addEventListener('blur', () => mostraFrase(box));
+      gruppo.appendChild(b);
+    });
+    // Il posto della frase misura già la più lunga: se cambiasse altezza al passaggio del cursore, la chat in fondo
+    // salterebbe, il pulsante scivolerebbe via da sotto il cursore e il clic andrebbe a vuoto.
+    const posto = document.createElement('div');
+    posto.className = 'dash-autonomia-frase-posto';
+    for (const l of livelli) {
+      const misura = document.createElement('span');
+      misura.className = 'dash-autonomia-frase-misura';
+      misura.setAttribute('aria-hidden', 'true');
+      misura.textContent = A.infoLivello(l.id).frase;
+      posto.appendChild(misura);
+    }
+    const frase = document.createElement('div');
+    frase.className = 'dash-autonomia-frase';
+    frase.setAttribute('aria-live', 'polite');
+    posto.appendChild(frase);
+    box.append(gruppo, posto);
+    segnaLivello(box, A.livelloAttivo(livello));
+    // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
+    livelloSalvato().then((lv) => { if (lv) segnaLivello(box, A.livelloAttivo(lv)); });
+    return box;
   }
 
   // ── La via d'uscita che non passa dal modello ─────────────────────────────
@@ -160,6 +322,17 @@
   // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
   // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
   // che aspettare la prossima scheda.
+  // Una home preparata nascosta (#1128) non prende la ripresa del turno rimasto a metà: la chiede arrivando davanti.
+  async function riprendiAllaComparsa() {
+    if (!onboardingActive || isSending()) return;
+    const state = await fetchOnboarding();
+    const thread = (state && state.thread) || [];
+    const last = thread[thread.length - 1];
+    if (!state || !state.resume || !onboardingActive || isSending() || !last || last.role !== 'user') return;
+    beginSending();
+    await runTurnAndContinue({ userMessage: last.text });
+  }
+
   async function maybeOpenOnboardingLater() {
     if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
@@ -170,7 +343,7 @@
   // Una chat in cui Filo ha solo risposto «servono i crediti» non è una conversazione in corso: chi ha scritto
   // prima di averli deve vedere Filo presentarsi, non la stessa risposta ferma.
   function nienteDaInterrompere() {
-    if (document.body.dataset.state === 'home') return true;
+    if (nienteInCorso && nienteInCorso()) return true;
     return Boolean(soloRisposteSenzaCrediti && soloRisposteSenzaCrediti());
   }
 
@@ -202,7 +375,13 @@
   let closingShownAt = 0;
   let closingDwellTimer = null;
 
+  // L'annuncio arriva a tutte le schede, ma torna alla home solo quella che mostrava l'intervista: nelle altre c'è la
+  // conversazione dell'utente, e rilanciare l'accoglienza non la tocca (#1297).
   function onboardingDone(msg) {
+    if (!onboardingActive && !closingShownAt) {
+      refreshOnboardingNotice().catch(() => {});
+      return;
+    }
     onboardingActive = false;
     clearTimeout(onboardingHomeFallback);
     const atteso = closingShownAt ? Date.now() - closingShownAt : CLOSING_DWELL_MS;
@@ -222,15 +401,12 @@
     closingShownAt = 0;
     clearTimeout(onboardingHomeFallback);
     hideSkipOnboarding();
-    goHome(); // svuota bolle e storico: l'intervista è finita
-    if (isHomeMessageVisible()) {
-      homeMessageEl.classList.remove('dash-home-msg-loading');
-      homeMessageEl.textContent = msg?.message || 'Filo è in ascolto.';
-    }
+    segnaPagina(false);
+    // Il filo si rilegge da capo: l'intervista ne è il primo tratto, e il primo messaggio di Filo sta in coda (#869).
+    goHome();
     setSuggestions(Array.isArray(msg?.suggestions) ? msg.suggestions : []);
-    // La home appena generata È la risposta finale. Se non è arrivata (chiave
-    // assente, provider giù) la si carica per la strada normale.
-    if (!msg?.message) loadDashboard().catch(() => {});
+    // I suggerimenti nati con quel messaggio; se non sono arrivati (chiave assente, provider giù) quelli di sempre.
+    if (!msg?.suggestions?.length) loadDashboard().catch(() => {});
     // Chiusa prima della fine? Il congedo era in chat, e la chat è appena
     // sparita: la riga qui sotto è quello che ne resta.
     refreshOnboardingNotice().catch(() => {});
@@ -249,7 +425,16 @@
       const r = await send({ type: MSG.FILO_GET_ONBOARDING, peek: true });
       st = r?.ok ? r.onboarding : null;
     } catch (_) { return; }
-    if (st && st.done && st.notice === 'early') showOnboardingNotice();
+    aggiornaRiga(st);
+  }
+
+  // 'chiusa': finita prima della fine. 'aperta': rifatta e lasciata a metà in un'altra scheda, che magari non c'è più;
+  // da qui si riprende come una chiusa.
+  function aggiornaRiga(st) {
+    if (onboardingActive || !st) { hideOnboardingNotice(); return; }
+    const risposto = Array.isArray(st.thread) && st.thread.some((m) => m && m.role === 'user');
+    if (st.done && st.notice === 'early') showOnboardingNotice('chiusa');
+    else if (!st.done && st.rifatta && risposto) showOnboardingNotice('aperta');
     else hideOnboardingNotice();
   }
 
@@ -258,21 +443,23 @@
     if (!box) return;
     box.innerHTML = '';
     box.hidden = true;
+    delete box.dataset.tipo;
   }
 
-  function showOnboardingNotice() {
+  function showOnboardingNotice(tipo = 'chiusa') {
     const box = $('onbNotice');
-    if (!box || !box.hidden) return; // già a schermo: non la ricostruiamo
+    if (!box || (!box.hidden && box.dataset.tipo === tipo)) return; // già a schermo: non la ricostruiamo
     box.innerHTML = '';
+    box.dataset.tipo = tipo;
     const text = document.createElement('span');
     text.className = 'dash-onb-notice-text';
-    text.textContent = 'Abbiamo chiuso la presentazione a metà.';
+    text.textContent = tipo === 'aperta' ? 'La presentazione è rimasta a metà.' : 'Abbiamo chiuso la presentazione a metà.';
     const redo = document.createElement('button');
     redo.type = 'button';
     redo.id = 'onbNoticeRedo';
     redo.textContent = 'Riprendiamola';
-    redo.title = 'Riapre l’intervista di benvenuto qui, da capo. La trovi anche in Preferenze.';
-    redo.addEventListener('click', restartOnboardingHere);
+    redo.title = 'Riapre l’intervista da dove l’avevamo lasciata. Per rifarla da capo c’è Preferenze.';
+    redo.addEventListener('click', riprendiQui);
     const ok = document.createElement('button');
     ok.type = 'button';
     ok.id = 'onbNoticeDismiss';
@@ -285,18 +472,27 @@
     box.hidden = false;
   }
 
+  // Su un'intervista rimasta aperta «No, va bene così» la chiude, come «Salta l'accoglienza» nella sua scheda.
   async function dismissOnboardingNotice() {
-    hideOnboardingNotice();
-    try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
-  }
-
-  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
-  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
-  async function restartOnboardingHere() {
+    const box = $('onbNotice');
+    const aperta = !!box && box.dataset.tipo === 'aperta';
     hideOnboardingNotice();
     try {
-      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING });
-      if (r?.ok && r.onboarding) await openOnboarding({ ...r.onboarding, resume: false });
+      await send(aperta ? { type: MSG.FILO_CLOSE_ONBOARDING, senzaRiga: true } : { type: MSG.FILO_ONBOARDING_NOTICE_SEEN });
+    } catch (_) {}
+  }
+
+  // Riprenderla da qui, nella scheda che l'utente ha davanti: la stessa intervista, dalla domanda rimasta in sospeso e
+  // con quello che Filo ha già imparato (#1297). Da capo la si rifà da Preferenze. Una scheda con una conversazione
+  // sua la tiene: l'intervista riparte in una scheda nuova, come da Preferenze, e il turno in sospeso lo prende lei.
+  async function riprendiQui() {
+    hideOnboardingNotice();
+    const altrove = !!(chatInCorso && chatInCorso());
+    try {
+      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING, riprendi: true, ...(altrove ? { altrove: true } : {}) });
+      if (!r?.ok || !r.onboarding || r.onboarding.done) return;
+      if (altrove) await send({ type: MSG.OPEN_URL, url: `filo://newtab/?${SEGNO}=1` });
+      else await openOnboarding({ ...r.onboarding, resume: !!r.resume });
     } catch (_) {}
   }
 
@@ -306,20 +502,24 @@
     bubblesEl = deps.bubblesEl;
     threadView = deps.threadView;
     inputEl = deps.inputEl;
-    homeMessageEl = deps.homeMessageEl;
     makeBubble = deps.makeBubble;
     stepTrace = deps.stepTrace;
     goHome = deps.goHome;
     goThread = deps.goThread;
     resetHistory = deps.resetHistory;
     pushHistory = deps.pushHistory;
+    segnaFermato = deps.segnaFermato || null;
     isSending = deps.isSending;
+    giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
-    isHomeMessageVisible = deps.isHomeMessageVisible;
+    nienteInCorso = deps.nienteInCorso;
+    chatInCorso = deps.chatInCorso || null;
+    allApertura = deps.allApertura;
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
+    rispondi = deps.rispondi || null;
   }
 
   global.SN_DASH_ONBOARDING = {
@@ -331,8 +531,11 @@
     onboardingClosing,
     onboardingDone,
     maybeOpenOnboardingLater,
+    riprendiAllaComparsa,
     refreshOnboardingNotice,
     hideOnboardingNotice,
     makeSkipOnboardingBtn,
+    sceltaAutonomia,
+    aggiornaSceltaAutonomia,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

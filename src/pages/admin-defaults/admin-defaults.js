@@ -16,11 +16,17 @@
 
   // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
+  // Catene lette che la griglia non mostra: il salvataggio riscrive la mappa intera, e senza
+  // queste cancellerebbe la scelta di una funzione spostata in Gestione prima che lì la si salvi (#465).
+  let hiddenModels = {};
 
   // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
   // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
   // `null` = non ancora caricato; lista = caricato.
   const providerModelCache = { openrouter: null };
+
+  // Il tetto delle risposte per famiglia di funzioni (#1097.3): famiglia → campo.
+  const CAMPI_LUNGHEZZA = [['conversazioni', 'lunghezzaConversazioni'], ['testi', 'lunghezzaTesti'], ['brevi', 'lunghezzaBrevi']];
 
   function $(id) { return document.getElementById(id); }
 
@@ -57,6 +63,7 @@
       if (it && it.label) opt.label = it.label;
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Carica (una sola volta) il catalogo di un provider chiedendolo al main.
@@ -96,10 +103,26 @@
     $('h-models').textContent = I18n.t('options_models');
     $('models-desc').textContent = I18n.t('options_models_desc');
     $('addModelRow').textContent = I18n.t('options_model_add');
+    $('providerSortLabel').textContent = I18n.t('admin_defaults_sort_general');
+    $('providerSortDesc').textContent = I18n.t('admin_defaults_sort_general_desc');
+    riempiSceltaGenerale();
     $('h-excluded').textContent = I18n.t('admin_defaults_excluded');
     $('excluded-desc').textContent = I18n.t('admin_defaults_excluded_desc');
     $('addExcludedRow').textContent = I18n.t('admin_defaults_excluded_add');
     $('saveBtn').textContent = I18n.t('admin_defaults_save');
+    $('h-delicate').textContent = I18n.t('admin_defaults_delicate');
+    $('delicate-desc').textContent = I18n.t('admin_defaults_delicate_desc');
+    $('h-contesto').textContent = I18n.t('admin_defaults_contesto');
+    $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
+    $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
+    $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
+    $('l-contesto-cache').textContent = I18n.t('admin_defaults_contesto_cache');
+    $('contestoCache5m').textContent = I18n.t('admin_defaults_contesto_cache_5m');
+    $('contestoCache1h').textContent = I18n.t('admin_defaults_contesto_cache_1h');
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_codice');
+    $('h-lunghezza').textContent = I18n.t('admin_defaults_lunghezza');
+    $('lunghezza-desc').textContent = I18n.t('admin_defaults_lunghezza_desc');
+    for (const [f] of CAMPI_LUNGHEZZA) $(`l-lunghezza-${f}`).textContent = I18n.t(`admin_defaults_lunghezza_${f}`);
   }
 
   function keyStateText(present) {
@@ -126,6 +149,77 @@
     }
     const s = String(v == null ? '' : v).toLowerCase().trim();
     return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
+  }
+
+  function ricontrollaAvvisi() {
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) avvisaProduttore(row);
+    if (modelChains) ModelChain.ricontrolla(modelChains);
+    // Una riga del registro cambiata o tolta può essere il sostituto aperto di qualche funzione.
+    renderOpenWeightsImpact();
+  }
+
+  const PROVIDER_SORTS = (window.SN_CONST && window.SN_CONST.PROVIDER_SORTS)
+    || ['auto', 'throughput', 'latency', 'price'];
+
+  // Le misure del «Prova» stanno con chi le ha prese (la config condivisa è di
+  // tutti), per nickname, nello stesso posto delle Opzioni: sono la stessa cosa.
+  let misureProva = {};
+
+  async function ricordaMisura(nickname, esito) {
+    if (!nickname) return;
+    misureProva = { ...misureProva, [nickname]: esito };
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.UPDATE_SETTINGS,
+        settings: { defaultModelTests: misureProva },
+      });
+    } catch (_) {}
+  }
+
+  // Con che modello, ragionamento e ordinamento la riga chiamerebbe adesso:
+  // «Automatico» rimanda alla scelta generale, che sta su questa stessa pagina.
+  function configurazioneRiga(row) {
+    const val = (sel) => { const el = row.querySelector(sel); return el ? el.value : ''; };
+    return {
+      model: val('.sn-model-id').trim(),
+      reasoning: normReasoning(val('.sn-model-reason')),
+      sort: window.SN_CONST.ordinamentoEffettivo(val('.sn-model-sort'), $('providerSort').value),
+    };
+  }
+
+  function mostraMisura(row) {
+    const statusEl = row.querySelector('.sn-model-row-status');
+    if (!statusEl) return;
+    const misura = row._misura;
+    if (!window.SN_CONST.misuraValePer(misura, configurazioneRiga(row))) {
+      statusEl.textContent = I18n.t('options_model_untested');
+      return;
+    }
+    const giorno = giornoMisura(misura.at);
+    statusEl.textContent = I18n.t('options_test_result', misura.ttftMs ?? '—', misura.tokensPerSec ?? '—') + giorno;
+  }
+
+  // Il giorno solo se non è oggi: numeri di settimane fa messi accanto a quelli
+  // appena presi si leggerebbero allo stesso modo.
+  function giornoMisura(at) {
+    const d = at ? new Date(at) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    if (d.toDateString() === new Date().toDateString()) return '';
+    return ` · ${d.toLocaleDateString()}`;
+  }
+
+  function rinfrescaMisure() {
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      mostraMisura(row);
+    }
+  }
+
+  function normSort(v) {
+    if (window.SN_CONST && window.SN_CONST.normalizeProviderSort) {
+      return window.SN_CONST.normalizeProviderSort(v);
+    }
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    return s && s !== 'auto' && PROVIDER_SORTS.includes(s) ? s : null;
   }
 
   function makeModelRow(nick, entry) {
@@ -190,11 +284,25 @@
     }
     reasonSel.value = normReasoning(entry && entry.reasoning) || 'auto';
 
+    // Con che criterio OpenRouter sceglie l'host per QUESTO modello: gemello del
+    // select del reasoning, perché sono le due manopole della velocità.
+    const sortSel = document.createElement('select');
+    sortSel.className = 'sn-model-sort';
+    sortSel.title = I18n.t('admin_defaults_sort_desc');
+    for (const val of PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = I18n.t('provider_sort_' + val);
+      sortSel.appendChild(opt);
+    }
+    sortSel.value = normSort(entry && entry.sort) || 'auto';
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('options_model_remove');
-    del.addEventListener('click', () => { row.remove(); });
+    del.addEventListener('click', () => { row.remove(); ricontrollaAvvisi(); segnalaModifica(); });
+    for (const el of [nickIn, idIn]) el.addEventListener('change', ricontrollaAvvisi);
 
     const test = document.createElement('button');
     test.type = 'button';
@@ -205,13 +313,39 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
+    // Perché una riga non è stata salvata: qui, accanto alla riga, e non in un
+    // avviso generico che non dice quale.
+    const msg = document.createElement('div');
+    msg.className = 'sn-model-row-msg';
+
+    const warn = document.createElement('div');
+    warn.className = 'sn-model-row-warn';
+    warn.setAttribute('role', 'status');
+    warn.hidden = true;
+
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
     row.appendChild(reasonSel);
+    row.appendChild(sortSel);
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
+    row.appendChild(msg);
+    row.appendChild(warn);
+    idIn.addEventListener('input', () => avvisaProduttore(row));
+    avvisaProduttore(row);
+
+    // Una misura parla della configurazione con cui è stata presa: toccare la
+    // riga la rimette in discussione subito, non al prossimo caricamento.
+    row._misura = misureProva[nick] || null;
+    for (const [el, evento] of [[nickIn, 'input'], [idIn, 'input'], [reasonSel, 'change'], [sortSel, 'change']]) {
+      el.addEventListener(evento, () => {
+        if (el === nickIn) row._misura = misureProva[nickIn.value.trim()] || null;
+        mostraMisura(row);
+      });
+    }
+    mostraMisura(row);
     return row;
   }
 
@@ -227,19 +361,29 @@
     statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
-      // Testa la riga così com'è scritta (provider + stringa modello), anche
-      // prima del salvataggio: il main usa le chiavi predefinite (mai visibili
-      // qui). Il nickname viaggia solo come informazione di contorno.
+      // Testa la riga così com'è scritta, scelta generale compresa e anche
+      // prima del salvataggio: è la configurazione a cui la misura viene poi
+      // attribuita. Il nickname viaggia solo come informazione di contorno.
+      const conf = configurazioneRiga(row);
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
         provider,
         model: modelId,
+        reasoning: conf.reasoning || '',
+        sort: conf.sort || '',
       });
       if (!res?.ok) {
         statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
-        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+        row._misura = {
+          ttftMs: res.ttftMs ?? null,
+          tokensPerSec: res.tokensPerSec ?? null,
+          at: new Date().toISOString(),
+          ...conf,
+        };
+        mostraMisura(row);
+        ricordaMisura(nickname, row._misura);
       }
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
@@ -258,6 +402,7 @@
       I18n.t('options_model_provider'),
       I18n.t('options_model_id'),
       I18n.t('admin_defaults_reasoning'),
+      I18n.t('admin_defaults_sort'),
       '', '',
     ].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
@@ -273,9 +418,14 @@
     populateNicknames(registry);
   }
 
+  // Una riga scartata (soprannome mancante o già usato) non sparisce in
+  // silenzio: torna a chi salva, che la segnala e non annuncia un salvataggio
+  // intero. Stessa regola della pagina Opzioni.
   function collectModelRegistry() {
     const host = $('modelRegistryList');
     const out = {};
+    const missingNickRows = [];
+    const dupRows = [];
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
       const provider = row.querySelector('.sn-model-provider').value;
@@ -283,21 +433,45 @@
       const label = (row.dataset.label || '').trim();
       const reasonEl = row.querySelector('.sn-model-reason');
       const reasoning = normReasoning(reasonEl && reasonEl.value);
+      const sortEl = row.querySelector('.sn-model-sort');
+      const sort = normSort(sortEl && sortEl.value);
       if (!nick && !model) continue;
-      if (!nick) continue;
-      if (out[nick]) continue;
+      if (!nick) { missingNickRows.push(row); continue; }
+      if (out[nick]) { dupRows.push({ row, nick }); continue; }
       const entry = { provider, model };
       if (label) entry.label = label;
       // Salviamo il livello solo se diverso da 'auto' (default): così le voci
       // integrate restano pulite e "auto" non gonfia il doc condiviso.
       if (reasoning) entry.reasoning = reasoning;
-      // Ciò che la riga non modifica ma la voce dichiara resta com'era.
-      for (const k of ['weights', 'inputs', 'outputs']) {
-        if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
-      }
+      if (sort) entry.sort = sort;
+      // Ciò che la voce dichiara del modello resta solo se il modello è ancora quello.
+      Object.assign(entry, window.SN_CONST.dichiarazioniPerModello(row._entry, model));
       out[nick] = entry;
     }
-    return out;
+    return { registry: out, missingNickRows, dupRows };
+  }
+
+  // Evidenzia le righe che il salvataggio ha scartato e ripulisce le altre.
+  function markRegistryRowIssues(missingNickRows, dupRows) {
+    const host = $('modelRegistryList');
+    for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      row.classList.remove('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.remove('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = '';
+    }
+    for (const row of missingNickRows || []) {
+      row.classList.add('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.add('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = I18n.t('options_model_nickname_required');
+    }
+    for (const { row, nick } of dupRows || []) {
+      row.classList.add('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.add('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = I18n.t('options_model_nickname_duplicate', nick);
+    }
   }
 
   function populateNicknames(registry) {
@@ -414,7 +588,7 @@
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('admin_defaults_excluded_remove');
-    del.addEventListener('click', () => { row.remove(); renderExcludedDrift(); });
+    del.addEventListener('click', () => { row.remove(); renderExcludedDrift(); segnalaModifica(); });
 
     const msg = document.createElement('div');
     msg.className = 'sn-model-row-msg';
@@ -439,6 +613,7 @@
   // "l'ho svuotata", per i nomi e per i motivi separatamente.
   let loadedExcluded = [];
   let loadedReasons = '[]';
+  let excludedLoaded = false;
 
   function renderExcluded(list, reasons) {
     const host = $('excludedList');
@@ -453,6 +628,7 @@
     }
     loadedExcluded = collectExcluded();
     loadedReasons = JSON.stringify(collectExcludedReasons());
+    excludedLoaded = true;
     renderExcludedDrift();
   }
 
@@ -507,7 +683,40 @@
     note.value = d.note || '';
   }
 
+  // Un soprannome che porta a un modello il cui produttore questa lista lascia servire (#1059): lo si dice sulla
+  // riga, mentre lo si imposta, col bottone che lo esclude. Prima che la lista sia in pagina non c'è niente da dire.
+  function avvisaProduttore(row) {
+    const warn = row.querySelector('.sn-model-row-warn');
+    const C = window.SN_CONST;
+    if (!warn || !C || typeof C.unexcludedProducer !== 'function') return;
+    const model = row.querySelector('.sn-model-id').value.trim();
+    const nome = excludedLoaded ? C.unexcludedProducer(model, collectExcluded(), providerCatalog) : '';
+    if (warn.dataset.nome === nome) return;
+    warn.dataset.nome = nome;
+    warn.replaceChildren();
+    warn.hidden = !nome;
+    if (!nome) return;
+    const text = document.createElement('span');
+    text.textContent = I18n.t('admin_defaults_producer_not_excluded', nome);
+    const fix = document.createElement('button');
+    fix.type = 'button';
+    fix.className = 'sn-excluded-guess';
+    fix.textContent = I18n.t('admin_defaults_producer_exclude', nome);
+    fix.addEventListener('click', () => escludiProduttore(nome));
+    warn.append(text, fix);
+  }
+
+  function escludiProduttore(nome) {
+    if (!collectExcluded().some((x) => x.toLowerCase() === nome.toLowerCase())) {
+      $('excludedList').appendChild(makeExcludedRow(nome, { kind: 'producer', note: '' }));
+      segnalaModifica();
+    }
+    renderExcludedDrift();
+  }
+
   function renderExcludedDrift() {
+    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue.
+    ricontrollaAvvisi();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();
@@ -532,30 +741,207 @@
   function renderModelsGrid(models) {
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
-      getRegistry: () => collectModelRegistry(),
+      getRegistry: () => collectModelRegistry().registry,
+      // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
+      avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref], collectExcluded()),
+      costoDi: costoModello,
+      // Mentre si scrive il segmento è a metà: l'avviso segue solo i valori confermati.
+      onChange: (scrivendo) => { if (!scrivendo) renderOpenWeightsImpact(); },
     });
+    hiddenModels = Object.fromEntries(Object.entries(models || {})
+      .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
+    renderOpenWeightsImpact();
+  }
+
+  // Il costo di un uso accanto a ogni modello (#819), come nelle Opzioni. Senza avviso: qui si decide il predefinito,
+  // che è proprio il metro dell'avviso.
+  let stimaCtx = null;
+  async function caricaStime() {
+    let ctx = null;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.STIMA_COSTO_MODELLI });
+      if (r && r.ok && r.contesto) ctx = r.contesto;
+    } catch (_) { ctx = null; }
+    stimaCtx = { ...(ctx || { modo: 'crediti', listino: null, registro: {} }), predefiniti: {} };
+    if (modelChains) ModelChain.aggiornaCosti(modelChains);
+  }
+  function costoModello(action, ref) {
+    const S = window.SN_STIMA_COSTO;
+    if (!S || !ref) return null;
+    if (!stimaCtx) return { breve: '…', testo: 'Sto leggendo il listino di OpenRouter.' };
+    return S.valuta(action, ref, collectModelRegistry().registry, stimaCtx);
   }
 
   function collectModels() {
-    return ModelChain.collect(modelChains);
+    return { ...hiddenModels, ...ModelChain.collect(modelChains) };
+  }
+
+  // Cosa trova chi accende «Solo modelli a pesi aperti» con la config com'è sulla pagina, non salvata: lo stesso calcolo
+  // delle Opzioni sulle sole funzioni della griglia (#465). È un avviso, il salvataggio resta libero (#833).
+  function renderOpenWeightsImpact() {
+    const host = $('openWeightsImpact');
+    const C = window.SN_CONST;
+    if (!host) return;
+    const models = ModelChain.collect(modelChains);
+    // Senza nessun modello scelto non c'è niente da dire: «partono già da modelli aperti» sarebbe falso.
+    const conModello = Object.values(models).some((v) => String(v || '').trim());
+    if (!C || typeof C.openWeightsImpact !== 'function' || !conModello) { host.hidden = true; return; }
+    const impact = C.openWeightsImpact(models, collectModelRegistry().registry);
+    const riga = (testo, cls) => {
+      const p = document.createElement('p');
+      p.textContent = testo;
+      if (cls) p.className = cls;
+      return p;
+    };
+    host.replaceChildren();
+    if (!impact.unavailable.length && !impact.substituted.length) {
+      host.className = 'sn-muted sn-ow-impact';
+      host.appendChild(riga(I18n.t('admin_defaults_open_weights_all_open')));
+      host.hidden = false;
+      return;
+    }
+    host.className = 'sn-info-box sn-ow-impact';
+    const titolo = document.createElement('div');
+    titolo.className = 'sn-info-box-title';
+    titolo.textContent = I18n.t('admin_defaults_open_weights_title');
+    host.appendChild(titolo);
+    if (impact.unavailable.length) {
+      const nomi = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
+      host.appendChild(riga(I18n.t('options_open_weights_unavailable', nomi.join(', ')), 'sn-ow-stop'));
+    }
+    const perModello = new Map();
+    for (const s of impact.substituted) {
+      if (!perModello.has(s.to)) perModello.set(s.to, []);
+      perModello.get(s.to).push(ModelChain.etichetta(s.action));
+    }
+    for (const [to, nomi] of perModello) host.appendChild(riga(I18n.t('admin_defaults_open_weights_to', to, nomi.join(', '))));
+    if (!impact.unavailable.length) host.appendChild(riga(I18n.t('admin_defaults_open_weights_none_stop')));
+    host.hidden = false;
+  }
+
+  // ── Pagine delicate (#1004) ─────────────────────────────────────────────────
+  let delicateCaricate = {};
+  let delicateDiSerie = {};
+  const righeSiti = (testo) => [...new Set(String(testo || '').split(/[\n,]+/)
+    .map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, ''))
+    .filter(Boolean))];
+  function renderDelicate(elenco, diSerie) {
+    delicateCaricate = elenco || {};
+    delicateDiSerie = diSerie || {};
+    const box = $('delicateLists');
+    box.textContent = '';
+    for (const k of [...new Set([...Object.keys(delicateDiSerie), ...Object.keys(delicateCaricate)])]) {
+      const id = `delicate-${k}`;
+      const label = document.createElement('label');
+      label.htmlFor = id;
+      label.style.marginTop = '12px';
+      const nome = I18n.t(`admin_defaults_delicate_${k}`);
+      label.textContent = nome && !nome.startsWith('admin_defaults_') ? nome : k;
+      const ta = document.createElement('textarea');
+      ta.id = id;
+      ta.dataset.categoria = k;
+      ta.rows = 6;
+      ta.style.width = '100%';
+      ta.value = (delicateCaricate[k] || []).join('\n');
+      box.append(label, ta);
+    }
+  }
+  // Le categorie da salvare: tutte quelle che non sono come nel codice. null = niente di cambiato.
+  function collectDelicate() {
+    const ora = {};
+    for (const ta of $('delicateLists').querySelectorAll('textarea[data-categoria]')) ora[ta.dataset.categoria] = righeSiti(ta.value);
+    const uguali = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+    if (Object.keys(ora).every((k) => uguali(ora[k], delicateCaricate[k]))) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(ora)) if (!uguali(v, delicateDiSerie[k])) out[k] = v;
+    return out;
+  }
+
+  // ── Quanto ricorda la chat (#868) ───────────────────────────────────────────
+  let contestoCaricato = {};
+  function renderContesto(salvato, diSerie) {
+    contestoCaricato = salvato || {};
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
+      $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
+    }
+    $('contestoCache').value = contestoCaricato.cache === '5m' || contestoCaricato.cache === '1h' ? contestoCaricato.cache : '';
+    const serie = diSerie && diSerie.cache === '5m' ? 'admin_defaults_contesto_cache_5m' : 'admin_defaults_contesto_cache_1h';
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_serie', I18n.t(serie));
+  }
+  // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
+  function collectContesto() {
+    const ora = {};
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      const v = $(id).value.trim();
+      if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
+    }
+    if ($('contestoCache').value) ora.cache = $('contestoCache').value;
+    return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
+  }
+
+  // ── Quanto può essere lunga una risposta (#1097.3) ─────────────────────────
+  let lunghezzaCaricata = {};
+  function renderLunghezza(salvato, diSerie) {
+    lunghezzaCaricata = salvato || {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      $(id).value = lunghezzaCaricata[f] != null ? String(lunghezzaCaricata[f]) : '';
+      $(id).placeholder = diSerie && diSerie[f] != null ? String(diSerie[f]) : '';
+    }
+  }
+  // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
+  function collectLunghezza() {
+    const ora = {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      const v = $(id).value.trim();
+      if (v !== '' && Number.isFinite(Number(v))) ora[f] = Number(v);
+    }
+    return JSON.stringify(ora) === JSON.stringify(lunghezzaCaricata) ? null : ora;
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
-  function applyConfig(cfg) {
+  // Le voci della scelta generale sono le stesse delle righe, meno «Automatico»:
+  // a livello generale «automatico» vuol dire lasciar scegliere il router.
+  function riempiSceltaGenerale() {
+    const sel = $('providerSort');
+    sel.innerHTML = '';
+    for (const val of PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val === 'auto'
+        ? I18n.t('provider_sort_general_auto')
+        : I18n.t('provider_sort_' + val);
+      sel.appendChild(opt);
+    }
+  }
+
+  function applyStatoChiavi(cfg) {
     const present = cfg.apiKeysPresent || {};
     $('apiKey-state').textContent = `(${keyStateText(present.openrouter)})`;
     $('apiKeyTavily-state').textContent = `(${keyStateText(present.tavily)})`;
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
+  }
+
+  function applyConfig(cfg) {
+    applyStatoChiavi(cfg);
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
+    caricaStime();
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
+    renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
+    renderContesto(cfg.contestoFilo, cfg.contestoFiloDiSerie);
+    renderLunghezza(cfg.lunghezzaRisposte, cfg.lunghezzaRisposteDiSerie);
     ensureProviderCatalog();
+    $('providerSort').value = normSort(cfg.providerSort) || 'auto';
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
     ensureProviderModels('openrouter');
+    // Le righe nascono prima che la scelta generale sia in pagina, e senza di
+    // quella non sanno a cosa rimanda l'«Automatico» della loro misura.
+    rinfrescaMisure();
   }
 
   async function load() {
@@ -563,6 +949,7 @@
     try {
       const settings = await Storage.getSettings();
       window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+      misureProva = settings.defaultModelTests || {};
     } catch (_) {}
 
     let res;
@@ -581,10 +968,25 @@
     applyConfig(res.config || {});
   }
 
+  // La conferma parla dell'ULTIMO salvataggio: appena qualcosa sullo schermo non
+  // è più ciò che è partito agli utenti, lo dice invece di lasciar credere di sì.
+  function segnalaModifica() {
+    // Una modifica fatta mentre il salvataggio viaggia non è partita con lui:
+    // la ricorda, e a risposta arrivata la pagina lo dice invece di annunciare
+    // un salvataggio che quella modifica non contiene.
+    if (save._inCorso) { save._modificatoDurante = true; return; }
+    const status = $('saveStatus');
+    clearTimeout(save._t);
+    status.classList.remove('sn-error');
+    status.textContent = I18n.t('admin_defaults_unsaved');
+  }
+
   async function save() {
     const status = $('saveStatus');
     const btn = $('saveBtn');
     btn.disabled = true;
+    save._inCorso = true;
+    save._modificatoDurante = false;
     status.classList.remove('sn-error');
     status.textContent = I18n.t('admin_defaults_saving');
 
@@ -595,9 +997,11 @@
     if (or) apiKeys.openrouter = or;
     if (tav) apiKeys.tavily = tav;
 
+    const { registry, missingNickRows, dupRows } = collectModelRegistry();
     const config = {
-      modelRegistry: collectModelRegistry(),
+      modelRegistry: registry,
       models: collectModels(),
+      providerSort: normSort($('providerSort').value) || '',
     };
     // Fornitori esclusi: si invia la lista SOLO se l'owner l'ha toccata (anche
     // per svuotarla: [] è un valore, e viaggia). Salvarla a ogni salvataggio
@@ -613,6 +1017,12 @@
     if (config.excludedProviders || JSON.stringify(reasons) !== loadedReasons) {
       config.excludedProviderReasons = reasons;
     }
+    const delicate = collectDelicate();
+    if (delicate) config.sitiDelicati = delicate;
+    const contesto = collectContesto();
+    if (contesto) config.contestoFilo = contesto;
+    const lunghezza = collectLunghezza();
+    if (lunghezza) config.lunghezzaRisposte = lunghezza;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();
@@ -626,13 +1036,30 @@
       $('apiKey').value = '';
       $('apiKeyTavily').value = '';
       $('apiKeySafebrowse').value = '';
-      applyConfig(res.config || {});
-      status.textContent = I18n.t('admin_defaults_saved');
+      // Ridisegnare la pagina dalla risposta cancella quello che non è dentro
+      // la risposta: la scelta fatta mentre il salvataggio viaggiava e le righe
+      // che il salvataggio ha scartato. In quei due casi resta lo schermo.
+      const scartate = missingNickRows.length + dupRows.length;
+      if (save._modificatoDurante || scartate) {
+        applyStatoChiavi(res.config || {});
+      } else {
+        applyConfig(res.config || {});
+      }
+      markRegistryRowIssues(missingNickRows, dupRows);
+      if (save._modificatoDurante) {
+        status.textContent = I18n.t('admin_defaults_unsaved');
+      } else if (scartate) {
+        status.classList.add('sn-error');
+        status.textContent = I18n.t('admin_defaults_saved_partial');
+      } else {
+        status.textContent = I18n.t('admin_defaults_saved');
+      }
     } catch (e) {
       status.classList.add('sn-error');
       status.textContent = I18n.t('admin_defaults_save_fail', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      save._inCorso = false;
       clearTimeout(save._t);
       save._t = setTimeout(() => { status.textContent = ''; status.classList.remove('sn-error'); }, 4000);
     }
@@ -640,15 +1067,23 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Una regola sola per tutta la pagina, campi di oggi e righe aggiunte dopo:
+    // ciò che cambia sullo schermo spegne la conferma dell'ultimo salvataggio.
+    for (const evento of ['input', 'change']) {
+      $('editor').addEventListener(evento, segnalaModifica);
+    }
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
+      segnalaModifica();
     });
     $('addExcludedRow').addEventListener('click', () => {
       const row = makeExcludedRow('');
       $('excludedList').appendChild(row);
       row.querySelector('.sn-excluded-name').focus();
+      segnalaModifica();
     });
-    $('excludedDriftFix').addEventListener('click', addMissingExcluded);
+    $('excludedDriftFix').addEventListener('click', () => { addMissingExcluded(); segnalaModifica(); });
+    $('providerSort').addEventListener('change', rinfrescaMisure);
     $('saveBtn').addEventListener('click', save);
   });
 })();

@@ -17,6 +17,9 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/comboBox.js"></script>
   <script src="filo://shared/modelChainEditor.js"></script>
+  <script src="filo://shared/stimaCosto.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/vociImpostazioni.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -38,6 +41,20 @@
       </label>
       <p class="sn-muted" id="openWeightsOnly-desc"></p>
       <div id="openWeightsImpact" class="sn-muted" hidden></div>
+    </section>
+
+    <section id="sec-own-key-providers" hidden>
+      <label class="sn-switch-row" style="display:flex;align-items:center;gap:10px;font-weight:600;">
+        <input type="checkbox" id="ownKeyAllProviders" />
+        <span id="ownKeyAllProviders-label"></span>
+      </label>
+      <p class="sn-muted" id="ownKeyAllProviders-desc"></p>
+    </section>
+
+    <section id="sec-host-order">
+      <label for="ordineHost" id="ordineHost-label" style="font-weight:600;"></label>
+      <div style="max-width: 280px;"><select id="ordineHost"></select></div>
+      <p class="sn-muted" id="ordineHost-desc"></p>
     </section>
 
     <section class="sn-advanced-models" id="sec-provider">
@@ -100,6 +117,10 @@
         <div>
           <label id="lbl-spent"></label>
           <div id="spentBox" class="sn-muted">—</div>
+        </div>
+        <div>
+          <label id="lbl-cost-warn" for="costWarnRatio"></label>
+          <input type="number" id="costWarnRatio" min="0" max="1000" step="1" />
         </div>
       </div>
       <p class="sn-muted">Stima locale. Il dato autoritativo è quello del provider.</p>

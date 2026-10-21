@@ -60,6 +60,18 @@ irraggiungibili.
   `window` (il menu del tasto destro: `src/content/menu.js`) lo legge come "la
   pagina si è mossa" e **si chiude da solo**. Confronta con una tolleranza pari
   allo sposto d'ingresso e scrivi `scrollTop` solo se cambia davvero.
+- **I tempi aspettano il puntatore, e la durata è una sola (#630).** Col
+  puntatore su un avviso tutta la pila si ferma (uno che sparisse farebbe
+  scivolare gli altri sotto il cursore); uscito, a chi era agli sgoccioli restano
+  due secondi. Ferma il puntatore che si **muove** sopra l'avviso, non l'entrata:
+  un avviso che compare sotto un cursore fermo (sul tasto appena premuto) riceve
+  `mouseenter` senza che nessuno lo stia leggendo, e restava lì per sempre a
+  prendersi il clic seguente (#954). La durata delle Preferenze è quella dell'avviso standard e porta in
+  scala quelle scelte da chi mostra; 0 = restano finché l'utente non li chiude,
+  quindi un avviso visibile prende il puntatore e si chiude col clic (il vuoto
+  attorno resta della pagina). Una pila nuova prende tempi e hover da
+  `SN_AVVISI` (`src/shared/avvisiTempo.js`), mai da un `setTimeout` suo:
+  sentinella `tests/unit/avvisiTempo.test.mjs`.
 - **Dove:** il modello è `NOTIFS` (`enforceCap`) in `src/renderer/shell.js`; a
   schermo la pila la disegna la vista sopra la pagina
   (`src/main/avvisiSopraPagina.js`, `src/renderer/avvisi.{html,js,css}`), alta al

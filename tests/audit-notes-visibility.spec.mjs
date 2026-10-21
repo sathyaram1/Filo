@@ -22,6 +22,7 @@
 //   5) da lì l'editor si apre davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
 
@@ -172,14 +173,14 @@ test('nella home i controlli sono solo quelli del browser: nessuna porta agli ap
 
   // Assert POSITIVO sull'insieme completo: se tornasse una voce "Appunti"
   // (o qualsiasi altra porta separata) l'elenco non combacerebbe più.
-  // Il Red Team in pausa (#896) non c'è per chi non è owner.
-  await expect(controls).toHaveCount(5);
+  // Il Red Team in pausa (#896) non c'è per chi non è owner; le altre voci stanno nella barra laterale (#871).
+  await expect(controls).toHaveCount(2);
   const items = await controls.evaluateAll((els) => els.map((e) => ({
     command: e.dataset.command,
     label: e.getAttribute('aria-label') || '',
   })));
   expect(items.map((i) => i.command))
-    .toEqual(['home', 'history', 'settings', 'apps', 'account']);
+    .toEqual(['settings', 'account']);
   // (l'etichetta del profilo cambia con lo stato di accesso: qui basta che
   //  nessun controllo si presenti come porta agli appunti)
   expect(items.some((i) => /appunt/i.test(i.label))).toBe(false);
@@ -202,12 +203,12 @@ test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto des
   // 2) Menu tasto destro su una pagina esterna — registro src/shared/icons.js.
   const page = await testServer.openReady(openTab, PAGE_HTML);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await expect(overflow).toBeVisible();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2_000 });
   const btn = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="editorApp"]');
   await expect(btn).toBeVisible();

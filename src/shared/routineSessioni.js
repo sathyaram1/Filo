@@ -1,5 +1,5 @@
 // Come partono le sessioni delle routine (doc config/routines): quante insieme,
-// da quale account per prima, quali account sono esclusi.
+// da quale account per prima, quali account sono esclusi, e le pause in corso a parole.
 // Logica pura: la pagina di gestione e il main rifiutano gli stessi valori.
 
 (function (global) {
@@ -84,7 +84,57 @@
     return escluso ? (s.priorityAccount === 'A' ? 'B' : 'A') : '';
   }
 
+  // L'esito che ha messo in pausa un'accensione, a parole (#996); il codice resta accanto, fra parentesi.
+  const MOTIVI_PAUSA = Object.freeze({
+    http_429: 'troppe accensioni per claude.ai',
+    http_402: 'crediti finiti',
+    http_401: 'claude.ai rifiuta il token di accensione',
+    http_403: 'claude.ai rifiuta il token di accensione',
+    http_404: 'claude.ai non trova la routine',
+    network: 'claude.ai non raggiungibile',
+    dead_round: 'accesa, ma la sessione non è partita',
+  });
+
+  function motivoPausa(perche) {
+    const p = typeof perche === 'string' ? perche : '';
+    if (MOTIVI_PAUSA[p]) return p.startsWith('http_') ? `${MOTIVI_PAUSA[p]} (HTTP ${p.slice(5)})` : MOTIVI_PAUSA[p];
+    const http = /^http_(\d{3})$/.exec(p);
+    if (http) return Number(http[1]) >= 500 ? `claude.ai in errore (HTTP ${http[1]})` : `claude.ai ha rifiutato l'accensione (HTTP ${http[1]})`;
+    return 'accensione non riuscita';
+  }
+
+  /**
+   * Una pausa in corso (pauseDa del server) in parole: `testo` per la riga, `dettaglio` per il suo hover. Null se la
+   * voce non è una pausa leggibile o è già scaduta a `nowMs`.
+   * @param {string} chi «Account A», «La routine server»…
+   */
+  function pausaInParole(chi, voce, nowMs) {
+    const v = voce && typeof voce === 'object' ? voce : null;
+    const fino = v ? Number(v.finoMs) : NaN;
+    if (!Number.isFinite(fino) || fino <= nowMs) return null;
+    const ora = new Date(fino).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const stessoGiorno = new Date(fino).toDateString() === new Date(nowMs).toDateString();
+    const domani = new Date(nowMs);
+    domani.setDate(domani.getDate() + 1);
+    const quando = stessoGiorno ? `alle ${ora}`
+      : new Date(fino).toDateString() === domani.toDateString() ? `a domani alle ${ora}`
+        : `al ${new Date(fino).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} alle ${ora}`;
+    const msg = typeof v.dettaglio === 'string' ? v.dettaglio.trim() : '';
+    const testo = `${chi} in pausa fino ${quando}: ${motivoPausa(v.perche)}.${msg ? ` «${msg}»` : ''}`;
+    const strikes = Math.max(1, Math.floor(Number(v.strikes) || 1));
+    const oggi = Math.max(0, Math.floor(Number(v.oggi) || 0));
+    // Un giro nato morto non è un rifiuto di claude.ai: l'accensione era passata.
+    const [tanti, uno] = v.perche === 'dead_round' ? ['accensioni di fila senza sessione', 'fallimento'] : ['rifiuti di fila', 'rifiuto'];
+    const righe = [
+      strikes > 1 ? `${strikes} ${tanti}: la pausa raddoppia a ogni ${uno}, fino a un giorno.`
+        : `La pausa raddoppia a ogni ${uno} di fila, fino a un giorno.`,
+    ];
+    // La routine server senza un account noto non ha un conto del giorno da dire.
+    if (v.account === undefined || v.account === 'A' || v.account === 'B') righe.push(`Accensioni di oggi su quell'account: ${oggi}.`);
+    return { testo, dettaglio: righe.join(' ') };
+  }
+
   global.SN_ROUTINE_SESSIONI = {
-    CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato,
+    CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa, pausaInParole,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

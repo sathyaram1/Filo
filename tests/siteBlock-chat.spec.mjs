@@ -4,10 +4,15 @@
 
 import { test, expect, lista, schede, contaAvvisi } from './helpers/reteFinta.mjs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { aspettaFinestra } from './fixtures/electron.mjs';
 
 const naviga = (url, id = 'n1', extra = {}) => ({ id, name: 'NAVIGA', arguments: JSON.stringify({ url, etichetta: 'pagina', ...extra }) });
 const risposteAlModello = async (app, giro) => JSON.stringify(((await chiamateAlModello(app))[giro] || []).filter((m) => m && m.role !== 'system'));
 const suBloccato = async (app) => (await schede(app)).filter((u) => u.includes('blocked.test'));
+const lettura = { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' };
+// Il testo di un giro che chiude il turno arriva in streaming prima delle azioni: la fine del turno la dice l'invio
+// che torna al posto del quadrato.
+const turnoFinito = (page) => expect(page.locator('#sendBtn')).toBeVisible({ timeout: 30_000 });
 
 test('NAVIGA verso una pagina che dichiara di rimandare al sito della lista dopo un secondo: il modello sa che non si è aperta', async ({ app, shell, rete }) => {
   test.setTimeout(60_000);
@@ -31,7 +36,8 @@ test('tre NAVIGA nello stesso giro: le schede nascono insieme, non una dopo il c
   await lista(shell, ['blocked.test']);
   const urls = ['/a', '/b', '/c'].map((p) => rete.pagina('libero.test', p, `<h1>${p}</h1>`, { ritardoMs: 800 }));
   const page = await home(app);
-  await modelloFinto(app, [{ toolCalls: urls.map((u, i) => naviga(u, `n${i}`, { background: true })) }, { text: 'Aperte.' }]);
+  // Le aperture riuscite chiudono il turno (#1130): la frase va scritta insieme.
+  await modelloFinto(app, [{ text: 'Aperte.', toolCalls: urls.map((u, i) => naviga(u, `n${i}`, { background: true })) }]);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     globalThis.__nascite = [];
@@ -41,6 +47,7 @@ test('tre NAVIGA nello stesso giro: le schede nascono insieme, non una dopo il c
   try {
     await chiedi(page, 'apri le tre pagine');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Aperte' })).toBeVisible({ timeout: 30_000 });
+    await turnoFinito(page);
     const nascite = await app.evaluate(() => globalThis.__nascite);
     expect(nascite).toHaveLength(3);
     expect(nascite[2] - nascite[0]).toBeLessThan(500);
@@ -81,10 +88,13 @@ test('la pagina aperta da NAVIGA che più tardi si sposta da sé sul sito della 
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   const ponte = rete.pagina('accorcia.test', '/lento', ponteLento(bersaglio, 2500));
   const page = await home(app);
-  await modelloFinto(app, [{ toolCalls: [naviga(ponte)] }, { text: 'Ecco la pagina.' }, { text: 'SECONDO-TURNO' }]);
+  // L'apertura riuscita chiude il turno (#1130): la frase va scritta insieme, e il blocco arriva a turno finito.
+  await modelloFinto(app, [{ text: 'Ecco la pagina.', toolCalls: [naviga(ponte)] }, { text: 'SECONDO-TURNO' }]);
   try {
     await chiedi(page, 'apri quel link');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la pagina' })).toBeVisible({ timeout: 20_000 });
+    await turnoFinito(page);
+    expect(await chiamateAlModello(app)).toHaveLength(1);
     await expect(page.locator('.dash-action-link-chip')).toBeVisible();
     await expect.poll(async () => (await avvisi()).length, { timeout: 8000 }).toBeGreaterThan(0);
     await expect(page.getByRole('button', { name: /^Apri comunque/ })).toBeVisible({ timeout: 4000 });
@@ -93,7 +103,7 @@ test('la pagina aperta da NAVIGA che più tardi si sposta da sé sul sito della 
 
     await chiedi(page, 'si è aperta?');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDO-TURNO' })).toBeVisible({ timeout: 20_000 });
-    expect(await risposteAlModello(app, 2)).toContain('si sono spostate da sole su un sito bloccato');
+    expect(await risposteAlModello(app, 1)).toContain('si sono spostate da sole su un sito bloccato');
   } finally {
     await ripristina(app);
   }
@@ -105,7 +115,8 @@ test('il blocco più tardivo arriva mentre il modello sta ancora rispondendo: la
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   const ponte = rete.pagina('accorcia.test', '/lento', ponteLento(bersaglio, 2500));
   const page = await home(app);
-  await modelloFinto(app, [{ toolCalls: [naviga(ponte)] }, { ritardoMs: 4000, text: 'Ecco la pagina.' }]);
+  // Con una lettura nel giro il modello lavora ancora quando il blocco arriva: un'apertura da sola chiuderebbe il turno (#1130).
+  await modelloFinto(app, [{ toolCalls: [naviga(ponte), lettura] }, { ritardoMs: 4000, text: 'Ecco la pagina.' }]);
   try {
     await chiedi(page, 'apri quel link');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la pagina' })).toBeVisible({ timeout: 20_000 });
@@ -122,11 +133,12 @@ test('dopo un clic dell\'utente nella pagina aperta da NAVIGA, un sito della lis
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
   const aperta = rete.pagina('libero.test', '/', `<a id="l" href="${bersaglio}" style="font-size:40px">vai</a>`);
   const page = await home(app);
-  await modelloFinto(app, [{ toolCalls: [naviga(aperta)] }, { text: 'Ecco la pagina.' }]);
+  await modelloFinto(app, [{ text: 'Ecco la pagina.', toolCalls: [naviga(aperta)] }]);
   try {
     await chiedi(page, 'apri quella pagina');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la pagina' })).toBeVisible({ timeout: 20_000 });
-    const tab = app.windows().find((w) => w.url().includes('libero.test'));
+    await turnoFinito(page);
+    const tab = await aspettaFinestra(app, (w) => w.url().includes('libero.test'), 'la pagina aperta da NAVIGA');
     await tab.click('#l', { noWaitAfter: true });
     await expect((await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     await page.waitForTimeout(800);
@@ -250,6 +262,36 @@ test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», l
     await pagina("document.body.append(b); b.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;opacity:0;z-index:2147483647;margin:0;padding:0;border:0';");
     await tab.mouse.click(200, 300);
   });
+});
+
+// #592.16: un sito uscito dalla lista nel frattempo «Apri comunque» lo apre subito; lo preme solo l'utente.
+test('assistente sulla pagina: «Apri comunque» premuto dal codice della pagina non fa niente, dall\'utente riporta la notifica', async ({ app, shell, rete, avvisi }) => {
+  test.setTimeout(60_000);
+  await lista(shell, ['blocked.test']);
+  const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  const { tab, naviga: apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1>'), 'sito.test');
+  expect(await apri(bersaglio)).toBe(false);
+  const bottone = tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' });
+  await expect(bottone).toBeVisible();
+  const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  const aSchermo = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+  await aSchermo.first().locator('.shell-notif-close').click();
+  await expect(notifica).toHaveCount(0, { timeout: 3000 });
+
+  await tab.evaluate(([trova]) => {
+    const b = new Function(`return (${trova})()`)();
+    b.focus();
+    b.click();
+    b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, detail: 1 }));
+  }, [bottoneDellaPagina.toString()]);
+  await tab.waitForTimeout(1500);
+  await expect(aSchermo).toHaveCount(0);
+  expect(await suBloccato(app)).toEqual([]);
+
+  await bottone.click();
+  await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+  expect(await suBloccato(app)).toEqual([]);
 });
 
 test('assistente sulla pagina: la pagina aperta che dopo qualche secondo si sposta da sé sul sito della lista cambia il diario', async ({ app, shell, rete }) => {

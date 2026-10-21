@@ -1,0 +1,54 @@
+// Copia di giro2-conferma-che-non-fa-niente.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
+// #567.1/2/4, secondo giro — la stessa domanda della segnalazione («perché non
+// è successo niente?») sulla porta che resta: l'impostazione che Filo chiede di
+// confermare e che poi non parte.
+//
+// Il popup si apre da solo, l'utente dice sì, e da lì in avanti nessuno gli
+// dice cosa è andato storto: il diario resta fermo sulla richiesta e il bottone
+// dice soltanto «non eseguita».
+
+import { test, expect } from '../../fixtures/electron.mjs';
+import { newtabPage, configureModel, fakeProvider, restore, chiedi } from './aiuto.mjs';
+import { clickConfirm, confirmText } from '../../helpers/confirm.mjs';
+
+test('confermata un\'impostazione che non si può applicare, l\'utente deve capire cosa è successo', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  // Un valore che il modello può benissimo scrivere e che Filo non sa applicare.
+  await fakeProvider(app, [
+    {
+      toolCalls: [{
+        id: 'g2p', name: 'IMPOSTA_PREFERENZA',
+        arguments: '{"chiave":"modalita_terminale","valore":"quando serve"}',
+      }],
+    },
+    { text: 'Fatto.' },
+  ], '__v567g2p');
+
+  await chiedi(page, 'attiva la modalità terminale quando serve');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
+
+  // Su main un valore che Filo non sa applicare si rifiuta prima del popup (#949); se il popup c'è, l'utente
+  // legge e conferma.
+  await page.waitForTimeout(1_500);
+  const testoPopup = await confirmText(page);
+  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
+  if (testoPopup) {
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    await expect(btn).toContainText('✗', { timeout: 10_000 });
+  }
+
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  const righe = await activity.locator('.dash-activity-body .dash-activity-row').allTextContents();
+  const testoBtn = (await btn.count()) ? ((await btn.textContent()) || '') : '';
+  const spiega = /non applicat|non riuscit|non valid|non sa|non è partit/i.test(`${righe.join(' | ')} ${testoBtn}`)
+    && !/^\s*✗ Non eseguita\s*$/.test(testoBtn.trim());
+  expect(spiega, `popup: ${JSON.stringify(testoPopup)} — bottone: ${JSON.stringify(testoBtn)} — diario: ${JSON.stringify(righe)}`).toBe(true);
+
+  await restore(app, '__v567g2p');
+});

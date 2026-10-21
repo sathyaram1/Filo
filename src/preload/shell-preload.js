@@ -49,7 +49,16 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('tabs:permesso-fine', fine);
       return () => { ipcRenderer.removeListener('tabs:permesso', chiedi); ipcRenderer.removeListener('tabs:permesso-fine', fine); };
     },
-    rispondiPermesso: (id, si) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si }),
+    rispondiPermesso: (id, si, fonte) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si, fonte }),
+    // Il microfono di Filo per una pagina web (#586): si apre qui, e alla pagina vanno solo i campioni.
+    onMicrofono: (fn) => {
+      const w = (_event, info) => { try { fn(info || {}); } catch (_) {} };
+      ipcRenderer.on('shell:microfono', w);
+      return () => ipcRenderer.removeListener('shell:microfono', w);
+    },
+    microfonoEsito: (id, esito) => ipcRenderer.send('shell:microfono-esito', { ...(esito || {}), id }),
+    microfonoDati: (id, dati) => ipcRenderer.send('shell:microfono-dati', { id, dati }),
+    microfonoFine: (id) => ipcRenderer.send('shell:microfono-fine', { id }),
     permessi: (id) => ipcRenderer.invoke('tabs:permessi', { id }),
     dimenticaPermessi: (id) => ipcRenderer.invoke('tabs:permessi-dimentica', { id }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
@@ -58,6 +67,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
     // Banner dei cookie del sito della scheda: true = mostrali, false = Filo li gestisce di nuovo.
     cookieBanners: (id, show) => ipcRenderer.invoke('tabs:cookie-banners', { id, show }),
+    // «Resta connesso qui»: dalla scheda (id) o dalla proposta dopo un accesso (sito).
+    restaConnesso: (id, on, sito) => ipcRenderer.invoke('tabs:resta-connesso', { id, on, sito }),
   },
   // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
   // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
@@ -76,6 +87,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
+    // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
+    rimettiNome: (id) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id }),
     // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
@@ -93,13 +106,19 @@ contextBridge.exposeInMainWorld('filoShell', {
   // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
   // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
   onTriggerButton: (fn) => {
-    const wrapped = (_event, info) => { try { fn(info && info.command); } catch (_) {} };
+    const wrapped = (_event, info) => { try { fn(info && info.command, info && info.anchor); } catch (_) {} };
     ipcRenderer.on('shell:trigger-button', wrapped);
     return () => ipcRenderer.removeListener('shell:trigger-button', wrapped);
   },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
-  // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").
+  // #430 — la carta con l'anteprima della scheda sotto il puntatore.
+  anteprima: {
+    prepara: () => ipcRenderer.send('anteprima:prepara'),
+    mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
+    nascondi: () => ipcRenderer.send('anteprima:nascondi'),
+  },
+  // §2.3 — toast informativo (es. dopo il riordino automatico delle schede).
   onToast: (fn) => {
     const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
     ipcRenderer.on('shell:toast', wrapped);
@@ -118,6 +137,13 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:sopra', wrapped);
       return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
     },
+  },
+  // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
+  barra: {
+    stato: (dati) => ipcRenderer.send('barra:dalla-shell', dati),
+    commuta: () => ipcRenderer.send('barra:commuta'),
+    chiudi: () => ipcRenderer.send('barra:chiudi'),
+    menu: (x, y) => ipcRenderer.send('barra:menu-maniglia', { x, y }),
   },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
@@ -151,7 +177,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   // Account "Accedi con Google". I token vivono nel main process: qui
   // arriva solo il profilo pubblico { email, name, picture }.
   auth: {
-    status: () => ipcRenderer.invoke('filo:message', { type: 'auth_status' }),
+    status: (opzioni) => ipcRenderer.invoke('filo:message', { type: 'auth_status', ...(opzioni && opzioni.senzaRete ? { senzaRete: true } : {}) }),
     signIn: () => ipcRenderer.invoke('filo:message', { type: 'auth_signin' }),
     signOut: () => ipcRenderer.invoke('filo:message', { type: 'auth_signout' }),
     onChanged: (fn) => {

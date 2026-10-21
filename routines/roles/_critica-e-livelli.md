@@ -100,10 +100,10 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   spec da solo prima di farne un rilievo; in dubbio confronta con `main`.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
-- Nel contenitore delle routine gli spec che aprono Electron vogliono davanti
-  `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`: `finish:check` ce li mette da
-  sé, un `npx playwright test` lanciato a mano no. Un rosso all'avvio senza
-  quei due non è un rosso.
+- Nel contenitore delle routine `npx playwright test` si accende da solo lo
+  schermo virtuale con la sandbox spenta, come `finish:check`; senza xvfb si
+  ferma prima di aprire Electron e lo dice. Quello stop non è un rosso del
+  codice.
 
 ## La critica
 
@@ -134,17 +134,21 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   titolo preso dalla prima frase.
 - **Le prove restano nel ramo**, in
   `tests/verifica/<numero>/giro<k>-r<n>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
-  fixture del repo, come ogni spec). In un giro locale la cartella te la dice
-  il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
-  in partenza. Una prova che era solo esplorazione (dipende dall'ambiente, non
-  asserisce niente) si cancella. Si cancella anche quella di un rilievo
-  **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
-  suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
-  rispiegare per sempre.
+  fixture del repo, come ogni spec), e si committano rosse: il segno di rosso
+  atteso (`test.fail`) va solo su quella di un rilievo messo da parte che resta
+  nel ramo, mai su una di un rilievo che registri. Segnata, conta il corpo: se
+  fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
+  porta è chiusa e le togli il segno. Una prova che era solo esplorazione
+  (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
+  quella di un rilievo **esterno**, nello stesso commit: quel rilievo esce di
+  qui dentro un feedback suo, col suo testo, e la prova lasciata indietro
+  sarebbe solo un rosso da rispiegare per sempre.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
-  porta tutti (`giro2-r1-r3-salva.spec.mjs`); una che non ne riproduce nessuno
+  porta tutti (`giro2-r1-r3-salva.spec.mjs`), e il titolo di ogni suo caso comincia
+  col numero del suo rilievo (`test('r3 …')`): la pulizia lascia uscire per intero
+  solo un caso rosso che porta il numero di un messo da parte. Una che non ne riproduce nessuno
   (una porta di un giro passato ri-provata e chiusa) non ha numero. Una prova di
   un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
   giro e il numero di adesso: il numero che porta è di una critica vecchia.
@@ -154,9 +158,16 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
   nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
   questa verifica; a una che copre anche un rilievo da correggere togli solo il
-  caso dei messi da parte. Da quel commit una prova rossa tolta ferma la
-  consegna, e una a cui hai tolto un caso si rilancia: quello che resta, se è
-  rosso, la ferma. Se la risposta dice che il lavoro passa, le togli seguendola.
+  caso dei messi da parte. Un file di supporto (un aiuto, una pagina) non è una
+  prova: se ne togli righe, la registrazione rilancia le prove che lo usano.
+  Prima di registrare `--record-pulizia` rilancia le prove a cui hai tolto un
+  caso o un aiuto, sul codice della critica: un caso rosso diventato verde, o
+  una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
+  in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
+  a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
+  Una che la pulizia ha dimenticato esce con un'altra, anche dopo le correzioni:
+  un commit a parte che toglie solo lei, registrato finché è l'ultimo.
+  Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o
@@ -168,19 +179,20 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
-[0e] …" [--segnala <file.md>]
+[0e] …" [--domanda <file.json>]
 ```
 
 <!-- includi: _segnala.md -->
 
-Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
+Qui la domanda accompagna un rilievo col `?`: la riga nella critica resta una
+riga, le scelte e i loro costi stanno nella domanda. Un difetto non va lì: è un
 rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
-di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
-`--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
-restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato che l'owner
-decide a parte. Se poi il server ti manda a correggere, una segnalazione a
+di livello 2 o 3 col `?` e la domanda allegata, anche senza rilievi: con
+`--domanda` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
+restano davanti a chi riprende dopo la sua risposta. Un rilievo col `?` senza
+domanda allegata la fa nascere dal server, coi rilievi come problema. Un 1 col
+`?`, o un esterno di qualunque livello, va avanti in un feedback derivato che
+l'owner decide a parte. Se poi il server ti manda a correggere, una domanda a
 QUELLA consegna ferma il lavoro come per chi risolve.
 
 La critica registrata non si modifica più.

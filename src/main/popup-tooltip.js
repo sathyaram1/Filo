@@ -9,11 +9,14 @@
 // close, per evitare il costo di reload ad ogni hover).
 
 const { BrowserWindow, nativeTheme } = require('electron');
+const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
+const { quandoSparita } = require('./popup-anteprima');
 
 let tipWin = null;
 let tipReady = false;
 let pendingShow = null;
+let giro = 0;
 
 function buildHTML() {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -36,10 +39,9 @@ html,body{background:transparent;overflow:hidden;height:100%;
 :root.dark{--bg:#1d1a16;--fg:#f1e7d6;--border:#3b332a}
 </style></head><body><div id="tip"></div>
 <script>
-  // API minimale: il main process chiama webContents.send('set', {text, dark})
+  // Il main manda {text, dark, giro} (tooltip-preload.js); la misura torna col suo giro.
   const tip = document.getElementById('tip');
-  const { ipcRenderer } = require('electron');
-  ipcRenderer.on('set', (_e, { text, dark }) => {
+  window.fumetto.onTesto(({ text, dark, giro }) => {
     document.documentElement.classList.toggle('dark', !!dark);
     tip.textContent = text || '';
     // Misura sincrona: requestAnimationFrame non scatta quando la BrowserWindow
@@ -47,7 +49,7 @@ html,body{background:transparent;overflow:hidden;height:100%;
     // restava bloccato. getBoundingClientRect forza un layout reflow sincrono
     // anche con window nascosta, quindi le misure sono affidabili.
     const r = tip.getBoundingClientRect();
-    ipcRenderer.send('size', { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+    window.fumetto.misura({ w: Math.ceil(r.width), h: Math.ceil(r.height), giro });
   });
 </script></body></html>`;
 }
@@ -69,9 +71,10 @@ function ensureWin(parentWin) {
     width: 200,
     height: 30,
     webPreferences: {
-      contextIsolation: false,
-      nodeIntegration: true,
-      sandbox: false,
+      preload: path.join(__dirname, '..', 'preload', 'tooltip-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
   // Il fumetto compare sotto il puntatore: se prendesse lui il mouse, la barra non saprebbe che il
@@ -87,8 +90,17 @@ function ensureWin(parentWin) {
       doShow(parentWin, text, x, y);
     }
   });
+  // Col processo morto il fumetto non comparirebbe più: si butta, e il prossimo ne fa uno nuovo.
+  const questa = tipWin;
+  questa.webContents.on('render-process-gone', () => {
+    if (tipWin === questa) { tipWin = null; tipReady = false; }
+    if (!questa.isDestroyed()) questa.destroy();
+  });
   tipWin.webContents.on('ipc-message', (_e, channel, payload) => {
     if (channel === 'size' && tipWin && !tipWin.isDestroyed()) {
+      // Nascosto mentre misurava (il puntatore se n'è andato in quell'istante): hideTooltip non l'ha trovato
+      // visibile, e mostrarlo adesso lo lascerebbe appeso senza nessuno che lo tolga più.
+      if (!payload || payload.giro !== giro) return;
       const w = Math.max(20, payload.w + 4);
       const h = Math.max(16, payload.h + 4);
       tipWin.setBounds({ x: tipWin.getBounds().x, y: tipWin.getBounds().y, width: w, height: h });
@@ -108,19 +120,25 @@ function doShow(parentWin, text, x, y) {
   const px = cb.x + Math.round(x);
   const py = cb.y + Math.round(y);
   tipWin.setBounds({ x: px, y: py, width: 200, height: 30 });
-  tipWin.webContents.send('set', { text, dark: nativeTheme.shouldUseDarkColors });
+  tipWin.webContents.send('set', { text, dark: nativeTheme.shouldUseDarkColors, giro });
 }
 
 function showTooltip(parentWin, text, x, y) {
-  ensureWin(parentWin);
-  if (!tipReady) {
-    pendingShow = { text, x, y };
-    return;
-  }
-  doShow(parentWin, text, x, y);
+  const mio = ++giro;
+  quandoSparita(parentWin, () => {
+    // Nascosto o sostituito mentre aspettava la carta: non compare più.
+    if (mio !== giro || !parentWin || parentWin.isDestroyed()) return;
+    ensureWin(parentWin);
+    if (!tipReady) {
+      pendingShow = { text, x, y };
+      return;
+    }
+    doShow(parentWin, text, x, y);
+  });
 }
 
 function hideTooltip() {
+  giro++;
   if (tipWin && !tipWin.isDestroyed() && tipWin.isVisible()) tipWin.hide();
   pendingShow = null;
 }

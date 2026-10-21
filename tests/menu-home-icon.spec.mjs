@@ -4,6 +4,12 @@
 // attuale. Regressione feedback #211.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+
+// Da #871 queste icone stanno nella barra laterale: qui si prova la strada del tasto destro,
+// quella di chi le ha rimesse nel menu.
+test.beforeEach(async ({ app }) => { await mettiNelMenu(app, ['home']); });
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo test page</h1>
@@ -12,12 +18,12 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 
 async function openOverflowGrid(page) {
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await expect(overflow).toBeVisible();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }

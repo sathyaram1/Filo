@@ -26,7 +26,7 @@ solo i testi e la barra della nuova. Quando i pulsanti cambiano davvero (lo
 stato è un altro, un sì si arma) la riga si sostituisce, ed è giusto così:
 quello che c'era sotto il cursore non esiste più.
 
-Due dettagli fanno la differenza:
+Tre dettagli fanno la differenza:
 
 - **Un nodo che resta non si stacca mai**, nemmeno per un attimo: prima si
   tolgono i figli che se ne vanno, poi i nuovi si infilano davanti a quelli
@@ -34,11 +34,19 @@ Due dettagli fanno la differenza:
   sostituirlo.
 - La chiave guarda **ciò che un clic può colpire**, non i dati: i byte
   ricevuti cambiano a ogni evento e non toccano i pulsanti.
+- **Chi ascolta sulla riga rimasta legge la voce di adesso**, per `data-id`,
+  non quella con cui la riga è nata: la riga vecchia tiene i suoi ascoltatori.
+  Nella pagina Scaricamenti il menu del tasto destro, dopo una rinomina, offriva
+  le azioni della voce com'era prima (#950).
 
 ## Dove vive
 
 - `src/shared/righeVive.js` — `SN_RIGHE_VIVE.riconcilia(lista, righeNuove, selettoreAzioni)`.
 - Lo usano il pannello scaricamenti della barra (`src/renderer/shell.js`) e la pagina Scaricamenti.
+- La barra delle schede (`render` in `src/renderer/shell.js`) tiene un nodo per scheda, gli eventi sulla striscia e
+  una firma per scheda: un titolo che cambia non tocca le altre (#1089, `tests/tab-barra-riconciliata.spec.mjs`).
 - `tests/downloads-eseguibili.spec.mjs` — «Scarica» premuto col tasto giù più a lungo di un avanzamento, su tutte e due le superfici.
+- I rimedi dell'avviso dei crediti (`src/shared/creditiAvvisoUi.js`, `aggiorna`): la pagina Crediti e la bolla in chat si
+  riallineano sul posto, una riga per rimedio, e il pulsante resta finché fa la stessa cosa (#818, `tests/avviso-crediti.spec.mjs`).
 
 Vicini: [Una conferma non è un avviso sopra un fatto già compiuto](una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md).

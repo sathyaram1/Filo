@@ -15,6 +15,9 @@
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/vociImpostazioni.js"></script>
+  <script src="filo://shared/nomiSito.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -23,10 +26,25 @@
     </p>
     <h1 id="title"></h1>
 
+    <section id="sec-correttore">
+      <h2 id="h-correttore"></h2>
+      <label class="sn-switch-row" style="display:flex;align-items:center;gap:10px;font-weight:600;">
+        <input type="checkbox" id="spellcheckErrori" />
+        <span id="spellcheckErrori-label"></span>
+      </label>
+      <p class="sn-muted" id="spellcheckErrori-desc"></p>
+      <label class="sn-switch-row" style="display:flex;align-items:center;gap:10px;font-weight:600;">
+        <input type="checkbox" id="spellcheckSuggerimenti" />
+        <span id="spellcheckSuggerimenti-label"></span>
+      </label>
+      <p class="sn-muted" id="spellcheckSuggerimenti-desc"></p>
+    </section>
+
     <section>
       <h2 id="h-blocklist"></h2>
-      <p class="sn-muted">Domini su cui l'estensione è disabilitata (uno per riga).</p>
-      <textarea id="blocklist"></textarea>
+      <p class="sn-muted" id="blocklistDesc"></p>
+      <textarea id="blocklist" aria-labelledby="h-blocklist" spellcheck="false"></textarea>
+      <p class="sn-chain-warn" id="blocklistError" role="alert" aria-live="polite" hidden></p>
     </section>
 
     <section>
@@ -39,13 +57,14 @@
     <section>
       <h2 id="h-shortcuts"></h2>
       <ul id="shortcutsList" class="sn-muted" style="line-height:1.7"></ul>
+      <button class="sn-btn sn-btn-secondary" id="cambiaScorciatoie" type="button">Cambiale in Preferenze</button>
     </section>
 
     <div class="sn-toolbar" style="margin-top: 24px;">
       <span id="savedHint" class="sn-saved-indicator"></span>
       <button class="sn-btn sn-btn-secondary" id="openHome">Aperti per dopo</button>
       <button class="sn-btn sn-btn-secondary" id="openHistory">Cronologia AI</button>
-      <button class="sn-btn sn-btn-secondary" id="openArchive">Cronologia</button>
+      <button class="sn-btn sn-btn-secondary" id="openArchive">Memorie</button>
       <button class="sn-btn sn-btn-secondary" id="openSpellcheck">Gestisci correttore</button>
     </div>
   </main>

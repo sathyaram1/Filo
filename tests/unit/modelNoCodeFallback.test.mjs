@@ -96,8 +96,12 @@ test('i nomi mostrati nel messaggio d\'errore restano leggibili anche se assurdi
 });
 
 test('ogni funzione che consuma un modello si può impostare dall\'editor', async () => {
+  require(join(ROOT, 'src', 'shared', 'modelUsage.js'));
   require(join(ROOT, 'src', 'shared', 'modelChainEditor.js'));
   const editable = new Set(globalThis.SN_MODEL_CHAIN.actionLabels().map(([action]) => action));
+  // Le funzioni di chi gestisce Filo si impostano nel loro slot di Gestione, e
+  // l'errore manda lì (#465).
+  for (const { action } of globalThis.SN_MODEL_USAGE.ownerActions()) editable.add(action);
   // Se una funzione ha un modello di default deve anche essere impostabile:
   // altrimenti, quando la sua catena non risolve, l'errore direbbe "impostalo"
   // indicando un posto dove la funzione non compare.

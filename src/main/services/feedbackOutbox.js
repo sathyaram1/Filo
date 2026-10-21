@@ -22,13 +22,17 @@
 //   SN_CONST     STORAGE_KEYS.FEEDBACK_OUTBOX
 //
 // API
-//   init({ prepare, onDone, onGiveUp, tokenOwner, log, backoffMin, backoffMax })  — una volta all'avvio
+//   init({ prepare, onDone, onGiveUp, onAttesaOwner, tokenOwner, log, backoffMin, backoffMax })  — una volta all'avvio
 //     onGiveUp(item, motivo) torna `false` se l'avviso non è arrivato a
 //     nessuno: quella voce resta in coda finché non si riesce a dirlo.
 //     tokenOwner() -> idToken admin fresco o '' (#595): chiesto a ogni
 //     spedizione di una voce dell'owner, MAI salvato nella coda.
-//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
+//     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
+//     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
+//     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
+//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito (payload.name = titolo già scelto)
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
+//   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
 
 (function (global) {
@@ -47,6 +51,7 @@
   let queue = [];        // mirror in memoria del persistito
   let loaded = false;
   let flushing = false;
+  let ancora = false;    // chiesto un giro mentre un altro era in corso
   let timer = null;
   let auto = true;       // scheduling automatico (disattivabile nei test)
   let prepareFn = null;  // async (payload) -> name (titolo generato al momento dell'invio)
@@ -55,6 +60,8 @@
   // = non c'era nessuno a cui dirlo, la voce resta in coda e si riprova)
   let onGiveUpFn = null;
   let tokenOwnerFn = null;
+  let onAttesaOwnerFn = null;
+  let onScadutaFn = null;
   let logFn = function () { try { console.log.apply(console, ['[feedback-outbox]'].concat([].slice.call(arguments))); } catch (_) {} };
   let backoffMin = 3000;
   let backoffMax = 30000;
@@ -67,6 +74,7 @@
       // #602 — una voce che aspetta solo di essere ANNUNCIATA (non partirà
       // mai): si persiste come le altre, così l'avviso sopravvive a un riavvio.
       rinuncia: !!it.rinuncia, motivoRinuncia: it.motivoRinuncia || '',
+      attesaAccesso: !!it.attesaAccesso, avvisatoAccesso: it.avvisatoAccesso || '',
     };
   }
 
@@ -93,6 +101,8 @@
             dallOwner: !!x.dallOwner,
             rinuncia: !!x.rinuncia,
             motivoRinuncia: x.motivoRinuncia || '',
+            attesaAccesso: !!x.attesaAccesso,
+            avvisatoAccesso: x.avvisatoAccesso === true ? 'assente' : String(x.avvisatoAccesso || ''),
           }));
       }
     } catch (e) { logFn('load fallito:', e?.message || e); }
@@ -104,6 +114,8 @@
     if (typeof opts.onDone === 'function') onDoneFn = opts.onDone;
     if (typeof opts.onGiveUp === 'function') onGiveUpFn = opts.onGiveUp;
     if (typeof opts.tokenOwner === 'function') tokenOwnerFn = opts.tokenOwner;
+    if (typeof opts.onAttesaOwner === 'function') onAttesaOwnerFn = opts.onAttesaOwner;
+    if (typeof opts.onScaduta === 'function') onScadutaFn = opts.onScaduta;
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
@@ -124,9 +136,11 @@
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const dallOwner = !!(opts && opts.dallOwner);
+    // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
+    const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
       if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
       await persist();
     }
@@ -155,12 +169,36 @@
     catch (_) { return true; }
   }
 
+  // Detto una volta per voce e per motivo; un avvisatore che risponde `false` (nessuno a cui dirlo) riprova al giro dopo.
+  function attendiAccesso(it, motivo, perche) {
+    it.attesaAccesso = true;
+    logFn('voce dell\'owner ferma finché torna il suo accesso:', it.id, motivo);
+    if (it.avvisatoAccesso === perche || !onAttesaOwnerFn) return;
+    let detto = true;
+    try { detto = onAttesaOwnerFn(it, perche) !== false; } catch (_) { detto = true; }
+    if (detto) it.avvisatoAccesso = perche;
+  }
+
+  // #912: col token rifiutato ogni giro consumava un numero del contatore comune e ricaricava gli allegati, ogni
+  // mezzo minuto e per sempre. Si riprova solo quando l'owner rientra o al riavvio (il segno non si salva).
+  // Chi rientra non aspetta il giro del backoff già fissato, che può cadere mezzo minuto dopo (#1212).
+  function accessoCambiato() {
+    for (const it of queue) it.tokenRifiutato = false;
+    if (!queue.length) return;
+    if (timer) { clearTimeout(timer); timer = null; }
+    backoff = backoffMin;
+    scheduleFlush(0);
+  }
+
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
   // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
   // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
   async function flush() {
-    if (flushing) return queue.length === 0;
+    // Il giro in corso ha già scelto le voci e letto il token: chi arriva adesso (un invio, un rientro) ne vuole
+    // un altro appena finisce, o resterebbe fermo fino al prossimo invio.
+    if (flushing) { ancora = true; return queue.length === 0; }
     flushing = true;
+    ancora = false;
     let anyFail = false;
     try {
       await load();
@@ -172,11 +210,14 @@
           else anyFail = true;
           continue;
         }
-        if (Date.now() - it.queuedAt > MAX_AGE_MS) {
+        // Una voce dell'owner che aspetta il suo accesso non scade: buttarla perderebbe il feedback, che parte appena torna.
+        if (!it.attesaAccesso && Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
           remove(it.id);
+          try { onScadutaFn && onScadutaFn(it); } catch (_) {}
           continue;
         }
+        if (it.tokenRifiutato) continue;
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
@@ -194,15 +235,18 @@
           const payload = it.name ? Object.assign({}, it.payload, { name: it.name }) : it.payload;
           let idToken = '';
           if (it.dallOwner) {
-            try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (_) { idToken = ''; }
-            if (!idToken) logFn('voce dell\'owner senza accesso valido: parte anonima e passa dai giudici', it.id);
+            try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (e) {
+              it.attempts = (it.attempts || 0) + 1;
+              anyFail = true;
+              logFn('token dell\'owner non ottenuto (rete, riprovo):', it.id, e?.message || e);
+              continue;
+            }
+            if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); anyFail = true; continue; }
           }
-          const result = idToken ? await fb.submit(payload, { idToken }) : await fb.submit(payload);
+          // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
+          const result = idToken ? await fb.submit(payload, { idToken, soloAdmin: true }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
-          if (idToken && result && result.senderProof !== 'admin') {
-            logFn('token dell\'owner rifiutato' + (result.authRefused ? ` (${result.authRefused})` : '') + ': partita anonima', it.id);
-          }
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
@@ -219,6 +263,12 @@
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
           }
+          if (it.dallOwner && e && e.accessoOwner) {
+            it.tokenRifiutato = true;
+            attendiAccesso(it, e.message || 'token rifiutato', 'rifiutato');
+            continue;
+          }
+          it.attesaAccesso = false;
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
@@ -228,7 +278,11 @@
     } finally {
       flushing = false;
     }
-    if (anyFail && queue.length) {
+    if (ancora && queue.length) {
+      ancora = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      scheduleFlush(0);
+    } else if (anyFail && queue.length) {
       const d = backoff;
       backoff = Math.min(backoffMax, Math.round(backoff * 1.7));
       scheduleFlush(d);
@@ -240,13 +294,14 @@
     init,
     enqueue,
     flush,
+    accessoCambiato,
     size: () => queue.length,
     // ---- helper per i test (logica pura, nessun effetto in produzione) ----
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
-      queue = []; loaded = false; flushing = false; auto = true;
-      prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; backoff = backoffMin;
+      queue = []; loaded = false; flushing = false; ancora = false; auto = true;
+      prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };

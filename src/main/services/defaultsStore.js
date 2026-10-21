@@ -35,6 +35,8 @@ require('../../shared/feedbackThread.js');
 // Registra SN_ROUTINE_SESSIONI: le regole su quante sessioni e da quale
 // account, le stesse che applica la pagina di gestione.
 require('../../shared/routineSessioni.js');
+// Registra SN_ROUTINE_MODELLI: modello e sforzo per fase, stesse regole della pagina.
+require('../../shared/routineModelli.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
@@ -53,6 +55,14 @@ const CREDITS_DOC = 'config/credits';
 const REDTEAM_DOC = 'config/redteam';
 
 // Cache degli override remoti dall'ultimo refresh.
+// Campi del doc modelli lasciati dal fornitore ritirato: il salvataggio li toglie.
+const CAMPI_RITIRATI = ['geminiDirect'];
+
+function fornitoreNoto(p) {
+  const C = globalThis.SN_CONST || {};
+  return typeof p === 'string' && (C.PROVIDER_ORDER || ['openrouter']).includes(p);
+}
+
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
 // Popolato SOLO quando chi usa Filo è admin (#581): per tutti gli altri resta
 // null e le chiavi effettive sono quelle del build.
@@ -150,6 +160,8 @@ async function refresh() {
   const admin = isAdminUser();
   let dentro = false;
   try { dentro = Boolean(auth.isSignedIn()); } catch (_) {}
+  let prima = null;
+  try { prima = JSON.stringify(get()); } catch (_) { prima = null; }
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
   const tokenMancato = (admin || dentro) && !idToken;
@@ -180,7 +192,23 @@ async function refresh() {
   // la rete tornava un istante dopo. Riprovare subito non è un ciclo: qui ci
   // si passa solo all'avvio, all'accesso e quando una pagina chiede la config.
   if (risposto) lastFetchTs = adesso();
-  return get();
+  const dopo = get();
+  // La configurazione condivisa arriva dalla RETE, e la prima home è già a
+  // schermo quando arriva: chi decide se Filo può rispondere deve poterlo
+  // rifare adesso, invece di lasciare l'utente sul cartello «non posso
+  // rispondere» finché non ricarica (#663).
+  let dopoJson = null;
+  try { dopoJson = JSON.stringify(dopo); } catch (_) { dopoJson = null; }
+  if (prima !== dopoJson) {
+    for (const fn of ascoltatori) { try { fn(dopo); } catch (_) {} }
+  }
+  return dopo;
+}
+
+// Chi vuole sapere che la configurazione condivisa è cambiata davvero.
+const ascoltatori = [];
+function onChanged(fn) {
+  if (typeof fn === 'function') ascoltatori.push(fn);
 }
 
 // Ogni quanto la config remota si rilegge da sola. Cinque minuti erano
@@ -277,6 +305,18 @@ function get() {
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
+    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità, pa): ogni categoria remota sostituisce la sua.
+    if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
+      out.sitiDelicati = remoteModels.sitiDelicati;
+    }
+    // #868 — i due tetti di quanto filo la chat ha davanti: valgono per chi non li ha cambiati in Preferenze.
+    if (remoteModels.contestoFilo && typeof remoteModels.contestoFilo === 'object') {
+      out.contestoFilo = tettiContesto(remoteModels.contestoFilo);
+    }
+    // #1097.3 — il tetto delle risposte per famiglia di funzioni: vale per chi non l'ha cambiato in Preferenze.
+    if (remoteModels.lunghezzaRisposte && typeof remoteModels.lunghezzaRisposte === 'object') {
+      out.lunghezzaRisposte = tettiRisposte(remoteModels.lunghezzaRisposte);
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
@@ -327,7 +367,45 @@ function getPublicForAdmin() {
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
+    // #1004 — gli elenchi delle pagine delicate in vigore, e quelli del codice: l'editor salva solo le categorie che
+    // se ne discostano, così una banca aggiunta con un rilascio arriva anche dove l'owner non ha toccato niente.
+    sitiDelicati: PD() ? PD().elenco(eff.sitiDelicati) : (eff.sitiDelicati || {}),
+    sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
+    contestoFilo: eff.contestoFilo || {},
+    contestoFiloDiSerie: contestoDiSerie(),
+    lunghezzaRisposte: eff.lunghezzaRisposte || {},
+    lunghezzaRisposteDiSerie: risposteDiSerie(),
   };
+}
+const PD = () => globalThis.SN_PAGINE_DELICATE || null;
+
+// Solo numeri dentro i limiti: un valore assente vuol dire «quello del codice».
+function tettiContesto(o) {
+  const FC = globalThis.SN_FILO_CONTESTO;
+  const out = {};
+  for (const k of ['giorni', 'token']) {
+    const v = FC ? FC.numeroIn(o && o[k], FC.LIMITI[k]) : null;
+    if (v != null) out[k] = k === 'token' ? Math.round(v) : v;
+  }
+  const cache = FC ? FC.durataIn(o && o.cache) : null;
+  if (cache) out.cache = cache;
+  return out;
+}
+function contestoDiSerie() {
+  const FC = globalThis.SN_FILO_CONTESTO;
+  return FC ? { ...FC.TETTI_DI_SERIE } : {};
+}
+
+// Solo le famiglie note, coi numeri nei limiti: un valore assente vuol dire «quello del codice».
+function tettiRisposte(o) {
+  const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+  if (!LR) return {};
+  const pulito = LR.pulisci(o);
+  return Object.fromEntries(Object.entries(pulito).filter(([, v]) => v != null));
+}
+function risposteDiSerie() {
+  const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+  return LR ? { ...LR.DI_SERIE } : {};
 }
 
 async function patchDoc(docPath, fields, mask, idToken) {
@@ -358,7 +436,13 @@ async function update(partial, idToken) {
   // Doc modelli (non segreto).
   const modelFields = {};
   const modelMask = [];
-  if (typeof partial.provider === 'string') { modelFields.provider = toFsValue(partial.provider); modelMask.push('provider'); }
+  // Il fornitore dichiarato si riscrive a ogni salvataggio dei modelli, anche se
+  // l'editor non lo mostra: un valore ritirato restava lì per sempre (#663).
+  if (typeof partial.provider === 'string' || partial.models || partial.modelRegistry) {
+    const C = globalThis.SN_CONST || {};
+    modelFields.provider = toFsValue(fornitoreNoto(partial.provider) ? partial.provider : (C.DEFAULT_PROVIDER || 'openrouter'));
+    modelMask.push('provider');
+  }
   if (partial.models && typeof partial.models === 'object') { modelFields.models = toFsValue(partial.models); modelMask.push('models'); }
   if (partial.modelRegistry && typeof partial.modelRegistry === 'object') {
     modelFields.modelRegistry = toFsValue(partial.modelRegistry);
@@ -402,6 +486,27 @@ async function update(partial, idToken) {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
   }
+  // #1004 — le categorie delle pagine delicate: l'oggetto inviato sostituisce quello remoto per intero.
+  if (partial.sitiDelicati && typeof partial.sitiDelicati === 'object' && !Array.isArray(partial.sitiDelicati)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(partial.sitiDelicati)) {
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !Array.isArray(v)) continue;
+      clean[k] = [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+    }
+    modelFields.sitiDelicati = toFsValue(clean);
+    modelMask.push('sitiDelicati');
+  }
+  // #868 — l'oggetto inviato sostituisce quello remoto: un tetto tolto torna al valore del codice.
+  if (partial.contestoFilo && typeof partial.contestoFilo === 'object' && !Array.isArray(partial.contestoFilo)) {
+    modelFields.contestoFilo = toFsValue(tettiContesto(partial.contestoFilo));
+    modelMask.push('contestoFilo');
+  }
+  if (partial.lunghezzaRisposte && typeof partial.lunghezzaRisposte === 'object' && !Array.isArray(partial.lunghezzaRisposte)) {
+    modelFields.lunghezzaRisposte = toFsValue(tettiRisposte(partial.lunghezzaRisposte));
+    modelMask.push('lunghezzaRisposte');
+  }
+  // Nella maschera ma non nel corpo: Firestore li cancella.
+  if (modelMask.length) modelMask.push(...CAMPI_RITIRATI);
   if (modelMask.length) {
     await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
     // Il salvato entra subito nella copia: se la rilettura qui sotto non arriva,
@@ -473,20 +578,14 @@ async function setAutomationGate(enabled, idToken) {
   return Boolean(enabled);
 }
 
-// Auto-approvazione per mittente (config/automation, campo `autoApprove`): quali
-// categorie di mittente possono entrare in coda da sole quando l'interruttore
-// master è acceso. La decisione vera la prende il backend di sicurezza; qui c'è
-// solo la lettura/scrittura per la dashboard. Campo assente ⇒ tutti ammessi, che
-// è ciò che l'automatica faceva prima che questi sottointerruttori esistessero.
+// L'automatica per fiducia (config/automation, campo `autoApprove`, SPEC-DOMANDE.md §10): quali livelli di fiducia
+// entrano in coda da soli col master acceso. Decide il backend di sicurezza; qui lettura e scrittura per la dashboard.
+// Campo assente ⇒ tutti ammessi; una mappa per mittente salvata prima la traduce resolveAutoApprove (modulo condiviso).
 function autoApproveGroups() {
   const T = globalThis.SN_FEEDBACK_THREAD;
-  return (T && T.AUTO_APPROVE_GROUPS) || ['owner', 'filo', 'claude', 'user'];
+  return (T && T.AUTO_APPROVE_GROUPS) || ['fidato', 'non_fidato'];
 }
 
-// Un documento salvato prima che gli interruttori si sdoppiassero ha il solo
-// `claude` per tutte le istanze: il ripiego che fa ereditare quel valore vive
-// nel modulo condiviso (resolveAutoApprove), così la dashboard e il backend di
-// sicurezza leggono la stessa mappa dallo stesso documento.
 function normalizeAutoApprove(raw) {
   const T = globalThis.SN_FEEDBACK_THREAD;
   if (T && T.resolveAutoApprove) {
@@ -523,10 +622,10 @@ async function setAutomationAutoApprove(partial, idToken) {
 }
 
 // ── Ciò che le routine devono sapere (config/routines) ──────────────────────
-// Interruttore master, esplorazione a coda vuota e tentativi del loop vivono in
-// un documento SEPARATO da config/automation, e leggibile senza credenziali.
+// Interruttore master e tentativi del loop vivono in un documento SEPARATO da
+// config/automation, e leggibile senza credenziali.
 //
-// Perché separato: chi legge queste tre cose sono le macchine delle routine, che
+// Perché separato: chi legge queste cose sono le macchine delle routine, che
 // non hanno nessuna credenziale. Finché stavano nel documento admin-only la
 // lettura falliva sempre, in silenzio, e si ricadeva sui default: in dashboard
 // sembravano attive, ma nessuna routine le ha mai viste (stessa radice del
@@ -552,25 +651,15 @@ async function setRoutinesEnabled(on, idToken) {
   return Boolean(on);
 }
 
-// Esplorazione automatica a coda vuota (campo `proberWhenIdle`): quando non c'è
-// più niente da lavorare, le routine vanno a cercare problemi che nessuno ha
-// segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
-// un `false` scritto apposta ferma l'esplorazione.
-async function getAutomationProberIdle(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero. Il
-  // ripiego sul documento vecchio (config/automation) mostrava all'owner un
-  // valore che il server ignorava — la manopola girava, le ruote no. È già
-  // successo: la migrazione ha seminato i default nel documento nuovo e le
-  // scelte fatte prima (esplorazione spenta, tetto a 5) sono rimaste in
-  // ombra nel vecchio, mai più lette da nessuno.
+// I lavori server alle routine (#1159): solo un `true` scritto apposta li accende, come legge il server.
+async function getLavoriServer(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
-  return true;
+  return !!doc && doc.lavoriServer === true;
 }
 
-async function setAutomationProberIdle(on, idToken) {
-  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'esplorazione automatica.');
-  await patchDoc(ROUTINES_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
+async function setLavoriServer(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare i lavori server.');
+  await patchDoc(ROUTINES_DOC, { lavoriServer: toFsValue(Boolean(on)) }, ['lavoriServer'], idToken);
   return Boolean(on);
 }
 
@@ -609,9 +698,9 @@ function clampCap(n) {
 }
 
 async function getRoutineCaps(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero, e
-  // mostrare un valore pescato altrove significa mostrare una regola che
-  // nessuno applica (vedi il commento in getAutomationProberIdle).
+  // SOLO config/routines: è il documento che il server legge davvero. Un
+  // ripiego sul vecchio config/automation mostrava valori che il server
+  // ignorava: la manopola girava, le ruote no.
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
   if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
@@ -697,6 +786,34 @@ async function setRoutineSessions(patch, idToken) {
   }
 }
 
+// Modello e sforzo del worker per fase (config/routines, campo `roleModels`): li legge il server quando
+// consegna un biglietto. Regole in SN_ROUTINE_MODELLI; `null` dalla lettura è «non letto», come sopra.
+async function getRoutineRoleModels(idToken) {
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  if (doc === null) throw new Error('Modelli delle fasi non raggiungibili.');
+  return globalThis.SN_ROUTINE_MODELLI.leggiDoc(doc);
+}
+
+// Si scrive il SOLO campo scelto (maschera sulla foglia): il modello di una fase non riscrive il suo sforzo né
+// le altre fasi. Vuoto = la foglia esce dalla maschera senza valore, e Firestore la toglie.
+async function setRoutineRoleModel(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare i modelli delle fasi.');
+  const RM = globalThis.SN_ROUTINE_MODELLI;
+  const esito = RM.valida(patch);
+  if (!esito.ok) throw new Error(esito.testo);
+  const { ruolo, campo, valore } = esito;
+  const fields = valore
+    ? { [RM.CAMPO]: toFsValue({ [ruolo]: { [campo]: valore } }) }
+    : {};
+  await patchDoc(ROUTINES_DOC, fields, [RM.percorso(ruolo, campo)], idToken);
+  const scritto = { ruolo, campo, valore };
+  try {
+    return { letto: true, scritto, roleModels: await getRoutineRoleModels(idToken) };
+  } catch (_) {
+    return { letto: false, scritto };
+  }
+}
+
 
 // ── Red Team aperto a tutti (#896) ───────────────────────────────────────────
 // `aperto` è vero solo per un `openToAll: true` scritto: documento assente o
@@ -717,7 +834,7 @@ async function setRedteamOpen(on, idToken) {
 }
 
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
-// Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
+// Le impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
 // src/shared/wallet.js: qui si applica, non si ridichiara.
 //
@@ -771,8 +888,12 @@ async function setCreditsKnobs(patch, idToken) {
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
-async function getWorkerLog(idToken) {
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+// `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
+// della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
+async function getWorkerLog(idToken, { severo = false } = {}) {
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
+  const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
   const entries = raw
     .filter((e) => e && typeof e === 'object')
@@ -787,9 +908,12 @@ async function getWorkerLog(idToken) {
 }
 
 module.exports = {
+  tettiContesto,
+  tettiRisposte,
   get,
   fornitoreUsabile,
   getPublicForAdmin,
+  onChanged,
   refresh,
   refreshIfStale,
   DEFAULT_MAX_AGE_MS,
@@ -801,14 +925,16 @@ module.exports = {
   setAutomationGate,
   getAutomationAutoApprove,
   setAutomationAutoApprove,
-  getAutomationProberIdle,
-  setAutomationProberIdle,
+  getLavoriServer,
+  setLavoriServer,
   getRoutinesEnabled,
   setRoutinesEnabled,
   getRoutineCaps,
   setRoutineCaps,
   getRoutineSessions,
   setRoutineSessions,
+  getRoutineRoleModels,
+  setRoutineRoleModel,
   getCreditsKnobs,
   setCreditsKnobs,
   getRedteamOpen,

@@ -30,6 +30,9 @@
   let terminalMode = false;          // attivabile da Preferenze
   let terminalShell = 'powershell';  // 'powershell' | 'cmd' | 'bash'
   let currentCwd = '';               // directory mostrata nella riga grigia
+  // #892 — segnaposto «/comando» e riga della cartella solo nella chat dove è
+  // girato un comando: la sola modalità accesa non riempie la home di gergo.
+  let comandoInChat = false;
 
   function updateDirLine() {
     dashDir.textContent = currentCwd || '';
@@ -53,19 +56,31 @@
   function applyCommandCwd(actions) {
     if (!Array.isArray(actions)) return;
     let cwd = '';
+    let girato = false;
     for (const a of actions) {
       const out = a && a._output;
-      if (out && out.cwd) cwd = out.cwd;
+      if (!out || (a.type && String(a.type).toUpperCase() !== 'ESEGUI_COMANDO')) continue;
+      if (out.cwd) cwd = out.cwd;
+      if (out.command && !out.blocked) girato = true;
     }
+    if (girato) comandoInChat = true;
     if (cwd) setCwd(cwd);
+    if (girato) applyTerminalMode();
   }
 
   function applyTerminalMode() {
-    dashDir.hidden = !terminalMode || !currentCwd;
-    inputEl.placeholder = terminalMode
+    const vivo = terminalMode && comandoInChat;
+    dashDir.hidden = !vivo || !currentCwd;
+    inputEl.placeholder = vivo
       ? 'Chiedi qualsiasi cosa… o /comando per la shell'
       : 'Chiedi qualsiasi cosa…';
     updateInputClass();
+  }
+
+  // Una chat nuova (o riaperta) riparte senza gergo, a meno che dentro ci sia già un comando.
+  function nuovaChat(conComandi = false) {
+    comandoInChat = !!conComandi;
+    if (dashDir) applyTerminalMode();
   }
 
   async function initCwd() {
@@ -140,12 +155,113 @@
     return { end: pos + 2, sgr: null }; // sequenza a due byte (ESC c, ESC 7…)
   }
 
+  // #968 — un testo appena incollato (o trascinato) nella barra finisce in `fine`: se nel comando è un percorso
+  // intero che esiste e con gli spazi si spezzerebbe, prende le virgolette adesso, prima dell'Invio. Annullando si tolgono.
+  async function virgoletteSuInserito(testo, fine) {
+    const V = global.SN_VIRGOLETTE;
+    if (!terminalMode || !inputEl || typeof testo !== 'string' || !V || !V.forseDaQuotare(testo)) return;
+    const pezzo = testo.replace(/\r\n?/g, '\n');
+    const riga = inputEl.value;
+    const inizio = fine - pezzo.length;
+    if (inizio < 0 || riga.slice(inizio, fine) !== pezzo || !riga.trimStart().startsWith('/')) return;
+    let r = null;
+    try {
+      r = await window.filo?.shellVirgoletteIncolla?.({ riga, inizio, fine, shell: terminalShell, cwd: currentCwd });
+    } catch (_) { r = null; }
+    const s = r && r.sostituzione;
+    if (!s || typeof s.testo !== 'string' || !Number.isInteger(s.inizio) || !Number.isInteger(s.fine)) return;
+    // Nel frattempo si può aver scritto o incollato altro DOPO: va bene. Se è cambiato il percorso o quello che
+    // lo precede, o se il comando è già partito, non si tocca niente.
+    const ora = inputEl.value;
+    const seguito = ora.slice(s.fine);
+    if (ora.slice(0, s.fine) !== riga.slice(0, s.fine) || (seguito && !/^[\s;&|]/.test(seguito))) return;
+    const cursore = inputEl.selectionEnd;
+    const delta = s.testo.length - (s.fine - s.inizio);
+    let fatto = false;
+    if (document.activeElement === inputEl) {
+      inputEl.setSelectionRange(s.inizio, s.fine);
+      try { fatto = document.execCommand('insertText', false, s.testo); } catch (_) { fatto = false; }
+      if (!fatto) inputEl.setSelectionRange(cursore, cursore);
+    }
+    if (!fatto) {
+      inputEl.setRangeText(s.testo, s.inizio, s.fine, 'end');
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    const dove = cursore >= s.fine ? cursore + delta : cursore;
+    inputEl.setSelectionRange(dove, dove);
+  }
+
+  // #968 — un comando scritto a mano è fallito: se aveva un percorso con spazi senza virgolette, sotto l'errore
+  // compare la versione con le virgolette, da lanciare con un clic. Parte solo quello che c'è scritto lì.
+  async function proponiVirgolette({ command, cwd, shell, out, chat }) {
+    let r = null;
+    try { r = await window.filo?.shellPropostaVirgolette?.({ comando: command, shell, cwd }); } catch (_) { r = null; }
+    const p = r && r.proposta;
+    if (!p || typeof p.comando !== 'string' || !Array.isArray(p.pezzi) || !out.isConnected) return;
+    const riga = document.createElement('div');
+    riga.className = 'dash-term-proposta';
+    const testo = document.createElement('code');
+    testo.className = 'dash-term-proposta-cmd';
+    const prompt = document.createElement('span');
+    prompt.className = 'dash-term-prompt';
+    prompt.textContent = '/ ';
+    testo.appendChild(prompt);
+    for (const pz of p.pezzi) {
+      const el = document.createElement(pz && pz.aggiunto ? 'mark' : 'span');
+      el.textContent = String((pz && pz.testo) || '');
+      testo.appendChild(el);
+    }
+    const esegui = document.createElement('button');
+    esegui.type = 'button';
+    esegui.className = 'dash-action-btn dash-action-btn-primary dash-term-proposta-esegui';
+    esegui.textContent = 'Esegui';
+    esegui.title = 'Esegui con le virgolette';
+    const lancia = () => {
+      if (esegui.disabled) return;
+      esegui.disabled = true;
+      runShellCommand(p.comando, chat);
+    };
+    const nellaBarra = () => {
+      inputEl.value = `/${p.comando}`;
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      inputEl.focus();
+      inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+    };
+    const copia = () => { try { navigator.clipboard.writeText(p.comando); } catch (_) {} };
+    esegui.addEventListener('click', lancia);
+    const menu = (e) => {
+      const M = global.SN_RINOMINA_UI;
+      if (!M || typeof M.menu !== 'function') return;
+      e.preventDefault();
+      const rect = esegui.getBoundingClientRect();
+      const x = e.type === 'contextmenu' && e.clientX ? e.clientX : rect.left;
+      const y = e.type === 'contextmenu' && e.clientY ? e.clientY : rect.bottom;
+      const voci = [];
+      if (!esegui.disabled) voci.push(['Esegui', lancia]);
+      voci.push(['Modifica prima di eseguire', nellaBarra], ['Copia il comando', copia]);
+      M.menu(x, y, voci, { ancora: esegui });
+    };
+    riga.addEventListener('contextmenu', menu);
+    esegui.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) menu(e);
+    });
+    riga.append(testo, esegui);
+    out.appendChild(riga);
+    const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 80;
+    if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
   function runShellCommand(command, chat) {
     if (!command) return;
     if (document.body.dataset.state !== 'thread') goThread();
+    comandoInChat = true;
+    applyTerminalMode();
     // La conversazione a cui il comando e il suo esito appartengono è questa,
     // anche se l'esito arriva fra dieci secondi e intanto l'utente se n'è andato.
     const chatDelComando = chat || chatDellaRiga();
+    // Dove e con quale shell è girato: la proposta dopo un errore legge i percorsi da lì, non da dove si è poi.
+    const cwdDelComando = currentCwd;
+    const shellDelComando = terminalShell;
 
     // #525 — il comando e il suo esito sono battute di QUESTA conversazione:
     // l'utente li legge qui, in mezzo alle altre, e riaprendo la chat da
@@ -156,6 +272,8 @@
 
     // Bolla "comando" (stile utente) con il prompt digitato.
     const cmdBubble = makeBubble({ role: 'user', text: '' });
+    // Nata vuota sarebbe una bolla «solo azioni», senza fondo: il comando in chiaro su chiaro non si vedeva.
+    cmdBubble.classList.remove('dash-bubble-actions-only');
     cmdBubble.classList.add('dash-term-cmd');
     const promptLine = document.createElement('span');
     promptLine.className = 'dash-term-prompt';
@@ -282,10 +400,12 @@
       command,
       cwd: currentCwd,
       shell: terminalShell,
+      chat: chatDelComando,
       onData: ({ chunk, stream }) => appendOut(chunk, stream === 'stderr'),
       onExit: ({ code, cwd }) => {
         if (cwd) setCwd(cwd);
         finish(code === 0 ? null : `(uscita con codice ${code})`);
+        if (code !== 0) proponiVirgolette({ command, cwd: cwdDelComando, shell: shellDelComando, out, chat: chatDelComando });
       },
       onError: ({ message }) => {
         appendOut(`\n${message || 'Errore di esecuzione.'}`, true);
@@ -337,5 +457,8 @@
     applySettings,
     initCwd,
     runShellCommand,
+    virgoletteSuInserito,
+    nuovaChat,
+    comandoInChat: () => comandoInChat,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

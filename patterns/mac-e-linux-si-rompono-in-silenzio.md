@@ -25,8 +25,8 @@ aggiunge lì.
   Alt+lettera apre menu e schede negli altri programmi (Alt+H è la Home di Word): le
   scorciatoie di Filo si ascoltano sui suoi webContents (`before-input-event`), così valgono
   solo con Filo davanti (#838, sentinella `tests/unit/scorciatoieSoloInFilo.test.mjs`).
-  Il visore dei PDF è un webContents a sé che non passa da quell'evento: i suoi tasti li
-  porta agli ascolti della scheda `inoltraTastiDegliOspiti` (`src/main/tabs.js`).
+  Il visore dei PDF, da Electron 41, è un riquadro della scheda: i suoi tasti passano dallo
+  stesso evento.
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta.
   `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')` dà `Ctrl+B` su
@@ -68,6 +68,14 @@ aggiunge lì.
 
 - **Ctrl resta Ctrl.** Su Linux non c'è Cmd e non c'è la barra dei menu
   dell'applicazione: `SN_TASTI` lo sa già, non servono rami per Linux.
+- **I caratteri sono più larghi di Segoe UI.** `--sn-font` lì cade su un altro font (Inter
+  nel contenitore delle routine): una scritta che su Windows sta in una riga va a capo, e
+  un tetto d'altezza fisso fa scorrere un testo che doveva leggersi tutto. Un'impaginazione
+  si regge sulla misura vera (la scatola presa prima di cambiare la scritta, un tetto
+  relativo allo spazio che c'è), mai sui pixel visti su Windows. Per lo stesso motivo un
+  rosso d'impaginazione nel contenitore è quello che vede un utente Linux, non un rosso
+  d'ambiente: si corregge, non si mette fra i rossi noti (#663.4: il tasto Approva armato
+  e la casella della chat dell'editor, corretti da #256.3 e #530.5).
 - **La modalità terminale non è PowerShell.** Fuori da Windows si parte da `/bin/sh`, o
   da `bash` se l'utente l'ha scelto nelle Preferenze. La regola sta solo in `resolveShell`
   di `src/main/services/terminal.js`: la sessione persistente
@@ -76,7 +84,11 @@ aggiunge lì.
 - **L'aggiornamento automatico può fermarsi, e allora lo dice.** electron-updater
   riscrive l'AppImage da cui Filo sta girando: riesce se il file è scrivibile e l'app è
   partita davvero come AppImage. Quando inciampa, `avvisaSeAggiornamentoBloccato` scrive
-  fra le notifiche che la versione nuova va presa a mano, come su Mac.
+  fra le notifiche che la versione nuova va presa a mano, come su Mac. «Riavvia e aggiorna»
+  compare solo dove l'installazione può riuscire (`haPulsante` in
+  `src/main/aggiornamentoRegole.js`): su Mac mai, su Linux solo con la cartella dell'AppImage
+  scrivibile. Lì Filo si riapre con `app.relaunch`, cioè a processo chiuso: lanciato subito, il
+  Filo nuovo troverebbe preso il lucchetto dell'istanza unica e si chiuderebbe.
 - **Il link d'invito passa dalla voce di menu.** `filo://` arriva a Filo solo se il
   `.desktop` dentro l'AppImage dichiara `x-scheme-handler/filo`, riga che
   electron-builder scrive solo perché `build.protocols` è dichiarato.
@@ -88,6 +100,11 @@ aggiunge lì.
   guarda le tre manopole del kernel e aggiunge `--no-sandbox` SOLO dove dicono di no:
   Filo è un browser, e dove la gabbia regge deve restare. Il lanciatore usa `exec -a` per
   non cambiare il nome del processo, da cui viene l'aggancio dell'icona nella barra.
+- **In una sessione Wayland Filo parte su X.** Da Electron 38 Chromium lì parte come
+  programma Wayland, dove una finestra non sceglie dove aprirsi: i menu e le anteprime di
+  Filo sono finestre a sé messe accanto al puntatore. Lo stesso lanciatore aggiunge
+  `--ozone-platform=x11` quando c'è un X (anche XWayland) e l'utente non ha scelto da sé.
+  `app.commandLine.appendSwitch` non basta: la piattaforma si sceglie prima che parta il JS.
 - **La ricetta**: `build.linux` in `package.json`, `scripts/after-pack-linux.js` e il
   lavoro `release-linux`. Il nome del file è **fisso** perché il sito ha un collegamento
   solo; `artifactName`, `category` e `desktop` non sono decorazioni: senza il primo il
@@ -135,10 +152,26 @@ costruisce il codice di QUEL tag e gli riattacca i suoi file, senza far girare l
 senza pubblicare una versione nuova. Il feedback dell'allarme manda proprio lì, e il nome
 della casella vive in `casella()` dello script, così i due non divergono.
 
-Un guasto lo si racconta **per quello che è**: ogni file atteso sa da quale passo arriva
-(`attaccaDa`), quindi quando cade il caricamento del foglietto il feedback non dichiara
-rotto anche il download. Dare per perso tutto manda chi lo prende a cercare un guasto più
-grosso di quello vero (#733, primo giro di verifica).
+Un guasto lo si racconta **per quello che è**, e lo dice solo la pagina della versione:
+l'avviso la legge da sé (`GH_TOKEN` nel suo passo), e vale anche l'elenco del controllo
+finale. Dare per perso tutto manda chi lo prende a cercare un guasto più grosso di quello
+vero (#733, primo giro). Dedurlo dai passi girati sbagliava al secondo tentativo, quando
+programma e manifesto stanno già lì dal primo, e su un numero scritto a mano che non esiste
+(#733.3): senza la pagina l'avviso dice che non ha potuto guardare, e una versione che fra
+le release non c'è la chiama inesistente.
+
+**La chiave dice quale guasto è, non solo quale piattaforma.** Il server non apre un
+feedback nuovo per una chiave già in un feedback aperto o parcheggiato. Con la chiave fissa
+`piattaforma:linux` un guasto NUOVO, dopo che Linux era tornato a uscire, finiva dentro il
+feedback vecchio e la corsa restava verde (#752). La chiave porta l'ultima versione uscita
+per quella piattaforma, cioè con tutti i suoi file (`piattaforma:mac:dopo-v0.2.302`): finché
+resta rotta non cambia e non nascono doppioni, tornata a uscire un guasto dopo ne ha una
+nuova. Se i file nella pagina ci sono tutti, è rotto il resto del lavoro (le impronte):
+la chiave è `piattaforma:mac:impronte:dopo-v…` e conta uscita solo una versione che ha
+anche le impronte, lette nella sua pagina dallo strumento che le scrive. Contando i soli
+file, ogni versione rotta alle impronte era «uscita» e apriva un feedback suo (#1348,
+verifica). Senza release lette, o senza quello strumento, la chiave è della versione
+(`in-v…`): un doppione è meglio di un guasto inghiottito.
 
 **L'allarme deve poter parlare prima di tutto il resto.** Lo strumento che apre il
 feedback vive nel repo, e la copia di lavoro del lavoro di piattaforma diventa quella del
@@ -149,9 +182,18 @@ l'allarme e il controllo finale usano quella copia, non `scripts/`.
 
 **E se l'allarme non parte, la corsa non resta verde.** Il passo riprova tre volte, poi
 scrive `esito=muto` fra gli output del lavoro, lo dice nel riepilogo della corsa ed esce
-rosso; il lavoro `avviso-mancato` legge quell'output e fa fallire la corsa. È l'ultimo
-segnale rimasto: senza, un feedback non consegnato riportava esattamente il silenzio da
-cui è nato il #733 (secondo giro di verifica). Un `|| echo` su quel passo è il bug.
+rosso. Il lavoro `avviso-mancato` fa fallire la corsa quando una metà che doveva girare
+non ha detto `finito=si` (lo scrive solo il riepilogo, l'ultimo passo) e non ha detto
+`aperto`. Non basta guardare `muto`: un lavoro stroncato dal tetto di tempo o da una
+macchina persa non fa girare il passo dell'avviso, e il suo esito resta vuoto (#733.4).
+Non ci si fida neanche di `needs.<lavoro>.result`, che con `continue-on-error` può dire
+riuscito. Un `|| echo` o un `|| true` sull'invio è il bug.
+
+La sentinella in `tests/unit/releaseSuite.test.mjs` non legge la forma delle righe: valuta la
+condizione della rete, scenario per scenario e per tutte e due le piattaforme, ed esegue il
+passo dell'avviso con un invio che fallisce (`tests/helpers/azioniGithub.mjs`). Una seconda
+prova le applica i due guasti che la forma lasciava passare (la rete che guarda solo il Mac,
+l'invio che non può fallire seguito da `aperto`) e pretende che diventi rossa (#733.6).
 
 **Il titolo dice solo quello che si è guardato.** Se nessuno ha letto la pagina della
 versione non si annuncia un elenco di file mancanti, e se il lavoro si è fermato prima di

@@ -46,8 +46,8 @@ const state = {
 };
 
 const fornitoreFinto = (provider) => ({
-  streamComplete: async ({ apiKey, model, messages, providerRouting, onDelta }) => {
-    state.calls.push({ provider, apiKey, model, providerRouting });
+  streamComplete: async ({ apiKey, model, messages, providerRouting, reasoning, onDelta }) => {
+    state.calls.push({ provider, apiKey, model, providerRouting, reasoning });
     if (state.streamError) throw new Error(state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
@@ -57,10 +57,8 @@ const fornitoreFinto = (provider) => ({
 globalThis.SN_PROVIDERS = { getProvider: (nome) => fornitoreFinto(nome) };
 require(join(__dirname, '..', '..', 'src', 'main', 'services', 'modelGate.js'));
 
-const providerRoutingFinto = (settings) => {
-  const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
-  return ignore.length ? { ignore } : null;
-};
+// La regola vera: esclusione più ordinamento, quello della voce prima di quello generale.
+const providerRoutingFinto = (settings, entrySort) => globalThis.SN_CONST.providerRoutingFor(settings, entrySort);
 const modelGate = globalThis.SN_MODEL_GATE.create({
   getSettings: async () => state.effective,
   routing: providerRoutingFinto,
@@ -92,7 +90,8 @@ registerAi((type, fn) => handlers.set(type, fn), {
   modelGate,
 });
 
-const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
+const DA_FILO = 'filo://admin-defaults/admin-defaults.html';
+const testModel = (msg, origin = DA_FILO) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg, { url: origin }, origin);
 const testProvider = (msg) => handlers.get(MSG.TEST_PROVIDER)(msg);
 
 beforeEach(() => {
@@ -126,8 +125,23 @@ test('riga esplicita da non-admin: rifiutata senza chiamare il provider', async 
   state.defaults.apiKeys = { openrouter: 'sk-or-default' };
   const res = await testModel({ provider: 'openrouter', model: 'qualcosa/x' });
   assert.equal(res.ok, false);
+  assert.equal(res.code, 'not_admin');
   assert.match(String(res.error), /amministrator/i);
   assert.equal(state.calls.length, 0);
+});
+
+// #784.2: sulla macchina dell'owner «sei l'admin?» è sempre sì; un sito visitato non spende le chiavi predefinite.
+test('da un sito visitato nessuna prova parte, nemmeno con la sessione dell\'owner aperta', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.defaults.modelRegistry = { gemma: { provider: 'openrouter', model: 'google/gemma-4-31b-it' } };
+  for (const msg of [{ provider: 'openrouter', model: 'qualsiasi/modello' }, { nickname: 'gemma' }]) {
+    const res = await testModel(msg, 'https://evil.example/pagina');
+    assert.deepEqual(res, { ok: false, code: 'forbidden', error: 'forbidden' });
+  }
+  assert.equal(state.calls.length, 0);
+  const daFilo = await testModel({ nickname: 'gemma' });
+  assert.equal(daFilo.ok, true, `da una pagina di Filo la prova deve partire: ${daFilo.error}`);
 });
 
 test('stream concluso senza contenuto → ok:false "risposto vuoto" (capita su alcuni endpoint :free)', async () => {
@@ -295,6 +309,42 @@ test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   const ignore = (state.calls[0].providerRouting || {}).ignore || [];
   assert.ok(ignore.length, 'la prova partiva senza dire chi è escluso');
+});
+
+// ── La prova misura la velocità: deve girare come girerebbe la voce ─────────
+
+test('riga non salvata: la prova parte con ordinamento e reasoning scritti sulla riga', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price' };
+  const res = await testModel({
+    provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput', reasoning: 'low',
+  });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'throughput' });
+  assert.equal(state.calls[0].reasoning, 'low');
+});
+
+test('nickname salvato: la prova prende ordinamento e reasoning dalla voce del registry', async () => {
+  state.defaults = {
+    modelRegistry: { svelto: { provider: 'openrouter', model: 'vendor/aperto', sort: 'latency', reasoning: 'off' } },
+    apiKeys: { openrouter: 'sk-or-default' },
+  };
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'] };
+  const res = await testModel({ nickname: 'svelto' });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'latency' });
+  assert.equal(state.calls[0].reasoning, 'off');
+});
+
+test('prova dalle Opzioni: vale anche lì la scelta fatta sulla voce personale', async () => {
+  state.effective = {
+    modelRegistry: { mio: { provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput' } },
+    apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price',
+  };
+  const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-mia', model: 'vendor/aperto', nickname: 'mio' });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'throughput' });
 });
 
 // ── Il limite di spesa vale anche per le prove (#591): sono chiamate vere ─────

@@ -12,9 +12,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
 
 const campo = (v) => (typeof v === 'string' ? { stringValue: v } : v);
+// Dal #1148 conta la fiducia, non la prova: le pratiche dell'owner e delle sessioni con la prova nascono (o la migrazione
+// le fa) fidate. Le prove la dicono come la scriverebbe il server, salvo dove la passano loro.
 function documento(id, f) {
   const fields = {};
-  for (const [k, v] of Object.entries(f)) if (v !== undefined) fields[k] = campo(v);
+  const proprie = /^(owner|local):/i.test(String(f.clientId || '')) && f.senderProof === 'admin';
+  for (const [k, v] of Object.entries(proprie && !('fiducia' in f) ? { ...f, fiducia: 'fidato' } : f)) if (v !== undefined) fields[k] = campo(v);
   return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields };
 }
 
@@ -75,7 +78,7 @@ test('--non-locale toglie il segno: maschera sul campo, nessun valore', async ()
     const r = await mod.segnaLocale('abc', false, OPTS);
     assert.equal(r.ok, true, r.motivo);
     assert.equal(patch.length, 1);
-    assert.deepEqual(patch[0].body.fields, {});
+    assert.deepEqual(Object.keys(patch[0].body.fields), ['updatedAt']);
   });
 });
 
@@ -189,7 +192,7 @@ test('all’avvio una pratica dell’owner senza segno locale, dove le routine l
       const testo = mod.rifiutoPratica('s1', r);
       assert.match(testo, /owner-feedback\.mjs s1 --solo-locale/, `${status}: dice come mettere il segno`);
       assert.match(testo, /l’ha tolto lui/, `${status}: un segno tolto dall'owner non si rimette senza chiedere`);
-      assert.doesNotMatch(testo, /--serve-locale|feedback:ripasso/, `${status}: non è un utente né senza prova`);
+      assert.doesNotMatch(testo, /--serve-locale|vale come un utente/, `${status}: non è un utente né senza prova`);
     });
   }
   await conRete(documento('s2', { clientId: 'owner:me', senderProof: 'admin', status: 'aligned', statusPublic: 'open' }), async () => {
@@ -226,7 +229,8 @@ test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner
   await conRete(falso, async (patch) => {
     const r = await mod.scrivi('f3', 'done', 'fatto', { ...OPTS, attore: 'routine' });
     assert.deepEqual([r.ok, r.senzaProva, patch.length], [false, true, 0]);
-    assert.match(mod.rifiutoPratica('f3', r), /feedback:ripasso/);
+    assert.doesNotMatch(mod.rifiutoPratica('f3', r), /--riconosci/, '#957: la prova a mano solo da Gestione');
+    assert.match(mod.rifiutoPratica('f3', r), /in Gestione, col tasto «🤝 Segna fidato»/);
   });
   const segno = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } };
   const owner = documento('o3', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open', notes: '', localOnly: segno });
@@ -302,25 +306,9 @@ test('un lavoro locale già chiuso si segna e la sua scheda esce dalla bacheca p
   });
 });
 
-test('--riconosci: la prova la dà l’owner, solo sui prefissi suoi e delle sessioni senza prova', async () => {
-  const senza = documento('s1', { clientId: 'local:claude', status: 'unlabeled', statusPublic: 'open' });
-  await conReteScritture(senza, async (scritte) => {
-    const r = await mod.riconosciMittente('s1', OPTS);
-    assert.equal(r.ok, true, r.motivo);
-    assert.equal(scritte.length, 1);
-    assert.match(scritte[0].url, /updateMask\.fieldPaths=senderProof$/);
-    assert.deepEqual(scritte[0].body.fields, { senderProof: { stringValue: 'admin' } });
-  });
-  for (const [id, f] of [
-    ['p1', { clientId: 'owner:me', senderProof: 'admin', status: 'todo' }],
-    ['u1', { clientId: 'c-utente', status: 'todo' }],
-    ['r1', { clientId: 'routine:residuo', status: 'unlabeled' }],
-  ]) {
-    await conReteScritture(documento(id, f), async (scritte) => {
-      assert.equal((await mod.riconosciMittente(id, OPTS)).ok, false, id);
-      assert.equal(scritte.length, 0, id);
-    });
-  }
+// #957: la prova data a mano salta L5 come il sì: solo «🙋 È mio» in Gestione. La riga di comando: lavoroLocaleApprovato.test.mjs.
+test('--riconosci non c’è più: lo script non sa dare la prova del mittente', () => {
+  assert.equal(mod.riconosciMittente, undefined);
 });
 
 // Giro 3 della verifica locale: la regola del lettore vale anche per chi dà fiducia (segno locale, prova del mittente).
@@ -331,12 +319,10 @@ test('segno locale e prova del mittente: rifiutati, senza scrivere, sui feedback
     ['segno, collegio con un attacco', 'segnaLocale', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', pipeline: attacco }],
     ['segno, fermato dal filtro', 'segnaLocale', { clientId: 'owner:me', senderProof: 'admin', status: 'unlabeled', pipeline: pericoloso }],
     ['segno, giudizio illeggibile', 'segnaLocale', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', pipeline: 'FENC1:non-si-apre' }],
-    ['prova, allineato con un attacco', 'riconosciMittente', { clientId: 'local:claude', status: 'aligned', pipeline: attacco }],
-    ['prova, design con un attacco', 'riconosciMittente', { clientId: 'owner:me', status: 'design', pipeline: attacco }],
   ];
   for (const [nome, fn, f] of casi) {
     await conReteScritture(documento('x1', { statusPublic: 'open', ...f }), async (scritte) => {
-      const r = fn === 'segnaLocale' ? await mod.segnaLocale('x1', true, OPTS) : await mod.riconosciMittente('x1', OPTS);
+      const r = await mod[fn]('x1', true, OPTS);
       assert.equal(r.ok, false, nome);
       assert.match(r.motivo, /attacco|giudizio/, nome);
       assert.equal(scritte.length, 0, nome);
@@ -346,9 +332,6 @@ test('segno locale e prova del mittente: rifiutati, senza scrivere, sui feedback
   const pulito = JSON.stringify({ verdicts: [{ judge: 'A', class: 'aligned' }] });
   await conReteScritture(documento('x2', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', statusPublic: 'open', pipeline: pulito }), async () => {
     assert.equal((await mod.segnaLocale('x2', true, OPTS)).ok, true);
-  });
-  await conReteScritture(documento('x3', { clientId: 'local:claude', status: 'aligned', statusPublic: 'open', pipeline: pulito }), async () => {
-    assert.equal((await mod.riconosciMittente('x3', OPTS)).ok, true);
   });
 });
 
@@ -372,12 +355,9 @@ test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti
         const s = await mod.serveLocale('h1', 'prova', { ...OPTS, dryRun: true });
         if (!s.ok) vicoli.push(`--serve-locale: ${s.motivo}`);
       }
-      if (testo.includes('--riconosci')) {
-        const s = await mod.riconosciMittente('h1', { ...OPTS, dryRun: true });
-        if (!s.ok) vicoli.push(`--riconosci: ${s.motivo}`);
-      }
       if (nome === 'utente in coda') assert.match(testo, /--serve-locale/, nome);
-      if (nome === 'sessione senza prova, pulita') assert.match(testo, /--riconosci/, nome);
+      assert.doesNotMatch(testo, /--riconosci/, nome);
+      if (nome === 'sessione senza prova, pulita') assert.match(testo, /in Gestione, col tasto «🤝 Segna fidato»/, nome);
       if (/Ricevuti/.test(nome) || /segnalata/.test(nome)) assert.match(testo, /owner/, `${nome}: dice chi decide`);
     });
     assert.deepEqual(vicoli, [], nome);
@@ -433,7 +413,7 @@ test('--non-locale su un lavoro locale chiuso: toglie il segno, lo dice, e non c
     assert.equal(r.ok, true, r.motivo);
     assert.equal(r.chiusa, true);
     assert.equal(scritture.length, 1, scritture.join('\n'));
-    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly$/);
+    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly&updateMask\.fieldPaths=updatedAt$/);
   } finally { globalThis.fetch = vero; }
 });
 
@@ -467,4 +447,22 @@ test('approvato come lavoro locale: i passaggi di npm run feedback e la presa in
     assert.equal(rifiuto.ok, false);
     assert.equal(rifiuto.utente, true);
   } finally { globalThis.fetch = vero; }
+});
+
+test('praticaInChiaro: fiducia assente resta assente (regola di prima fino alla migrazione), presente ma non testo è un no', async () => {
+  const doc = (extra) => ({
+    name: 'projects/p/databases/(default)/documents/feedback/x1',
+    fields: { clientId: { stringValue: 'local:claude' }, senderProof: { stringValue: 'admin' }, status: { stringValue: 'todo' }, ...extra },
+  });
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  const assente = await mod.praticaInChiaro(doc());
+  assert.equal(assente.fiducia, undefined);
+  assert.equal(MR.localSenderCheck(assente).ok, true, 'la pratica locale prima della migrazione si lega');
+  const nulla = await mod.praticaInChiaro(doc({ fiducia: { nullValue: null } }));
+  assert.equal(nulla.fiducia, '');
+  assert.equal(MR.localSenderCheck(nulla).ok, false);
+  const nonFidata = await mod.praticaInChiaro(doc({ fiducia: { stringValue: 'non_fidato' } }));
+  assert.equal(MR.localSenderCheck(nonFidata).nonFidato, true);
+  const fidata = await mod.praticaInChiaro(doc({ fiducia: { stringValue: 'fidato' } }));
+  assert.equal(MR.localSenderCheck(fidata).ok, true);
 });

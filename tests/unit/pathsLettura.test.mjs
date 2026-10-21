@@ -209,9 +209,11 @@ test('un errore di Firestore in lettura si vede: non torna una lista vuota', asy
 // prompt: un percorso enorme si taglia dicendolo, e gli altri di quel dominio
 // arrivano lo stesso al modello.
 test('un percorso gonfiato apposta non si mangia il posto degli altri', async () => {
+  // Oltre il suo tetto un elemento si taglia: quattro volte il tetto pesa nel prompt quanto trentamila caratteri, senza
+  // pagare a ogni corsa la pulizia sull'elemento intero, che costa col quadrato della lunghezza (#1063).
   const gonfio = fsDoc('gonfio', {
     initialUrl: '/x', intent: 'cosa enorme', success: true,
-    steps: Array.from({ length: 30 }, () => ({ selector: 'a'.repeat(30000), action: 'click' })),
+    steps: Array.from({ length: 30 }, () => ({ selector: 'a'.repeat(Safety.LIMITI.MAX_SELECTOR_LEN * 4), action: 'click' })),
   });
   const buono = fsDoc('buono', {
     initialUrl: '/ordini', intent: 'vedere gli ordini', success: true,

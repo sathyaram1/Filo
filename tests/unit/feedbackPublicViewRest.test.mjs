@@ -134,7 +134,7 @@ test('la lettura con credenziali le allega; la vista pubblica no (non ne ha)', a
 test('il contatore più alto di ogni numero esistente torna in pari, ma solo col massimo vero in mano', async () => {
   const gonfiato = { fields: { value: { integerValue: '90000' } }, updateTime: 'T1' };
 
-  // Senza `allowLower`: non si tocca. Abbassarlo col massimo dei soli feedback
+  // Senza pavimento: non si tocca. Abbassarlo col massimo dei soli feedback
   // caricati riassegnerebbe numeri già usati.
   await withFetch((call) => okJson(gonfiato), async (calls) => {
     const v = await FB.ensureSeqCounter(584, { idToken: 'tok' });
@@ -142,9 +142,9 @@ test('il contatore più alto di ogni numero esistente torna in pari, ma solo col
     assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0);
   });
 
-  // Con `allowLower` (li abbiamo letti tutti): torna al massimo `seq` vero.
+  // Col pavimento (il massimo vero di tutti): torna lì.
   await withFetch((call) => (call.method === 'PATCH' ? okJson({}) : okJson(gonfiato)), async (calls) => {
-    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', allowLower: true });
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', pavimento: 584 });
     assert.equal(v, 584);
     const patch = calls.find((c) => c.method === 'PATCH');
     assert.ok(patch, 'il contatore va riscritto');
@@ -154,10 +154,10 @@ test('il contatore più alto di ogni numero esistente torna in pari, ma solo col
   });
 });
 
-test('un contatore già in pari non si riscrive, nemmeno con allowLower', async () => {
+test('un contatore già in pari non si riscrive, nemmeno col pavimento', async () => {
   const inPari = { fields: { value: { integerValue: '584' } }, updateTime: 'T1' };
   await withFetch(() => okJson(inPari), async (calls) => {
-    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', allowLower: true });
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', pavimento: 584 });
     assert.equal(v, 584);
     assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0);
   });
@@ -188,20 +188,41 @@ test('nessun feedback numerato: il massimo è «non lo so», non zero', async ()
 
 // Uno scarto piccolo è gente che sta inviando in questo momento, non un
 // contatore gonfiato: abbassarlo stamperebbe due volte lo stesso numero.
-test('un contatore avanti di poco non si abbassa, nemmeno con allowLower', async () => {
+test('un contatore avanti di poco non si abbassa, nemmeno col pavimento', async () => {
   const avantiDiPoco = { fields: { value: { integerValue: '586' } }, updateTime: 'T1' };
   await withFetch(() => okJson(avantiDiPoco), async (calls) => {
-    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', allowLower: true });
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', pavimento: 584 });
     assert.equal(v, 586);
     assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0);
   });
 });
 
-test('un contatore INDIETRO si alza sempre, allowLower o no', async () => {
+test('un contatore INDIETRO si alza sempre, col pavimento o senza', async () => {
   const indietro = { fields: { value: { integerValue: '10' } }, updateTime: 'T1' };
   await withFetch((call) => (call.method === 'PATCH' ? okJson({}) : okJson(indietro)), async (calls) => {
     assert.equal(await FB.ensureSeqCounter(584, { idToken: 'tok' }), 584);
     assert.equal(calls.filter((c) => c.method === 'PATCH').length, 1);
+  });
+});
+
+// #923: chi non ha il massimo vero in mano (la vista pubblica oltre i 500) non ricrea il contatore sul solo numero
+// provato: lo chiede al server, o non lo crea.
+test('un contatore che manca rinasce sul numero più alto in uso, chiesto al server se nessuno lo passa', async () => {
+  const assente = { ok: false, status: 404, json: async () => ({}), text: async () => 'NOT_FOUND' };
+  const piuAlto = [{ document: { name: 'x/feedback/abc', fields: { seq: { integerValue: '900' } } } }];
+  await withFetch((call) => {
+    if (call.url.includes(':runQuery')) return okJson(piuAlto);
+    return call.method === 'PATCH' ? okJson({}) : assente;
+  }, async (calls) => {
+    assert.equal(await FB.ensureSeqCounter(880, { idToken: 'tok' }), 900);
+    assert.equal(calls.find((c) => c.method === 'PATCH').body.fields.value.integerValue, '900');
+  });
+  await withFetch((call) => {
+    if (call.url.includes(':runQuery')) return { ok: false, status: 503, json: async () => ({}), text: async () => 'giù' };
+    return call.method === 'PATCH' ? okJson({}) : assente;
+  }, async (calls) => {
+    await assert.rejects(FB.ensureSeqCounter(880, { idToken: 'tok' }));
+    assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0, 'senza il massimo vero il contatore non si crea');
   });
 });
 

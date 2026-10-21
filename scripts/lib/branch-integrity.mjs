@@ -29,8 +29,10 @@
 // test girano su repo git temporanei con un finto `origin`.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { installaControlloSpedizione } from './copie-di-dati.mjs';
+import { ensureCommentChar } from './carattere-commento.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
@@ -94,7 +96,7 @@ export function isProtectedBranch(name, mainBranch = '') {
 
 /**
  * Marcatore di tentativo: `20260807T195800Z`. Sta dentro i caratteri ammessi da
- * merge-gate.isValidBranch e ordina cronologicamente come stringa.
+ * nomi di ramo validi e ordina cronologicamente come stringa.
  */
 export function attemptStamp(nowMs = Date.now()) {
   return new Date(nowMs).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
@@ -223,7 +225,7 @@ export function writeBranchState(root, state) {
 // directory, adesso, deve stare su questo branch". Lo scrive il dispatcher
 // quando consegna il lavoro e lo cancella quando il lavoro è consegnato — dopo
 // la consegna non c'è più niente da proteggere (ed è ciò che permette al
-// merge-gate di cambiare branch legittimamente).
+// lavoro di dopo di cambiare branch legittimamente).
 
 export function expectationFile(root) {
   return resolve(root, '.claude', 'branch-expect.json');
@@ -403,10 +405,13 @@ export const SESSION_MARKERS = Object.freeze([
   '.claude/routine-ticket.json',
   '.claude/routine-beat.json',
   '.claude/routine-beat-hook.stamp',
+  '.claude/routine-consumo.json',
   '.claude/routine-role.json',
   '.claude/branch-expect.json',
   '.claude/verify-local.json',
   '.claude/routine-state/',
+  '.claude/biglietti/',
+  '.claude/filo-worker.json',
 ]);
 
 /**
@@ -478,6 +483,9 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // non decidono più la sorte dei marcatori di sessione (vedi il commento su
   // SESSION_MARKERS). Best-effort: un fallimento non ferma la preparazione.
   ensureSessionExcludes(root);
+  // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
+  try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
+  ensureCommentChar(root);
 
   if (create) {
     const wanted = base || mainBranch;
@@ -558,8 +566,25 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
  *
  * @returns {{ok:boolean, current:string, assigned:string, reason:string}}
  */
-export function checkDelivery(root, assignedBranch) {
+export function checkDelivery(root, assignedBranch, { da, dal } = {}) {
+  const altra = altraCartellaDelDeposito(root, da);
+  if (altra) {
+    return {
+      ok: false, current: altra.ramo, assigned: String(assignedBranch || ''), cartella: altra.cartella, radice: altra.radice,
+      reason: `la registrazione parte dalla cartella "${altra.cartella}"${altra.ramo ? ` (ramo "${altra.ramo}")` : ''}, un'altra cartella dello stesso deposito: il lavoro si registra da "${altra.radice}", dove è stato posizionato`,
+    };
+  }
   const v = identityVerdict(currentBranch(root), assignedBranch);
+  if (v.ok && v.assigned) {
+    const fuori = lavoroInUnAltroWorktree(root, { dal: dal ?? (readExpectation(root) || {}).since });
+    if (fuori) {
+      const lista = fuori.commit.map((c) => c.slice(0, 12)).join(' ');
+      return {
+        ...v, ok: false, altrove: fuori,
+        reason: `il ramo "${v.assigned}" non contiene ${fuori.commit.length === 1 ? 'un commit fatto' : `${fuori.commit.length} commit fatti`} dopo l'inizio di questo lavoro nella cartella "${fuori.cartella}"${fuori.ramo ? ` (ramo "${fuori.ramo}")` : ''}, e la verifica non li troverebbe: portali qui (\`git -C "${fuori.radice}" cherry-pick ${lista}\`) e registra di nuovo; se non sono di questo lavoro, togli quella cartella (\`git worktree remove "${fuori.cartella}"\`, il suo ramo resta)`,
+      };
+    }
+  }
   if (v.ok || v.current) return v;
   // Durante il rebase del ramo assegnato la cartella è staccata per forza: il rifiuto resta, ma non è una
   // deriva (`rebase: true`). Il rebase di un altro ramo lo è.
@@ -573,6 +598,60 @@ export function checkDelivery(root, assignedBranch) {
     rebase: true,
     reason: `c'è un rebase in corso del ramo "${r.ramo}": portalo a termine (risolvi i conflitti, poi \`git rebase --continue\`) e registra dopo, dal ramo`,
   };
+}
+
+/**
+ * Un worktree dello stesso deposito da cui parte la registrazione, diverso dalla cartella posizionata (`root`): lì
+ * ramo e commit non sono quelli che il controllo guarda (#772). null se no; fuori da ogni deposito, o in un altro, non conta.
+ */
+export function altraCartellaDelDeposito(root, da = process.cwd()) {
+  const chiedi = (dir) => {
+    const r = gitIn(dir)(['rev-parse', '--show-toplevel', '--git-common-dir']);
+    if (!r.ok) return null;
+    const [top, comune] = r.out.split(/\r?\n/);
+    return top && comune ? { top: percorsoVero(resolve(dir, top)), comune: percorsoVero(resolve(dir, comune)) } : null;
+  };
+  const qui = chiedi(da);
+  const lavoro = qui ? chiedi(root) : null;
+  if (!qui || !lavoro || qui.comune !== lavoro.comune || qui.top === lavoro.top) return null;
+  return { cartella: qui.top, radice: lavoro.top, ramo: currentBranch(da) };
+}
+
+/**
+ * Un altro worktree dello stesso deposito con commit nati da `dal` (l'inizio del lavoro) che la cartella posizionata
+ * non contiene (#772.1). Non contano la linea principale né i commit già portati qui con un cherry-pick.
+ * @returns {null | { cartella: string, ramo: string, radice: string, commit: string[] }} i commit dal più vecchio
+ */
+export function lavoroInUnAltroWorktree(root, { dal = '' } = {}) {
+  const inizio = Math.floor(Date.parse(String(dal || '')) / 1000);
+  if (!Number.isFinite(inizio)) return null;
+  const g = gitIn(root);
+  const top = g(['rev-parse', '--show-toplevel']);
+  const elenco = g(['worktree', 'list', '--porcelain']);
+  if (!top.ok || !elenco.ok) return null;
+  const radice = percorsoVero(top.out);
+  const def = g(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok && def.out ? def.out.replace(/^origin\//, '') : 'main';
+  const fuori = [principale, `origin/${principale}`].filter((r) => g(['rev-parse', '--verify', '--quiet', `${r}^{commit}`]).ok);
+  for (const blocco of elenco.out.split(/\r?\n\s*\r?\n/)) {
+    const righe = blocco.split(/\r?\n/);
+    const campo = (nome) => (righe.find((r) => r.startsWith(`${nome} `)) || '').slice(nome.length + 1).trim();
+    const cartella = campo('worktree');
+    const testa = campo('HEAD');
+    // Una cartella sparita (worktree da potare) non è dove si lavora adesso.
+    if (!cartella || !/^[0-9a-f]{7,64}$/i.test(testa) || righe.includes('bare') || !existsSync(cartella)) continue;
+    if (percorsoVero(cartella) === radice) continue;
+    const r = g(['log', '--no-merges', '--right-only', '--cherry-pick', '--format=%H %ct', `HEAD...${testa}`, ...fuori.map((x) => `^${x}`)]);
+    if (!r.ok || !r.out) continue;
+    const commit = r.out.split(/\r?\n/).map((l) => l.trim().split(' '))
+      .filter(([sha, ct]) => sha && Number(ct) >= inizio).map(([sha]) => sha).reverse();
+    if (commit.length) return { cartella: percorsoVero(cartella), ramo: campo('branch').replace(/^refs\/heads\//, ''), radice, commit };
+  }
+  return null;
+}
+
+function percorsoVero(p) {
+  try { return realpathSync.native(p); } catch (_) { return p; }
 }
 
 /**
@@ -607,15 +686,18 @@ export function rebaseInCorso(root) {
  * solo alla soglia (porta il feedback in `design`); `persist` salva lo stato
  * fuori dal processo, se il chiamante ha un modo per farlo.
  *
- * @returns {{ok:true, state:object|null} | {ok:false, message:string, escalated:boolean, count:number}}
+ * @returns {{ok:true, state:object|null}
+ *   | {ok:false, message:string, escalated:boolean, count:number, current:string, assigned:string, rebase?:true}}
  */
-export function guardTransition(root, id, { escalate, persist, clear } = {}) {
+export function guardTransition(root, id, { escalate, persist, clear, assigned: ripiego = '' } = {}) {
   const prev = readBranchState(root, id);
-  const assigned = prev?.branch || '';
+  // `assigned` vale solo se lo stato non nomina un ramo: chi lo passa (il canale) lo legge dall'identità attesa.
+  const assigned = prev?.branch || String(ripiego || '');
   const v = checkDelivery(root, assigned);
   if (v.ok) return { ok: true, state: prev };
+  const dove = { current: v.current, assigned: v.assigned, ...(v.cartella ? { cartella: v.cartella, radice: v.radice } : {}), ...(v.altrove ? { altrove: v.altrove } : {}) };
   // Il rebase del ramo assegnato si finisce e poi si registra: non conta verso la sospensione per deriva.
-  if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, message: `registrazione rifiutata su ${id}: ${v.reason}` };
+  if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, ...dove, message: `registrazione rifiutata su ${id}: ${v.reason}` };
 
   const b = bumpRejects(prev || { id, branch: assigned });
   b.state.id = id;
@@ -623,11 +705,75 @@ export function guardTransition(root, id, { escalate, persist, clear } = {}) {
   if (b.escalate) {
     try { if (typeof escalate === 'function') escalate(b.count); } catch (_) { /* la nota resta in coda */ }
     try { if (typeof clear === 'function') clear(); } catch (_) {}
-    return { ok: false, escalated: true, count: b.count, message: `${base} — rifiuto ${b.count}: feedback portato in design` };
+    return { ok: false, escalated: true, count: b.count, ...dove, message: `${base} — rifiuto ${b.count}: feedback portato in design` };
   }
   writeBranchState(root, b.state);
   try { if (typeof persist === 'function') persist(); } catch (_) {}
-  return { ok: false, escalated: false, count: b.count, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+  return { ok: false, escalated: false, count: b.count, ...dove, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+}
+
+export function clearBranchState(root, id) {
+  if (!id) return;
+  const f = resolve(stateDir(root), `${id}.json`);
+  if (existsSync(f)) rmSync(f, { force: true });
+}
+
+/** Una transizione accettata consuma i rifiuti di fila (vedi clearRejects). Best-effort. */
+export function azzeraRifiuti(root, id) {
+  const s = id ? readBranchState(root, id) : null;
+  if (!s || s.identityRejects === undefined) return;
+  try { writeBranchState(root, clearRejects(s)); } catch (_) { /* il contatore resta: decide la soglia */ }
+}
+
+/** `refs/heads/x` è `x`: la forma piena di git conferma il nome corto. PURA. */
+function nomeRamo(s) {
+  return String(s || '').trim().replace(/^refs\/heads\//, '');
+}
+
+/**
+ * C sulla strada diretta del canale (#772), per le consegne che valgono per un commit. Ramo assegnato e id vengono
+ * dall'identità attesa di dispatch; da lì controllo e contatore sono quelli di guardTransition, e alla soglia la
+ * sospensione la manda `escalate`. Senza identità attesa restano i divieti che non dipendono dall'assegnazione
+ * (linea principale, cartella staccata): il confronto col ramo legato al biglietto lo fa il server sul ramo VERO.
+ * Un ramo dichiarato può solo confermare quello della cartella.
+ *
+ * @returns {{ok:true, branch:string, id:string, assigned:string}
+ *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato'|'cartella'|'altrove', current:string, assigned:string,
+ *      cartella?:string, radice?:string, altrove?:{cartella:string, ramo:string, radice:string, commit:string[]},
+ *      declared?:string, rebaseDi?:string, count?:number, escalated?:boolean}}
+ */
+export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
+  const exp = readExpectation(root);
+  const id = String((exp && exp.id) || '');
+  let assigned = String((exp && exp.branch) || '');
+  const rebaseDi = () => { const r = rebaseInCorso(root); return r ? (r.ramo || '?') : ''; };
+  const def = gitIn(root)(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
+  if (exp) {
+    // Un'attesa senza id non ha uno stato a cui intestare i rifiuti: il controllo resta, il contatore no.
+    const g = id
+      ? guardTransition(root, id, { assigned, escalate, clear: () => clearBranchState(root, id) })
+      : checkDelivery(root, assigned);
+    if (!g.ok) {
+      const cur = g.current || '';
+      const motivo = g.cartella ? 'cartella' : g.altrove ? 'altrove' : g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
+      const dove = g.cartella ? { cartella: g.cartella, radice: g.radice } : g.altrove ? { altrove: g.altrove } : {};
+      return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated, ...dove };
+    }
+    if (g.state && g.state.branch) assigned = g.state.branch;
+  } else {
+    const altra = altraCartellaDelDeposito(root);
+    if (altra) return { ok: false, motivo: 'cartella', current: altra.ramo, assigned, cartella: altra.cartella, radice: altra.radice };
+  }
+  const current = currentBranch(root);
+  if (!current) {
+    const ramo = rebaseDi();
+    return { ok: false, motivo: ramo ? 'rebase' : 'staccata', current, assigned, rebaseDi: ramo };
+  }
+  if (isProtectedBranch(current, principale)) return { ok: false, motivo: 'principale', current, assigned };
+  const declared = nomeRamo(dichiarato);
+  if (declared && declared !== current) return { ok: false, motivo: 'dichiarato', current, assigned, declared };
+  return { ok: true, branch: current, id, assigned };
 }
 
 /**

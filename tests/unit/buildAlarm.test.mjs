@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFileSync, rmSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const esegui = promisify(execFile);
 const { testoEntroIlTetto, TETTO_TESTO } = await import('../../scripts/build-alarm.mjs');
@@ -83,6 +83,7 @@ test('il nome di un guasto è il file di prova o di test rosso; le chiavi il cui
   assert.equal(nomeDelGuasto('unit:tests/unit/fineRigaLf.test.mjs'), 'fineRigaLf');
   assert.equal(nomeDelGuasto('suite:fuori-dai-casi'), 'errori fuori dai casi');
   assert.equal(nomeDelGuasto('suite:non-partita'), 'suite non partita');
+  assert.equal(nomeDelGuasto('suite:tetto'), 'suite oltre il tetto di tempo');
   for (const k of ['unit', 'bake:tavily', 'piattaforma:mac', 'rilascio:fermo', '', undefined]) assert.equal(nomeDelGuasto(k), '', String(k));
 });
 
@@ -105,18 +106,41 @@ test('gli argomenti: titolo e testo, --chiave ripetibile, --chiavi-da, --chiavi-
   assert.throws(() => leggiArgomenti(['T', 'x', '--chiavi']), /non capita/);
 });
 
+const { parolaDellaCostruzione } = await import('../../scripts/build-alarm.mjs');
+
+test('la parola d’ordine della costruzione perde spazi e a capo ai bordi, e senza resta vuota', () => {
+  assert.equal(parolaDellaCostruzione({ FILO_BUILD_PASSPHRASE: '    abc-def\r\n' }), 'abc-def');
+  assert.equal(parolaDellaCostruzione({ FILO_BUILD_PASSPHRASE: 'abc def' }), 'abc def', 'dentro non si tocca');
+  assert.equal(parolaDellaCostruzione({ FILO_BUILD_PASSPHRASE: '   ' }), '');
+  assert.equal(parolaDellaCostruzione({}), '');
+  assert.equal(parolaDellaCostruzione(undefined), '');
+});
+
+test('ogni strumento legge FILO_BUILD_PASSPHRASE da parolaDellaCostruzione, non dall’ambiente nudo', () => {
+  const cartella = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts');
+  const nudi = [];
+  for (const f of [...readdirSync(cartella), ...readdirSync(join(cartella, 'lib')).map((x) => `lib/${x}`)]) {
+    if (!f.endsWith('.mjs') || f === 'build-alarm.mjs') continue;
+    if (/env(\?\.|\[['"])FILO_BUILD_PASSPHRASE/.test(readFileSync(join(cartella, f), 'utf8'))) nudi.push(f);
+  }
+  assert.deepEqual(nudi, [], 'con gli spazi ai bordi il server la rifiuta: si passa dal pulitore');
+});
+
 describe('le chiavi arrivano al server', () => {
   const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'build-alarm.mjs');
 
-  async function spedisci(argomenti) {
+  // Il server vero risponde 401 bad_passphrase a una parola d'ordine che non è la sua, spazi compresi.
+  async function spedisci(argomenti, { parola = 'prova', giusta = 'prova' } = {}) {
     const ricevute = [];
     const srv = createServer((req, res) => {
       let corpo = '';
       req.on('data', (c) => { corpo += c; });
       req.on('end', () => {
-        ricevute.push(JSON.parse(corpo));
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, num: '#9', duplicate: false }));
+        const json = JSON.parse(corpo);
+        ricevute.push(json);
+        const buona = json.passphrase === giusta;
+        res.writeHead(buona ? 200 : 401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(buona ? { ok: true, num: '#9', duplicate: false } : { ok: false, reason: 'bad_passphrase' }));
       });
     });
     await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
@@ -124,13 +148,17 @@ describe('le chiavi arrivano al server', () => {
     try {
       writeFileSync(join(dir, 'chiavi.txt'), 'suite:tests/a.spec.mjs\n\nsuite:tests/a.spec.mjs\nsuite:fuori-dai-casi\n');
       writeFileSync(join(dir, 'unit.log'), `not ok 1 - x\n${String.raw`  location: 'tests\unit\y.test.mjs:1:1'`}\n`);
-      const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, FILO_BUILD_PASSPHRASE: 'prova',
+      const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, FILO_BUILD_PASSPHRASE: parola,
         NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' };
-      const r = await esegui(process.execPath, [CLI, ...argomenti], { cwd: dir, env });
-      return { ricevute, stdout: r.stdout };
+      try {
+        const r = await esegui(process.execPath, [CLI, ...argomenti], { cwd: dir, env });
+        return { ricevute, stdout: r.stdout, registro: `${r.stdout}\n${r.stderr}`, uscita: 0 };
+      } catch (e) {
+        return { ricevute, stdout: e.stdout || '', registro: `${e.stdout || ''}\n${e.stderr || ''}`, uscita: e.code ?? 1 };
+      }
     } finally {
       await new Promise((ok) => srv.close(ok));
-      rmSync(dir, { recursive: true, force: true });
+      togliCartella(dir);
     }
   }
 
@@ -158,5 +186,29 @@ describe('le chiavi arrivano al server', () => {
     const { ricevute } = await spedisci(['Titolo', 'testo']);
     assert.equal(ricevute.length, 1);
     assert.ok(!('keys' in ricevute[0]), 'un `keys` vuoto non deve arrivare');
+  });
+
+  // #1210: il segreto incollato con la riga rientrata in cui routine-keys stampava la parola d'ordine.
+  test('una parola d’ordine incollata con spazi e a capo ai bordi arriva pulita, e l’allarme si apre', async () => {
+    const r = await spedisci(['Titolo', 'testo', '--chiave', 'rilascio:fermo'], { parola: '    prova\n' });
+    assert.equal(r.uscita, 0, r.registro);
+    assert.equal(r.ricevute.length, 1);
+    assert.equal(r.ricevute[0].passphrase, 'prova');
+    assert.match(r.registro, /feedback aperto \(#9\)/);
+    assert.match(r.registro, /::warning::FILO_BUILD_PASSPHRASE ha spazi o a capo ai bordi/,
+      'il segreto sporco va ricopiato: la corsa lo dice in evidenza');
+  });
+
+  test('una parola d’ordine pulita non porta avvisi', async () => {
+    const r = await spedisci(['Titolo', 'testo']);
+    assert.equal(r.uscita, 0, r.registro);
+    assert.doesNotMatch(r.registro, /::warning::/);
+  });
+
+  test('una parola d’ordine che il server non riconosce si dice in evidenza, col segreto da ricopiare', async () => {
+    const r = await spedisci(['Titolo', 'testo', '--chiave', 'rilascio:fermo'], { parola: 'vecchia' });
+    assert.notEqual(r.uscita, 0);
+    assert.match(r.registro, /non consegnato \(401 bad_passphrase\)/);
+    assert.match(r.registro, /::error::Allarme non consegnato: il server non riconosce FILO_BUILD_PASSPHRASE[^\n]*«rilascio»/);
   });
 });

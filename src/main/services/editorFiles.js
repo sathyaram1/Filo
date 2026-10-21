@@ -177,4 +177,23 @@ async function readFile(fileId) {
   } catch (_) { return { ok: false, id }; }
 }
 
-module.exports = { writeNote, migrateNotesToEditor, listFileSummaries, readFile, notesCorpusText };
+// I documenti dal più recente, coi soli campi che la carta dell'Editor nella home mostra (#870).
+async function recenti() {
+  const Store = STORE();
+  try {
+    const collection = await loadCollection();
+    const files = (collection && Array.isArray(collection.files)) ? collection.files : [];
+    const ms = (f) => { const t = Date.parse(f && f.meta && f.meta.modified); return Number.isFinite(t) ? t : 0; };
+    const file = files
+      .map((f) => ({
+        id: String(f.id || ''),
+        titolo: (f.meta && f.meta.title) || (Store && Store.DEFAULT_TITLE) || 'Documento senza titolo',
+        modificato: ms(f) ? new Date(ms(f)).toISOString() : null,
+      }))
+      .filter((f) => f.id)
+      .sort((a, b) => String(b.modificato || '').localeCompare(String(a.modificato || '')));
+    return { ok: true, totale: file.length, file };
+  } catch (_) { return { ok: false, totale: 0, file: [] }; }
+}
+
+module.exports = { writeNote, migrateNotesToEditor, listFileSummaries, readFile, notesCorpusText, recenti };

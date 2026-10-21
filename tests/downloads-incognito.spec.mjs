@@ -81,7 +81,8 @@ test('in incognito un programma chiede prima di scendere e la voce resta alla su
     await expect.poll(() => statoDi(incog, 'setup.exe'), { timeout: 20000 }).toBe('pending');
     expect(contenuto(dir)).not.toContain('setup.exe');
 
-    const avviso = incog.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: '«setup.exe»' });
+    const avviso = incog.locator('#dl-panel .dl-row[data-chiede="1"]')
+      .filter({ has: incog.locator('.dl-row-ask-nome', { hasText: /^setup\.exe$/ }) }); // il nome sta nel suo riquadro (#592.7)
     await expect(avviso).toBeVisible({ timeout: 10000 });
     await expect(avviso).toContainText('programma');
     await expect(avviso).toContainText('127.0.0.1');

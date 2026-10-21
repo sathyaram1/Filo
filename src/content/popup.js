@@ -11,6 +11,56 @@
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
 
+  // Un errore dell'AI detto all'utente, dalla risposta dell'IPC (`error`) o
+  // dello stream (`message`). La regola sta in SN_CHAT_ERRORS, una volta sola:
+  // ricomporla qui faceva arrivare la riga grezza del servizio (#663).
+  function frasePerLUtente(res) {
+    const generico = I18n.t('err_provider_failed');
+    const CE = global.SN_CHAT_ERRORS;
+    if (!CE) return (res && (res.error || res.message)) || generico;
+    const r = { ...(res || {}) };
+    if (!r.error && r.message) r.error = r.message;
+    return CE.sentence(CE.fromResponse(r, generico));
+  }
+
+  // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
+  // web «riscattalo nella pagina Crediti» è un'indicazione senza strada: da lì
+  // l'utente a quella pagina non sa arrivare (#663). `dopo`: chi lo ospita si chiude (il menu, l'avviso).
+  function paginaDelRimedio(res) {
+    const CE = global.SN_CHAT_ERRORS;
+    return CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
+  }
+  function apriRimedio(pagina) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url })).catch(() => {}); } catch (_) {}
+  }
+  function mostraRimedio(host, res, { dopo = null } = {}) {
+    const pagina = paginaDelRimedio(res);
+    if (!host || !pagina) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-rimedio';
+    btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
+    btn.addEventListener('click', (e) => {
+      // Il tasto sta nel documento del sito: un clic finto della pagina non apre schede.
+      const vero = global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted;
+      if (!vero) return;
+      e.stopPropagation();
+      apriRimedio(pagina);
+      if (typeof dopo === 'function') dopo();
+    });
+    host.appendChild(btn);
+    return btn;
+  }
+
+  // Un errore dell'AI mostrato in un riquadro: la frase e, sotto, la strada per togliere l'ostacolo. Viaggiano
+  // insieme da qui perché ogni superficie che scriveva solo la frase lasciava l'utente senza strada (#663).
+  function scriviErrore(host, res, opts) {
+    if (!host) return null;
+    host.textContent = frasePerLUtente(res);
+    return mostraRimedio(host, res, opts);
+  }
+
   // z-index iniziale e step per stacking deterministico
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
@@ -53,10 +103,16 @@
   async function apriCollegamento(a, { sfondo = false } = {}) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return;
+    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo };
     let r = null;
-    try {
-      r = await chrome.runtime.sendMessage({ type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo });
-    } catch (_) {}
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    // Un dato dell'utente in un link scritto sopra una pagina chiede l'OK, come se lo aprisse l'assistente (#868.6).
+    if (r && r.conferma) {
+      const Ui = global.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : false;
+      if (!ok) return;
+      try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
   }
 
@@ -78,10 +134,14 @@
   const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
     if (e.type === 'auxclick' && e.button !== 1) return;
-    const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
+    const t = global.SN_FILO_UI?.bersaglio ? global.SN_FILO_UI.bersaglio(e) : e.target;
+    const a = t && t.closest && t.closest('a.filo-md-link');
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
+    // Sui siti un clic fabbricato sull'host di un riquadro chiuso arriva qui col bersaglio sotto le sue coordinate:
+    // il collegamento lo apre solo il clic dell'utente (#1071).
+    if (!inPaginaDiFilo && !global.SN_FILO_UI?.veroONostro?.(e)) return;
     if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
@@ -89,6 +149,43 @@
   else {
     window.addEventListener('click', suCollegamento, true);
     window.addEventListener('auxclick', suCollegamento, true);
+  }
+
+  // In un sito i riquadri che portano parole dell'utente o dei modelli stanno in uno shadow root chiuso, chiusi ai gesti
+  // finti: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md. L'host non genera un box.
+  const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css', 'spellcheck.css'];
+  const FONT_SOLO_GENERICO = '*, ::before, ::after, ::placeholder { font-family: system-ui, sans-serif !important; }';
+  let fogliRiquadro = null;
+  function fogliDelRiquadro() {
+    if (fogliRiquadro) return fogliRiquadro;
+    let testo = '';
+    try {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      testo = FOGLI_RIQUADRO.map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
+    } catch (_) {}
+    testo += '\n' + FONT_SOLO_GENERICO;
+    const foglio = new CSSStyleSheet();
+    try { foglio.replaceSync(testo); } catch (_) {}
+    fogliRiquadro = [foglio];
+    return fogliRiquadro;
+  }
+  function riquadro(contenuto) {
+    if (inPaginaDiFilo) return contenuto;
+    const UI = global.SN_FILO_UI;
+    const host = document.createElement('div');
+    UI?.mark(host);
+    host.style.cssText = 'all:initial!important;display:contents!important;';
+    const radice = UI?.ombra ? UI.ombra(host) : host.attachShadow({ mode: 'closed' });
+    try { radice.adoptedStyleSheets = fogliDelRiquadro(); } catch (_) {}
+    // I tasti scritti qui dentro il sito non li vede: SN_FILO_UI.tastoNelRiquadro.
+    UI?.soloGestiVeri(contenuto);
+    radice.appendChild(contenuto);
+    return host;
+  }
+  function togliRiquadro(contenuto) {
+    const host = contenuto && contenuto.getRootNode && contenuto.getRootNode().host;
+    try { (host || contenuto).remove(); } catch (_) {}
   }
 
   // ----------------------------------------------------------------
@@ -817,7 +914,7 @@
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
     try { popup.pose?.dispose(); } catch (_) {}
-    popup.root.remove();
+    togliRiquadro(popup.root);
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
     // Rimette la selezione che il fuoco della riga per scrivere aveva spento:
@@ -845,18 +942,24 @@
   //  • `scrollHeight` comprende l'IMBOTTITURA, `height` (se il box è
   //    content-box) no. Scriverlo tal quale lasciava la casella più alta del
   //    suo testo di quei pixel, e non li restituiva più: cancellata la domanda
-  //    la casella restava gonfia e la risposta non si riprendeva lo spazio.
+  //    la casella restava gonfia e la risposta non si riprendeva lo spazio;
+  //  • vuota torna alla misura con cui è nata: misurata, andrebbe a capo col
+  //    segnaposto lungo e resterebbe una riga più alta di prima di scrivere.
   function autoGrow(el) {
     if (!el) return;
+    if (!el.value) { el.style.height = ''; return; }
     el.style.height = 'auto';
-    let pad = 0;
+    // scrollHeight è contenuto più imbottitura: in border-box mancano i bordi, e la riga che usciva di 2px
+    // accendeva la barra (#853.1).
+    let correzione = 0;
     try {
       const cs = getComputedStyle(el);
-      if (cs.boxSizing !== 'border-box') {
-        pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-      }
+      const somma = (a, b) => (parseFloat(cs[a]) || 0) + (parseFloat(cs[b]) || 0);
+      correzione = cs.boxSizing === 'border-box'
+        ? somma('borderTopWidth', 'borderBottomWidth')
+        : -somma('paddingTop', 'paddingBottom');
     } catch (_) {}
-    el.style.height = `${Math.max(0, el.scrollHeight - pad)}px`;
+    el.style.height = `${Math.max(0, el.scrollHeight + correzione)}px`;
   }
 
   // ----------------------------------------------------------------
@@ -883,7 +986,7 @@
       </div>
     `;
     root.querySelector('.sn-popup-title').textContent = title;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(riquadro(root));
 
     const cleanupZoom = attachZoomCompensation(root);
     const pose = attachPose(root, anchor);
@@ -914,14 +1017,15 @@
     // Quando l'utente clicca dentro il popup, portalo in primo piano
     root.addEventListener('mousedown', () => bringToFront(popup), true);
 
-    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga
+    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga. Una domanda spende una chiamata: parte solo
+    // da un tasto o da un clic dell'utente, mai da uno fabbricato (#1071).
     popup.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        submitFollowup(popup);
+        if (global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted) submitFollowup(popup);
       }
     });
-    popup.sendEl.addEventListener('click', () => submitFollowup(popup));
+    popup.sendEl.addEventListener('click', (e) => { if (e.isTrusted) submitFollowup(popup); });
     // Auto-grow textarea
     popup.inputEl.addEventListener('input', () => {
       autoGrow(popup.inputEl);
@@ -1003,6 +1107,97 @@
   // Il riquadro è appena diventato più alto: rimettilo in posa.
   function reflow(popup) {
     try { popup?.pose?.reflow(); } catch (_) {}
+  }
+
+  // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
+  // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
+  // Vale come detta solo se `el`, dove sta la frase, resta a schermo il tempo di leggerla: un riquadro
+  // chiuso prima, o appena compare, lascia partire l'avviso (che il main tiene fermo 4 s).
+  const RIPIEGO_LETTO_MS = 1500;
+  function ripiegoMostrato(el) {
+    if (!el || !el.isConnected) return;
+    setTimeout(() => {
+      if (!el.isConnected) return;
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.KEY_FALLBACK_SHOWN })).catch(() => {}); } catch (_) {}
+    }, RIPIEGO_LETTO_MS);
+  }
+  function notaRipiego(parent, keyFallback) {
+    if (!parent || !keyFallback || !keyFallback.line) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback';
+    el.textContent = keyFallback.line;
+    parent.appendChild(el);
+    ripiegoMostrato(el);
+    return el;
+  }
+
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) non passa per intera: lo si dice sotto, e dove la
+  // conversazione può andare avanti c'è «Continua».
+  function notaInterrotta(parent, finishReason, onContinua = null) {
+    const CE = global.SN_CHAT_ERRORS;
+    const frase = CE && CE.rispostaInterrotta ? CE.rispostaInterrotta(finishReason) : '';
+    if (!parent || !frase) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback sn-risposta-interrotta';
+    el.textContent = frase;
+    if (typeof onContinua === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-msg-rimedio';
+      btn.textContent = 'Continua';
+      btn.title = 'Continua la risposta da dove si è interrotta';
+      btn.addEventListener('click', () => { btn.remove(); onContinua(); });
+      el.appendChild(btn);
+    }
+    parent.appendChild(el);
+    return el;
+  }
+
+  // «Copia» sotto ogni risposta: una traduzione si chiede quasi sempre per usarla altrove (#846). Nasce a risposta
+  // finita, quindi non copia mai un pezzo, e copia il testo come si legge, senza marcature né note sotto.
+  const COPIATO_MS = 1600;
+  // Gli appunti li scrive il main, che mette il testo anche in cronologia come il «Copia» del tasto destro: in un
+  // riquadro incorporato di un altro sito la pagina non ne ha il permesso. Se il main dice no, ci prova la pagina.
+  async function copiaTesto(testo) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text: testo });
+      if (r && r.ok) return true;
+    } catch (_) {}
+    try { await navigator.clipboard.writeText(testo); return true; } catch (_) { return false; }
+  }
+  const iconaCopia = (nome) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](14) : '');
+  function tastoCopia(wrap, sorgente) {
+    const Md = global.SN_MARKDOWN;
+    const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
+    if (!wrap || !testo.trim()) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-copia';
+    const mostra = (stato) => {
+      const chiave = stato === 'ok' ? 'popup_copied' : stato === 'no' ? 'popup_copy_failed' : 'popup_copy';
+      btn.dataset.etichetta = I18n.t(chiave);
+      btn.setAttribute('aria-label', I18n.t(chiave));
+      btn.classList.toggle('sn-copiato', stato === 'ok');
+      btn.classList.toggle('sn-non-copiato', stato === 'no');
+      const svg = iconaCopia(stato === 'ok' ? 'check' : 'copy');
+      if (svg) btn.innerHTML = svg; else btn.textContent = I18n.t(chiave);
+    };
+    mostra(null);
+    let timer = null;
+    // Il fuoco resta nella riga per scrivere: copiare non vuol dire aver finito di fare domande.
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
+      const ok = await copiaTesto(testo);
+      clearTimeout(timer);
+      mostra(ok ? 'ok' : 'no');
+      timer = setTimeout(() => mostra(null), COPIATO_MS);
+    });
+    const riga = document.createElement('div');
+    riga.className = 'sn-msg-azioni';
+    riga.appendChild(btn);
+    wrap.appendChild(riga);
+    return btn;
   }
 
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
@@ -1090,7 +1285,10 @@
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
+            tastoCopia(bubble.wrap, daMostrare);
           }
+          notaRipiego(bubble.text, m.keyFallback);
+          notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
@@ -1099,8 +1297,10 @@
         popup.activePort = null;
       } else if (m.type === 'error') {
         // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
+        // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
+        // {…}») non dice niente a chi ha finito i crediti (#663).
         scrollaConservando(popup, () => {
-          bubble.text.textContent = m.message || I18n.t('err_provider_failed');
+          scriviErrore(bubble.text, m);
           bubble.wrap.classList.add('sn-msg-error');
         }, true);
         popup.activePort = null;
@@ -1124,7 +1324,17 @@
     if (popup.activePort) return; // già in streaming
     popup.inputEl.value = '';
     popup.inputEl.style.height = 'auto';
+    chiedi(popup, txt);
+  }
 
+  // «Continua» sotto una risposta interrotta è una domanda come le altre, già scritta.
+  const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  function continuaRisposta(popup) {
+    if (!popup || popup.activePort) return;
+    chiedi(popup, CONTINUA_RISPOSTA);
+  }
+
+  function chiedi(popup, txt) {
     // Mostra bolla utente
     const userBubble = appendBubble(popup, 'user');
     userBubble.text.textContent = txt;
@@ -1190,16 +1400,32 @@
   // fuori dal viewport. Teniamo i più recenti, che sono i più rilevanti.
   const MAX_TOAST_STACK = 4;
 
+  // Col puntatore su un avviso della pila i tempi di tutti aspettano (regola in avvisiTempo.js).
+  let tempiPila = null;
+  function tempi() {
+    if (!tempiPila) tempiPila = global.SN_AVVISI.orologio();
+    return tempiPila;
+  }
+
   function toastHost() {
     // `isConnected`: se la pagina rifà il DOM (SPA che rimpiazza il body) il
     // vecchio contenitore resta orfano e gli avvisi successivi sparirebbero.
     if (!toastHostEl || !toastHostEl.isConnected) {
       toastHostEl = document.createElement('div');
       toastHostEl.className = 'sn-toasts';
+      toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
       global.SN_FILO_UI?.mark(toastHostEl);
       document.documentElement.appendChild(toastHostEl);
     }
     return toastHostEl;
+  }
+
+  // Il menu del tasto destro è l'ultima cosa chiesta dall'utente: finché è aperto la pila gli sta sotto, o un
+  // avviso gli coprirebbe le voci e la guardia dei clic le fermerebbe (#1453).
+  let pilaSottoMenu = false;
+  function sottoIlMenu(on) {
+    pilaSottoMenu = !!on;
+    if (toastHostEl) toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
   }
 
   // Sfratta subito (senza attendere il timeout) gli avvisi più vecchi oltre il
@@ -1215,7 +1441,7 @@
     for (let i = 0; i < over; i++) {
       const c = live[i]; // i più vecchi stanno in cima: si appende in coda
       if (typeof c._snDispose === 'function') { try { c._snDispose(); } catch (_) {} continue; }
-      try { c.remove(); } catch (_) {}
+      unmountToast(c);
     }
   }
 
@@ -1241,10 +1467,15 @@
 
   // API per gli altri avvisi in pagina ancorati allo stesso angolo: li aggancia
   // allo stack invece che direttamente al documento.
+  // Tutto ciò che entra nella pila risponde al tasto destro col suo menu (regola in avvisiTempo.js):
+  // `chiudi` e `azioni` li dà chi lo mostra; senza, «Chiudi» lo toglie dalla pila.
   function mountToast(el, opts = {}) {
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
+    global.SN_AVVISI.chiudibile(el, opts.chiudi || (() => unmountToast(el)), opts.azioni);
+    tempi().segui(el);
     toastHost().appendChild(el);
+    tempi().ripulisci();
     enforceToastCap();
     syncToastOverflow();
     return el;
@@ -1254,7 +1485,16 @@
   // ricalcola l'overflow dello stack.
   function unmountToast(el) {
     try { el?.remove(); } catch (_) {}
+    if (el) tempi().lascia(el);
     syncToastOverflow();
+  }
+
+  // Il tempo di un avviso agganciato alla pila: in scala con la durata delle Preferenze, fermo col
+  // puntatore sopra. `ms` è quello che vale con la durata standard; 0 = resta finché non lo si chiude.
+  // `deveScadere`: alla scadenza succede qualcosa (si chiude la scheda), e la durata 0 non lo rimanda per sempre.
+  function tempoAvviso(ms, onScade, { deveScadere = false } = {}) {
+    const d = global.SN_AVVISI.durata(ms);
+    return tempi().avvia(d || (deveScadere ? ms : 0), onScade);
   }
 
   // ----------------------------------------------------------------
@@ -1264,17 +1504,21 @@
   // lunghe: l'avviso "sto lavorando" deve durare quanto il lavoro). Ritorna
   // sempre un handle con close(), così chi mostra un avviso di avanzamento può
   // sostituirlo con l'esito invece di impilarci sopra un secondo riquadro.
+  // `rimedio`: la risposta d'errore dell'IPC (o l'errore ricomposto) di una frase che nomina dove si rimedia; l'avviso
+  // porta il tasto per andarci (#663) e resta abbastanza da arrivarci col puntatore, che lo ferma.
+  const DURATA_CON_RIMEDIO_MS = 15000;
   function showToast(text, opts = {}) {
     const t = document.createElement('div');
     t.className = 'sn-toast';
     t.textContent = text;
+    const pagina = opts.rimedio ? paginaDelRimedio(opts.rimedio) : null;
     let closed = false;
-    let timer = null;
+    let tempo = null;
     // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
     // il timer va spento o continuerebbe a puntare a un elemento morto.
     t._snDispose = () => {
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       unmountToast(t);
     };
     mountToast(t);
@@ -1282,15 +1526,35 @@
     const close = () => {
       if (closed) return;
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
       t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
-      setTimeout(() => unmountToast(t), 250);
+      setTimeout(() => unmountToast(t), self.SN_THEME_TOKENS?.motionMs(250) ?? 250);
     };
-    const duration = opts.duration === 0 ? 0 : (opts.duration || 2200);
-    if (duration > 0) timer = setTimeout(close, duration);
+    // Sotto il puntatore il toast prende i clic: chiuderlo è la risposta, e l'unica strada con la durata a 0.
+    // Chi ne sta selezionando il testo non lo perde.
+    t.addEventListener('click', () => {
+      const sel = t.ownerDocument.getSelection && t.ownerDocument.getSelection();
+      if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
+      close();
+    });
+    let azioni;
+    let durata = opts.duration === 0 ? 0 : (opts.duration || 2200);
+    if (pagina) {
+      mostraRimedio(t, opts.rimedio, { dopo: close });
+      // Dal tasto destro sull'avviso la stessa strada: il clic che il menu girerebbe al tasto non è vero.
+      azioni = [{ label: pagina.label, fn: () => { apriRimedio(pagina); close(); } }];
+      if (durata) durata = Math.max(durata, DURATA_CON_RIMEDIO_MS);
+    }
+    global.SN_AVVISI.chiudibile(t, close, azioni);
+    tempo = tempoAvviso(durata, close);
     return { close, el: t };
+  }
+
+  // Un errore dell'AI detto con un avviso (le strade senza un riquadro dove scriverlo): frase e tasto insieme.
+  function avvisoErrore(res, opts = {}) {
+    return showToast(frasePerLUtente(res), { duration: 9000, ...opts, rimedio: res });
   }
 
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
@@ -1298,17 +1562,26 @@
 
   global.SN_POPUP = {
     openStreaming,
+    notaRipiego, ripiegoMostrato, notaInterrotta,
     close,
     closeTopmost,
     showToast,
     mountToast,
     unmountToast,
+    sottoIlMenu,
+    tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    riquadro,
+    togliRiquadro,
     apriCollegamento,
     scaricaCollegamento,
+    frasePerLUtente,
+    mostraRimedio,
+    scriviErrore,
+    avvisoErrore,
     // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
     // è l'Esc quando si è a tutto schermo (#514).
     hasOpen: () => popups.length > 0,

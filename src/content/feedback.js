@@ -31,9 +31,8 @@
     return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
   }
 
-  // Chiave storage per la bozza di testo: sopravvive a chiusura/riapertura del
-  // box e al riavvio di Filo (chrome.storage.local → storage.json).
-  const DRAFT_KEY = 'sn_feedback_draft_text';
+  // La bozza sopravvive a chiusura/riapertura del box e al riavvio di Filo, ma resta al sito dove è nata (#1071).
+  const DRAFT_KEY = global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza('sn_feedback_draft_text') : null;
   // Colore/tratto del disegno di annotazione.
   const STROKE_COLOR = '#ff3b30';
   const STROKE_WIDTH = 3;
@@ -71,7 +70,8 @@
     if (!activeRoot) return;
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
-    activeRoot.remove();
+    if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
+    else activeRoot.remove();
     activeRoot = null;
     setShellDim(false);
   }
@@ -117,8 +117,8 @@
   }
 
   // Animazione ricompensa (C3): alla chiusura del box, alcune "monete credito"
-  // volano dalla posizione del box verso l'angolo in alto a destra — la
-  // direzione dell'icona profilo/account — con una piccola etichetta "+N".
+  // volano dalla posizione del box verso l'angolo in basso a sinistra — il
+  // profilo, in fondo alla barra laterale — con una piccola etichetta "+N".
   // Vive nel content overlay (la barra in alto della shell è coperta dalla
   // WebContentsView nativa, quindi un'animazione disegnata dalla shell sarebbe
   // occlusa). Puramente decorativa: best-effort, non blocca, si auto-rimuove.
@@ -128,6 +128,8 @@
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const reduce = !!(global.matchMedia &&
         global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      // Token `motion`: moltiplica le durate; a 0 l'etichetta resta ferma il tempo di leggerla.
+      const k = global.SN_THEME_TOKENS ? global.SN_THEME_TOKENS.motionFactor(document) : 1;
 
       const layer = document.createElement('div');
       layer.className = 'sn-fb-credit-fly';
@@ -144,9 +146,9 @@
         : { left: window.innerWidth / 2 - 20, top: window.innerHeight - 80, width: 40, height: 40 };
       const ox = r.left + r.width / 2;
       const oy = r.top + r.height / 2;
-      // Bersaglio: angolo in alto a destra, dove vive l'icona profilo/account.
-      const tx = Math.max(24, window.innerWidth - 26);
-      const ty = 26;
+      // Bersaglio: il profilo, in fondo alla barra laterale sul bordo sinistro (#871).
+      const tx = 24;
+      const ty = Math.max(26, window.innerHeight - 64);
       const GOLD = '#e0a93f';
 
       // Etichetta "+N" che sale e svanisce sopra l'origine.
@@ -162,7 +164,7 @@
 
       const coinSvg = icon('credits', 22) || '●';
       const coins = [];
-      const count = reduce ? 0 : Math.min(7, Math.max(4, n));
+      const count = reduce || !k ? 0 : Math.min(7, Math.max(4, n));
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.className = 'sn-fb-coin';
@@ -176,15 +178,15 @@
         coins.push(c);
       }
 
-      let maxEnd = 900;
+      let maxEnd = 900 * k;
       coins.forEach((c, i) => {
         const sx = ox + (Math.random() - 0.5) * 80;
         const sy = oy + (Math.random() - 0.5) * 30;
         // Punto intermedio: si alza in un arco prima di puntare in alto a destra.
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 60;
         const my = Math.min(sy, ty) - 40 - Math.random() * 40;
-        const delay = i * 40;
-        const dur = 650 + i * 50 + Math.random() * 120;
+        const delay = i * 40 * k;
+        const dur = (650 + i * 50 + Math.random() * 120) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         c.animate([
           { transform: `translate(${sx}px,${sy}px) scale(.6)`, opacity: 0 },
@@ -194,18 +196,23 @@
         ], { duration: dur, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' });
       });
 
-      label.animate([
-        { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
-        { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
-        { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
-      ], { duration: reduce ? 900 : Math.max(900, maxEnd), easing: 'ease-out', fill: 'forwards' });
+      if (k) {
+        label.animate([
+          { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
+          { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
+          { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
+        ], { duration: reduce ? 900 * k : Math.max(900 * k, maxEnd), easing: 'ease-out', fill: 'forwards' });
+      } else {
+        label.style.transform = 'translate(-50%,-110%)';
+      }
 
-      const total = (reduce ? 900 : maxEnd) + 120;
+      const total = k ? (reduce ? 900 * k : maxEnd) + 120 : 1200;
       setTimeout(() => { try { layer.remove(); } catch (_) {} }, total);
     } catch (_) {}
   }
 
-  function open() {
+  // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
+  function open({ testo: proposta = '' } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -233,7 +240,7 @@
         <input type="file" class="sn-fb-file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,application/json,text/plain,text/markdown,text/csv,.png,.jpg,.jpeg,.gif,.webp,.bmp,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml" multiple hidden />
       </div>
     `;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
     // Entra in modalità annotazione: oscura anche la barra in alto di Filo.
     setShellDim(true);
@@ -285,9 +292,11 @@
     // ---- bozza di testo persistente ----
     let saveTimer = null;
     function saveDraft() {
+      if (!DRAFT_KEY) return;
       try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
     }
     function clearDraft() {
+      if (!DRAFT_KEY) return;
       try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
     }
     textEl.addEventListener('input', () => {
@@ -296,11 +305,20 @@
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
     });
-    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto).
+    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
+    // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
+    const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
+    if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
-      chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = r?.[DRAFT_KEY];
-        if (saved && activeRoot === root && !textEl.value) textEl.value = saved;
+        if (activeRoot !== root) return;
+        if (saved && !textEl.value) textEl.value = saved;
+        else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
+          textEl.value = `${saved}\n\n${proposta}`;
+          inFondo();
+        }
+        if (proposta) saveDraft();
       }).catch(() => {});
     } catch (_) {}
 
@@ -492,7 +510,8 @@
         return;
       }
       const dataUrl = await blobToDataUrl(blob);
-      images.push({ dataUrl });
+      // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
+      images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
     }
@@ -636,8 +655,10 @@
       }
     }, true);
 
-    // Paste immagini nel modal
+    // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
+    // fabbricato lo ferma soloGestiVeri, sui siti).
     modal.addEventListener('paste', async (e) => {
+      if (!e.isTrusted) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const it of items) {
@@ -650,6 +671,7 @@
 
     // Accetta immagini incollate via tasto destro (custom event da content.js)
     modal.addEventListener('filo:paste-image', async (e) => {
+      if (!global.SN_FILO_UI?.veroONostro?.(e)) return;
       if (e.detail?.blob) {
         e.preventDefault();
         await addImageFromBlob(e.detail.blob);
@@ -673,15 +695,16 @@
     // "Allega": apre il selettore file. Si possono allegare immagini E altri
     // file (pdf, txt, md, json…), oltre a incolla/trascina. Parità tra i
     // cammini equivalenti.
-    attachBtn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
+    attachBtn.addEventListener('click', (e) => { if (e.isTrusted) { try { fileInput.click(); } catch (_) {} } });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
       for (const f of picked) await addAttachment(f);
       fileInput.value = '';
     });
 
-    // Invio
-    sendBtn.addEventListener('click', async () => {
+    // Invio: solo dal clic dell'utente sul tasto (#1071).
+    sendBtn.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
       const text = textEl.value.trim();
       // Allega lo screenshot quando c'è un disegno (annotato) OPPURE quando
       // l'utente ha premuto "Allega screenshot" (scatto della pagina senza disegno).
@@ -732,10 +755,10 @@
           if (shot) {
             const annotated = await composeAnnotated(shot);
             const full = await stackTopbar(annotated, topbarShot);
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full });
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
           } else if (topbarShot) {
             // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot });
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot, name: 'schermata annotata' });
           } else {
             statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
           }
@@ -774,8 +797,8 @@
         let awarded = 5;
         let premio = null;
         try {
-          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK });
-          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo };
+          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK, ref: res.id || null });
+          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo, senzaPremio: String(ar.senzaPremio || '') };
           else if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
         if (!premio) flyCredits(originRect, awarded);
@@ -783,13 +806,14 @@
         // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
         // sono andati persi, così non resta convinto che siano stati inviati.
         const failed = Array.isArray(res.failed) ? res.failed : [];
-        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.' : '';
+        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.'
+          : (premio?.senzaPremio ? ` ${premio.senzaPremio}` : '');
         if (failed.length) {
           const names = failed.map((f) => f?.name || 'allegato').join(', ');
           const inviato = premio ? 'Feedback inviato' : `Feedback inviato (+${awarded} crediti)`;
           Popup?.showToast?.(`${inviato}, ma non sono riuscito a caricare: ${names}${dopo ? `.${dopo}` : ''}`, { duration: 6000 });
         } else {
-          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio ? 4000 : 2800 });
+          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio?.senzaPremio ? 5500 : (premio ? 4000 : 2800) });
         }
       } catch (e) {
         console.error('[SN feedback] submit', e);
@@ -838,6 +862,7 @@
 
     updateClearBtn();
     textEl.focus();
+    if (proposta) inFondo();
   }
 
   global.SN_FEEDBACK_UI = { open, close };

@@ -12,10 +12,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 import {
   attemptStamp, newWorkBranch, identityVerdict,
@@ -60,7 +60,7 @@ function makeRepo() {
 }
 
 test.after(() => {
-  for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} }
+  for (const d of made) { try { togliCartella(d); } catch (_) {} }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -432,7 +432,7 @@ describe('B — l’identità attesa esposta alla guardia', () => {
     assert.equal(readExpectation(work).branch, 'worker/atteso');
     clearExpectation(work);
     assert.equal(readExpectation(work), null,
-      'dopo la consegna il merge-gate DEVE poter cambiare branch: l’attesa va tolta');
+      'dopo la consegna cambiare branch è legittimo: l’attesa va tolta');
   });
 
   test('la guardia ferma l’istanza sul branch sbagliato e la lascia passare su quello giusto', () => {

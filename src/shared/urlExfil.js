@@ -4,7 +4,7 @@
 // conferma). Una pagina ostile può però iniettare istruzioni nel modello
 // (prompt injection) per fargli aprire un URL che PORTA FUORI dati sensibili
 // che il modello aveva nel contesto — memoria/profilo dell'utente, appunti,
-// output di comandi — codificandoli nella query/path/sottodominio. È una GET
+// output di comandi, ciò che ha scritto in chat — codificandoli nella query/path/sottodominio. È una GET
 // silenziosa verso il server dell'attaccante.
 //
 // L'idea chiave: NON si prova a capire se un URL "sembra" sensibile (impossibile
@@ -216,14 +216,19 @@
 
   // Solo la parte che può portare dati: sottodomini, percorso, query, frammento.
   // Il dominio no, se no ogni sito citato in un file diventerebbe sospetto.
-  function carrierAlnum(url) {
+  function carrierTesto(url) {
     let u;
     try { u = new URL(url); } catch (_) {
-      try { u = new URL(`https://${url}`); } catch (_) { return exposedAlnum(url); }
+      try { u = new URL(`https://${url}`); } catch (_) { return String(url || ''); }
     }
     const labels = (u.hostname || '').split('.');
     const sub = labels.slice(0, Math.max(0, labels.length - 2)).join('.');
-    return exposedAlnum(`${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`);
+    // Nome e password prima della chiocciola arrivano al sito come il resto (#868.6).
+    return `${u.username || ''} ${u.password || ''} ${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`;
+  }
+
+  function carrierAlnum(url) {
+    return exposedAlnum(carrierTesto(url));
   }
 
   // `esposto` = testo già ridotto a minuscolo alfanumerico (di un URL o di una
@@ -260,6 +265,171 @@
     return confrontaLetto(exposedAlnum(testo), letto);
   }
 
+  // ── Quello che l'utente ha scritto nelle conversazioni (#868.6) ──────────
+  // Il modello ha davanti le parole dell'utente di ogni scheda e le chat che ripesca: un indirizzo che ne porta fuori un
+  // dato (numero, email, indirizzo di casa, codice, un pezzo lungo di frase) chiede l'OK. Le parole comuni no: coincidono
+  // con ogni ricerca. Né quello che sta nella domanda di adesso, né un link che la conversazione contiene tale e quale.
+  const CIFRE_SCRITTE = 7;
+  const CIFRE_PEZZO = 9;
+  const TIPI_VIA = new Set([
+    'via', 'viale', 'vle', 'piazza', 'pza', 'pzza', 'piazzale', 'corso', 'cso', 'largo', 'vicolo', 'vico', 'strada',
+    'contrada', 'cda', 'località', 'localita', 'loc', 'frazione', 'fraz', 'borgo', 'lungomare', 'lungarno',
+    'lungotevere', 'salita', 'traversa', 'circonvallazione', 'calle', 'fondamenta',
+    'street', 'st', 'road', 'rd', 'avenue', 'ave', 'lane', 'ln', 'drive', 'dr', 'boulevard', 'blvd', 'court', 'ct',
+    'place', 'square', 'terrace', 'way', 'crescent', 'close', 'rue', 'allée', 'allee', 'chemin', 'impasse', 'quai',
+    'cours', 'avenida', 'avda', 'plaza', 'paseo', 'carrer', 'camino', 'rua', 'praça', 'praca', 'travessa',
+    'strasse', 'straße', 'str', 'weg', 'platz', 'gasse',
+  ]);
+  const CIVICO = /^(\d{1,4})(?:\/?([a-z]))?[,.;:)]*$/;
+  const PRIMA_DEL_CIVICO = /^(?:n|nr|no|num|civico|#)\.?$/;
+  const soloAlnum = (s) => String(s || '').replace(/[^a-z0-9]+/g, '');
+
+  // «via Garibaldi 12» → «garibaldi12», «10 Downing Street» → «10downing»: la via accanto al civico, come esce in un URL.
+  function indirizziNelTesto(testo) {
+    const out = new Set();
+    const parole = testo.split(/\s+/).filter(Boolean);
+    const civico = (w) => {
+      const m = w.replace(/^(?:n|nr|no|num)\.?(?=\d)/, '').match(CIVICO);
+      return m ? m[1] + (m[2] || '') : '';
+    };
+    for (let i = 0; i < parole.length; i++) {
+      if (!TIPI_VIA.has(parole[i].replace(/[.,;:]+$/, '').replace(/\./g, ''))) continue;
+      for (let j = i + 2; j <= i + 6 && j < parole.length; j++) {
+        const n = civico(parole[j]);
+        if (!n) continue;
+        let k = j - 1;
+        while (k > i && PRIMA_DEL_CIVICO.test(parole[k])) k--;
+        const t = k > i ? soloAlnum(parole[k]) + n : '';
+        if (t.length >= MIN_TOKEN) out.add(t);
+        break;
+      }
+      for (let j = i - 1; j >= Math.max(0, i - 4); j--) {
+        const n = civico(parole[j]);
+        if (!n) continue;
+        const t = n + soloAlnum(parole[j + 1]);
+        if (t.length >= MIN_TOKEN) out.add(t);
+        break;
+      }
+    }
+    return out;
+  }
+
+  // I dati che si riconoscono da soli: email, parole con una cifra (codici, CAP, targhe), indirizzi di casa. Le email
+  // si cercano parola per parola: su un testo incollato lunghissimo la regex sull'intero sarebbe quadratica.
+  const EMAIL = /^[^a-z0-9]*([a-z0-9._%+-]+)@[a-z0-9.-]+\.[a-z]{2,}/;
+  function datiScritti(testo) {
+    const out = new Set();
+    for (const w of testo.split(/\s+/)) {
+      const m = w.length <= 320 && w.includes('@') ? w.match(EMAIL) : null;
+      if (!m) continue;
+      out.add(soloAlnum(m[0]));
+      const local = soloAlnum(m[1]);
+      if (local.length >= MIN_TOKEN) out.add(local);
+    }
+    for (const w of testo.split(/[^a-z0-9]+/)) if (w.length >= MIN_TOKEN && /\d/.test(w)) out.add(w);
+    for (const t of indirizziNelTesto(testo)) out.add(t);
+    return out;
+  }
+
+  // Una password di sole lettere o un PIN di quattro cifre sono parole qualunque: li riconosce la parola che li
+  // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
+  // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
+  const PRESENTA_PASSWORD = /\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\b/g;
+  const PRESENTA_CODICE = /\b(?:pin|codice|code|combinazione|otp)\b/g;
+  const PAROLE_DOPO = 8;
+  const RIEMPITIVI = new Set([
+    'della', 'delle', 'dello', 'degli', 'nella', 'sulla', 'sempre', 'ancora', 'adesso', 'stessa', 'stesso', 'nuova',
+    'nuovo', 'vecchia', 'vecchio', 'questa', 'questo', 'quella', 'quello', 'solita', 'solito', 'uguale', 'scritta',
+    'scritto', 'cambiata', 'cambiato', 'router', 'account', 'email', 'casella', 'banca', 'bancomat', 'carta', 'portone',
+    'cancello', 'allarme', 'telefono', 'cellulare', 'computer', 'invece', 'perché', 'perche', 'quindi', 'anche', 'about',
+  ]);
+  function segretiDetti(testo) {
+    const out = [];
+    const prendi = (re, soloCifre) => {
+      for (const m of testo.matchAll(re)) {
+        const coda = testo.slice(m.index + m[0].length, m.index + m[0].length + 200).split(/\n|[.,;!?](?=\s|$)/)[0];
+        for (const w of coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO)) {
+          const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+          const cifre = /\d/.test(t);
+          if (cifre ? soloAlnum(t).length < 4 : (soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
+          out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
+        }
+      }
+    };
+    prendi(PRESENTA_PASSWORD, false);
+    prendi(PRESENTA_CODICE, true);
+    return out;
+  }
+
+  // Un numero scritto a gruppi («+39 347 123 4567») è un numero solo; in un URL le cifre contano anche spezzate da
+  // pochi caratteri («?a=347&b=1234567»), come per ciò che esce (formeDi).
+  const RUN_CIFRE = new RegExp(`\\d{${CIFRE_SCRITTE},}`, 'g');
+  const cifreScritte = (testo) => testo.replace(/(\d)[\s.()/-]{1,3}(?=\d)/g, '$1').match(RUN_CIFRE) || [];
+  const cifreVicine = (forme) => forme.flatMap((f) => f.replace(/(\d)\D{1,4}(?=\d)/g, '$1').match(RUN_CIFRE) || []);
+
+  const chiaveSenzaSchema = (url) => chiaveLink(url).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '');
+  const LINK_SCRITTO = /^(?:https?:\/\/|www\.|(?:[a-z0-9-]+\.)+[a-z]{2,}\/)/;
+  function chiaviSenzaSchema(testo) {
+    const out = new Set();
+    for (const w of testo.split(/[\s<>"'«»]+/)) {
+      if (w.length > 4096 || !LINK_SCRITTO.test(w)) continue;
+      const l = w.replace(/[.,;:!?)\]’]+$/, '');
+      out.add(chiaveSenzaSchema(/^https?:\/\//.test(l) ? l : `https://${l}`));
+    }
+    return out;
+  }
+
+  // `scritto` = le parole dell'utente (e le chat ripescate) che il modello ha davanti; `domanda` = quelle di adesso.
+  function taintScritto(url, scritto, domanda = '') {
+    const testo = formaBase(String(scritto || '')).toLowerCase();
+    if (!testo.trim()) return null;
+    // Le forme di ciò che esce, anche in base64 o esadecimale corti: un numero di telefono codificato resta quel numero.
+    const fuori = formeDi(carrierTesto(url));
+    const esposto = fuori.alnum;
+    if (esposto.length < MIN_TOKEN) return null;
+    if (chiaviSenzaSchema(testo).has(chiaveSenzaSchema(url).toLowerCase())) return null;
+    const d = formaBase(String(domanda || '')).toLowerCase();
+    const dAlnum = soloAlnum(d);
+    const dCifre = cifreVicine([d]);
+    const suo = (p) => dAlnum.includes(p) || dCifre.some((c) => c.includes(p));
+    const reason = 'contiene un dato che hai scritto in chat';
+    // Al contrario esce uguale: chi riceve lo rigira.
+    const rovescia = (s) => [...s].reverse().join('');
+    const esposti = [esposto, rovescia(esposto)];
+    for (const t of datiScritti(testo)) if (esposti.some((e) => e.includes(t)) && !suo(t)) return { reason };
+    const detti = segretiDetti(testo);
+    if (detti.length) {
+      const nellaDomanda = d.trim() ? formeDi(d) : null;
+      for (const x of detti) if (esce(x.valore, x.regola, fuori, true) && !(nellaDomanda && esce(x.valore, x.regola, nellaDomanda))) return { reason };
+    }
+    // Un numero lungo conta anche a pezzi di nove cifre: «+39 347…» scritto, «347…» nell'URL.
+    const cifreFuori = fuori.cifre.flatMap((r) => [r, rovescia(r)]);
+    const pezziFuori = new Set();
+    for (const r of cifreFuori) {
+      for (const run of r.split(' ')) for (let i = 0; i + CIFRE_PEZZO <= run.length; i++) pezziFuori.add(run.substr(i, CIFRE_PEZZO));
+    }
+    for (const c of cifreScritte(testo)) {
+      if (c.length < CIFRE_PEZZO) {
+        if (cifreFuori.some((r) => r.includes(c)) && !suo(c)) return { reason };
+        continue;
+      }
+      for (let i = 0; i + CIFRE_PEZZO <= c.length; i++) {
+        const p = c.substr(i, CIFRE_PEZZO);
+        if (pezziFuori.has(p) && !suo(p)) return { reason };
+      }
+    }
+    if (esposto.length >= FINESTRA) {
+      const grams = new Set();
+      for (let i = 0; i + FINESTRA <= esposto.length; i++) grams.add(esposto.substr(i, FINESTRA));
+      const flat = soloAlnum(testo);
+      for (let i = 0; i + FINESTRA <= flat.length; i++) {
+        const g = flat.substr(i, FINESTRA);
+        if (grams.has(g) && !dAlnum.includes(g)) return { reason };
+      }
+    }
+    return null;
+  }
+
   // Un link come lo si confronta: senza frammento né barra finale, dominio minuscolo.
   function chiaveLink(url) {
     const raw = String(url || '').trim();
@@ -269,12 +439,20 @@
     } catch (_) { return raw.replace(/#.*$/, '').replace(/\/+$/, ''); }
   }
 
+  function hostDi(url) {
+    try { return new URL(url).hostname; } catch (_) { return String(url || '').slice(0, 80); }
+  }
+
   // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
   // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
-  // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810).
+  // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810), `scritto` = le conversazioni
+  // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6), `salvate` = le pagine di «Aperti per
+  // dopo» lette (#845).
   function contestoDaAzioni(actions) {
     const pezzi = [];
+    const conversazioni = [];
+    const salvate = [];
     let nonFidato = false;
     const linkNoti = new Set();
     const esterni = [];
@@ -283,13 +461,28 @@
     for (const a of Array.isArray(actions) ? actions : []) {
       const out = a && a._output;
       if (!out || typeof out !== 'object') continue;
+      // Testo venuto da fuori che il filo riporta (#868), da qualunque azione: la lettura che era.
+      for (const x of Array.isArray(out.daFuori) ? out.daFuori : []) {
+        const t = testo(x && x.testo);
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, testo(x.fonte) || 'da fuori'); }
+      }
       const type = String(a.type || '').toUpperCase();
       if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
+      } else if (type === 'VEDI_SCHERMO') {
+        // #778 — quello che si vede in una finestra (e i titoli delle finestre aperte) l'hanno scritto altri.
+        const titoli = [out.finestra, ...(Array.isArray(out.elenco) ? out.elenco.map((v) => v && v.nome) : [])]
+          .map(testo).filter((t) => t.trim()).join('\n');
+        const t = [testo(out.testo), titoli].filter((x) => x.trim()).join('\n');
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, 'da una finestra guardata sullo schermo'); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
+      } else if (type === 'CERCA_DOCUMENTI') {
+        const trovati = (Array.isArray(out.risultati) ? out.risultati : []).filter(Boolean)
+          .map((r) => `${testo(r.nome)}\n${testo(r.percorso)}\n${testo(r.inizio)}\n${testo(r.squarcio)}`);
+        if (trovati.length) { nonFidato = true; pezzi.push(...trovati); daFuori(trovati.join('\n'), 'dai documenti trovati sul disco'); }
       } else if (type === 'LEGGI_FILE') {
         pezzi.push(testo(out.text));
       } else if (type === 'CERCA_CHAT') {
@@ -298,8 +491,32 @@
         for (const r of Array.isArray(out.results) ? out.results : []) {
           if (r) letti.push(`${testo(r.title)}\n${testo(r.snippet)}`);
         }
+        conversazioni.push(...letti);
+        // I cambi del filo sono dati del computer; le pagine visitate si riaprono tali e quali, come i link di
+        // una ricerca, e quello che ci hanno scritto i siti conta come testo di fuori (#868).
+        for (const c of Array.isArray(out.cambi) ? out.cambi : []) if (c) letti.push(testo(c.frase));
         pezzi.push(...letti);
         daFuori(letti.filter(Boolean).join('\n'), 'da una conversazione archiviata');
+        const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
+        for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
+        daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
+      } else if (type === 'LEGGI_PAGINA') {
+        // Una pagina letta è testo di sconosciuti (#553): i suoi codici non escono, e il suo indirizzo il modello l'ha visto.
+        if (!out.ok) continue;
+        nonFidato = true;
+        if (out.url) linkNoti.add(chiaveLink(out.url));
+        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, out.url ? `dalla pagina ${hostDi(out.url)}` : 'da una pagina letta');
+      } else if (type === 'CERCA_SALVATE' || type === 'APRI_SALVATA') {
+        // #845 — cosa ha salvato l'utente, con titoli scritti dai siti. Una pagina si riapre tale e quale, come i link di
+        // una ricerca; i suoi pezzi dentro un altro indirizzo chiedono l'OK (`salvate`, in assess). Gli indirizzi non
+        // vanno fra i testi di fuori: un codice nel loro indirizzo fermerebbe la pagina stessa, anche dalla lista.
+        const pagine = type === 'APRI_SALVATA'
+          ? (out.aperta ? [{ title: out.titolo, url: out.url }] : [])
+          : (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
+        if (pagine.length) nonFidato = true;
+        for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
+        for (const p of pagine) salvate.push(`${testo(p.title)}\n${testo(p.url)}\n${testo(p.categoria)}`);
+        daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.categoria)}`).join('\n'), 'dalle pagine salvate per dopo');
       } else if (type === 'CERCA_WEB') {
         const results = Array.isArray(out.results) ? out.results : [];
         if (results.length) nonFidato = true;
@@ -310,42 +527,51 @@
     }
     let letto = pezzi.filter(Boolean).join('\n');
     if (letto.length > MAX_LETTO) letto = letto.slice(-MAX_LETTO);
-    return { letto, nonFidato, linkNoti, esterni };
+    let scritto = conversazioni.filter(Boolean).join('\n');
+    if (scritto.length > MAX_LETTO) scritto = scritto.slice(-MAX_LETTO);
+    return { letto, nonFidato, linkNoti, esterni, scritto, salvate: salvate.join('\n').slice(-MAX_LETTO) };
   }
 
   // Verdetto: { exfil, reason }. corpus = memoria e appunti (dati personali
-  // persistenti); letto = ciò che il modello ha letto dal computer nel turno.
+  // persistenti); letto = ciò che il modello ha letto dal computer nel turno;
+  // scritto = ciò che l'utente ha scritto in chat, tranne `domanda` (quella di adesso).
   // fromUntrusted = nel contesto è entrato testo scritto da altri: allora anche
   // la forma dell'URL conta, salvo i link citati tali e quali da una ricerca
-  // (aprirli non porta fuori niente che la ricerca non contenesse già).
-  function assess(url, { corpus = '', letto = '', fromUntrusted = false, linkNoti = null } = {}) {
+  // (aprirli non porta fuori niente che la ricerca non contenesse già). `salvate` = le pagine salvate lette: un loro
+  // indirizzo si riapre tale e quale, un altro che ne porta dei pezzi chiede l'OK (#845).
+  function assess(url, {
+    corpus = '', letto = '', fromUntrusted = false, linkNoti = null, scritto = '', domanda = '', salvate = '',
+  } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
-    const t = taint(link, corpus) || taintLetto(link, letto);
+    const noto = !!(linkNoti && linkNoti.has(chiaveLink(link)));
+    const t = taint(link, corpus) || taintLetto(link, letto) || (noto ? null : taintLetto(link, salvate));
     if (t) return { exfil: true, reason: t.reason };
-    if (fromUntrusted && !(linkNoti && linkNoti.has(chiaveLink(link)))) {
-      const s = structural(link);
-      if (s) return { exfil: true, reason: s.reason };
-    }
+    const s = noto ? null : taintScritto(link, scritto, domanda) || (fromUntrusted ? structural(link) : null);
+    if (s) return { exfil: true, reason: s.reason };
     return { exfil: false, reason: '' };
   }
 
-  // NAVIGA nel turno: memoria + azioni viste dal modello + chi ha mandato.
+  // NAVIGA e LEGGI_PAGINA nel turno: memoria + azioni viste dal modello + parole dell'utente + chi ha mandato.
   // `daPagina` = l'agente vive su una pagina web, che è già nel suo contesto.
-  function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false } = {}) {
+  function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false, parole = '', domanda = '' } = {}) {
     const ctx = contestoDaAzioni(azioni);
     return assess(url, {
       corpus: memoria,
       letto: ctx.letto,
       fromUntrusted: !!daPagina || ctx.nonFidato,
       linkNoti: ctx.linkNoti,
+      scritto: [String(parole || ''), ctx.scritto].filter(Boolean).join('\n'),
+      domanda,
+      salvate: ctx.salvate,
     });
   }
 
   // CERCA_WEB nel turno: la query esce verso il motore di ricerca. Sospetta se
   // porta un segreto della memoria (solo un token forte: le parole comuni di una
   // query coincidono spesso con gli appunti) o un pezzo di ciò che è stato letto.
-  // Niente ripiego strutturale: una query non ha la forma di un URL.
+  // Niente ripiego strutturale: una query non ha la forma di un URL. Né le parole dell'utente (#868.6): la query va al
+  // servizio di ricerca, non a un indirizzo scelto da chi ha scritto nel contesto, e cercare con ciò che ha detto è il lavoro.
   function valutaRicerca(query, { memoria = '', azioni = [] } = {}) {
     const q = String(query || '').trim();
     if (!q) return { exfil: false, reason: '' };
@@ -361,10 +587,12 @@
   // «far uscire un segreto» del capitolo 9: nessun livello e nessun OK lo sblocca.
   const USCITE = Object.freeze({
     NAVIGA: "non ho aperto l'indirizzo",
+    LEGGI_PAGINA: 'non ho letto la pagina',
     CERCA_WEB: 'non ho fatto la ricerca',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
+    APRI_SALVATA: 'non ho aperto la pagina salvata',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
@@ -474,10 +702,10 @@
   }
 
   // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
-  // ciò che ha letto prima; `parole` = ciò che l'utente ha scritto (un codice suo passa). `memoria` e
-  // `daPagina` servono all'OK in più di #587. Torna { blocca, frase } oppure { exfil, reason }.
+  // ciò che ha letto prima; `parole` = ciò che l'utente ha scritto (un codice suo passa). `memoria`, `daPagina` e
+  // `domanda` (le parole di adesso, dentro `parole`) servono all'OK in più di #587. Torna { blocca, frase } oppure { exfil, reason }.
   function valutaUscita(action, {
-    segreti = [], azioni = [], pagina = null, letti = [], parole = '', memoria = '', daPagina = false,
+    segreti = [], azioni = [], pagina = null, letti = [], parole = '', memoria = '', daPagina = false, domanda = '',
   } = {}) {
     const tipo = String((action && action.type) || '').toUpperCase();
     const verbo = verboUscita(tipo);
@@ -497,7 +725,8 @@
         return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }
-    if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+    const avvisi = { memoria, azioni, daPagina, parole, domanda };
+    if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, avvisi, niente);
     const fonti = contestoDaAzioni(azioni).esterni.slice();
     if (pagina && typeof pagina.testo === 'string' && pagina.testo.trim()) {
       fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
@@ -518,7 +747,7 @@
       return ferma(x.regola, x.fonte);
     }
     for (const f of saturi) if (pezzoPresente(u, f.testo, parole)) return ferma('codice', f.fonte);
-    return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+    return valutaAvvisi(tipo, action, avvisi, niente);
   }
 
   // Un testo con più segreti di quanti se ne tengano è costruito apposta per nascondere quello vero (#810): lì ferma
@@ -550,10 +779,11 @@
   }
 
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
-  function valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente) {
-    if (tipo === 'NAVIGA') {
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
-      const v = url ? valutaNaviga(url, { memoria, azioni, daPagina }) : null;
+  function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
+    if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
+      const L = global.SN_ACTION_LEVELS;
+      const url = L && L.indirizzoDi ? L.indirizzoDi(action) : String(action.url ?? action.href ?? action.link ?? '').trim();
+      const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
     if (tipo === 'CERCA_WEB') {
@@ -565,6 +795,6 @@
 
   global.SN_URL_EXFIL = {
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
-    taint, taintLetto, taintTestoLetto, structural, exposedAlnum, corpusTokens,
+    taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

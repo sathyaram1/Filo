@@ -1,6 +1,6 @@
-// Le icone Impostazioni, Home e l'app interna Editor devono essere
-// raggiungibili fra le icone del menu del tasto destro (feedback alpha). Di
-// default vivono nella griglia "Altro…" (secondary).
+// Le icone Impostazioni e l'app interna Editor devono essere raggiungibili fra
+// le icone del menu del tasto destro (feedback alpha). Di default vivono nella
+// griglia "Altro…" (secondary). Home è globale e da #871 sta nella barra laterale.
 //
 // «Feedback» NON è in quell'elenco dal 2026-09 (#583): apre la posta delle
 // segnalazioni, che legge solo chi le gestisce, quindi l'icona esiste solo per
@@ -8,6 +8,7 @@
 // una strada di tutti, ed è la voce «Invia feedback» dello stesso menu.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo test page</h1>
@@ -16,21 +17,21 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 
 async function openOverflowGrid(page) {
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await expect(overflow).toBeVisible();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }
 
-test('Impostazioni, Home ed Editor sono presenti fra le icone del menu', async ({ openTab, testServer }) => {
+test('Impostazioni ed Editor sono presenti fra le icone del menu', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   const grid = await openOverflowGrid(page);
 
-  for (const id of ['openOptions', 'home', 'editorApp']) {
+  for (const id of ['openOptions', 'editorApp']) {
     await expect(
       grid.locator(`.sn-menu-icon-btn[data-sn-icon-id="${id}"]`),
       `icona "${id}" mancante nel menu`,
@@ -50,7 +51,7 @@ test('#583 chi non gestisce i feedback non trova l\'icona che porta alla loro po
 test('#583 mandare un feedback resta nel menu, per chiunque', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
 });

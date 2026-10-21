@@ -52,6 +52,6 @@ scritti in una classe reggono contro chi prova a spegnerli da JS con
 appena la spegnitura passa da una classe, vince la specificità, non
 l'intenzione.
 
-Codice: `src/pages/archive/archive.html` (le due righe `[hidden]`, accanto alle
-classi che dichiarano il `display`), `tests/cronologia-chat.spec.mjs`
-(«senza nemmeno una chat di comando l'interruttore non si vede»).
+Codice: `src/pages/quaderno/quaderno.html` (le righe `[hidden]` accanto alle
+classi che dichiarano il `display`). Il caso che l'ha fatto nascere era nella
+Cronologia, che il quaderno delle memorie ha sostituito (#872).

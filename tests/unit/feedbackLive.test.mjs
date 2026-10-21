@@ -74,3 +74,27 @@ test('applyChanges: senza cambiamenti restituisce gli stessi documenti', () => {
   assert.equal(out.length, 1);
   assert.equal(out[0], a);
 });
+
+// #676: un campo della lista tolto sul server (pre-approvazione, lavoro locale) non resta nella riga fusa.
+test('applyChanges: un campo della lista che la proiezione riletta non porta più esce dalla riga', () => {
+  const segno = { by: 'owner@example.com', at: 1 };
+  const prima = [{ _id: 'p', _proiezione: true, _updateTime: 't1', name: 'x', mergePreapproved: segno, localOnly: segno, votes: { u: { vote: 'works' } } }];
+  const dopo = LIVE.applyChanges(prima, { fresh: [{ _id: 'p', _proiezione: true, _updateTime: 't2', name: 'x' }] })[0];
+  assert.equal('mergePreapproved' in dopo, false);
+  assert.equal('localOnly' in dopo, false);
+  assert.deepEqual(dopo.votes, { u: { vote: 'works' } }, 'i voti vengono dalla scheda pubblica: una lettura mancata non li toglie');
+});
+
+test('applyChanges: sul documento intero esce solo un campo della lista, non la conversazione', () => {
+  const FB = globalThis.SN_FEEDBACK;
+  globalThis.SN_FEEDBACK = { CAMPI_LISTA: ['name', 'mergePreapproved'] };
+  try {
+    const prima = [{ _id: 'p', _updateTime: 't1', name: 'x', notes: 'report', mergePreapproved: { by: 'o', at: 1 } }];
+    const dopo = LIVE.applyChanges(prima, { fresh: [{ _id: 'p', _proiezione: true, _updateTime: 't2', name: 'y' }] })[0];
+    assert.equal(dopo.name, 'y');
+    assert.equal(dopo.notes, 'report');
+    assert.equal('mergePreapproved' in dopo, false);
+  } finally {
+    if (FB === undefined) delete globalThis.SN_FEEDBACK; else globalThis.SN_FEEDBACK = FB;
+  }
+});

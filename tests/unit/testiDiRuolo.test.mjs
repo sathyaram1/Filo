@@ -15,10 +15,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RUOLI = join(ROOT, 'routines', 'roles');
@@ -33,7 +33,7 @@ function cartellaConPezzi() {
 }
 
 test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
-  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'prober', 'halt']) {
+  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'halt']) {
     const testo = readRoleInstructions(ruolo);
     assert.ok(testo.length > 400, `il ruolo ${ruolo} riceve un testo vuoto`);
     assert.ok(!/<!--\s*includi:/i.test(testo), `richiamo non espanso nel testo del ruolo ${ruolo}`);
@@ -76,7 +76,7 @@ test('un pezzo condiviso dentro un altro viene espanso', () => {
   const d = cartellaConPezzi();
   try {
     assert.match(espandiInclusioni('<!-- includi: _esterno.md -->', d), /LE REGOLE CHE CONTANO/);
-  } finally { rmSync(d, { recursive: true, force: true }); }
+  } finally { togliCartella(d); }
 });
 
 test('un richiamo che non si sa espandere ferma, invece di passare intatto', () => {
@@ -86,14 +86,14 @@ test('un richiamo che non si sa espandere ferma, invece di passare intatto', () 
     // Un anello fra due pezzi non gira all'infinito: si ferma come gli altri.
     writeFileSync(join(d, '_interno.md'), '<!-- includi: _esterno.md -->');
     assert.throws(() => espandiInclusioni('<!-- includi: _esterno.md -->', d), /non espanso/);
-  } finally { rmSync(d, { recursive: true, force: true }); }
+  } finally { togliCartella(d); }
 });
 
 test('un pezzo condiviso che manca ferma', () => {
   const d = cartellaConPezzi();
   try {
     assert.throws(() => espandiInclusioni('<!-- includi: _assente.md -->', d), /manca il pezzo condiviso/);
-  } finally { rmSync(d, { recursive: true, force: true }); }
+  } finally { togliCartella(d); }
 });
 
 test('nessuna regola scritta due volte in due testi di ruolo', () => {
@@ -116,7 +116,7 @@ test('nessuna regola scritta due volte in due testi di ruolo', () => {
 // dentro il testo che ogni ruolo riceve davvero, quante volte viene spiegata
 // la stessa cosa: due spiegazioni sono due regole che divergeranno.
 test('dentro un testo di ruolo la stessa regola non viene spiegata due volte', () => {
-  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit', 'prober'];
+  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit'];
   // Ogni voce: il segno che riconosce la spiegazione, e cosa spiega.
   const UNA_VOLTA = [
     [/rombo/g, 'dove l\'owner apre un trade-off segnalato'],

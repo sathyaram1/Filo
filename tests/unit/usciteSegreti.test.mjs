@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -48,7 +49,7 @@ describe('un segreto custodito da Filo non esce da nessuna uscita, a nessun live
     { type: 'CERCA_WEB', domanda: CHIAVE },
   ];
   for (const a of azioni) {
-    test(`${a.type} (livello ${L.levelFor(a)}) ${JSON.stringify(a).slice(0, 60)}`, () => {
+    test(`${a.type} (costo ${L.costoFor(a)}) ${JSON.stringify(a).slice(0, 60)}`, () => {
       const v = X.valutaUscita(a, { segreti: SEGRETI });
       assert.equal(v.blocca, true);
       assert.match(v.frase, /^non ho /);
@@ -493,12 +494,13 @@ describe('un testo lungo non tiene fermo il processo principale', () => {
     'Nel 2019 il 45% delle banche usava codici OTP via SMS; il costo medio era 0,05 euro per messaggio.',
     'Un token hardware one-time password come il modello RSA SecurID 700 mostra 6 cifre ogni 60 secondi.',
   ];
-  test('due milioni di caratteri sul 2FA in meno di un secondo e mezzo', () => {
+  test('due milioni di caratteri sul 2FA costano poco, anche a macchina carica', () => {
     let testo = '';
     for (let i = 0; testo.length < 2000000; i++) testo += `${frasi[i % frasi.length]} Riferimento ${10000 + (i * 7919) % 90000}.\n`;
-    const t = Date.now();
-    X.valutaUscita({ type: 'NAVIGA', url: 'https://example.org/guida' }, { pagina: { testo, host: 'forum.example' } });
-    assert.ok(Date.now() - t < 1500, `${Date.now() - t} ms`);
+    let v;
+    const c = costoInUnita(() => { v = X.valutaUscita({ type: 'NAVIGA', url: 'https://example.org/guida' }, { pagina: { testo, host: 'forum.example' } }); }, { tetto: 100 });
+    assert.ok(c.entro, c.come);
+    assert.equal(v.blocca, false);
   });
   test('trentamila codici letti: anche l\'ultimo si ferma', () => {
     let testo = '';
@@ -657,9 +659,10 @@ describe('i segreti custoditi non arrivano a un modello', () => {
     const lungo = 'Lorem ipsum https://example.com/a/b?id=abcdef1234567890 aGVsbG8gd29ybGQgZnJvbSBmaWxv 6c6f72656d20697073756d\n'.repeat(5000);
     const foto = `data:image/png;base64,${Buffer.alloc(300000, 7).toString('base64')}`;
     const m = [{ role: 'user', content: [{ type: 'text', text: lungo }, { type: 'image_url', image_url: { url: foto } }] }];
-    const t0 = Date.now();
-    assert.equal(G.oscuraSegreti(m, [CHIAVE]), m);
-    assert.ok(Date.now() - t0 < 2000);
+    let fuori;
+    const c = costoInUnita(() => { fuori = G.oscuraSegreti(m, [CHIAVE]); }, { tetto: 50 });
+    assert.equal(fuori, m);
+    assert.ok(c.entro, c.come);
   });
 
   test('il cancello dei modelli manda i messaggi oscurati', async () => {
@@ -703,12 +706,19 @@ function corpo(sorgente, inizio) {
 
 describe('sentinella: ogni uscita passa dalla porta unica', () => {
   const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-  const esegui = corpo(handlers, 'async function executeFiloAction(');
+  // executeFiloAction dichiara solo la provenienza dei cambi (#867) e passa tutto a eseguiAzioneFilo.
+  const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
+
+  test('executeFiloAction non fa niente da sé: ogni azione passa dal corpo che ha la porta', () => {
+    const fuori = corpo(handlers, 'async function executeFiloAction(');
+    assert.ok(/eseguiAzioneFilo\(action, opzioni\)/.test(fuori), 'executeFiloAction non delega a eseguiAzioneFilo');
+    assert.ok(!/switch \(type\)|\.openTab\(|runCommand\(/.test(fuori), 'executeFiloAction esegue qualcosa per conto suo');
+  });
 
   test('executeFiloAction chiama la porta prima del gate dei livelli e di ogni esecuzione', () => {
     const porta = esegui.indexOf('controllaUscita(');
     assert.ok(porta > 0, 'executeFiloAction non passa dalla porta delle uscite');
-    assert.ok(porta < esegui.indexOf('Levels.levelFor(action)'), 'la porta deve venire prima del gate dei livelli');
+    assert.ok(porta < esegui.indexOf('Levels.ingressi(action'), 'la porta deve venire prima del gate dell\'autonomia');
     assert.ok(porta < esegui.indexOf('switch (type)'), 'la porta deve venire prima di ogni esecuzione');
   });
 
@@ -724,7 +734,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
       if (PRIMITIVE.some((re) => re.test(c)) && !X.USCITE[tipo]) mancanti.push(tipo);
     }
     assert.deepEqual(mancanti, [], `uscite che saltano la porta: ${mancanti.join(', ')}`);
-    for (const t of Object.keys(X.USCITE)) assert.ok(L.levelFor({ type: t }) >= 1, `${t} non è nel registro dei livelli`);
+    for (const t of Object.keys(X.USCITE)) assert.ok(L.costoFor({ type: t }) != null, `${t} non è nel registro delle azioni`);
   });
 
   // Un bottone della chat che apre un indirizzo scelto dal modello è un'uscita come NAVIGA: l'azione che lo
@@ -802,7 +812,8 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     prima(finestre, 'SN_USCITA_DA_FILO(', 'openExternalScheme(', 'una pagina di Filo passa la posta al sistema prima della porta');
     assert.match(finestre.slice(0, finestre.indexOf('return { action: \'deny\' }')), /SN_USCITA_DA_FILO\(url, wc, \(\) => \{\s*this\.apriDaCollegamento\(/);
     const apre = corpo(tabs, '  apriDaCollegamento(url');
-    for (const passo of ['openExternalScheme(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
+    for (const passo of ['fermaNavigazione(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
+    assert.ok(corpo(tabs, 'function fermaNavigazione(').includes('openExternalScheme('), 'fermaNavigazione non passa la posta al sistema');
     prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'safeFetch(', 'leggere un collegamento lo chiede al sito prima della porta');
     const dash = src('pages', 'dashboard', 'dashboard.js');
     assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
@@ -852,7 +863,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
     assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
     const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-    assert.match(handlers, /const paroleUtente = cleanHistory\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
+    assert.match(handlers, /(?:const|let) paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
     assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
   });
 
@@ -890,9 +901,10 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
 
   test('il cancello dei modelli oscura i segreti sia nelle risposte intere sia in quelle a flusso', () => {
     const gate = readFileSync(join(ROOT, 'src', 'main', 'services', 'modelGate.js'), 'utf8');
-    for (const f of ['completeWithFallback({', 'streamCompleteWithFallback({']) {
-      const i = gate.indexOf(f);
-      assert.ok(i > 0 && gate.slice(i, i + 200).includes('senzaSegreti('), `${f} senza oscuramento`);
+    // I messaggi oscurati stanno in una costante prima della chiamata: il piano della cache si fa su quelli (#1412).
+    for (const f of ['completeWithFallback', 'streamCompleteWithFallback']) {
+      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
+      assert.match(gate, re, `${f} senza oscuramento`);
     }
     assert.ok(/segreti:\s*async/.test(handlers), 'il cancello di Filo non riceve i segreti custoditi');
   });

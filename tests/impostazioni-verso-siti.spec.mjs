@@ -4,6 +4,7 @@
 // DENTRO il mondo isolato dei content script, dove arriva davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CHIAVE = 'sk-or-v1-SPINTA-589-' + Date.now();
 const PROXY = 'socks5://utente-{country}:parolasegreta589@gate.provider.example:7000';
@@ -148,9 +149,10 @@ test('a un sito non arriva l\'intervista di benvenuto, e da un sito non si riscr
       const tutto = await chrome.storage.local.get(null);
       // …e quelle che fa davvero continuano a funzionare.
       const dettatura = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { models: { transcribe_audio: 'whisper' } } });
-      await chrome.storage.local.set({ sn_feedback_draft_text: 'bozza-589' });
-      const bozza = await chrome.storage.local.get(['sn_feedback_draft_text']);
-      return JSON.stringify({ proxy, tetto, letta, chiaviTutto: Object.keys(tutto), dettatura: dettatura && dettatura.ok, bozza: bozza.sn_feedback_draft_text });
+      const chiave = 'sn_feedback_draft_text@' + location.origin;
+      await chrome.storage.local.set({ [chiave]: 'bozza-589' });
+      const bozza = await chrome.storage.local.get([chiave]);
+      return JSON.stringify({ proxy, tetto, letta, chiaviTutto: Object.keys(tutto), dettatura: dettatura && dettatura.ok, bozza: bozza[chiave] });
     })()
   `));
   expect(esiti.proxy?.ok).toBe(false);
@@ -250,7 +252,7 @@ test('sul sito escluso Filo resta spento', async ({ shell, openTab, testServer }
   await web.waitForTimeout(1500);
   await web.locator('h1').click({ button: 'right' });
   await web.waitForTimeout(800);
-  await expect(web.locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
+  await expect(menuDi(web).locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
 });
 
 // Anche le spinte senza dati passano dalla lista: l'avviso dei dati dal vivo

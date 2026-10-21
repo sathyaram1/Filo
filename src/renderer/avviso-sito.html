@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'" />
+  <title>Avviso sul sito</title>
+  <link rel="stylesheet" href="avviso-sito.css" />
+</head>
+<body>
+  <main id="carta" tabindex="-1" role="alertdialog" aria-modal="true" aria-labelledby="titolo" aria-describedby="corpo" hidden>
+    <div class="icona" aria-hidden="true">⚠️</div>
+    <h1 id="titolo"></h1>
+    <p id="corpo"></p>
+    <div id="conferma" hidden>
+      <label for="parola">Se sai cosa stai facendo, scrivi "confermo" per continuare.</label>
+      <input id="parola" type="text" autocomplete="off" spellcheck="false" placeholder="confermo" />
+    </div>
+    <div class="pulsanti">
+      <button type="button" id="indietro" class="secondario">Torna indietro</button>
+      <button type="button" id="avanti" class="primario"></button>
+    </div>
+  </main>
+  <script src="avviso-sito.js"></script>
+</body>
+</html>

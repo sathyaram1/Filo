@@ -82,6 +82,20 @@ test('Novita è escluso: host che ha restituito la risposta di un\'altra richies
   }
 });
 
+test("Alibaba è escluso col nome che OpenRouter dà all'host, non solo col prefisso qwen/", () => {
+  const list = C.DEFAULT_EXCLUDED_PROVIDERS;
+  // È il nome che OpenRouter riporta nel campo `provider` della risposta (slug `alibaba`).
+  for (const served of ['Alibaba', 'alibaba', 'Alibaba Cloud', 'Alibaba Cloud Int.', 'alibaba/qwen']) {
+    assert.equal(C.isProviderExcluded(served, list), true, served);
+    assert.equal(C.servedPolicyViolation(served, 'qwen/qwen3-coder', list), 'excluded', served);
+  }
+  assert.equal(C.hostPolicyViolation({ name: 'Alibaba Cloud Int.', tag: 'alibaba' }, 'qwen/qwen3-coder', list), 'excluded');
+  assert.ok(C.providerIgnoreList(list).includes('Alibaba'));
+  assert.ok(C.providerIgnoreList(list).includes('Qwen'));
+  const reason = C.DEFAULT_EXCLUDED_PROVIDER_REASONS.find((r) => r.name === 'Alibaba');
+  assert.equal(reason && reason.kind, 'producer');
+});
+
 // ── Deriva fra la lista del codice e quella scritta a mano ───────────────────
 // La lista remota (config/models) SOSTITUISCE quella di build: un'esclusione
 // aggiunta al codice non arriva dove esiste già una lista scritta a mano. Questa
@@ -144,13 +158,20 @@ test('complete: providerRouting.ignore finisce in body.provider.ignore', async (
   assert.equal(res.servedBy, 'DeepInfra');
 });
 
-test('complete: senza providerRouting nessun blocco provider (retro-compat)', async () => {
-  const sent = {};
-  await withFetch(
-    (url, opts) => { Object.assign(sent, JSON.parse(opts.body)); return Promise.resolve(jsonResponse({ choices: [{ message: { content: 'ok' } }], usage: {} })); },
-    () => OpenRouter.complete({ apiKey: 'k', model: 'x/y', messages: [{ role: 'user', content: 'x' }] }),
-  );
-  assert.equal(sent.provider, undefined);
+test('complete: senza providerRouting nessun blocco provider con la chiave propria; coi crediti solo la ritenzione zero', async () => {
+  globalThis.SN_WALLET_MAIN = { keySourceOf: async (k) => (k === 'own' ? 'own' : 'personal') };
+  try {
+    for (const [apiKey, atteso] of [['own', undefined], ['personal', { zdr: true }]]) {
+      const sent = {};
+      await withFetch(
+        (url, opts) => { Object.assign(sent, JSON.parse(opts.body)); return Promise.resolve(jsonResponse({ choices: [{ message: { content: 'ok' } }], usage: {} })); },
+        () => OpenRouter.complete({ apiKey, model: 'qwen/qwen-y', messages: [{ role: 'user', content: 'x' }] }),
+      );
+      assert.deepEqual(sent.provider, atteso, apiKey);
+    }
+  } finally {
+    delete globalThis.SN_WALLET_MAIN;
+  }
 });
 
 test('streamComplete: ignore nel body e servedBy estratto dallo stream', async () => {

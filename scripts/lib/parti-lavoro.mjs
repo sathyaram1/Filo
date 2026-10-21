@@ -59,6 +59,30 @@ export function parteTardiva({ status, parti = {}, parte, ramo = '', solo = fals
 }
 
 /**
+ * Pratica chiusa, e dell'altra parte c'è ancora un ramo legato fuori da main: la parte `parte` la riapre (#938). Vale
+ * la parte tardiva, e anche il seguito di una parte già passata, se l'ultima fusione è di questo lavoro (stesso ramo),
+ * da poco, e nessuno ha detto che stava tutto da una parte. PURA. `chiusaDa`: la parte la cui fusione l'ha chiusa.
+ * @returns {{ ok: true, chiusaDa: string, at: number } | { ok: false, motivo: string }}
+ */
+export function riaperturaConAltraInArrivo({ status, parti = {}, parte, ramo = '', solo = false, locale = false, ora = Date.now() } = {}) {
+  const t = parteTardiva({ status, parti, parte, ramo, solo, locale, ora });
+  if (t.ok) return { ok: true, chiusaDa: t.altra, at: t.at };
+  if (status !== 'done' || !locale || !PARTI.includes(parte) || !parti[parte]) return t;
+  const no = (motivo) => ({ ok: false, motivo });
+  if (solo) return no(`dici che il lavoro sta tutto nella parte ${NOME_PARTE[parte]}, ma dell’altra parte c’è ancora un ramo legato alla pratica`);
+  if (parti.solo) return no(`l’ha chiusa la parte ${NOME_PARTE[parti.solo]} dicendo che il lavoro stava tutto lì`);
+  if (parti.ramo !== ramo) {
+    return no(`l’ha chiusa la fusione di ${parti.ramo || 'un ramo senza nome'}, e un seguito vale solo dallo stesso nome di ramo, non da ${ramo || 'un ramo senza nome'}`);
+  }
+  const chiusaDa = PARTI.filter((p) => parti[p]).sort((a, b) => parti[b] - parti[a])[0];
+  const eta = ora - parti[chiusaDa];
+  if (eta > FINESTRA_PARTE_TARDIVA_MS || eta < -10 * 60 * 1000) {
+    return no(`l’ultima fusione di questo lavoro è su main da più di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore`);
+  }
+  return { ok: true, chiusaDa, at: parti[chiusaDa] };
+}
+
+/**
  * La parte del server che manca: il ramo di filo-security con lo stesso nome di quello dell'app, se c'è e non è
  * ancora su origin/main del server. `cartellaServer` = filo-security/functions ('' = server assente).
  * @returns {{ part: 'server', branch: string }[]}

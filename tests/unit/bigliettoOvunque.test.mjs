@@ -1,15 +1,16 @@
 // Sentinella: il biglietto a mano (`--ticket <codice>` o `--ticket=<codice>`) vale in qualunque posizione e in
 // ogni comando che usa un biglietto, con la stessa regola: sostituisce, conferma o si rifiuta, mai ignorato.
 // Il contratto dei worker dice «ripeti aggiungendo --ticket» (#724.1, #545, #587).
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { bigliettoAMano, parolaInPiu } from '../../scripts/routine-channel.mjs';
 import { leggiBigliettoAMano } from '../../scripts/lib/routine-ticket.mjs';
 
@@ -88,7 +89,7 @@ test('dispatch: --ticket davanti a un --record-* fa quello che fa messo in coda'
       const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
       assert.ok(consegna, `ordine ${argv[0]}: la consegna deve arrivare al server (uscita ${r.code}, stderr: ${r.se})`);
       esiti.push({ code: r.code, ticket: consegna.body.ticket });
-    } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+    } finally { srv.close(); togliCartella(casa); }
   }
   assert.deepEqual(esiti[0], esiti[1], 'i due ordini devono dare lo stesso esito');
   assert.equal(esiti[0].ticket, BIGLIETTO);
@@ -108,7 +109,7 @@ test('deliver: --ticket al posto del biglietto davanti consegna con quel bigliet
     const d = consegna.body.data || {};
     assert.equal(d.ticket, undefined, 'il biglietto non è un dato della consegna');
     assert.equal(d.biglietto, undefined, 'il biglietto non è un dato della consegna');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('deliver senza biglietto: uscita 1 col rimedio, non 3 («canale giù»), e nessuna chiamata', async () => {
@@ -122,7 +123,7 @@ test('deliver senza biglietto: uscita 1 col rimedio, non 3 («canale giù»), e 
     assert.match(r.se, /NESSUN BIGLIETTO/);
     assert.match(r.se, /--ticket/);
     assert.equal(ricevuti.length, 0, 'il server non va chiamato');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('deliver: due biglietti diversi si rifiutano, non se ne sceglie uno in silenzio', async () => {
@@ -136,7 +137,7 @@ test('deliver: due biglietti diversi si rifiutano, non se ne sceglie uno in sile
     assert.equal(r.code, 1, `stderr: ${r.se}`);
     assert.match(r.se, /Due biglietti diversi/);
     assert.equal(ricevuti.length, 0);
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('una regola sola: il biglietto a mano sostituisce, conferma o si rifiuta in ogni comando', () => {
@@ -216,7 +217,7 @@ test('promemoria perso e una parola in più: la risposta la nomina, col bigliett
 async function conServer(fn) {
   const { srv, ricevuti, port } = await fintoServer();
   const casa = depositoSulRamo();
-  try { await fn({ ricevuti, env: ambiente(port, casa) }); } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  try { await fn({ ricevuti, env: ambiente(port, casa) }); } finally { srv.close(); togliCartella(casa); }
 }
 
 test('rilascio e battito: il biglietto a mano arriva al server, due diversi si rifiutano', async () => {
@@ -374,5 +375,45 @@ test('consegna con biglietto davanti e intento storto: si ferma qui, non parte v
     assert.equal(r.code, 1, `stderr: ${r.se}`);
     assert.match(r.se, /Intento non capito: «fixd»/);
     assert.equal(ricevuti.length, 0);
+  });
+});
+
+// #878: un biglietto copiato con uno spazio o un a capo in fondo arriva al server ripulito, davanti come a mano.
+test('il biglietto davanti con spazi o un a capo intorno arriva al server ripulito, in ogni comando che ne usa uno', async () => {
+  for (const sporco of [`${VERO} `, `${VERO}\n`, ` ${VERO_TRATTINO}\r\n`, `${BIGLIETTO}\n`]) {
+    const pulito = sporco.trim();
+    for (const [argv, url] of [
+      [['deliver', sporco, 'note', '--notes', 'Report.'], 'routineDeliver'],
+      [['release', sporco, '--role', 'verifier', '--senza-push', '--senza-rapporto'], 'routineRelease'],
+      [['heartbeat', sporco], 'routineHeartbeat'],
+      [['compare', sporco, 'verifier', '12'], 'routineCompare'],
+    ]) {
+      await conServer(async ({ ricevuti, env }) => {
+        const r = await esegui('routine-channel.mjs', argv, env);
+        const chiamata = ricevuti.find((x) => x.url.includes(url));
+        assert.ok(chiamata, `${argv[0]} ${JSON.stringify(sporco)}: doveva arrivare al server (uscita ${r.code}, stderr: ${r.se})`);
+        assert.equal(chiamata.body.ticket, pulito, `${argv[0]} ${JSON.stringify(sporco)}`);
+      });
+    }
+  }
+  // Lo stesso biglietto davanti e a mano, uno dei due con l'a capo, è uno solo.
+  assert.deepEqual(bigliettoAMano('deliver', [`${VERO}\n`, 'note'], VERO), { args: [VERO, 'note'] });
+});
+
+// #878: senza biglietto il ruolo scalava al suo posto e partiva verso il server come biglietto.
+test('confronto senza biglietto: si ferma dicendo che manca, e il server non viene chiamato', async () => {
+  await conServer(async ({ ricevuti, env }) => {
+    for (const argv of [['compare', 'verifier', '12'], ['compare', 'new-work', '1359']]) {
+      const r = await esegui('routine-channel.mjs', argv, env);
+      assert.equal(r.code, 1, `${argv.join(' ')}: ${r.se}`);
+      assert.match(r.se, /NESSUN BIGLIETTO/);
+      assert.match(r.se, /compare <biglietto> <ruolo> <numero>/);
+    }
+    assert.equal(ricevuti.length, 0, 'il ruolo non parte come biglietto');
+    const r = await esegui('routine-channel.mjs', ['compare', 'verifier', '12', '--ticket', BIGLIETTO], env);
+    assert.equal(r.code, 0, r.se);
+    const chiamata = ricevuti.find((x) => x.url.includes('routineCompare'));
+    assert.equal(chiamata?.body.ticket, BIGLIETTO);
+    assert.deepEqual(chiamata?.body.mine, { role: 'verifier', num: '12' });
   });
 });

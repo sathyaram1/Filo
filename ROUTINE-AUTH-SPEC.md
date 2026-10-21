@@ -207,10 +207,9 @@ diventa un **muro**.
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni conflitto di fusione (dispatch a chi lavora consegna solo il feedback) | i rilievi di una verifica: li corregge chi li ha scritti |
+| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni fusione fermata (un conflitto, o gli unit rossi sul risultato della fusione con il loro elenco: chi riallinea li elenca nel report e non li corregge, #1204) | i rilievi di una verifica: li corregge chi li ha scritti |
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
-| `prober` | niente | la coda |
 
 **L'ambito della verifica.** Il payload del `verifier` porta `scope`, deciso dal
 server:
@@ -221,7 +220,9 @@ server:
   (Gestione → Automazioni, spento di serie). `rilievi` sono i rilievi corretti
   in quel giro, `shaPrima` il commit su cui era stata scritta la critica;
 - `riallineamento`, con `perimetro: { shaVerificato?, reportRebase? }`: il
-  lavoro era verificato e un conflitto di fusione è stato risolto a mano.
+  lavoro era verificato e la base è stata rifatta su main, dopo un conflitto
+  di fusione o dopo unit rossi sul risultato della fusione. Chi verifica
+  rilancia gli unit: ogni rosso è un rilievo interno.
 
 dispatch sceglie il testo del ruolo dall'ambito (`verifier-chiusura.md`,
 `verifier-riallineamento.md`) e scrive il perimetro in coda al compito, come
@@ -309,8 +310,8 @@ lo ritenta, perché è una risposta, non un'interruzione di rete.
 **I giri li accende il pacemaker.** Una funzione schedulata nel progetto
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
 (`config/routines.enabled`) acceso? nessun **battito di sistema** fresco
-(qualcuno sta già lavorando)? run giornalieri rimasti (tetto di default 12,
-`config/routines.pacemakerDailyCap`)? l'ultimo giro non è **nato morto** e
+(qualcuno sta già lavorando)? l'account non è in pausa (un'accensione rifiutata
+da claude.ai la mette, crescente; nessun tetto giornaliero, #996)? l'ultimo giro non è **nato morto** e
 nessun guasto è stato dichiarato (periodo di rispetto ≥ 1h)? c'è lavoro (stessa
 domanda del sondaggio di prontezza, fatta dentro il server)? Solo se tutto dice
 sì, una POST accende la routine su claude.ai (id in
@@ -337,10 +338,17 @@ tutti. "Difficile" non è una difesa: **l'ultimo livello deve essere non
 convincibile**, cioè un posto dove non c'è nessun LLM da persuadere e nessun
 ambiente da avvelenare.
 
-Da oggi la fusione è una consegna del canale come le altre:
+Da oggi la fusione è una consegna del canale come le altre. **Dal #1207
+(decisione dell'owner del 12/10/2026) non la chiede più nessuno**: col pass
+della verifica e del controllo di sicurezza registrati il server accende da sé
+l'azione degli unit sulla fusione e, con l'esito letto da GitHub, fa i passi qui
+sotto (sezione «Gli unit sulla fusione li lancia GitHub»). `routineMerge` resta
+per gli strumenti di prima: controlla biglietto, ruolo, ramo e verdetti come
+sempre, non fonde e passa la pratica all'azione (`result: 'server'`,
+`esito: 'attesa_unit'`).
 
-- **`routineMerge` `{ ticket, branch }`** — la chiede solo il controllo di
-  sicurezza, a verdetto registrato. Il server, in ordine e fail-closed:
+- **La fusione** (fino al #1207 `routineMerge` `{ ticket, branch }`, chiesta
+  dal controllo di sicurezza a verdetto registrato). Il server, in ordine e fail-closed:
   1. biglietto vivo, ruolo `secaudit`, ramo = quello **del biglietto** (un
      messaggio che ne nomina un altro è respinto e registrato, non corretto);
   2. **stato vero**: PASS della verifica e PASS del controllo di sicurezza
@@ -361,29 +369,28 @@ Da oggi la fusione è una consegna del canale come le altre:
      non una richiesta che verrebbe approvata e fallirebbe;
   5. fusione di **quello sha**, via API GitHub con l'identità del server.
      Conflitto → `conflict`, niente fusione.
-- **La pre-approvazione per singola pratica** (dal 2026-09-13). L'owner può
-  mettere sulla pratica un segno — «Fondi senza chiedermelo», dal dettaglio in
-  Gestione o con `scripts/owner-feedback.mjs <id> --preapprova`; si toglie con
-  «Chiedimi prima di fondere» / `--chiedi-prima`. È il campo
-  `mergePreapproved { by, at }` sul documento del feedback, scrivibile solo
-  dall'owner (regole Firestore) e valido finché la pratica è aperta. Al passo
-  4, se L5 blocca **e** la pratica porta il segno, il server **non apre la
-  richiesta**: fa gli stessi passi di una fusione approvata (la prova di
-  fusione è già passata; un conflitto esce come `conflict` prima), fonde lo
-  sha esaminato con la sua identità e registra la fusione nella collezione
-  delle approvazioni con `preapproved: true`, chi aveva messo il segno e
-  **l'elenco intero** di ciò che L5 aveva segnalato (gate, file, righe: senza
-  tetto). Il blocco resta comunque nel registro dei rifiuti. Il lavoratore
-  riceve `merged` e chiude la pratica come dopo ogni fusione. L'owner rilegge
-  a posteriori in Gestione → Automazioni, «Fuse senza chiedere»
-  (`ownerMergeApprovals {op:'list'}` → `preapproved`, stessa finestra di
-  `recent`). Vale **solo** per il lavoro delle routine: `npm run finish`
-  locale non guarda il segno e apre la richiesta come sempre. Non esiste una
-  pre-approvazione globale o per mittente.
-- **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
-  e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
-  1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
-  sono spariti da questa macchina: qui non c'è più niente da convincere.
+- **La fiducia decide L5** (dal #1148, SPEC-DOMANDE.md §1.5; al posto della
+  pre-approvazione per pratica del 2026-09-13). Ogni biglietto nasce pulito o
+  sporco e si sporca quando il server gli consegna qualcosa di non fidato
+  (`channel.fetchWork`, prima della consegna); ogni biglietto che può spingere
+  sul ramo entra nel registro `routine-branches` con la sua fiducia e lo sha
+  (emissione, consegne `fixed`/`status`, riallineamenti del server). Al passo
+  4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
+  fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
+  apre la richiesta**: fonde lo sha esaminato con la sua identità e registra
+  la fusione nella collezione delle approvazioni con `preapproved: true`,
+  `skippedL5: true`, `motivo: 'fiducia'` e **l'elenco intero** di ciò che L5
+  aveva segnalato. Il blocco resta nel registro dei rifiuti. L'owner rilegge a
+  posteriori in Gestione → Log, «Fuse senza chiedere». Lo stesso vale
+  per «Salta il controllo» e per il finish locale (registro scritto da
+  `verify-local start` e `finish` col biglietto della sessione). Lavoro non
+  fidato → richiesta all'owner come prima. `mergePreapproved` non si scrive
+  più: lo legge solo la decisione dei rami nati prima del registro
+  (`fiduciaRamo.decisioneL5Legacy`), finché l'ultimo non si chiude.
+- **Il citofono `scripts/merge-gate.mjs`** presentava il biglietto e riferiva
+  l'esito; dal #1207 non c'è più: il git locale, l'L5 locale, il verdetto
+  passato via ambiente e infine la prova degli unit sono spariti dalla macchina
+  che lavora, e lì non c'è più niente da convincere.
 - **Cosa copre un'approvazione** (dal 2026-09-13). Un'approvazione copre il
   contenuto approvato più uno spostamento su main senza conflitti,
   ricontrollato. Vale per il click dell'owner in Gestione come per il segno di
@@ -404,15 +411,10 @@ Da oggi la fusione è una consegna del canale come le altre:
   riallinea: il suo ramo vive anche nella cartella dell'owner, e un commit
   messo sul remoto dal server farebbe respingere in silenzio il salvataggio
   automatico di quella cartella.
-- **Il segno di pre-approvazione**, in breve: l'owner può marcare una pratica
-  con «Fondi senza chiedermelo» (dal dettaglio in Gestione, o dallo script
-  locale dei feedback; si toglie con «Chiedimi prima di fondere»). Con il
-  segno, un blocco L5 sul lavoro di quella pratica non apre la richiesta: il
-  server fonde come dopo un'approvazione e registra la fusione fra le
-  approvazioni con `preapproved: true`, chi aveva messo il segno e l'elenco
-  intero dei blocchi (`ownerMergeApprovals {op:'list'}` → `preapproved`).
-  Vale solo per il lavoro delle routine, mai per il finish locale; non esiste
-  una pre-approvazione globale o per mittente.
+- **Il segno del clic** (#515): un'approvazione col clic vale anche per i
+  riallineamenti dello stesso ciclo, limitata ai blocchi già approvati. Dal
+  #1148 il segno vive nello stato del giro (`routine-state/{id}.approvatoIl`,
+  solo server) e si toglie quando la pratica entra o esce dalla chiusura.
 
 ### L'identità del server: una GitHub App (2026-08-20)
 
@@ -466,6 +468,31 @@ muro non era un muro.
   spedisce il ramo, chiede la fusione, traduce l'esito. Esce con zero **solo**
   se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
   senso e viene fermato subito.
+
+### Il sì si dà anche da browser (2026-10-04, #489)
+
+L'unica superficie di approvazione stava dentro l'app: se il lavoro bloccato
+fosse proprio quello che impedisce a Filo di partire, non ci sarebbe stato
+nessun modo di approvarlo. La seconda superficie è una pagina statica,
+`site/approvazioni`, pubblicata su Firebase Hosting del progetto
+(`https://filo-8b9cb.web.app`) e raggiungibile da qualunque browser.
+
+- **Stessa identità, stessi controlli**: accesso Google con l'account del
+  proprietario, poi la stessa `ownerMergeApprovals` dell'app (`list`,
+  `approve`, `discard`). Il server non distingue le due superfici e non
+  concede niente di più: niente scorciatoie da riga di comando.
+- **Le credenziali restano in memoria** (persistenza `none`): chiusa la scheda
+  non resta niente su disco che un programma sul computer possa riusare, e la
+  scelta dell'account si rivede a ogni accesso.
+- **Non si lascia incorniciare** (`frame-ancestors 'none'`, `X-Frame-Options`,
+  e la pagina stessa non si disegna dentro un riquadro): un'altra pagina non
+  può far cliccare «Approva» a chi non la vede.
+- **Le card sono quelle dell'app**: `scripts/build-approvazioni.mjs` copia
+  modulo, icone e tema; una sentinella negli unit pretende le copie allineate e
+  il predeploy rifiuta una copia vecchia.
+- **Si pubblica solo ciò che è fuso**: `npm run regole:pubblica` porta su
+  Firebase regole, indici e la pagina insieme, da `main` allineato a
+  `origin/main`. Il terminale del finish, a ogni blocco, nomina l'indirizzo.
 
 ### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
 
@@ -560,7 +587,14 @@ La regola, uguale per tutti e due:
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
   NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
-  su questa macchina parla di un altro commit. Se la verifica ha dato l'ok su
+  su questa macchina parla di un altro commit. Dal #929 `ownerMerge` porta anche
+  `provaUnit`: gli unit girati da chi chiede sul risultato della fusione con
+  origin/main (`scripts/lib/unit-sulla-fusione.mjs`); per le routine, dal #1207,
+  la prova la legge il server da GitHub. Il server fonde solo se main è ancora lo
+  sha provato (`main_moved` altrimenti, e la prova si rifà, al massimo tre
+  volte); rossi solo sulla fusione → riallineamento con l'elenco dei test
+  (`unit_rossi`); senza prova fonde come prima e lo scrive nel log
+  (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
   un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
   giudica il server (punto sopra). Se su questa macchina non risulta su quale
   commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
@@ -575,9 +609,10 @@ La regola, uguale per tutti e due:
   tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
   `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
   detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
-  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
-  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
-  copia che il ramo si porta dietro;
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto, come quelli di ogni testo che
+  uno strumento del giro stampa (suo o del server), portano agli **attrezzi del
+  giro** (`absolutizeOutput`), non a `scripts/…`, che riporterebbe alla copia
+  che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
   Il rifiuto e le note del citofono si reggono sullo specchio locale («la
   verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
@@ -620,14 +655,55 @@ La regola, uguale per tutti e due:
   richiesta partiva lo stesso. Adesso il nome e la directory devono combaciare,
   ed è il primo controllo di tutti.
 
-Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
-`scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
-timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
+Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs` e
+`scripts/routine-channel.mjs`, dove lo sha si timbra da solo invece di
+chiederlo a chi lavora — e questa regola. (Fino al #1207 anche il citofono,
+`scripts/merge-gate.mjs`, coi controlli descritti qui sopra.) **Il
 confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
 il posto giusto: è l'ultimo livello, quello che non si può convincere. Il
 repo pubblico chiude il cammino onesto; il muro è il server, che dal #773
 respinge un verdetto L4 senza sha e al cancello lo confronta con la punta
 come quello della verifica.
+
+### Gli unit sulla fusione li lancia GitHub (#1207, 12/10/2026)
+
+Fino al #1207 gli unit sul risultato della fusione del ramo con main li faceva
+girare l'agente del controllo di sicurezza (5–20 minuti, `scripts/merge-gate.mjs`)
+e la prova la dichiarava lui al server. Adesso:
+
+- **chi lavora registra il verdetto e rilascia.** Col pass il server mette la
+  pratica in attesa (`feedback.attesa = 'unit_fusione'`, `routine-state.provaFusione`):
+  `select` non le dà ruoli e il recupero delle fusioni non la tocca;
+- **l'azione** è `.github/workflows/unit-fusione.yml` del repo pubblico, accesa
+  dal server con `repository_dispatch` (basta il permesso sui contenuti che il
+  cancello ha già). GitHub accende sempre la versione del workflow che sta su
+  main: un ramo non la cambia per la propria corsa. Gira il codice di un ramo
+  che può venire da un feedback non fidato, quindi: nessun segreto, token in
+  sola lettura (`contents: read`), credenziali mai lasciate nei checkout, la
+  coppia di sha solo come variabili d'ambiente validate, e nessun workflow del
+  repo usa le cache di Actions (sentinella: `tests/unit/unitFusioneAzione.test.mjs`).
+  Gli strumenti della prova vengono da main (`scripts/unit-fusione-azione.mjs`),
+  le dipendenze dal ramo, come sulla macchina che provava prima;
+- **il server si fida solo di quello che legge da GitHub per quella coppia**
+  (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
+  `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo
+  registro la riga `FILO-UNIT-FUSIONE` con i due sha interi e un esito che dice
+  la stessa cosa della conclusione. Una corsa accesa da una spinta, o con
+  un'altra coppia, non decide niente;
+- **gli esiti**: verde (o rosso anche su main da solo, o main già dentro il
+  ramo, che non costa una corsa) → cancello e fusione sul main provato, come
+  sempre; rossi solo sulla fusione o conflitto → riallineamento; main o punta
+  mossi prima della fusione → la prova si rifà, al più tre volte, poi la
+  riprende il recupero fra un'ora. Un blocco L5 va all'owner con la spiegazione
+  composta dal server dai blocchi. Un'azione che non parte, non finisce o non
+  scrive la riga si riaccende; alla terza di fila si fonde senza prova, come
+  quando la prova non si poteva fare, e la riga del registro in Gestione lo conta;
+- **il recupero delle fusioni mai chieste (#715)** si riduce al rilancio
+  dell'azione: un'ora senza fusione, o un'attesa che nessuno muove da tre ore,
+  e la prova riparte; al terzo rilancio sullo stesso verdetto la pratica va
+  all'owner;
+- **`npm run finish` non cambia**: la prova la fa il PC dell'owner, che la
+  dichiara con le sue credenziali (`ownerMerge`).
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
@@ -701,7 +777,11 @@ verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Le regole Firestore ammettono
+richiesta aperta, `conflitto`, `ramo assente`). Un lavoro server non si fonde
+da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
+prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
+`rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude
+solo col server su main. Le regole Firestore ammettono
 `livelli` nei due rami di triage con vincolo di forma (mappa con al più
 `l3`/`l4`, testo cifrato ≤ 20.000).
 
@@ -755,7 +835,7 @@ A fine sessione orchestratore e worker rispondono a una domanda che l'owner
 imposta; ognuno risponde per sé (l'orchestratore non legge mai i worker).
 
 - **`routineClosing` `{ passphrase | ticket, op: 'question' | 'answer', id?, answer?, requestId? }`** — domanda e risposta (`requestId`, uno per invocazione, fa ritrovare lo stesso documento ai ritentativi); mai rifiutata per `fault_declared` né a routine spente; `answer` oltre 32768 byte → `answer_too_big` con `bytes` e `max`, mai troncata.
-- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `prober` (gli altri: `bad_slot` con l'elenco); ripiego nel server.
+- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit` (gli altri: `bad_slot` con l'elenco); ripiego nel server.
 - `routine-channel.mjs domanda "<parola>"` | `domanda --biglietto <b>` — stampa la domanda e il comando per rispondere; exit 0 · 2 nessuna domanda (404, rete) · 4 rifiutata.
 - `routine-channel.mjs risposta "<parola>" <id>` | `risposta --biglietto <b>` — il testo da stdin (`<<'FINE'`); stessi exit.
 - `routine-domanda.mjs mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]` — lo strumento dell'owner; stampa i testi coi caratteri di controllo resi visibili (`\x1b`), perché le risposte vengono da sessioni che leggono testo non fidato.

@@ -319,15 +319,111 @@ test('#595 voce di un utente: nessun token chiesto, submit anonima come prima', 
   assert.equal(state.calls[0].argomenti, 1, 'submit chiamata con il solo payload');
 });
 
-test('#595 owner senza accesso valido: parte anonima e lo scrive nel log', async () => {
-  const { OB, state } = setup();
+// #912: la voce dell'owner non parte mai da anonima. Senza accesso aspetta, lo dice una volta, non scade, e parte
+// con la prova appena l'accesso torna.
+test('#912 owner senza accesso valido: aspetta in coda, lo dice una volta, poi parte con la prova', async () => {
+  const { OB, state, store } = setup();
   conSubmitRegistrata(state);
-  const log = [];
-  OB.init({ tokenOwner: async () => '', log: (...a) => log.push(a.join(' ')) });
+  let token = '';
+  const avvisi = [];
+  OB.init({ tokenOwner: async () => token, onAttesaOwner: (it) => { avvisi.push(it.id); return true; } });
   state.online = true;
   await OB.enqueue({ submissionId: 'o2', clientId: 'owner:abc', text: 'sessione chiusa' }, { dallOwner: true });
   await OB.flush();
-  assert.equal(OB.size(), 0, 'non si ferma: parte lo stesso');
-  assert.equal(state.calls[0].argomenti, 1);
-  assert.ok(log.some((r) => /anonima/.test(r) && r.includes('o2')), log.join('\n'));
+  await OB.flush();
+  assert.equal(state.calls.length, 0, 'senza accesso non si spedisce niente, nemmeno da anonimo');
+  assert.equal(OB.size(), 1);
+  assert.deepEqual(avvisi, ['o2'], 'detto una volta sola');
+  // Un giorno dopo resta: buttarla perderebbe il feedback.
+  store.get('feedbackOutbox')[0].queuedAt = Date.now() - 48 * 3600e3;
+  OB._reset(); OB._setAuto(false);
+  OB.init({ tokenOwner: async () => token, onAttesaOwner: (it) => { avvisi.push(it.id); return true; } });
+  await OB.flush();
+  assert.equal(OB.size(), 1, 'la voce in attesa dell’accesso non scade');
+  assert.deepEqual(avvisi, ['o2'], 'l’avviso dato sopravvive al riavvio');
+  token = 'tok';
+  await OB.flush();
+  assert.equal(OB.size(), 0);
+  assert.equal(state.calls[0].opts.idToken, 'tok');
+  assert.equal(state.calls[0].opts.soloAdmin, true, 'col token rifiutato non deve ripiegare sull’anonimo');
+});
+
+test('#912 owner col token rifiutato: la voce resta in coda invece di partire da anonima', async () => {
+  const { OB, state } = setup();
+  const avvisi = [];
+  globalThis.SN_FEEDBACK.submit = async (payload, opts) => {
+    state.calls.push({ payload, opts });
+    throw Object.assign(new Error('firestore create fallito (403): token admin rifiutato'), { accessoOwner: true });
+  };
+  OB.init({ tokenOwner: async () => 'scaduto', onAttesaOwner: (it) => { avvisi.push(it.id); return true; } });
+  await OB.enqueue({ submissionId: 'o3', clientId: 'owner:abc', text: 'token vecchio' }, { dallOwner: true });
+  await OB.flush();
+  assert.equal(OB.size(), 1);
+  assert.deepEqual(avvisi, ['o3']);
+  assert.ok(state.calls.every((c) => c.opts && c.opts.soloAdmin === true));
+});
+
+// #1212 — LA CODA SI SVEGLIA QUANDO SERVE, NON AL GIRO DEL BACKOFF.
+//
+// Qui i timer sono quelli veri: è proprio il giro già fissato a trattenere la voce.
+async function aspetta(cond, ms = 2000) {
+  const fine = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > fine) throw new Error('la coda non si è mossa');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+test('#1212 l’owner che rientra non aspetta il giro del backoff già fissato', async () => {
+  const { OB, state } = setup();
+  conSubmitRegistrata(state);
+  let token = '';
+  OB.init({ tokenOwner: async () => token, backoffMin: 60_000, backoffMax: 60_000 });
+  OB._setAuto(true);
+  try {
+    state.online = true;
+    await OB.enqueue({ submissionId: 'o5', clientId: 'owner:abc', text: 'rientro' }, { dallOwner: true });
+    await aspetta(() => OB._peek()[0] && OB._peek()[0].attesaAccesso);
+    token = 'tok';
+    OB.accessoCambiato();
+    await aspetta(() => OB.size() === 0);
+    assert.equal(state.calls.length, 1);
+    assert.equal(state.calls[0].opts.idToken, 'tok');
+  } finally { OB._setAuto(false); }
+});
+
+test('#1212 un feedback accodato mentre un altro sta partendo parte anche lui', async () => {
+  const { OB, state } = setup();
+  let sblocca;
+  const primoInViaggio = new Promise((r) => { sblocca = r; });
+  globalThis.SN_FEEDBACK.submit = async (payload) => {
+    state.calls.push(payload.submissionId);
+    if (payload.submissionId === 'a') await primoInViaggio;
+    return { id: 'srv_' + payload.submissionId, failed: [] };
+  };
+  OB._setAuto(true);
+  try {
+    await OB.enqueue({ submissionId: 'a', text: 'primo, con gli allegati che salgono' });
+    await aspetta(() => state.calls.includes('a'));
+    await OB.enqueue({ submissionId: 'b', text: 'secondo' });
+    // Il giro chiesto dal secondo invio scatta prima di questo timer, quindi mentre il primo è ancora in viaggio.
+    await new Promise((r) => setTimeout(r, 5));
+    sblocca();
+    await aspetta(() => OB.size() === 0);
+    assert.deepEqual(state.calls, ['a', 'b']);
+  } finally { OB._setAuto(false); }
+});
+
+// #953 — la chat dell'owner accoda la segnalazione che l'utente ha confermato: il titolo che ha letto parte com'è.
+test('#953 un titolo già scelto parte com’è, senza rigenerarlo', async () => {
+  const { OB, state } = setup();
+  let generati = 0;
+  OB.init({ prepare: () => { generati += 1; return 'titolo generato'; } });
+  state.online = true;
+  await OB.enqueue({ submissionId: 'chat-1', text: 'La barra in alto resta a schermo intero', name: 'Schermo intero' });
+  await OB.enqueue({ submissionId: 'box-1', text: 'Dal riquadro, senza titolo' });
+  await OB.flush();
+  assert.equal(state.calls.find((c) => c.submissionId === 'chat-1').name, 'Schermo intero');
+  assert.equal(state.calls.find((c) => c.submissionId === 'box-1').name, 'titolo generato');
+  assert.equal(generati, 1, 'il titolo si genera solo per chi non ne aveva uno');
 });

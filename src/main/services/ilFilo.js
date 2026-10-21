@@ -1,0 +1,442 @@
+// Il filo (#866): l'unico modulo che legge e scrive la linea del tempo, un file suo che cresce solo in coda.
+// Non passa da storage.json e non tiene niente dell'incognito su disco. Regole:
+// patterns/il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md, forma degli eventi in src/shared/filoEventi.js.
+
+'use strict';
+
+const fsp = require('node:fs/promises');
+const path = require('node:path');
+
+const E = () => globalThis.SN_FILO_EVENTI;
+const FILE_EVENTI = 'eventi.jsonl';
+const FILE_DISPOSITIVO = 'dispositivo';
+// Segno che le schede chiuse di prima del filo ci sono entrate (#872): dopo, entrano solo quelle di un backup.
+const FILE_SCHEDE_ENTRATE = 'schede-chiuse-entrate';
+// Una visita già nel filo per la stessa scheda chiusa: stesso indirizzo, aperta fra l'apertura e la chiusura (più un margine).
+const MARGINE_SCHEDA_MS = 2 * 60 * 1000;
+
+function disco() {
+  try { return require('../shim/storage'); } catch (_) { return null; }
+}
+
+function inIncognito(opts) {
+  if (opts && opts.incognito != null) return !!opts.incognito;
+  try { return !!(disco() && disco().inIncognito()); } catch (_) { return false; }
+}
+
+function cartellaDati() {
+  if (process.env.FILO_USER_DATA) return process.env.FILO_USER_DATA;
+  return require('electron').app.getPath('userData');
+}
+
+// Un'istanza per profilo: il profilo segreto ne aprirà una sua con un'altra cartella, senza vedere questa.
+function creaFilo({ cartella } = {}) {
+  const dir = () => cartella || path.join(cartellaDati(), 'filo');
+  const fileEventi = () => path.join(dir(), FILE_EVENTI);
+
+  const normale = { stato: E().nuovoStato(), caricato: false, caricando: null, dispositivo: '' };
+  // L'incognito ha un filo suo in memoria: si vede solo da lì e sparisce con l'ultima finestra incognito.
+  let incognito = { stato: E().nuovoStato(), eventi: [] };
+
+  let coda = Promise.resolve();
+  function inCoda(fn) {
+    const r = coda.then(fn, fn);
+    coda = r.then(() => {}, () => {});
+    return r;
+  }
+
+  async function leggiDispositivo() {
+    const f = path.join(dir(), FILE_DISPOSITIVO);
+    try {
+      const id = (await fsp.readFile(f, 'utf8')).trim();
+      if (id) return id;
+    } catch (_) {}
+    const id = E().uuid();
+    try {
+      await fsp.mkdir(dir(), { recursive: true });
+      await fsp.writeFile(f, id + '\n', 'utf8');
+    } catch (e) { console.warn('[Filo] dispositivo non salvato:', e?.message || e); }
+    return id;
+  }
+
+  async function scriviInCoda(testo) {
+    await fsp.mkdir(dir(), { recursive: true });
+    const fh = await fsp.open(fileEventi(), 'a');
+    try {
+      await fh.appendFile(testo, 'utf8');
+      // Chi chiude l'app di colpo, o resta senza corrente, ritrova quello che era già scritto.
+      await fh.datasync().catch(() => {});
+    } finally { await fh.close(); }
+  }
+
+  async function rinomina(da, a) {
+    for (let i = 0; ; i++) {
+      try { return await fsp.rename(da, a); } catch (e) {
+        // Su Windows un antivirus o un indicizzatore tiene il file aperto per un attimo.
+        if (i >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+        await new Promise((r) => setTimeout(r, 60 * (i + 1)));
+      }
+    }
+  }
+
+  // Le uniche righe che si tolgono dal file sono quelle coperte da una cancellazione; le altre restano byte per byte.
+  async function compattaFile() {
+    let testo = '';
+    try { testo = await fsp.readFile(fileEventi(), 'utf8'); } catch (e) { if (e.code === 'ENOENT') return 0; throw e; }
+    const coppie = [];
+    for (const r of testo.split('\n')) {
+      if (!r.trim()) continue;
+      let ev = null;
+      try { ev = JSON.parse(r); } catch (_) { continue; }
+      if (!ev || typeof ev !== 'object') continue;
+      coppie.push({ r, ev });
+    }
+    const validi = coppie.filter((c) => E().valido(c.ev)).map((c) => c.ev);
+    const tenuti = new Set(E().compatta(validi));
+    // Una riga che questa versione non capisce (una versione più nuova del formato) resta dov'è.
+    const restano = coppie.filter((c) => !E().valido(c.ev) || tenuti.has(c.ev));
+    const tmp = fileEventi() + '.tmp';
+    const fh = await fsp.open(tmp, 'w');
+    try {
+      await fh.writeFile(restano.map((c) => c.r + '\n').join(''), 'utf8');
+      await fh.datasync().catch(() => {});
+    } finally { await fh.close(); }
+    await rinomina(tmp, fileEventi());
+    return coppie.length - restano.length;
+  }
+
+  async function caricaDaDisco() {
+    const stato = E().nuovoStato();
+    let testo = '';
+    try { testo = await fsp.readFile(fileEventi(), 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    const { eventi, scartate } = E().analizza(testo);
+    if (scartate) console.warn(`[Filo] filo: ${scartate} righe illeggibili saltate`);
+    let daCompattare = false;
+    for (const ev of eventi) if (E().applica(stato, ev).tolti) daCompattare = true;
+    // Una riga lasciata a metà da un guasto non deve incollarsi all'evento che arriva dopo.
+    if (testo && !testo.endsWith('\n')) await scriviInCoda('\n');
+    // Una cancellazione scritta ma non ancora tolta dal file (l'app è morta in mezzo) si finisce adesso.
+    if (daCompattare) await compattaFile();
+    return stato;
+  }
+
+  // Le chat salvate prima del filo (#525) diventano segmenti: una chat già nel filo non si riscrive, così la
+  // migrazione si può ripetere (un avvio interrotto, un vecchio export reimportato) senza doppioni.
+  async function migraChatSalvate(chats) {
+    const lista = (Array.isArray(chats) ? chats : []).filter((c) => c && c.id && !normale.stato.chat.has(c.id));
+    if (!lista.length) return 0;
+    const eventi = E().daChatSalvate(lista, { dispositivo: normale.dispositivo });
+    await scriviInCoda(eventi.map(E().riga).join(''));
+    for (const ev of eventi) E().applica(normale.stato, ev);
+    return lista.length;
+  }
+
+  // Il registro grezzo di prima (#868): la sua sola copia dei messaggi tagliati a 200 caratteri non serve più a nessuno.
+  async function togliRegistroGrezzo() {
+    const D = disco();
+    const KEY = globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS && globalThis.SN_CONST.STORAGE_KEYS.FILO_RAW_LOG;
+    const chrome = globalThis.chrome;
+    if (!KEY || !chrome || !chrome.storage || !chrome.storage.local) return;
+    const togli = async () => {
+      const r = await chrome.storage.local.get(KEY);
+      if (r && r[KEY] !== undefined) await chrome.storage.local.remove(KEY);
+    };
+    if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
+  }
+
+  async function migraDaStorage() {
+    try { await togliRegistroGrezzo(); } catch (e) { console.warn('[Filo] registro grezzo non tolto:', e?.message || e); }
+    const D = disco();
+    const KEY = globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS && globalThis.SN_CONST.STORAGE_KEYS.FILO_CHATS;
+    const chrome = globalThis.chrome;
+    if (!KEY || !chrome || !chrome.storage || !chrome.storage.local) return;
+    const leggi = () => chrome.storage.local.get(KEY);
+    const res = D && D.fuoriDaIncognito ? await D.fuoriDaIncognito(leggi) : await leggi();
+    const chats = res && res[KEY];
+    if (chats === undefined) return;
+    if (Array.isArray(chats) && chats.length) await migraChatSalvate(chats);
+    const togli = async () => {
+      await chrome.storage.local.remove(KEY);
+      if (D && D.flushNow) await D.flushNow();
+    };
+    if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
+  }
+
+  function carica() {
+    if (normale.caricato) return Promise.resolve();
+    if (!normale.caricando) {
+      normale.caricando = (async () => {
+        if (!normale.dispositivo) normale.dispositivo = await leggiDispositivo();
+        try {
+          normale.stato = await caricaDaDisco();
+        } catch (e) {
+          // Senza leggere il filo non si migra né si compatta: una migrazione su un elenco vuoto farebbe doppioni.
+          console.warn('[Filo] filo non leggibile, riprovo alla prossima richiesta:', e?.message || e);
+          normale.caricando = null;
+          return;
+        }
+        try { await migraDaStorage(); } catch (e) { console.warn('[Filo] migrazione delle chat:', e?.message || e); }
+        normale.caricato = true;
+      })();
+    }
+    return normale.caricando;
+  }
+
+  function evento(tipo, campi, { autore, ts, id } = {}) {
+    return E().crea(tipo, campi, { autore, ts, id, dispositivo: normale.dispositivo || 'sconosciuto' });
+  }
+
+  // Un evento fuori formato non si butta in silenzio: chi scrive lo deve sapere (per la chat lo registra handlers.js).
+  async function scrivi(incog, eventi, { scartaInvalidi = false } = {}) {
+    const tutti = Array.isArray(eventi) ? eventi : [eventi];
+    const validi = tutti.filter((ev) => E().valido(ev));
+    if (validi.length < tutti.length && !scartaInvalidi) {
+      throw new Error(`evento del filo fuori formato: ${tutti.filter((ev) => !E().valido(ev)).map((ev) => ev && ev.tipo).join(', ')}`);
+    }
+    const st = incog ? incognito.stato : normale.stato;
+    const visite = new Set(validi.filter((ev) => ev.tipo === E().TIPI.NAVIGAZIONE && !E().coperto(st, ev)).map((ev) => ev.id));
+    const daScrivere = validi.filter((ev) => !E().coperto(st, ev, visite));
+    if (!daScrivere.length) return { scritti: [], tolti: 0 };
+    let tolti = 0;
+    if (incog) {
+      const scritti = [];
+      for (const ev of daScrivere) {
+        const r = E().applica(incognito.stato, ev);
+        if (r.nuovo) { incognito.eventi.push(ev); scritti.push(ev); }
+        tolti += r.tolti;
+      }
+      if (tolti) incognito.eventi = E().compatta(incognito.eventi);
+      return { scritti, tolti };
+    }
+    const nuovi = daScrivere.filter((ev) => !normale.stato.ids.has(ev.id));
+    if (!nuovi.length) return { scritti: [], tolti: 0 };
+    await scriviInCoda(nuovi.map(E().riga).join(''));
+    for (const ev of nuovi) tolti += E().applica(normale.stato, ev).tolti;
+    if (tolti) await compattaFile();
+    return { scritti: nuovi, tolti };
+  }
+
+  // Leggere, decidere e scrivere senza che un'altra scrittura passi in mezzo: due schede che chattano insieme non
+  // si mangiano un messaggio. L'incognito si decide qui, una volta, con la richiesta.
+  function transazione(fn, opts) {
+    const incog = inIncognito(opts);
+    return inCoda(async () => {
+      await carica();
+      const v = incog ? incognito : normale;
+      return fn({
+        incognito: incog,
+        chat: (id) => (id ? v.stato.chat.get(id) || null : null),
+        tutte: () => [...v.stato.chat.values()],
+        evento,
+        scrivi: (eventi, o) => scrivi(incog, eventi, o),
+      });
+    });
+  }
+
+  async function vista(opts) {
+    const incog = inIncognito(opts);
+    await carica();
+    return incog ? incognito : normale;
+  }
+
+  // Una chat nascosta (#1295) non la vede nessuno che chiede «le chat»: solo chi la chiede (`nascoste`: true tutte, 'solo').
+  const quali = (opts) => {
+    const n = opts && opts.nascoste;
+    return n === 'solo' ? (c) => !!c.nascosta : (n ? () => true : (c) => !c.nascosta);
+  };
+  async function chats(opts) {
+    const v = await vista(opts);
+    return E().elencoChat(v.stato).filter(quali(opts)).map(E().copiaChat);
+  }
+
+  async function chat(id, opts) {
+    if (!id) return null;
+    const v = await vista(opts);
+    return E().copiaChat(v.stato.chat.get(id));
+  }
+
+  // Per la home (#869): tutte le chat col dispositivo di ogni messaggio, le pagine e il dispositivo di qui. `pos` cambia a
+  // ogni evento: chi ne ricava qualcosa di costoso lo tiene finché non cambia.
+  async function perLaCoda(opts) {
+    const v = await vista(opts);
+    return {
+      pos: v.stato.pos,
+      qui: normale.dispositivo,
+      chats: E().elencoChat(v.stato).filter(quali(opts)).map((c) => E().copiaChat(c, { dispositivi: true })),
+      pagine: E().pagineNelPeriodo(v.stato, { da: null, a: null }).map((p) => ({ ...p })),
+    };
+  }
+
+  // Dov'è un evento (messaggio o pagina visitata), per saltarci: null se non c'è più (#872).
+  async function dove(id, opts) {
+    const v = await vista(opts);
+    return E().dove(v.stato, id);
+  }
+
+  // L'evento dell'ultimo messaggio dell'utente in una chat: la fonte di una lezione chiesta a parole.
+  async function ultimaDomanda(id, opts) {
+    const v = await vista(opts);
+    const c = id ? E().copiaChat(v.stato.chat.get(String(id)), { ids: true }) : null;
+    if (!c) return '';
+    for (let i = c.messages.length - 1; i >= 0; i--) if (c.messages[i].role === 'user') return c.eids[i] || '';
+    return '';
+  }
+
+  async function pagine(periodo, opts) {
+    const v = await vista(opts);
+    return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
+  }
+
+  // Ogni pagina aperta in una scheda: dalla finestra incognito resta nel filo in memoria, mai su disco.
+  function registraVisita({ url, titolo, scheda, ts } = {}, opts) {
+    if (!url) return Promise.resolve(null);
+    return transazione(async (t) => {
+      const ev = t.evento(E().TIPI.NAVIGAZIONE, {
+        url: String(url), titolo: String(titolo || ''), scheda: scheda == null ? undefined : scheda,
+      }, { autore: 'utente', ts });
+      await t.scrivi([ev]);
+      return ev;
+    }, opts);
+  }
+
+  // Il titolo che la pagina si dà dopo (un'app web, «Caricamento…» che diventa il nome vero) è un evento in coda.
+  function aggiornaTitolo({ visita, titolo } = {}, opts) {
+    if (!visita || typeof titolo !== 'string' || !titolo) return Promise.resolve(null);
+    return transazione(async (t) => {
+      const ev = t.evento(E().TIPI.TITOLO_PAGINA, { visita: String(visita), titolo }, { autore: 'utente' });
+      const { scritti } = await t.scrivi([ev]);
+      return scritti.length ? ev : null;
+    }, opts);
+  }
+
+  function cancellaPagine(periodo, opts) {
+    if (!periodo) return Promise.resolve(0);
+    return cancella([periodo], opts);
+  }
+
+  // Visite tolte ({ ts, sito, url }, o una fila dello stesso sito con { da, a }), in una scrittura sola. `schedeChiuse:
+  // false` quando sono proprio le schede chiuse a portarle via (la Cronologia): quelle ancora aperte restano fuori.
+  function cancellaVisite(visite, opts, { schedeChiuse = true } = {}) {
+    const periodi = (Array.isArray(visite) ? visite : []).filter((p) => p && p.ts)
+      .map((p) => ({ da: p.da || p.ts, a: p.a || p.ts, sito: p.sito || '', url: p.url || null }));
+    return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
+  }
+
+  // Ogni strada che toglie pagine passa di qui, e da qui lo sanno le home aperte.
+  const pagineTolte = new Set();
+  function suPagineTolte(fn) { if (typeof fn === 'function') pagineTolte.add(fn); }
+
+  function cancella(periodi, opts, { schedeChiuse = true } = {}) {
+    return transazione(async (t) => {
+      const voci = periodi.map((periodo) => {
+        const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
+        return { pagine: { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) }, url: periodo.url || null };
+      });
+      const { tolti } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
+      // Il ricordo dei campi password va via per sito, e ogni volta si riscrive: un sito una volta sola («Svuota archivio»).
+      const siti = new Set();
+      for (const v of voci) {
+        const k = v.pagine.sito || `|${v.pagine.da}|${v.pagine.a}`;
+        if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
+        if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
+      }
+      for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
+      return tolti;
+    }, opts);
+  }
+
+  // Per l'esportazione: il filo così com'è sul disco (o, dall'incognito, quello in memoria).
+  async function esporta(opts) {
+    const incog = inIncognito(opts);
+    return inCoda(async () => {
+      await carica();
+      if (incog) return Buffer.from(incognito.eventi.map(E().riga).join(''), 'utf8');
+      try { return await fsp.readFile(fileEventi()); } catch (e) { if (e.code === 'ENOENT') return Buffer.alloc(0); throw e; }
+    });
+  }
+
+  // Gli eventi di un export: entrano quelli con un id che qui non c'è, nell'ordine in cui erano.
+  function importa(testo, opts) {
+    return transazione(async (t) => {
+      const { eventi, scartate } = E().analizza(Buffer.isBuffer(testo) ? testo.toString('utf8') : testo);
+      const { scritti } = await t.scrivi(eventi, { scartaInvalidi: true });
+      return { aggiunti: scritti.length, scartate };
+    }, opts);
+  }
+
+  // Un export di prima del filo porta le chat nel vecchio formato: entrano come alla migrazione.
+  function importaChatSalvate(chatsVecchie, opts) {
+    return transazione(async (t) => {
+      if (t.incognito) {
+        const nuove = (Array.isArray(chatsVecchie) ? chatsVecchie : []).filter((c) => c && c.id && !t.chat(c.id));
+        await t.scrivi(E().daChatSalvate(nuove, { dispositivo: normale.dispositivo || 'sconosciuto' }));
+        return nuove.length;
+      }
+      return migraChatSalvate(chatsVecchie);
+    }, opts);
+  }
+
+  // Le schede chiuse archiviate prima che il filo esistesse entrano alla loro data, una visita per scheda, legata alla
+  // sua voce d'archivio (riassunto e vettore restano lì). Si ripete senza doppioni: una scheda già legata, o che ha già
+  // una visita del suo indirizzo mentre era aperta, non rientra; una che una cancellazione copre non si scrive.
+  function entranoSchedeChiuse(schede, { unaVolta = false } = {}) {
+    return transazione(async (t) => {
+      if (t.incognito) return 0;
+      const segno = path.join(dir(), FILE_SCHEDE_ENTRATE);
+      if (unaVolta) { try { await fsp.access(segno); return 0; } catch (_) {} }
+      const st = normale.stato;
+      const legate = new Set();
+      const perUrl = new Map();
+      for (const p of st.pagine.values()) {
+        if (p.archivio) legate.add(p.archivio);
+        if (!perUrl.has(p.url)) perUrl.set(p.url, []);
+        perUrl.get(p.url).push(Date.parse(p.ts));
+      }
+      const eventi = [];
+      const ordinate = (Array.isArray(schede) ? schede : [])
+        .filter((s) => s && typeof s.id === 'string' && typeof s.url === 'string' && /^(https?|file):/i.test(s.url))
+        .map((s) => ({ s, t: Date.parse(s.openedAt) || Date.parse(s.closedAt) }))
+        .filter((x) => Number.isFinite(x.t))
+        .sort((a, b) => a.t - b.t);
+      for (const { s, t: inizio } of ordinate) {
+        if (legate.has(s.id)) continue;
+        const fine = Date.parse(s.closedAt) || inizio;
+        const viste = perUrl.get(s.url) || [];
+        if (viste.some((x) => x >= inizio - MARGINE_SCHEDA_MS && x <= fine + MARGINE_SCHEDA_MS)) continue;
+        eventi.push(t.evento(E().TIPI.NAVIGAZIONE, {
+          url: s.url, titolo: String(s.title && s.title !== s.url ? s.title : ''), archivio: s.id,
+        }, { autore: 'utente', ts: new Date(inizio).toISOString() }));
+      }
+      const { scritti } = eventi.length ? await t.scrivi(eventi) : { scritti: [] };
+      if (unaVolta) {
+        try { await fsp.mkdir(dir(), { recursive: true }); await fsp.writeFile(segno, new Date().toISOString() + '\n', 'utf8'); }
+        catch (e) { console.warn('[Filo] segno delle schede chiuse non scritto:', e?.message || e); }
+      }
+      return scritti.length;
+    }, { incognito: false });
+  }
+
+  function resetIncognito() {
+    incognito = { stato: E().nuovoStato(), eventi: [] };
+  }
+
+  async function dispositivo() {
+    await carica();
+    return normale.dispositivo;
+  }
+
+  // Aspetta che ogni scrittura in fila sia arrivata su disco (prove e chiusura dell'app).
+  function quandoFermo() {
+    return inCoda(() => {});
+  }
+
+  return {
+    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    esporta, importa, importaChatSalvate,
+    resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
+  };
+}
+
+const filo = creaFilo();
+globalThis.SN_IL_FILO = filo;
+module.exports = { ...filo, creaFilo };

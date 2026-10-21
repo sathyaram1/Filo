@@ -94,13 +94,15 @@ test('il ritardo è sorteggiato dentro una finestra dichiarata, non fisso', asyn
     Collector._setSorteggio(() => sorte);
     const prima = Date.now();
     await raccogli('https://esempio.it/x', 'una cosa');
+    const dopo = Date.now();
     const [voce] = Collector._peek();
-    attese.push(voce.nonPrimaDi - prima);
+    // Il ritardo parte da un istante fra prima e dopo: la finestra si controlla con quei due, a macchina carica come ferma.
+    attese.push({ almeno: voce.nonPrimaDi - dopo, alPiu: voce.nonPrimaDi - prima });
   }
-  for (const a of attese) {
-    assert.ok(a >= RITARDO_MIN_MS - 1000 && a <= RITARDO_MAX_MS + 1000, `ritardo fuori finestra: ${a}ms`);
+  for (const { almeno, alPiu } of attese) {
+    assert.ok(alPiu >= RITARDO_MIN_MS && almeno <= RITARDO_MAX_MS, `ritardo fuori finestra: fra ${almeno} e ${alPiu} ms`);
   }
-  assert.ok(new Set(attese).size > 1, 'un ritardo sempre uguale sarebbe di nuovo un orario');
+  assert.ok(new Set(attese.map((a) => a.alPiu)).size > 1, 'un ritardo sempre uguale sarebbe di nuovo un orario');
   assert.ok(RITARDO_MIN_MS >= 30 * 60 * 1000, 'meno di mezz’ora non stacca niente');
   assert.ok(RITARDO_MAX_MS >= 12 * 60 * 60 * 1000, 'la finestra deve essere larga ore, non minuti');
 });

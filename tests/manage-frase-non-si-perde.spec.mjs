@@ -231,11 +231,14 @@ const LARGHEZZA_FISSA = 1600;
 
 async function finestraLarga(app, px) {
   const dato = await app.evaluate(({ BrowserWindow }, l) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (!w) return 0;
     if (w.isMaximized()) w.unmaximize();
     const [, h] = w.getContentSize();
+    // Su Windows a scala 125% la finestra senza cornice prende una larghezza fissa in più: si chiede quella meno lo scarto.
     w.setContentSize(l, h);
+    const scarto = w.getContentSize()[0] - l;
+    if (scarto) w.setContentSize(l - scarto, h);
     return w.getContentSize()[0];
   }, px);
   // Se la finestra non è diventata larga come chiesto la misura dopo parlerebbe
@@ -245,8 +248,8 @@ async function finestraLarga(app, px) {
 
 test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, openTab }) => {
   // Un file sospetto offre il massimo dei pulsanti: "In coda", "Lavoro locale" (#913), "Conferma
-  // attacco", "Conferma spam", "Archivia" — più preferito e frase. Prima gli
-  // ultimi due finivano su una seconda riga.
+  // attacco", "Conferma spam", "Archivia" — più preferito, frase, «Senza chiedere» (#1034) e «Aspetta» (#903). Prima gli
+  // ultimi finivano su una seconda riga.
   await finestraLarga(app, LARGHEZZA_FISSA);
   const page = await openTab(URL);
   await prepara(page, [{ ...BASE, _id: 'fb-sosp', seq: 912, status: 'suspicious_file', statusPublic: 'open' }], 'inbox', 'fb-sosp');
@@ -254,7 +257,7 @@ test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, 
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
     return { quanti: bs.length, righe: window.__righeDeiTasti(bs) };
   });
-  expect(misure.quanti).toBe(7);
+  expect(misure.quanti).toBe(9);
   expect(misure.righe).toBe(1);
 });
 

@@ -43,7 +43,7 @@
           <button type="button" data-sc="translate">${I18n.t('edit_box_shortcut_translate')}</button>
           <button type="button" data-sc="fix">${I18n.t('edit_box_shortcut_fix')}</button>
         </div>
-        <input type="text" class="sn-editbox-instruction" placeholder="${I18n.t('edit_box_instruction_placeholder')}">
+        <input type="text" class="sn-editbox-instruction">
         <div class="sn-editbox-panels">
           <div class="sn-editbox-panel">
             <div class="sn-editbox-label">${I18n.t('edit_box_original')}</div>
@@ -61,11 +61,13 @@
         </div>
       </div>
     `;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(Popup.riquadro ? Popup.riquadro(root) : root);
 
     const $orig = root.querySelector('.sn-editbox-original');
     const $prop = root.querySelector('.sn-editbox-proposed');
     const $instr = root.querySelector('.sn-editbox-instruction');
+    // Il testo d'esempio ha le virgolette: come attributo nel modello HTML si troncherebbe.
+    $instr.placeholder = I18n.t('edit_box_instruction_placeholder');
     const $cancel = root.querySelector('.sn-editbox-cancel');
     const $copy = root.querySelector('.sn-editbox-copy');
     const $replace = root.querySelector('.sn-editbox-replace');
@@ -80,8 +82,10 @@
       translate: 'Traduci il testo in inglese.',
       fix: 'Correggi eventuali errori grammaticali e di ortografia, senza alterare il senso.',
     };
+    // Una riscrittura spende una chiamata: parte solo da un tasto o da un clic dell'utente (#1071).
     root.querySelectorAll('.sn-editbox-shortcuts button').forEach((b) => {
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
         const k = b.dataset.sc;
         $instr.value = SHORTCUTS[k] || '';
         runEdit();
@@ -90,10 +94,15 @@
 
     let currentResult = '';
     let inFlight = false;
+    let $nota = null; // la riga del ripiego sui crediti di Filo, della proposta in vista
+    let $interrotta = null; // la riga della proposta fermata dal tetto di lunghezza (#1097.3)
     async function runEdit() {
       const instruction = $instr.value.trim();
       if (!instruction || inFlight) return;
       inFlight = true;
+      if ($nota) { $nota.remove(); $nota = null; }
+      if ($interrotta) { $interrotta.remove(); $interrotta = null; }
+      $prop.classList.remove('sn-editbox-errore');
       $prop.classList.add('sn-editbox-empty');
       $prop.textContent = I18n.t('edit_box_loading');
       $copy.disabled = true;
@@ -103,27 +112,40 @@
           type: MSG.AI_REQUEST,
           action: ACTIONS.EDIT_TEXT,
           payload: { original: originalText, instruction },
+          diceRipiego: true,
         });
         if (!res?.ok || !res.text) {
-          $prop.textContent = res?.error || I18n.t('edit_box_error');
+          // Perché la riscrittura non è partita, con la strada per rimediare: la regola sta in
+          // SN_CHAT_ERRORS, non un elenco di casi per riquadro (#663).
+          mostraErrore(res);
           return;
         }
         currentResult = res.text.trim();
         $prop.classList.remove('sn-editbox-empty');
         renderDiff($prop, originalText, currentResult);
+        $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
+        $interrotta = Popup.notaInterrotta($prop.parentNode, res.finishReason);
         $copy.disabled = false;
-        $replace.disabled = false;
-      } catch (_) {
-        $prop.textContent = I18n.t('edit_box_error');
+        // Una riscrittura tagliata al posto del testo intero ne perderebbe la coda: si copia, non si sostituisce.
+        $replace.disabled = !!global.SN_CHAT_ERRORS?.troncata?.(res.finishReason);
+      } catch (e) {
+        mostraErrore({ message: e?.message });
       } finally {
         inFlight = false;
       }
+    }
+    // Il motivo prende il posto della proposta, ma non il suo aspetto né quello dell'attesa: chi legge di sfuggita
+    // non lo deve scambiare per la riscrittura (#663).
+    function mostraErrore(res) {
+      $prop.classList.remove('sn-editbox-empty');
+      $prop.classList.add('sn-editbox-errore');
+      Popup.scriviErrore($prop, res);
     }
 
     $instr.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        runEdit();
+        if (global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted) runEdit();
       } else if (e.key === 'Escape') {
         close();
         // Il tasto è nostro e lo dichiariamo (#514): a schermo intero è così
@@ -133,13 +155,15 @@
       }
     });
     $cancel.addEventListener('click', close);
-    $copy.addEventListener('click', () => {
+    $copy.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
       navigator.clipboard.writeText(currentResult).then(() => {
         Popup.showToast(I18n.t('toast_copied'));
         close();
       }, () => Popup.showToast(I18n.t('err_provider_failed')));
     });
-    $replace.addEventListener('click', () => {
+    $replace.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
       deps.setPasteContext(savedCtx);
       deps.restorePasteContext();
       // In input/textarea sostituisco il range salvato; in contenteditable uso execCommand insertText
@@ -147,10 +171,17 @@
       if (savedCtx.kind === 'input') {
         const el = savedCtx.el;
         const start = savedCtx.start, end = savedCtx.end;
-        el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
         const caret = start + currentResult.length;
-        el.setSelectionRange(start, caret);
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+        // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
+        if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, currentResult)) {
+          el.setSelectionRange(start, caret);
+        } else {
+          el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
+          el.setSelectionRange(start, caret);
+          // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
+          const ev = new Event('input', { bubbles: true });
+          el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+        }
       } else if (savedCtx.kind === 'ce') {
         try { document.execCommand('insertText', false, currentResult); } catch (_) {}
       }
@@ -159,7 +190,8 @@
     });
 
     function close() {
-      try { root.remove(); } catch (_) {}
+      if (Popup.togliRiquadro) Popup.togliRiquadro(root);
+      else { try { root.remove(); } catch (_) {} }
       document.removeEventListener('keydown', onDocKey, true);
     }
     const onDocKey = (e) => {

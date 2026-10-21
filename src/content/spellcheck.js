@@ -1,73 +1,91 @@
-// Correttore AI a due livelli, complementare al correttore nativo del browser.
-//
-// ┌────────────────────────────────────────────────────────────────────────┐
-// │ ROSSO (nativo) — il browser disegna lo zigzag rosso sulle parole       │
-// │ ortograficamente errate, esattamente come fa di default. Non lo        │
-// │ tocchiamo. Quando l'utente fa click destro su un editabile e non c'è   │
-// │ un errore "blu" sotto il cursore, il flusso del menu (vedi             │
-// │ content.js) chiama requestWordSuggestion() per ottenere on-demand un   │
-// │ suggerimento dall'LLM e lo mostra nel menu.                            │
-// │                                                                         │
-// │ BLU (nostro) — un overlay assoluto, posizionato sopra l'editabile      │
-// │ focalizzato, riproduce il testo con color: transparent e disegna       │
-// │ uno zigzag blu sotto i range che l'LLM ha marcato come errori          │
-// │ contestuali (semantic / grammar / repetition). L'editabile reale resta │
-// │ intatto: il testo "vero" è quello sotto, lo zigzag blu è un livello    │
-// │ visivo soprapposto.                                                    │
-// └────────────────────────────────────────────────────────────────────────┘
-//
-// Restrizioni intenzionali:
-// - Solo <textarea> e [contenteditable] (no <input>: barre di ricerca, password, ecc.)
-// - Watch attivato solo quando l'editabile riceve focus (no overlay su tutta la pagina)
-// - Debounce 1500ms sull'input
-// - Limite lunghezza testo (oltre, niente scan continuo per non bombardare l'API)
+// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo. Il codice
+// segna subito i candidati, sbiaditi; il controllo rapido e quello ragionato del modello li confermano o li scartano.
+// Le regole senza DOM stanno in correttoreRegole.js e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
   'use strict';
 
   const { MSG } = global.SN_MSG;
   const { ACTIONS, STORAGE_KEYS } = global.SN_CONST;
+  const R = () => global.SN_CORRETTORE;
+  const Coerenza = () => global.SN_COERENZA;
+  const t = (k, ...a) => (global.SN_I18N ? global.SN_I18N.t(k, ...a) : k);
 
-  const DEBOUNCE_MS = 1500;
-  const MIN_TEXT_LENGTH = 8;
-  const MAX_TEXT_LENGTH = 4000;
+  // Il testo della pagina intorno al campo: tetto largo, e oltre si tiene la parte più vicina al campo.
+  const CONTESTO_MAX = 12000;
+  const CONTESTO_DOPO_MAX = 3000;
+  const CONTESTO_NODI_MAX = 20000;
+  // Il campo intorno al pezzo nuovo: l'inizio di «prima» si sposta a scatti, così il prefisso della domanda resta uguale.
+  const PRIMA_MIN = 3000;
+  const PRIMA_SCATTO = 2000;
+  const DOPO_MAX = 1000;
+  // Al controllo rapido basta la coda della conversazione per il registro; il ragionato ha la pagina intera.
+  const CONVERSAZIONE_MAX = 1500;
+  const LUOGO_VALE_MS = 10000;
+  // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
+  const PASSAGGIO_MS = 320;
+  // Oltre, i candidati del codice si ricalcolano a una pausa breve invece che a ogni tasto.
+  const LUNGO = 20000;
+  const RICALCOLO_LUNGO_MS = 300;
+  const ESITI_MAX = 40;
+  const GIUDICATI_MAX = 12;
+  const DIZIONARIO_MAX = 20000;
+  const MIN_TESTO = 8;
 
-  // Stato per ogni editabile attualmente "agganciato" (focus). WeakMap per non
-  // tenere riferimenti che impediscano GC se il sito rimuove l'elemento.
+  // Ogni casella ha il suo stato per tutta la vita della pagina: chi esce e rientra ritrova segni e giudizi già pagati
+  // (#1097.5), e un ascoltatore solo, che guarda lo stato vivo (#1070).
   const monitored = new WeakMap();
+  const ascoltate = new WeakSet();
   let activeEl = null;
   let personalDict = new Set();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
   let settings = null;
-  // Guard contro la ricorsione: l'applyFix dell'autocorrect dispatcha un input
-  // event che rientrerebbe nel listener; questa flag salta una sola passata.
+  // L'applyFix dell'autocorrect dispatcha un input che rientrerebbe nel listener: questa flag salta una passata.
   let suppressAutocorrect = false;
 
-  // Suggerimenti del correttore NATIVO (Electron) per l'ultima parola su cui è
-  // stato richiesto il menu contestuale. Il main li spinge via broadcast
-  // `_spell:native` sull'evento context-menu (vedi tabs.js). Sono immediati e
-  // non dipendono dall'LLM: il menu di correzione li usa come base affidabile.
+  // Suggerimenti del correttore NATIVO per l'ultima parola su cui è stato chiesto il menu: il main li spinge al tasto
+  // destro (`_spell:native`, tabs.js). Servono alle caselle di una riga e ai blocchi sigillati (#438).
   let lastNative = { word: '', suggestions: [], ts: 0 };
   const nativeWaiters = new Set();
+
+  // ============================================================================
+  // Impostazioni
+  // ============================================================================
+  const spentoQui = () => !settings || settings.sitoSpento === true;
+  function erroriAttivi() { return !spentoQui() && settings.featureFlags?.spellcheck !== false; }
+  function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
+  function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
+  function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
+  function tempi() {
+    const C = global.SN_CONST;
+    return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
+  }
+  const attivo = () => erroriAttivi() || suggerimentiAttivi();
+
+  // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
+  // caselle di una riga. Sul sito dove Filo è spento il browser fa da sé.
+  function segnaRadice() {
+    const r = document.documentElement;
+    if (!r || !r.dataset) return;
+    if (spentoQui()) { delete r.dataset.snCorrettore; return; }
+    r.dataset.snCorrettore = erroriAttivi() ? 'errori' : 'senza-errori';
+  }
 
   // ============================================================================
   // Init
   // ============================================================================
   function init(s) {
     settings = s;
+    segnaRadice();
     loadDictionary();
     loadAutocorrect();
-
-    // Aggancia/sgancia in base al focus. Usiamo capture per intercettare anche
-    // focus su elementi dentro custom elements / shadow root (per quanto possibile).
+    // In cattura, per i campi dentro i componenti (per quanto possibile).
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
-
-    // Riallinea overlay attivo a scroll/resize della finestra.
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
+    document.addEventListener('visibilitychange', riprendiRimandati);
 
-    // Riceve i suggerimenti del correttore nativo spinti dal main al click destro.
     try {
       chrome.runtime.onMessage.addListener((m) => {
         if (m?.type !== '_spell:native') return;
@@ -76,22 +94,21 @@
           suggestions: Array.isArray(m.suggestions) ? m.suggestions : [],
           ts: Date.now(),
         };
-        // Marker DOM per i test: espone l'ultima parola con suggerimenti nativi
-        // ricevuta, così un test può attendere che il broadcast sia stato
-        // EFFETTIVAMENTE registrato prima di simulare il click destro, invece di
-        // affidarsi a un timeout fisso (causa di flakiness). Innocuo a runtime.
+        // Per i test: la parola di cui sono arrivati i suggerimenti nativi, invece di un'attesa fissa.
         try { document.documentElement.dataset.filoNativeWord = lastNative.word; } catch (_) {}
         for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
       });
     } catch (_) {}
 
-    // Aggiornamento live se la pagina del correttore cambia dizionario/autocorrect.
+    // La pagina del correttore cambia dizionario e correzioni automatiche: qui valgono subito.
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
         if (changes[STORAGE_KEYS.PERSONAL_DICT]) {
           const words = changes[STORAGE_KEYS.PERSONAL_DICT].newValue || [];
           personalDict = new Set(words.map((w) => String(w).toLowerCase()));
+          const state = activeEl && monitored.get(activeEl);
+          if (state) aggiornaCodice(state);
         }
         if (changes[STORAGE_KEYS.AUTOCORRECT]) {
           autocorrectMap = changes[STORAGE_KEYS.AUTOCORRECT].newValue || {};
@@ -102,15 +119,25 @@
 
   function updateSettings(s) {
     settings = s;
-    if (!isEnabled()) detachAll();
+    segnaRadice();
+    if (!attivo()) { detachAll(); return; }
+    const state = activeEl && monitored.get(activeEl);
+    if (!state) return;
+    // Ogni parte si spegne da sola, e le altre restano.
+    if (!modelloErrori()) fermaTimer(state, ['timerRapido', 'timerFine']);
+    if (!suggerimentiAttivi()) fermaTimer(state, ['timerRagionato']);
+    aggiornaCodice(state);
+    // Anche il tema può essere cambiato: i colori dei segni lo leggono dall'overlay.
+    syncOverlay(state);
   }
 
-  function isEnabled() {
-    return settings?.featureFlags?.spellcheck !== false;
+  function fermaTimer(state, nomi) {
+    for (const k of nomi) if (state[k]) { clearTimeout(state[k]); state[k] = null; }
+    if (nomi.includes('timerRapido')) state.cambioDa = 0;
   }
 
   // ============================================================================
-  // Dizionario personale
+  // Dizionari
   // ============================================================================
   async function loadDictionary() {
     try {
@@ -124,17 +151,14 @@
     const w = String(word || '').trim();
     if (!w) return;
     const wLower = w.toLowerCase();
-    // Match case-insensitive: se la parola (in qualsiasi casing) è già presente, non aggiungerla.
     if (personalDict.has(wLower)) return;
-    personalDict.add(wLower); // Il set interno resta lowercase per isInDictionary
+    personalDict.add(wLower);
     try {
-      // Legge l'array esistente dallo storage (che preserva il casing originale) e aggiunge
-      // la nuova parola mantenendo il casing, con dedup case-insensitive.
+      // Lo storage tiene la parola come l'ha scritta l'utente («iPhone»); il confronto è senza maiuscole.
       const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
       const existing = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
-      const alreadyExists = existing.some((x) => String(x).toLowerCase() === wLower);
-      if (!alreadyExists) {
-        existing.push(w); // preserva il casing originale
+      if (!existing.some((x) => String(x).toLowerCase() === wLower)) {
+        existing.push(w);
         await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
       }
     } catch (_) {}
@@ -142,6 +166,28 @@
 
   function isInDictionary(word) {
     return personalDict.has(String(word || '').trim().toLowerCase());
+  }
+
+  // Il dizionario del browser, ricordato per pagina. Finché non ha caricato le sue lingue ogni parola risulta giusta:
+  // quella risposta non si ricorda, se no una parola sbagliata scritta nel primo secondo resterebbe giusta per sempre.
+  const parereDizionario = new Map();
+  let dizionarioPronto = false;
+  function sbagliataPerIlBrowser(parola) {
+    const D = global.SN_DIZIONARIO;
+    if (!D) return false;
+    const k = String(parola || '');
+    if (parereDizionario.has(k)) return parereDizionario.get(k);
+    if (!dizionarioPronto) dizionarioPronto = D.sbagliata('qzxwvkjh');
+    const v = D.sbagliata(k);
+    if (!dizionarioPronto) return v;
+    if (parereDizionario.size >= DIZIONARIO_MAX) parereDizionario.clear();
+    parereDizionario.set(k, v);
+    return v;
+  }
+
+  function proposteDelBrowser(parola) {
+    const D = global.SN_DIZIONARIO;
+    try { return D ? D.proposte(String(parola || '')).filter((p) => p && p !== parola) : []; } catch (_) { return []; }
   }
 
   // ============================================================================
@@ -166,25 +212,9 @@
   }
 
   function isWordCharLocal(c) { return !!c && /[\p{L}\p{N}'’\-]/u.test(c); }
+  // Spazio o punteggiatura di fine parola: il confine dopo cui scatta la correzione automatica.
   function isBoundaryChar(c) {
-    // Whitespace o punteggiatura "fine parola" che ha senso per l'autocorrect.
     return !!c && /[\s.,!?;:)\]…"'»“”]/u.test(c);
-  }
-
-  // Applica al testo della correzione la stessa "case" della parola digitata:
-  // - "PAROLA" -> tutta maiuscola
-  // - "Parola" -> prima lettera maiuscola
-  // - altrimenti invariata
-  function matchCase(originalWord, correction) {
-    if (!originalWord || !correction) return correction;
-    if (originalWord.length > 1 && originalWord === originalWord.toUpperCase()) {
-      return correction.toUpperCase();
-    }
-    const first = originalWord[0];
-    if (first && first === first.toUpperCase() && first !== first.toLowerCase()) {
-      return correction[0].toUpperCase() + correction.slice(1);
-    }
-    return correction;
   }
 
   function tryAutocorrect(state) {
@@ -193,46 +223,28 @@
     const el = state.el;
     const text = getEditableText(el);
     if (!text) return;
-
-    let pos = -1;
-    if (el.tagName === 'TEXTAREA') {
-      pos = el.selectionStart ?? -1;
-    } else {
-      pos = contenteditableCaretOffset(el);
-    }
+    const pos = cursoreNelCampo(el);
     if (pos <= 1) return;
-
-    const lastChar = text[pos - 1];
-    if (!isBoundaryChar(lastChar)) return;
-
+    if (!isBoundaryChar(text[pos - 1])) return;
     const end = pos - 1;
-    // Serve almeno un carattere di parola prima del confine.
     if (end <= 0 || !isWordCharLocal(text[end - 1])) return;
-
-    // Cerca la chiave (anche multi-parola, es. "x es") che termina a `end`.
     const match = findAutocorrectMatch(text, end);
     if (!match) return;
     const { start } = match;
     const original = text.slice(start, end);
-    const replacement = matchCase(original, autocorrectMap[match.key]);
+    const replacement = R().comeScritto(original, autocorrectMap[match.key]);
     if (!replacement || replacement === original) return;
-
     suppressAutocorrect = true;
     try {
       applyFix(el, { start, end }, replacement, { cursor: 'preserve' });
     } finally {
-      // Resetta la guardia dopo il flush degli eventi sincroni e dell'input event
-      // riemesso da setRangeText.
+      // Dopo il flush degli eventi sincroni e dell'input riemesso da setRangeText.
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
   }
 
-  // Trova la chiave di autocorrect che termina ESATTAMENTE all'offset `end` nel
-  // testo, delimitata a sinistra da un confine di parola. Le chiavi possono
-  // contenere spazi ("x es" → "per esempio"): non basta più risalire al singolo
-  // token prima del confine. A parità di posizione finale vince la chiave più
-  // lunga, così "x es" batte "es" se entrambe esistono. Ritorna { start, key }
-  // (con `key` la chiave lowercased nella mappa) oppure null.
+  // La chiave che finisce ESATTAMENTE a `end`, con un confine di parola a sinistra («es» non scatta dentro «mese»). Le
+  // chiavi possono avere spazi («x es» → «per esempio»): a parità di fine vince la più lunga. { start, key } o null.
   function findAutocorrectMatch(text, end) {
     const lowerRegion = text.slice(0, end).toLowerCase();
     let best = null;
@@ -240,22 +252,15 @@
       if (!key) continue;
       const start = end - key.length;
       if (start < 0) continue;
-      // Il testo che precede il confine deve coincidere con la chiave.
       if (lowerRegion.slice(start) !== key) continue;
-      // Confine di parola a sinistra: il carattere prima del match non dev'essere
-      // un carattere di parola, così "es" non scatta dentro "mese".
       if (start > 0 && isWordCharLocal(text[start - 1])) continue;
-      // La chiave deve iniziare con un carattere di parola (le chiavi sono
-      // trim()+lowercase, quindi lo sono sempre): esclude match che partono da
-      // uno spazio interno spurio.
       if (!isWordCharLocal(text[start])) continue;
       if (!best || key.length > best.key.length) best = { start, key };
     }
     return best;
   }
 
-  // Posiziona il caret all'offset di carattere `target` nell'elemento contenteditable,
-  // popolando il Range passato (non lo aggiunge al selection: lascia farlo al chiamante).
+  // Il Range passato messo al carattere `target` del campo modificabile (non lo aggiunge alla selezione).
   function placeCaretAtOffset(el, target, range) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let cur = 0, n;
@@ -268,12 +273,10 @@
       }
       cur += len;
     }
-    // Fallback: a fine elemento
     range.selectNodeContents(el);
     range.collapse(false);
   }
 
-  // Offset (0-based) del caret nel testo completo dell'elemento contenteditable.
   function contenteditableCaretOffset(el) {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return -1;
@@ -289,14 +292,23 @@
     return -1;
   }
 
+  // Dove sta il cursore nel testo del campo, solo se non c'è una selezione: -1 altrimenti.
+  function cursoreNelCampo(el) {
+    try {
+      if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+        return el.selectionStart === el.selectionEnd ? (el.selectionStart ?? -1) : -1;
+      }
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && !sel.isCollapsed) return -1;
+      return contenteditableCaretOffset(el);
+    } catch (_) { return -1; }
+  }
+
   // ============================================================================
-  // Detection editabili
+  // Quali campi
   // ============================================================================
-  // Editabili supportati: textarea e contenteditable. Niente <input>.
-  // Per il contenteditable consideriamo SOLO il "root" — l'elemento che porta
-  // l'attributo contenteditable. I discendenti ereditano isContentEditable,
-  // ma agganciare l'overlay a un figlio invece che al root (es. uno <span>
-  // dentro un editor di Slack/Twitter) sballa allineamento e dimensioni.
+  // Textarea e campi modificabili, mai <input> (ricerche, password). Del campo modificabile si prende la radice, quella
+  // con l'attributo: un figlio (lo <span> di un editor di chat) sballa allineamento e misure.
   function isSupportedEditable(el) {
     if (!el || el.nodeType !== 1) return false;
     if (el.tagName === 'TEXTAREA') return !el.disabled && !el.readOnly;
@@ -305,100 +317,171 @@
     return ce === '' || ce === 'true' || ce === 'plaintext-only';
   }
 
-  // L'editabile può essere un antenato del target. Saliamo finché non troviamo
-  // un textarea o un elemento con attributo contenteditable.
+  // Dove il sito chiede di non correggere: spellcheck="false" (anche da un antenato), il segno per Grammarly e simili,
+  // e gli editor di codice. Niente elenchi di siti.
+  const NON_CORREGGERE = '[data-gramm="false"], [data-gramm_editor="false"], [data-enable-grammarly="false"]';
+  const EDITOR_DI_CODICE = '.CodeMirror, .cm-editor, .monaco-editor, .ace_editor, .ace_text-input, pre, code';
+  function campoEscluso(el) {
+    try {
+      if (el.spellcheck === false) return true;
+      for (let e = el; e && e.nodeType === 1;) {
+        if (e.closest(NON_CORREGGERE) || e.closest(EDITOR_DI_CODICE)) return true;
+        const r = e.getRootNode();
+        e = r && r.host ? r.host : null;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  // Il campo può essere un antenato del bersaglio.
   function findSupportedEditable(el) {
     while (el && el.nodeType === 1) {
-      if (isSupportedEditable(el)) return el;
+      if (isSupportedEditable(el)) return campoEscluso(el) ? null : el;
       el = el.parentElement;
     }
     return null;
   }
 
+  // Da un riquadro chiuso di Filo (feedback, spiegazione) il focus arriva all'host: il campo vero lo sa SN_FILO_UI,
+  // e l'overlay sta dentro lo stesso riquadro, perché ripete il testo e nel documento del sito lo leggerebbe (#1071).
+  // Dentro il componente aperto di un sito il fuoco arriva all'host: il campo vero è il primo del cammino dell'evento.
+  function editabileDellEvento(e) {
+    const UI = global.SN_FILO_UI;
+    const tg = e && e.target;
+    const riquadro = !!(UI && UI.bersaglio && tg && tg.hasAttribute && tg.hasAttribute(UI.RIQUADRO));
+    if (riquadro) return findSupportedEditable(UI.bersaglio(e));
+    let vero = tg;
+    try { const via = typeof e.composedPath === 'function' ? e.composedPath() : null; if (via && via[0] && via[0].nodeType === 1) vero = via[0]; } catch (_) {}
+    return findSupportedEditable(vero);
+  }
+  function radiceDi(el) {
+    try {
+      const r = el.getRootNode();
+      const UI = global.SN_FILO_UI;
+      if (r && r !== document && r.host && UI && r.host.hasAttribute(UI.RIQUADRO)) return r;
+    } catch (_) {}
+    return null;
+  }
+
   // ============================================================================
-  // Focus lifecycle
+  // Fuoco
   // ============================================================================
   function onFocusIn(e) {
-    if (!isEnabled()) return;
-    const el = findSupportedEditable(e.target);
+    if (!attivo()) return;
+    const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
   }
 
   function onFocusOut(e) {
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
-    // Mantieni l'overlay finché l'utente sta interagendo col popup correzione,
-    // altrimenti il click destro su un range blu lo nasconde subito.
+    // L'overlay resta mentre si usa il menu del tasto destro, che col clic sposterebbe il fuoco.
     setTimeout(() => {
-      if (document.activeElement === el) return;
+      if ((radiceDi(el) || document).activeElement === el) return;
       detach(el);
     }, 200);
   }
 
-  function attach(el) {
+  function statoDi(el) {
     let state = monitored.get(el);
-    if (!state) {
-      state = {
-        el,
-        overlay: null,
-        issues: [],
-        lastScannedText: '',
-        timer: null,
-        ro: null,
-        // Cache delle correzioni per-parola (popolata sia dal prefetch dopo lo scan
-        // blu sia dalle richieste on-demand al click destro). Le chiavi sono lowercased.
-        wordCache: new Map(),
-      };
-      monitored.set(el, state);
-      el.addEventListener('input', () => {
-        // 1) autocorrect istantaneo
-        tryAutocorrect(state);
-        // 2) gli issue blu hanno offset relativi al testo precedente: digitare anche
-        // un solo carattere prima della fine può sfasare l'intero set. Cancellali
-        // subito; verranno ricostruiti dal prossimo scan (debounce 1.5s). Senza
-        // questo, "Risolvi" può applicare il fix sul range sbagliato e "mangiare"
-        // la frase.
-        if (state.issues.length) {
-          state.issues = [];
-          renderOverlayContent(state);
-        }
-        // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
-        //    (boundary char), lancia subito il check ortografico così che al
-        //    click destro non ci sia attesa. Limitato e in background.
-        prefetchJustCompletedWord(state);
-        // 4) il prossimo scan
-        scheduleScan(state);
-      });
-      el.addEventListener('scroll', () => syncOverlay(state));
-      // Resize observer per cambi di dimensione (autoresize textarea, ecc.)
+    if (state) return state;
+    state = {
+      el, overlay: null, ro: null, attivo: false, riquadro: null,
+      // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
+      testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
+      // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
+      baseRapido: '', baseRagionato: '',
+      verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
+      timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
+      cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
+      rimandati: new Set(), luogo: null, luogoAlle: 0, inVista: [],
+      // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
+      giudicati: { rapido: new Map(), ragionato: new Map() },
+    };
+    monitored.set(el, state);
+    return state;
+  }
+
+  function attach(el) {
+    const state = statoDi(el);
+    if (!ascoltate.has(el)) {
+      ascoltate.add(el);
+      el.addEventListener('input', (e) => { const vivo = monitored.get(el); if (vivo && vivo.attivo) suInput(vivo, e); });
+      el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
+    }
+    if (!state.ro) {
       try {
         state.ro = new ResizeObserver(() => syncOverlay(state));
         state.ro.observe(el);
       } catch (_) {}
     }
+    state.attivo = true;
     activeEl = el;
     ensureOverlay(state);
+    seguiIlTesto(state);
+    aggiornaCodice(state, { senzaDisegno: true });
     syncOverlay(state);
-    scheduleScan(state);
+    // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
+    // mouse sulla casella o con Tab (che cade sul campo di prima: la casella la riceve solo al rilascio).
+    const tab = (l) => l.tasto === 'Tab';
+    if (prendeGesto(state, tab)) programmaRapido(state, { gesto: true });
+    if (prendeGesto(state, tab, 'coerenza')) programmaRagionato(state, { gesto: true });
   }
 
   function detach(el) {
     const state = monitored.get(el);
     if (!state) return;
-    if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    fermaTimer(state, ['timerRapido', 'timerFine', 'timerRagionato', 'timerCodice', 'timerPassaggio']);
+    state.rimandati.clear();
     if (state.overlay) { state.overlay.remove(); state.overlay = null; }
     if (state.ro) { try { state.ro.disconnect(); } catch (_) {} state.ro = null; }
+    state.attivo = false;
     if (activeEl === el) activeEl = null;
-    monitored.delete(el);
   }
 
   function detachAll() {
     if (activeEl) detach(activeEl);
   }
 
+  function suInput(state, evento) {
+    if (erroriAttivi()) tryAutocorrect(state);
+    state.ultimoTasto = Date.now();
+    seguiIlTesto(state);
+    // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Quella già chiesta da un
+    // gesto (un tasto tenuto premuto) si sposta soltanto: resta una, sul testo finale.
+    const gesto = prendeGesto(state);
+    const nuovo = aggiornaCodice(state);
+    // Il controllo che non aspetta la pausa lo paga solo il tasto che chiude una parola, come una volta quello della
+    // parola: una pagina che a ogni lettera scrive una parola sbagliata ne otterrebbe uno per tasto (#1070).
+    const G = global.SN_GESTO;
+    const chiude = nuovo && !!G && G.prendi('parola', G.CHIUDE, G.dentro(state.el));
+    programmaRapido(state, { gesto: gesto || chiude, subito: chiude });
+    programmaRagionato(state, { gesto: prendeGesto(state, null, 'coerenza'), fineFrase: chiudeFrase(state, evento) });
+    programmaFine(state);
+  }
+
+  // Solo un gesto vero caduto dentro la casella apre una chiamata al modello, e una volta sola: `input` e `focus` li
+  // fabbrica anche la pagina (#1070). I due controlli prendono il gesto ognuno per sé (`chi`).
+  function prendeGesto(state, oppure, chi = 'correttore') {
+    const G = global.SN_GESTO;
+    if (!G) return false;
+    const qui = G.dentro(state.el);
+    return G.prendi(chi, undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
+  }
+
+  // Un tasto che chiude una frase: punto, punto esclamativo o interrogativo, Invio (che in un campo modificabile apre un
+  // paragrafo invece di scrivere un a capo).
+  function chiudeFrase(state, evento) {
+    const tipo = evento && evento.inputType;
+    if (tipo === 'insertParagraph' || tipo === 'insertLineBreak') return true;
+    const testo = getEditableText(state.el);
+    const pos = cursoreNelCampo(state.el);
+    return pos > 0 && /[.!?…\n]/.test(testo[pos - 1] || '');
+  }
+
   // ============================================================================
-  // Overlay rendering
+  // Lo strato dei segni
   // ============================================================================
   // Stili copiati dall'editabile per allineare il testo invisibile dell'overlay.
   const COPIED_STYLE_PROPS = [
@@ -412,24 +495,26 @@
   ];
 
   function ensureOverlay(state) {
-    if (state.overlay && document.body.contains(state.overlay)) return;
+    if (state.overlay && state.overlay.isConnected) return;
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(o);
+    (radiceDi(state.el) || document.body).appendChild(o);
     state.overlay = o;
   }
+
+  const SPORGENZA_SEGNI = 8;
 
   function syncOverlay(state) {
     const o = state.overlay;
     const el = state.el;
-    if (!o || !el || !document.body.contains(el)) return;
+    if (!o || !el || !el.isConnected) return;
 
     const cs = window.getComputedStyle(el);
     const r = el.getBoundingClientRect();
+    state.riquadro = { left: r.left, top: r.top, width: r.width, height: r.height };
 
-    // Posizione fissa rispetto al viewport: l'overlay segue l'editabile.
     o.style.position = 'fixed';
     o.style.left = r.left + 'px';
     o.style.top = r.top + 'px';
@@ -448,15 +533,34 @@
     for (const p of COPIED_STYLE_PROPS) {
       o.style.setProperty(p, cs.getPropertyValue(p));
     }
+    // Lo specchio deve andare a capo come la casella: larghezza e altezza qui sopra sono del bordo esterno, e la barra
+    // di scorrimento della casella toglie spazio al testo che lo specchio (senza barra) avrebbe in più.
+    o.style.boxSizing = 'border-box';
+    const px = (p) => parseFloat(cs.getPropertyValue(p)) || 0;
+    const barraV = Math.max(0, el.offsetWidth - el.clientWidth - px('border-left-width') - px('border-right-width'));
+    const barraO = Math.max(0, el.offsetHeight - el.clientHeight - px('border-top-width') - px('border-bottom-width'));
+    const latoBarra = cs.direction === 'rtl' ? 'padding-left' : 'padding-right';
+    if (barraV) o.style.setProperty(latoBarra, `${px(latoBarra) + barraV}px`);
+    // Sotto l'ultima riga di una casella piena c'è solo il suo margine interno: i segni stanno qualche pixel più giù del
+    // testo, e lo specchio li lascia sporgere sotto il bordo invece di tagliarli (altezza e margine crescono insieme).
+    o.style.height = (r.height + SPORGENZA_SEGNI) + 'px';
+    o.style.setProperty('padding-bottom', `${px('padding-bottom') + barraO + SPORGENZA_SEGNI}px`);
 
     renderOverlayContent(state);
-
-    // Allinea lo scroll dell'overlay con quello dell'editabile.
-    o.scrollTop = el.scrollTop;
-    o.scrollLeft = el.scrollLeft;
   }
 
-  // Sincronizzazione differita per scroll/resize globali (evita ridisegni inutili).
+  // Svuotare e riempire lo specchio lo riporta in cima: ogni disegno riprende lo scorrimento della casella. Sul campo
+  // modificabile i segni sono già dove si vedono le parole: lo specchio non scorre.
+  function allineaScorrimento(state) {
+    const o = state.overlay;
+    if (!o || !state.el) return;
+    const scorre = campoDiTesto(state.el);
+    o.scrollTop = scorre ? state.el.scrollTop : 0;
+    o.scrollLeft = scorre ? state.el.scrollLeft : 0;
+  }
+
+  const campoDiTesto = (el) => el.tagName === 'TEXTAREA' || el.tagName === 'INPUT';
+
   let syncQueued = false;
   function queueSync() {
     if (syncQueued || !activeEl) return;
@@ -473,211 +577,818 @@
     return el.textContent || '';
   }
 
+  // Il testo che va ai controlli: in un campo modificabile le righe sono paragrafi, <div> e <br>, che textContent
+  // attacca («Ciao Marcosì»). Qui hanno il loro a capo; `riporta` rimette i segni sulle posizioni di getEditableText,
+  // su cui si disegna e si corregge, e `verso` porta una posizione del campo in quel testo.
+  function testoDaControllare(el) {
+    if (campoDiTesto(el)) return { testo: getEditableText(el), riporta: (lista) => lista, verso: (p) => p };
+    let testo = '';
+    let pos = 0;
+    let serveACapo = false;
+    const bordi = [0];
+    const aCapo = () => { testo += '\n'; bordi.push(pos); serveACapo = false; };
+    const visita = (n) => {
+      if (n.nodeType === 3) {
+        const v = n.nodeValue;
+        if (!v) return;
+        if (serveACapo && testo && !testo.endsWith('\n')) aCapo();
+        serveACapo = false;
+        for (let i = 0; i < v.length; i++) { pos++; bordi.push(pos); }
+        testo += v;
+        return;
+      }
+      if (n.nodeType !== 1) return;
+      if (n.tagName === 'BR') {
+        if (serveACapo && testo && !testo.endsWith('\n')) aCapo();
+        aCapo();
+        return;
+      }
+      const blocco = !/^inline/.test(window.getComputedStyle(n).display);
+      if (blocco) serveACapo = true;
+      for (const c of n.childNodes) visita(c);
+      if (blocco) serveACapo = true;
+    };
+    for (const c of el.childNodes) visita(c);
+    const campo = getEditableText(el);
+    const riporta = (lista) => lista.map((it) => {
+      const start = bordi[it.start];
+      const end = bordi[it.end];
+      return 'segment' in it ? { ...it, start, end, segment: campo.slice(start, end) } : { ...it, start, end };
+    }).filter((it) => it.end > it.start);
+    const verso = (p) => {
+      if (typeof p !== 'number' || p < 0) return -1;
+      let lo = 0;
+      let hi = bordi.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (bordi[mid] <= p) lo = mid; else hi = mid - 1;
+      }
+      return lo;
+    };
+    return { testo, riporta, verso };
+  }
+
   function renderOverlayContent(state) {
+    state.inVista = segniInVista(state);
+    disegnaSpecchio(state);
+    allineaScorrimento(state);
+    seguiIlCampo();
+    passaggiInCorso(state);
+  }
+
+  // Un segno che si conferma o sparisce è a metà del suo passaggio: alla fine lo strato si ridisegna senza.
+  function passaggiInCorso(state) {
+    if (state.timerPassaggio) return;
+    const ora = Date.now();
+    const resto = state.inVista.reduce((m, s) => {
+      const da = s.svanisce || s.confermatoAlle || 0;
+      return da && ora - da < PASSAGGIO_MS ? Math.max(m, PASSAGGIO_MS - (ora - da)) : m;
+    }, 0);
+    if (!resto) return;
+    state.timerPassaggio = setTimeout(() => {
+      state.timerPassaggio = null;
+      if (state.attivo) renderOverlayContent(state);
+    }, resto + 20);
+  }
+
+  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
+  // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
+  let seguendo = false;
+  function seguiIlCampo() {
+    if (seguendo) return;
+    seguendo = true;
+    const giro = () => {
+      const state = activeEl && monitored.get(activeEl);
+      if (!state || !state.overlay || !state.el.isConnected || !state.inVista.length) {
+        seguendo = false;
+        return;
+      }
+      const r = state.el.getBoundingClientRect();
+      const u = state.riquadro;
+      if (!u || r.left !== u.left || r.top !== u.top || r.width !== u.width || r.height !== u.height) syncOverlay(state);
+      requestAnimationFrame(giro);
+    };
+    requestAnimationFrame(giro);
+  }
+
+  // Le classi di un segno: il suo tipo, il dubbio sbiadito, e il passaggio breve di una conferma o di uno scarto.
+  function classiDi(s, ora) {
+    const k = [s.segno === 'errore' ? 'sn-errore' : 'sn-suggerimento'];
+    if (s.dubbio) k.push('sn-dubbio');
+    if (s.svanisce) k.push('sn-svanisce');
+    else if (s.confermatoAlle && ora - s.confermatoAlle < PASSAGGIO_MS) k.push('sn-conferma');
+    return k.join(' ');
+  }
+  function ritardoDi(s, ora) {
+    const da = s.svanisce || (s.confermatoAlle && ora - s.confermatoAlle < PASSAGGIO_MS ? s.confermatoAlle : 0);
+    return da ? -(ora - da) : 0;
+  }
+
+  // Un pezzo di testo coi segni che lo coprono: fuori i puntini del suggerimento, dentro l'onda dell'errore, così sulla
+  // stessa parola convivono. `nodo` è il testo (o lo span con il font della pagina) da avvolgere.
+  function avvolgi(nodo, coprono, ora) {
+    for (const k of ['errore', 'suggerimento']) {
+      const s = coprono.find((x) => x.segno === k);
+      if (!s) continue;
+      const span = document.createElement('span');
+      span.className = classiDi(s, ora);
+      const ritardo = ritardoDi(s, ora);
+      if (ritardo) span.style.animationDelay = `${ritardo}ms`;
+      span.appendChild(nodo);
+      nodo = span;
+    }
+    return nodo;
+  }
+
+  // Il tratto da disegnare di un segno: senza gli spazi ai bordi (« il» ripetuto si sottolinea sotto «il»).
+  function tratto(testo, s) {
+    let a = s.start;
+    let b = s.end;
+    while (a < b && /\s/.test(testo[a])) a++;
+    while (b > a && /\s/.test(testo[b - 1])) b--;
+    return b > a ? { a, b } : null;
+  }
+
+  function disegnaSpecchio(state) {
     const o = state.overlay;
     if (!o) return;
     const text = getEditableText(state.el);
     if (!text) { o.textContent = ''; return; }
+    const ora = Date.now();
+    const segni = state.inVista.map((s) => ({ s, t: tratto(text, s) })).filter((x) => x.t)
+      .map(({ s, t: tr }) => ({ ...s, da: tr.a, a: tr.b }));
+    if (!campoDiTesto(state.el)) { disegnaSulCampo(state, segni, ora); return; }
 
-    const issues = (state.issues || [])
-      .filter((i) => i.start >= 0 && i.end <= text.length && i.end > i.start)
-      .sort((a, b) => a.start - b.start);
+    // Un a capo in fondo è una riga nella casella ma non nello specchio: senza, lo specchio è più basso e lo scorrimento
+    // si ferma una riga prima.
+    const coda = /\n$/.test(text) && (state.el.tagName === 'TEXTAREA') ? '​' : '';
+    if (!segni.length) { o.textContent = text + coda; return; }
 
-    if (!issues.length) { o.textContent = text; return; }
-
+    const bordi = [...new Set([0, text.length, ...segni.flatMap((s) => [s.da, s.a])])].sort((x, y) => x - y);
     const frag = document.createDocumentFragment();
-    let pos = 0;
-    for (const issue of issues) {
-      if (issue.start > pos) {
-        frag.appendChild(document.createTextNode(text.slice(pos, issue.start)));
-      }
-      const span = document.createElement('span');
-      span.className = 'sn-semantic-error';
-      span.textContent = text.slice(issue.start, issue.end);
-      frag.appendChild(span);
-      pos = issue.end;
+    for (let k = 0; k + 1 < bordi.length; k++) {
+      const a = bordi[k];
+      const b = bordi[k + 1];
+      const pezzo = text.slice(a, b);
+      const coprono = segni.filter((s) => s.da <= a && s.a >= b);
+      frag.appendChild(coprono.length ? avvolgi(document.createTextNode(pezzo), coprono, ora) : document.createTextNode(pezzo));
     }
-    if (pos < text.length) {
-      frag.appendChild(document.createTextNode(text.slice(pos)));
-    }
+    if (coda) frag.appendChild(document.createTextNode(coda));
     o.innerHTML = '';
     o.appendChild(frag);
   }
 
-  // ============================================================================
-  // Scan LLM (zigzag blu)
-  // ============================================================================
-  function scheduleScan(state) {
-    if (!isEnabled()) return;
-    if (state.timer) clearTimeout(state.timer);
-    state.timer = setTimeout(() => scanText(state), DEBOUNCE_MS);
-  }
+  // Un campo modificabile si impagina con lo stile della pagina (margini e interlinea dei paragrafi, righe nuove,
+  // scorrimento): una copia lo rincorre una proprietà alla volta. I segni si misurano sulle parole vere del campo, un
+  // riquadro per riga, col font del loro testo; si ridisegnano a ogni scorrimento e ridimensionamento (syncOverlay).
+  const FONT_DEL_TESTO = ['font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'font-variant',
+    'font-feature-settings', 'font-variation-settings', 'font-kerning', 'letter-spacing', 'word-spacing', 'text-transform',
+    'direction'];
 
-  async function scanText(state) {
-    if (!state || !state.el || !document.body.contains(state.el)) return;
-    const text = getEditableText(state.el);
-
-    // Reset se il testo è troppo corto o invariato
-    if (!text || text.length < MIN_TEXT_LENGTH) {
-      state.issues = [];
-      state.lastScannedText = text;
-      renderOverlayContent(state);
-      return;
-    }
-    if (text === state.lastScannedText) return;
-    if (text.length > MAX_TEXT_LENGTH) {
-      // Niente scan continuo su testi enormi: lasciamo invariati gli issue precedenti.
-      return;
-    }
-
-    const context = extractContext(state.el);
-    let res;
-    try {
-      res = await chrome.runtime.sendMessage({
-        type: MSG.AI_REQUEST,
-        action: ACTIONS.SPELLCHECK_SEMANTIC,
-        payload: { text, context },
-      });
-    } catch (err) {
-      console.error('[SN] scan blu — sendMessage fallito:', err);
-      return;
-    }
-
-    // Se nel frattempo l'utente ha modificato il testo, scarta la risposta:
-    // sarebbe disallineata. Il prossimo input rilancerà lo scan.
-    const currentText = getEditableText(state.el);
-    if (currentText !== text) return;
-
-    if (!res?.ok) {
-      console.error('[SN] scan blu — provider error:', res?.code, res?.error);
-      return;
-    }
-    if (typeof res.text !== 'string') {
-      console.warn('[SN] scan blu — risposta senza text:', res);
-      return;
-    }
-    const allIssues = buildIssues(parseIssues(res.text), text);
-    state.issues = allIssues;
-    state.lastScannedText = text;
-    renderOverlayContent(state);
-    // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
-    // chiediamo subito allo stesso modello la verifica ortografica e mettiamo in
-    // cache, così il click destro non deve attendere la chiamata.
-    // NB: NON filtriamo più gli issue blu in base al risultato — la verifica
-    // per-parola è una stima inaffidabile di "il browser ha messo il rosso?"
-    // (l'LLM e lo spellcheck nativo dissentono spesso, soprattutto su parole
-    // italiane reali ma usate male). Il blu resta stabile; per evitare la
-    // sovrapposizione con il rosso nativo lo zigzag blu è leggermente offsettato
-    // verticalmente in CSS.
-    prefetchSingleWordSuggestions(state, text).catch((e) => {
-      console.warn('[SN] prefetch single-word failed:', e);
-    });
-  }
-
-  // ============================================================================
-  // Prefetch e cache delle correzioni per parola
-  // ============================================================================
-  function getCachedSuggestion(el, word) {
-    const state = monitored.get(el);
-    if (!state || !state.wordCache) return null;
-    return state.wordCache.get(String(word || '').toLowerCase()) || null;
-  }
-
-  function setCachedSuggestion(el, word, sugg) {
-    const state = monitored.get(el);
-    if (!state) return;
-    if (!state.wordCache) state.wordCache = new Map();
-    state.wordCache.set(String(word || '').toLowerCase(), sugg);
-  }
-
-  // Set globale di chiavi "in volo" per evitare richieste duplicate per la
-  // stessa parola/frase mentre la precedente è in corso.
-  function makeWordKey(word, sentence) {
-    return String(word || '').toLowerCase() + '|' + String(sentence || '').trim().slice(0, 200);
-  }
-
-  // Lancia un check ortografico in background per la parola che l'utente ha
-  // appena chiuso (ultimo carattere = boundary), così quando fa click destro
-  // sulla parola la correzione è già pronta in cache.
-  async function prefetchJustCompletedWord(state) {
-    if (!isEnabled()) return;
-    const el = state.el;
-    const text = getEditableText(el);
-    if (!text || text.length < 2) return;
-    let pos = -1;
-    if (el.tagName === 'TEXTAREA') {
-      pos = el.selectionStart ?? -1;
-    } else {
-      pos = contenteditableCaretOffset(el);
-    }
-    if (pos <= 1) return;
-    const lastChar = text[pos - 1];
-    if (!isBoundaryChar(lastChar)) return;
-    // Risali alla parola che precede il boundary.
-    let end = pos - 1;
-    while (end > 0 && /\s/.test(text[end - 1])) end--;
-    let s = end;
-    while (s > 0 && /[\p{L}\p{N}'’\-]/u.test(text[s - 1])) s--;
-    if (end <= s) return;
-    const word = text.slice(s, end);
-    if (!/[\p{L}]/u.test(word)) return;
-    if (isInDictionary(word)) return;
-    const sentence = sentenceAround(text, s, end);
-    const key = makeWordKey(word, sentence);
-    if (!state.wordCache) state.wordCache = new Map();
-    if (!state.inflightKeys) state.inflightKeys = new Set();
-    const cached = state.wordCache.get(word.toLowerCase());
-    if (cached && cached.sentence === sentence) return; // già coperto
-    if (state.inflightKeys.has(key)) return;
-    state.inflightKeys.add(key);
-    try {
-      const ctx = extractContext(el);
-      const sugg = await requestWordSuggestion({ word, sentence, prev: ctx.prev, next: ctx.next });
-      // Salva anche se null o non-misspelled: evita ri-fire continui.
-      state.wordCache.set(word.toLowerCase(), sugg ? { ...sugg, sentence } : { misspelled: false, correction: '', sentence });
-    } catch (_) {
-      // Errore: lasciamo che la richiesta possa essere riprovata in futuro.
-    } finally {
-      state.inflightKeys.delete(key);
-    }
-  }
-
-  // Limite di chiamate simultanee per non saturare il provider.
-  const PREFETCH_MAX = 8;
-
-  async function prefetchSingleWordSuggestions(state, scannedText) {
-    if (!state.issues?.length) return;
-    const ctx = extractContext(state.el);
-    const candidates = [];
-    for (const issue of state.issues) {
-      const seg = scannedText.slice(issue.start, issue.end).trim();
-      // Solo issue che coprono una sola "parola" tipografica.
-      if (!/^[\p{L}\p{N}'’\-]+$/u.test(seg)) continue;
-      const key = seg.toLowerCase();
-      // Già in cache? Salta la chiamata, ma considera comunque per il filtro.
-      if (state.wordCache.has(key)) {
-        candidates.push({ issue, seg, key, cached: state.wordCache.get(key) });
-      } else {
-        candidates.push({ issue, seg, key, cached: null });
+  function disegnaSulCampo(state, segni, ora) {
+    const o = state.overlay;
+    o.innerHTML = '';
+    if (!segni.length) return;
+    const nodi = [];
+    const w = document.createTreeWalker(state.el, NodeFilter.SHOW_TEXT);
+    let tot = 0;
+    for (let n = w.nextNode(); n; n = w.nextNode()) { nodi.push({ n, da: tot }); tot += n.nodeValue.length; }
+    const base = o.getBoundingClientRect();
+    const ox = base.left + o.clientLeft;
+    const oy = base.top + o.clientTop;
+    const range = document.createRange();
+    const frag = document.createDocumentFragment();
+    const bordi = [...new Set(segni.flatMap((s) => [s.da, s.a]))].sort((x, y) => x - y);
+    for (let k = 0; k + 1 < bordi.length; k++) {
+      const a = bordi[k];
+      const b = bordi[k + 1];
+      const coprono = segni.filter((s) => s.da <= a && s.a >= b);
+      if (!coprono.length) continue;
+      for (const { n, da } of nodi) {
+        const fine = da + n.nodeValue.length;
+        if (fine <= a || da >= b) continue;
+        for (const riga of righeDelPezzo(range, n, Math.max(a, da) - da, Math.min(b, fine) - da)) {
+          frag.appendChild(riquadroDelSegno(n, riga, coprono, ox, oy, ora));
+        }
       }
     }
-    if (!candidates.length) return;
-
-    const toFetch = candidates.filter((c) => !c.cached).slice(0, PREFETCH_MAX);
-    await Promise.all(toFetch.map(async (c) => {
-      const sentence = sentenceAround(scannedText, c.issue.start, c.issue.end);
-      const sugg = await requestWordSuggestion({
-        word: c.seg, sentence, prev: ctx.prev, next: ctx.next,
-      });
-      // Cache con la frase usata, per poter rilevare cambio di contesto al
-      // momento del click destro. Anche risposte null/negative entrano in
-      // cache per evitare fire ripetuti.
-      state.wordCache.set(c.key, sugg ? { ...sugg, sentence } : { misspelled: false, correction: '', sentence });
-    }));
+    o.appendChild(frag);
   }
 
-  // Cerca di estrarre frase precedente e successiva al campo editabile.
-  // Best-effort: se non riusciamo, ritorniamo stringhe vuote.
+  // Le righe su cui il pezzo [s, e) del nodo di testo va a capo, carattere per carattere: { s, e, left, top, height }.
+  function righeDelPezzo(range, n, s, e) {
+    const v = n.nodeValue;
+    const righe = [];
+    let cur = null;
+    for (let i = s; i < e;) {
+      const j = Math.min(e, i + (/[\uD800-\uDBFF]/.test(v[i]) ? 2 : 1));
+      range.setStart(n, i);
+      range.setEnd(n, j);
+      const q = range.getBoundingClientRect();
+      if (q.width || q.height) {
+        if (!cur || Math.abs(q.top - cur.top) > q.height / 2) {
+          cur = { s: i, e: j, left: q.left, top: q.top, height: q.height };
+          righe.push(cur);
+        } else {
+          cur.e = j;
+          cur.left = Math.min(cur.left, q.left);
+        }
+      }
+      i = j;
+    }
+    return righe;
+  }
+
+  function riquadroDelSegno(n, riga, coprono, ox, oy, ora) {
+    const cs = window.getComputedStyle(n.parentElement);
+    const box = document.createElement('div');
+    // L'interlinea alta quanto il testo: il pezzo sta dove sta la parola, senza mezza interlinea sopra.
+    box.style.cssText = `position:absolute;left:${riga.left - ox}px;top:${riga.top - oy}px;margin:0;padding:0;border:0;`
+      + `white-space:pre;text-indent:0;text-align:left;line-height:${riga.height}px;`;
+    const testo = document.createElement('span');
+    // Anche sul pezzo: una regola della pagina sugli span non deve cambiargli il font.
+    for (const p of FONT_DEL_TESTO) for (const e of [box, testo]) e.style.setProperty(p, cs.getPropertyValue(p));
+    testo.textContent = n.nodeValue.slice(riga.s, riga.e).replace(/\s+$/, '');
+    box.appendChild(avvolgi(testo, coprono, ora));
+    return box;
+  }
+
+  // ============================================================================
+  // I segni
+  // ============================================================================
+  // Chi cambia il testo perde i segni del modello che il cambio tocca: gli altri restano dov'erano finché un controllo
+  // non li rinnova (#1111), sugli offset giusti per «Correggi».
+  function seguiIlTesto(state) {
+    const ora = getEditableText(state.el);
+    if (ora === state.testo) return;
+    const prima = state.testo;
+    state.testo = ora;
+    // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora».
+    if (!ora.trim()) state.ignorate.clear();
+    if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
+    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo.
+    if (state.inViaggio.length) {
+      const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora).issues.map((v) => [v.id, v]));
+      for (const v of state.inViaggio) {
+        const n = vivi.get(v.id);
+        if (n) { v.start = n.start; v.end = n.end; } else v.perso = true;
+      }
+    }
+  }
+
+  // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
+  // (un bordo che passa da separatore a lettera), si perde.
+  function riallineaIssues(issues, vecchio, nuovo) {
+    const lista = Array.isArray(issues) ? issues : [];
+    vecchio = String(vecchio ?? '');
+    nuovo = String(nuovo ?? '');
+    if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
+    const corto = Math.min(vecchio.length, nuovo.length);
+    let p = 0;
+    while (p < corto && vecchio[p] === nuovo[p]) p++;
+    let s = 0;
+    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
+    const fineCambio = vecchio.length - s;
+    const delta = nuovo.length - vecchio.length;
+    const out = [];
+    for (const it of lista) {
+      let da;
+      if (it.end <= p) da = it.start;
+      else if (it.start >= fineCambio) da = it.start + delta;
+      else continue;
+      const a = da + (it.end - it.start);
+      if (isWordCharLocal(vecchio[it.start - 1]) !== isWordCharLocal(nuovo[da - 1])) continue;
+      if (isWordCharLocal(vecchio[it.end]) !== isWordCharLocal(nuovo[a])) continue;
+      out.push(da === it.start ? it : { ...it, start: da, end: a });
+    }
+    return { issues: out, perse: out.length !== lista.length };
+  }
+
+  const segnoDaData = (d) => ({
+    ...d, segno: 'suggerimento', dubbio: true, fonte: 'data', tipo: 'data', motivo: d.spiegazione || '',
+    correzioni: Array.isArray(d.correzioni) ? d.correzioni : [], citazione: '',
+  });
+
+  // I candidati del codice sul testo di adesso: subito, gratis, sbiaditi finché un controllo non li giudica. Vero se ce
+  // n'è uno nuovo da far giudicare: il controllo rapido parte senza aspettare la pausa.
+  function aggiornaCodice(state, { senzaDisegno = false } = {}) {
+    const el = state.el;
+    if (!senzaDisegno && getEditableText(el).length > LUNGO) {
+      if (!state.timerCodice) {
+        state.timerCodice = setTimeout(() => {
+          state.timerCodice = null;
+          if (!state.attivo) return;
+          if (calcolaCodice(state) && state.timerRapido) programmaRapido(state, { subito: true });
+          renderOverlayContent(state);
+        }, RICALCOLO_LUNGO_MS);
+      }
+      renderOverlayContent(state);
+      return false;
+    }
+    const nuovo = calcolaCodice(state);
+    if (!senzaDisegno) renderOverlayContent(state);
+    return nuovo;
+  }
+
+  function calcolaCodice(state) {
+    const d = testoDaControllare(state.el);
+    const Rg = R();
+    if (!Rg) { state.codice = []; return false; }
+    const errori = erroriAttivi() ? Rg.senzaSovrapposti([
+      ...Rg.erroriFissi(d.testo),
+      ...(ripetizioniAttive() ? Rg.ripetizioni(d.testo) : []),
+      ...Rg.candidatiDizionario(d.testo, {
+        sbagliata: sbagliataPerIlBrowser,
+        nota: (p) => isInDictionary(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
+      }),
+    ]) : [];
+    const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
+    state.codiceTesto = d.testo;
+    state.codiceT2 = [...errori, ...date];
+    state.codice = d.riporta(state.codiceT2);
+    const scrive = inScritturaNelCampo(state);
+    return state.codice.some((c) => c.segno === 'errore' && !verdetto(state, c) && !state.richiesti.has(Rg.chiaveVerdetto(c))
+      && !(scrive && c.start < scrive.end && c.end > scrive.start));
+  }
+
+  function verdetto(state, c) {
+    const v = state.verdetti.get(R().chiaveVerdetto(c));
+    // Spenta la parte del modello degli errori, i suoi giudizi tornano dubbi: resta il solo codice.
+    if (!v || (v.da === 'rapido' && !modelloErrori())) return null;
+    return v;
+  }
+
+  // La parola su cui si sta scrivendo: non si segna e non si manda, finché la pausa non dice che è finita.
+  function inScritturaNelCampo(state) {
+    if (!state.attivo || Date.now() - state.ultimoTasto >= tempi().pausaRagionatoMs) return null;
+    const testo = getEditableText(state.el);
+    return R().parolaAlCursore(testo, cursoreNelCampo(state.el));
+  }
+  function inScritturaNelTesto(state, d) {
+    const w = inScritturaNelCampo(state);
+    if (!w) return null;
+    return { start: d.verso(w.start), end: d.verso(w.end) };
+  }
+
+  const chiaveIgnora = (s) => ({ fonte: s.segno, tipo: s.segno, segment: s.segment });
+  function ignorato(state, s, testo) {
+    if (!state.ignorate.size) return false;
+    const C = Coerenza();
+    const lista = [...state.ignorate.values()];
+    if (C) return C.ignorato({ ...s, fonte: s.segno, tipo: s.segno }, lista, testo);
+    return lista.some((ig) => ig.fonte === s.segno && ig.segment === s.segment);
+  }
+
+  // I segni da disegnare: errori e suggerimenti, del modello e del codice coi loro giudizi. Fra due che si coprono vince
+  // quello del modello, poi un candidato confermato, poi uno ancora in dubbio.
+  function segniInVista(state, { ignoraScrittura = false } = {}) {
+    const el = state.el;
+    const testo = getEditableText(el);
+    const ora = Date.now();
+    const scrive = ignoraScrittura ? null : inScritturaNelCampo(state);
+    const Rg = R();
+    if (!Rg) return [];
+    const codice = [];
+    for (const c of state.codice) {
+      const v = verdetto(state, c);
+      if (!v) { codice.push(c); continue; }
+      if (v.stato === 'scartato') {
+        if (ora - v.alle < PASSAGGIO_MS) codice.push({ ...c, svanisce: v.alle });
+        continue;
+      }
+      codice.push({
+        ...c, dubbio: false, confermatoAlle: v.alle, giudicatoDa: v.da, motivo: v.motivo || c.motivo,
+        correzioni: v.correzioni && v.correzioni.length ? v.correzioni : c.correzioni, citazione: v.citazione || c.citazione,
+      });
+    }
+    const delModello = state.modello.filter((m) => (m.fonte === 'rapido' ? modelloErrori() : suggerimentiAttivi()));
+    const valido = (x) => x.start >= 0 && x.end <= testo.length && x.end > x.start && testo.slice(x.start, x.end) === x.segment;
+    const tieni = (x) => valido(x) && !ignorato(state, x, testo)
+      && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && isInDictionary(x.segment))
+      && !(scrive && x.start < scrive.end && x.end > scrive.start);
+    const ordina = (k) => [
+      ...delModello.filter((m) => m.segno === k),
+      ...codice.filter((c) => c.segno === k && !c.dubbio && !c.svanisce),
+      ...codice.filter((c) => c.segno === k && (c.dubbio || c.svanisce)),
+    ].filter(tieni);
+    return [
+      ...(erroriAttivi() ? Rg.senzaSovrapposti(ordina('errore')) : []),
+      ...(suggerimentiAttivi() ? Rg.senzaSovrapposti(ordina('suggerimento')) : []),
+    ];
+  }
+
+  function avvisaAscoltatori(state) {
+    for (const f of [...state.ascoltatori]) { try { f(); } catch (_) {} }
+  }
+
+  // ============================================================================
+  // I due controlli del modello
+  // ============================================================================
+  // Il rapido: dopo la pausa breve, al più ogni `ogniRapidoMs` mentre si continua a scrivere, e subito a ogni candidato
+  // nuovo. Senza un gesto (#1070) quello già chiesto si sposta soltanto.
+  function programmaRapido(state, { gesto = false, subito = false } = {}) {
+    if (!modelloErrori()) return;
+    if (!gesto && !state.timerRapido) return;
+    const T = tempi();
+    if (state.timerRapido) clearTimeout(state.timerRapido);
+    const ora = Date.now();
+    if (!state.cambioDa) state.cambioDa = ora;
+    const resto = Math.max(0, T.ogniRapidoMs - (ora - state.cambioDa));
+    const attesa = subito ? 0 : Math.min(T.pausaRapidoMs, resto);
+    state.timerRapido = setTimeout(() => {
+      state.timerRapido = null;
+      state.cambioDa = 0;
+      controlloRapido(state);
+    }, attesa);
+  }
+
+  // La parola lasciata fuori perché si stava scrivendo si giudica alla pausa lunga: fa parte del gesto che l'ha scritta.
+  function programmaFine(state) {
+    if (state.timerFine) clearTimeout(state.timerFine);
+    state.timerFine = setTimeout(() => {
+      state.timerFine = null;
+      if (!state.attivo) return;
+      aggiornaCodice(state);
+      if (state.restaParola && modelloErrori() && !state.timerRapido) controlloRapido(state);
+    }, tempi().pausaRagionatoMs + 30);
+  }
+
+  // Il ragionato: a fine frase, sulle frasi chiuse, e dopo la pausa lunga su quello che è cambiato.
+  function programmaRagionato(state, { gesto = false, fineFrase = false } = {}) {
+    if (!suggerimentiAttivi()) return;
+    if (!gesto && !state.timerRagionato) return;
+    if (state.timerRagionato) clearTimeout(state.timerRagionato);
+    state.timerRagionato = setTimeout(() => {
+      state.timerRagionato = null;
+      controlloRagionato(state);
+    }, tempi().pausaRagionatoMs);
+    if (fineFrase && gesto) setTimeout(() => controlloRagionato(state, { fineFrase: true }), 0);
+  }
+
+  // A scheda nascosta non si spende: il controllo chiesto parte quando la scheda torna davanti.
+  function riprendiRimandati() {
+    if (document.hidden || !activeEl) return;
+    const state = monitored.get(activeEl);
+    if (!state || !state.rimandati.size) return;
+    const quali = [...state.rimandati];
+    state.rimandati.clear();
+    if (quali.includes('rapido')) controlloRapido(state);
+    if (quali.includes('ragionato')) controlloRagionato(state);
+  }
+
+  // Gli esiti già pagati, per domanda (#1097.5): un campo lasciato e ripreso, o un annulla che torna a un testo già
+  // controllato, non ripagano. Le domande in viaggio si aspettano invece di rifarle.
+  const esiti = new Map();
+  const domandeInViaggio = new Map();
+  function chiedi(action, payload, { suRichiesta = false, giorno = '' } = {}) {
+    const chiave = `${action}\u0000${giorno}\u0000${JSON.stringify({ ...payload, campo: undefined })}`;
+    if (esiti.has(chiave)) {
+      const r = esiti.get(chiave);
+      esiti.delete(chiave);
+      esiti.set(chiave, r);
+      return Promise.resolve(r);
+    }
+    let p = domandeInViaggio.get(chiave);
+    if (!p) {
+      p = Promise.resolve(chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST, action, payload,
+        // Senza il tasto destro è un lavoro automatico: l'uso lo conta il menu che mostra la correzione (#969).
+        ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
+      })).then((res) => {
+        if (res && res.ok && typeof res.text === 'string') {
+          esiti.set(chiave, { ok: true, text: res.text, senzaContesto: !!res.senzaContesto });
+          while (esiti.size > ESITI_MAX) esiti.delete(esiti.keys().next().value);
+        }
+        return res;
+      });
+      domandeInViaggio.set(chiave, p);
+      const via = () => { if (domandeInViaggio.get(chiave) === p) domandeInViaggio.delete(chiave); };
+      p.then(via, via);
+    }
+    return p;
+  }
+
+  // Il campo prima del pezzo nuovo, da un inizio che si sposta a scatti di PRIMA_SCATTO caratteri.
+  function inizioPrima(testo, start) {
+    let da = Math.max(0, start - PRIMA_MIN);
+    da = Math.floor(da / PRIMA_SCATTO) * PRIMA_SCATTO;
+    while (da > 0 && da < start && isWordCharLocal(testo[da - 1])) da++;
+    return da;
+  }
+
+  // I tre pezzi che partono, col campo intero per il main: i dati riservati si cercano lì, perché la parola che presenta
+  // una password può stare fuori dal pezzo che porta il valore (correttoreRiservati.js). Il campo non parte.
+  function pezziDa(testo, start, end) {
+    const da = inizioPrima(testo, start);
+    return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), dopo: testo.slice(end, end + DOPO_MAX), campo: testo, campoDa: da };
+  }
+
+  // Dove si scrive: il sito e la coda del testo della pagina prima del campo (in una chat, gli ultimi messaggi). Si
+  // rilegge ogni LUOGO_VALE_MS: la conversazione cambia, ma non a ogni tasto. Il sito lo rimette il main.
+  function luogoDi(state) {
+    if (state.luogo && Date.now() - state.luogoAlle < LUOGO_VALE_MS) return state.luogo;
+    let sito = '';
+    try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
+    const contesto = contestoDelCampo(state.el);
+    state.luogo = { sito, conversazione: contesto.prima ? contesto.prima.slice(-CONVERSAZIONE_MAX) : '' };
+    state.luogoAlle = Date.now();
+    return state.luogo;
+  }
+
+  const perche = (c) => c.motivo || (c.fonte === 'dizionario' ? t('spell_perche_dizionario') : '');
+
+  async function controlloRapido(state, { suRichiesta = false, ignoraScrittura = false } = {}) {
+    if (!modelloErrori() || !state.el || !state.el.isConnected) return;
+    if (document.hidden && !suRichiesta) { state.rimandati.add('rapido'); return; }
+    const Rg = R();
+    seguiIlTesto(state);
+    const d = testoDaControllare(state.el);
+    if (d.testo.trim().length < 2) return;
+    if (tornaAGiudicato(state, 'rapido', d)) return;
+    const scrive = ignoraScrittura ? null : inScritturaNelTesto(state, d);
+    const regione = Rg.regioneNuova(state.baseRapido, d.testo);
+    state.restaParola = !!(scrive && regione && scrive.start < regione.end && scrive.end > regione.start);
+    const g = Rg.daGiudicare(state.baseRapido, d.testo, { inScrittura: scrive, regione });
+    if (!g) return;
+    const baseDiPrima = state.baseRapido;
+    state.baseRapido = g.base;
+    const numero = ++state.inviatiRapido;
+    if (state.codiceTesto !== d.testo) calcolaCodice(state);
+    const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    for (const c of candidati) state.richiesti.add(Rg.chiaveVerdetto(c));
+    const payload = {
+      ...pezziDa(d.testo, g.start, g.end),
+      candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
+      luogo: luogoDi(state),
+    };
+    const [regioneCampo] = d.riporta([{ start: g.start, end: g.end }]);
+    const viaggio = { id: `r${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0 };
+    state.inViaggio.push(viaggio);
+    let res = null;
+    try {
+      res = await chiedi(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta });
+    } catch (err) {
+      console.warn('[SN] correttore, controllo rapido:', err);
+    } finally {
+      state.inViaggio = state.inViaggio.filter((v) => v !== viaggio);
+    }
+    if (!res || !res.ok || typeof res.text !== 'string') {
+      // Il pezzo torna da giudicare al prossimo giro, se nel frattempo non ne è partito un altro.
+      if (state.inviatiRapido === numero) state.baseRapido = baseDiPrima;
+      if (res && !res.ok) console.warn('[SN] correttore, controllo rapido:', res.code, res.error);
+      return;
+    }
+    applicaRisposta(state, res.text, { fonte: 'rapido', viaggio });
+  }
+
+  async function controlloRagionato(state, { fineFrase = false } = {}) {
+    if (!suggerimentiAttivi() || !state.el || !state.el.isConnected) return;
+    if (document.hidden) { state.rimandati.add('ragionato'); return; }
+    const Rg = R();
+    seguiIlTesto(state);
+    const d = testoDaControllare(state.el);
+    if (d.testo.trim().length < MIN_TESTO) return;
+    if (tornaAGiudicato(state, 'ragionato', d)) return;
+    let finoA = null;
+    if (fineFrase) {
+      const pos = d.verso(cursoreNelCampo(state.el));
+      if (pos < 0) return;
+      finoA = Rg.ultimaFineFrase(d.testo, pos);
+    }
+    const g = Rg.frasiDaGiudicare(state.baseRagionato, d.testo, { finoA });
+    if (!g) return;
+    const baseDiPrima = state.baseRagionato;
+    state.baseRagionato = g.base;
+    const numero = ++state.inviatiRagionato;
+    if (state.codiceTesto !== d.testo) calcolaCodice(state);
+    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    const contesto = contestoDelCampo(state.el);
+    const payload = {
+      ...pezziDa(d.testo, g.start, g.end),
+      candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
+      contesto,
+      ripetizioni: ripetizioniAttive(),
+      luogo: { sito: luogoDi(state).sito },
+    };
+    const [regioneCampo] = d.riporta([{ start: g.start, end: g.end }]);
+    const viaggio = { id: `g${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0 };
+    state.inViaggio.push(viaggio);
+    let res = null;
+    try {
+      // Le date relative cambiano a mezzanotte: il giorno è parte della domanda.
+      res = await chiedi(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString() });
+    } catch (err) {
+      console.warn('[SN] correttore, controllo ragionato:', err);
+    } finally {
+      state.inViaggio = state.inViaggio.filter((v) => v !== viaggio);
+    }
+    if (!res || !res.ok || typeof res.text !== 'string') {
+      if (state.inviatiRagionato === numero) state.baseRagionato = baseDiPrima;
+      if (res && !res.ok) console.warn('[SN] correttore, controllo ragionato:', res.code, res.error);
+      return;
+    }
+    applicaRisposta(state, res.text, { fonte: 'ragionato', viaggio, contesto: res.senzaContesto ? {} : contesto });
+  }
+
+  // La risposta si posa sul testo di ADESSO (correttoreRegole.segniDaRisposta): un pezzo cambiato nel frattempo non si
+  // ritrova e cade. Un candidato del codice nello stesso punto prende il giudizio; il resto sono segni del modello, che
+  // sostituiscono quelli dello stesso controllo nel pezzo giudicato.
+  function applicaRisposta(state, raw, { fonte, viaggio = null, contesto = null }) {
+    const Rg = R();
+    seguiIlTesto(state);
+    const d = testoDaControllare(state.el);
+    const rapido = fonte === 'rapido';
+    const { segni, giusti } = Rg.segniDaRisposta(raw, d.testo, {
+      tipi: rapido ? ['errore'] : ['errore', 'suggerimento', 'contraddizione'],
+      citata: (c) => !!contesto && !!Coerenza() && Coerenza().citazioneNelContesto(c, contesto),
+      fonte,
+    });
+    if (state.codiceTesto !== d.testo) calcolaCodice(state);
+    const ora = Date.now();
+    const suo = rapido ? 'errore' : 'suggerimento';
+    const tocca = (a, b) => a.start < b.end && a.end > b.start;
+    const candidati = state.codiceT2.filter((c) => c.segno === suo);
+    for (const g of giusti) {
+      for (const c of candidati) if (tocca(c, g)) state.verdetti.set(Rg.chiaveVerdetto(c), { stato: 'scartato', alle: ora, da: fonte });
+    }
+    const nuovi = [];
+    for (const s of segni) {
+      const c = candidati.find((x) => x.start === s.start && x.end === s.end)
+        || (!rapido && s.segno === 'suggerimento' ? candidati.find((x) => tocca(x, s)) : null);
+      if (!c) { nuovi.push({ ...s, confermatoAlle: ora }); continue; }
+      state.verdetti.set(Rg.chiaveVerdetto(c), {
+        stato: 'confermato', alle: ora, da: fonte,
+        motivo: rapido ? (s.motivo || c.motivo) : (c.motivo || s.motivo),
+        correzioni: rapido ? (s.correzioni.length ? s.correzioni : c.correzioni) : (c.correzioni.length ? c.correzioni : s.correzioni),
+        citazione: s.citazione,
+      });
+    }
+    const delCampo = d.riporta(nuovi);
+    const giustiCampo = d.riporta(giusti);
+    const giudicato = viaggio && !viaggio.perso ? viaggio : null;
+    state.modello = state.modello.filter((m) => m.fonte !== fonte
+      || !((giudicato && tocca(m, giudicato)) || delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n))));
+    state.modello.push(...delCampo);
+    const base = rapido ? state.baseRapido : state.baseRagionato;
+    const sigla = rapido ? 'r' : 'g';
+    if (base === d.testo && !state.inViaggio.some((v) => v.id[0] === sigla)) ricordaGiudicato(state, fonte);
+    renderOverlayContent(state);
+    avvisaAscoltatori(state);
+  }
+
+  // Il testo di adesso giudicato per intero, coi segni del modello che ne erano usciti. Si ritrova a meno di spazi e
+  // punteggiatura, che non cambiano il giudizio.
+  function ricordaGiudicato(state, fonte) {
+    const m = state.giudicati[fonte];
+    const testo = getEditableText(state.el);
+    const k = R().ossatura(testo);
+    m.delete(k);
+    m.set(k, { testo, segni: state.modello.filter((x) => x.fonte === fonte).map((x) => ({ ...x })) });
+    while (m.size > GIUDICATI_MAX) m.delete(m.keys().next().value);
+  }
+
+  // Un annulla, o una correzione tolta, riporta a un testo già giudicato per intero: tornano i suoi segni, senza
+  // chiamata. Vero se ha fatto così.
+  function tornaAGiudicato(state, fonte, d) {
+    const testo = getEditableText(state.el);
+    const g = state.giudicati[fonte].get(R().ossatura(testo));
+    if (!g) return false;
+    if (fonte === 'rapido') state.baseRapido = d.testo; else state.baseRagionato = d.testo;
+    const segni = riallineaIssues(g.segni.map((x) => ({ ...x })), g.testo, testo).issues;
+    state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni];
+    state.testo = testo;
+    renderOverlayContent(state);
+    return true;
+  }
+
+  // ============================================================================
+  // Per il tasto destro (content.js)
+  // ============================================================================
+  // I segni sotto il punto, uno per tipo. Il tasto destro dice che non si sta scrivendo: anche la parola appena scritta
+  // ha il suo segno.
+  function segniSotto(el, clientX, clientY) {
+    const vuoto = { errore: null, suggerimento: null };
+    const state = el && monitored.get(el);
+    if (!state) return vuoto;
+    const pos = caretCharOffsetFromPoint(el, clientX, clientY);
+    if (pos < 0) return vuoto;
+    seguiIlTesto(state);
+    if (state.codiceTesto !== testoDaControllare(el).testo) calcolaCodice(state);
+    const vista = segniInVista(state, { ignoraScrittura: true }).filter((s) => !s.svanisce);
+    const su = (k) => vista.find((s) => s.segno === k && pos >= s.start && pos < s.end) || null;
+    return { errore: su('errore'), suggerimento: su('suggerimento') };
+  }
+
+  // Un candidato ancora da giudicare sotto il tasto destro: il controllo rapido parte adesso, e il menu aperto si
+  // aggiorna quando risponde (seguiSegno).
+  function giudicaOra(el, segno) {
+    const state = el && monitored.get(el);
+    if (!state || !segno || !segno.dubbio || segno.segno !== 'errore' || !modelloErrori()) return false;
+    const k = R().chiaveVerdetto(segno);
+    if (state.inViaggio.some((v) => v.start < segno.end && v.end > segno.start)) return true;
+    state.richiesti.add(k);
+    // Fuori dalla base, così il pezzo torna nuovo anche se era già stato mandato; ciò che era da giudicare resta.
+    const d = testoDaControllare(el);
+    const a = d.verso(segno.start);
+    const b = d.verso(segno.end);
+    const r = R().regioneNuova(state.baseRapido, d.testo);
+    if (a >= 0 && b > a && !(r && r.start <= a && r.end >= b)) {
+      const da = r ? Math.min(a, r.start) : a;
+      const fino = r ? Math.max(b, r.end) : b;
+      state.baseRapido = d.testo.slice(0, da) + d.testo.slice(fino);
+    }
+    controlloRapido(state, { suRichiesta: true, ignoraScrittura: true });
+    return true;
+  }
+
+  function seguiSegno(el, segno, cb) {
+    const state = el && monitored.get(el);
+    if (!state || !segno) return () => {};
+    const f = () => {
+      const ora = segniInVista(state, { ignoraScrittura: true })
+        .find((s) => s.segno === segno.segno && s.start < segno.end && s.end > segno.start && !s.svanisce);
+      cb(ora || null);
+    };
+    state.ascoltatori.add(f);
+    return () => state.ascoltatori.delete(f);
+  }
+
+  function correggi(el, segno, correzione) {
+    if (!el || !segno) return;
+    applyFix(el, { start: segno.start, end: segno.end }, correzione, { expectedSegment: segno.segment });
+  }
+
+  function ignora(el, segno) {
+    const state = el && monitored.get(el);
+    if (!state || !segno) return;
+    const ig = chiaveIgnora(segno);
+    state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
+    renderOverlayContent(state);
+  }
+
+  // Una parola che Filo sa giusta in quel campo: nel dizionario personale, scartata dal modello o ignorata. Lì la
+  // proposta del browser (che la segna comunque) non va in cima al menu.
+  function parolaGiusta(el, parola) {
+    const w = String(parola || '').trim();
+    if (!w) return false;
+    if (isInDictionary(w)) return true;
+    const state = el && monitored.get(el);
+    if (!state) return false;
+    if (verdetto(state, { fonte: 'dizionario', segment: w })?.stato === 'scartato') return true;
+    return ignorato(state, { segno: 'errore', segment: w, start: 0, end: w.length }, w);
+  }
+
+  async function aggiungiAlDizionario(el, segno) {
+    if (!segno) return;
+    await addToDictionary(segno.segment);
+    const state = el && monitored.get(el);
+    if (state) aggiornaCodice(state);
+  }
+
+  // Gli errori confermati che hanno una correzione: «Correggi tutti gli errori» non tocca i candidati né i suggerimenti.
+  function erroriDaCorreggere(el) {
+    const state = el && monitored.get(el);
+    if (!state) return [];
+    seguiIlTesto(state);
+    return segniInVista(state, { ignoraScrittura: true })
+      .filter((s) => s.segno === 'errore' && !s.dubbio && !s.svanisce && Array.isArray(s.correzioni) && s.correzioni.length);
+  }
+
+  // Dal fondo all'inizio: ogni correzione lascia al loro posto quelle prima. Quante ne ha fatte.
+  function correggiTutti(el) {
+    const lista = erroriDaCorreggere(el).sort((a, b) => b.start - a.start);
+    let fatte = 0;
+    for (const s of lista) {
+      const prima = getEditableText(el);
+      correggi(el, s, s.correzioni[0]);
+      if (getEditableText(el) !== prima) fatte++;
+    }
+    return fatte;
+  }
+
+  // Il controllo rapido chiesto col tasto destro su una parola di una casella di una riga: { errore, correzione, motivo }
+  // per quella parola, o null se il controllo non ha risposto.
+  async function controlloSuRichiesta(el, wordCtx) {
+    if (!modelloErrori() || !el || !wordCtx) return null;
+    const testo = campoDiTesto(el) ? String(el.value || '') : getEditableText(el);
+    if (testo.slice(wordCtx.start, wordCtx.end) !== wordCtx.word) return null;
+    let sito = '';
+    try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
+    const payload = {
+      ...pezziDa(testo, wordCtx.start, wordCtx.end),
+      candidati: [{ pezzo: wordCtx.word, perche: t('spell_perche_chiesta') }],
+      luogo: { sito },
+    };
+    let res;
+    try { res = await chiedi(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta: true }); } catch (_) { return null; }
+    if (!res || !res.ok || typeof res.text !== 'string') return null;
+    const { segni } = R().segniDaRisposta(res.text, testo, { fonte: 'rapido' });
+    const e = segni.find((s) => s.start < wordCtx.end && s.end > wordCtx.start);
+    if (!e) return { errore: false };
+    return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo };
+  }
+
+  // Cerca di estrarre frase precedente e successiva al campo editabile, per la parola sotto il tasto destro.
   function extractContext(el) {
     let prev = '';
     let next = '';
@@ -686,118 +1397,21 @@
       if (!parent) return { prev, next };
       const siblings = Array.from(parent.childNodes);
       const idx = siblings.indexOf(el);
-      if (idx > 0) {
-        for (let i = idx - 1; i >= 0; i--) {
-          const t = (siblings[i].textContent || '').trim();
-          if (t) { prev = t; break; }
-        }
+      for (let i = idx - 1; idx > 0 && i >= 0; i--) {
+        const tx = (siblings[i].textContent || '').trim();
+        if (tx) { prev = tx; break; }
       }
-      if (idx >= 0 && idx < siblings.length - 1) {
-        for (let i = idx + 1; i < siblings.length; i++) {
-          const t = (siblings[i].textContent || '').trim();
-          if (t) { next = t; break; }
-        }
+      for (let i = idx + 1; idx >= 0 && i < siblings.length; i++) {
+        const tx = (siblings[i].textContent || '').trim();
+        if (tx) { next = tx; break; }
       }
     } catch (_) {}
     return { prev: prev.slice(0, 300), next: next.slice(0, 300) };
   }
 
-  function parseIssues(raw) {
-    if (!raw) return { annotated: '', issues: [] };
-    const trimmed = String(raw).trim();
-    // L'LLM a volte avvolge la risposta in ```json ... ```
-    const cleaned = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start < 0 || end <= start) return { annotated: '', issues: [] };
-    try {
-      const obj = JSON.parse(cleaned.slice(start, end + 1));
-      return {
-        annotated: typeof obj.annotated === 'string' ? obj.annotated : '',
-        issues: Array.isArray(obj.issues) ? obj.issues : [],
-      };
-    } catch (_) {
-      return { annotated: '', issues: [] };
-    }
-  }
-
-  // Estrae le porzioni avvolte in **...** da `annotated` IN ORDINE, e per ognuna
-  // trova la posizione della prossima occorrenza nel testo originale a partire
-  // da dopo l'ultima trovata. Così i refusi ripetuti (es. "oggi … oggi") vengono
-  // localizzati correttamente quando solo una delle due è marcata.
-  function locateAnnotatedRanges(text, annotated) {
-    if (!annotated) return [];
-    const out = [];
-    const re = /\*\*(.+?)\*\*/g;
-    let cursor = 0;
-    let m;
-    while ((m = re.exec(annotated)) !== null) {
-      const marked = m[1];
-      if (!marked) continue;
-      const idx = text.indexOf(marked, cursor);
-      if (idx < 0) {
-        // Fallback: prova case-insensitive (l'LLM a volte cambia maiuscole).
-        const lower = text.toLowerCase().indexOf(marked.toLowerCase(), cursor);
-        if (lower < 0) { out.push(null); continue; }
-        out.push({ start: lower, end: lower + marked.length });
-        cursor = lower + marked.length;
-        continue;
-      }
-      out.push({ start: idx, end: idx + marked.length });
-      cursor = idx + marked.length;
-    }
-    return out;
-  }
-
-  function buildIssues({ annotated, issues }, text) {
-    const ranges = locateAnnotatedRanges(text, annotated);
-    const out = [];
-    for (let i = 0; i < ranges.length; i++) {
-      const r = ranges[i];
-      if (!r) continue;
-      const meta = (issues && issues[i]) || {};
-      if (!['semantic', 'grammar', 'repetition'].includes(meta.type)) continue;
-      const segment = text.slice(r.start, r.end).trim();
-      if (!segment) continue;
-      if (segment.split(/\s+/).every((w) => isInDictionary(w))) continue;
-      out.push({
-        type: meta.type,
-        start: r.start,
-        end: r.end,
-        explanation: String(meta.explanation || '').slice(0, 100),
-        correction: String(meta.correction || ''),
-        // Segmento "originale" del testo. Usato in applyFix per validare che il
-        // testo non sia cambiato fra scan e click su Risolvi: se è cambiato, niente
-        // fix (evita di cancellare/sostituire la frase sbagliata).
-        segment: text.slice(r.start, r.end),
-      });
-    }
-    // Garantisce ordine + niente sovrapposizioni.
-    out.sort((a, b) => a.start - b.start);
-    const merged = [];
-    for (const it of out) {
-      const last = merged[merged.length - 1];
-      if (last && it.start < last.end) continue;
-      merged.push(it);
-    }
-    return merged;
-  }
-
   // ============================================================================
-  // API per il content script (right-click)
+  // La parola sotto il tasto destro
   // ============================================================================
-  // Restituisce il range "blu" sotto il punto, se c'è. Altrimenti null.
-  function getSemanticIssueAt(el, clientX, clientY) {
-    const state = monitored.get(el);
-    if (!state || !state.issues?.length) return null;
-    const pos = caretCharOffsetFromPoint(el, clientX, clientY);
-    if (pos < 0) return null;
-    for (const it of state.issues) {
-      if (pos >= it.start && pos < it.end) return it;
-    }
-    return null;
-  }
-
   // Trova la parola sotto al click in un editabile, restituisce
   // { word, start, end, sentence, prev, next } o null.
   function getWordAt(el, clientX, clientY) {
@@ -1076,9 +1690,130 @@
     return line.startOffset + Math.max(0, Math.min(line.text.length, lo));
   }
 
+
+  // ============================================================================
+  // La pagina intorno al campo
+  // ============================================================================
+  // Il testo della pagina intorno al campo, dal più vicino: in una chat la conversazione (gli ultimi messaggi stanno
+  // subito sopra la casella), altrove il contenuto principale. Niente di nascosto, niente UI di Filo, niente altri campi.
+  const RADICI_CONTESTO = 'main, [role="main"], #main, article, [role="dialog"], dialog';
+  const TAG_SALTATI = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION',
+    'DATALIST', 'BUTTON', 'SVG', 'svg', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'NAV', 'ASIDE', 'HEAD']);
+  const RUOLI_SALTATI = new Set(['navigation', 'complementary', 'menu', 'menubar', 'listbox', 'tooltip', 'button', 'search']);
+  const TAG_IN_RIGA = new Set(['A', 'ABBR', 'B', 'BDI', 'BDO', 'CITE', 'CODE', 'DATA', 'DFN', 'EM', 'FONT', 'I', 'KBD',
+    'MARK', 'Q', 'S', 'SAMP', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME', 'U', 'VAR', 'LABEL']);
+
+  function radiceContesto(el) {
+    let r = el.parentElement && el.parentElement.closest(RADICI_CONTESTO);
+    // Un riquadro piccolo (la scheda di un post) non basta: si sale al contenitore successivo.
+    while (r) {
+      const su = r.parentElement && r.parentElement.closest(RADICI_CONTESTO);
+      const proprio = el.isContentEditable ? (el.textContent || '').length : 0;
+      if (!su || (r.textContent || '').length - proprio >= 600) break;
+      r = su;
+    }
+    if (r) return r;
+    const root = el.getRootNode();
+    if (root && root.nodeType === 11) return root;
+    return el.ownerDocument.body || el.ownerDocument.documentElement;
+  }
+
+  function contestoDelCampo(el) {
+    const vuoto = { prima: '', dopo: '', troncato: false };
+    // Nei riquadri di Filo intorno c'è Filo, non la pagina.
+    if (!el || radiceDi(el)) return vuoto;
+    try {
+      const radice = radiceContesto(el);
+      const UI = global.SN_FILO_UI;
+      const doc = el.ownerDocument;
+      const filtro = {
+        acceptNode(n) {
+          if (n === el || el.contains(n)) return NodeFilter.FILTER_REJECT;
+          if (n.nodeType === 3) return /\S/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+          if (n.contains(el)) return NodeFilter.FILTER_SKIP;
+          if (TAG_SALTATI.has(n.tagName) || (UI && UI.is(n))) return NodeFilter.FILTER_REJECT;
+          const ruolo = n.getAttribute('role');
+          if (ruolo && RUOLI_SALTATI.has(ruolo)) return NodeFilter.FILTER_REJECT;
+          if (n.getAttribute('aria-hidden') === 'true') return NodeFilter.FILTER_REJECT;
+          const ce = n.getAttribute('contenteditable');
+          if (ce === '' || ce === 'true' || ce === 'plaintext-only') return NodeFilter.FILTER_REJECT;
+          if (typeof n.checkVisibility === 'function' && !n.checkVisibility({ visibilityProperty: true })) return NodeFilter.FILTER_REJECT;
+          return n.tagName === 'BR' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        },
+      };
+      const blocco = (n) => {
+        let e = n.nodeType === 3 ? n.parentElement : n;
+        while (e && e !== radice && TAG_IN_RIGA.has(e.tagName)) e = e.parentElement;
+        return e;
+      };
+      const raccogli = (avanti, tetto) => {
+        const w = doc.createTreeWalker(radice, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filtro);
+        w.currentNode = el;
+        const pezzi = [];
+        let lunghezza = 0;
+        let visti = 0;
+        let n;
+        while ((n = avanti ? w.nextNode() : w.previousNode())) {
+          if (++visti > CONTESTO_NODI_MAX) return { pezzi, pieno: true };
+          const t = n.nodeType === 3 ? n.nodeValue.replace(/\s+/g, ' ') : '\n';
+          pezzi.push({ t, b: n.nodeType === 3 ? blocco(n) : n });
+          lunghezza += t.length;
+          if (lunghezza > tetto) return { pezzi, pieno: true };
+        }
+        return { pezzi, pieno: false };
+      };
+      const cuci = (pezzi) => {
+        let s = '';
+        let prima = null;
+        for (const p of pezzi) {
+          if (prima && p.b !== prima) s += '\n';
+          s += p.t;
+          prima = p.b;
+        }
+        return s.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim();
+      };
+      const dopo = raccogli(true, CONTESTO_DOPO_MAX);
+      let testoDopo = cuci(dopo.pezzi);
+      if (testoDopo.length > CONTESTO_DOPO_MAX) testoDopo = testoDopo.slice(0, CONTESTO_DOPO_MAX);
+      const tettoPrima = CONTESTO_MAX - testoDopo.length;
+      const prima = raccogli(false, tettoPrima);
+      let testoPrima = cuci(prima.pezzi.reverse());
+      if (testoPrima.length > tettoPrima) testoPrima = testoPrima.slice(-tettoPrima);
+      return { prima: testoPrima, dopo: testoDopo, troncato: prima.pieno || dopo.pieno };
+    } catch (e) {
+      console.warn('[SN] coerenza — contesto non letto:', e);
+      return vuoto;
+    }
+  }
+
   // ============================================================================
   // Applicazione correzioni
   // ============================================================================
+  // Come una battuta, dall'editing del browser: il correttore nativo sposta i segni delle altre parole invece di
+  // perderli (riscrivere il valore cancella tutto lo zigzag rosso del campo, #1111), e Ctrl+Z annulla la correzione.
+  // Falso se il campo è rimasto com'era: allora lo si riscrive.
+  function sostituisciComeBattuta(el, range, testo, cursorMode) {
+    testo = String(testo ?? '');
+    const prima = el.value;
+    const caret = el.selectionEnd;
+    // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
+    if (el.maxLength >= 0 && prima.length - (range.end - range.start) + testo.length > el.maxLength) return false;
+    try {
+      const radice = el.getRootNode();
+      if (radice.activeElement !== el) el.focus({ preventScroll: true });
+      if (radice.activeElement !== el) return false;
+      el.setSelectionRange(range.start, range.end);
+      if (testo) document.execCommand('insertText', false, testo);
+      else if (range.end > range.start) document.execCommand('delete', false);
+    } catch (_) {}
+    if (el.value === prima) return false;
+    if (cursorMode === 'preserve' && typeof caret === 'number') {
+      const dove = caret >= range.end ? caret + testo.length - (range.end - range.start) : caret;
+      try { el.setSelectionRange(dove, dove); } catch (_) {}
+    }
+    return true;
+  }
+
   function applyFix(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
     // 'end' = caret a fine inserzione (popup correttore manuale).
@@ -1108,18 +1843,19 @@
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
         return;
       }
-      // Usa setRangeText (API standard): più robusta del concat manuale e
-      // mantiene correttamente l'undo stack del browser.
-      try {
-        el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
-      } catch (_) {
-        const before = v.slice(0, range.start);
-        const after = v.slice(range.end);
-        el.value = before + safeReplacement + after;
-        const caret = before.length + safeReplacement.length;
-        try { el.setSelectionRange(caret, caret); } catch (_) {}
+      if (!sostituisciComeBattuta(el, range, safeReplacement, cursorMode)) {
+        try {
+          el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
+        } catch (_) {
+          const before = v.slice(0, range.start);
+          const after = v.slice(range.end);
+          el.value = before + safeReplacement + after;
+          const caret = before.length + safeReplacement.length;
+          try { el.setSelectionRange(caret, caret); } catch (_) {}
+        }
+        // Segnato come nostro: un campo di un riquadro di Filo, chiuso ai finti, deve sentire la correzione.
+        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
       }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
       const text = el.textContent || '';
       if (range.start < 0 || range.end > text.length || range.end <= range.start) {
@@ -1202,57 +1938,20 @@
         }
       }
     }
-    // Rimuovi l'issue dallo stato e ridisegna; il prossimo scan rivaluterà.
+    // Il segno corretto cade col testo che cambia (anche se l'input non è arrivato). Una correzione scelta dal menu è un
+    // gesto: i controlli rileggono il pezzo. L'autocorrezione (`preserve`) arriva battendo, e lì li programma il tasto.
     const state = monitored.get(el);
     if (state) {
-      state.issues = (state.issues || []).filter((i) => !(i.start === range.start && i.end === range.end));
-      state.lastScannedText = '';
-      renderOverlayContent(state);
-      scheduleScan(state);
-    }
-  }
-
-  // ============================================================================
-  // Richiesta on-demand: parola sotto cursore → suggerimento LLM
-  // ============================================================================
-  // Restituisce { misspelled, correction } o null se la chiamata fallisce.
-  async function requestWordSuggestion({ word, sentence, prev, next }) {
-    try {
-      const res = await chrome.runtime.sendMessage({
-        type: MSG.AI_REQUEST,
-        action: ACTIONS.SPELLCHECK_WORD,
-        payload: { word, sentence, prev, next },
-      });
-      if (!res?.ok) {
-        console.error('[SN] word check — provider error:', res?.code, res?.error);
-        return null;
+      seguiIlTesto(state);
+      if (getEditableText(el) === currentText) {
+        state.modello = state.modello.filter((i) => !(i.start === range.start && i.end === range.end));
       }
-      if (!res.text) {
-        console.warn('[SN] word check — risposta vuota:', res);
-        return null;
+      aggiornaCodice(state);
+      if (cursorMode !== 'preserve' && state.attivo) {
+        programmaRapido(state, { gesto: true });
+        programmaRagionato(state, { gesto: true });
       }
-      return parseWordResponse(res.text);
-    } catch (err) {
-      console.error('[SN] word check — sendMessage fallito:', err);
-      return null;
     }
-  }
-
-  function parseWordResponse(raw) {
-    const cleaned = String(raw).trim()
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```$/, '');
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start < 0 || end <= start) return null;
-    try {
-      const obj = JSON.parse(cleaned.slice(start, end + 1));
-      if (typeof obj.misspelled !== 'boolean') return null;
-      return {
-        misspelled: obj.misspelled,
-        correction: String(obj.correction || ''),
-      };
-    } catch (_) { return null; }
   }
 
   // ============================================================================
@@ -1322,25 +2021,40 @@
     return finish;
   }
 
+
   // ============================================================================
   // API pubblica
   // ============================================================================
   global.SN_SPELLCHECK = {
     init,
     updateSettings,
-    isEnabled,
+    erroriAttivi,
+    suggerimentiAttivi,
+    modelloErrori,
     isSupportedEditable,
     findSupportedEditable,
-    getSemanticIssueAt,
+    campoEscluso,
+    segniSotto,
+    giudicaOra,
+    seguiSegno,
+    correggi,
+    ignora,
+    aggiungiAlDizionario,
+    parolaGiusta,
+    erroriDaCorreggere,
+    correggiTutti,
+    controlloSuRichiesta,
+    proposteDelBrowser,
+    sbagliataPerIlBrowser,
+    contestoDelCampo,
     getWordAt,
     getInputWordAt,
-    requestWordSuggestion,
     applyFix,
+    sostituisciComeBattuta,
+    riallineaIssues,
     addToDictionary,
     isInDictionary,
     setAutocorrect,
-    getCachedSuggestion,
-    setCachedSuggestion,
     getNativeSuggestions,
     onNativeSuggestions,
     onNextNativeSuggestion,

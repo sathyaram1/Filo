@@ -6,7 +6,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, tempiCorrettore } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -15,8 +15,25 @@
   const CUSTOM_KEY = '__custom__';
 
   function $(id) { return document.getElementById(id); }
+  // I numeri che la pagina scrive: 1.234 e 1,5 (regola in tests/unit/numeriItaliani.test.mjs).
+  const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
 
-  let saveTimer = null;
+  // Nessuna casella della pagina ha un «Salva», e chiudere o cambiare scheda non avvisa la pagina (#590.5): ognuna
+  // parte da qui, dopo una pausa o al primo segno di uscita. Uscendo, i numeri fuori scala tornano al valore in uso.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      if (!caricato) return;
+      canonAutoArchiveIdle();
+      canonNotifDuration();
+    },
+    spegni(nome) {
+      const hint = $({ token: 'tokenSavedHint', tabColor: 'tabColorSavedHint' }[nome] || 'savedHint');
+      if (hint) hint.classList.remove('sn-show');
+    },
+  });
+  caselle.registra('pref', () => persist());
+  caselle.registra('token', () => persistTokens());
+  caselle.registra('tabColor', () => persistTabColor());
 
   // Indicatore "Salvato": può lampeggiare su più ancore (quella globale a fondo
   // pagina e quella locale della sezione token), così la conferma è visibile
@@ -44,7 +61,6 @@
   // risultano personalizzati finché non li si tocca direttamente.
 
   let currentOverrides = {};
-  let tokensSaveTimer = null;
 
   // Tema risolto (light/dark) com'è applicato ora su <html>: i default di alcuni
   // token differiscono fra chiaro e scuro.
@@ -57,16 +73,8 @@
     return !!t && t.type === 'color';
   }
 
-  // Messaggio d'errore puntuale per tipo di token.
   function tokenErrorMsg(name) {
-    const t = Tokens && Tokens.get(name);
-    switch (t && t.type) {
-      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
-      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
-      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
-      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
-      default: return 'Valore non valido.';
-    }
+    return Tokens ? Tokens.errorMessage(name) : 'Valore non valido.';
   }
 
   // (Ri)disegna una singola riga dal modello: valore effettivo, stato
@@ -118,7 +126,7 @@
       input.spellcheck = false;
       input.autocomplete = 'off';
       input.setAttribute('aria-label', t.label || name);
-      input.addEventListener('input', () => onTokenInput(name));
+      input.addEventListener('input', (e) => onTokenInput(name, e));
       input.addEventListener('blur', () => {
         const v = input.value.trim();
         if (v !== '' && !Tokens.validate(name, v)) {
@@ -167,6 +175,7 @@
   let tokenAzzeraTutti = false;
 
   async function persistTokens() {
+    const biglietto = caselle.spedita('token');
     const nomi = [...tokenDaSalvare];
     const tutti = tokenAzzeraTutti;
     tokenDaSalvare.clear();
@@ -189,10 +198,10 @@
     for (const name of tokenInCorso) {
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
     }
     chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
-    flashSaved('tokenSavedHint');
+    if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
   }
 
   // Un aggiornamento arrivato da altrove: si ridisegnano i token che l'utente
@@ -211,11 +220,6 @@
     }
   }
 
-  function persistTokensDebounced() {
-    clearTimeout(tokensSaveTimer);
-    tokensSaveTimer = setTimeout(persistTokens, 400);
-  }
-
   // Ridisegna tutte le righe TRANNE quella in `exceptName` (che l'utente sta
   // editando): serve quando si cambia un token-categoria, così i token che ne
   // ereditano (es. link.color da accent) mostrano subito il valore ereditato.
@@ -224,7 +228,7 @@
     for (const name of Tokens.names()) if (name !== exceptName && !tokenInCorso.has(name)) renderTokenRow(name);
   }
 
-  function onTokenInput(name) {
+  function onTokenInput(name, e) {
     const input = $(`tok-${name}`);
     const row = input.closest('.sn-token-row');
     const err = row.querySelector('.sn-token-error');
@@ -239,11 +243,12 @@
     row.classList.remove('sn-token-invalid');
     if (v !== '' && !Tokens.validate(name, v)) return;
 
-    if (v === '' || v === Tokens.defaultValue(name, resolvedTheme())) {
+    const canonico = v === '' ? '' : Tokens.normalize(name, v);
+    if (canonico === '' || canonico === Tokens.defaultValue(name, resolvedTheme())) {
       // Vuoto o uguale al predefinito del tema corrente: nessun override.
       delete currentOverrides[name];
     } else {
-      currentOverrides[name] = v;
+      currentOverrides[name] = canonico;
     }
     row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
     if (isColorToken(name)) {
@@ -253,7 +258,7 @@
     tokenDaSalvare.add(name);
     renderOtherTokenRows(name);
     applyTokensLive();
-    persistTokensDebounced();
+    caselle.cambiato('token', e);
   }
 
   function resetToken(name) {
@@ -309,7 +314,8 @@
     if (!r || !r.ok) return;
     flashSaved('onboardingHint');
     renderOnboardingArchive(r.onboarding);
-    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://newtab/' });
+    // Il segno lega l'intervista a questa scheda: le altre home restano il filo (#1297).
+    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://newtab/?accoglienza=1' });
   }
 
   function onboardingWhen(conv) {
@@ -346,9 +352,24 @@
       const scambi = conv.thread.filter((m) => m.role === 'user').length;
       meta.textContent = conv.current && !state.done
         ? 'in corso'
-        : `${scambi} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
+        : `${cifre(scambi)} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
       sum.appendChild(when);
       sum.appendChild(meta);
+      // Quello che Filo conserva si toglie da qui, una per una (#1297); quella ancora aperta si chiude dalla home.
+      if (!(conv.current && !state.done)) {
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'mem-via onb-via';
+        via.textContent = '×';
+        via.title = 'Togli';
+        via.setAttribute('aria-label', `Togli l’intervista del ${onboardingWhen(conv)}`);
+        via.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          togliIntervista(via, O.chiaveConversazione(conv));
+        });
+        sum.appendChild(via);
+      }
       det.appendChild(sum);
       const lines = document.createElement('div');
       lines.className = 'onb-lines';
@@ -371,6 +392,14 @@
     });
   }
 
+  async function togliIntervista(btn, chiave) {
+    btn.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_ONBOARDING_TOGLI, chiave }); } catch (_) { r = null; }
+    if (r && r.ok && r.onboarding) renderOnboardingArchive(r.onboarding);
+    else btn.disabled = false;
+  }
+
   async function loadOnboardingArchive() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_ONBOARDING, peek: true });
@@ -385,7 +414,6 @@
   // (via SETTINGS_UPDATED) aggiorna live il colore delle tab. ↺ riporta il
   // singolo parametro al predefinito; il bottone in fondo li azzera tutti.
   let currentTabColor = {};
-  let tabColorSaveTimer = null;
 
   function buildTabColorSection() {
     const box = $('tabColorCode');
@@ -418,8 +446,8 @@
       input.step = String(m.step);
       input.spellcheck = false;
       input.autocomplete = 'off';
-      input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
-      input.addEventListener('input', () => onTabColorInput(m.key));
+      input.setAttribute('aria-label', `${m.label} (${cifre(m.min)}–${cifre(m.max)})`);
+      input.addEventListener('input', (e) => onTabColorInput(m.key, e));
       input.addEventListener('blur', () => {
         if (!tabColDaSalvare.has(m.key)) tabColInCorso.delete(m.key);
         renderTabColorRow(m.key);
@@ -430,7 +458,7 @@
       reset.type = 'button';
       reset.className = 'sn-token-reset';
       reset.textContent = '↺';
-      reset.title = `Ripristina il predefinito (${m.def})`;
+      reset.title = `Ripristina il predefinito (${cifre(m.def)})`;
       reset.setAttribute('aria-label', `Ripristina ${m.key}`);
       reset.addEventListener('click', () => resetTabColorParam(m.key));
       row.appendChild(reset);
@@ -441,7 +469,7 @@
       help.hidden = false;
       help.style.color = 'var(--sn-muted, #888)';
       help.style.gridColumn = '2 / -1';
-      help.textContent = `intervallo ${m.min}–${m.max} · ${m.comment}`;
+      help.textContent = `intervallo ${cifre(m.min)}–${cifre(m.max)} · ${m.comment}`;
       row.appendChild(help);
 
       box.appendChild(row);
@@ -469,7 +497,7 @@
   const tabColDaSalvare = new Set();
   const tabColInCorso = new Set();
 
-  function onTabColorInput(key) {
+  function onTabColorInput(key, e) {
     const input = $(`tabcol-${key}`);
     const m = tabColorMeta(key);
     if (!input || !m) return;
@@ -482,7 +510,7 @@
     tabColDaSalvare.add(key);
     const row = input.closest('.sn-token-row');
     if (row) row.classList.toggle('sn-token-modified', n !== m.def);
-    persistTabColorDebounced();
+    caselle.cambiato('tabColor', e);
   }
 
   function resetTabColorParam(key) {
@@ -508,6 +536,7 @@
   }
 
   function persistTabColor() {
+    caselle.spedita('tabColor');
     const clamped = TabColor ? TabColor.clampParams(currentTabColor) : currentTabColor;
     currentTabColor = clamped;
     const parte = {};
@@ -535,11 +564,6 @@
     }
   }
 
-  function persistTabColorDebounced() {
-    clearTimeout(tabColorSaveTimer);
-    tabColorSaveTimer = setTimeout(persistTabColor, 400);
-  }
-
   // Lo stile come si salva e come arriva al modello: quello che si legge nel
   // riquadro (#592).
   function currentStyleText() {
@@ -556,8 +580,8 @@
     note.classList.toggle('agent-style-over', over);
     $('agentStyleText').classList.toggle('agent-style-over', over);
     note.textContent = over
-      ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
-      : `${n} / ${AGENT_STYLE_MAX}`;
+      ? `Troppo lungo: ${cifre(n)} caratteri, il massimo è ${cifre(AGENT_STYLE_MAX)}. Non lo salvo finché non lo accorci.`
+      : `${cifre(n)} / ${cifre(AGENT_STYLE_MAX)}`;
     mostraTuttoLoStile();
     return !over;
   }
@@ -753,11 +777,8 @@
     synth.speak(u);
   }
 
-  // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
-  // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
-  // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
-  // I toni (sequenze di note + player AudioContext) vivono nel modulo condiviso
-  // SN_SOUNDS, riusato anche dalla shell per il suono delle notifiche (#170.1).
+  // I motivi stanno in SN_SOUNDS e basta: l'anteprima qui, le notifiche della
+  // shell e la suoneria di timer e sveglie devono suonare gli stessi.
   const Sounds = window.SN_SOUNDS;
 
   // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
@@ -774,11 +795,30 @@
     }
   }
 
+  // Il volume si giudica a orecchio: l'anteprima usa quello scelto adesso, o
+  // la manopola si regolerebbe alla cieca.
+  function volumeDa(id) {
+    const n = parseInt($(id).value, 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
   function previewRingtone() {
-    if (Sounds) Sounds.play($('timerRingtone').value);
+    if (Sounds) Sounds.play($('timerRingtone').value, volumeDa('timerRingtoneVolume'));
   }
   function previewNotifSound() {
-    if (Sounds) Sounds.play($('notifSound').value);
+    if (Sounds) Sounds.play($('notifSound').value, volumeDa('notifSoundVolume'));
+  }
+  function mostraVolume(id) {
+    const eco = $(id + 'Val');
+    if (eco) eco.textContent = `${volumeDa(id)}%`;
+  }
+  // Un valore assente o storto vale «pieno»: il silenzio si sceglie.
+  function volumeSalvato(salvato) {
+    const n = Number(salvato);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+  function caricaVolume(id, salvato) {
+    $(id).value = String(volumeSalvato(salvato));
+    mostraVolume(id);
   }
 
   // Clamp dei due campi numerici "liberi" (li usano sia il salvataggio sia il
@@ -812,27 +852,33 @@
   // cambio arrivato da altrove (la chat, un'altra scheda) non li riscrive. Il
   // resto della pagina segue la memoria (#592).
   const toccati = new Set();
-  const CAMPO_DI = {
-    theme: 'theme', textScale: 'textScale', showHomeMessage: 'showHomeMessage',
-    agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
-    terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
-    ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
-    ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
-    autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
-    autoArchiveOnClose: 'autoArchive.onClose',
-    notifDuration: 'notifications.durationSec', notifSoundEnabled: 'notifications.soundEnabled',
-    notifSound: 'notifications.sound',
-  };
+  // Quale campo scrive quale impostazione: lo dice la fonte unica delle voci, la stessa da cui la chat
+  // legge e cambia ogni preferenza (#949).
+  const CAMPO_DI = window.SN_VOCI_IMPOSTAZIONI.campi('preferences');
 
   function valoreDelCampo(k) {
     switch (k) {
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'homeSistema.ora': return $('homeSisOra').checked;
+      case 'homeSistema.batteria': return $('homeSisBatteria').checked;
+      case 'homeSistema.rete': return $('homeSisRete').checked;
+      case 'homeSistema.bluetooth': return $('homeSisBluetooth').checked;
+      case 'homeSistema.volume': return $('homeSisVolume').checked;
+      case 'tabPreview.enabled': return $('tabPreviewEnabled').checked;
+      case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
+      case 'timerRingtoneVolume': return volumeDa('timerRingtoneVolume');
       case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'schermo.guarda': return $('schermoGuarda').checked;
+      case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
+      case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
+      case 'propostaEmail.attiva': return $('propostaEmailAttiva').checked;
+      case 'propostaEmail.incognito': return $('propostaEmailIncognito').checked;
       case 'terminal.shell': return $('terminalShell').value;
+      case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
       case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
@@ -840,12 +886,52 @@
       case 'autoArchive.enabled': return $('autoArchiveEnabled').checked;
       case 'autoArchive.idleHours': return clampIdleHours(parseInt($('autoArchiveIdleHours').value, 10));
       case 'autoArchive.onClose': return $('autoArchiveOnClose').checked;
+      case 'riassuntoSchede.enabled': return $('riassuntoSchede').checked;
       case 'notifications.durationSec': return clampNotifDurationSec(parseInt($('notifDuration').value, 10));
       case 'notifications.soundEnabled': return $('notifSoundEnabled').checked;
       case 'notifications.sound': return $('notifSound').value || 'default';
+      case 'barraLaterale.spinta': return $('barraSpinta').checked;
+      case 'barraLaterale.striscia': return $('barraStriscia').checked;
+      case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
+      case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
+      case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
+      case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
+      case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
+      case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
+      case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
+      case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn($('contestoCache').value);
+      case 'lunghezzaRisposte.conversazioni': return tettoRisposte($('lunghezzaConversazioni').value);
+      case 'lunghezzaRisposte.testi': return tettoRisposte($('lunghezzaTesti').value);
+      case 'lunghezzaRisposte.brevi': return tettoRisposte($('lunghezzaBrevi').value);
+      case 'avvisoCrediti.attivo': return $('avvisoCreditiAttivo').checked;
+      case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
+      case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
+      case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'descriviImmagini.enabled': return $('descriviImmagini').checked;
+      case 'contatori.attivi': return $('contatoriAttivi').checked;
+      case 'featureFlags.help': return $('aiutoAcceso').checked;
+      case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
+      case 'featureFlags.spellcheckContext': return $('correttoreSuggerimenti').checked;
+      case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
+      case 'correttore.modelloErrori': return $('correttoreModello').checked;
+      case 'correttore.ripetizioni': return $('correttoreRipetizioni').checked;
+      case 'correttore.pausaRapidoMs': return tempoCorrettoreDelCampo('pausaRapidoMs');
+      case 'correttore.ogniRapidoMs': return tempoCorrettoreDelCampo('ogniRapidoMs');
+      case 'correttore.pausaRagionatoMs': return tempoCorrettoreDelCampo('pausaRagionatoMs');
       default: return undefined;
     }
   }
+
+  // Gli interruttori di funzione con il loro valore di serie: acceso finché non è `false`, o spento finché non è `true`.
+  const INTERRUTTORI = [['help', 'aiutoAcceso', true], ['spellcheck', 'correttoreAcceso', true], ['spellcheckContext', 'correttoreSuggerimenti', true], ['categorize', 'categorieAutomatiche', false]];
+  // I tempi del correttore (#1446): campo per chiave; limiti e predefiniti in SN_CONST.CORRETTORE_TEMPI.
+  const CAMPI_TEMPI_CORRETTORE = { pausaRapidoMs: 'correttorePausaRapido', ogniRapidoMs: 'correttoreOgniRapido', pausaRagionatoMs: 'correttorePausaRagionato' };
+  const tempoCorrettoreDelCampo = (campo) => tempiCorrettore({ correttore: { [campo]: $(CAMPI_TEMPI_CORRETTORE[campo]).value } })[campo];
+  const interruttore = (s, nome, diSerie) => {
+    const v = s.featureFlags && s.featureFlags[nome];
+    return diSerie ? v !== false : v === true;
+  };
 
   // Lo stesso valore letto dalla memoria, con le stesse regole di riempi().
   function valoreSalvato(s, k) {
@@ -857,9 +943,23 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'homeSistema.ora': return !(s.homeSistema && s.homeSistema.ora === false);
+      case 'homeSistema.batteria': return !(s.homeSistema && s.homeSistema.batteria === false);
+      case 'homeSistema.rete': return !(s.homeSistema && s.homeSistema.rete === false);
+      case 'homeSistema.bluetooth': return !(s.homeSistema && s.homeSistema.bluetooth === false);
+      case 'homeSistema.volume': return !(s.homeSistema && s.homeSistema.volume === false);
+      case 'tabPreview.enabled': return !(s.tabPreview && s.tabPreview.enabled === false);
+      case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
+      case 'timerRingtoneVolume': return volumeSalvato(s.timerRingtoneVolume);
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'schermo.guarda': return !!(s.schermo && s.schermo.guarda === true);
+      case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
+      case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'propostaEmail.attiva': return !(s.propostaEmail && s.propostaEmail.attiva === false);
+      case 'propostaEmail.incognito': return !!(s.propostaEmail && s.propostaEmail.incognito === true);
+      case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -868,14 +968,100 @@
       case 'autoArchive.enabled': return aa.enabled !== false;
       case 'autoArchive.idleHours': return clampIdleHours(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
       case 'autoArchive.onClose': return aa.onClose !== false;
+      case 'riassuntoSchede.enabled': return !(s.riassuntoSchede && s.riassuntoSchede.enabled === false);
       case 'notifications.durationSec': return clampNotifDurationSec(Number.isFinite(dur) && dur >= 0 ? dur : 5);
       case 'notifications.soundEnabled': return notif.soundEnabled === true;
       case 'notifications.sound': return notif.sound || 'default';
+      case 'barraLaterale.spinta': return opzioniBarraLaterale(s.barraLaterale).spinta;
+      case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
+      case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
+      case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
+      case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
+      case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
+      case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
+      case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
+      case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
+      case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn(s.contestoFilo && s.contestoFilo.cache);
+      case 'lunghezzaRisposte.conversazioni':
+      case 'lunghezzaRisposte.testi':
+      case 'lunghezzaRisposte.brevi': return tettoRisposte(s.lunghezzaRisposte && s.lunghezzaRisposte[k.split('.')[1]]);
+      case 'avvisoCrediti.attivo': return !(s.avvisoCrediti && s.avvisoCrediti.attivo === false);
+      case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
+      case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
+      case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
+      case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
+      case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
+      case 'correttore.ripetizioni': return !(s.correttore && s.correttore.ripetizioni === false);
+      case 'correttore.pausaRapidoMs':
+      case 'correttore.ogniRapidoMs':
+      case 'correttore.pausaRagionatoMs': return tempiCorrettore(s)[k.split('.')[1]];
+      case 'featureFlags.help':
+      case 'featureFlags.spellcheck':
+      case 'featureFlags.spellcheckContext':
+      case 'featureFlags.categorize': {
+        const [nome, , diSerie] = INTERRUTTORI.find(([n]) => k === `featureFlags.${n}`);
+        return interruttore(s, nome, diSerie);
+      }
       default: return undefined;
     }
   }
 
+  // Le soglie dell'avviso dei crediti (#818): vuoto = il predefinito, fuori scala torna dentro come nella chat.
+  const sogliaCrediti = (k, v) => window.SN_CREDITI_AVVISO.numeroSoglia(k, v);
+  const CAMPI_CREDITI = [['giorni', 'avvisoCreditiGiorni'], ['percento', 'avvisoCreditiPercento']];
+  function canonCrediti() {
+    for (const [k, id] of CAMPI_CREDITI) $(id).value = String(sogliaCrediti(k, $(id).value));
+  }
+
+  // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
+  function tettoContesto(k, v) {
+    const FC = window.SN_FILO_CONTESTO;
+    const c = FC.numeroIn(v, FC.LIMITI[k]);
+    return c != null && k === 'token' ? Math.round(c) : c;
+  }
+  function canonContesto() {
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      const v = tettoContesto(k, $(id).value);
+      $(id).value = v == null ? '' : String(v);
+    }
+  }
+  // Quanto può essere lunga una risposta (#1097.3): vuoto = come i predefiniti; fuori scala torna dentro come nel main.
+  const CAMPI_LUNGHEZZA = [['conversazioni', 'lunghezzaConversazioni'], ['testi', 'lunghezzaTesti'], ['brevi', 'lunghezzaBrevi']];
+  const tettoRisposte = (v) => window.SN_LUNGHEZZA_RISPOSTE.numeroIn(v);
+  function canonLunghezza() {
+    for (const [, id] of CAMPI_LUNGHEZZA) {
+      const v = tettoRisposte($(id).value);
+      $(id).value = v == null ? '' : String(v);
+    }
+  }
+
+  // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
+  async function segnapostiContesto() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
+      const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
+      if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
+      if (d.token != null) $('contestoToken').placeholder = String(d.token);
+      if (d.cache) $('contestoCachePredefinita').textContent = `Come i predefiniti (${d.cache === '1h' ? 'un\'ora' : '5 minuti'})`;
+      const l = { ...((r && r.lunghezzaRisposteDiSerie) || {}), ...((r && r.lunghezzaRisposte) || {}) };
+      for (const [f, id] of CAMPI_LUNGHEZZA) if (l[f] != null) $(id).placeholder = String(l[f]);
+    } catch (_) {}
+  }
+
+  function scriviTempiVoce() {
+    const sec = (n) => `${String(n).replace('.', ',')} s`;
+    $('dictationSilenceVal').textContent = sec(parseFloat($('dictationSilence').value) || 0);
+    $('dictationCancelVal').textContent = sec(parseFloat($('dictationCancel').value) || 0);
+  }
+
+  function misuraAnteprima(v) {
+    return ['piccola', 'media', 'grande'].includes(v) ? v : 'media';
+  }
+
   async function persist() {
+    const biglietto = caselle.spedita('pref');
     const styleOk = syncStyleNote();
     const settings = {};
     const partiti = [];
@@ -895,12 +1081,8 @@
     Bootstrap.applyTextScale(parseFloat($('textScale').value) || 1);
     if (!partiti.length) return;
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings });
-    flashSaved();
-  }
-
-  function persistDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(persist, 400);
+    // Una modifica arrivata mentre questa viaggiava: «Salvato» lo dice il salvataggio che la porta.
+    if (caselle.aggiornata('pref', biglietto)) flashSaved();
   }
 
   function buildPresetOptions() {
@@ -929,6 +1111,16 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    const sis = settings.homeSistema || {};
+    if (vuole('homeSistema.ora')) $('homeSisOra').checked = sis.ora !== false;
+    if (vuole('homeSistema.batteria')) $('homeSisBatteria').checked = sis.batteria !== false;
+    if (vuole('homeSistema.rete')) $('homeSisRete').checked = sis.rete !== false;
+    if (vuole('homeSistema.bluetooth')) $('homeSisBluetooth').checked = sis.bluetooth !== false;
+    if (vuole('homeSistema.volume')) $('homeSisVolume').checked = sis.volume !== false;
+    const tp = settings.tabPreview || {};
+    if (vuole('tabPreview.enabled')) $('tabPreviewEnabled').checked = tp.enabled !== false;
+    if (vuole('tabPreview.size')) $('tabPreviewSize').value = misuraAnteprima(tp.size);
+    $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
 
     if (vuole('agentStyle')) {
       $('agentStyleText').value = settings.agentStyle || '';
@@ -940,9 +1132,25 @@
     if (vuole('autoArchive.enabled')) $('autoArchiveEnabled').checked = aa.enabled !== false;
     if (vuole('autoArchive.onClose')) $('autoArchiveOnClose').checked = aa.onClose !== false;
     if (vuole('autoArchive.idleHours')) $('autoArchiveIdleHours').value = String(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
+    if (vuole('riassuntoSchede.enabled')) $('riassuntoSchede').checked = !(settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
+
+    const barra = opzioniBarraLaterale(settings.barraLaterale);
+    if (vuole('barraLaterale.spinta')) $('barraSpinta').checked = barra.spinta;
+    if (vuole('barraLaterale.striscia')) $('barraStriscia').checked = barra.striscia;
+    if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
+    if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('schermo.guarda')) $('schermoGuarda').checked = !!(settings.schermo && settings.schermo.guarda === true);
+    if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+    if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    if (vuole('propostaEmail.attiva')) $('propostaEmailAttiva').checked = !(settings.propostaEmail && settings.propostaEmail.attiva === false);
+    if (vuole('propostaEmail.incognito')) $('propostaEmailIncognito').checked = !!(settings.propostaEmail && settings.propostaEmail.incognito === true);
+    $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
+    if (vuole('aggiornamenti.installa')) {
+      $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+    }
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -963,12 +1171,49 @@
       const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
       $('notifSound').value = nsOpt ? notifSound : 'default';
     }
+    if (vuole('notifications.soundVolume')) caricaVolume('notifSoundVolume', notif.soundVolume);
+
+    if (vuole('dictation.autoSend')) {
+      $('dictationAutoSend').value = settings.dictation && settings.dictation.autoSend === false ? 'no' : 'si';
+    }
+    const tempiVoce = dictationTimes(settings.dictation);
+    if (vuole('dictation.silenceSec')) $('dictationSilence').value = String(tempiVoce.silenceSec);
+    if (vuole('dictation.cancelSec')) $('dictationCancel').value = String(tempiVoce.cancelSec);
+    scriviTempiVoce();
+
+    const cf = settings.contestoFilo || {};
+    if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
+    if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
+    if (vuole('contestoFilo.cache')) $('contestoCache').value = window.SN_FILO_CONTESTO.durataIn(cf.cache) || '';
+    const lr = settings.lunghezzaRisposte || {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      if (vuole(`lunghezzaRisposte.${f}`)) $(id).value = lr[f] == null ? '' : String(lr[f]);
+    }
+    const ac = settings.avvisoCrediti || {};
+    if (vuole('avvisoCrediti.attivo')) $('avvisoCreditiAttivo').checked = ac.attivo !== false;
+    for (const [k, id] of CAMPI_CREDITI) {
+      if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
+    }
+    if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    if (vuole('descriviImmagini.enabled')) $('descriviImmagini').checked = !(settings.descriviImmagini && settings.descriviImmagini.enabled === false);
+    if (vuole('contatori.attivi')) $('contatoriAttivi').checked = !(settings.contatori && settings.contatori.attivi === false);
+    for (const [nome, id, diSerie] of INTERRUTTORI) {
+      if (vuole(`featureFlags.${nome}`)) $(id).checked = interruttore(settings, nome, diSerie);
+    }
+    const corr = settings.correttore || {};
+    if (vuole('correttore.modelloErrori')) $('correttoreModello').checked = corr.modelloErrori !== false;
+    if (vuole('correttore.ripetizioni')) $('correttoreRipetizioni').checked = corr.ripetizioni !== false;
+    const tempiCorr = tempiCorrettore(settings);
+    for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
+      if (vuole(`correttore.${campo}`)) $(id).value = String(tempiCorr[campo]);
+    }
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
       const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
       $('timerRingtone').value = ringOpt ? ringtone : 'default';
     }
+    if (vuole('timerRingtoneVolume')) caricaVolume('timerRingtoneVolume', settings.timerRingtoneVolume);
 
     const tts = settings.tts || {};
     if (vuole('tts.modelVoice')) populateModelVoices(tts.modelVoice || '');
@@ -976,12 +1221,12 @@
       if (vuole('tts.rate')) {
         const rate = Number(tts.rate) || 1;
         $('ttsRate').value = String(rate);
-        $('ttsRateVal').textContent = rate.toFixed(1) + '×';
+        $('ttsRateVal').textContent = rate.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       }
       if (vuole('tts.pitch')) {
         const pitch = Number(tts.pitch) || 1;
         $('ttsPitch').value = String(pitch);
-        $('ttsPitchVal').textContent = pitch.toFixed(1);
+        $('ttsPitchVal').textContent = pitch.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       }
       if (vuole('tts.voice')) populateVoices(tts.voice || '');
     }
@@ -1007,88 +1252,495 @@
     }
   }
 
-  // ── Memoria di Filo (#592) ───────────────────────────────────────────────
-  // Profilo, preferenze apprese e lezioni entrano in ogni conversazione: qui
-  // l'utente le rilegge e ne toglie una riga alla volta.
-  const NOMI_GRUPPO = { PROFILO: 'Chi sei', PREFERENZE: 'Cosa preferisci' };
-  function nomeGruppo(nome) {
-    if (NOMI_GRUPPO[nome]) return NOMI_GRUPPO[nome];
-    const t = String(nome || '').replace(/_+/g, ' ').trim().toLowerCase();
-    return t ? t[0].toUpperCase() + t.slice(1) : 'Altro';
+  // ── Memoria di Filo: si legge e si corregge nel quaderno delle memorie (#872) ─────────
+  function apriQuaderno() {
+    try { chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' }); } catch (_) {}
   }
 
-  async function caricaMemoria() {
-    if (!$('memoria')) return;
-    let r = null;
-    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_VIEW }); } catch (_) {}
-    if (r && r.ok) disegnaMemoria(r);
-  }
+  // ── Ricerca nei documenti (#947) ─────────────────────────────────────────
+  // L'elenco delle cartelle si salva a ogni gesto, fuori dai campi in sospeso. Le tre di sistema tolte restano
+  // sbiadite con «Rimetti»: quello che si toglie si deve poter rimettere da qui.
+  const CARTELLE_DI_SERIE = { documenti: 'Documenti', download: 'Download', scrivania: 'Scrivania' };
+  let cartelleSalvate = null;
+  let statoDocumenti = null;
+  let giroStato = null;
 
-  function disegnaMemoria({ moduli = [], lezioni = [] }) {
-    const box = $('memoria');
-    if (!box) return;
-    box.textContent = '';
-    const posto = (n) => (n === 'PROFILO' ? 0 : n === 'PREFERENZE' ? 1 : 2);
-    const gruppi = [];
-    for (const m of [...moduli].sort((a, b) => posto(a.nome) - posto(b.nome))) {
-      if (!Array.isArray(m.righe) || !m.righe.length) continue;
-      gruppi.push({ titolo: nomeGruppo(m.nome), righe: m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } })) });
-    }
-    if (lezioni.length) {
-      gruppi.push({ titolo: 'Imparato da poco', righe: lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })) });
-    }
-    if (!gruppi.length) {
-      const p = document.createElement('p');
-      p.className = 'sn-muted';
-      p.textContent = 'Filo non ha ancora imparato niente su di te.';
-      box.appendChild(p);
-      return;
-    }
-    for (const g of gruppi) {
-      const h = document.createElement('h3');
-      h.className = 'mem-gruppo';
-      h.textContent = g.titolo;
-      box.appendChild(h);
-      for (const r of g.righe) box.appendChild(rigaMemoria(r));
-    }
-  }
-
-  function rigaMemoria({ testo, via }) {
+  function rigaCartella(voce, { tolta = false } = {}) {
     const row = document.createElement('div');
-    row.className = 'mem-riga';
+    row.className = `mem-riga${tolta ? ' doc-tolta' : ''}`;
+    row.dataset.cartella = voce;
     const t = document.createElement('span');
     t.className = 'mem-testo';
-    t.textContent = testo;
+    const nome = CARTELLE_DI_SERIE[voce] || voce.split(/[\\/]/).filter(Boolean).pop() || voce;
+    t.textContent = nome;
+    const info = statoDocumenti && Array.isArray(statoDocumenti.cartelle)
+      ? statoDocumenti.cartelle.find((c) => c.voce === voce) : null;
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    dove.textContent = tolta ? 'tolta: Filo non ci cerca'
+      : (info && !info.esiste ? `${info.percorso ? `${info.percorso} · ` : ''}non c'è su questo computer`
+        : (info && info.negata ? `il sistema non lascia leggere questa cartella a Filo · ${statoDocumenti.comePermesso || 'dagli il permesso nelle impostazioni del sistema'}`
+          : ((info && info.percorso) || (CARTELLE_DI_SERIE[voce] ? '' : voce))));
+    if (info && info.negata && !tolta) { dove.classList.add('doc-negata'); dove.title = info.percorso || ''; }
+    if (dove.textContent) t.appendChild(dove);
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (tolta) {
+      b.className = 'doc-rimetti';
+      b.textContent = 'Rimetti';
+      b.title = `Cerca di nuovo in ${nome}`;
+      b.addEventListener('click', () => salvaCartelle([...(cartelleSalvate || []), voce]));
+    } else {
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Togli';
+      b.setAttribute('aria-label', `Togli la cartella ${nome}`);
+      b.addEventListener('click', () => salvaCartelle((cartelleSalvate || []).filter((x) => x !== voce)));
+    }
+    row.appendChild(b);
+    return row;
+  }
+
+  function disegnaCartelle(elenco) {
+    const box = $('documentiCartelle');
+    if (!box) return;
+    cartelleSalvate = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
+    box.textContent = '';
+    if (!cartelleSalvate.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessuna cartella: Filo non cerca fra i tuoi documenti.';
+      box.appendChild(p);
+    }
+    for (const v of cartelleSalvate) box.appendChild(rigaCartella(v));
+    for (const v of Object.keys(CARTELLE_DI_SERIE)) {
+      if (!cartelleSalvate.includes(v)) box.appendChild(rigaCartella(v, { tolta: true }));
+    }
+    const cercate = $('documentiCercate');
+    if (cercate) {
+      const occasionali = statoDocumenti && Array.isArray(statoDocumenti.occasionali) ? statoDocumenti.occasionali : [];
+      cercate.textContent = '';
+      for (const o of occasionali) cercate.appendChild(rigaOccasionale(o));
+      cercate.hidden = !occasionali.length;
+    }
+  }
+
+  // #947.3 — una cartella fuori elenco in cui l'utente ha chiesto di cercare: Filo tiene quello che ne ha già letto,
+  // e qui lo si vede e lo si dimentica.
+  function rigaOccasionale(o) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga doc-occasionale';
+    row.dataset.occasionale = o.percorso;
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = o.nome || o.percorso;
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    const n = Number(o.documenti) || 0;
+    const quanti = n === 1 ? 'un documento già letto' : `${cifre(n)} documenti già letti`;
+    dove.textContent = `${o.percorso} · ci hai cercato tu · ${quanti}${o.esiste ? '' : ' · ora non c\'è'}`;
+    t.appendChild(dove);
     row.appendChild(t);
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'mem-via';
     b.textContent = '×';
     b.title = 'Dimentica';
-    b.setAttribute('aria-label', `Dimentica: ${testo.slice(0, 80)}`);
-    b.addEventListener('click', () => dimentica(b, via));
+    b.setAttribute('aria-label', `Dimentica i documenti letti in ${o.nome || o.percorso}`);
+    b.addEventListener('click', () => dimenticaCartella(b, o.percorso));
     row.appendChild(b);
     return row;
   }
 
-  // Si dice «Dimenticato» solo se il main l'ha tolta davvero: con la pagina
-  // rimasta indietro la riga può non esserci più.
-  async function dimentica(b, via) {
+  async function dimenticaCartella(b, percorso) {
     b.disabled = true;
     let r = null;
-    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_MEMORY_FORGET, ...via }); } catch (_) {}
-    const hint = $('memoriaHint');
-    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticato' : 'Non c\'era più: ecco com\'è adesso';
-    flashSaved('memoriaHint');
-    caricaMemoria();
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_DIMENTICA, percorso }); } catch (_) { r = null; }
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticata' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('documentiHint');
+    await caricaStatoDocumenti();
   }
+
+  function scriviStatoDocumenti() {
+    const el = $('documentiStato');
+    if (!el || !statoDocumenti) return;
+    const s = statoDocumenti;
+    const cifre = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
+    const n = Number(s.documenti) || 0;
+    let t = n === 1 ? 'Un documento' : `${cifre(n)} documenti`;
+    if (s.scansioni) t += `, di cui ${cifre(s.scansioni)} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
+    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${cifre(Math.min(s.inCorso.fatti + 1, s.inCorso.totali))} di ${cifre(s.inCorso.totali)}`;
+    el.textContent = cartelleSalvate && cartelleSalvate.length ? t : '';
+  }
+
+  async function caricaStatoDocumenti() {
+    if (!$('documentiCartelle')) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_STATO }); } catch (_) { r = null; }
+    if (!r || !r.ok) return;
+    statoDocumenti = r;
+    if (cartelleSalvate) disegnaCartelle(cartelleSalvate);
+    scriviStatoDocumenti();
+    // Mentre legge, il conto si muove: la pagina lo chiede finché il giro non finisce.
+    clearTimeout(giroStato);
+    if (r.inCorso && !document.hidden) giroStato = setTimeout(caricaStatoDocumenti, 1500);
+  }
+
+  async function salvaCartelle(nuovo) {
+    const elenco = Array.from(new Set(nuovo));
+    disegnaCartelle(elenco);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { documenti: { cartelle: elenco } } });
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = 'Salvato';
+    flashSaved('documentiHint');
+    setTimeout(caricaStatoDocumenti, 400);
+  }
+
+  async function aggiungiCartella() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_SCEGLI_CARTELLA }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.percorso) return;
+    if ((cartelleSalvate || []).includes(r.percorso)) {
+      const hint = $('documentiHint');
+      if (hint) hint.textContent = 'Salvato';
+      flashSaved('documentiHint');
+      return;
+    }
+    await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
+  }
+
+  // ── Siti dove il tasto destro apre il loro menu (#975) ───────────────────
+  // Si aggiungono dal tasto destro sul sito o chiedendolo a Filo; qui si vedono tutti e si tolgono.
+  let sitiMenuSalvati = null;
+
+  function disegnaSitiMenu(elenco) {
+    const box = $('menuDelSitoSiti');
+    if (!box) return;
+    sitiMenuSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
+    box.textContent = '';
+    const tasto = $('menuDelSitoTasto');
+    if (tasto) tasto.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Shift') : 'Shift';
+    if (!sitiMenuSalvati.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.';
+      box.appendChild(p);
+    }
+    for (const sito of sitiMenuSalvati) {
+      const row = document.createElement('div');
+      row.className = 'mem-riga';
+      row.dataset.sito = sito;
+      const t = document.createElement('span');
+      t.className = 'mem-testo';
+      t.textContent = (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito;
+      row.appendChild(t);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Torna al menu di Filo';
+      b.setAttribute('aria-label', `Su ${t.textContent} torna al menu di Filo`);
+      b.addEventListener('click', () => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)));
+      row.appendChild(b);
+      box.appendChild(row);
+    }
+  }
+
+  async function salvaSitiMenu(nuovo) {
+    const elenco = Array.from(new Set(nuovo));
+    disegnaSitiMenu(elenco);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { menuDelSito: { siti: elenco } } });
+    flashSaved('menuDelSitoHint');
+  }
+
+  // ── Scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto (#842) ────────
+  // Si cambiano premendo i tasti nuovi; lettura e controlli stanno in SN_TASTI, gli stessi della chat. Mentre si
+  // registra, il main lascia arrivare qui anche i tasti che prende prima della pagina: Ctrl+T si rifiuta col perché.
+  let scorciatoieSalvate = {};
+  let registrando = null;
+
+  // I moduli dell'Editor tengono le loro combinazioni nei documenti: una delle quattro sopra le spegnerebbe.
+  const COLLEZIONE_EDITOR = 'filo.editor.collection';
+  async function caricaModuliEditor() {
+    try {
+      const r = await chrome.storage.local.get(COLLEZIONE_EDITOR);
+      window.SN_TASTI?.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+    } catch (_) {}
+  }
+
+  function rigaScorciatoia(id) {
+    return document.querySelector(`#scorciatoieFilo .sc-riga[data-azione="${id}"]`);
+  }
+
+  // I tasti di una combinazione come tasti veri, uno per pezzo.
+  function mostraTasti(el, etichetta) {
+    el.textContent = '';
+    String(etichetta).split('+').forEach((pezzo, i) => {
+      if (i) {
+        const piu = document.createElement('span');
+        piu.className = 'sc-piu';
+        piu.textContent = '+';
+        el.appendChild(piu);
+      }
+      const k = document.createElement('kbd');
+      k.className = 'sc-kbd';
+      k.textContent = pezzo;
+      el.appendChild(k);
+    });
+  }
+
+  function mostraErroreScorciatoia(id, testo) {
+    const riga = rigaScorciatoia(id);
+    const err = riga && riga.querySelector('.sc-errore');
+    if (!err) return;
+    err.textContent = testo || '';
+    err.hidden = !testo;
+  }
+
+  function disegnaScorciatoie(mappa) {
+    const box = $('scorciatoieFilo');
+    const T = window.SN_TASTI;
+    if (!box || !T) return;
+    scorciatoieSalvate = { ...((mappa && typeof mappa === 'object') ? mappa : {}) };
+    T.usaScorciatoieFilo(scorciatoieSalvate);
+    // La riga in ascolto non si ridisegna sotto le dita: lo fa chi chiude l'ascolto.
+    if (registrando) return;
+    box.textContent = '';
+    for (const s of T.scorciatoieFilo()) {
+      const riga = document.createElement('div');
+      riga.className = `sc-riga${s.diSerie ? '' : ' sc-cambiata'}`;
+      riga.dataset.azione = s.id;
+
+      const nome = document.createElement('span');
+      nome.className = 'sc-nome';
+      nome.textContent = s.nome;
+
+      const tasti = document.createElement('button');
+      tasti.type = 'button';
+      tasti.className = 'sc-tasti';
+      tasti.title = 'Cambia';
+      tasti.setAttribute('aria-label', `${s.nome}: ${s.etichetta}. Premi per cambiarla`);
+      mostraTasti(tasti, s.etichetta);
+      tasti.addEventListener('click', () => avviaRegistrazione(s.id));
+      tasti.addEventListener('blur', () => { if (registrando && registrando.id === s.id) fermaRegistrazione(); });
+
+      const serie = T.etichettaFilo(s.serie);
+      const rip = document.createElement('button');
+      rip.type = 'button';
+      rip.className = 'sc-ripristina';
+      rip.textContent = '↺';
+      rip.title = `Rimetti ${serie}`;
+      rip.setAttribute('aria-label', `Rimetti ${serie} per ${s.nome}`);
+      rip.hidden = s.diSerie;
+      rip.addEventListener('click', () => salvaScorciatoia(s.id, s.serie));
+
+      const err = document.createElement('span');
+      err.className = 'sc-errore';
+      err.setAttribute('role', 'alert');
+      err.hidden = true;
+
+      riga.append(nome, tasti, rip, err);
+      box.appendChild(riga);
+    }
+  }
+
+  // Il main tiene l'ascolto al più un minuto: finché la riga ascolta lo si rinnova.
+  function chiediTasti(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REGISTRA_TASTI, attivo })).catch(() => {}); } catch (_) {}
+  }
+
+  function avviaRegistrazione(id) {
+    if (registrando && registrando.id === id) return;
+    fermaRegistrazione();
+    const riga = rigaScorciatoia(id);
+    if (!riga) return;
+    const tasti = riga.querySelector('.sc-tasti');
+    registrando = { id, tasti, ctrlZ: document.documentElement.dataset.filoCtrlZ, rinnovo: setInterval(() => chiediTasti(true), 20000) };
+    // Ctrl+Z qui è un tasto da registrare, non «torna alla pagina di prima».
+    document.documentElement.dataset.filoCtrlZ = 'pagina';
+    chiediTasti(true);
+    caricaModuliEditor();
+    riga.classList.add('sc-registra');
+    mostraErroreScorciatoia(id, '');
+    attesaTasti();
+    tasti.focus();
+  }
+
+  function attesaTasti(mods) {
+    if (!registrando) return;
+    const el = registrando.tasti;
+    if (mods && mods.length) { mostraTasti(el, [...mods, '…'].join('+')); return; }
+    el.textContent = '';
+    const s = document.createElement('span');
+    s.className = 'sc-attesa';
+    s.textContent = 'Premi i tasti…';
+    el.appendChild(s);
+  }
+
+  function fermaRegistrazione() {
+    if (!registrando) return;
+    const r = registrando;
+    registrando = null;
+    clearInterval(r.rinnovo);
+    if (r.ctrlZ === undefined) delete document.documentElement.dataset.filoCtrlZ;
+    else document.documentElement.dataset.filoCtrlZ = r.ctrlZ;
+    chiediTasti(false);
+    const tornaIlFuoco = document.activeElement === r.tasti;
+    disegnaScorciatoie(scorciatoieSalvate);
+    if (tornaIlFuoco) { const t = rigaScorciatoia(r.id)?.querySelector('.sc-tasti'); if (t) t.focus(); }
+  }
+
+  // I modificatori tenuti premuti, coi nomi di questa tastiera.
+  function modificatoriPremuti(e) {
+    const mac = window.SN_TASTI.suMac();
+    const [meta, ctrl] = [e.metaKey, e.ctrlKey];
+    const out = [];
+    if (meta) out.push(mac ? 'Cmd' : 'Win');
+    if (ctrl) out.push('Ctrl');
+    if (e.altKey) out.push(mac ? 'Opzione' : 'Alt');
+    if (e.shiftKey) out.push('Shift');
+    return out;
+  }
+
+  function tastoRegistrato(e) {
+    if (!registrando) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.isComposing || e.repeat) return;
+    const T = window.SN_TASTI;
+    const libero = !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey;
+    if (libero && (e.key === 'Escape' || e.key === 'Tab')) { fermaRegistrazione(); return; }
+    const r = T.scorciatoiaDaEvento(e);
+    if (!r) return;
+    if (r.attesa) { attesaTasti(modificatoriPremuti(e)); return; }
+    const no = r.rifiuto || T.rifiutoScorciatoiaFilo(registrando.id, r.accel);
+    if (no) {
+      attesaTasti();
+      mostraErroreScorciatoia(registrando.id, T.testoRifiutoFilo(no));
+      return;
+    }
+    salvaScorciatoia(registrando.id, r.accel);
+  }
+
+  async function salvaScorciatoia(id, accel) {
+    const T = window.SN_TASTI;
+    const no = T.rifiutoScorciatoiaFilo(id, accel);
+    if (no) { mostraErroreScorciatoia(id, T.testoRifiutoFilo(no)); return; }
+    await salvaMappaScorciatoie({ [id]: T.valoreDaSalvare(id, accel) }, id);
+  }
+
+  async function salvaMappaScorciatoie(richiesto, id) {
+    const T = window.SN_TASTI;
+    await caricaModuliEditor();
+    // «Ripristina» ne tocca quattro: quella che non può tornare di serie resta com'è, col perché sulla sua riga.
+    const dopo = Object.fromEntries(T.AZIONI_FILO.map((a) => {
+      const v = Object.prototype.hasOwnProperty.call(richiesto, a.id) ? richiesto[a.id] : scorciatoieSalvate[a.id];
+      return [a.id, v || a.serie];
+    }));
+    const cambio = {};
+    const rifiutate = [];
+    for (const [x, v] of Object.entries(richiesto)) {
+      const no = T.rifiutoScorciatoiaFilo(x, v || T.AZIONI_FILO.find((a) => a.id === x).serie, undefined, dopo);
+      if (no) rifiutate.push([x, T.testoRifiutoFilo(no)]);
+      else cambio[x] = v;
+    }
+    const mostraRifiutate = () => { for (const [x, testo] of rifiutate) mostraErroreScorciatoia(x, testo); };
+    if (!Object.keys(cambio).length) { if (registrando) fermaRegistrazione(); mostraRifiutate(); return; }
+    scorciatoieSalvate = { ...scorciatoieSalvate, ...cambio };
+    if (registrando) fermaRegistrazione();
+    else disegnaScorciatoie(scorciatoieSalvate);
+    const r = await Promise.resolve(chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { scorciatoie: cambio } })).catch(() => null);
+    if (r && r.ok) {
+      flashSaved('scorciatoieHint');
+      disegnaScorciatoie(r.settings && r.settings.scorciatoie);
+      mostraRifiutate();
+    } else if (id) {
+      mostraErroreScorciatoia(id, 'Non sono riuscito a salvarla: riprova.');
+    }
+  }
+
+  function vociScorciatoia(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const riga = el && el.closest ? el.closest('#scorciatoieFilo .sc-riga') : null;
+    const T = window.SN_TASTI;
+    const s = riga && T ? T.scorciatoieFilo().find((x) => x.id === riga.dataset.azione) : null;
+    if (!s) return [];
+    const voci = [{ type: 'item', label: `Cambia la scorciatoia di «${s.nome}»`, onClick: () => avviaRegistrazione(s.id) }];
+    if (!s.diSerie) voci.push({ type: 'item', label: `Rimetti ${T.etichettaFilo(s.serie)}`, onClick: () => salvaScorciatoia(s.id, s.serie) });
+    return voci;
+  }
+  window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
+  if (!window.SN_VOCI_PAGINA.includes(vociScorciatoia)) window.SN_VOCI_PAGINA.push(vociScorciatoia);
 
   let caricato = false;
 
+  // ── Autonomia di Filo (#530) ─────────────────────────────────────────────
+  // Alzare il livello vuole «conferma», abbassarlo no: lo dice SN_AUTONOMIA, non questa pagina.
+  // La scelta parte subito e da sola, fuori dai campi in sospeso: un livello mezzo confermato non esiste.
+  const Autonomia = window.SN_AUTONOMIA;
+  let livelloSalvato = Autonomia ? Autonomia.LIVELLO_PREDEFINITO : 'default';
+  let sceltaInCorso = false;
+
+  function disegnaAutonomia() {
+    const box = $('autonomiaLivelli');
+    if (!box || !Autonomia) return;
+    box.textContent = '';
+    for (const l of Autonomia.livelliSelezionabili()) {
+      const label = document.createElement('label');
+      label.className = 'sn-cookie-mode';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'autonomia';
+      input.value = l.id;
+      input.id = `autonomia-${l.id}`;
+      input.addEventListener('change', () => { if (input.checked) scegliAutonomia(l.id); });
+      const testo = document.createElement('span');
+      const nome = document.createElement('span');
+      nome.className = 'sn-cookie-mode-label';
+      nome.textContent = l.nome;
+      const frase = document.createElement('span');
+      frase.className = 'sn-muted sn-cookie-mode-desc';
+      frase.textContent = l.frase;
+      testo.append(nome, frase);
+      label.append(input, testo);
+      box.appendChild(label);
+    }
+  }
+
+  function mostraAutonomia(livello) {
+    if (!Autonomia) return;
+    livelloSalvato = Autonomia.livelloAttivo(livello);
+    const r = $(`autonomia-${livelloSalvato}`);
+    if (r) r.checked = true;
+  }
+
+  async function scegliAutonomia(nuovo) {
+    if (sceltaInCorso || nuovo === livelloSalvato) return;
+    const serve = Autonomia.richiestaCambioLivello(livelloSalvato, nuovo);
+    if (serve === 'no') { mostraAutonomia(livelloSalvato); return; }
+    if (serve === 'conferma') {
+      sceltaInCorso = true;
+      const Ui = window.SN_CONFIRM_UI;
+      let ok = false;
+      try {
+        ok = Ui ? await Ui.confirmTyped(Autonomia.confermaAlzata(nuovo)) : false;
+      } finally { sceltaInCorso = false; }
+      if (!ok) { mostraAutonomia(livelloSalvato); return; }
+    }
+    mostraAutonomia(nuovo);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
+    flashSaved('autonomiaHint');
+  }
+
   async function load() {
     const settings = await Storage.getSettings();
+    disegnaAutonomia();
+    mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     buildPresetOptions();
     preparaShell();
+    $('aggiornamentiQuando').hidden = !shellDiWindows();
     populateNotifSounds();
     if (!ttsSupported()) {
       const u = $('ttsUnsupported');
@@ -1099,6 +1751,10 @@
       });
     }
     riempi(settings);
+    disegnaCartelle(settings.documenti && settings.documenti.cartelle);
+    caricaStatoDocumenti();
+    disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaScorciatoie(settings.scorciatoie);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -1115,15 +1771,30 @@
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
     caricato = true;
+    // La sezione chiesta dall'indirizzo (la carta dell'aggiornamento manda a #sec-aggiornamenti) si raggiunge solo
+    // adesso: le sezioni costruite qui sopra l'hanno spostata in giù dopo lo scorrimento del browser.
+    try {
+      const sezione = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (sezione) sezione.scrollIntoView();
+    } catch (_) {}
   }
 
   // Un cambio arrivato da altrove: si riscrive solo quello che è davvero
   // cambiato e che l'utente non sta toccando qui, così il cursore non salta.
   function riallinea(settings) {
     if (!caricato || !settings) return;
+    if (!sceltaInCorso) mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     riempi(settings, (k) => !toccati.has(k) && valoreDelCampo(k) !== valoreSalvato(settings, k));
     riallineaToken(settings.themeTokens);
     riallineaTabColor(settings.tabColor);
+    const cartelle = settings.documenti && settings.documenti.cartelle;
+    if (JSON.stringify(cartelle || []) !== JSON.stringify(cartelleSalvate || [])) {
+      disegnaCartelle(cartelle);
+      setTimeout(caricaStatoDocumenti, 400);
+    }
+    const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
+    if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1137,11 +1808,24 @@
     try {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) riallinea(msg.settings);
-        if (msg && msg.type === MSG.FILO_MEMORY_CHANGED && Array.isArray(msg.moduli)) disegnaMemoria(msg);
+        // L'archivio delle interviste cambia anche da fuori: un «dimentica tutto» in chat, un'intervista che avanza.
+        if (msg && msg.type === MSG.FILO_ONBOARDING_UPDATED && msg.onboarding) renderOnboardingArchive(msg.onboarding);
       });
     } catch (_) {}
     load();
-    caricaMemoria();
+    $('apriQuaderno').addEventListener('click', apriQuaderno);
+    $('documentiAggiungi').addEventListener('click', aggiungiCartella);
+    window.addEventListener('keydown', tastoRegistrato, true);
+    window.addEventListener('keyup', (e) => {
+      if (!registrando) return;
+      e.preventDefault();
+      attesaTasti(modificatoriPremuti(e));
+    }, true);
+    window.addEventListener('blur', fermaRegistrazione);
+    $('scorciatoieRipristina').addEventListener('click', () => {
+      salvaMappaScorciatoie(Object.fromEntries(window.SN_TASTI.AZIONI_FILO.map((a) => [a.id, ''])));
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaStatoDocumenti(); });
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
@@ -1157,27 +1841,81 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
+    $('tabPreviewEnabled').addEventListener('change', () => {
+      $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
+      persist();
+    });
+    $('tabPreviewSize').addEventListener('change', persist);
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);
+    $('autoArchiveIdleHours').addEventListener('input', (e) => caselle.cambiato('pref', e));
     // Al blur riallinea il campo al valore realmente salvato (clampato), così
     // un numero fuori scala non resta a schermo a mentire sul valore in uso.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
+    $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
+    $('schermoGuarda').addEventListener('change', persist);
+    $('nomiSensatiScaricamenti').addEventListener('change', persist);
+    $('aggiornamentiAutomatici').addEventListener('change', persist);
+    // Spenta la proposta, «anche in incognito» non ha niente da aggiungere.
+    $('propostaEmailAttiva').addEventListener('change', () => {
+      $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
+      persist();
+    });
+    $('propostaEmailIncognito').addEventListener('change', persist);
+    for (const id of ['contestoGiorni', 'contestoToken']) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonContesto);
+    }
+    $('contestoCache').addEventListener('change', persist);
+    for (const [, id] of CAMPI_LUNGHEZZA) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonLunghezza);
+    }
+    $('avvisoCreditiAttivo').addEventListener('change', persist);
+    $('spiegaAnticipata').addEventListener('change', persist);
+    $('descriviImmagini').addEventListener('change', persist);
+    $('contatoriAttivi').addEventListener('change', persist);
+    for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
+    $('correttoreModello').addEventListener('change', persist);
+    $('correttoreRipetizioni').addEventListener('change', persist);
+    for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
+      $(id).addEventListener('change', persist);
+      // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
+      $(id).addEventListener('blur', () => { $(id).value = String(tempiCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
+    }
+    for (const [, id] of CAMPI_CREDITI) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonCrediti);
+    }
+    segnapostiContesto();
     $('terminalShell').addEventListener('change', persist);
+    $('barraSpinta').addEventListener('change', persist);
+    $('barraStriscia').addEventListener('change', persist);
+    for (const [id, campo] of [['barraAttesa', 'attesaMs'], ['barraUscita', 'uscitaMs']]) {
+      $(id).addEventListener('change', persist);
+      // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
+      $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
+    }
+    $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {
       window.speechSynthesis.addEventListener('voiceschanged', () => populateVoices());
     }
     $('ttsVoice').addEventListener('change', persist);
-    $('ttsRate').addEventListener('input', () => {
-      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
-      persistDebounced();
+    $('ttsRate').addEventListener('input', (e) => {
+      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
+      caselle.cambiato('pref', e);
     });
-    $('ttsPitch').addEventListener('input', () => {
-      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
-      persistDebounced();
+    $('ttsPitch').addEventListener('input', (e) => {
+      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      caselle.cambiato('pref', e);
     });
     $('ttsPreview').addEventListener('click', previewTts);
     $('ttsModelPreview').addEventListener('click', previewModelVoice);
@@ -1186,17 +1924,27 @@
       if ($('ttsModelVoice').value === CUSTOM_VOICE) $('ttsModelVoiceCustom').focus();
       else persist();
     });
-    $('ttsModelVoiceCustom').addEventListener('input', persistDebounced);
+    $('ttsModelVoiceCustom').addEventListener('input', (e) => caselle.cambiato('pref', e));
+    $('ttsModelVoiceCustom').addEventListener('change', persist);
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
+    $('notifDuration').addEventListener('input', (e) => caselle.cambiato('pref', e));
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
+    $('notifSoundVolume').addEventListener('input', () => mostraVolume('notifSoundVolume'));
+    $('notifSoundVolume').addEventListener('change', persist);
+    $('dictationAutoSend').addEventListener('change', persist);
+    for (const id of ['dictationSilence', 'dictationCancel']) {
+      $(id).addEventListener('input', (e) => { scriviTempiVoce(); caselle.cambiato('pref', e); });
+    }
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
 
     // Suoneria timer: salva al cambio + anteprima.
     $('timerRingtone').addEventListener('change', persist);
+    $('timerRingtoneVolume').addEventListener('input', () => mostraVolume('timerRingtoneVolume'));
+    $('timerRingtoneVolume').addEventListener('change', persist);
     $('timerRingtonePreview').addEventListener('click', previewRingtone);
 
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano
@@ -1212,9 +1960,9 @@
       }
       persist();
     });
-    $('agentStyleText').addEventListener('input', () => {
+    $('agentStyleText').addEventListener('input', (e) => {
       syncPresetSelect();
-      if (syncStyleNote()) persistDebounced();
+      if (syncStyleNote()) caselle.cambiato('pref', e);
     });
     // Uscendo dal campo si vede quello che è stato salvato, non un testo con
     // dentro caratteri invisibili o righe vuote in più (gli spazi ai bordi no).

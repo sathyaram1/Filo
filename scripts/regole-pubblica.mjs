@@ -1,5 +1,5 @@
-// Pubblica regole e indici di Firestore e regole di Storage solo da main uguale a origin/main, coi file intatti.
-// È l'unica strada: firebase.json la richiama (--controlla) a ogni deploy, così un ramo non pubblica regole mai fuse.
+// Pubblica regole e indici di Firestore, regole di Storage e la pagina delle approvazioni da browser solo da main, coi
+// file pubblicati intatti e uguali a origin/main. È l'unica strada: firebase.json la richiama (--controlla) a ogni deploy.
 // Decisioni: tests/unit/regolePubblica.test.mjs. Uso: npm run regole:pubblica [-- --dry-run]
 
 import { spawnSync } from 'node:child_process';
@@ -10,17 +10,22 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Gli indici vanno con le regole che li usano: una query senza il suo indice smette di rispondere in silenzio.
-export const BERSAGLI = Object.freeze(['firestore:rules', 'firestore:indexes', 'storage']);
+// La pagina delle approvazioni (#489) è la via d'uscita quando Filo non parte: pubblica solo ciò che è stato fuso.
+export const BERSAGLI = Object.freeze(['firestore:rules', 'firestore:indexes', 'storage', 'hosting']);
 const OPZIONI = ['--dry-run', '--controlla'];
 // Il deploy lanciato da qui lo porta: il predeploy di firebase.json senza di esso è un firebase deploy a mano.
 export const SEGNO_GUARDIA = 'FILO_REGOLE_DALLA_GUARDIA';
+// Pubblicati anche loro: le intestazioni della pagina (CSP) stanno in firebase.json, il progetto in .firebaserc.
+export const CONFIGURAZIONE = Object.freeze(['firebase.json', '.firebaserc']);
 
 /** I file che i BERSAGLI pubblicano, letti da firebase.json. PURA. */
 export function fileDaPubblicare(firebaseJson) {
   const fs = (firebaseJson && firebaseJson.firestore) || {};
   const st = firebaseJson && firebaseJson.storage;
   const storage = (Array.isArray(st) ? st : [st]).map((x) => x && x.rules);
-  return [fs.rules, fs.indexes, ...storage].filter((f) => typeof f === 'string' && f.trim()).map((f) => f.trim());
+  const ho = firebaseJson && firebaseJson.hosting;
+  const pagine = (Array.isArray(ho) ? ho : [ho]).map((x) => x && x.public);
+  return [fs.rules, fs.indexes, ...storage, ...pagine].filter((f) => typeof f === 'string' && f.trim()).map((f) => f.trim());
 }
 
 /** Il progetto di default di .firebaserc, '' se manca. PURA. */
@@ -36,19 +41,23 @@ export function fileToccati(statusZ) {
 
 /**
  * Si pubblica? PURA. Ogni no porta il motivo da stampare.
- * @param {{ errore?: string, ramo: string, testa: string, origine: string, file: string[], progetto: string, toccati: string[] }} s
+ * `diversi`: i file pubblicati che cambiano fra la testa e origin/main (assente se coincidono o non si sa).
+ * @param {{ errore?: string, ramo: string, testa: string, origine: string, diversi?: string[], file: string[], progetto: string, toccati: string[] }} s
  */
 export function decidi(s) {
   const corto = (sha) => String(sha || '?').slice(0, 9);
   if (s.errore) return { ok: false, motivo: s.errore };
-  if (!s.file || s.file.length < BERSAGLI.length) return { ok: false, motivo: 'firebase.json non nomina i file di regole e indici di Firestore e delle regole di Storage' };
+  if (!s.file || s.file.length < BERSAGLI.length) return { ok: false, motivo: 'firebase.json non nomina i file di regole e indici di Firestore, delle regole di Storage e la cartella della pagina delle approvazioni' };
   if (!s.progetto) return { ok: false, motivo: '.firebaserc non dice su quale progetto pubblicare' };
   if (s.ramo !== 'main') return { ok: false, motivo: `il checkout è su «${s.ramo || 'testa staccata'}», non su main: si pubblica solo ciò che è stato fuso` };
   if (!s.origine) return { ok: false, motivo: 'origin/main non si legge' };
-  if (s.testa !== s.origine) {
-    return { ok: false, motivo: `main locale (${corto(s.testa)}) non è origin/main (${corto(s.origine)}): allinealo (git pull --ff-only) o porta prima il lavoro su main` };
+  // Una fusione fra il checkout e la fetch sposta origin/main (#1557): se non tocca ciò che si pubblica, si pubblica
+  // proprio ciò che è fuso. Se lo tocca, la copia vecchia riporterebbe indietro regole già più strette.
+  if (s.testa !== s.origine && (!Array.isArray(s.diversi) || s.diversi.length)) {
+    const cambia = Array.isArray(s.diversi) ? ` e lì cambiano ${s.diversi.join(', ')}` : '';
+    return { ok: false, motivo: `main locale (${corto(s.testa)}) non è origin/main (${corto(s.origine)})${cambia}: allinealo (git pull --ff-only) o porta prima il lavoro su main` };
   }
-  if (s.toccati && s.toccati.length) return { ok: false, motivo: `file delle regole modificati e non fusi: ${s.toccati.join(', ')}` };
+  if (s.toccati && s.toccati.length) return { ok: false, motivo: `file da pubblicare modificati e non fusi: ${s.toccati.join(', ')}` };
   return { ok: true };
 }
 
@@ -75,12 +84,19 @@ function stato() {
   const ramo = git(['rev-parse', '--abbrev-ref', 'HEAD']);
   const testa = git(['rev-parse', 'HEAD']);
   const origine = git(['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']);
-  const st = file.length ? git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...file]) : { codice: 0, out: '' };
+  const guardati = file.length ? [...file, ...CONFIGURAZIONE] : [];
+  const st = guardati.length ? git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...guardati]) : { codice: 0, out: '' };
   if (ramo.codice !== 0 || testa.codice !== 0 || st.codice !== 0) return { errore: `git non risponde: ${ramo.err || testa.err || st.err}`, file, progetto };
-  return {
+  const s = {
     ramo: ramo.out.trim() === 'HEAD' ? '' : ramo.out.trim(), testa: testa.out.trim(), origine: origine.codice === 0 ? origine.out.trim() : '',
     file, progetto, toccati: fileToccati(st.out),
   };
+  if (s.origine && s.testa !== s.origine && guardati.length) {
+    const d = git(['diff', '--name-only', '-z', '--no-renames', s.testa, s.origine, '--', ...guardati]);
+    if (d.codice !== 0) return { errore: `non riesco a confrontare i file da pubblicare con origin/main (${d.err.split('\n')[0] || d.codice})`, file, progetto };
+    s.diversi = d.out.split('\0').filter(Boolean);
+  }
+  return s;
 }
 
 function lancia(p) {
@@ -103,20 +119,23 @@ export async function main(argv, { leggiStato = stato, esegui = lancia, env = pr
   const controlla = args.includes('--controlla');
   const dryRun = args.includes('--dry-run');
   if (controlla && env[SEGNO_GUARDIA] !== '1') {
-    err('RIFIUTATO: firebase deploy lanciato a mano. Le regole si pubblicano con npm run regole:pubblica, da main allineato a origin/main: regole e indici di Firestore e regole di Storage insieme.');
+    err('RIFIUTATO: firebase deploy lanciato a mano. Si pubblica con npm run regole:pubblica, da main allineato a origin/main: regole e indici di Firestore, regole di Storage e pagina delle approvazioni insieme.');
     return 3;
   }
 
   const s = leggiStato();
   const d = decidi(s);
   if (!d.ok) { err(`RIFIUTATO: ${d.motivo}.`); return 3; }
-  if (controlla) { log(`Guardia delle regole: main = origin/main (${s.testa.slice(0, 9)}), file intatti.`); return 0; }
+  const dove = s.testa === s.origine
+    ? `main = origin/main (${s.testa.slice(0, 9)})`
+    : `main (${s.testa.slice(0, 9)}) non è origin/main (${s.origine.slice(0, 9)}), ma ciò che si pubblica è identico`;
+  if (controlla) { log(`Guardia della pubblicazione: ${dove}, file intatti.`); return 0; }
   const p = passo({ radice: ROOT, progetto: s.progetto });
-  log(`main = origin/main (${s.testa.slice(0, 9)}), ${s.file.join(', ')} intatti.`);
+  log(`${dove}, ${s.file.join(', ')} intatti.`);
   log(`  in ${p.cwd}\n  $ ${p.cmd} ${p.args.join(' ')}`);
   if (dryRun) { log('(prova a vuoto: non ho pubblicato niente)'); return 0; }
   const codice = esegui(p);
-  if (codice !== 0) err(`firebase deploy è uscito con ${codice}: le regole in produzione potrebbero essere quelle di prima.`);
+  if (codice !== 0) err(`firebase deploy è uscito con ${codice}: regole e pagina in produzione potrebbero essere quelle di prima.`);
   return codice;
 }
 

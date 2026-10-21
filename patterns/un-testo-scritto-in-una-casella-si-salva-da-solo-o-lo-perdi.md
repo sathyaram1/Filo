@@ -70,7 +70,15 @@ sito e concludeva che la lista non funzionava (#590.2).
 
 - **Chiudere una scheda non dà alla pagina nessun evento.** Filo la chiude con
   `webContents.close()`: niente `beforeunload`, `pagehide` o `visibilitychange`.
-  Quello che non è partito prima non parte più.
+  Per questo una pagina con caselle scritte e non spedite lo dice al main
+  (`CASELLE_IN_SOSPESO`, al primo carattere e quando ha spedito): chiudendo la
+  sua scheda il main toglie la vista, le manda `TAB_IN_VISTA` falso e chiude la
+  pagina quando risponde «niente più», al più dopo due secondi
+  (`src/main/tabs/chiusuraConCaselle.js`, #666). Chi spedisce manda il suo
+  messaggio senza `await` davanti, così arriva prima del «niente più». Le prove
+  chiudevano con `filoShell.tabs.close` senza nessun fuoco perso: prima di
+  questo il numero si perdeva. Lo stesso vale per la finestra chiusa e per
+  l'uscita da Filo (sezione in fondo).
 - **Quindi il testo parte mentre si scrive**, dopo una pausa breve, e subito al
   primo segno di uscita: il Ctrl, Cmd o Alt premuto da solo (arriva alla pagina
   prima della lettera di Ctrl+W, Ctrl+Tab o Alt+cifra, che il main si tiene), il
@@ -113,9 +121,101 @@ sito e concludeva che la lista non funzionava (#590.2).
   Playwright fa credere alla pagina di avere sempre il fuoco, quindi niente
   `blur`: Ctrl+W si prova con `sendInputEvent`, prima il Ctrl da solo e poi la
   lettera.
-- **Dove:** `testoCambiato`, `spedisci`, `uscita`, `righe`, `save` e
-  `saveCookies` in `src/pages/security/security.js`; `riapplicaListaBloccati`,
-  `_seguiLista` e `activate` in `src/main/tabs.js`. Test:
+- **Dove:** pausa e uscite in `SN_CASELLE` (`src/shared/caselleAlSicuro.js`);
+  `uscita`, `righe`, `save` e `saveCookies` in
+  `src/pages/security/security.js`; `riapplicaListaBloccati`, `_seguiLista` e
+  `activate` in `src/main/tabs.js`. Test:
   `tests/security-liste-non-si-perdono.spec.mjs` e i casi sulla riga a metà
-  in `tests/siteBlock-strade.spec.mjs`. Le pagine Opzioni e Altro
-  hanno ancora campi che si salvano solo al `change` (#590.5).
+  in `tests/siteBlock-strade.spec.mjs`.
+
+## Le altre pagine delle impostazioni passano dallo stesso punto
+
+In Altro, Modelli e Preferenze le caselle si salvavano solo al `change`, o dopo
+una pausa che Ctrl+W tagliava: un dominio escluso, il limite di spesa, le
+chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
+
+- **Una pagina, un modulo.** Ogni pagina crea il suo `SN_CASELLE.crea()`,
+  iscrive chi salva e gli passa ogni `input`; pausa, Ctrl da solo, fuoco che
+  esce, `TAB_IN_VISTA` e ricarica li ascolta il modulo. Una casella nuova non
+  scrive i suoi ascoltatori di uscita: si iscrive.
+- **Un valore che a metà ha effetto aspetta la pausa lunga** (tre secondi,
+  `PAUSA_LUNGA_MS`) o l'uscita. Scrivendo «15» il limite di spesa passerebbe
+  da «1» e fermerebbe le richieste di quell'istante; con una chiave tronca la
+  richiesta verrebbe rifiutata e pagata coi crediti; un modello scritto a metà
+  fallirebbe; il nome di una categoria a metà finirebbe nelle altre pagine.
+  Senza nessuna pausa no: la scheda chiusa col mouse arriva alla pagina al più
+  come fuoco che esce, e le prove non lo sanno riprodurre. Incollare parte
+  subito.
+  Un numero che serve a vedere l'effetto mentre lo si regola, come il colore
+  delle schede, tiene la pausa breve.
+- **Una scelta finita parte subito.** Nell'editor dei modelli per azione il
+  segmento a metà arriva come `scrivendo`; la scelta dalla tendina, un
+  segmento aggiunto o tolto e il valore confermato o respinto partono al
+  momento.
+- **Quello che parte prima della conferma passa dallo stesso controllo.** Un
+  modello che l'azione respinge, lasciato col clic, torna indietro; salvato da
+  pausa, Ctrl+W o cambio di scheda finiva salvato lo stesso. Chi salva prima
+  legge il segmento a metà già controllato (respinto vale l'ultimo accettato),
+  e all'uscita vera il segmento si conferma come al clic, avviso compreso.
+- **Gli avvisi aspettano l'uscita anche qui.** Una riga nuova del registro dei
+  modelli, scritta partendo dalla stringa, a metà non ha ancora il nickname:
+  mentre si scrive una riga corretta si ripulisce ma una nuova non si accende,
+  e il «Salvato» non compare finché una riga resta fuori.
+- **Un effetto che non si disfa parte solo confermato.** Rinominare una
+  categoria col nome di un'altra le fonde. Il nome a metà, partito da solo,
+  passava da «Lavoro» togliendo una parola a «Lavoro vecchio», e le fondeva
+  prima che si finisse di scrivere. Ora il nome salvato senza conferma arriva
+  con `unisci: false`: un nome già preso resta in attesa, con l'avviso nella
+  riga, e fonde solo col tasto o con Invio. La conferma va in fila dietro il
+  `change` del suo stesso clic, così vede com'è finito.
+- **All'uscita la casella dice il valore in uso.** Un numero fuori scala torna
+  al valore salvato, un nome di categoria svuotato torna al nome che la
+  categoria ha davvero.
+- **Dove:** `caselle` in `src/pages/options/altro.js`,
+  `src/pages/options/options.js`, `src/pages/preferences/preferences.js`. Test:
+  `tests/impostazioni-caselle-non-si-perdono.spec.mjs`.
+
+## Le manopole con «Salva» passano dallo stesso punto
+
+Nella pagina «Inviti e utenti» le manopole dei crediti hanno il loro «Salva» e
+partivano anche lasciando il campo, ma ricaricare la pagina o chiudere la
+scheda col cursore dentro buttava via il numero (#666).
+
+- **Un campo col suo «Salva» si iscrive lo stesso.** Il «Salva» resta la strada
+  esplicita; pausa lunga, Ctrl da solo, ricarica e scheda chiusa li porta
+  `SN_CASELLE`. Un numero storto non parte e lo dice all'uscita vera, non
+  mentre si scrive.
+- **La risposta di un salvataggio non cancella quello scritto dopo.** Se nel
+  campo è cambiato qualcosa mentre il server rispondeva, il campo resta com'è
+  (e resta da spedire); un salvataggio chiesto in quel mentre parte appena
+  torna la risposta.
+- **Dove:** `collega` in `src/shared/campoNumero.js`, `costruisciManopole` in
+  `src/pages/credits/owner.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.
+
+## Il main aspetta la pagina anche alla finestra chiusa e all'uscita da Filo
+
+Chiudere la finestra o uscire da Filo distrugge le schede senza passare dalla
+chiusura della singola scheda: l'ultima modifica a metà pausa, o una rinomina
+ancora aperta, si perdeva.
+
+- **Una regola sola per le tre uscite.** Scheda, finestra (`close` in
+  `src/main/window.js`) e uscita (`before-quit` in `src/main/main.js`, tutte le
+  finestre) chiedono a `chiusuraConCaselle`; la pagina riceve lo stesso
+  `TAB_IN_VISTA` falso e lo tratta come uscita vera.
+- **Lo stato «in sospeso» è della pagina**, non dell'istanza: Opzioni e Altro
+  stanno nella stessa scheda, e il «niente più» di una non deve far chiudere
+  la pagina mentre l'altra ha ancora da spedire.
+- **Prima di sparire c'è tempo per UN messaggio.** Chi salva all'uscita spedisce
+  subito quello che ha in mano, senza rileggere prima lo storage: il Correttore
+  rileggeva l'elenco e quel giro arrivava a scheda già distrutta.
+- **Un campo che si conferma lasciandolo** (rinomina nell'Editor,
+  riga del Correttore) a metà non deve partire, né alla pausa né al Ctrl:
+  `SN_CASELLE.alVolo()` dice al main di aspettare e ne fa partire la conferma
+  solo all'uscita vera.
+- **«Salvato» parla dell'ultima modifica.** `spedita()` restituisce un biglietto;
+  a risposta arrivata la pagina accende la conferma solo se `aggiornata()` dice
+  che dopo non è cambiato niente, e `spegni` la toglie appena arriva una
+  modifica.
+- **Dove:** `src/main/tabs/chiusuraConCaselle.js`, `src/shared/caselleAlSicuro.js`.
+  Test: `tests/unit/chiusuraConCaselle.test.mjs`, `tests/unit/caselleAlSicuro.test.mjs`,
+  `tests/uscite-che-salvano.spec.mjs`, `tests/chiusura-scheda-salva.spec.mjs`.

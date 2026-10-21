@@ -35,7 +35,7 @@ export const MAX_AGE_MS = 12 * 60 * 60 * 1000;
 // I ruoli che il dispatcher può consegnare. Un valore fuori da qui viene
 // scartato: il marcatore finisce nell'identità pubblica del feedback, quindi
 // non deve poter contenere testo arbitrario.
-export const KNOWN_ROLES = ['prober', 'verifier', 'secaudit', 'fixer', 'new-work'];
+export const KNOWN_ROLES = ['verifier', 'secaudit', 'fixer', 'new-work'];
 
 export function roleFile(root) {
   return resolve(root, '.claude', 'routine-role.json');
@@ -124,4 +124,16 @@ export function readRole(root, { now = Date.now() } = {}) {
   if (fromEnv) return fromEnv;
   const m = readMarker(root, { now });
   return m ? normalizeRole(m.role) : '';
+}
+
+/**
+ * Questa istanza è una routine? Si dichiara con FILO_ROUTINE=1; il biglietto o il ruolo scritti da dispatch la
+ * riconoscono anche se se n'è dimenticata. Serve agli strumenti che una routine non deve usare (#914).
+ */
+export function isRoutineInstance(root, { env = process.env, now = Date.now() } = {}) {
+  const dichiarata = String((env && env.FILO_ROUTINE) || '').trim();
+  if (dichiarata && dichiarata !== '0') return true;
+  if (String((env && env.FILO_ROUTINE_TICKET) || '').trim()) return true;
+  if (normalizeRole(env && env.FILO_ROUTINE_ROLE)) return true;
+  return !!readMarker(root, { now });
 }

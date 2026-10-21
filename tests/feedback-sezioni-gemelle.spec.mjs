@@ -133,10 +133,11 @@ test('#509 — stato illeggibile: niente sezioni su ENTRAMBE le pagine', async (
   // 1. Le sezioni non si disegnano. Le schede che NON sono sezioni
   //    (Statistiche, Modelli, Automazioni, Log) non dipendono dallo stato delle
   //    segnalazioni e restano raggiungibili.
-  for (const tab of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
+  for (const tab of ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived']) {
     await expect(mg.locator(`.mg-tab[data-tab="${tab}"]`)).toBeHidden();
   }
-  await expect(mg.locator('.mg-tab[data-tab="log"]')).toBeVisible();
+  await expect(mg.locator('.mg-tab[data-tab="fbstats"]')).toBeVisible();
+  await expect(mg.locator('.mg-sezione[data-sezione="routine"]')).toBeVisible();
 
   // 2. Una riga dice perché — le stesse parole della gemella.
   await expect(mg.locator('#mgNoSections')).toBeVisible();
@@ -285,7 +286,7 @@ test('#509 — le due pagine offrono le stesse azioni sulla stessa segnalazione'
   }
 
   // Le due invarianti dette per esteso, sulla pagina di riferimento.
-  expect(azioniFb.z4).toEqual(['→ In coda', '💻 Lavoro locale', 'Conferma attacco', 'Conferma spam', 'Archivia']);
+  expect(azioniFb.z4).toEqual(['→ In coda', '💻 Lavoro server', 'Conferma attacco', 'Conferma spam', 'Archivia']);
   expect(azioniFb.z6).toEqual(['Archivia', 'Riapri']);
   for (const id of ['z7', 'z8', 'z9', 'zA', 'zB']) {
     expect(azioniFb[id], `archiviata ${id}: solo il ripristino`).toEqual(['↩ Ripristina']);

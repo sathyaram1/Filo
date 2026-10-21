@@ -32,14 +32,28 @@ export function sembraOpzione(arg) {
   return !/^[-‐-—−]?\d/.test(s.slice(1));
 }
 
+/** Trattini seguiti da uno spazio o da un a capo: un elenco puntato o un inciso, mai un'opzione (#878). PURA. */
+export function apreUnElenco(arg) {
+  return /^[-‐‑‒–—−]+\s/.test(String(arg ?? ''));
+}
+
 /**
- * Come `sembraOpzione`, per il report di una correzione: lì un trattino seguito da uno spazio apre un
- * elenco puntato, non un'opzione. La critica resta sulla regola stretta (cosa accetta il verificatore non
- * cambia). PURA.
+ * Il rimedio quando sotto npm manca un titolo o un testo: uno che comincia col trattino npm lo prende per sé se il
+ * `--` non arriva (dimenticato, o mangiato dalla conchiglia), senza lasciarne traccia (#1359).
+ * '' fuori da npm. PURA.
+ */
+export function avvisoTrattinoDaNpm(env = {}) {
+  const comando = String((env && env.npm_lifecycle_event) || '');
+  if (!comando) return '';
+  return `Se cominciava con un trattino (un elenco puntato, un inciso), npm l'ha preso per una sua opzione e qui non è arrivato: scrivi i due trattini subito dopo il nome del comando (npm run ${comando} -- "titolo" "- …"), oppure metti "-" al posto del testo e passalo da stdin, che arriva anche dove i due trattini se li mangia la conchiglia.`;
+}
+
+/**
+ * Come `sembraOpzione`, per un testo libero (il report di una correzione, il testo di un feedback). La critica
+ * resta sulla regola stretta (cosa accetta il verificatore non cambia). PURA.
  */
 export function sembraOpzioneNelReport(arg) {
-  const s = String(arg ?? '');
-  return sembraOpzione(s) && !/\s/.test(s[1]);
+  return sembraOpzione(arg) && !apreUnElenco(arg);
 }
 
 /** La forma normale di un'opzione: due trattini veri, minuscola. PURA. */
@@ -180,12 +194,22 @@ export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) 
  * @param {string[]} argv        gli argomenti, senza node e senza lo script
  * @param {string[]} opzioni     le opzioni ammesse, in forma `--nome`
  * @param {string[]} conValore   quelle che pretendono un valore dopo di sé
+ * @param {string[]} ripetibili  quelle con valore che si possono scrivere più volte (`--allega a --allega b`)
  * @returns {string|null} il messaggio da stampare, o null se è tutto a posto
  */
-export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaParoleLibere = false } = {}) {
+export function controllaArgomenti(argv, { opzioni = [], conValore = [], ripetibili = [], senzaParoleLibere = false } = {}) {
   const lista = Array.isArray(argv) ? argv.map((a) => String(a ?? '')) : [];
   const ammesse = new Set(opzioni);
   const vuole = new Set(conValore);
+  // Due valori per un'opzione che ne tiene uno: chi legge ne prenderebbe uno in silenzio (#1058).
+  const ripetibile = new Set(ripetibili);
+  const giaVista = new Set();
+  const doppia = (nome) => {
+    if (ripetibile.has(nome)) return null;
+    if (giaVista.has(nome)) return `l'opzione ${nome} è scritta più di una volta: ne vale una sola, scrivila una volta — non ho toccato niente.`;
+    giaVista.add(nome);
+    return null;
+  };
 
   for (let i = 0; i < lista.length; i += 1) {
     const arg = lista[i];
@@ -205,7 +229,7 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaPa
       const nome = arg.split('/').pop().toLowerCase();
       return `«${arg}» è la tua opzione /${nome} trasformata in percorso dalla conchiglia — non ho toccato niente. Scrivila --${nome}.`;
     }
-    if (!sembraOpzione(arg)) continue;
+    if (!sembraOpzioneNelReport(arg)) continue;
     // `--opzione=valore` è la forma che regge quando la riga passa da npm:
     // qui vale come opzione col suo valore, non come un nome sconosciuto.
     const uguale = arg.indexOf('=');
@@ -223,6 +247,8 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaPa
       if (!arg.slice(uguale + 1)) {
         return `l'opzione ${conNome} vuole un valore dopo di sé — non ho toccato niente.`;
       }
+      const due = doppia(conNome);
+      if (due) return due;
       continue;
     }
     const forma = normalizza(arg);
@@ -239,9 +265,11 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaPa
     }
     if (vuole.has(forma)) {
       const dopo = lista[i + 1];
-      if (dopo === undefined || sembraOpzione(dopo)) {
+      if (dopo === undefined || sembraOpzioneNelReport(dopo)) {
         return `l'opzione ${forma} vuole un valore dopo di sé — non ho toccato niente.`;
       }
+      const due = doppia(forma);
+      if (due) return due;
       i += 1; // il valore è suo: non lo si esamina come argomento a sé
     }
   }
@@ -251,7 +279,7 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaPa
   if (senzaParoleLibere) {
     for (let i = 0; i < lista.length; i += 1) {
       const arg = lista[i];
-      if (sembraOpzione(arg)) {
+      if (sembraOpzioneNelReport(arg)) {
         if (vuole.has(normalizza(arg)) && !arg.includes('=')) i += 1; // il valore è suo
         continue;
       }

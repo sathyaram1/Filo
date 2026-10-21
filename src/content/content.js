@@ -29,7 +29,9 @@
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
     isBlocked: () => isBlocked(),
+    isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
+    spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,
@@ -183,6 +185,9 @@
     settings = await fetchSettings();
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
+    self.SN_AVVISI?.imposta(settings.notifications);
+    // I tasti di Spiega e Aiuto scelti dall'utente: il menu li scrive accanto alle voci (#842).
+    Tasti.usaScorciatoieFilo(settings.scorciatoie);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -196,13 +201,16 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo applica attenuato alle tab inattive.
+      // e lo mescola col fondo della barra nelle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
-      // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
+      // Segnali di attività (§2.1): ultima interazione, % di scroll.
       // Servono all'LLM per decidere cosa archiviare.
       try { startTabActivityReporter(); } catch (_) {}
     }
+    // Il testo da inviare invece si guarda in ogni frame: editor, commenti e
+    // moduli di contatto stanno spesso in un riquadro (#824).
+    try { startFormTracker(); } catch (_) {}
 
     // Siamo nati mentre lo schermo intero era già acceso? Lo CHIEDIAMO, non
     // aspettiamo l'annuncio: l'annuncio parte quando la modalità cambia, e una
@@ -328,10 +336,13 @@
       if (escInoltrato) return;
       escInoltrato = true;
       try {
-        document.dispatchEvent(new KeyboardEvent('keydown', {
+        const tasto = new KeyboardEvent('keydown', {
           key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
           bubbles: true, cancelable: true, composed: true,
-        }));
+        });
+        // Segnato come nostro: il primo ascolto della pagina lo dà ai riquadri di Filo prima che al sito (#859).
+        try { self.SN_FILO_UI?.nostro?.(tasto); } catch (_) {}
+        document.dispatchEvent(tasto);
       } catch (_) {}
       escInoltrato = false;
     };
@@ -409,6 +420,8 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
+      if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
       // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
@@ -417,16 +430,10 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) {
-      self.__snFiloSpento = true;
-      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
-      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
-      });
-      return;
-    }
-
-    SpellCheck.init(settings);
+    // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
+    // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
+    seguiSpento();
+    SpellCheck.init(impostazioniDelCorrettore());
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
@@ -446,16 +453,24 @@
     // click (e.preventDefault()), il menu di Filo si fa da parte.
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
+      if (typeof self.__snSetMenuDelSitoPrima === 'function') self.__snSetMenuDelSitoPrima(menuDelSitoPrima);
     } else {
       window.addEventListener('contextmenu', (e) => {
-        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+        if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
       });
     }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
     document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
+    // Chi si ferma prima di rilasciare il mouse o il dito non cambia più la selezione: il rilascio, gesto vero, la
+    // prepara (#1070); la pressione lunga del dito seleziona prima del rilascio.
+    for (const tipo of ['mouseup', 'touchend']) {
+      document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
+    }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      // Spento sul sito tacciono le azioni sulla pagina; lo stato (impostazioni, schermo intero) si segue lo stesso.
+      if (isBlocked() && AZIONI_DA_FUORI.has(msg?.type)) return;
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
@@ -477,11 +492,9 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta, quanto ha
-  // scrollato (0-100%) e se ha "sporcato" un form (input non ancora inviato).
-  // Throttled per non inondare l'IPC.
+  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
+  // scrollato (0-100%). Throttled per non inondare l'IPC.
   function startTabActivityReporter() {
-    let formDirty = false;
     let lastSentScroll = -1;
     let pending = false;
     let lastSend = 0;
@@ -523,26 +536,476 @@
       }, 500);
     }
 
-    // Form "sporco": primo input/change su un campo editabile. Si manda una volta.
-    function onFormInput(e) {
-      if (formDirty) return;
-      const t = e.target;
-      if (!t) return;
-      const tag = (t.tagName || '').toUpperCase();
-      const editable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
-      if (!editable) return;
-      formDirty = true;
-      send({ formDirty: true, scrollPct: Math.round(scrollPct()) });
-    }
-
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
     window.addEventListener('keydown', onInteract, { passive: true, capture: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('input', onFormInput, { passive: true, capture: true });
-    window.addEventListener('change', onFormInput, { passive: true, capture: true });
 
     // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+  }
+
+  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
+  // (#824). Conta il testo nato da un gesto (o scritto da Filo per lui), seguito per contenuto; il sito
+  // l'ha ricevuto quando una richiesta riuscita lo porta (src/main/tabs.js). Porte: tests/tab-auto-archive.spec.mjs.
+  function startFormTracker() {
+    if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
+    const PAGINA_DI_FILO = /^filo:/i.test(location.href);
+    // Area in cui l'utente ha scritto → testo che mostrava prima che ci scrivesse.
+    const aree = new Map();
+    const basi = new WeakMap();
+    // Caselle a più righe ed editor: il solo testo che si segue fuori dal suo campo.
+    const lunghe = new WeakSet();
+    // Componenti chiusi in cui è arrivata una scrittura: il testo lì dentro non si legge.
+    const opachi = new Set();
+    // Testo di un campo tolto dalla pagina: la pagina può tenerlo in memoria (il passo dopo di una
+    // procedura, il riepilogo), quindi protegge finché non ricompare in un campo o non parte. { t, righe }
+    const orfani = [];
+    // Le righe di ogni area all'ultima rilettura: tolta dalla pagina, un editor non le dà più.
+    const righeViste = new WeakMap();
+    // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
+    const partiti = new Set();
+    let ultimoMandato = null;
+    let ultimeImpronte = '';
+    let ultimoTocco = null;
+    let rilettura = null;
+    const TIPI_DI_TESTO = /^(text|search|email|url|tel|password|number)$/;
+    function campoDiTesto(t) {
+      if (t && t.nodeType === 3) t = t.parentElement;
+      if (!t || !t.tagName) return null;
+      const tag = t.tagName.toUpperCase();
+      if (tag === 'TEXTAREA') return t;
+      if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
+      if (!t.isContentEditable) return null;
+      while (t.parentElement && t.parentElement.isContentEditable) t = t.parentElement;
+      return t;
+    }
+    // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
+    // dato i risultati senza un invio da riconoscere.
+    function diRicerca(el) {
+      const tag = el.tagName.toUpperCase();
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+      if (/^searchbox$/i.test(el.getAttribute('role') || '') || el.closest('[role="search" i]')) return true;
+      if (/^(q|s|k|query|search|search_query|keywords?|field-keywords)$/i.test(el.name || '')) return true;
+      if (tag === 'TEXTAREA') return false;
+      if (String(el.type).toLowerCase() === 'search') return true;
+      return /(search|cerca|ricerca|busca|recherche|suche)/i.test(`${el.getAttribute('aria-label') || ''} ${el.placeholder || ''}`);
+    }
+    const grande = (el) => { try { const r = el.getBoundingClientRect(); return r.width >= 8 && r.height >= 8; } catch (_) { return true; } };
+    function primoGrande(da, body) {
+      for (let p = da, n = 0; p && p !== body && n < 8; p = p.parentElement, n++) if (grande(p)) return p;
+      return null;
+    }
+    // Gli editor di codice ricevono i tasti in una casella minuscola e mostrano il testo
+    // altrove: l'area è il contenitore visibile, o quello su cui si è cliccato per scrivere.
+    const areaDelCampo = new WeakMap();
+    function areaDi(campo) {
+      if (campo.isContentEditable) return campo;
+      let area = areaDelCampo.get(campo);
+      if (area && area.isConnected) return area;
+      const body = campo.ownerDocument.body;
+      const tocco = ultimoTocco && ultimoTocco.ownerDocument === campo.ownerDocument ? ultimoTocco : null;
+      area = grande(campo) ? campo : (primoGrande(campo.parentElement, body) || (tocco && primoGrande(tocco, body)) || campo);
+      areaDelCampo.set(campo, area);
+      return area;
+    }
+    function testo(area) {
+      const tag = area.tagName.toUpperCase();
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return area.value || '';
+      if (area.isContentEditable) return area.textContent || '';
+      return area.innerText || area.textContent || '';
+    }
+    // Gli editor ricchi lasciano spazi a larghezza zero anche quando sono vuoti.
+    const pulito = (s) => String(s).replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, '');
+    // Solo lettere e cifre minuscole, come il main riduce il testo delle richieste: il sito pu\u00F2
+    // averlo mandato in Markdown, in HTML o con le maiuscole sue.
+    const essenziale = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '');
+    // Casella a pi\u00F9 righe \u2192 il suo testo all'ultima richiesta riuscita che lo portava al sito.
+    const ricevuti = new WeakMap();
+    // Campo di una riga \u2192 il suo testo dopo l'ultima scrittura dell'utente: se la pagina lo cambia
+    // (una voce scelta dai suggerimenti, una correzione) quel testo non \u00E8 pi\u00F9 suo.
+    const digitati = new WeakMap();
+    const sostituito = (area) => !lunghe.has(area) && digitati.has(area) && essenziale(testo(area)) !== digitati.get(area);
+    // Un riquadro tolto dalla pagina lascia i suoi nodi «connessi» a un documento morto.
+    const viva = (a) => a.isConnected && !!(a.ownerDocument && a.ownerDocument.defaultView);
+
+    // Quello che Filo scrive per l'utente (Incolla, dettatura, sostituzioni, l'agente) arriva con
+    // eventi sintetici dal suo mondo isolato e conta come un gesto; quelli della pagina no.
+    let daFilo = 0;
+    const segnate = new WeakSet();
+    function segnaScrittureDiFilo(win) {
+      if (PAGINA_DI_FILO) return;
+      try {
+        const proto = win.EventTarget.prototype;
+        if (segnate.has(proto)) return;
+        segnate.add(proto);
+        const originale = proto.dispatchEvent;
+        proto.dispatchEvent = function (ev) { daFilo++; try { return originale.call(this, ev); } finally { daFilo--; } };
+      } catch (_) {}
+    }
+    const gesto = (e) => e.isTrusted || daFilo > 0 || PAGINA_DI_FILO;
+
+    // Un'area vuota resta in elenco: l'editor può rimetterci il testo dopo l'evento.
+    function stato() {
+      let daInviare = false;
+      for (const [area, base] of aree) {
+        if (!viva(area)) { lascia(area, base); continue; }
+        const ora = pulito(testo(area));
+        if (ora && ora !== pulito(base) && !sostituito(area)) daInviare = true;
+      }
+      // Un componente chiuso tolto dalla pagina non dice se il testo è ricomparso: resta protetto.
+      return daInviare || opachi.size > 0 || orfani.length > 0;
+    }
+    function righeDi(area) {
+      let s = '';
+      try { s = area.isContentEditable ? area.innerText || area.textContent || '' : testo(area); } catch (_) { s = testo(area); }
+      return s.split(/\r\n|\r|\n/).map(pulito).filter(Boolean);
+    }
+    function lascia(area, base) {
+      aree.delete(area);
+      // Una password non è una bozza: dopo un accesso fatto senza cambiare pagina proteggerebbe per sempre.
+      if (/^input$/i.test(area.tagName) && String(area.type).toLowerCase() === 'password') return;
+      const t = pulito(testo(area));
+      if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
+      if (ricevuti.get(area) === t || sostituito(area)) return;
+      const viste = righeViste.get(area);
+      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
+      if (orfani.length > 100) orfani.shift();
+    }
+    // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
+    // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
+    function partito(inviato) {
+      if (typeof inviato !== 'string' || !inviato) return;
+      const dentro = (t, righe) => {
+        const tutto = essenziale(t);
+        if (tutto && inviato.includes(tutto)) return true;
+        const r = righe.map(essenziale).filter(Boolean);
+        return r.length > 0 && r.every((x) => inviato.includes(x));
+      };
+      // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
+      stato();
+      for (const area of [...aree.keys()]) {
+        if (!viva(area)) continue;
+        const ora = testo(area);
+        if (!pulito(ora) || !dentro(ora, righeDi(area))) continue;
+        if (lunghe.has(area)) ricevuti.set(area, pulito(ora)); else aree.set(area, ora);
+      }
+      for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
+      aggiorna(false);
+    }
+    function impronta(s) {
+      let h1 = 0xdeadbeef;
+      let h2 = 0x41c6ce57;
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+    }
+    function impronte() {
+      const out = new Set(partiti);
+      for (const [area, base] of aree) {
+        if (!lunghe.has(area) || !viva(area)) continue;
+        const t = pulito(testo(area));
+        if (t && t !== pulito(base) && ricevuti.get(area) !== t) out.add(impronta(t));
+      }
+      return [...out].slice(-50);
+    }
+    function invia(payload) {
+      try { Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {}); } catch (_) {}
+    }
+    // Solo la digitazione vera è un'interazione: una risposta al ricontrollo non
+    // deve far sembrare la scheda appena usata al modello.
+    function manda(ora, daUtente) {
+      ultimoMandato = ora;
+      const payload = { type: MSG.TAB_ACTIVITY, formDirty: ora };
+      if (daUtente) payload.lastInteractionAt = Date.now();
+      invia(payload);
+    }
+    // Le impronte partono a riposo (dopo la rilettura, all'invio, al ricontrollo), mai a ogni tasto.
+    function mandaImpronte() {
+      const imp = impronte();
+      const k = imp.join(',');
+      if (k === ultimeImpronte) return;
+      ultimeImpronte = k;
+      invia({ type: MSG.TAB_ACTIVITY, impronte: imp });
+    }
+    function aggiorna(daUtente) {
+      const ora = stato();
+      if (ora !== ultimoMandato) manda(ora, daUtente);
+    }
+
+    const bersaglio = (e) => (e.composedPath && e.composedPath()[0]) || e.target;
+    // I riquadri di Filo nella pagina (feedback, spiegazioni, Aiuto) non sono del sito: il loro
+    // testo parte o si butta col riquadro. Vale l'elenco di chi li ha disegnati, non l'attributo.
+    function diFilo(el) {
+      let nostre = [];
+      try { nostre = self.SN_FILO_UI?.aperti?.() || []; } catch (_) {}
+      for (let n = el; n && nostre.length;) {
+        if (nostre.some((r) => r === n || (r.contains && r.contains(n)))) return true;
+        const radice = n.getRootNode && n.getRootNode();
+        n = radice && radice.host ? radice.host : null;
+      }
+      return false;
+    }
+    function campoDa(e) {
+      const el = campoDiTesto(bersaglio(e));
+      return el && !diRicerca(el) && !diFilo(el) ? el : null;
+    }
+    // Da dentro un componente chiuso la scrittura arriva al suo host, che non è un campo.
+    function opaco(e) {
+      if (typeof e.inputType !== 'string') return null;
+      const t = bersaglio(e);
+      if (!t || t.nodeType !== 1 || t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName)) return null;
+      return diFilo(t) ? null : t;
+    }
+    function aRiposo() {
+      clearTimeout(rilettura);
+      rilettura = setTimeout(() => {
+        stato();
+        for (const area of aree.keys()) righeViste.set(area, righeDi(area));
+        adotta(null);
+        aggiorna(false);
+        mandaImpronte();
+      }, 400);
+    }
+    // Un editor di codice riceve i tasti in una casella a più righe e mostra il testo altrove.
+    const aPiuRighe = (el) => !!el && (el.tagName.toUpperCase() === 'TEXTAREA' || el.isContentEditable);
+    function scritto(area, base, campo) {
+      if (!aree.has(area)) aree.set(area, base);
+      if (aPiuRighe(area) || aPiuRighe(campo)) lunghe.add(area);
+      else digitati.set(area, essenziale(testo(area)));
+      aggiorna(true);
+      aRiposo();
+    }
+    function scrittoInOpaco(e) {
+      const h = opaco(e);
+      if (!h || opachi.has(h)) return;
+      opachi.add(h);
+      aggiorna(true);
+    }
+    const iniziale = (a) => (/^(input|textarea)$/i.test(a.tagName) ? a.defaultValue || '' : '');
+    function onTocco(e) { ultimoTocco = bersaglio(e); }
+    function onPrima(e) {
+      if (!gesto(e)) return;
+      const campo = campoDa(e);
+      if (!campo) { scrittoInOpaco(e); return; }
+      const area = areaDi(campo);
+      if (!aree.has(area)) basi.set(area, testo(area));
+    }
+    function onFormInput(e) {
+      if (!gesto(e)) return;
+      const campo = campoDa(e);
+      if (!campo) { scrittoInOpaco(e); return; }
+      const area = areaDi(campo);
+      scritto(area, basi.has(area) ? basi.get(area) : iniziale(area), campo);
+    }
+    // Molti editor ricchi incollano e ricevono il trascinamento da soli, senza «input».
+    function onIncolla(e) {
+      if (!gesto(e)) return;
+      const campo = campoDa(e);
+      if (!campo) return;
+      const area = areaDi(campo);
+      scritto(area, testo(area), campo);
+      setTimeout(() => {
+        if (aree.has(area) && !lunghe.has(area)) digitati.set(area, essenziale(testo(area)));
+        aggiorna(true);
+      }, 0);
+    }
+
+    // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un rifiuto e un invio
+    // via script si somigliano: lì decide la risposta del sito alla richiesta che porta il testo (partito).
+    // Il testo si smette di seguire solo quando il documento se ne va (lo azzera il main): un modulo
+    // mandato in un'altra scheda, in un riquadro o senza cambiare pagina lo lascia nella casella.
+    function onSubmit(e) {
+      const form = e.target;
+      if (!form || !aree.size) return;
+      mandaImpronte();
+      setTimeout(() => {
+        if (e.defaultPrevented) return;
+        let conTesto = false;
+        for (const [a, base] of [...aree]) {
+          if (a.form !== form && !(form.contains && form.contains(a))) continue;
+          const ora = pulito(testo(a));
+          if (ora && ora !== pulito(base) && !sostituito(a)) conTesto = true;
+          const t = lunghe.has(a) ? ora : '';
+          if (t && t !== pulito(base)) partiti.add(impronta(t));
+        }
+        // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main).
+        // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
+        let dest = '';
+        try {
+          if (form.querySelector('input[type=password]')) conTesto = false;
+          dest = (e.submitter && e.submitter.getAttribute('formtarget')) || form.getAttribute('target') || '';
+        } catch (_) {}
+        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+        aggiorna(false);
+        mandaImpronte();
+      }, 0);
+    }
+    // L'accesso in testata c'è in ogni pagina del sito: nella pagina dopo non vuol dire sessione scaduta.
+    function passwordFuori(form) {
+      try {
+        return Array.prototype.some.call(document.querySelectorAll('input[type=password]'),
+          (el) => !form.contains(el) && el.getClientRects().length > 0);
+      } catch (_) { return false; }
+    }
+    // Il modulo parte anche senza il suo bottone (uno script, un controllo antispam, un editor in un
+    // riquadro che copia il testo nel modulo): conta quello che il modulo porta, non da dove si è scritto.
+    function onDatiModulo(e) {
+      const form = e.target;
+      if (IS_SUBFRAME || !form || !aree.size || !e.formData) return;
+      try {
+        if (form.querySelector('input[type=password]')) return;
+        if (!/^(|_self|_top)$/i.test(form.getAttribute('target') || '')) return;
+      } catch (_) { return; }
+      const valori = [];
+      try {
+        for (const [, v] of e.formData) {
+          if (typeof v !== 'string' || !v) continue;
+          const t = /[<&]/.test(v) ? new DOMParser().parseFromString(v, 'text/html').body.textContent || '' : v;
+          valori.push(essenziale(t));
+        }
+      } catch (_) {}
+      for (const [a, base] of aree) {
+        if (!viva(a) || sostituito(a)) continue;
+        const ora = testo(a);
+        if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
+        const ess = essenziale(ora);
+        if (ess && valori.some((v) => v.includes(ess))) {
+          invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+          return;
+        }
+      }
+    }
+
+    // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
+    // pagina: solo al ricontrollo, mai al caricamento.
+    function radici(doc) {
+      const out = [doc];
+      for (let i = 0; i < out.length; i++) for (const el of out[i].querySelectorAll('*')) if (el.shadowRoot) out.push(el.shadowRoot);
+      return out;
+    }
+    function* documenti(doc, n = 0) {
+      yield doc;
+      if (n >= 4) return;
+      for (const r of radici(doc)) for (const f of r.querySelectorAll('iframe, frame')) {
+        let d = null;
+        try { d = f.contentDocument; } catch (_) {}
+        if (d) yield* documenti(d, n + 1);
+      }
+    }
+    // Il testo dell'utente si segue per contenuto: un campo che mostra il testo di un'area tolta
+    // (cambio di editor) o rimandato dal server (anteprima, invio respinto, passo dopo) è ancora suo.
+    function adotta(daServer) {
+      const cercate = new Set(Array.isArray(daServer) ? daServer.map(String) : []);
+      if (!cercate.size && !orfani.length) return;
+      for (const doc of documenti(document)) for (const r of radici(doc)) {
+        for (const el of r.querySelectorAll('textarea, [contenteditable], input')) {
+          const nascosto = el.tagName.toUpperCase() === 'INPUT' && String(el.type).toLowerCase() === 'hidden';
+          const area = nascosto ? el : campoDiTesto(el);
+          if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area) || diFilo(area)) continue;
+          const t = pulito(testo(area));
+          if (!t) continue;
+          const o = orfani.findIndex((x) => x.t === t || (x.t.length >= 20 && t.includes(x.t)));
+          if (o < 0 && !cercate.has(impronta(t))) continue;
+          if (o >= 0) orfani.splice(o, 1);
+          aree.set(area, '');
+          if (area.tagName.toUpperCase() !== 'INPUT' || nascosto) lunghe.add(area);
+        }
+      }
+    }
+    // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
+    // non caricano Filo: li segue il documento che li contiene. Riaggiungere gli
+    // ascoltatori non li duplica, e dopo un document.open() li rimette.
+    function osserva(win) {
+      const o = { passive: true, capture: true };
+      segnaScrittureDiFilo(win);
+      try {
+        win.addEventListener('pointerdown', onTocco, o);
+        win.addEventListener('beforeinput', onPrima, o);
+        win.addEventListener('input', onFormInput, o);
+        win.addEventListener('change', onFormInput, o);
+        win.addEventListener('paste', onIncolla, o);
+        win.addEventListener('drop', onIncolla, o);
+        win.addEventListener('submit', onSubmit, o);
+        win.addEventListener('formdata', onDatiModulo, o);
+        win.addEventListener('blur', onUscita);
+        win.document.addEventListener('load', onCaricato, o);
+        for (const f of win.document.querySelectorAll('iframe, frame')) riquadro(f);
+      } catch (_) {}
+    }
+    function riquadro(f) {
+      let w = null;
+      try { w = f.contentWindow; if (!w || !w.document) return; } catch (_) { return; }
+      osserva(w);
+    }
+    const eRiquadro = (t) => !!(t && t.tagName && /^i?frame$/i.test(t.tagName));
+    function onCaricato(e) { if (eRiquadro(e.target)) riquadro(e.target); }
+    function onUscita(e) {
+      const w = e.target;
+      setTimeout(() => {
+        try {
+          let a = w.document.activeElement;
+          while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+          if (eRiquadro(a)) riquadro(a);
+        } catch (_) {}
+      }, 0);
+    }
+
+    // Tornando Indietro il browser rimette nei campi il testo di prima, senza
+    // eventi: è ancora testo dell'utente.
+    function adottaRipristinati() {
+      let nav = null;
+      try { nav = performance.getEntriesByType('navigation')[0]; } catch (_) {}
+      if (!nav || nav.type !== 'back_forward') return;
+      for (const el of document.querySelectorAll('input, textarea')) {
+        if (!campoDiTesto(el) || diRicerca(el) || !grande(el) || el.value === el.defaultValue) continue;
+        aree.set(el, el.defaultValue);
+        if (el.tagName.toUpperCase() === 'TEXTAREA') lunghe.add(el);
+      }
+    }
+    adottaRipristinati();
+    // In un riquadro Filo si monta al primo tocco: quel che si è scritto prima
+    // dell'arrivo di questo script sta nel campo col fuoco.
+    const attivo = IS_SUBFRAME && campoDiTesto(document.activeElement);
+    if (attivo && !diRicerca(attivo) && areaDi(attivo) === attivo
+      && (attivo.isContentEditable || attivo.value !== attivo.defaultValue)) {
+      aree.set(attivo, attivo.isContentEditable ? '' : attivo.defaultValue);
+      if (attivo.isContentEditable || attivo.tagName.toUpperCase() === 'TEXTAREA') lunghe.add(attivo);
+    }
+    if (aree.size) { aggiorna(false); mandaImpronte(); }
+
+    osserva(window);
+    // Pagina tornata dalla cache di navigazione: per il main è un documento nuovo.
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return;
+      manda(stato(), false);
+      ultimeImpronte = '';
+      mandaImpronte();
+    });
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
+      if (!msg || msg.type !== MSG.FORM_RECHECK) return;
+      osserva(window);
+      stato();
+      try { adotta(msg.impronte); } catch (_) {}
+      manda(stato(), false);
+      mandaImpronte();
+    });
+  }
+
+  // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
+  // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
+  function seguiSpento() {
+    const spento = isBlocked();
+    if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
+    self.__snFiloSpento = spento;
   }
 
   function isBlocked() {
@@ -570,11 +1033,14 @@
   // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
   // riquadro di un'altra origine non è leggibile.
   let pageUrl = '';
+  // Finché il main non l'ha detto non si sa: vale incognito, e la selezione non parte da sola verso un modello.
+  let inIncognito = true;
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
       if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
+      if (res && typeof res.incognito === 'boolean') inIncognito = res.incognito;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
@@ -605,7 +1071,10 @@
   // all'host del componente, e closest()/tagName non vedono più il link,
   // l'immagine o il campo davvero cliccati. composedPath()[0] attraversa lo
   // shadow boundary e restituisce l'elemento reale.
+  // Dentro un riquadro chiuso di Filo (spiegazione, Modifica, feedback) il nodo vero lo sa solo SN_FILO_UI.
   function realTarget(e) {
+    const UI = self.SN_FILO_UI;
+    if (e && UI?.bersaglio) return UI.bersaglio(e);
     return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
   }
 
@@ -647,7 +1116,8 @@
       for (const el of hits) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
-        if (el.shadowRoot) collect(el.shadowRoot);
+        const ombra = el.shadowRoot || self.SN_FILO_UI?.ombraDi?.(el);
+        if (ombra) collect(ombra);
         out.push(el);
       }
     };
@@ -658,9 +1128,82 @@
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
-  async function onContextMenu(e) {
-    // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
-    if (e.shiftKey) return;
+  // ------------------------------------------------------------
+  // Il menu che il sito si disegna da sé (#975): «Menu di <sito>» in cima, e la scelta di aprirlo subito.
+  // Chi ascolta e il clic rigiocato stanno in src/preload/menu-del-sito.js; la scelta per sito in menuDelSito.siti.
+  // ------------------------------------------------------------
+  // Il sito è quello del frame cliccato: il menu di un riquadro è del suo sito, non della pagina che lo ospita.
+  function hostQui() {
+    try { return String(location.hostname || '').toLowerCase().replace(/\.+$/, ''); } catch (_) { return ''; }
+  }
+
+  function menuDelSitoPrima() {
+    const h = hostQui();
+    const siti = settings?.menuDelSito?.siti;
+    if (!h || !Array.isArray(siti)) return false;
+    return siti.some((d) => typeof d === 'string' && d && (h === d || h.endsWith(`.${d}`)));
+  }
+
+  // Il nome che il sito dà a sé stesso; senza, il suo indirizzo. Testo della pagina: niente caratteri che girano la riga.
+  const NOME_SITO_MAX = 40;
+  function nomeDelSito() {
+    const meta = (sel) => { try { return document.querySelector(sel)?.getAttribute('content') || ''; } catch (_) { return ''; } };
+    let n = meta('meta[property="og:site_name"]') || meta('meta[name="application-name"]')
+      || meta('meta[name="apple-mobile-web-app-title"]');
+    n = String(n).replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim();
+    if (n.length > NOME_SITO_MAX) n = `${n.slice(0, NOME_SITO_MAX - 1).trimEnd()}…`;
+    return n || hostQui().replace(/^www\./, '');
+  }
+
+  // La voce c'è se sul cammino del clic la pagina ascolta il tasto destro; col menu del sito già al primo posto,
+  // dal menu aperto con Shift c'è sempre: è da lì che si torna a quello di Filo.
+  function statoMenuDelSito(e, opzioni) {
+    const M = self.__snMenuDelSito;
+    if (!M || PAGINA_DI_FILO || !hostQui()) return null;
+    const nodo = realTarget(e);
+    if (!nodo || self.SN_FILO_UI?.inside?.(nodo)) return null;
+    const prima = menuDelSitoPrima();
+    if (!(prima && opzioni && opzioni.conMaiusc) && !M.ascolta(nodo)) return null;
+    return {
+      nodo, prima, nome: nomeDelSito(),
+      x: e.clientX, y: e.clientY, sx: e.screenX, sy: e.screenY,
+      ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey, clic: Date.now(),
+    };
+  }
+
+  function conMenuDelSito(items, sito) {
+    if (!sito) return;
+    items.unshift({
+      type: 'split',
+      label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
+      onClick: () => apriMenuDelSito(sito),
+      arrowTitle: I18n.t('menu_del_sito_scelta'),
+      subItems: [sito.prima
+        ? { label: I18n.t('menu_del_sito_torna_filo'), onClick: () => impostaMenuDelSito(false) }
+        : { label: I18n.t('menu_del_sito_sempre'), onClick: () => impostaMenuDelSito(true) }],
+    }, { type: 'separator' });
+  }
+
+  // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
+  function apriMenuDelSito(sito) {
+    setTimeout(async () => {
+      let esito = null;
+      try { esito = await self.__snMenuDelSito.apri(sito); } catch (_) { esito = null; }
+      if (esito !== 'menu' || sito.prima) return;
+      try { await chrome.runtime.sendMessage({ type: MSG.MENU_DEL_SITO_SCELTO }); } catch (_) {}
+    }, 0);
+  }
+
+  function impostaMenuDelSito(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.MENU_DEL_SITO_IMPOSTA, attivo, avvisa: true })).catch(() => {}); } catch (_) {}
+  }
+
+  // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
+  async function onContextMenu(e, opzioni) {
+    // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) return;
+    // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
+    const sito = statoMenuDelSito(e, opzioni);
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
@@ -684,51 +1227,62 @@
     // lo stesso canale `context-menu` del webContents.
     e.stopPropagation();
 
-    // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
-    // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
-    // parola sotto il cursore (zigzag rosso del browser).
+    const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
+    if (avviso) { openAvvisoMenu(avviso, e); return; }
+    // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
+    const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
+    if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
+
+    // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
+    // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
     try {
-      if (settings?.featureFlags?.spellcheck !== false && SpellCheck) {
+      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
         const rt = realTarget(e);
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
-          const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
-          if (blueIssue) {
-            await openSpellBlueMenu(editableEl, blueIssue, e);
+          const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
+          if (sotto.errore || sotto.suggerimento) {
+            await openSpellMarksMenu(editableEl, sotto, e, sito);
             return;
           }
-          const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
-          if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
-            await openSpellWordMenu(editableEl, wordCtx, e);
+          // Una parola che il browser segna e Filo no (il dizionario non ancora pronto, un campo mai entrato col fuoco):
+          // la proposta del browser, come nelle caselle di una riga.
+          const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
+          if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
+            && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
+            await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
         }
-        // Su `<input>` testuali (non "supportati" dal nostro overlay): la
-        // parola sotto il cursore va comunque corretta. La vecchia estensione
-        // mostrava il suggerimento in cima e la nuova app no, perché si
-        // affidava ai SOLI suggerimenti nativi di Electron (che non sempre
-        // arrivano — dipende dal dizionario della lingua attiva). Ora, come per
-        // textarea/contenteditable, estraiamo la parola e chiediamo la
-        // correzione all'LLM (affidabile a prescindere dal dizionario nativo),
-        // tenendo i suggerimenti nativi come base immediata quando ci sono.
-        const inputEl = rt?.closest?.('input');
-        if (inputEl && isTextLikeInput(inputEl)) {
+        const inputEl = SpellCheck.erroriAttivi() ? rt?.closest?.('input') : null;
+        if (inputEl && isTextLikeInput(inputEl) && !SpellCheck.campoEscluso(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
-            await openSpellWordMenu(inputEl, wordCtx, e);
+            await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
-          // Nessuna parola sotto il cursore (es. click su area vuota): menu
-          // normale, che riserva comunque lo slot per il nativo se arriva.
-          await openNormalMenuAt(e);
-          return;
         }
       }
     } catch (err) {
-      console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
+      console.error('[SN] correttore, tasto destro: apro il menu normale', err);
     }
 
-    await openNormalMenuAt(e);
+    await openNormalMenuAt(e, sito);
+  }
+
+  // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
+  function openAvvisoMenu({ el, chiudi, azioni }, e) {
+    const items = [];
+    if (azioni) {
+      for (const a of azioni) items.push({ type: 'item', label: a.label, onClick: () => a.fn() });
+    } else {
+      for (const b of el.querySelectorAll('button')) {
+        const label = (b.textContent || '').trim();
+        if (label) items.push({ type: 'item', label, onClick: () => b.click() });
+      }
+    }
+    items.push({ type: 'item', label: I18n.t('popup_close'), onClick: () => chiudi() });
+    Menu.open({ x: e.clientX, y: e.clientY, items });
   }
 
   // Input testuali in cui ha senso aspettarsi una correzione ortografica
@@ -747,7 +1301,12 @@
     return true;
   }
 
-  async function openNormalMenuAt(e) {
+  // Sul sito dove Filo è spento il correttore tace e il browser torna a sottolineare da sé (#589.2, #1446).
+  function impostazioniDelCorrettore() {
+    return isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false }, sitoSpento: true } : settings;
+  }
+
+  async function openNormalMenuAt(e, sito = null) {
     // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
     // se il broadcast `_spell:native` arrivato durante l'await sotto è già
     // pertinente a questa apertura del menu (altrimenti lo perdevamo).
@@ -767,7 +1326,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -785,8 +1344,13 @@
     // applyNativeCorrection, che agisce sul campo a fuoco senza doverlo
     // identificare dalla pagina. Resta appeso al correttore: se l'utente lo ha
     // spento, niente slot e niente suggerimenti.
-    const wantCorrection = settings?.featureFlags?.spellcheck !== false && !!SpellCheck;
+    // Nei campi dove i segni li disegna Filo (#1446) decide il correttore: una parola che sa giusta (un cognome scartato
+    // dal modello, una parola ignorata) non riprende dal browser la sua «correzione».
+    const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
+    const wantCorrection = !!SpellCheck && SpellCheck.erroriAttivi();
     let updateCorrection = null;
+    const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
+    if (tutti) items.unshift(tutti, { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
@@ -818,6 +1382,7 @@
       });
     };
 
+    conMenuDelSito(items, sito);
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
     if (wantCorrection) {
@@ -825,7 +1390,7 @@
       // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
       // spellcheck ce lo consegna subito invece di lasciarci aspettare.
       SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
-        if (!suggestions?.length) return;
+        if (!suggestions?.length || (campoDiFilo && SpellCheck.parolaGiusta(campoDiFilo, word))) return;
         revealNativeCorrection(word, suggestions);
       }, { since: openedAt });
     }
@@ -1406,16 +1971,14 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
   }
 
-  // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
-  // correggi automaticamente, gestisci correttore.
-  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = []) {
+  // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
+  // `parola`: il segno è una parola sola, e allora si può aggiungere al dizionario o correggere da sé d'ora in poi.
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true) {
     const items = [];
-    // Suggerimenti alternativi (dal correttore nativo): righe "applica" sopra le
-    // azioni di gestione. Saltiamo quello già mostrato come correzione primaria.
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
       const v = String(s || '').trim();
@@ -1427,231 +1990,201 @@
           expectedSegment: wordCtx.word,
         }),
       });
+      if (items.length >= 4) break;
     }
     if (items.length) items.push({ type: 'separator' });
-    items.push(
-      {
+    if (parola) {
+      items.push({
         label: I18n.t('spell_add_dict'),
         onClick: () => {
           SpellCheck.addToDictionary(wordCtx.word);
           Popup.showToast(I18n.t('toast_added_to_dict'));
         },
-      },
-      {
+      });
+    }
+    if (parola && correction) {
+      items.push({
         label: I18n.t('spell_autocorrect'),
         onClick: async () => {
           await SpellCheck.setAutocorrect(wordCtx.word, correction);
-          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction);
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction, { expectedSegment: wordCtx.word });
           Popup.showToast(I18n.t('toast_autocorrect_saved'));
         },
-      },
-      {
-        label: I18n.t('spell_manage'),
-        onClick: () => {
-          chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
-        },
-      },
-    );
+      });
+    }
+    items.push({ label: I18n.t('spell_manage'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE }) });
     return items;
   }
 
-  // Sub-menu per una correzione "blu" (errore contestuale): mostra la spiegazione
-  // dell'errore come riga informativa, poi link a "Gestisci correttore".
-  function buildBlueSubItems(issue) {
-    return [
-      {
-        type: 'info',
-        label: issue.explanation || I18n.t('spell_semantic_issue'),
+  // Una parola sola, senza spazi intorno: « il» ripetuto non è una parola da mettere nel dizionario.
+  const unaParola = (s) => /^[^\s]+$/.test(String(s || ''));
+
+  // Il perché di un segno, col bordo del suo colore; per un suggerimento con la frase della pagina che lo motiva.
+  function rigaDelPerche(segno, cambia) {
+    return {
+      type: 'inline',
+      onMount(el) {
+        el.classList.add('sn-menu-segno', segno.segno === 'errore' ? 'sn-menu-segno-errore' : 'sn-menu-segno-suggerimento');
+        const scrivi = (s) => {
+          el.textContent = '';
+          const perche = document.createElement('div');
+          const ripiego = s.segno !== 'errore' ? 'spell_ocra_controlla' : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+          perche.textContent = s.motivo || I18n.t(ripiego);
+          el.appendChild(perche);
+          if (s.citazione) {
+            const prova = document.createElement('div');
+            prova.className = 'sn-menu-segno-citazione';
+            prova.textContent = I18n.t('spell_ocra_prima', s.citazione);
+            el.appendChild(prova);
+          }
+        };
+        scrivi(segno);
+        if (cambia) cambia(scrivi);
       },
-      { type: 'separator' },
+    };
+  }
+
+  // Su un errore (#1446): la correzione in cima, un clic; il perché; «Ignora»; «Aggiungi al dizionario» per una parola.
+  // Un candidato ancora da giudicare mostra la proposta del dizionario e chiede il controllo rapido, che quando risponde
+  // aggiorna la riga nel menu aperto.
+  function vociErrore(editableEl, errore) {
+    const parola = { word: errore.segment, start: errore.start, end: errore.end };
+    // Le proposte del dizionario: quelle che il browser ha mandato col tasto destro, o chieste adesso; arrivate dopo
+    // l'apertura del menu, prendono il posto di quelle chieste.
+    const mandate = unaParola(errore.segment) ? SpellCheck.getNativeSuggestions(errore.segment) : [];
+    let native = mandate.length ? mandate : (unaParola(errore.segment) ? SpellCheck.proposteDelBrowser(errore.segment) : []);
+    let giudicato = null;
+    const proposta = (s) => (s.correzioni && s.correzioni.length ? s.correzioni[0] : (s.dubbio ? native[0] : undefined));
+    const etichetta = (s, c) => (c === '' ? I18n.t('spell_togli', s.segment.trim()) : c);
+    const riga = (s) => {
+      const c = proposta(s);
+      return {
+        hidden: c === undefined,
+        label: c === undefined ? '' : etichetta(s, c),
+        loading: false,
+        onClick: c === undefined ? null : () => SpellCheck.correggi(editableEl, s, c),
+        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment)),
+      };
+    };
+    const ascolti = [];
+    const segui = (fn) => { ascolti.push(fn); };
+    let staccato = null;
+    const avvia = () => {
+      if (staccato || !ascolti.length) return;
+      staccato = SpellCheck.seguiSegno(editableEl, errore, (nuovo) => { if (nuovo && !nuovo.dubbio) for (const fn of ascolti) fn(nuovo); });
+      SpellCheck.giudicaOra(editableEl, errore);
+    };
+    if (!errore.dubbio && (errore.fonte === 'rapido' || errore.giudicatoDa === 'rapido')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_SEMANTIC);
+    const items = [
       {
-        label: I18n.t('spell_manage'),
-        onClick: () => {
-          chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
+        type: 'correction', ...riga(errore),
+        onMount: (_root, update) => {
+          let stacca = null;
+          if (errore.dubbio) {
+            segui((nuovo) => { giudicato = nuovo; update(riga(nuovo)); });
+            if (!mandate.length && unaParola(errore.segment)) {
+              stacca = SpellCheck.onNativeSuggestions(errore.segment, (sugg) => {
+                if (giudicato || !sugg || !sugg.length) return;
+                native = sugg;
+                update(riga(errore));
+              });
+            }
+          }
+          avvia();
+          return () => { if (staccato) staccato(); if (stacca) stacca(); };
         },
       },
+      { type: 'separator', hidden: proposta(errore) === undefined },
+      rigaDelPerche(errore, errore.dubbio ? (scrivi) => { segui(scrivi); avvia(); } : null),
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, errore) },
     ];
-  }
-
-  // Click destro su parola in editabile (errore "rosso", non coperta da issue blu).
-  //
-  // Regole (feedback alpha):
-  // - Non mostriamo MAI il flash "Cerco una correzione…": la riga compare solo se
-  //   sappiamo che la parola è davvero sbagliata.
-  // - Se la cache locale ha già marcato la parola come errata, mostriamo subito
-  //   la correzione cached (anche quando il contesto è cambiato).
-  // - Se il contesto è cambiato dal calcolo originale, rilanciamo la richiesta in
-  //   background e aggiorniamo la riga quando arriva (eventualmente sostituendo
-  //   la correzione visibile).
-  // - Se non c'è cache, riserviamo uno slot nascosto e firiamo la richiesta in
-  //   background: lo slot si rivela SOLO se la risposta dice misspelled=true.
-  //   Niente cache ≈ niente prefetch coperto la parola (testo pre-esistente o
-  //   editor che non emette input event attesi): garantisce che il suggerimento
-  //   appaia comunque entro la latenza dell'LLM.
-  // La logica di prefetch proattivo (al completamento di una parola durante la
-  // digitazione e dopo gli scan blu) sta in spellcheck.js — qui ci limitiamo a
-  // consumare la cache e a coprire i casi non prefetchati.
-  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent) {
-    const items = await buildBaseItemsAt(mouseEvent);
-
-    const cached = SpellCheck.getCachedSuggestion(editableEl, wordCtx.word);
-    const cachedUsable = cached && cached.misspelled && cached.correction && cached.correction !== wordCtx.word;
-    const contextChanged = cached && cached.sentence !== wordCtx.sentence;
-    // Rilanciamo in background quando: (a) non c'è cache, oppure (b) c'è cache ma
-    // il contesto è cambiato. In entrambi i casi potremmo finire per mostrare una
-    // correzione che inizialmente non era visibile.
-    const refireInBackground = !cached || contextChanged;
-
-    let updateCorrection = null;
-
-    // Suggerimenti del correttore NATIVO (Electron) per questa parola: immediati
-    // e affidabili (sono quelli dietro lo zigzag rosso). Il main li spinge al
-    // click destro; di solito sono già in cache quando il menu si compone (c'è il
-    // round-trip della clipboard history prima), altrimenti li riveliamo appena
-    // arrivano. Sono la base che garantisce "qualcosa appare" anche senza LLM.
-    const nativeSugg = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
-    const nativeTop = nativeSugg[0] || '';
-
-    const applyAt = (corr) => SpellCheck.applyFix(
-      editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word },
-    );
-
-    // Correzione mostrata inizialmente: la cache LLM se usabile, altrimenti il
-    // primo suggerimento nativo. `shown` traccia se una riga è visibile.
-    let visibleCorrection = cachedUsable ? cached.correction : nativeTop;
-    let shown = !!visibleCorrection;
-
-    const buildCorrectionItem = (initialLabel, initialOnClick, initialSubItems, hidden) => ({
-      type: 'correction',
-      label: initialLabel,
-      loading: false,
-      hidden,
-      onClick: initialOnClick,
-      subItems: initialSubItems,
-      onMount: (_root, update) => { updateCorrection = update; },
-    });
-
-    if (shown) {
-      items.unshift(
-        buildCorrectionItem(
-          visibleCorrection,
-          () => applyAt(visibleCorrection),
-          buildRedSubItems(editableEl, wordCtx, visibleCorrection, nativeSugg),
-          /* hidden */ false,
-        ),
-        { type: 'separator' },
-      );
-    } else {
-      // Slot riservato, ma invisibile finché non sappiamo se la parola è errata.
-      // Lo riserviamo SEMPRE (non solo quando rilanciamo l'LLM): il correttore
-      // nativo può marcare la parola — e quindi avere suggerimenti — anche
-      // quando la cache LLM dice "non errata" o quando il broadcast `_spell:native`
-      // arriva con qualche ms di ritardo dopo l'apertura del menu. Senza uno slot
-      // montato, onNativeSuggestions non avrebbe dove rivelare la correzione e il
-      // suggerimento (es. "ciiao" → "ciao", quello dietro lo zigzag rosso) non
-      // comparirebbe mai — proprio il sintomo del feedback.
-      items.unshift(
-        buildCorrectionItem('', null, [], /* hidden */ true),
-        { type: 'separator', hidden: true },
-      );
-    }
-
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
-
-    // Rivela/aggiorna la riga di correzione con `corr` (e relative alternative).
-    const revealCorrection = (corr, alts) => {
-      if (!updateCorrection || !corr) return;
-      visibleCorrection = corr;
-      shown = true;
-      updateCorrection({
-        hidden: false,
-        label: corr,
-        loading: false,
-        onClick: () => applyAt(corr),
-        subItems: buildRedSubItems(editableEl, wordCtx, corr, alts || []),
-      });
-    };
-
-    // Se i suggerimenti nativi non erano ancora arrivati al momento dell'apertura,
-    // rivela appena arrivano (a meno che non si stia già mostrando qualcosa).
-    if (!shown) {
-      SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => {
-        if (shown || !sugg?.length) return;
-        revealCorrection(sugg[0], sugg);
+    if (unaParola(errore.segment)) {
+      items.push({
+        type: 'item', label: I18n.t('spell_add_dict'),
+        onClick: () => { SpellCheck.aggiungiAlDizionario(editableEl, errore); Popup.showToast(I18n.t('toast_added_to_dict')); },
       });
     }
-
-    // Helper: applica la risposta dell'LLM. Quando l'LLM declina ma esiste un
-    // suggerimento nativo, manteniamo comunque quest'ultimo visibile.
-    const applyResponse = (res) => {
-      // Cache SOLO un verdetto definitivo dell'LLM. Se `res` è null la chiamata è
-      // FALLITA (nessuna chiave/errore provider, parse fallito): NON va cachata
-      // come "non errata", altrimenti il prossimo click destro sulla stessa parola
-      // non rilancerebbe più nulla e — peggio — soffocherebbe il suggerimento
-      // nativo. È esattamente lo scenario del feedback: senza chiave LLM la parola
-      // resta segnata in rosso dal nativo ma il menu non mostrava più la correzione.
-      if (res) {
-        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, { ...res, sentence: wordCtx.sentence });
-      }
-      if (!updateCorrection) return;
-      const usable = res && res.misspelled && res.correction && res.correction !== wordCtx.word;
-      if (!usable) {
-        // Rileggi i suggerimenti nativi ADESSO: il broadcast `_spell:native` può
-        // essere arrivato dopo l'apertura del menu (lo snapshot in `nativeSugg`
-        // era vuoto). È la fonte affidabile quando l'LLM non risponde.
-        const freshNative = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
-        const freshTop = freshNative[0] || '';
-        if (freshTop) {
-          // Il correttore nativo ha comunque marcato la parola: mostra il nativo.
-          if (!shown || visibleCorrection !== freshTop) revealCorrection(freshTop, freshNative);
-        } else if (shown) {
-          updateCorrection({ remove: true });
-        } else {
-          updateCorrection({ hidden: true });
-        }
-        return;
-      }
-      // Correzione LLM (contestuale): preferiscila, mantenendo i nativi come alternative.
-      revealCorrection(res.correction, (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || nativeSugg);
-    };
-
-    if (refireInBackground) {
-      SpellCheck.requestWordSuggestion(wordCtx).then(applyResponse).catch(() => {});
-    }
+    items.push({ type: 'separator' });
+    return items;
   }
 
-  // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
-  // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
-  // = applica; freccetta = box con la spiegazione completa.
-  async function openSpellBlueMenu(editableEl, issue, mouseEvent) {
-    const items = await buildBaseItemsAt(mouseEvent);
-
-    // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
-    // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
-    let label;
-    if (issue.correction) {
-      label = issue.correction;
-    } else if (issue.type === 'repetition') {
-      label = I18n.t('spell_resolve');
-    } else {
-      label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
-    }
-
-    items.unshift(
-      {
+  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
+  function vociSuggerimento(editableEl, sugg) {
+    if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
+    const righe = [rigaDelPerche(sugg)];
+    for (const c of sugg.correzioni || []) {
+      righe.push({
         type: 'correction',
-        label,
+        label: c === '' ? I18n.t('spell_togli', sugg.segment.trim()) : c,
         loading: false,
-        onClick: () => {
-          SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
-            expectedSegment: issue.segment,
-          });
-        },
-        subItems: buildBlueSubItems(issue),
-      },
+        onClick: () => SpellCheck.correggi(editableEl, sugg, c),
+        senzaFreccia: true,
+      });
+    }
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) },
       { type: 'separator' },
     );
+    return righe;
+  }
+
+  // «Correggi tutti gli errori» sul campo: solo gli errori confermati, mai i suggerimenti né i candidati in dubbio.
+  // `minimo`: sul menu di un errore la voce serve solo se ce n'è almeno un altro.
+  function voceCorreggiTutti(editableEl, minimo = 1) {
+    const n = SpellCheck.erroriDaCorreggere(editableEl).length;
+    if (n < minimo) return null;
+    return { type: 'item', label: I18n.t('spell_correggi_tutti', n), onClick: () => SpellCheck.correggiTutti(editableEl) };
+  }
+
+  // Una correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
+  function contaUsoDelCorrettore(action) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
+  }
+
+  async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
+    const items = await buildBaseItemsAt(mouseEvent);
+    const sopra = [];
+    if (errore) sopra.push(...vociErrore(editableEl, errore));
+    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
+    const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
+    if (tutti) sopra.push(tutti, { type: 'separator' });
+    items.unshift(...sopra);
+    conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+  }
+
+  // Una parola di una casella di una riga, che Filo non segna: le proposte del dizionario subito, e il controllo rapido
+  // chiesto adesso, che quando dice che è un errore mette la sua correzione in cima. Se non è un errore la riga resta
+  // nascosta, o la proposta del dizionario se il dizionario non la conosce.
+  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
+    const items = await buildBaseItemsAt(mouseEvent);
+    let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
+    if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
+    let updateCorrection = null;
+    const applyAt = (corr) => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    const riga = (corr, alts) => ({
+      hidden: !corr, label: corr || '', loading: false,
+      onClick: corr ? () => applyAt(corr) : null,
+      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || []),
+    });
+    let mostrata = native[0] || '';
+    items.unshift(
+      { type: 'correction', ...riga(mostrata, native.slice(1)), onMount: (_root, update) => { updateCorrection = update; } },
+      { type: 'separator', hidden: !mostrata },
+    );
+    conMenuDelSito(items, sito);
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+
+    const mostra = (corr, alts) => {
+      if (!updateCorrection || !corr || corr === wordCtx.word) return;
+      mostrata = corr;
+      updateCorrection(riga(corr, alts));
+    };
+    if (!mostrata) {
+      SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => { if (!mostrata && sugg?.length) mostra(sugg[0], sugg.slice(1)); });
+    }
+    const esito = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
+    if (esito && esito.errore && esito.correzione) mostra(esito.correzione, native.filter((p) => p !== esito.correzione));
   }
 
   function buildFeedbackItem() {
@@ -1659,6 +2192,25 @@
       type: 'item',
       label: 'Invia feedback',
       onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()),
+    };
+  }
+
+  // #843 — spegne Filo sul sito della scheda (anche dal menu di un riquadro: «questo sito» è quello che si sta visitando).
+  // Solo dove c'è un sito con un nome: una pagina di Filo, un IP o «localhost» non entrano nell'elenco.
+  function buildSpegniFiloItem() {
+    if (PAGINA_DI_FILO || !self.SN_NOMI_SITO) return null;
+    let host = '';
+    try {
+      const u = new URL(pageUrl || location.href);
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.hostname;
+    } catch (_) { host = ''; }
+    if (!self.SN_NOMI_SITO.daScritto(host)) return null;
+    return {
+      type: 'item',
+      label: I18n.t('menu_spegni_filo'),
+      onClick: () => {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
+      },
     };
   }
 
@@ -1682,7 +2234,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
   }) {
     const items = [];
 
@@ -1691,9 +2243,9 @@
     // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
     items.push(MenuIcons.buildGlobalIconRow(navState));
 
-    // 2. Aiuto — voce sempre presente, etichettata.
-    items.push({ type: 'separator' });
-    items.push(buildHelpItem());
+    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    const sezioneAiuto = [];
+    if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
     // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
@@ -1701,7 +2253,7 @@
     // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
     // inoltrare l'arresto alla scheda che legge davvero.
     if (TTS.isAnyReading()) {
-      items.push(TTS.buildStopReadingItem());
+      sezioneAiuto.push(TTS.buildStopReadingItem());
     }
 
     // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
@@ -1714,7 +2266,7 @@
       && TranslatePage.showsRestore();
     if (TranslatePage && typeof TranslatePage.canContinue === 'function'
         && TranslatePage.canContinue() && !iconIsRestore) {
-      items.push(TranslatePage.buildRestoreOriginalItem());
+      sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
     // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
@@ -1723,25 +2275,51 @@
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
-    if (zoomItem) items.push(zoomItem);
+    if (zoomItem) sezioneAiuto.push(zoomItem);
+    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
-    const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
-    });
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
+    const contextItems = [
+      ...vociDellaPagina(target),
+      ...buildContextualItems({
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+      }),
+      ...vociRiquadro,
+    ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
-      for (const it of contextItems) items.push(it);
+      // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
+      const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
+      contextItems.forEach((it, i) => items.push(i === prima ? { ...it, primaDaTastiera: true } : it));
     }
 
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
+    const spegni = buildSpegniFiloItem();
+    if (spegni) items.push(spegni);
     // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
     refreshRedteamVisibile();
     if (redteamVisibile) items.push(buildRedteamAttackItem());
 
     return items;
+  }
+
+  // Le voci che una pagina di Filo dà ai suoi elementi (il segno di un cambio sulla bolla, #867): ogni
+  // fornitore in SN_VOCI_PAGINA riceve l'elemento cliccato. Mai sui siti: lì quel nome è della pagina.
+  function vociDellaPagina(target) {
+    if (!PAGINA_DI_FILO || !target) return [];
+    const fornitori = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
+    const out = [];
+    for (const f of fornitori) {
+      try {
+        const voci = typeof f === 'function' ? f(target) : null;
+        if (Array.isArray(voci)) out.push(...voci.filter((v) => v && v.label && typeof v.onClick === 'function'));
+      } catch (_) {}
+    }
+    return out;
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
@@ -1804,7 +2382,7 @@
     return {
       type: 'item',
       label: I18n.t('menu_help'),
-      shortcut: Tasti.etichetta('Alt+H'),
+      shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
       onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
@@ -1832,13 +2410,22 @@
   function buildLinkActionItems(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
-    const out = [
+    const out = [];
+    // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+      out.push({
+        type: 'item',
+        label: I18n.t('menu_redeem_invite'),
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: String(linkEl.href) }).catch(() => {}); },
+      });
+    }
+    out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
       },
-    ];
+    );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
@@ -1874,7 +2461,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
   }) {
     const items = [];
 
@@ -1883,7 +2470,7 @@
       items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem());
+      items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
@@ -2005,7 +2592,7 @@
     if (editable) {
       // Casella input senza selezione: incolla + detta.
       items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem());
+      items.push(TTS.buildDictateItem(target));
       return items;
     }
 
@@ -2081,14 +2668,41 @@
   // ------------------------------------------------------------
   // Sidebar Aiuto (Fase 2)
   // ------------------------------------------------------------
+  // L'interruttore dell'Aiuto (#841): spento, nessuna strada apre il pannello e il tasto dice perché.
+  function aiutoAcceso() {
+    return !(settings && settings.featureFlags && settings.featureFlags.help === false);
+  }
+
   function openHelpSidebar(context) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
 
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
+  function rispondiEtichetteBarra(ids) {
+    if (IS_SUBFRAME) return;
+    try {
+      const voci = MenuIcons.statoPerBarra?.(ids) || [];
+      if (voci.length) chrome.runtime.sendMessage({ type: MSG.BARRA_ETICHETTE, voci }).catch?.(() => {});
+    } catch (_) {}
+  }
+
   function onRuntimeMessage(msg, sender, sendResponse) {
+    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
+      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_FUORI) {
+      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
+      rispondiEtichetteBarra(msg.ids);
+      return;
+    }
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
@@ -2131,6 +2745,8 @@
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
+      if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);
       return;
     }
     if (msg?.type === MSG.SHOW_TOAST) {
@@ -2139,7 +2755,8 @@
       if (IS_SUBFRAME) return;
       try {
         if (document.visibilityState === 'visible' && document.hasFocus()) {
-          Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800 });
+          // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
+          Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null });
         }
       } catch (_) {}
       return;
@@ -2153,19 +2770,26 @@
     }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
+      seguiSpento();
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
+      self.SN_AVVISI?.imposta(settings.notifications);
+      Tasti.usaScorciatoieFilo(settings.scorciatoie);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.
       if (!IS_SUBFRAME) { try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {} }
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
-      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
+      SpellCheck.updateSettings(impostazioniDelCorrettore());
+      // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
+      // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
+      if (isBlocked()) return;
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }

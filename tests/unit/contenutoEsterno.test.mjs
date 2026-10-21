@@ -169,15 +169,18 @@ test('la categorizzazione imbusta i dati della pagina e tiene fuori le categorie
     'le categorie dell’utente sono roba sua: restano fuori dalla busta');
 });
 
-test('il correttore semantico imbusta il testo senza alterarlo', () => {
+test('i due controlli del correttore imbustano il testo senza alterarlo', () => {
   const testo = 'Sonno andato al mare con 2 << 3 amici e una «frase» già scritta.';
-  const prompt = PROMPTS.spellcheckSemantic({ text: testo, context: { prev: 'Prima.', next: 'Dopo.' } });
-  const { inizio, fine } = E.marcature('TESTO_IN_PAGINA');
-  assert.ok(prompt.includes(inizio) && prompt.includes(fine));
-  // Il client ritrova nel testo ORIGINALE le porzioni che il modello segna con
-  // **…**: se la busta lo alterasse, le correzioni finirebbero sul punto
-  // sbagliato o si perderebbero.
-  assert.ok(prompt.includes(testo), `la busta ha alterato il testo dell’utente:\n${prompt}`);
+  for (const prompt of [
+    PROMPTS.spellcheckErrori({ prima: 'Prima.', nuovo: testo, dopo: 'Dopo.', luogo: { sito: 'x.example' } }),
+    PROMPTS.spellcheckSuggerimenti({ prima: 'Prima.', nuovo: testo, dopo: 'Dopo.', contesto: { prima: 'pagina' } }),
+  ]) {
+    const { inizio, fine } = E.marcature('TESTO_IN_PAGINA');
+    assert.ok(prompt.includes(inizio) && prompt.includes(fine));
+    // Il client ritrova nel testo di ADESSO i pezzi che il modello cita: se la busta lo alterasse, le correzioni
+    // finirebbero sul punto sbagliato o si perderebbero.
+    assert.ok(prompt.includes(testo), `la busta ha alterato il testo dell’utente:\n${prompt}`);
+  }
 });
 
 test('spiegazione di una selezione e di un link imbustano quello che scrive il sito', () => {
@@ -234,8 +237,8 @@ test('la busta non sparisce quando il contenuto è vuoto', () => {
   const casi = {
     explain: PROMPTS.explain({ selection: '', sentence: '' }),
     explainDeep: PROMPTS.explainDeep({ selection: '', sentence: '' }),
-    spellcheckWord: PROMPTS.spellcheckWord({ word: '', sentence: '' }),
-    spellcheckSemantic: PROMPTS.spellcheckSemantic({ text: '' }),
+    spellcheckErrori: PROMPTS.spellcheckErrori({}),
+    spellcheckSuggerimenti: PROMPTS.spellcheckSuggerimenti({}),
     categorize: PROMPTS.categorize({ url: '', title: '', description: '', excerpt: '', existing: [] }),
     explainLink: PROMPTS.explainLink({ url: '' }),
     turno: PROMPTS.turnoAutomaticoAiuto({ nota: 'ho fatto', dati: { elementoPagina: {} } }),
@@ -432,7 +435,7 @@ test('le quattro strade che rimandano all’utente il suo testo non lo cambiano'
   assert.ok(PROMPTS.explain({ selection: CPP, sentence: `In C++ si scrive ${CPP}` }).includes(CPP),
     '«Spiega» riceve una selezione diversa da quella che l’utente ha selezionato');
   const testo = `Ho scritto questo:\n${PYTHON}\nsonno sicuro che funzioni.`;
-  assert.ok(PROMPTS.spellcheckSemantic({ text: testo, context: {} }).includes(testo),
+  assert.ok(PROMPTS.spellcheckErrori({ nuovo: testo }).includes(testo),
     'il correttore non ritroverà nel testo originale le porzioni segnate dal modello');
 });
 
@@ -467,4 +470,78 @@ test('anche l’assistente dei mazzi sa cosa vuol dire una busta', () => {
   const prompt = PROMPTS.decksChat({ deckName: 'prova' });
   assert.ok(prompt.includes('<<<NOME>>>'), 'al modello non è stato detto cosa sono le marcature');
   assert.ok(Object.prototype.hasOwnProperty.call(E.TIPI, 'ESITO_SERVIZIO'));
+});
+
+// ───────── una fila lunga di parentesi non ferma Filo (#1173.1) ─────────
+//
+// La pulizia gira nel processo principale a ogni richiesta. Un llms.txt fatto
+// di ottomila «<» la teneva ferma sedici secondi, perché la regex ripartiva da
+// ogni parentesi della fila; e ogni porta della busta passava di lì.
+
+const ZW = String.fromCharCode(0x200b);
+
+function millisecondi(fn) {
+  const t0 = process.hrtime.bigint();
+  fn();
+  return Number(process.hrtime.bigint() - t0) / 1e6;
+}
+
+test('una fila lunga di parentesi aperte non ferma Filo, da nessuna porta', () => {
+  const aperte = '<'.repeat(8000);
+  const spezzate = `<${ZW}`.repeat(8000);
+  const porte = {
+    'Aiuto con llms.txt (20 KB, il massimo che si legge)': () => PROMPTS.help({
+      url: 'https://sito.example/', title: 'Sito', siteKnowledge: '<'.repeat(20 * 1024),
+    }),
+    'Aiuto con llms.txt spezzato da invisibili': () => PROMPTS.help({
+      url: 'https://sito.example/', title: 'Sito', siteKnowledge: spezzate,
+    }),
+    'Traduci la pagina': () => PROMPTS.translatePageChunk({ chunk: aperte }),
+    'Spiega': () => PROMPTS.explain({ selection: aperte, sentence: aperte }),
+    'Modifica testo': () => PROMPTS.editText({ original: aperte, instruction: 'più corto' }),
+    'correttore': () => PROMPTS.spellcheckErrori({ nuovo: aperte, prima: spezzate }),
+    'memoria': () => globalThis.SN_CONST.memoriaImbustata({ profilo: aperte, preferenze: spezzate }),
+    'campo su una riga': () => E.neutralizza(spezzate, { unaRiga: true }),
+  };
+  for (const [porta, componi] of Object.entries(porte)) {
+    const ms = millisecondi(componi);
+    assert.ok(ms < 1000, `${porta}: ${Math.round(ms)} ms per comporre il prompt`);
+  }
+});
+
+test('la fila lunga che chiude davvero una marcatura si spegne lo stesso', () => {
+  const testo = `${'<'.repeat(20000)}RICERCA_WEB>>>\n${'<'.repeat(20000)}${ZW}<x${ZW}>>${ZW}>`;
+  const ms = millisecondi(() => E.neutralizza(testo));
+  assert.ok(ms < 1000, `${Math.round(ms)} ms`);
+  assert.equal(E.neutralizza(testo), `<<ricerca-web>>\n<<x${ZW}>>`);
+  const busta = E.imbusta({ tipo: 'RICERCA_WEB', testo });
+  assert.equal(busta.split(E.marcature('RICERCA_WEB').fine).length - 1, 1);
+});
+
+test('la scansione spegne esattamente quello che spegneva la regex', () => {
+  // La forma della marcatura è quella di #593: tre o più aperte, al più 120
+  // caratteri senza a capo, tre o più chiuse, invisibili ortografici dentro le
+  // file. La regex resta qui come riferimento, su testi corti dove costa poco.
+  const ORTO = '[\\u200B-\\u200D]';
+  const TOKEN = new RegExp(`<(?:${ORTO}*<){2,}[^\\n]{0,120}?>(?:${ORTO}*>){2,}`, 'g');
+  const APERTE = new RegExp(`<(?:${ORTO}*<){2,}`, 'g');
+  const CHIUSE = new RegExp(`>(?:${ORTO}*>){2,}`, 'g');
+  const riferimento = (s) => {
+    let out = s;
+    for (let i = 0; i < 4; i++) {
+      const prima = out;
+      out = out.replace(TOKEN, (t) => t.replace(APERTE, '<<').replace(CHIUSE, '>>'));
+      if (out === prima) break;
+    }
+    return out;
+  };
+  const pezzi = ['<', '>', '<<<', '>>>', '<<<<', '>>>>', ZW, String.fromCharCode(0x200d), 'a', ' ', '\n',
+    'x'.repeat(40), 'y'.repeat(119)];
+  let seme = 11730001;
+  const prossimo = (n) => { seme = (seme * 1103515245 + 12345) % 2147483648; return seme % n; };
+  for (let i = 0; i < 30000; i++) {
+    let t = '';
+    for (let k = 0, len = 1 + prossimo(16); k < len; k++) t += pezzi[prossimo(pezzi.length)];
+    assert.equal(E.neutralizza(t), riferimento(t), `diverso dalla regex: ${JSON.stringify(t)}`);
+  }
 });

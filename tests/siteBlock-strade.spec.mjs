@@ -3,6 +3,7 @@
 
 import { rmSync } from 'node:fs';
 import { test, expect, lista, schede, finestre, apri, idAttiva, contaAvvisi, schedaSu, avviaFilo, chiudiApp, cartellaTemporanea } from './helpers/reteFinta.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const aperteSu = async (app, host) => (await schede(app)).filter((u) => u.includes(host));
 const PAGINA_BLOCCATA = /^filo:\/\/error\/error\.html\?.*code=blocked/;
@@ -13,8 +14,10 @@ test('una finestrella di accesso aperta dalla pagina verso il sito della lista n
   await lista(shell, ['blocked.test']);
   const avvisi = await contaAvvisi(app);
   const accesso = rete.pagina('blocked.test', '/dialog', '<h1>SITO DELLA LISTA</h1>') + '?client_id=x&response_type=code&redirect_uri=y';
-  const pagina = rete.pagina('sito.test', '/', `<h1>pagina</h1><script>setTimeout(() => window.open(${JSON.stringify(accesso)}, 'accesso', 'width=500,height=400'), 300)</script>`);
+  // Col blocco dei popup una finestra la apre solo il clic (#737.1).
+  const pagina = rete.pagina('sito.test', '/', `<button id="b" onclick='window.open(${JSON.stringify(accesso)}, "accesso", "width=500,height=400")'>accedi</button>`);
   await apri(app, shell, pagina);
+  await app.windows().find((w) => w.url().includes('sito.test')).click('#b');
   await shell.waitForTimeout(2500);
   expect((await finestre(app)).filter((u) => u.includes('blocked.test'))).toEqual([]);
   expect((await avvisi()).length).toBeGreaterThan(0);
@@ -40,10 +43,9 @@ test('«Apri» sull\'avviso del popup non scavalca la lista dei siti bloccati', 
   await lista(shell, ['blocked.test']);
   const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO DELLA LISTA</h1>');
-  const pagina = rete.pagina('sito.test', '/', `<button id="b" onclick="window.open('${bersaglio}', 'p', 'width=400,height=300')">pop</button>`);
+  // Da sola, senza clic: è la finestra che il blocco ferma (il clic dell'utente la aprirebbe).
+  const pagina = rete.pagina('sito.test', '/', `<script>setTimeout(function(){window.open('${bersaglio}', 'p', 'width=400,height=300')},800)</script>`);
   await apri(app, shell, pagina);
-  const tab = app.windows().find((w) => w.url().includes('sito.test'));
-  await tab.click('#b');
   const chip = (await vista()).locator('.shell-notif', { hasText: 'Bloccato popup' }).first();
   await expect(chip).toBeVisible({ timeout: 6000 });
   await chip.locator('.shell-notif-action', { hasText: 'Apri' }).click();
@@ -57,15 +59,16 @@ test('dai risultati di una ricerca il sito della lista si ferma, cliccato o aper
   const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO CERCATO</h1>');
   const r = rete.rimbalzo('accorcia.test', '/r', bersaglio);
-  const risultati = rete.pagina('www.bing.com', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
+  const risultati = rete.pagina('www.ecosia.org', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
   await apri(app, shell, risultati);
-  const tab = app.windows().find((w) => w.url().includes('www.bing.com'));
-  await tab.evaluate(() => document.getElementById('nuova').click());
+  const tab = app.windows().find((w) => w.url().includes('www.ecosia.org'));
+  // Il clic vero: col blocco dei popup una scheda nuova la apre solo l'utente (#737.1).
+  await tab.click('#nuova');
   await shell.waitForTimeout(1500);
   await tab.evaluate(() => document.getElementById('diretto').click());
   await shell.waitForTimeout(1500);
   expect(await aperteSu(app, 'blocked.test')).toEqual([]);
-  expect(tab.url()).toContain('www.bing.com/search');
+  expect(tab.url()).toContain('www.ecosia.org/search');
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
@@ -257,7 +260,7 @@ test('alla riapertura di Filo una scheda su un sito della lista torna sulla pagi
   const userData = cartellaTemporanea('filo-test-');
   const avvia = async () => {
     const app = await avviaFilo(rete, userData);
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     return { app, shell };
   };
@@ -492,10 +495,9 @@ test('dentro un sito aperto con «Apri comunque» le sue finestrelle di accesso 
 test('dentro un sito aperto con «Apri comunque», «Apri» sull\'avviso del popup apre il popup di quel sito', async ({ app, shell, rete, avvisi: vista }) => {
   await lista(shell, ['blocked.test']);
   const pop = rete.pagina('blocked.test', '/pop', '<h1>POPUP DEL SITO</h1>');
-  const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1><button id="b" onclick="window.open('${pop}', 'p', 'width=400,height=300')">pop</button>`);
-  const tab = await apertoComunque(app, shell, sito);
+  const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1><script>setTimeout(function(){window.open('${pop}', 'p', 'width=400,height=300')},1500)</script>`);
+  await apertoComunque(app, shell, sito);
   const avvisi = await contaAvvisi(app);
-  await tab.click('#b');
   const chip = (await vista()).locator('.shell-notif', { hasText: 'Bloccato popup' }).first();
   await expect(chip).toBeVisible({ timeout: 6000 });
   await chip.locator('.shell-notif-action', { hasText: 'Apri' }).click();

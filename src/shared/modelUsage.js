@@ -18,8 +18,9 @@
 //   from      da dove viene il modello:
 //               'user'  → impostazione di chi usa Filo (Opzioni → Modelli)
 //               'owner' → impostazione di chi gestisce Filo (Gestione → Modelli
-//                         di supporto): sono i punti che girano sui server di
-//                         Filo, non sul computer di chi lo usa
+//                         di supporto): i punti che girano sui server di Filo,
+//                         e con `action` le funzioni che solo lui usa, sul suo
+//                         computer (fuori da Opzioni e Modelli predefiniti, #465)
 //               'none'  → questo punto NON usa nessun modello (è scritto qui
 //                         apposta: sono i punti che sembrano usarne uno e non
 //                         lo fanno, così non si continua a cercarlo)
@@ -27,6 +28,7 @@
 //                         cambiarlo. DEVE restare vuoto: è la condizione che il
 //                         test `modelUsage.test.mjs` verifica.
 //   ref       per 'user' il nome interno della funzione; per 'owner' lo slot
+//   action    solo 'owner' che gira nell'app: la funzione che prende lo slot
 //   where     dove si imposta, in parole (per l'utente)
 //   note      dettaglio opzionale
 //
@@ -42,13 +44,15 @@
 
   // Dove si imposta, in parole. Testo per l'utente: niente percorsi di file.
   const WHERE_USER = 'Opzioni → Modelli';
-  const WHERE_OWNER = 'Gestione → Modelli di supporto (riservato a chi gestisce Filo)';
+  const WHERE_OWNER = 'Gestione → Automazioni → Modelli di supporto (riservato a chi gestisce Filo)';
 
   function user(id, label, area, action, note) {
     return { id, label, area, from: 'user', ref: action, where: WHERE_USER, note: note || '' };
   }
-  function owner(id, label, area, slot, note) {
-    return { id, label, area, from: 'owner', ref: slot, where: WHERE_OWNER, note: note || '' };
+  function owner(id, label, area, slot, note, action) {
+    const e = { id, label, area, from: 'owner', ref: slot, where: WHERE_OWNER, note: note || '' };
+    if (action) e.action = action;
+    return e;
   }
   function none(id, label, area, note) {
     return { id, label, area, from: 'none', ref: '', where: '', note: note || '' };
@@ -65,10 +69,11 @@
     user('translate-page', 'Traduci la pagina', 'Pagine web', A.TRANSLATE_PAGE),
     user('edit-text', 'Riscrivi il testo selezionato', 'Pagine web', A.EDIT_TEXT),
     user('categorize', 'Categorizza una pagina', 'Pagine web', A.CATEGORIZE),
-    user('describe-image', 'Descrivi un\'immagine', 'Pagine web', A.DESCRIBE_IMAGE),
+    user('describe-image', 'Descrivi un\'immagine', 'Pagine web', A.DESCRIBE_IMAGE,
+      'Lo stesso modello legge le finestre che Filo guarda quando glielo chiedi in chat.'),
     user('transcribe-image', 'Leggi il testo di un\'immagine', 'Pagine web', A.TRANSCRIBE_IMAGE),
-    user('spellcheck-word', 'Correttore ortografico — parola', 'Scrittura', A.SPELLCHECK_WORD),
-    user('spellcheck-semantic', 'Correttore ortografico — frase', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-semantic', 'Errori del correttore (controllo rapido)', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-context', 'Suggerimenti del correttore (controllo ragionato)', 'Scrittura', A.SPELLCHECK_CONTEXT),
     user('transcribe-audio', 'Dettatura dal microfono', 'Scrittura', A.TRANSCRIBE_AUDIO),
     user('tts', 'Lettura ad alta voce', 'Scrittura', A.TTS),
 
@@ -97,6 +102,10 @@
     user('editor-summary', 'Editor — riassunto del documento', 'Editor', A.EDITOR_SUMMARY),
     user('editor-chat', 'Editor — chat col documento', 'Editor', A.EDITOR_CHAT),
 
+    // File dell'utente
+    user('file-name', 'Nome sensato a un file', 'File', A.FILE_NAME,
+      'Legge l\'inizio del testo o una miniatura del file e propone un nome che dice cosa contiene. Serve un modello che veda le immagini.'),
+
     // Mazzi
     user('decks-chat', 'Mazzi — ricerca carte in chat', 'Mazzi', A.DECKS_CHAT),
     user('decks-opinion', 'Mazzi — parere su una carta', 'Mazzi', A.DECKS_OPINION),
@@ -106,10 +115,16 @@
     // Sicurezza e navigazione
     user('safebrowse-judge', 'Giudizio sui siti pericolosi', 'Sicurezza', A.SAFEBROWSE_JUDGE),
     user('geoblock-classify', 'Riconoscimento dei blocchi geografici', 'Sicurezza', A.GEOBLOCK_CLASSIFY),
+    user('embed-cookie-check', 'Contenuti incorporati rotti dai cookie', 'Sicurezza', A.EMBED_COOKIE_CHECK,
+      'Guarda l\'immagine di un riquadro di un altro sito che resta vuoto o chiede di entrare, solo quando le regole non lo riconoscono, e dice se è rotto per i cookie. Serve un modello che veda le immagini.'),
 
     // Feedback
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
-    user('manage-search', 'Ricerca fra i feedback', 'Feedback', A.MANAGE_SEARCH),
+    owner('manage-search', 'Ricerca fra i feedback', 'Feedback', 'manageSearch',
+      'Gira sul computer di chi gestisce Filo, con la chiave che usa nel resto di Filo.', A.MANAGE_SEARCH),
+    owner('manage-search-classify', 'Classificatore della ricerca fra i feedback', 'Feedback', 'manageSearchClassifier',
+      'Legge i feedback in parallelo e dice quali corrispondono alla ricerca; se manca o non risponde, li ordina il modello della ricerca.',
+      A.MANAGE_SEARCH_CLASSIFY),
 
     // Diagnostica
     user('provider-test', 'Prova di un fornitore («Prova» accanto alla chiave)', 'Diagnostica', A.PROVIDER_TEST),
@@ -156,6 +171,18 @@
     return ENTRIES.filter((e) => e.from === 'owner' && e.ref).map((e) => e.ref);
   }
 
+  // Le funzioni dell'app che prendono il modello da uno slot di chi gestisce
+  // Filo: [{ action, slot }].
+  function ownerActions() {
+    return ENTRIES.filter((e) => e.from === 'owner' && e.ref && e.action)
+      .map((e) => ({ action: e.action, slot: e.ref }));
+  }
+
+  function ownerSlotForAction(action) {
+    const hit = ownerActions().find((p) => p.action === action);
+    return hit ? hit.slot : '';
+  }
+
   // I punti che prendono il modello da un valore deciso nel codice. Deve essere
   // sempre vuoto: è l'invariante di questo censimento.
   function hardcoded() {
@@ -189,6 +216,8 @@
     byId,
     userActions,
     ownerSlots,
+    ownerActions,
+    ownerSlotForAction,
     hardcoded,
     WHERE_USER,
     WHERE_OWNER,

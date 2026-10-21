@@ -38,6 +38,13 @@ export async function scrollConfirmToEnd(page) {
   expect(done, 'testo del dialogo presente').toBe(true);
 }
 
+// Prima di un clic o di un tasto veri che devono valere come risposta: il dialogo
+// li ignora per mezzo secondo dal primo fotogramma, e sotto xvfb quel fotogramma
+// arriva anche un secondo dopo `toBeVisible()` (#592.11). Un'attesa fissa non basta.
+export async function aspettaConfermaPronta(page) {
+  await expect.poll(async () => (await confirmState(page))?.pronto, { message: 'il dialogo non accetta ancora un gesto vero' }).toBe(true);
+}
+
 // Clic vero del mouse su un bottone del dialogo, anche su OK in attesa (#592).
 export async function mouseClickConfirm(page, which = 'ok') {
   const p = await page.evaluate((w) => window.SN_CONFIRM_UI._test.point(w), which);
@@ -64,4 +71,49 @@ export function pointWhenConfirmAppears(page, which = 'ok') {
 export async function fillConfirmInput(page, value) {
   const filled = await page.evaluate((v) => window.SN_CONFIRM_UI._test.fill(v), value);
   expect(filled, 'campo di testo del dialogo presente').toBe(true);
+}
+
+function rgba(s) {
+  const t = String(s || '');
+  let m = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/.exec(t);
+  if (m) return [m[1], m[2], m[3]].map((x) => Number(x) * 255).concat(m[4] == null ? 1 : Number(m[4]));
+  m = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/.exec(t);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] == null ? 1 : Number(m[4])] : null;
+}
+
+// Quanto il filo a sinistra del riquadro (stato di confirmState) si stacca dallo
+// sfondo del popup, da 0 a 255 sul canale peggiore: sotto una sessantina non si vede.
+export function staccoDelFilo(s) {
+  const c = rgba(s && s.riquadro && s.riquadro.bordo);
+  const b = rgba(s && s.riquadro && s.riquadro.bgBox);
+  if (!c || !b || !(parseFloat(s.riquadro.bordoSinistro) >= 2)) return 0;
+  return Math.max(...[0, 1, 2].map((i) => Math.abs(c[i] * c[3] + b[i] * (1 - c[3]) - b[i])));
+}
+
+// Su una pagina web il popup non sta nel documento del sito ma in una vista di Filo sopra la
+// scheda (#592.6): la sua pagina è filo://shell/conferma.html, e lì valgono gli helper qui sopra.
+// Ritorna quella pagina quando il popup ci è a schermo.
+export async function confermaSopraPagina(app, { timeout = 10_000 } = {}) {
+  const scadenza = Date.now() + timeout;
+  while (Date.now() < scadenza) {
+    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/conferma.html'); } catch (_) { return false; } });
+    if (p && await p.evaluate(() => !!(window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test.state())).catch(() => false)) return p;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('confermaSopraPagina: il popup sopra la scheda non è comparso');
+}
+
+// Codice nel mondo isolato del preload di una scheda web, dove vivono i content script di Filo:
+// page.evaluate gira nel mondo della pagina e non ci arriva. `host` è l'hostname della scheda.
+export function nelMondoDiFilo(app, host, code) {
+  return app.evaluate(async ({ BrowserWindow }, { host, code }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const t = (w._filoTabs?.tabs || []).find((x) => {
+        try { return new URL(x.view.webContents.getURL()).hostname === host; } catch (_) { return false; }
+      });
+      // 999 è il mondo isolato dei preload di Electron.
+      if (t) return t.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }]);
+    }
+    throw new Error(`nelMondoDiFilo: nessuna scheda su ${host}`);
+  }, { host, code });
 }

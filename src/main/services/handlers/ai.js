@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
@@ -85,22 +85,234 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Da una pagina delicata non parte niente di automatico (#1004): né la descrizione di uno screenshot o di un'immagine
+  // copiata, né la spiegazione preparata alla selezione (#1274). Un'immagine nata lì resta fuori anche incollata su un
+  // altro sito: conta la pagina da cui viene. Senza la regola non si sa: nel dubbio vale delicata.
+  async function automaticaDaDelicata(msg, sender) {
+    const A = SN_CONST.ACTIONS;
+    const immagine = Boolean(msg && msg.action === A.DESCRIBE_IMAGE && msg.payload && msg.payload.automatica);
+    const preparata = Boolean(msg && msg.action === A.EXPLAIN && msg.suRichiesta !== true);
+    if (!immagine && !preparata) return false;
+    const url = String(sender?.tab?.url || sender?.url || '');
+    let delicata = null;
+    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { return true; }
+    const daQui = /^https?:/i.test(url) && Boolean(delicata(url));
+    if (!immagine) return daQui;
+    const Immagini = require('../immaginiDelicate').perFilo();
+    const dataUrl = msg.payload.dataUrl;
+    if (daQui) {
+      const incognito = Boolean(winOf && winOf(sender)?._filoTabs?.incognito);
+      await Immagini.segna(dataUrl, { incognito }).catch(() => {});
+      return true;
+    }
+    if (delicata.attivo === false) return false;
+    try { return await Immagini.daDelicata(dataUrl); } catch (_) { return true; }
+  }
+
+  // Spenta in Preferenze (#1274), la descrizione di screenshot e immagini copiate non parte: il file prende data e ora.
+  async function descrizioneSpenta(msg) {
+    if (!msg || msg.action !== SN_CONST.ACTIONS.DESCRIBE_IMAGE || !msg.payload || !msg.payload.automatica) return false;
+    let s = null;
+    try { s = await globalThis.SN_STORAGE.getSettings(); } catch (_) { s = null; }
+    return Boolean(s && s.descriviImmagini && s.descriviImmagini.enabled === false);
+  }
+
+  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: i due controlli del
+  // correttore (#1446) partono col solo testo di chi scrive e il nome del sito, e lo dicono alla pagina, che allora non
+  // ha citazioni da confrontare.
+  const DEL_CORRETTORE = new Set([SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC, SN_CONST.ACTIONS.SPELLCHECK_CONTEXT]);
+  const sitoDi = (url) => {
+    try { const u = new URL(url); return u.protocol === 'filo:' ? 'Filo' : (u.hostname || ''); } catch (_) { return ''; }
+  };
+  async function senzaPaginaDelicata(msg, sender) {
+    if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
+    const url = String(sender?.tab?.url || sender?.url || '');
+    if (!/^https?:/i.test(url)) return false;
+    let delicata = true;
+    try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
+    if (delicata) {
+      const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
+      msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
+    }
+    return delicata;
+  }
+
+  const tettoAutomatiche = require('../tettoAutomatiche').crea();
+  const { spingiAllaScheda } = require('../impostazioniPerOrigine');
+  // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
+  function fermataDalTetto(msg, sender) {
+    const wc = sender && sender.wc;
+    const fermo = tettoAutomatiche.passa(msg, wc);
+    if (!fermo) return null;
+    const I18n = globalThis.SN_I18N;
+    const frase = I18n ? I18n.t(`toast_tetto_${fermo.gruppo}`, fermo.tetto) : `${fermo.gruppo}: ${fermo.tetto}`;
+    if (fermo.primo) {
+      try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
+    }
+    return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
+  }
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
+    if (await descrizioneSpenta(msg)) return { ok: false, code: 'DESCRIZIONE_SPENTA' };
+    const fermata = fermataDalTetto(msg, sender);
+    if (fermata) return fermata;
+    const senzaContesto = await senzaPaginaDelicata(msg, sender);
+    // Chiavi, password e carte scritte nel campo restano sul computer (#1446); il sito lo dice chi ha mandato, non la pagina.
+    if (msg && DEL_CORRETTORE.has(msg.action) && msg.payload && typeof msg.payload === 'object') {
+      msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
+      const sito = sitoDi(String(sender?.tab?.url || sender?.url || ''));
+      msg.payload.luogo = { ...(msg.payload.luogo && typeof msg.payload.luogo === 'object' ? msg.payload.luogo : {}), sito };
+    }
+    // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
+    const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
+    if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
+      const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
+      if (d) esterno.documenti = d; else delete esterno.documenti;
+    }
+    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta.
+    if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
+      msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
+      msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+    }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
-    const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
+    // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
+    const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+    const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const chiedi = daSola
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    const K = globalThis.SN_WALLET_MAIN;
+    const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
+    const Cont = globalThis.SN_CONTATORI_MAIN;
+    const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
     if (lettura) await lettura;
-    return { ok: true, ...r };
+    return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
   });
 
-  // Dedup dell'avviso "lettura a modello non disponibile → voce del browser":
-  // lo segnaliamo al content script (firstFallback:true) solo la PRIMA volta che
-  // ripieghiamo in una sessione dell'app. Torna false appena una sintesi riesce,
-  // così se il modello torna a funzionare e poi ricasca l'utente è di nuovo avvisato.
-  let ttsFallbackAnnounced = false;
+  // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
+  // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
+  // pagina mostra i risultati mentre arrivano. Un giro per pagina: una ricerca nuova ferma quella di prima.
+  const { daFilo, soloFilo } = require('./origine');
+  const NON_ADMIN = () => ({ ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' });
+  const { settingsForOwnerAction } = require('../resolveSupportModel');
+  const giriRicerca = new Map(); // jobId → giro
+  let giriFatti = 0;
+  const GIRO_DIMENTICA_MS = 5 * 60 * 1000;
+  // Più dei feedback che la pagina carica, con margine: un elenco più lungo non viene da lei.
+  const RICERCA_MAX_CANDIDATI = 50000;
+
+  function fermaGiro(id) {
+    const g = giriRicerca.get(id);
+    if (!g) return;
+    giriRicerca.delete(id);
+    try { g.controller.abort(); } catch (_) {}
+  }
+
+  // Errori la cui frase è già per chi legge (dicono anche dove si imposta il modello).
+  const GIA_SCRITTI = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_API_KEY', 'NO_ALLOWED_HOST', 'LIMIT_REACHED', 'PROVIDER_METHOD_MISSING'];
+  function fraseErrore(e) {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (e && GIA_SCRITTI.includes(e.code)) return String(e.message || e.code);
+    return CE && typeof CE.sentence === 'function' ? CE.sentence(e) : String((e && e.message) || e || 'errore');
+  }
+
+  function candidatiValidi(lista) {
+    const out = [];
+    const visti = new Set();
+    for (const c of Array.isArray(lista) ? lista : []) {
+      const id = c && c.id != null ? String(c.id) : '';
+      if (!id || visti.has(id)) continue;
+      visti.add(id);
+      out.push({ id, title: String((c && c.title) || '').slice(0, 500), text: String((c && c.text) || '') });
+    }
+    return out;
+  }
+
+  on(MSG.MANAGE_SEARCH_CLASSIFY, async (msg, sender, origin) => {
+    if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!isAdmin()) return NON_ADMIN();
+    const op = msg && msg.op;
+    const jobId = msg && typeof msg.jobId === 'string' ? msg.jobId : '';
+    if (op === 'stop') { fermaGiro(jobId); return { ok: true }; }
+    if (op === 'status') {
+      const g = giriRicerca.get(jobId);
+      if (!g) return { ok: false, code: 'NO_JOB', error: 'ricerca non trovata' };
+      if (g.finished) giriRicerca.delete(jobId);
+      const S = globalThis.SN_MANAGE_SEARCH;
+      return {
+        ok: true, done: g.done, total: g.total, hits: S.rankHits(g.hits), finished: g.finished,
+        skipped: g.skipped, error: g.error, code: g.code, model: g.model,
+      };
+    }
+    if (op !== 'start') return { ok: false, code: 'BAD_OP', error: 'operazione sconosciuta' };
+
+    const S = globalThis.SN_MANAGE_SEARCH;
+    const query = String((msg && msg.query) || '').trim();
+    if (!query) return { ok: false, code: 'EMPTY_QUERY', error: 'ricerca vuota' };
+    const lista = Array.isArray(msg && msg.candidates) ? msg.candidates : [];
+    if (lista.length > RICERCA_MAX_CANDIDATI) {
+      return { ok: false, code: 'TOO_MANY', error: `Troppi feedback per il classificatore: ${lista.length}, al massimo ${RICERCA_MAX_CANDIDATI}.` };
+    }
+    const candidati = candidatiValidi(lista);
+    const wcId = sender && sender.wc && typeof sender.wc.id === 'number' ? sender.wc.id : null;
+    for (const [id, g] of giriRicerca) if (g.wcId === wcId) fermaGiro(id);
+
+    const action = SN_CONST.ACTIONS.MANAGE_SEARCH_CLASSIFY;
+    let settings;
+    let attempts;
+    try {
+      settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
+      attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
+    } catch (e) {
+      return { ok: false, code: (e && e.code) || 'NO_MODEL', error: fraseErrore(e) };
+    }
+    if (!attempts.some((a) => modelGate.supports(a.provider, 'decisions'))) {
+      return { ok: false, code: 'NO_DECISION_PROVIDER', error: 'Nessun fornitore del classificatore sa rispondere a domande chiuse.' };
+    }
+
+    const requests = S.buildDecisionRequests(query, candidati, S.CLASSIFIER.BATCH);
+    const id = `r${Date.now().toString(36)}${(++giriFatti).toString(36)}`;
+    const g = {
+      wcId, total: candidati.length, done: 0, hits: [], skipped: 0,
+      finished: false, error: null, code: null, model: attempts[0].model || '', controller: new AbortController(),
+    };
+    giriRicerca.set(id, g);
+    // La pagina chiusa a metà non paga il resto del giro.
+    try { if (sender && sender.wc && typeof sender.wc.once === 'function') sender.wc.once('destroyed', () => fermaGiro(id)); } catch (_) {}
+    const conta = (req, senza) => { g.done += req.ids.length; g.skipped += senza; };
+    modelGate.decideAll({
+      action, settings, attempts, requests, parallel: S.CLASSIFIER.PARALLEL, signal: g.controller.signal,
+      onAnswer: (i, answers) => {
+        const r = S.hitsFromAnswers(requests[i], answers, S.CLASSIFIER.THRESHOLD);
+        g.hits.push(...r.hits);
+        conta(requests[i], r.senza);
+      },
+    }).then((r) => {
+      for (const i of r.skipped || []) conta(requests[i], requests[i].ids.length);
+      if (r.model) g.model = r.model;
+      if (r.error) { g.error = fraseErrore(r.error); g.code = r.error.code || 'PARTIAL'; }
+    }).catch((e) => {
+      g.error = fraseErrore(e);
+      g.code = (e && e.code) || 'DECIDE_FAILED';
+      console.warn('[Filo ricerca] classificatore fermo:', (e && e.message) || e);
+    }).finally(() => {
+      g.finished = true;
+      const t = setTimeout(() => { if (giriRicerca.get(id) === g) giriRicerca.delete(id); }, GIRO_DIMENTICA_MS);
+      if (t && typeof t.unref === 'function') t.unref();
+    });
+    return { ok: true, jobId: id, total: g.total };
+  });
+
+  // Dedup dell'avviso "lettura a modello non disponibile → voce del browser": un motivo si annuncia
+  // una volta (firstFallback:true), un motivo DIVERSO sì (#713: altro modello escluso). Si riarma a ogni sintesi riuscita.
+  let ttsFallbackAnnounced = '';
 
   // Voci che il router ha DICHIARATO per un modello che non è nei cataloghi
   // ("Unknown voice … Supported voices: a, b, c"): dalla seconda richiesta in
@@ -152,15 +364,24 @@ module.exports = function register(on, ctx) {
   }
 
   const ttsFallback = (error, errorCode) => {
-    const firstFallback = !ttsFallbackAnnounced;
-    ttsFallbackAnnounced = true;
+    // I guasti tecnici hanno testi che cambiano a ogni frase: contano come un motivo solo.
+    const motivo = errorCode ? `${errorCode}|${error}` : 'guasto';
+    const firstFallback = ttsFallbackAnnounced !== motivo;
+    ttsFallbackAnnounced = motivo;
     // `errorCode` distingue i guasti tecnici (che il content script traduce in
     // una frase generica) dagli errori di CONFIGURAZIONE dei modelli, il cui
     // messaggio è già scritto per l'utente e va mostrato tale e quale.
     return { ok: false, error, errorCode: errorCode || '', firstFallback };
   };
 
-  on(MSG.TTS_SYNTH, async (msg) => {
+  // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
+  // dopo il primo di una lettura lunga (`parteDiUnUso`) contano solo se si guastano.
+  on(MSG.TTS_SYNTH, (msg) => {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    const misura = msg && msg.parteDiUnUso === true ? C && C.parteDiUnUso : C && C.unUso;
+    return typeof misura === 'function' ? misura(SN_CONST.ACTIONS.TTS, () => sintesiVocale(msg)) : sintesiVocale(msg);
+  });
+  async function sintesiVocale(msg) {
     // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
     // prova i fornitori che la implementano (il router, verso un host
     // indipendente). Se nessuno è disponibile o tutti falliscono, torna
@@ -225,7 +446,8 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
-            ttsFallbackAnnounced = false; // sintesi disponibile: riarma l'avviso
+            try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(SN_CONST.ACTIONS.TTS); } catch (_) {}
+            ttsFallbackAnnounced = ''; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
               audioBase64: hit.audioBase64,
@@ -243,7 +465,7 @@ module.exports = function register(on, ctx) {
             args: { text, voice: v, speed },
           }), { model: a.model, voice, lang });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
-          ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
+          ttsFallbackAnnounced = ''; // sintesi riuscita: riarma l'avviso
           return {
             ok: true,
             audioBase64: r.audioBase64,
@@ -260,7 +482,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return ttsFallback(e?.message || String(e));
     }
-  });
+  }
 
   // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
   // quale modello legge (il primo della catena), il suo catalogo raggruppato
@@ -336,10 +558,10 @@ module.exports = function register(on, ctx) {
     return '';
   }
 
-  on(MSG.TEST_PROVIDER, async (msg) => {
+  on(MSG.TEST_PROVIDER, async (msg, sender, origin) => {
     try {
       const provider = msg.provider;
-      const apiKey = (msg.apiKey || '').trim();
+      let apiKey = (msg.apiKey || '').trim();
       // "Solo modelli a pesi aperti" (#461): la prova è una chiamata VERA, quindi
       // passa dallo stesso cancello delle funzioni. Il fornitore si controlla
       // prima del modello: chiedergli quale modello proverebbe non ha senso se
@@ -355,7 +577,14 @@ module.exports = function register(on, ctx) {
           error: `Nessun modello ${provider} impostato per la prova: scegline uno in «Prova di un fornitore», fra le funzioni delle Opzioni.`,
         };
       }
-      if (!apiKey) return { ok: false, error: 'API key mancante' };
+      // La riga delle Opzioni senza chiave scritta si prova con la chiave con cui la funzione pagherebbe davvero, cioè
+      // i crediti di Filo (#598, #830); la sceglie il main, e solo per le pagine di Filo: un sito non spende crediti.
+      // Mai quella di fabbrica: su un modello qualunque la spende solo chi amministra (TEST_DEFAULT_MODEL).
+      if (!apiKey && msg.chiaveDellUso === true && daFilo(origin, sender)) {
+        const dellUso = String((s.apiKeys && s.apiKeys[provider]) || '').trim();
+        if (dellUso && await chiaveDellUtente(dellUso)) apiKey = dellUso;
+      }
+      if (!apiKey) return { ok: false, code: 'NO_API_KEY', error: 'API key mancante' };
       // Modello indicato dalla riga (registry personale): se è proprietario la
       // prova non parte, altrimenti l'unica richiesta che l'interruttore non
       // ferma sarebbe proprio quella che si lancia dalla pagina dove lo si
@@ -364,18 +593,27 @@ module.exports = function register(on, ctx) {
       if (modelBlocked) return { ok: false, error: modelBlocked };
       // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
       // si prova nel suo mestiere.
-      const kind = modelKind(provider, model, (s.modelRegistry || {})[msg.nickname] || null);
+      const rowEntry = (s.modelRegistry || {})[msg.nickname] || null;
+      // La riga delle Opzioni manda ordinamento e ragionamento già risolti al clic: la misura le verrà attribuita.
+      const sortRiga = typeof msg.sort === 'string' ? msg.sort : null;
+      const pesiRiga = SN_CONST.pesiDichiaratiPer(rowEntry, model);
+      const routing = sortRiga != null
+        ? providerRouting({ ...s, providerSort: '' }, sortRiga, pesiRiga)
+        : providerRouting(s, rowEntry && rowEntry.sort, pesiRiga);
+      const reasoningRiga = typeof msg.reasoning === 'string' ? msg.reasoning : (rowEntry && rowEntry.reasoning);
+      const kind = modelKind(provider, model, rowEntry);
       if (kind !== 'text') {
-        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
+        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing, nickname: msg.nickname || '' });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
-      // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
-      // l'unica richiesta di Filo che un fornitore escluso può servire.
+      // Anche la prova porta con sé chi NON deve servirla, e misura con l'ordinamento degli host e il
+      // ragionamento che la voce userebbe davvero: senza, la velocità letta parlerebbe di un'altra chiamata.
       const result = await probe({
-        settings: s, provider, apiKey, model, routing: providerRouting(s), method: 'streamComplete',
+        settings: s, provider, apiKey, model, routing, method: 'streamComplete',
+        reasoning: SN_CONST.normalizeReasoning(reasoningRiga) || undefined,
         args: {
           messages,
           onDelta: (delta) => {
@@ -398,9 +636,63 @@ module.exports = function register(on, ctx) {
         tokensPerSec: Math.round(tps * 10) / 10,
       };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, error: provaFallita(e) };
     }
   });
+
+  // Lo stesso verdetto di ensureAllowedHost (openrouter.js), chiesto mentre si sceglie il modello.
+  // Da un sito vale solo un nickname del registro: un id qualunque lo mandano solo le pagine di Filo.
+  on(MSG.AUDIO_HOST_CHECK, async (msg, sender, origin) => {
+    const A = SN_CONST.ACTIONS;
+    const fn = msg.action === A.TTS ? 'audio_host_fn_tts' : (msg.action === A.TRANSCRIBE_AUDIO ? 'audio_host_fn_stt' : '');
+    if (!fn) return { ok: true, verdict: 'na' };
+    const s = await getEffectiveSettings();
+    const interna = daFilo(origin, sender);
+    let routing = providerRouting(s);
+    let filoPays;
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando,
+    // senza la lista della chiave propria di chi la modifica (#962), e coi vincoli dei crediti di Filo (#831).
+    if (interna && Array.isArray(msg.excluded)) {
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string'), excludedProvidersOwnKey: null });
+      filoPays = true;
+    }
+    let entry = null;
+    if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
+      entry = { provider: msg.provider, model: msg.model.trim() };
+    } else {
+      const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
+      if (raw) entry = { ...registryEntryToSingle(raw), weights: raw.weights };
+    }
+    if (!entry || !entry.model) return { ok: true, verdict: 'na' };
+    const apiKey = (s.apiKeys && s.apiKeys[entry.provider]) || '';
+    const I18n = globalThis.SN_I18N;
+    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
+    // Un modello che i crediti di Filo non pagano (#830) si dice mentre lo si sceglie, prima di chi lo ospita.
+    if (!(await SN_CONST.creditsAllowModelLetto(entry.model, entry.weights)) && (filoPays === true || await pagaFilo(apiKey))) {
+      return { ok: true, verdict: 'crediti', hosts: [], warning: I18n ? I18n.t('audio_host_warn_crediti', label, I18n.t(fn)) : 'crediti' };
+    }
+    const v = await modelGate.hostVerdict({ provider: entry.provider, apiKey, model: entry.model, providerRouting: routing, filoPays });
+    if (v.ok) return { ok: true, verdict: 'ok' };
+    const many = v.excluded.length > 1 ? '_many' : '';
+    const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
+    const nomi = new Intl.ListFormat('it', { type: 'conjunction' }).format(v.excluded);
+    const warning = I18n ? I18n.t(key, label, I18n.t(fn), nomi) : key;
+    return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
+  });
+
+  // La chiave spende i crediti di Filo (la personale o quella di fabbrica)? Senza chi tiene le chiavi non si sa: no.
+  async function pagaFilo(apiKey) {
+    const K = globalThis.SN_WALLET_MAIN;
+    if (!apiKey || !K || typeof K.keySourceOf !== 'function') return false;
+    try { return ['personal', 'factory'].includes(await K.keySourceOf(apiKey)); } catch (_) { return false; }
+  }
+
+  // La chiave è di chi usa Filo: la sua o la personale dei crediti, non quella di fabbrica.
+  async function chiaveDellUtente(apiKey) {
+    const K = globalThis.SN_WALLET_MAIN;
+    if (!apiKey || !K || typeof K.keySourceOf !== 'function') return false;
+    try { return ['own', 'personal'].includes(await K.keySourceOf(apiKey)); } catch (_) { return false; }
+  }
 
   // Normalizza una entry del registry (nuovo schema { provider, model } o
   // vecchio duale { openrouter, … }) in { provider, model } — stessa logica
@@ -428,11 +720,23 @@ module.exports = function register(on, ctx) {
   }
 
   // Le prove sono chiamate vere, pagate: passano dal cancello come le funzioni (limite, costo, chi ha servito).
-  function probe({ settings, provider, apiKey, model, routing, method, args }) {
-    return modelGate.call({
+  // La prova misura la chiave che l'utente ha davanti: se OpenRouter la
+  // rifiuta lo deve dire, non rispondere coi crediti di Filo (#662).
+  function probe({ settings, provider, apiKey, model, routing, reasoning, method, args }) {
+    const call = () => modelGate.call({
       action: SN_CONST.ACTIONS.PROVIDER_TEST, settings,
-      attempt: { provider, apiKey, model, providerRouting: routing }, method, args,
+      attempt: { provider, apiKey, model, providerRouting: routing, ...(reasoning ? { reasoning } : {}) }, method, args,
     });
+    const K = globalThis.SN_WALLET_MAIN;
+    return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
+  }
+
+  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché.
+  function provaFallita(e) {
+    const W = globalThis.SN_WALLET;
+    const st = W ? W.keyRefusalOf(e) : 0;
+    if (st) return `OpenRouter ha rifiutato questa chiave (${W.keyRefusalReason(st)}).`;
+    return e?.message || String(e);
   }
 
   async function probeNonText({ settings, kind, provider, apiKey, model, routing, nickname }) {
@@ -485,20 +789,22 @@ module.exports = function register(on, ctx) {
     return (eff.apiKeys || {})[provider] || '';
   }
 
-  on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
+  // Le prove spendono le chiavi predefinite: le chiedono solo le Opzioni e l'editor dei predefiniti,
+  // mai un sito visitato (#784.2).
+  on(MSG.TEST_DEFAULT_MODEL, soloFilo(async (msg) => {
     try {
       const nickname = (msg.nickname || '').trim();
       const explicitModel = (msg.model || '').trim();
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const d = Defaults.get();
       let provider; let modelId; let regEntry = null;
+      // Riga non ancora salvata: ordinamento e reasoning sono quelli scritti lì.
+      let tuning = { sort: msg.sort, reasoning: msg.reasoning };
       if (explicitModel) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
         // riservato agli amministratori.
-        if (!isAdmin()) {
-          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-        }
+        if (!isAdmin()) return NON_ADMIN();
         provider = 'openrouter';
         modelId = explicitModel;
       } else {
@@ -513,6 +819,7 @@ module.exports = function register(on, ctx) {
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
         regEntry = entry;
+        tuning = { sort: entry.sort, reasoning: entry.reasoning };
         const single = registryEntryToSingle(entry);
         provider = single.provider || 'openrouter';
         modelId = single.model || '';
@@ -535,8 +842,15 @@ module.exports = function register(on, ctx) {
       // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
+      // L'editor e le Opzioni mandano l'ordinamento già risolto dalla pagina (al clic: la misura va a quello, anche se
+      // la tendina cambia intanto). Senza, una voce predefinita si prova con la scelta personale di questo utente.
+      const sortDelClic = !explicitModel && typeof msg.sort === 'string' ? msg.sort : null;
+      const pesi = SN_CONST.pesiDichiaratiPer(regEntry, modelId);
+      const routing = explicitModel || sortDelClic != null
+        ? providerRouting({ ...eff, providerSort: '' }, explicitModel ? tuning.sort : sortDelClic, pesi)
+        : providerRouting(eff, SN_CONST.ordinamentoPerUtente(eff.ordineHost, tuning.sort, ''), pesi);
       if (kind !== 'text') {
-        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
+        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing, nickname });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
@@ -544,7 +858,8 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
       const result = await probe({
-        settings: eff, provider, apiKey, model, routing: providerRouting(eff), method: 'streamComplete',
+        settings: eff, provider, apiKey, model, routing, method: 'streamComplete',
+        reasoning: SN_CONST.normalizeReasoning(tuning.reasoning) || undefined,
         args: {
           messages,
           onDelta: (delta) => {
@@ -565,9 +880,9 @@ module.exports = function register(on, ctx) {
         tokensPerSec: Math.round(tps * 10) / 10,
       };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, error: provaFallita(e) };
     }
-  });
+  }));
 
   // Catalogo modelli di un provider, recuperato dal main con le chiavi
   // predefinite: la pagina admin non vede mai le chiavi vere, quindi non può
@@ -575,11 +890,9 @@ module.exports = function register(on, ctx) {
   // chiavi dell'utente). Solo metadati, nessuna inferenza. Ritorna
   // { ok, items: [{ id, label }] } già ordinati dal più recente e con
   // l'etichetta di categoria (Testo / Multimodale / Sintesi vocale / …).
-  on(MSG.DEFAULT_MODELS_LIST, async (msg) => {
+  on(MSG.DEFAULT_MODELS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
@@ -602,15 +915,23 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
+
+  // Le stime di costo accanto ai modelli (#819): la pagina le calcola col contesto che solo il main ha.
+  on(MSG.STIMA_COSTO_MODELLI, soloFilo(async (msg) => {
+    try {
+      const contesto = await require('../costoModelli').contesto({ Defaults, forzaListino: Boolean(msg && msg.forzaListino) });
+      return { ok: true, contesto };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
 
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
-  on(MSG.DEFAULT_PROVIDERS_LIST, async () => {
+  on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const res = await fetch('https://openrouter.ai/api/v1/providers');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -622,10 +943,11 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // La domanda esce verso il motore di ricerca: passa dalla porta delle uscite come la
   // ricerca della chat (#810). Solo il blocco: qui non c'è un popup per l'OK in più.
+  // La ricerca dell'Aiuto è una lettura del suo compito come CERCA_WEB in chat (#530): la stessa fonte.
   on(MSG.WEB_SEARCH, async (msg, sender) => {
     try {
       const parole = (Array.isArray(msg && msg.parole) ? msg.parole : [])
@@ -635,6 +957,7 @@ module.exports = function register(on, ctx) {
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       return { ok: true, ...r };
     } catch (e) {
       return { ok: false, error: e.message || String(e), results: [] };
@@ -660,7 +983,7 @@ module.exports = function register(on, ctx) {
     (async () => {
       try {
         const settings = await getEffectiveSettings();
-        if (!settings.apiKeys?.[settings.provider]) return;
+        if (!SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.HELP_INTENT_GUESS)) return;
         // Niente user agent e nessun identificativo del mittente (#584): nel
         // documento non ci entrano, e sistema operativo più versione più lingua
         // bastavano a rimettere insieme i percorsi della stessa installazione su
@@ -673,7 +996,7 @@ module.exports = function register(on, ctx) {
         // giro), e un token preso adesso a quel punto è scaduto. Chi manda se
         // lo fa dare al momento dell'invio, da `ottieniIdToken` (vedi l'init
         // della coda in handlers/misc.js).
-        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin, intera: true });
         const r = await PathsCollector.collectAndSave({ session: msg.payload?.session, invokeAI });
         if (r?.saved) console.info('[Filo] percorso in coda:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

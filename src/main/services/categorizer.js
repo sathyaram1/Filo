@@ -100,7 +100,8 @@
     const cats = await listCategories();
     const cat = categoryId ? cats.find((c) => c.id === categoryId) : null;
     const p = pages.find((x) => x.id === pageId);
-    if (!p) return null;
+    // Una categoria che non c'è più nasconderebbe la pagina: nella home un gruppo senza categoria non ha riquadro.
+    if (!p || (categoryId && !cat)) return null;
     p.categoryId = categoryId || null;
     p.category = cat?.name || null;
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
@@ -145,6 +146,7 @@
 
   global.SN_CATEGORIZER = {
     listCategories,
+    findByName,
     setCategories,
     ensureCategory,
     renameCategory,

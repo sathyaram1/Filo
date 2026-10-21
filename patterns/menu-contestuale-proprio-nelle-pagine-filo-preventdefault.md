@@ -17,4 +17,10 @@ il passo se `e.defaultPrevented` è già vero.
   nell'handler dell'elemento; NON serve `stopPropagation`. Se non chiami
   `preventDefault`, il tasto destro apre il normale menu di Filo.
 - **Dove:** registrazione in `src/content/content.js` (ramo pagine interne);
-  esempi in `src/pages/archive/archive.js` e `src/pages/decks/decks.js`.
+  esempio in `src/pages/decks/decks.js`. Chi vuole le sue voci DENTRO il menu di Filo
+  (il quaderno delle memorie, la home) le dà a `SN_VOCI_PAGINA` invece di aprirne uno suo.
+- **Da tastiera** (#1295): Shift+F10 e il tasto Menu aprono il menu di Filo anche con Shift premuto, e il
+  fuoco parte dalla prima voce che riguarda l'elemento (`primaDaTastiera`). Dentro valgono frecce, Tab,
+  Home e Fine, Invio e la prima lettera della scritta; chiuso, il fuoco torna dov'era. Un elemento che ha
+  voci sue deve potersi raggiungere col Tab: una lista lunga è una fermata sola, con le frecce dentro
+  (le bolle del filo della home). Prove: `tests/chat-nascoste.spec.mjs`.

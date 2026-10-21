@@ -65,12 +65,13 @@ test('tabFor su legacy/sconosciuto → null (serve normalizzare prima)', () => {
 
 // ── Transizioni (spec §3): legali, attori, illegali ────────────────────────
 
-test('solo la pipeline fa uscire da unlabeled', () => {
+test('da unlabeled il giudizio è della pipeline; l\'owner solo in coda o archiviato', () => {
   for (const to of ['attack', 'spam', 'design', 'todo', 'aligned', 'suspicious_file']) {
     assert.ok(FS.canTransition('unlabeled', to, 'pipeline'), to);
-    assert.ok(!FS.canTransition('unlabeled', to, 'owner'), `owner non può → ${to}`);
     assert.ok(!FS.canTransition('unlabeled', to, 'routine'), `routine non può → ${to}`);
   }
+  // Le decisioni dei Ricevuti (ownerActions): «→ In coda» e «Archivia», nessun verdetto al posto dei giudici.
+  assert.deepEqual(FS.transitionsFrom('unlabeled', 'owner').sort(), ['archived', 'todo']);
 });
 
 test('solo l\'owner fa uscire dagli stati di revisione umana', () => {
@@ -145,8 +146,10 @@ test('canReach: accetta le CATENE di passi dello stesso attore (coda collassata)
   assert.ok(!FS.canReach('aligned', 'todo', 'routine'));
   assert.ok(!FS.canReach('todo', 'revision_capability', 'owner'));
   assert.ok(!FS.canReach('attack', 'done', 'owner'));
-  // L'owner però raggiunge todo→…→? no: da todo l'owner non ha uscite.
-  assert.deepEqual(FS.transitionsFrom('todo', 'owner'), []);
+  // Da todo l'owner ha una sola uscita, l'archivio: l'iter resta delle routine.
+  assert.deepEqual(FS.transitionsFrom('todo', 'owner'), ['archived']);
+  assert.ok(!FS.canReach('todo', 'working', 'owner'));
+  assert.ok(!FS.canReach('todo', 'done', 'owner'));
 });
 
 test('transitionsFrom elenca le destinazioni per attore', () => {

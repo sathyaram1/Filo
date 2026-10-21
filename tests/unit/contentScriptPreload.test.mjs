@@ -24,6 +24,12 @@ const DIFFERENZE = {
     'src/content/cookies.js': 'banner dei cookie: le pagine interne non ne hanno',
     'src/content/cookieRules.js': 'regole dei banner dei cookie: le pagine interne non ne hanno',
     'src/content/cookieBanners.js': 'banner dei cookie da nascondere: le pagine interne non ne hanno',
+    'src/content/adSkip.js': 'pubblicità dei video da saltare: le pagine interne non ne hanno',
+    'src/content/riquadroRotto.js': 'riquadri di altri siti rotti dai cookie: le pagine interne non ne hanno',
+    'src/shared/campoAccesso.js': 'campi di accesso dei siti a cui proporre l\'email: le pagine interne sono di Filo',
+    'src/content/propostaEmail.js': 'l\'email dell\'account proposta nei campi di accesso: niente proposte sulle pagine di Filo',
+    'src/shared/menuDescritto.js': 'il menu come dati per lo strato sopra la scheda: sulle pagine di Filo resta nella pagina',
+    'src/content/menuNelloStrato.js': 'il menu nello strato sopra la scheda: sulle pagine di Filo resta nella pagina',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
@@ -107,4 +113,13 @@ test('i fogli di stile dei content script sono gli stessi nei due preload', () =
   const stiliInterne = elencoStili(corpoFunzione(internalSrc, 'injectContentScriptStyles'));
   assert.deepEqual(stiliInterne, stiliWeb);
   for (const f of stiliWeb) assert.ok(existsSync(join(ROOT, 'src', 'styles', f)), `filo://style/${f} non esiste`);
+});
+
+// Sui siti con CSP il <link filo://style/…> è bloccato e resta solo il CSS iniettato dal main: un foglio
+// che manca lì perde lo stile proprio sui siti più comuni (#948: il microfono dell'Aiuto senza voce.css).
+test('il main inietta sui siti gli stessi fogli di stile del preload', () => {
+  const m = leggi('src', 'main', 'tabs.js').match(/CONTENT_STYLE_FILES\s*=\s*\[([^\]]*)\]/);
+  assert.ok(m, 'CONTENT_STYLE_FILES non trovato in tabs.js');
+  const dalMain = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  assert.deepEqual(dalMain, elencoStili(pageSrc));
 });

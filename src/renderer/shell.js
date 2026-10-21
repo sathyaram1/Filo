@@ -17,6 +17,22 @@
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
+  // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
+  const manigliaBarra = document.getElementById('barra-maniglia');
+  if (manigliaBarra) {
+    manigliaBarra.dataset.tip = `Barra laterale (${TASTI && TASTI.etichettaBarra ? TASTI.etichettaBarra() : tasto('Ctrl+Shift+B')})`;
+    manigliaBarra.addEventListener('click', (e) => { if (e.isTrusted) api.barra?.commuta(); });
+    // Tasto destro: le scelte della striscia (aprirla, nasconderla, spegnere l'apertura dal bordo, regolarla).
+    manigliaBarra.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isTrusted) api.barra?.menu?.(Math.round(e.clientX), Math.round(e.clientY));
+    });
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isTrusted || (manigliaBarra && manigliaBarra.contains(e.target))) return;
+    try { api.barra?.chiudi(); } catch (_) {}
+  }, true);
   const backBtn = document.getElementById('nav-back');
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
@@ -52,19 +68,28 @@
   function applyShellTokens(tokens) {
     if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
   }
-  // Opacità del colore identità sulle tab inattive (param `opacita_tab` della
-  // spec "Colore identità delle tab"): governa quanto la tinta del sito copre lo
-  // sfondo del tab bar nel color-mix più sotto. 0 = nessun colore, 1 = tinta
-  // piena. Letta dalle impostazioni e aggiornata live al cambio prefs.
-  let tabOpacity = 0.6;
+  // Parametri "Colore identità delle tab" per il fondo delle schede non attive.
+  const TabColor = window.SN_TAB_COLOR;
+  let tabColorParams = TabColor ? TabColor.defaultParams() : null;
   function applyTabColorParams(tabColor) {
-    const v = tabColor && Number(tabColor.opacita_tab);
-    if (Number.isFinite(v)) tabOpacity = Math.max(0, Math.min(1, v));
+    if (TabColor && tabColor && typeof tabColor === 'object') tabColorParams = TabColor.clampParams(tabColor);
   }
+  // Fondo e inchiostri si calcolano sui colori veri del tema: al cambio di tema si ridipinge.
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', () => { try { render({ forza: true }); } catch (_) {} });
+  } catch (_) {}
   // Config notifiche (spec #170.1): durata, suono on/off, suono scelto. Letta
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
   // notifiche successive rispettano i nuovi valori senza riavviare.
   let notifConfig = { durationSec: 5, soundEnabled: false, sound: 'default' };
+  // Un volume assente o storto vale «pieno»: il silenzio si sceglie, non si
+  // eredita da un'impostazione malformata.
+  function volumeValido(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+
   function applyNotifConfig(notifications) {
     if (!notifications || typeof notifications !== 'object') return;
     const d = Number(notifications.durationSec);
@@ -72,14 +97,29 @@
       durationSec: Number.isFinite(d) && d >= 0 ? d : 5,
       soundEnabled: notifications.soundEnabled === true,
       sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
+      soundVolume: volumeValido(notifications.soundVolume),
     };
+  }
+  // #430 — carta con l'anteprima della scheda al passaggio del puntatore: accesa e misura dalle Preferenze.
+  let anteprimaSchede = { enabled: true, size: 'media' };
+  function applyTabPreview(tp) {
+    if (!tp || typeof tp !== 'object') return;
+    anteprimaSchede = {
+      enabled: tp.enabled !== false,
+      size: ['piccola', 'media', 'grande'].includes(tp.size) ? tp.size : 'media',
+    };
+    if (!anteprimaSchede.enabled) try { ANTEPRIMA.nascondi(); } catch (_) {}
   }
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
+      rispecchiaBarra();
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
-      try { render(); } catch (_) {}
+      applyTabPreview(r?.settings?.tabPreview);
+      applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
+      refreshRinging();
+      try { render({ forza: true }); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
     .catch(() => {});
@@ -87,9 +127,15 @@
     api.onBroadcast((m) => {
       if (m?.type === 'settings_updated') {
         applyShellTokens(m.settings?.themeTokens);
+        rispecchiaBarra();
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
-        try { render(); } catch (_) {}
+        applyTabPreview(m.settings?.tabPreview);
+        applyRingTone(m.settings?.timerRingtone, m.settings?.timerRingtoneVolume);
+        // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
+        // sentirebbe solo alla scadenza dopo.
+        refreshRinging();
+        try { render({ forza: true }); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
     });
@@ -110,13 +156,98 @@
     }
   }
 
+  // ── Suoneria di timer e sveglie ───────────────────────────────────────────
+  // Suona QUI perché la shell c'è sempre: una scadenza coglie l'utente su una
+  // scheda qualunque, e la pagina Nuova scheda può non essere nemmeno aperta.
+  const MSG_FILO = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  const ringBtn = document.getElementById('ring-indicator');
+  const ringLabel = document.getElementById('ring-ind-label');
+  setIcon(document.getElementById('ring-ind-icon'), 'alarm', 15);
+  let ringTone = 'default';
+  let ringVolume = 100;
+  let ringingIds = [];
+  let ringWake = null;
+
+  function applyRingTone(id, volume) {
+    const tones = window.SN_SOUNDS && window.SN_SOUNDS.TONES;
+    if (typeof id === 'string' && tones && tones[id]) ringTone = id;
+    ringVolume = volumeValido(volume);
+  }
+
+  function testoSuoneria(list) {
+    if (list.length > 1) return `${list.length} scadenze`;
+    const t = list[0];
+    if (t.kind === 'alarm') return t.label ? `Sveglia — ${t.label}` : 'Sveglia';
+    return t.label ? `${t.label} — scaduto` : 'Timer scaduto';
+  }
+
+  // Il watcher del main ricontrolla ogni pochi secondi: sentire la suoneria
+  // cinque secondi dopo lo zero è attrito, quindi ci svegliamo sulla scadenza.
+  function programmaRisveglio(timers) {
+    if (ringWake) { clearTimeout(ringWake); ringWake = null; }
+    let primo = Infinity;
+    for (const t of timers) {
+      if (!t || t.ringing || t.paused) continue;
+      const ms = new Date(t.endsAt).getTime() - Date.now();
+      if (Number.isFinite(ms) && ms < primo) primo = ms;
+    }
+    if (primo === Infinity) return;
+    ringWake = setTimeout(refreshRinging, Math.min(60000, Math.max(250, primo + 150)));
+  }
+
+  // `mio` lo decide il main: fra le finestre che vedono la stessa scadenza ne
+  // suona una sola. Il pulsante invece sta in tutte, perché l'utente può essere
+  // davanti a una qualunque e il gesto per far smettere non si cerca.
+  function applyRinging(timers, mio) {
+    const tutti = Array.isArray(timers) ? timers : [];
+    programmaRisveglio(tutti);
+    const list = tutti.filter((t) => t && t.ringing);
+    ringingIds = list.map((t) => t.id);
+    const acceso = list.length > 0;
+    if (ringBtn) ringBtn.hidden = !acceso;
+    if (acceso && ringLabel) ringLabel.textContent = testoSuoneria(list);
+    const S = window.SN_SOUNDS;
+    if (!S) return;
+    if (acceso && mio !== false) S.ring(ringTone, ringVolume); else S.silence();
+  }
+
+  // Ogni finestra chiede le SUE scadenze: quella incognito vede solo le proprie
+  // (i timer non sono fra le chiavi che eredita dal disco), quindi nessuna
+  // scadenza può squillare in due finestre insieme.
+  function refreshRinging() {
+    const type = MSG_FILO.FILO_GET_TIMERS;
+    if (!type) return;
+    api.message({ type })
+      .then((r) => applyRinging(r && r.ok ? r.timers : [], !r || r.suona !== false))
+      .catch(() => {});
+  }
+
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.FILO_LIVE_UPDATED) refreshRinging();
+    });
+  }
+
+  if (ringBtn) {
+    ringBtn.addEventListener('click', () => {
+      const type = MSG_FILO.FILO_STOP_TIMER_ALARM;
+      const ids = ringingIds.slice();
+      // Zittisci subito: l'attesa della risposta è attrito su un gesto che
+      // esiste per far smettere un rumore.
+      applyRinging([], false);
+      if (!type) return;
+      Promise.all(ids.map((id) => api.message({ type, id }).catch(() => {})))
+        .then(refreshRinging);
+    });
+  }
+
   // Registro app del launcher. Il Feedback vive qui fra le App.
   //
   // "Aperti per dopo" sta qui perché è la CONTROPARTE di "Salva per dopo": il
   // salvataggio chiude la scheda, quindi senza un ingresso sempre visibile la
   // lista di ciò che hai messo da parte resta irraggiungibile (l'icona dedicata
   // del menu del tasto destro è stata ritirata e l'icona Home porta alla nuova
-  // scheda, non lì). È l'analogo di "Scaricamenti": una lista di cose messe da
+  // scheda, non lì). È l'analogo di "Download": una lista di cose messe da
   // parte, non un'azione.
   // "Feedback" (la posta delle segnalazioni) e "Gestione" sono superfici
   // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
@@ -131,7 +262,8 @@
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
       { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
-      { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];
@@ -165,16 +297,20 @@
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
   // WebContentsView native, stilizzato come il menu tasto destro.
+  // Dove aprire il prossimo menu quando lo chiede la barra laterale: accanto alla sua icona.
+  let ancoraMenu = null;
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
-    // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
-    // (Impostazioni, App, Account) si aprono sotto le icone, che ora vivono in
-    // alto a destra DENTRO la home. La home parte sotto la fila di tab (~40px) e
-    // le icone sono alte ~34px: ancoriamo appena sotto. Coordinate relative alla
-    // finestra shell. popup-menu.js riallinea/clampa per restare nello schermo.
-    if (r.width === 0 && r.height === 0) {
+    // La barra in alto è nascosta e le icone reali hanno rect nullo. Dalla barra
+    // laterale arriva l'ancora; dall'assistente no, e il menu si apre in alto a
+    // destra. Coordinate relative alla finestra shell: popup-menu.js clampa.
+    if (ancoraMenu) {
+      x = ancoraMenu.x;
+      y = ancoraMenu.y;
+      ancoraMenu = null;
+    } else if (r.width === 0 && r.height === 0) {
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
     }
@@ -206,6 +342,8 @@
   let isAdmin = false;
   // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
   let authRemembered = true;
+  // Un account Google nelle schede (#1123): è un accesso diverso da quello a Filo, e il menu lo dice.
+  let googleNelleSchede = false;
 
   function shortName(p) {
     if (!p) return '';
@@ -213,6 +351,7 @@
   }
 
   function renderAccount() {
+    rispecchiaBarra();
     if (!accountBtn) return;
     if (authBusy) {
       accountBtn.dataset.tip = 'Accesso in corso…';
@@ -245,12 +384,13 @@
     }
   }
 
-  async function refreshAuth() {
+  async function refreshAuth(opzioni) {
     try {
-      const r = await api.auth.status();
+      const r = await api.auth.status(opzioni);
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
       isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
       authRemembered = !(r && r.remembered === false);
+      googleNelleSchede = !!(r && r.googleNelleSchede);
     } catch (_) {
       authProfile = null;
       isAdmin = false;
@@ -272,6 +412,16 @@
     }
   }
 
+  // YouTube, Gmail e Drive nelle schede: l'accesso a Google si apre in una scheda, con l'email già scritta.
+  async function collegaGoogle() {
+    try {
+      const r = await api.message({ type: 'auth_collega_google' });
+      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+    } catch (_) {
+      showToast('Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+    }
+  }
+
   async function doSignOut() {
     try { await api.auth.signOut(); } catch (_) {}
     authProfile = null; isAdmin = false; renderAccount();
@@ -282,17 +432,23 @@
     // finestra incognito" — spostata qui dal menu Impostazioni — è raggiungibile
     // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
     // sloggato mostra "Accedi con Google" + incognito.
-    accountBtn.addEventListener('click', () => {
+    accountBtn.addEventListener('click', async () => {
       if (authBusy) return;
+      // L'ancora la toglie chi aziona il bottone appena il clic torna: dopo l'attesa il menu finiva nell'angolo.
+      const ancora = ancoraMenu;
+      // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
+      if (authProfile) await refreshAuth({ senzaRete: true });
+      ancoraMenu = ancora;
       if (authProfile) {
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
           ...(authRemembered ? [] : [{ label: 'Accesso valido fino alla chiusura di Filo', disabled: true }]),
           { type: 'separator' },
+          ...(googleNelleSchede ? [] : [{ label: 'Collega anche i prodotti Google', icon: 'user', action: 'collega-google' }]),
           { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
-          { label: 'Esci', icon: 'close', action: 'auth-signout' },
+          { label: googleNelleSchede ? 'Esci da Filo (Google resta collegato)' : 'Esci da Filo', icon: 'close', action: 'auth-signout' },
         ]);
       } else {
         showNativeMenu(accountBtn, [
@@ -308,6 +464,7 @@
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
         else if (action === 'auth-signin') doSignIn();
+        else if (action === 'collega-google') collegaGoogle();
       });
     }
     // Aggiorna l'icona quando il main segnala un cambio sessione.
@@ -316,11 +473,28 @@
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
         authRemembered = m.remembered !== false;
         if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
+        // «Continua nel browser» (#1123) non serve più a chi è entrato.
+        if (authProfile) NOTIFS.dismissKey('accesso-nel-browser');
         renderAccount();
       });
     }
     refreshAuth();
   }
+  // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
+  // (tema, token dell'utente, incognito) e il profilo da mostrare.
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius', '--sn-motion', '--sn-ombra'];
+  function rispecchiaBarra() {
+    if (!api.barra) return;
+    const cs = getComputedStyle(document.documentElement);
+    const tema = {};
+    for (const k of VAR_BARRA) { const v = cs.getPropertyValue(k).trim(); if (v) tema[k] = v; }
+    const account = authProfile
+      ? { dentro: true, foto: authProfile.picture || '', etichetta: shortName(authProfile) }
+      : { dentro: false, foto: '', etichetta: '' };
+    try { api.barra.stato({ tema, account }); } catch (_) {}
+  }
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchiaBarra); } catch (_) {}
+
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
@@ -338,9 +512,13 @@
       minimize: winMinBtn,
       fullscreen: winMaxBtn,
     };
-    api.onTriggerButton((command) => {
+    api.onTriggerButton((command, anchor) => {
       const btn = triggerMap[command];
-      if (btn) btn.click();
+      if (!btn) return;
+      const ok = anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y);
+      ancoraMenu = ok ? { x: Math.round(anchor.x), y: Math.round(anchor.y) } : null;
+      btn.click();
+      ancoraMenu = null;
     });
   }
 
@@ -348,12 +526,13 @@
   // al main di mostrare un mini-BrowserWindow stile Filo (vedi popup-tooltip.js),
   // invece del title nativo bianco squadrato. Serve una BrowserWindow secondaria
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
-  // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
-  // tab ricreati ad ogni render().
+  // sopra le WebContentsView delle tab. Delega globale così funziona anche per le
+  // schede nate dopo.
+  // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
+  const SUGGERIMENTO_RITARDO = 350;
   (() => {
     let showTimer = null;
     let currentTarget = null;
-    const SHOW_DELAY = 350;
 
     function hide() {
       if (showTimer) { clearTimeout(showTimer); showTimer = null; }
@@ -362,7 +541,9 @@
     }
     document.addEventListener('mouseover', (e) => {
       const t = e.target.closest('[data-tip]');
-      if (!t || t === currentTarget) return;
+      if (t === currentTarget) return;
+      // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
+      if (!t) { if (currentTarget && !currentTarget.isConnected) hide(); return; }
       hide();
       currentTarget = t;
       const text = t.dataset.tip;
@@ -374,7 +555,7 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SHOW_DELAY);
+      }, SUGGERIMENTO_RITARDO);
     });
     document.addEventListener('mouseout', (e) => {
       const t = e.target.closest('[data-tip]');
@@ -386,6 +567,125 @@
   })();
 
   let state = { activeId: null, tabs: [] };
+
+  // #430 — la carta di anteprima. La prima compare dopo un attimo (attraversare la barra non deve accendere
+  // niente); da lì, finché si resta sulle schede, passa dall'una all'altra subito. Le foto sono già nella carta.
+  const ANTEPRIMA = (() => {
+    const RITARDO = 200;
+    const CALDA = 600;
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius', '--sn-motion', '--sn-ombra'];
+    let timer = null;
+    let attesaDi = null;
+    let puntatore = null;
+    let vaVia = null;
+    let aperta = null;
+    let spentaAlle = 0;
+    // La scheda appena cliccata non riapre la carta finché il puntatore non passa su un'altra.
+    let zittita = null;
+
+    function elDi(id) {
+      return tabsEl.querySelector(`.tab[data-anteprima="${CSS.escape(id)}"]`);
+    }
+    function tema() {
+      const cs = getComputedStyle(document.documentElement);
+      const vars = {};
+      for (const k of VAR_TEMA) {
+        const v = cs.getPropertyValue(k).trim();
+        if (v) vars[k] = v;
+      }
+      return vars;
+    }
+    function invia(id) {
+      const el = elDi(id);
+      const t = state.tabs.find((x) => x.id === id);
+      if (!el || !t || !api.anteprima) { nascondi(); return; }
+      const r = el.getBoundingClientRect();
+      aperta = id;
+      api.anteprima.mostra({
+        id, titolo: tabLabel(t), x: Math.round(r.left), y: Math.round(r.bottom + 4),
+        misura: anteprimaSchede.size, tema: tema(),
+      });
+    }
+    function nascondi() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (vaVia) { clearTimeout(vaVia); vaVia = null; }
+      if (!aperta) return;
+      aperta = null;
+      spentaAlle = Date.now();
+      try { api.anteprima && api.anteprima.nascondi(); } catch (_) {}
+    }
+    function sopra(id) {
+      if (vaVia) { clearTimeout(vaVia); vaVia = null; }
+      if (!anteprimaSchede.enabled || drag) return;
+      if (id === zittita) return;
+      zittita = null;
+      if (id === aperta) return;
+      // La barra si ridisegna a ogni titolo o icona che cambia e il puntatore «rientra» nella scheda rifatta:
+      // l'attesa della stessa scheda non riparte, o con un titolo che cambia spesso la carta non arriverebbe mai.
+      if (timer && attesaDi === id) return;
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta || Date.now() - spentaAlle < CALDA) { invia(id); return; }
+      attesaDi = id;
+      timer = setTimeout(() => {
+        timer = null;
+        attesaDi = null;
+        if (sottoIlPuntatore(id)) invia(id);
+      }, RITARDO);
+    }
+    // Croce, avviso audio e paese hanno il loro suggerimento, che cade dove sta la carta (#589.16): la carta gli
+    // cede il posto quando lui compare, non prima, o attraversando la croce verso la scheda accanto lampeggerebbe.
+    function suUnControllo(target, el) {
+      const c = target.closest('[data-tip]');
+      return !!c && c !== el && el.contains(c);
+    }
+    function cede() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+    }
+    // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
+    function sottoIlPuntatore(id) {
+      const el = elDi(id);
+      if (!el) return false;
+      if (el.matches(':hover')) return true;
+      if (!puntatore) return false;
+      const sotto = document.elementFromPoint(puntatore.x, puntatore.y);
+      return !!sotto && sotto.closest('.tab[data-anteprima]') === el;
+    }
+    // La barra si ridisegna a ogni titolo o icona che cambia: la carta segue la sua scheda, o sparisce con lei.
+    function ridisegnata() {
+      if (!aperta) return;
+      if (!anteprimaSchede.enabled || !elDi(aperta)) { nascondi(); return; }
+      invia(aperta);
+    }
+    tabsEl.addEventListener('mousemove', (e) => { puntatore = { x: e.clientX, y: e.clientY }; }, { passive: true });
+    tabsEl.addEventListener('mouseover', (e) => {
+      puntatore = { x: e.clientX, y: e.clientY };
+      const el = e.target.closest('.tab[data-anteprima]');
+      if (el && suUnControllo(e.target, el)) cede();
+      else if (el) sopra(el.dataset.anteprima);
+      // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
+      else if (!vaVia) vaVia = setTimeout(nascondi, 120);
+    });
+    tabsEl.addEventListener('mouseenter', () => {
+      if (anteprimaSchede.enabled) try { api.anteprima && api.anteprima.prepara(); } catch (_) {}
+    });
+    tabsEl.addEventListener('mouseleave', () => { zittita = null; puntatore = null; nascondi(); });
+    // Se la barra si ridisegna mentre il puntatore esce, l'uscita può perdersi: basta essere altrove.
+    document.addEventListener('mouseover', (e) => {
+      if (aperta && !tabsEl.contains(e.target)) { zittita = null; nascondi(); }
+    });
+    document.documentElement.addEventListener('mouseleave', nascondi);
+    tabsEl.addEventListener('mousedown', (e) => {
+      const el = e.target.closest('.tab[data-anteprima]');
+      zittita = el ? el.dataset.anteprima : null;
+      nascondi();
+    }, true);
+    tabsEl.addEventListener('wheel', nascondi, { passive: true });
+    tabsEl.addEventListener('contextmenu', nascondi, true);
+    window.addEventListener('blur', nascondi);
+    window.addEventListener('resize', nascondi);
+    return { nascondi, ridisegnata, aperta: () => aperta };
+  })();
 
   function activeTab() {
     return state.tabs.find((t) => t.id === state.activeId) || null;
@@ -478,7 +778,7 @@
   function startTabDrag(e, t, el) {
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
-    if (e.target.closest('.close, .mute-ind, .audio-ind, .proxy-ind')) return;
+    if (e.target.closest('.close, .tab-alert, .proxy-ind')) return;
     drag = { id: t.id, el, startX: e.clientX, moved: false };
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
@@ -494,6 +794,10 @@
   let puntatoreSullaFila = false;
   let sondaFila = null;
   let giroSonda = 0;
+  // Anche la parte di ogni scheda non cambia sotto il puntatore: un titolo che cambia mentre il puntatore sta
+  // sulla fila (una scheda dietro che finisce di caricare) aspetta che la lasci, o la scheda gli scappa (#429).
+  let passoTrattenuto = false;
+  const fermo = () => Boolean(larghezzeFerme) || passoTrattenuto;
 
   function sullaFila(x, y) {
     const r = tabRowEl.getBoundingClientRect();
@@ -507,7 +811,7 @@
 
   function sciogliLarghezze() {
     fermaSonda();
-    if (!larghezzeFerme) return;
+    if (!larghezzeFerme) { if (passoTrattenuto) misuraLarghezzeChieste(); return; }
     larghezzeFerme = null;
     strisciaFerma = 0;
     tabsEl.style.flex = '';
@@ -515,17 +819,20 @@
       el.style.flex = '';
       el.style.minWidth = '';
       el.style.maxWidth = '';
+      el._firma = ''; // la larghezza ferma non c'è più: la prossima volta la scheda si ridisegna da capo
     }
+    // Da ferme le schede hanno misurato la larghezza fermata: senza rimisurarle restano strette fino al prossimo ridisegno.
+    misuraLarghezzeChieste();
   }
 
   // Sulla pagina, e su Windows sulle zone di trascinamento della finestra, la
   // barra non riceve eventi del mouse: chiede al main dove sta il puntatore.
   function sondaPuntatore() {
     fermaSonda();
-    if (!larghezzeFerme) return;
+    if (!fermo()) return;
     const giro = giroSonda;
     Promise.resolve(typeof api.puntatore === 'function' ? api.puntatore() : null).then((p) => {
-      if (giro !== giroSonda || !larghezzeFerme || puntatoreSullaFila) return;
+      if (giro !== giroSonda || !fermo() || puntatoreSullaFila) return;
       if (p && sullaFila(p.x, p.y)) sondaFila = setTimeout(sondaPuntatore, 150);
       else sciogliLarghezze();
     }, () => { if (giro === giroSonda) sciogliLarghezze(); });
@@ -545,6 +852,14 @@
       if (w > 0) m.set(el.dataset.id, w);
     }
     if (!m.size) return;
+    // Con le schede larghe quanto il nome, la X della scheda che scivola al posto della chiusa cade sotto il
+    // puntatore solo se le si dà la larghezza della chiusa: così si chiudono più schede di fila (#428, #429).
+    const chiuse = primaIds.filter((id) => !dopo.has(id));
+    if (chiuse.length === 1) {
+      const i = primaIds.indexOf(chiuse[0]);
+      const subentra = primaIds.slice(i + 1).find((id) => dopo.has(id));
+      if (subentra && m.has(chiuse[0]) && m.has(subentra)) m.set(subentra, m.get(chiuse[0]));
+    }
     larghezzeFerme = m;
     // Se se ne va l'ultima, il + scivolerebbe sotto il puntatore e il clic
     // dopo aprirebbe una scheda: la striscia tiene la sua larghezza.
@@ -562,6 +877,12 @@
     sondaPuntatore();
   }, true);
   window.addEventListener('resize', sciogliLarghezze);
+  // Le larghezze dipendono dal posto della fila: si rifanno quando cambia la finestra o compare un indicatore.
+  window.addEventListener('resize', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); });
+  try {
+    new MutationObserver(() => { if (!larghezzeFerme) misuraLarghezzeChieste(); })
+      .observe(tabRowEl, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+  } catch (_) {}
 
   // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
   // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
@@ -589,22 +910,8 @@
     '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/><path d="M12 3a13.5 13.5 0 0 0 0 18"/></svg>';
 
-  // "Vetro smerigliato" della tab attiva (§1.1): dato il colore campionato dal
-  // sito, scegli un testo leggibile per contrasto (luminanza relativa).
-  function readableOn(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    const L = 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
-    return L > 0.45 ? '#1a1918' : '#f8f6f0';
-  }
-
-  // Un colore "ha identità" solo se ha croma sufficiente: bianco/nero/grigio
-  // (es. l'header bianco di YouTube campionato per il vetro smerigliato §1.1)
-  // non rappresentano il sito. Soglia allineata a SN_TAB_COLOR
-  // (src/shared/tabColor.js) e al campionatore favicon in pageColor.js.
+  // Per il bagliore audio una cima bianca/nera/grigia non è il sito e si ripiega sul suo colore
+  // (la scheda attiva invece resta della cima, D63). Soglia allineata a SN_TAB_COLOR.hasIdentity.
   function hasColorIdentity(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return false;
@@ -613,69 +920,39 @@
     return Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]) >= 24;
   }
 
-  // Colore identità attenuato (§1.2): smorza la saturazione del colore del sito
-  // a una frazione dell'originale (tinta "subliminale"). La luminosità non la
-  // tocchiamo qui: la spostiamo verso il neutro del tab bar mescolandola con
-  // --tab-bg via CSS color-mix (così resta giusta sia in tema chiaro che scuro).
-  function attenuateIdentity(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    const l = (mx + mn) / 2;
-    let h = 0, s = 0;
-    if (mx !== mn) {
-      const d = mx - mn;
-      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-      else if (mx === g) h = (b - r) / d + 2;
-      else h = (r - g) / d + 4;
-      h /= 6;
-    }
-    s *= 0.18; // saturazione ridotta al ~18% dell'originale (spec: 15-20%)
-    const hue2rgb = (pp, qq, t) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return pp + (qq - pp) * 6 * t;
-      if (t < 1 / 2) return qq;
-      if (t < 2 / 3) return pp + (qq - pp) * (2 / 3 - t) * 6;
-      return pp;
-    };
-    let nr, ng, nb;
-    if (s === 0) {
-      nr = ng = nb = l;
-    } else {
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const pq = 2 * l - q;
-      nr = hue2rgb(pq, q, h + 1 / 3);
-      ng = hue2rgb(pq, q, h);
-      nb = hue2rgb(pq, q, h - 1 / 3);
-    }
-    return `rgb(${Math.round(nr * 255)}, ${Math.round(ng * 255)}, ${Math.round(nb * 255)})`;
-  }
-
   let ctxTabId = null;
   let ctxMenuPos = { x: 0, y: 0 };
   // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
   // cambiare dalle impostazioni mentre l'app è aperta).
   let ctxProxyStatus = null;
+  let ctxGiro = 0;
+  const senzaErrore = (fn) => { try { return Promise.resolve(fn()).catch(() => null); } catch (_) { return Promise.resolve(null); } };
   async function openTabContextMenu(t, x, y) {
+    const mio = ++ctxGiro;
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
+    // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
+    const [proxy, permessi, impostazioni] = await Promise.all([
+      senzaErrore(() => api.tabs.proxyStatus()),
+      senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
+      senzaErrore(() => api.message({ type: 'get_settings' })),
+    ]);
+    // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
+    if (mio !== ctxGiro) return;
+    ctxProxyStatus = proxy;
     const entries = [
       { label: 'Duplica', icon: 'duplicate', action: 'tab-duplicate' },
       t.muted
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
-      { label: 'Aiuto', icon: 'help', action: 'tab-help' },
     ];
+    // L'Aiuto spento (#841) non ha la sua voce.
+    const ff = impostazioni && impostazioni.settings && impostazioni.settings.featureFlags;
+    if (!(ff && ff.help === false)) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
     // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
     // configurato — una voce che non può funzionare non deve comparire.
     // Il click diretto usa il default (ultima location usata, altrimenti USA);
     // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
-    try { ctxProxyStatus = await api.tabs.proxyStatus(); } catch (_) { ctxProxyStatus = null; }
     if (ctxProxyStatus && ctxProxyStatus.configured) {
       if (t.proxy) {
         // Tab già instradata: si può cambiare paese (apre la lista) o tornare
@@ -692,19 +969,22 @@
     }
     // #754 — cosa ha fatto Filo col banner dei cookie di questo sito, e la strada per rivederlo.
     const ck = t.cookies;
-    if (ck && (ck.shown || ck.rejected || ck.hidden)) {
-      entries.push({ type: 'separator' });
-      if (ck.shown) {
-        entries.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
-      } else {
-        if (ck.rejected) entries.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
-        if (ck.hidden) entries.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
-        entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
-      }
+    const cookieVoci = [];
+    if (ck && ck.shown) {
+      cookieVoci.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
+    } else if (ck && (ck.rejected || ck.hidden)) {
+      if (ck.rejected) cookieVoci.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
+      if (ck.hidden) cookieVoci.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
+      cookieVoci.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
     }
+    // #759 — con la privacy massima l'accesso al sito si perde alla chiusura, se non resta connesso.
+    if (t.connesso) {
+      cookieVoci.push(t.connesso.fidato
+        ? { label: 'Non restare connesso', icon: 'key', action: 'tab-connesso-no' }
+        : { label: 'Resta connesso qui', icon: 'key', action: 'tab-connesso-si' });
+    }
+    if (cookieVoci.length) entries.push({ type: 'separator' }, ...cookieVoci);
     // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
-    let permessi = null;
-    try { permessi = api.tabs.permessi ? await api.tabs.permessi(t.id) : null; } catch (_) { permessi = null; }
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
     }
@@ -713,6 +993,23 @@
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     );
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
+  async function restaConnesso(id, on, sito) {
+    let r = null;
+    try { r = await api.tabs.restaConnesso(id, on, sito); } catch (_) { r = null; }
+    if (!r || !r.ok) return;
+    // In Automatico l'accesso al sito resta comunque: la voce decide dei suoi contenuti incorporati in altri siti.
+    const automatico = r.modo === 'default';
+    // Un sito che tiene l'accesso in un archivio che non si sposta (chiavi crittografiche, WhatsApp Web): si rientra una volta.
+    const rientra = r.rientra ? (r.fidato ? ' Rientra una volta: il sito tiene l\'accesso in un archivio che Filo non riesce a spostare.'
+      : ' Per continuare devi rientrare: il sito tiene l\'accesso in un archivio che Filo non riesce a spostare.') : '';
+    showToast((r.fidato
+      ? (automatico ? `Resti connesso a ${r.nome} anche nei suoi contenuti dentro altri siti.`
+        : `Resti connesso a ${r.nome} anche quando chiudi la scheda o riapri Filo.`)
+      : (automatico ? `Dentro altri siti i contenuti di ${r.nome} tengono i cookie solo per la visita.`
+        : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`)) + rientra);
   }
 
   async function azzeraPermessi(id) {
@@ -767,172 +1064,359 @@
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
       else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
+      else if (action === 'tab-connesso-si') restaConnesso(id, true);
+      else if (action === 'tab-connesso-no') restaConnesso(id, false);
       else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }
 
-  function render() {
-    // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
-    // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
-    // viene confermato dal broadcast successivo al rilascio (api.tabs.move).
-    // NB: si sospende NON appena il drag è armato (mousedown), non solo dopo aver
-    // superato la soglia di 4px. Nella finestra tra mousedown e soglia `drag`
-    // esiste ma `moved` è ancora false: un broadcast `tabs:updated` che arriva lì
-    // (cambio titolo/favicon/loading/audio: frequentissimo) ricreerebbe tutti i
-    // nodi .tab, ORFANIZZANDO `drag.el`. Quando poi si supera la soglia, l'orfano
-    // verrebbe reinserito accanto al nodo rigenerato con lo stesso id → due schede
-    // fantasma affiancate e indice di rilascio sbagliato. Sospendere già da armato
-    // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
-    // rilascio dal broadcast successivo).
-    if (drag || premutoSullaStriscia) { ridisegnoRimandato = true; return; }
-    ridisegnoRimandato = false;
-    // tabs
-    tabsEl.innerHTML = '';
-    for (const t of state.tabs) {
-      const el = document.createElement('div');
-      el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
-      el.dataset.id = t.id;
-      el.dataset.tip = t.title || t.url;
-      const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
-      if (ferma) {
-        el.style.flex = `0 0 ${ferma}px`;
-        el.style.minWidth = `${ferma}px`;
-        el.style.maxWidth = `${ferma}px`;
+  // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
+  // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
+  // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
+  // stacca di STACCO dalla scheda tipica dietro solo con lo spazio che avanza: un vuoto suo non taglia un nome altrui.
+  const STACCO = 1.25;
+  const STACCO_MAX = 1.8;
+  const MIN_ATTIVA = 110;
+  const MIN_SCHEDA = 40;
+  let larghezzeInVigore = null; // { chiave, w: number[] }
+  function spazioDellaStriscia() {
+    const spazio = tabRowEl.querySelector('.tab-drag-spacer');
+    const sp = spazio ? spazio.getBoundingClientRect().width - (parseFloat(getComputedStyle(spazio).minWidth) || 0) : 0;
+    const cs = getComputedStyle(tabsEl);
+    return tabsEl.getBoundingClientRect().width + Math.max(0, sp) - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  }
+  function larghezzeDistribuite(naturali, ia, posto) {
+    const dietro = naturali.filter((_, i) => i !== ia);
+    const ordinate = [...dietro].sort((a, b) => a - b);
+    const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
+    const attivaCon = (tetto) => Math.max(MIN_ATTIVA, Math.min(ia >= 0 ? naturali[ia] : 0, Math.ceil(tetto * STACCO_MAX)));
+    const totale = (tetto) => dietro.reduce((s, w) => s + Math.max(MIN_SCHEDA, Math.min(w, tetto)), 0) + (ia >= 0 ? attivaCon(tetto) : 0);
+    let tetto = Math.max(MIN_SCHEDA, ...naturali);
+    if (totale(tetto) > posto) {
+      let lo = MIN_SCHEDA, hi = tetto;
+      for (let k = 0; k < 24 && hi - lo > 0.5; k++) { const m = (lo + hi) / 2; if (totale(m) > posto) hi = m; else lo = m; }
+      // Intero: le larghezze chieste vanno in px interi, e un tetto con la virgola le arrotonderebbe oltre il posto
+      // della fila, che le stringerebbe tutte in proporzione tagliando di un pixel anche il nome che ci stava (#429).
+      tetto = Math.max(MIN_SCHEDA, Math.floor(lo));
+    }
+    const attiva = attivaCon(tetto);
+    const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
+    const avanzo = Math.floor(posto - totale(tetto));
+    const conStacco = attiva + Math.max(0, Math.min(stacco, avanzo));
+    return naturali.map((w, i) => (i === ia ? conStacco : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
+  }
+  function misuraLarghezzeChieste() {
+    const schede = [...tabsEl.children];
+    if (!schede.length) return;
+    const posto = spazioDellaStriscia();
+    schede.forEach((el) => el.classList.add('misura'));
+    const pad = getComputedStyle(schede[0]);
+    const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
+    const naturali = schede.map((el) => Math.ceil(el.getBoundingClientRect().width));
+    const ia = schede.findIndex((el) => el.classList.contains('active'));
+    const misurate = larghezzeDistribuite(naturali, ia, posto);
+    const chiave = schede.map((el) => el.dataset.id).join(',') + '|' + ia;
+    const tieni = puntatoreSullaFila && larghezzeInVigore && larghezzeInVigore.chiave === chiave;
+    passoTrattenuto = Boolean(tieni) && misurate.some((w, i) => w !== larghezzeInVigore.w[i]);
+    const w = tieni ? larghezzeInVigore.w : misurate;
+    larghezzeInVigore = { chiave, w };
+    // La striscia divide in proporzione solo lo spazio oltre il padding: crescita e misura si contano sul contenuto.
+    schede.forEach((el, i) => {
+      const contenuto = Math.max(1, Math.ceil(w[i] - bordi));
+      el.style.setProperty('--tab-chiesta', `${contenuto}px`);
+      el.style.setProperty('--tab-crescita', String(contenuto));
+      el.classList.toggle('segni-stretti', w[i] < naturali[i]);
+      el.classList.remove('misura');
+    });
+  }
+
+  // La barra si riconcilia per id (#1089): un aggiornamento tocca solo le schede cambiate e i nodi restano gli
+  // stessi, così bagliore audio e suggerimenti non ripartono; misure e scorrimento si rifanno solo quando servono.
+  const schedeVive = new Map(); // id → .tab
+
+  // Il main rispedisce un'icona solo quando cambia (`faviconUguale`): le altre si riprendono dall'ultimo snapshot.
+  // Solo byte già scaricati dal main con la sessione della scheda: un indirizzo qui girerebbe nella sessione della barra (#1083).
+  const iconeNote = new Map(); // id → { dato, giro }
+  function conIcone(snap) {
+    if (!snap || !Array.isArray(snap.tabs)) return snap;
+    const vive = new Map();
+    for (const t of snap.tabs) {
+      const id = String(t.id);
+      const prima = iconeNote.get(id);
+      if (t.faviconUguale) t.favicon = prima ? prima.dato : '';
+      const dato = /^data:image\//.test(t.favicon || '') ? t.favicon : '';
+      vive.set(id, prima && prima.dato === dato ? prima : { dato, giro: (prima ? prima.giro : 0) + 1 });
+    }
+    iconeNote.clear();
+    for (const [id, nota] of vive) iconeNote.set(id, nota);
+    return snap;
+  }
+  const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
+  let firmaMisura = '';
+  let attivaInVista = null;
+  // Colori veri del tema: leggerli forza un ricalcolo degli stili, quindi si rileggono solo al cambio di tema.
+  let coloriTema;
+  function coloriDelTema() {
+    if (coloriTema === undefined) {
+      const bar = TabColor.resolveCssColor(document, 'var(--tab-bg)');
+      const page = TabColor.resolveCssColor(document, 'var(--bg)');
+      const fg = TabColor.resolveCssColor(document, 'var(--fg)');
+      coloriTema = bar && page && fg ? { bar, page, fg } : null;
+    }
+    return coloriTema;
+  }
+  // Il colore salvato del sito ha la tinta piena: saturazione e luminosità dell'utente si applicano qui.
+  function coloreDelSito(t) {
+    const c = TabColor && t.identityColor ? TabColor.adaptIdentity(t.identityColor, tabColorParams) : null;
+    return c ? TabColor.rgbCss(c) : null;
+  }
+
+  // Tutto ciò che si vede di una scheda: due descrizioni uguali disegnano la stessa scheda.
+  function descriviScheda(t, tinte) {
+    const attiva = t.id === state.activeId;
+    const d = { attiva, classi: [], stili: {} };
+    // Con l'anteprima accesa la carta dice già il titolo: il suggerimento di testo sarebbe un doppione.
+    if (anteprimaSchede.enabled) d.anteprima = true;
+    else d.tip = t.title || t.url || '';
+    const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
+    if (ferma) d.ferma = ferma;
+    // Tab attiva: sempre il colore della cima della pagina, anche bianca, mai il
+    // marchio del sito (decisione D63). Inchiostro con la regola delle inattive.
+    if (attiva && t.color) {
+      d.stili['--tab-active'] = t.color;
+      const c = TabColor ? coloriDelTema() : null;
+      const ink = c && TabColor.readableInk([t.color], [c.fg, c.page]);
+      if (ink) {
+        d.classi.push('inked');
+        d.stili['--tab-ink'] = TabColor.rgbCss(ink);
       }
-
-      // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
-      // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
-      // assumono lo stesso colore. Il testo passa a chiaro/scuro per contrasto.
-      // Se il colore campionato dalla cima pagina è neutro (header bianco/grigio:
-      // es. YouTube) non porta identità → ripieghiamo sul colore identità del
-      // sito (theme-color/favicon), così la tab attiva mostra il brand e non il
-      // bianco. Se manca anche quello, si resta sul colore campionato.
-      if (t.id === state.activeId) {
-        const activeColor = hasColorIdentity(t.color) ? t.color : (t.identityColor || t.color);
-        if (activeColor) {
-          const fg = readableOn(activeColor);
-          el.style.setProperty('--tab-active', activeColor);
-          if (fg) el.style.color = fg;
-        }
+    }
+    // Tab INATTIVE: la tinta del sito mescolata col neutro della barra quanto
+    // dice opacita_tab (tabColor.js). Passa da --tab-bg-eff, non da
+    // `background`, perché l'hover del CSS si calcola sulla stessa variabile.
+    if (!attiva && t.identityColor && tinte) {
+      const bg = TabColor.inactiveTabBackground(t.identityColor, tinte.bar, tabColorParams);
+      if (bg) {
+        const { ink, hover } = TabColor.inkAndHover(bg, tinte.fg, tinte.page);
+        d.classi.push('tinted', 'inked');
+        d.stili['--tab-bg-eff'] = TabColor.rgbCss(bg);
+        d.stili['--tab-bg-hover'] = TabColor.rgbCss(hover);
+        d.stili['--tab-ink'] = TabColor.rgbCss(ink);
       }
+    }
+    // Audio in riproduzione: bagliore col colore identità della scheda, o l'accento Filo se non ce l'ha.
+    const suona = t.audible && !t.muted;
+    if (suona) {
+      d.classi.push('audible');
+      const glow = hasColorIdentity(t.color) ? t.color : coloreDelSito(t);
+      if (glow) d.stili['--tab-glow-color'] = glow;
+    }
+    // Nella firma l'icona entra col suo numero di giro: un data: URL da centinaia di KB a ogni ridisegno bloccava la barra.
+    const nota = iconeNote.get(String(t.id));
+    d.icona = t.loading ? null : (nota && nota.dato ? nota.giro : '');
+    d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
+    d.titolo = tabLabel(t);
+    d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
+    const pm = t.permessi;
+    if (pm && ((pm.usati && pm.usati.length) || (pm.negati && pm.negati.length))) {
+      d.permessi = { usati: [...(pm.usati || [])].sort(), negati: [...(pm.negati || [])].sort() };
+    }
+    return d;
+  }
 
-      // Tab INATTIVE: tinta identità attenuata del sito (§1.2). Smorziamo la
-      // saturazione e poi mescoliamo col neutro del tab bar via CSS, così la
-      // tinta è appena percepibile ma riconoscibile a livello subliminale.
-      // Usiamo la variabile --tab-bg-eff (non `background` diretto) per non
-      // rompere il feedback di hover, che è definito in CSS sulla stessa var.
-      if (t.id !== state.activeId && t.identityColor && tabOpacity > 0) {
-        const tint = attenuateIdentity(t.identityColor);
-        if (tint) {
-          // `opacita_tab` controlla la frazione di tinta nel mix col fondo del
-          // tab bar: 0.6 (default) ≈ tinta percepibile ma sobria, 1 = piena.
-          const pct = Math.round(tabOpacity * 100);
-          el.style.setProperty(
-            '--tab-bg-eff',
-            `color-mix(in srgb, ${tint} ${pct}%, var(--tab-bg))`,
-          );
-        }
-      }
+  // Il segno di cosa il sito della scheda ha avuto in questa pagina o si è visto negare (#586): icone piccole prima della
+  // croce. Se lo usa ancora lo sa solo la pagina, e la pagina può mentire: le frasi dicono cosa ha avuto, non «adesso».
+  const SEGNI_PERMESSI = {
+    audio: ['mic', 'Ha avuto il microfono in questa pagina', 'Microfono negato'],
+    video: ['camera', 'Ha avuto la fotocamera in questa pagina', 'Fotocamera negata'],
+    posizione: ['location', 'Ha saputo dove ti trovi in questa pagina', 'Posizione negata'],
+    schermo: ['windowFrame', 'Ha visto il tuo schermo in questa pagina', 'Schermo negato'],
+    notifiche: ['bell', '', 'Notifiche negate'],
+    appunti: ['clipboard', '', 'Appunti negati'],
+    schermi: ['windowFrame', '', 'Schermi negati'],
+    presenza: ['user', '', 'Presenza al computer negata'],
+    strumenti: ['readAloud', '', 'Strumenti musicali negati'],
+    rete: ['wifi', '', 'Rete locale negata'],
+    file: ['pencil', '', 'Modifica dei file negata'],
+  };
+  // Il primo segno è il più delicato: sulla scheda più stretta del suo contenuto resta solo lui (shell.css), la frase li dice tutti.
+  const PESO_SEGNO = ['schermo', 'video', 'audio', 'posizione'];
+  const pesoSegno = (x) => { const i = PESO_SEGNO.indexOf(x); return i < 0 ? PESO_SEGNO.length : i; };
+  function disegnaSegni(nodo, pm) {
+    const frasi = [];
+    nodo.replaceChildren();
+    const usati = [...pm.usati].sort((a, b) => pesoSegno(a) - pesoSegno(b));
+    for (const [parte, negato] of [...usati.map((x) => [x, false]), ...pm.negati.map((x) => [x, true])]) {
+      const def = SEGNI_PERMESSI[parte];
+      if (!def) continue;
+      const i = document.createElement('span');
+      i.className = negato ? 'segno negato' : 'segno';
+      i.dataset.parte = parte;
+      setIcon(i, def[0], 13);
+      nodo.appendChild(i);
+      frasi.push(negato ? def[2] : def[1]);
+    }
+    const tip = frasi.filter(Boolean).join(' · ');
+    nodo.dataset.tip = tip;
+    nodo.setAttribute('aria-label', tip);
+  }
 
-      // Audio in riproduzione: aggiunge classe per il bagliore animato.
-      // Il colore del bagliore viene calcolato dal colore identità della tab
-      // (desaturato, come la tinta §1.2) e impostato come variabile CSS inline.
-      const isAudible = t.audible && !t.muted;
-      if (isAudible) {
-        el.classList.add('audible');
-        // Calcola il colore del bagliore: usa il colore identità se disponibile,
-        // altrimenti l'accento Filo come fallback. Desaturiamo già via CSS.
-        const glowBase = hasColorIdentity(t.color) ? t.color
-          : (t.identityColor || null);
-        if (glowBase) {
-          el.style.setProperty('--tab-glow-color', glowBase);
-        }
-      }
+  function creaScheda(id) {
+    const el = document.createElement('div');
+    el.dataset.id = id;
+    const ico = document.createElement('div');
+    const title = document.createElement('span');
+    title.className = 'title';
+    const close = document.createElement('span');
+    close.className = 'close';
+    if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
+    else close.textContent = '×';
+    el.append(ico, title, close);
+    el._parti = { ico, title, close, paese: null, audio: null, permessi: null };
+    return el;
+  }
 
-      // Slot favicon / spinner. Quando la tab suona, l'icona audio SOSTITUISCE
-      // la favicon in questo slot: un unico indicatore, sempre visibile a
-      // qualsiasi larghezza (lo slot è a larghezza fissa), che non si sovrappone
-      // mai alla favicon né viene duplicato altrove nella tab.
-      const ico = document.createElement('div');
-      if (t.loading) {
-        ico.className = 'spinner';
-      } else if (isAudible) {
-        // L'icona audio prende il posto della favicon (nessun overlay sotto).
-        ico.className = 'favicon favicon-audible';
-        ico.innerHTML = AUDIO_IND_SVG;
-        // Clic sullo slot favicon-audible muta la tab.
-        ico.setAttribute('role', 'button');
-        ico.title = 'Silenzia';
-        ico.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
-        ico.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-      } else {
-        ico.className = 'favicon';
-        if (t.favicon) ico.style.backgroundImage = `url("${t.favicon}")`;
-      }
-      el.appendChild(ico);
+  function applicaScheda(el, d) {
+    const id = el.dataset.id;
+    const classi = ['tab', ...(d.attiva ? ['active'] : []), ...d.classi].join(' ');
+    if (el.className !== classi) el.className = classi;
+    if (d.anteprima) {
+      el.dataset.anteprima = id;
+      delete el.dataset.tip;
+    } else {
+      delete el.dataset.anteprima;
+      el.dataset.tip = d.tip;
+    }
+    for (const p of STILI_SCHEDA) {
+      if (d.stili[p]) el.style.setProperty(p, d.stili[p]);
+      else el.style.removeProperty(p);
+    }
+    const ferma = d.ferma ? `${d.ferma}px` : '';
+    el.style.flex = ferma ? `0 0 ${ferma}` : '';
+    el.style.minWidth = ferma;
+    el.style.maxWidth = ferma;
 
-      // Indicatore "audio mutato": un altoparlante barrato accanto al titolo,
-      // così l'utente sa quali tab ha silenziato senza doverci passare sopra.
-      if (t.muted) {
-        const m = document.createElement('span');
-        m.className = 'mute-ind';
-        m.setAttribute('role', 'button');
-        m.title = 'Riattiva audio';
-        m.setAttribute('aria-label', 'Audio mutato — clicca per riattivare');
-        m.innerHTML = MUTE_IND_SVG;
-        m.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-        el.appendChild(m);
-      }
+    const p = el._parti;
+    // Un sito senza icona prende il globo, come nella home: il posto vuoto sembrava un'icona che non si è caricata.
+    const senzaIcona = d.icona === '';
+    p.ico.className = d.icona === null ? 'spinner' : senzaIcona ? 'favicon senza-icona' : 'favicon';
+    const nota = d.icona ? iconeNote.get(id) : null;
+    p.ico.style.backgroundImage = nota && nota.dato ? `url("${nota.dato}")` : '';
+    p.ico.innerHTML = senzaIcona && typeof ICONS.globe === 'function' ? ICONS.globe(14) : '';
 
-      // Indicatore "aperta da un altro paese": globo + codice paese accanto al
-      // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
-      if (t.proxy && t.proxy.country) {
-        const p = document.createElement('span');
-        p.className = 'proxy-ind';
-        p.setAttribute('aria-label', 'Aperta da un altro paese');
-        p.innerHTML = PROXY_IND_SVG + '<span class="cc">' + t.proxy.country.toUpperCase() + '</span>';
-        el.appendChild(p);
-      }
+    // Indicatore "aperta da un altro paese": globo + codice paese accanto al
+    // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
+    if (d.paese && !p.paese) {
+      p.paese = document.createElement('span');
+      p.paese.className = 'proxy-ind';
+      p.paese.setAttribute('aria-label', 'Aperta da un altro paese');
+      p.paese.dataset.tip = 'Aperta da un altro paese';
+      p.paese.innerHTML = PROXY_IND_SVG + '<span class="cc"></span>';
+      el.insertBefore(p.paese, p.title);
+    } else if (!d.paese && p.paese) {
+      p.paese.remove();
+      p.paese = null;
+    }
+    if (p.paese) p.paese.querySelector('.cc').textContent = d.paese;
 
-      const title = document.createElement('span');
-      title.className = 'title';
-      title.textContent = tabLabel(t);
-      el.appendChild(title);
+    if (p.title.textContent !== d.titolo) p.title.textContent = d.titolo;
 
-      // Tasto destro su una tab → menu contestuale (Duplica / Muta / Chiudi).
-      el.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        openTabContextMenu(t, e.clientX, e.clientY);
-      });
-
-      const close = document.createElement('span');
-      close.className = 'close';
-      if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
-      else close.textContent = '×';
-      close.addEventListener('click', (e) => {
-        e.stopPropagation();
-        api.tabs.close(t.id);
-      });
-      el.appendChild(close);
-
-      el.addEventListener('mousedown', (e) => startTabDrag(e, t, el));
-      el.addEventListener('click', () => {
-        if (suppressClickId === t.id) { suppressClickId = null; return; }
-        api.tabs.activate(t.id);
-      });
-      el.addEventListener('auxclick', (e) => {
-        if (e.button === 1) api.tabs.close(t.id);
-      });
-      tabsEl.appendChild(el);
+    // Avviso audio dopo il titolo, come in Chrome (#431): suona o mutata stanno
+    // nello stesso posto, così il clic che muta lascia lì il tasto per riattivare.
+    if (d.audio && !p.audio) {
+      p.audio = document.createElement('span');
+      p.audio.setAttribute('role', 'button');
+      el.insertBefore(p.audio, p.close);
+    } else if (!d.audio && p.audio) {
+      p.audio.remove();
+      p.audio = null;
+    }
+    if (p.audio && p.audio.dataset.stato !== d.audio) {
+      const muta = d.audio === 'muta';
+      p.audio.dataset.stato = d.audio;
+      p.audio.className = 'tab-alert ' + (muta ? 'mute-ind' : 'audio-ind');
+      // Ogni controllo dentro la scheda porta il suo data-tip (mai `title`): senza, il suggerimento
+      // di Filo risale a quello della scheda e dice il titolo della pagina (#431).
+      p.audio.dataset.tip = muta ? 'Riattiva audio' : 'Silenzia';
+      p.audio.setAttribute('aria-label', muta
+        ? 'Audio mutato — clicca per riattivare'
+        : 'Audio in riproduzione — clicca per silenziare');
+      p.audio.innerHTML = muta ? MUTE_IND_SVG : AUDIO_IND_SVG;
     }
 
-    tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
+    if (d.permessi && !p.permessi) {
+      p.permessi = document.createElement('span');
+      p.permessi.className = 'tab-permessi';
+      el.insertBefore(p.permessi, p.audio || p.close);
+    } else if (!d.permessi && p.permessi) {
+      p.permessi.remove();
+      p.permessi = null;
+    }
+    if (p.permessi) disegnaSegni(p.permessi, d.permessi);
 
-    // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
-    // sempre visibile (può finire fuori vista dopo che ne apri molte).
-    const activeEl = tabsEl.querySelector('.tab.active');
-    if (activeEl) {
+    // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
+    p.close.dataset.tip = d.attiva ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
+  }
+
+  // Prima si tolgono i nodi che non restano, poi si mettono in ordine: un nodo che resta non si stacca mai.
+  function allineaSchede(nodi) {
+    const tieni = new Set(nodi);
+    for (const f of [...tabsEl.children]) if (!tieni.has(f)) f.remove();
+    nodi.forEach((n, i) => { if (tabsEl.children[i] !== n) tabsEl.insertBefore(n, tabsEl.children[i] || null); });
+  }
+
+  // `forza`: tema, font o impostazioni cambiati, quindi colori e larghezze si rileggono anche a schede uguali.
+  function render({ forza = false } = {}) {
+    if (forza) { coloriTema = undefined; firmaMisura = ''; }
+    // Durante una trascinata (già da armata, al mousedown) e col tasto giù sulla striscia non si ridisegna:
+    // riordinare i nodi riporterebbe indietro la scheda trascinata. Il broadcast dopo il rilascio ridisegna.
+    if (drag || premutoSullaStriscia) { ridisegnoRimandato = true; return; }
+    ridisegnoRimandato = false;
+    // opacita_tab 0 = nessun colore: la scheda resta identica a una senza favicon.
+    const tinte = TabColor && tabColorParams && tabColorParams.opacita_tab > 0
+      && state.tabs.some((t) => t.id !== state.activeId && t.identityColor) ? coloriDelTema() : null;
+
+    let cambiata = false;
+    const nodi = [];
+    const visti = new Set();
+    const perMisura = [];
+    for (const t of state.tabs) {
+      const id = String(t.id);
+      visti.add(id);
+      let el = schedeVive.get(id);
+      if (!el) { el = creaScheda(id); schedeVive.set(id, el); }
+      const d = descriviScheda(t, tinte);
+      const firma = JSON.stringify(d);
+      if (el._firma !== firma) {
+        applicaScheda(el, d);
+        el._firma = firma;
+        cambiata = true;
+      }
+      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0, d.permessi || null]);
+      nodi.push(el);
+    }
+    for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
+    if (nodi.length !== tabsEl.children.length || nodi.some((n, i) => tabsEl.children[i] !== n)) {
+      allineaSchede(nodi);
+      cambiata = true;
+    }
+
+    const flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
+    const firma = JSON.stringify([perMisura, flex]);
+    if (firma !== firmaMisura) {
+      firmaMisura = firma;
+      misuraLarghezzeChieste();
+      cambiata = true;
+    }
+    if (tabsEl.style.flex !== flex) tabsEl.style.flex = flex;
+    if (cambiata) { try { ANTEPRIMA.ridisegnata(); } catch (_) {} }
+
+    // §6 — con la striscia scrollabile la scheda attiva resta in vista: si porta lì quando cambia, non a ogni
+    // aggiornamento, o la rotellina che scorre la striscia verrebbe riportata indietro dal titolo di un'altra.
+    const activeEl = state.activeId != null ? schedeVive.get(String(state.activeId)) : null;
+    if (activeEl && attivaInVista !== activeEl) {
+      attivaInVista = activeEl;
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
     }
 
@@ -947,6 +1431,40 @@
     // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
     applyChrome(isHomeUrl(a ? a.url : null));
   }
+
+  // Gli eventi delle schede stanno sulla striscia: valgono per ogni nodo, anche nato dopo, e leggono la
+  // scheda di adesso, non quella del momento in cui il nodo è nato.
+  function schedaDellEvento(e) {
+    const el = e.target && e.target.closest ? e.target.closest('.tab') : null;
+    if (!el || el.parentElement !== tabsEl) return null;
+    const t = state.tabs.find((x) => String(x.id) === el.dataset.id);
+    return t ? { el, t } : null;
+  }
+  tabsEl.addEventListener('contextmenu', (e) => {
+    const s = schedaDellEvento(e);
+    if (!s) return;
+    e.preventDefault();
+    openTabContextMenu(s.t, e.clientX, e.clientY);
+  });
+  tabsEl.addEventListener('mousedown', (e) => {
+    const s = schedaDellEvento(e);
+    if (s) startTabDrag(e, s.t, s.el);
+  });
+  tabsEl.addEventListener('click', (e) => {
+    const s = schedaDellEvento(e);
+    if (!s) return;
+    if (e.target.closest('.close')) { api.tabs.close(s.t.id); return; }
+    if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
+    if (suppressClickId === s.t.id) { suppressClickId = null; return; }
+    api.tabs.activate(s.t.id);
+  });
+  tabsEl.addEventListener('auxclick', (e) => {
+    if (e.button !== 1) return;
+    const s = schedaDellEvento(e);
+    if (s) api.tabs.close(s.t.id);
+  });
+  // Un font che finisce di caricare cambia la larghezza dei nomi.
+  try { document.fonts.addEventListener('loadingdone', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); }); } catch (_) {}
 
   function displayUrl(url) {
     if (!url) return '';
@@ -967,7 +1485,7 @@
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia AI',
-    'archive/archive.html': 'Cronologia',
+    'quaderno/quaderno.html': 'Memorie',
     'home/home.html': 'Aperti per dopo',
     'spellcheck/spellcheck.html': 'Correttore',
   };
@@ -1003,11 +1521,9 @@
     return !url || url.startsWith('filo://newtab/');
   }
 
-  // La barra indirizzi è sempre nascosta: le icone di navigazione (indietro,
-  // avanti, ricarica) vivono nel menu tasto destro, mentre home/impostazioni/
-  // app/profilo sono state spostate DENTRO la pagina home (in alto a destra).
-  // Resta solo la fila di tab, e la WebContentsView risale a coprire lo spazio
-  // liberato. Manteniamo applyChrome (chiamata dal render) per idempotenza.
+  // La barra indirizzi è sempre nascosta: navigazione, home, impostazioni, app e
+  // profilo vivono nella barra laterale (#871). Resta solo la fila di tab, e la
+  // WebContentsView risale a coprire lo spazio liberato.
   let chromeCompact = null;
   function applyChrome(_isHome) {
     const compact = true;
@@ -1041,9 +1557,8 @@
     // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
     // vengono rimosse subito, senza attendere il timeout.
     const MAX_STACK = 5;
-    // Col puntatore sopra la pila i tempi aspettano; uscito, a chi era agli sgoccioli restano almeno questi ms.
-    const RIPRESA_MS = 2000;
-    let fermi = false;
+    // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
+    const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
     function hostEl() {
       if (!host) {
@@ -1063,7 +1578,7 @@
     }
     // Questa pila è il modello e non si disegna (la coprirebbe la scheda): a schermo la disegna la
     // vista sopra la pagina (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
       const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
@@ -1078,7 +1593,7 @@
       try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
-      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => ferma(!!(dati && dati.sopra)));
+      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
       api.avvisi.onAzione((dati) => {
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
@@ -1098,41 +1613,31 @@
       const over = live.length - MAX_STACK;
       for (let i = 0; i < over; i++) {
         const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._timer) clearTimeout(c._timer);
+        if (c._tempo) c._tempo.annulla();
+        uscita(c);
         try { c.remove(); } catch (_) {}
       }
     }
-    function avviaTempo(card, ms) {
-      card._restano = ms;
-      if (fermi) return;
-      card._scade = Date.now() + ms;
-      card._timer = setTimeout(() => dismiss(card), ms);
+    function uscita(card) {
+      const fn = card._alChiudere;
+      card._alChiudere = null;
+      if (typeof fn === 'function') { try { fn(); } catch (_) {} }
     }
-    function ferma(sopra) {
-      if (sopra === fermi) return;
-      fermi = sopra;
-      for (const c of hostEl().children) {
-        if (c.dataset.closing === '1' || c._restano == null) continue;
-        if (sopra) {
-          if (!c._timer) continue;
-          clearTimeout(c._timer);
-          c._timer = null;
-          c._restano = Math.max(0, c._scade - Date.now());
-        } else if (!c._timer) {
-          avviaTempo(c, Math.max(c._restano, RIPRESA_MS));
-        }
-      }
+    function avviaTempo(card, ms) {
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = tempi.avvia(ms, () => dismiss(card));
     }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
-      if (card._timer) clearTimeout(card._timer);
-      card._timer = null;
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = null;
+      uscita(card);
       card.classList.remove('show');
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
-      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) fermi = false;
+      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, ThemeTokens ? ThemeTokens.motionMs(220) : 220);
     }
     // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3). Stanno prima della X.
     function azioni(card, actions) {
@@ -1159,34 +1664,34 @@
       card.insertBefore(bar, card.querySelector('.shell-notif-close'));
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
-    // actions: [{ label, onClick }], unica }. Senza opts usa la config delle Preferenze.
+    // actions: [{ label, onClick }], unica, alChiudere }. Senza opts usa la config delle Preferenze.
+    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, tetto).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
       if (opts.key) dismissKey(opts.key);
-      const durationSec = opts.durationSec != null
-        ? Number(opts.durationSec)
-        : notifConfig.durationSec;
-      const durata = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 0;
+      // Una durata scelta da chi chiama vale per la durata standard: quella delle Preferenze la riporta in scala.
+      const chiesta = opts.durationSec != null ? Number(opts.durationSec) : window.SN_AVVISI.STANDARD_SEC;
+      const durata = window.SN_AVVISI.durata(Number.isFinite(chiesta) && chiesta >= 0 ? chiesta * 1000 : undefined, notifConfig.durationSec);
 
       const chiave = opts.unica ? String(opts.unica) : '';
       const gemella = chiave && Array.from(hostEl().children)
         .find((c) => c.dataset.unica === chiave && c.dataset.closing !== '1');
       if (gemella) {
+        if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
+        gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
-        if (gemella._timer) clearTimeout(gemella._timer);
-        gemella._timer = null;
-        gemella._restano = null;
-        if (durata) avviaTempo(gemella, durata * 1000);
+        avviaTempo(gemella, durata);
         return gemella;
       }
 
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
+      card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
 
@@ -1219,10 +1724,13 @@
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
       if (wantSound && window.SN_SOUNDS) {
-        try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
+        try {
+          const tono = typeof wantSound === 'string' ? wantSound : notifConfig.sound;
+          window.SN_SOUNDS.play(tono, notifConfig.soundVolume);
+        } catch (_) {}
       }
 
-      if (durata) avviaTempo(card, durata * 1000);
+      avviaTempo(card, durata);
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
@@ -1253,7 +1761,7 @@
       // senza eseguirlo) resta a un clic.
       // La domanda sta nella riga del pannello: un avviso in basso finirebbe
       // sotto la pagina, e il clic sembrerebbe non fare niente.
-      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.text); return; }
+      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.parti); return; }
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
@@ -1277,6 +1785,8 @@
 
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
+    let annullata = false;
+    let allaChiusura = null;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito; con apriComunque scavalca la lista dei siti bloccati (#170.3).
@@ -1288,12 +1798,50 @@
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl, a.apriComunque === true) };
           }
-          // F4 — undo auto-feedback: azione dichiarativa cancelAutoFeedback.
+          // #759 — la proposta dopo un accesso: «Resta connesso» su quel sito.
+          if (a && typeof a.restaConnesso === 'string' && !a.onClick && api.tabs.restaConnesso) {
+            const sito = a.restaConnesso;
+            return { label: a.label, onClick: () => restaConnesso(null, true, sito) };
+          }
+          // F4 — la segnalazione automatica aspetta questo avviso (#784.6): Annulla la ferma, chiuderlo la fa partire.
           if (a && a.cancelAutoFeedback && !a.onClick) {
-            const fbId = a.cancelAutoFeedback;
+            const fbId = String(a.cancelAutoFeedback);
+            const nonRitirata = (r) => NOTIFS.show((r && r.frase) || 'Non sono riuscito a ritirare la segnalazione');
+            allaChiusura = () => { if (!annullata) api.message({ type: 'auto_feedback_parti', id: fbId }).catch(() => {}); };
             return {
               label: a.label,
-              onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
+              onClick: () => {
+                annullata = true;
+                api.message({ type: 'cancel_auto_feedback', id: fbId })
+                  .then((r) => { if (!r || r.ok === false) nonRitirata(r); }, () => nonRitirata(null));
+              },
+            };
+          }
+          // #975 — la proposta del menu del sito: «Sì» lo mette al primo posto su quel sito, «Annulla» lo toglie.
+          if (a && a.menuDelSito && !a.onClick) {
+            const { sito, attivo } = a.menuDelSito;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'menu_del_sito_imposta', sito, attivo: attivo === true, avvisa: attivo === true }).catch(() => {}),
+            };
+          }
+          // #843 — «Annulla» dopo aver spento o riacceso Filo su un sito: rimette i siti di quel cambio.
+          if (a && a.filoSpento && !a.onClick) {
+            const { siti, spento } = a.filoSpento;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'filo_spento_imposta', siti: Array.isArray(siti) ? siti : [], spento: spento === true }).catch(() => {}),
+            };
+          }
+          // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
+          if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
+          // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
+          if (a && a.aggiornaFilo && !a.onClick) {
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'aggiornamento_installa' }).then((res) => {
+                if (res && res.ok === false) NOTIFS.show(res.frase || 'Non sono riuscito ad avviare l’aggiornamento');
+              }).catch(() => {}),
             };
           }
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
@@ -1305,9 +1853,21 @@
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
+          // #950 — il nome dato da solo a uno scaricamento: «Annulla» rimette quello con cui era arrivato.
+          if (a && a.rimettiNomeDownloadId && !a.onClick && api.downloads && api.downloads.rimettiNome) {
+            const id = a.rimettiNomeDownloadId;
+            return {
+              label: a.label,
+              onClick: () => api.downloads.rimettiNome(id).then((r) => {
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
+                else NOTIFS.show((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima');
+              }).catch(() => {}),
+            };
+          }
           return a;
         }),
       };
+      if (allaChiusura) opts.alChiudere = allaChiusura;
     }
     NOTIFS.show(info.text, opts);
   });
@@ -1328,17 +1888,10 @@
   }
 
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
-  // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
-  // nativa della pagina) + pannello espandibile con i singoli download. Il
-  // pannello sfrutta reserveTop per rivelarsi SOPRA l'area pagina (che è una
-  // WebContentsView nativa e altrimenti lo occulterebbe).
+  // Pannello dei singoli download, che si apre da solo quando c'è una domanda (#588): nella fila di tab non
+  // c'è un tasto (#941), l'elenco sta nella home e nella pagina Download. reserveTop lo porta SOPRA la view
+  // nativa della pagina, che altrimenti lo coprirebbe.
   if (api.downloads) {
-    const dlBtn = document.getElementById('dl-indicator');
-    const dlIcon = document.getElementById('dl-ind-icon');
-    const dlCount = document.getElementById('dl-ind-count');
-    const dlFill = document.getElementById('dl-ind-fill');
-    setIcon(dlIcon, 'download', 15);
-
     // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
     let panelOpen = false;
@@ -1382,44 +1935,9 @@
       }
     }
 
-    function renderIndicator() {
-      const all = Array.from(dls.values());
-      if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
-      dlBtn.hidden = false;
-      const active = all.filter(isActive);
-      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
-      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
-      // segno che la domanda è ancora lì sparirebbe con lui.
-      const attesa = all.filter((r) => r && r.state === 'pending');
-      dlBtn.classList.toggle('attesa', attesa.length > 0);
-      dlBtn.dataset.tip = attesa.length
-        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
-        : 'Scaricamenti';
-      if (active.length || attesa.length) {
-        dlCount.hidden = false;
-        dlCount.textContent = String(active.length + attesa.length);
-        // Avanzamento aggregato: byte ricevuti / totali sui download con totale
-        // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
-        let recv = 0; let total = 0; let known = 0;
-        for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (!active.length) {
-          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
-          // che aspetta l'utente e non si muove.
-          dlBtn.classList.remove('indeterminate', 'active');
-          dlFill.style.width = '0%';
-        } else if (known && total > 0) {
-          dlBtn.classList.remove('indeterminate');
-          dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
-          dlBtn.classList.add('active');
-        } else {
-          dlBtn.classList.add('indeterminate', 'active');
-          dlFill.style.width = '40%';
-        }
-      } else {
-        dlBtn.classList.remove('active', 'indeterminate');
-        dlCount.hidden = true;
-        dlFill.style.width = '0%';
-      }
+    // Un elenco svuotato non lascia aperto un pannello che direbbe solo «Nessun download».
+    function aggiornaPannello() {
+      if (!dls.size) { if (panelOpen) closePanel(); return; }
       if (panelOpen) renderPanel();
     }
 
@@ -1437,13 +1955,13 @@
       head.className = 'dl-panel-head';
       const title = document.createElement('span');
       title.className = 'dl-panel-title';
-      title.textContent = 'Scaricamenti';
+      title.textContent = 'Download';
       // Punto d'accesso alla pagina completa (cronologia + azioni per voce).
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
       allBtn.textContent = 'Vedi tutti';
-      allBtn.title = 'Apri l’elenco completo degli scaricamenti';
+      allBtn.title = 'Apri l’elenco completo dei download';
       allBtn.addEventListener('click', () => {
         api.tabs.open('filo://downloads/downloads.html');
         closePanel();
@@ -1452,13 +1970,23 @@
       clearBtn.type = 'button';
       clearBtn.className = 'dl-panel-clear';
       clearBtn.textContent = 'Svuota';
-      clearBtn.title = 'Rimuovi gli scaricamenti conclusi';
+      clearBtn.title = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
+      // Senza un tasto nella fila di tab (#941) questa è la strada per chiuderlo col mouse; chiudere non risponde.
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'dl-panel-close';
+      closeBtn.id = 'dl-panel-close';
+      closeBtn.dataset.tip = 'Chiudi';
+      closeBtn.setAttribute('aria-label', 'Chiudi');
+      setIcon(closeBtn, 'close', 13);
+      closeBtn.addEventListener('click', () => closePanel());
       head.appendChild(title);
       head.appendChild(allBtn);
       head.appendChild(clearBtn);
+      head.appendChild(closeBtn);
       panel.appendChild(head);
       const list = document.createElement('div');
       list.className = 'dl-panel-list';
@@ -1482,7 +2010,7 @@
       if (!all.length) {
         const empty = document.createElement('div');
         empty.className = 'dl-empty';
-        empty.textContent = 'Nessuno scaricamento';
+        empty.textContent = 'Nessun download';
         list.replaceChildren(empty);
       } else if (window.SN_RIGHE_VIVE) {
         window.SN_RIGHE_VIVE.riconcilia(list, all.map(renderRow), ':scope > .dl-row-actions');
@@ -1551,13 +2079,13 @@
       }
       row.appendChild(meta);
 
-      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : '';
-      const domanda = r.state === 'pending' ? testoScarica(r) : apri;
+      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : null;
+      const domanda = r.state === 'pending' ? partiScarica(r) : apri;
       if (domanda) {
         row.dataset.chiede = '1';
         const ask = document.createElement('div');
         ask.className = 'dl-row-ask';
-        ask.textContent = domanda;
+        riempiDomanda(ask, domanda);
         row.appendChild(ask);
       }
       if (avvisiRiga.has(r.id)) {
@@ -1610,8 +2138,83 @@
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      if (r.state === 'completed' && !apri) {
+        row.addEventListener('contextmenu', (e) => { e.preventDefault(); apriMenuRiga(r); });
+        if (menuRiga.id === r.id && menuRiga.voci.length) {
+          row.classList.add('dl-row-con-menu');
+          row.appendChild(costruisciMenuRiga(r));
+        }
+      }
       return row;
     }
+
+    // #950 — il tasto destro su un file del pannello: le azioni della pagina Scaricamenti, compreso il nome
+    // sensato. Il menu si apre DENTRO la riga: fuori dal pannello lo coprirebbe la pagina, che sta sopra la barra.
+    // «Dai un nome sensato» porta alla pagina col riquadro aperto: nel pannello non c'è posto per casella ed esito.
+    const menuRiga = { id: '', voci: [] };
+    function chiudiMenuRiga() {
+      if (!menuRiga.id) return;
+      menuRiga.id = '';
+      menuRiga.voci = [];
+      if (panelOpen) renderPanel();
+    }
+    async function apriMenuRiga(riga) {
+      // La riga resta in pagina mentre il record cambia (nome nuovo, file sparito): conta quello di adesso.
+      const r = dls.get(riga.id) || riga;
+      const voci = [];
+      if (!r.missing) voci.push(['Apri file', () => openDownloadFile(r.id)]);
+      voci.push(['Apri cartella', () => openDownloadFolder(r.id)]);
+      const N = window.SN_NOMI_FILE;
+      if (!r.missing && !r.exe && N && N.tipoDi(r.filename)) {
+        let disp = false;
+        try { disp = !!((await api.message({ type: 'file_nome_stato' })) || {}).disponibile; } catch (_) { disp = false; }
+        if (disp) {
+          voci.push(['Dai un nome sensato', () => {
+            api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(r.id)}`);
+            closePanel();
+          }]);
+        }
+      }
+      if (!r.missing && r.nomeOriginale) {
+        voci.push(['Rimetti il nome di prima', () => api.downloads.rimettiNome(r.id).then((res) => {
+          avvisiRiga.set(r.id, res && res.ok
+            ? (res.cambiato ? `Il nome di prima era occupato: ora è «${res.nome}»` : `Nome di prima rimesso: ${res.nome}`)
+            : ((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima'));
+          if (panelOpen) renderPanel();
+        }).catch(() => {})]);
+      }
+      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {})]);
+      menuRiga.id = r.id;
+      menuRiga.voci = voci;
+      if (panelOpen) renderPanel();
+      const primo = panel && panel.querySelector('.dl-row-menu-voce');
+      if (primo) try { primo.focus({ preventScroll: false }); } catch (_) {}
+    }
+    function costruisciMenuRiga() {
+      const m = document.createElement('div');
+      m.className = 'dl-row-menu';
+      m.setAttribute('role', 'menu');
+      for (const [label, fn] of menuRiga.voci) {
+        const v = document.createElement('div');
+        v.className = 'dl-row-menu-voce';
+        v.setAttribute('role', 'menuitem');
+        v.tabIndex = 0;
+        v.textContent = label;
+        const scegli = () => { chiudiMenuRiga(); fn(); };
+        v.addEventListener('click', (e) => { e.stopPropagation(); scegli(); });
+        v.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scegli(); }
+        });
+        m.appendChild(v);
+      }
+      return m;
+    }
+    document.addEventListener('mousedown', (e) => {
+      if (menuRiga.id && !(e.target.closest && e.target.closest('.dl-row-menu'))) chiudiMenuRiga();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menuRiga.id) { e.stopImmediatePropagation(); chiudiMenuRiga(); }
+    }, true);
 
     // reserveTop = altezza del pannello (capped) così la view della pagina
     // scende e il pannello non finisce sotto di essa. Vedi setTopInset in tabs.js.
@@ -1626,7 +2229,6 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
-      dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
       // I file possono essere spariti dal disco mentre il pannello era chiuso
@@ -1636,18 +2238,15 @@
     }
     function closePanel() {
       panelOpen = false;
-      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
-      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre un programma in attesa resta in
+      // attesa, e la risposta si dà dalla pagina Download o dalla carta della home.
       domandeApri.clear();
       avvisiRiga.clear();
       firmaElenco = '';
       if (panel) panel.hidden = true;
-      dlBtn.classList.remove('open');
       riservaSopra('scaricamenti', 0);
     }
-    function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
-    dlBtn.addEventListener('click', togglePanel);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
@@ -1657,7 +2256,7 @@
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
-      renderIndicator();
+      aggiornaPannello();
       if (panelOpen) renderPanel();
     }
 
@@ -1667,20 +2266,38 @@
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
-      renderIndicator();
+      aggiornaPannello();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
       if (info.kind === 'ask') mostraRiga(info.item.id);
       else if (panelOpen) renderPanel();
     });
 
     function provenienza(r) {
-      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); } catch (_) {}
       return r.site ? `da ${r.site}` : '';
     }
 
-    function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
-      return `«${r.filename}» è un programma. Scaricarlo?`;
+    // Le domande sui programmi a pezzi: il nome lo sceglie il sito, e fra le parole di Filo potrebbe chiudere le
+    // virgolette e continuare con la sua voce. Sta in un riquadro suo, come nei popup di conferma (#592.7).
+    function partiScarica(r) {
+      try { return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
+      return ['Il file', { citazione: String(r.filename || '') }, 'è un programma. Scaricarlo?'];
+    }
+
+    function riempiDomanda(el, parti) {
+      for (const p of parti) {
+        if (typeof p === 'string') {
+          if (!p.trim()) continue;
+          const t = document.createElement('div');
+          t.textContent = p.trim();
+          el.appendChild(t);
+        } else if (p && typeof p === 'object' && p.citazione != null) {
+          const q = document.createElement('div');
+          q.className = 'dl-row-ask-nome';
+          q.textContent = String(p.citazione);
+          el.appendChild(q);
+        }
+      }
     }
 
     // Apre il pannello (che fa spazio sopra la pagina) e porta in vista la riga.
@@ -1692,8 +2309,11 @@
       });
     }
 
-    chiediApertura = (id, testo) => {
-      domandeApri.set(id, testo || 'È un programma: aprirlo vuol dire eseguirlo.');
+    chiediApertura = (id, parti) => {
+      const r = dls.get(id);
+      let d = Array.isArray(parti) && parti.length ? parti : null;
+      if (!d && r) { try { d = window.SN_ESEGUIBILI.partiApri(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {} }
+      domandeApri.set(id, d || ['È un programma: aprirlo vuol dire eseguirlo.']);
       mostraRiga(id);
     };
 
@@ -1748,10 +2368,10 @@
 
   api.tabs.onUpdate((snap) => {
     fermaLarghezzeSeChiusa(snap);
-    state = snap;
+    state = conIcone(snap);
     render();
   });
-  api.tabs.snapshot().then((snap) => { state = snap; render(); });
+  api.tabs.snapshot().then((snap) => { state = conIcone(snap); render(); });
 
   // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
   // Il box feedback vive in un content script sulla pagina e da lì oscura solo
@@ -1877,14 +2497,48 @@
   // Il main blocca un window.open() non richiesto e manda { tabId, url, host }: è un avviso della
   // pila in basso a destra, con «Apri» per aprirlo comunque (la chip sotto la barra la copriva la scheda).
   if (api.tabs.onPopupBlocked) {
+    // Una pagina che riprova di continuo ha un avviso solo: i tentativi lo aggiornano senza allungarlo, e chiuso
+    // dall'utente tace finché la scheda resta su quella pagina (#737.1 giro 3). Scaduto da solo torna dopo una pausa
+    // dei tentativi: un blocco isolato si vede sempre, la catena no (giro 9). Una voce per scheda.
+    const popupAvvisati = new Map();
+    const PAUSA_POPUP_MS = 10000;
     api.tabs.onPopupBlocked((info) => {
       if (!info || !info.url) return;
-      const { url, tabId } = info;
-      NOTIFS.show(`Bloccato popup da ${info.host || '?'}`, {
+      const { tabId } = info;
+      const pagina = String(info.pagina || '');
+      const da = info.host || '?';
+      const testo = info.app === 'mailto' ? `Bloccata la posta aperta da ${da}`
+        : info.app === 'tel' ? `Bloccata la chiamata avviata da ${da}`
+          : info.app === 'sms' ? `Bloccato l'SMS aperto da ${da}`
+            : `Bloccato popup da ${da}`;
+      const ora = Date.now();
+      const prima = popupAvvisati.get(tabId);
+      if (prima && prima.pagina === pagina) {
+        const dopoUnaPausa = ora - prima.ultimo >= PAUSA_POPUP_MS;
+        prima.ultimo = ora;
+        if (prima.carta && prima.carta.isConnected && prima.carta.dataset.closing !== '1') {
+          prima.url = info.url;
+          const msg = prima.carta.querySelector('.shell-notif-msg');
+          if (msg && msg.textContent !== testo) msg.textContent = testo;
+          return;
+        }
+        if (prima.chiusa || !dopoUnaPausa) return;
+      }
+      const voce = { pagina, url: info.url, carta: null, ultimo: ora, chiusa: false };
+      popupAvvisati.set(tabId, voce);
+      voce.carta = NOTIFS.show(testo, {
         durationSec: 8,
-        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(url, false, tabId); } catch (_) {} } }],
+        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(voce.url, false, tabId); } catch (_) {} } }],
       });
+      const x = voce.carta && voce.carta.querySelector('.shell-notif-close');
+      if (x) x.addEventListener('click', () => { voce.chiusa = true; });
     });
+    if (api.tabs.onUpdate) {
+      api.tabs.onUpdate((snap) => {
+        const vive = new Set(((snap && snap.tabs) || []).map((t) => t && t.id));
+        for (const id of popupAvvisati.keys()) if (!vive.has(id)) popupAvvisati.delete(id);
+      });
+    }
   }
 
   // ─── Domande dei permessi (#591.1) ──────────────────────────────────────
@@ -1903,8 +2557,17 @@
       if (d.tipo === 'posizione') return { testo: 'vuole sapere dove ti trovi', icone: ['location'] };
       if (d.tipo === 'notifiche') return { testo: 'vuole mandarti notifiche', icone: ['bell'] };
       if (d.tipo === 'schermi') return { testo: 'vuole usare tutti i tuoi schermi', icone: ['windowFrame'] };
+      if (d.tipo === 'schermo') return { testo: 'vuole vedere il tuo schermo', icone: ['windowFrame'] };
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
+      if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
+      if (d.tipo === 'file') {
+        const o = d.oggetto || {};
+        const nome = String(o.nome || '');
+        if (!nome) return { testo: 'vuole modificare i tuoi file', icone: ['pencil'] };
+        if (o.cartella) return { testo: 'vuole creare, modificare e cancellare file in', nome, percorso: o.percorso, icone: ['folder'] };
+        return { testo: 'vuole modificare', nome, percorso: o.percorso, icone: ['pencil'] };
+      }
       const parti = Array.isArray(d.parti) ? d.parti : [];
       const mic = parti.includes('audio');
       const cam = parti.includes('video');
@@ -1923,12 +2586,46 @@
       return bar;
     };
 
-    const rispondiA = (d, si) => {
+    const rispondiA = (d, si, fonte) => {
       const i = domande.indexOf(d);
       if (i >= 0) domande.splice(i, 1);
-      api.tabs.rispondiPermesso(d.id, si).catch(() => {});
+      api.tabs.rispondiPermesso(d.id, si, fonte).catch(() => {});
       mostraDomanda();
     };
+
+    const creaConsenti = (d) => {
+      const si = document.createElement('button');
+      si.type = 'button';
+      si.className = 'permesso-btn permesso-si';
+      si.textContent = 'Consenti';
+      si.addEventListener('click', () => rispondiA(d, true));
+      return si;
+    };
+
+    const fontiDelloSchermo = (d) => (Array.isArray(d.fonti) ? d.fonti : []).map((f) => {
+      const bt = document.createElement('button');
+      bt.type = 'button';
+      bt.className = 'permesso-btn permesso-fonte';
+      bt.dataset.tipo = String(f.tipo || '');
+      const nome = f.questa ? 'Questa scheda' : String(f.nome || '');
+      bt.dataset.tip = nome;
+      const vista = document.createElement('span');
+      vista.className = 'permesso-fonte-vista';
+      if (typeof f.anteprima === 'string' && f.anteprima.startsWith('data:image/')) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = f.anteprima;
+        vista.appendChild(img);
+      } else {
+        setIcon(vista, f.tipo === 'scheda' ? 'globe' : 'windowFrame', 22);
+      }
+      const n = document.createElement('span');
+      n.className = 'permesso-fonte-nome';
+      n.textContent = nome;
+      bt.append(vista, n);
+      bt.addEventListener('click', () => rispondiA(d, true, String(f.id || '')));
+      return bt;
+    });
 
     // Funzioni come costanti: una dichiarazione dentro il blocco rimpiazzerebbe il `render` della shell.
     const mostraDomanda = () => {
@@ -1972,25 +2669,39 @@
       testo.className = 'permesso-cosa';
       testo.textContent = cosa.testo;
       msg.append(chi, ' ', testo);
-      const si = document.createElement('button');
-      si.type = 'button';
-      si.className = 'permesso-btn permesso-si';
-      si.textContent = 'Consenti';
+      if (cosa.nome) {
+        // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
+        const n = document.createElement('strong');
+        n.className = 'permesso-oggetto';
+        const c = Array.from(cosa.nome);
+        n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
+        n.title = String(cosa.percorso || cosa.nome);
+        msg.append(' ', n);
+      }
+      // Lo schermo (#586): ogni cosa che si può mostrare è il suo «Consenti», e la scelta vale per questa volta.
+      const consensi = d.tipo === 'schermo' ? fontiDelloSchermo(d) : [creaConsenti(d)];
       // Consenti si arma dopo ARMA_MS senza clic sulla striscia: una raffica che continua lo tiene spento (#591, giro 20).
       const arma = () => {
-        si.disabled = true;
+        for (const c of consensi) c.disabled = true;
         clearTimeout(timerArma);
-        timerArma = setTimeout(() => { if (mostrata === d) si.disabled = false; }, ARMA_MS);
+        timerArma = setTimeout(() => { if (mostrata === d) for (const c of consensi) c.disabled = false; }, ARMA_MS);
       };
       arma();
-      b.onpointerdown = () => { if (si.disabled) arma(); };
-      si.addEventListener('click', () => rispondiA(d, true));
+      b.onpointerdown = () => { if (consensi.some((c) => c.disabled)) arma(); };
       const no = document.createElement('button');
       no.type = 'button';
       no.className = 'permesso-btn permesso-no';
       no.textContent = 'Non consentire';
       no.addEventListener('click', () => rispondiA(d, false));
-      b.replaceChildren(icone, msg, no, si);
+      b.classList.toggle('permesso-schermo', d.tipo === 'schermo');
+      if (d.tipo === 'schermo') {
+        const fila = document.createElement('div');
+        fila.className = 'permesso-fonti';
+        fila.append(...consensi);
+        b.replaceChildren(icone, msg, no, fila);
+      } else {
+        b.replaceChildren(icone, msg, no, ...consensi);
+      }
       b.hidden = false;
       requestAnimationFrame(() => {
         const h = Math.ceil(b.getBoundingClientRect().height);
@@ -2018,6 +2729,66 @@
         }
       }
       mostraDomanda();
+    });
+  }
+
+  // Il microfono di Filo per una pagina web (#586): si apre qui, nella cornice, e alla pagina vanno solo i campioni a
+  // 16 kHz (services/microfonoDiFilo.js). Così il sito non riceve mai il permesso.
+  if (api.tabs.onMicrofono) {
+    const RATE = 16000;
+    const aperti = new Map();
+    const chiudiMic = (id) => {
+      const m = aperti.get(id);
+      aperti.delete(id);
+      if (!m || !m.ctx) return;
+      try { m.proc.onaudioprocess = null; m.proc.disconnect(); m.source.disconnect(); } catch (_) {}
+      try { m.stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+      try { m.ctx.close(); } catch (_) {}
+    };
+    const apriMic = async (id) => {
+      const Seg = window.SN_DICTATION_SEGMENTER;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      aperti.set(id, {});
+      let stream;
+      try {
+        if (!Seg || !Ctx) throw Object.assign(new Error('mic'), { name: 'NotSupportedError' });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        aperti.delete(id);
+        api.tabs.microfonoEsito(id, { ok: false, errore: String((e && e.name) || 'NotAllowedError') });
+        return;
+      }
+      // Chiuso mentre il sistema rispondeva: il microfono non resta acceso per nessuno.
+      if (!aperti.has(id)) { try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {} return; }
+      let ctx; let source; let proc;
+      try {
+        ctx = new Ctx();
+        source = ctx.createMediaStreamSource(stream);
+        proc = ctx.createScriptProcessor(4096, 1, 1);
+        try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
+      } catch (_) {
+        try { stream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
+        try { if (ctx) ctx.close(); } catch (_) {}
+        aperti.delete(id);
+        api.tabs.microfonoEsito(id, { ok: false, errore: 'NotReadableError' });
+        return;
+      }
+      aperti.set(id, { stream, ctx, source, proc });
+      proc.onaudioprocess = (e) => {
+        if (!aperti.has(id)) return;
+        try { api.tabs.microfonoDati(id, Seg.downsample(e.inputBuffer.getChannelData(0), ctx.sampleRate, RATE)); } catch (_) {}
+      };
+      source.connect(proc);
+      proc.connect(ctx.destination);
+      // Il microfono staccato a metà: la pagina lo sa, e non aspetta campioni che non arrivano.
+      for (const tr of stream.getAudioTracks()) tr.addEventListener('ended', () => { if (aperti.has(id)) { chiudiMic(id); api.tabs.microfonoFine(id); } });
+      api.tabs.microfonoEsito(id, { ok: true, rate: RATE });
+    };
+    api.tabs.onMicrofono(({ azione, id } = {}) => {
+      const k = String(id || '');
+      if (!k) return;
+      if (azione === 'apri') apriMic(k);
+      else if (azione === 'chiudi') chiudiMic(k);
     });
   }
 })();

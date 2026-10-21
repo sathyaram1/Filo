@@ -8,17 +8,28 @@
 // Rete finta come in routineChannel.test.mjs (fetchImpl); per la riga di
 // comando un server HTTP locale come in sealConsegna.test.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { senzaSessione } from '../helpers/sessione.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
+const { rapportoVuoto, slugProgetto } = await import('../../scripts/session-report.mjs');
+const { ambientePerITest } = await import('../../scripts/run-unit-tests.mjs');
+
+test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa versione di quello vero', () => {
+  const src = readFileSync(resolve(REPO, 'scripts', 'routine-channel.mjs'), 'utf8');
+  const m = src.match(/rapporto = \{ v: (\d+), role: ruolo/);
+  assert.ok(m, 'il rapporto di ripiego c\'è ancora');
+  assert.equal(Number(m[1]), rapportoVuoto().v);
+});
 const {
   heartbeat, release, releaseConRapporto, pushRamoCorrente, statoContenitore,
   memoriaContenitore, uptimeContenitore, rssProcessi, commitRestante,
@@ -161,6 +172,65 @@ test('400 report_malformed: si rilascia senza rapporto, e lo si dice', async () 
   assert.match(r.avviso, /report_malformed: campo x/);
 });
 
+// #882: un server che non conosce ancora il campo `listino` non deve far rilasciare ogni routine senza rapporto.
+const conListino = { ...RAPPORTO, listino: '2026-10-06' };
+const rifiutaListino = (corpi, extra = () => null) => async (u, init) => {
+  const b = JSON.parse(init.body); corpi.push(b);
+  return (b.report && extra(b)) || (b.report && 'listino' in b.report
+    ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo listino' })
+    : reply(200, { ok: true }));
+};
+
+test('400 report_malformed sul listino: il rapporto parte senza il campo, con la versione nelle note', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl: rifiutaListino(corpi), ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.equal('listino' in corpi[1].report, false);
+  assert.deepEqual(corpi[1].report.notes, ['una nota', 'listino 2026-10-06']);
+  assert.equal(corpi[1].report.costUsd, 1, 'il resto del rapporto resta');
+  assert.match(r.avviso, /campo listino.*nelle note/);
+  assert.equal(conListino.listino, '2026-10-06', 'l\'originale non viene mutilato');
+});
+
+test('un server che accetta il listino lo riceve al primo colpo, senza avvisi', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(r.rapporto, 'allegato');
+  assert.equal(corpi.length, 1);
+  assert.equal(corpi[0].report.listino, '2026-10-06');
+  assert.equal('avviso' in r, false);
+});
+
+test('malformato anche senza listino: si rilascia senza rapporto, col dettaglio del primo rifiuto', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: corpi.length === 1 ? 'campo listino' : 'campo y' }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'scartato');
+  assert.equal(corpi.length, 3);
+  assert.equal('report' in corpi[2], false);
+  assert.match(r.avviso, /report_malformed: campo listino\): rilasciato SENZA rapporto/);
+});
+
+test('troppo grande e poi malformato sul listino: arriva quello snello senza listino', async () => {
+  const corpi = [];
+  const grosso = (b) => (b.report.tools && b.report.tools.byName ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8000 }) : null);
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl: rifiutaListino(corpi, grosso), ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  const ultimo = corpi[corpi.length - 1].report;
+  assert.ok(ultimo, 'un rapporto è arrivato');
+  assert.equal('listino' in ultimo, false);
+  assert.equal('byName' in ultimo.tools, false);
+  assert.match(r.avviso, /listino/);
+  assert.match(r.avviso, /9000.*8000/);
+});
+
 test('un altro rifiuto del server NON viene ritentato senza rapporto: il no è una risposta', async () => {
   let n = 0;
   const fetchImpl = async () => { n += 1; return reply(401, { ok: false, reason: 'dead_ticket' }); };
@@ -195,7 +265,7 @@ function scena() {
   return { base, origin, work };
 }
 const remoteSha = (origin, ramo) => (g(origin, ['rev-parse', '--verify', '-q', `refs/heads/${ramo}`]) || '');
-test.after(() => { for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} } });
+test.after(() => { for (const d of made) { try { togliCartella(d); } catch (_) {} } });
 
 describe('pushRamoCorrente', () => {
   test('un ramo mai spedito arriva su origin; uno riscritto da un rebase pure (--force-with-lease)', () => {
@@ -317,9 +387,11 @@ function fintoServer(rispondi) {
   });
   return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok({ srv, port: srv.address().port, ricevute })));
 }
-function cli(args, env) {
+// Il figlio non vede la sessione che lancia i test, come sotto `npm run test:unit`: col file lanciato a mano in una
+// routine misurava il consumo vero, che finiva nel rilascio e nel deposito di prova (#1123.2, #1084.2).
+function cli(args, env, chiLancia = process.env) {
   return new Promise((done) => {
-    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...process.env, ...env } },
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...senzaSessione(ambientePerITest(chiLancia)), ...env } },
       (err, so, se) => done({ code: err ? (err.code ?? 1) : 0, so: String(so || ''), se: String(se || '') }));
   });
 }
@@ -327,13 +399,12 @@ function cli(args, env) {
 describe('release da riga di comando', () => {
   test('spinge il ramo, poi rilascia col rapporto allegato (rapporto minimo: qui non c\'è un transcript)', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
-    const { base, origin, work } = scena();
+    const { origin, work } = scena();
     try {
       g(work, ['checkout', '-q', '-b', 'worker/10']);
       commitFile(work, 'lavoro.js');
       const r = await cli(['release', 'tkt-cli', '--role', 'resolver'], {
         FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
-        CLAUDE_CONFIG_DIR: resolve(base, 'claude-vuoto'), FILO_TRANSCRIPT: '',
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       assert.match(r.so, /biglietto rilasciato/);
@@ -342,7 +413,7 @@ describe('release da riga di comando', () => {
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
       assert.ok(rilascio, 'il server ha ricevuto il rilascio');
       assert.equal(rilascio.body.ticket, 'tkt-cli');
-      assert.equal(rilascio.body.report.v, 2);
+      assert.equal(rilascio.body.report.v, rapportoVuoto().v);
       assert.equal(rilascio.body.report.role, 'resolver');
       assert.equal(rilascio.body.report.ticket, 'tkt-cli');
       assert.ok(Array.isArray(rilascio.body.report.notes) && rilascio.body.report.notes.length >= 1, 'senza transcript: la nota c\'è');
@@ -379,6 +450,25 @@ describe('release da riga di comando', () => {
     } finally { srv.close(); }
   });
 
+  test('la sessione viva di chi lancia i test non entra nel rilascio; quella data al figlio sì', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const transcript = resolve(base, 'sessione-viva.jsonl');
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(transcript, `${JSON.stringify(turno)}\n`, 'utf8');
+    const nudo = ['release', 'tkt-cli', '--senza-push', '--senza-rapporto', '--guasto', 'motivo'];
+    const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' };
+    const rilasci = () => ricevute.filter((x) => x.url.includes('routineRelease'));
+    try {
+      const r = await cli(nudo, env, { ...process.env, FILO_ROUTINE: '1', FILO_TRANSCRIPT: transcript });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo' });
+      const d = await cli(nudo, { ...env, FILO_TRANSCRIPT: transcript });
+      assert.equal(d.code, 0, `stderr: ${d.se}`);
+      assert.equal(rilasci()[1].body.consumo.sessionId, 'sessione-viva', 'il transcript finto si misura: la prova sopra distingue');
+    } finally { srv.close(); }
+  });
+
   test('un file rimasto fuori dai commit viene committato e spedito prima del rilascio, e lo si dice', async () => {
     const { srv, port } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
     const { origin, work } = scena();
@@ -392,6 +482,57 @@ describe('release da riga di comando', () => {
       assert.equal(g(work, ['status', '--porcelain']), '');
       assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/13']).includes('nato-da-shell.txt'), 'il file è arrivato su origin col rilascio');
     } finally { srv.close(); }
+  });
+
+  test('la sessione che lancia il file a mano non entra nella prova: niente consumo nel rilascio, niente cartella nel deposito', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const sessione = resolve(base, 'sessione-che-lancia.jsonl');
+    writeFileSync(sessione, '', 'utf8');
+    const prima = { FILO_ROUTINE: process.env.FILO_ROUTINE, FILO_TRANSCRIPT: process.env.FILO_TRANSCRIPT };
+    Object.assign(process.env, { FILO_ROUTINE: '1', FILO_TRANSCRIPT: sessione });
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/14']);
+      const r = await cli(['release', 'tkt-cli', '--senza-push', '--senza-rapporto'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.equal(g(work, ['status', '--porcelain']), '');
+    } finally {
+      for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      srv.close();
+    }
+  });
+
+  // La condizione della segnalazione: chi lancia si è dichiarato routine e ha un transcript, e il rilascio provato
+  // lo trovava col ripiego del «più recente». Qui la si ricrea anche fuori da una routine.
+  test('una routine che lancia le prove non entra nel rilascio provato: né il suo consumo nel corpo, né il suo stato nella cartella', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const config = resolve(base, 'claude-di-chi-lancia');
+    const progetto = resolve(config, 'projects', slugProgetto(process.cwd()));
+    mkdirSync(progetto, { recursive: true });
+    const uso = { input_tokens: 5, cache_read_input_tokens: 40000, cache_creation_input_tokens: 2000, output_tokens: 700 };
+    writeFileSync(resolve(progetto, 'sessione-di-chi-lancia.jsonl'),
+      `${JSON.stringify({ type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: uso, content: [] } })}\n`);
+    const prima = { FILO_ROUTINE: process.env.FILO_ROUTINE, CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR };
+    Object.assign(process.env, { FILO_ROUTINE: '1', CLAUDE_CONFIG_DIR: config });
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/14']);
+      writeFileSync(resolve(work, 'nato-da-shell.txt'), 'x\n', 'utf8');
+      const r = await cli(['release', 'tkt-cli', '--senza-rapporto', '--guasto', 'motivo'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
+      assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
+    } finally {
+      for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      srv.close();
+    }
   });
 });
 

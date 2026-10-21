@@ -23,39 +23,44 @@
     $('clear').textContent = I18n.t('history_clear');
     $('empty').textContent = I18n.t('history_empty');
 
+    await leggi();
+  }
+
+  async function leggi() {
     const r = await chrome.runtime.sendMessage({ type: MSG.GET_HISTORY });
     items = r?.items || [];
     buildFilterOptions();
     render();
   }
+  // Un backup importato in un'altra scheda porta voci sue: compaiono senza riaprire la pagina (#1256).
+  try {
+    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.type === MSG.DATI_IMPORTATI) leggi().catch(() => {}); });
+  } catch (_) {}
 
-  // Popola il menu "filtra per tipo" con SOLO i tipi di azione realmente
-  // presenti in cronologia (niente opzioni per funzioni mai usate), ciascuno con
-  // la sua etichetta leggibile. Così il filtro copre da sé ogni azione — comprese
-  // quelle nuove — senza restare disallineato da una lista hard-coded.
+  // Il menu "filtra per tipo" elenca solo i tipi presenti, e per ETICHETTA, non
+  // per codice: più codici interni portano lo stesso nome (#481), e la voce deve
+  // tenere tutte le righe che mostrano quel nome.
   function buildFilterOptions() {
     const sel = $('filter');
     const current = sel.value;
     const seen = new Set();
     for (const it of items) {
-      if (it && it.action) seen.add(it.action);
+      if (it && it.action) seen.add(formatActionLabel(it.action));
     }
-    const opts = [...seen]
-      .map((a) => ({ value: a, label: formatActionLabel(a) }))
-      .sort((x, y) => x.label.localeCompare(y.label, 'it'));
+    seen.delete('');
+    const labels = [...seen].sort((x, y) => x.localeCompare(y, 'it'));
 
     sel.innerHTML = '';
     const all = document.createElement('option');
     all.value = '';
     all.textContent = I18n.t('history_filter_all');
     sel.appendChild(all);
-    for (const o of opts) {
+    for (const label of labels) {
       const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
+      opt.value = label;
+      opt.textContent = label;
       sel.appendChild(opt);
     }
-    // Mantieni la scelta corrente se ancora valida (es. dopo un reload dati).
     sel.value = seen.has(current) ? current : '';
   }
 
@@ -66,7 +71,7 @@
     list.innerHTML = '';
 
     let filtered = items;
-    if (filter) filtered = filtered.filter((it) => it.action === filter);
+    if (filter) filtered = filtered.filter((it) => it && it.action && formatActionLabel(it.action) === filter);
     if (q) {
       filtered = filtered.filter((it) => {
         // Cerca SOLO sui testi che la voce mostra davvero — non su
@@ -75,33 +80,70 @@
         // punteggiatura JSON, facendo "trovare" parole che l'utente non vede
         // da nessuna parte. Qui usiamo l'input formattato come in lista,
         // l'etichetta dell'azione, il modello, l'output e l'origine.
-        const haystack = [
-          formatActionLabel(it.action),
-          formatInput(it.input),
-          it.output || '',
-          it.origin || '',
-          it.model || '',
-        ].join(' ').toLowerCase();
-        return haystack.includes(q);
+        return haystackOf(it).includes(q);
       });
     }
 
+    shown = filtered;
+    drawn = 0;
     if (!filtered.length) {
-      // Distingui "cronologia realmente vuota" da "nessun risultato per la
-      // ricerca/filtro": mostrare il testo di vuoto assoluto durante una
-      // ricerca fa credere che la cronologia sia stata cancellata.
-      const empty = $('empty');
-      if (items.length && q) empty.textContent = I18n.t('history_no_results');
-      else if (items.length && filter) empty.textContent = I18n.t('history_no_results_filter');
-      else empty.textContent = I18n.t('history_empty');
-      empty.hidden = false;
+      showEmpty();
       return;
     }
     $('empty').hidden = true;
+    drawMore();
+  }
 
-    for (const it of filtered) {
-      list.appendChild(renderItem(it));
+  // Distingui "cronologia realmente vuota" da "nessun risultato per la
+  // ricerca/filtro": mostrare il testo di vuoto assoluto durante una
+  // ricerca fa credere che la cronologia sia stata cancellata.
+  function showEmpty() {
+    const q = ($('search').value || '').trim();
+    const empty = $('empty');
+    if (fondo) fondo.hidden = true;
+    if (items.length && q) empty.textContent = I18n.t('history_no_results');
+    else if (items.length && $('filter').value) empty.textContent = I18n.t('history_no_results_filter');
+    else empty.textContent = I18n.t('history_empty');
+    empty.hidden = false;
+  }
+
+  // La cronologia non ha tetto (#1065): disegnarla tutta a ogni apertura e a ogni lettera della ricerca
+  // blocca la pagina per secondi con qualche migliaio di voci. Si disegna un lotto, il resto mentre si scorre.
+  const LOTTO = 100;
+  let shown = [];
+  let drawn = 0;
+  let fondo = null;
+
+  function drawMore() {
+    const frag = document.createDocumentFragment();
+    const fine = Math.min(shown.length, drawn + LOTTO);
+    for (; drawn < fine; drawn++) frag.appendChild(renderItem(shown[drawn]));
+    $('list').appendChild(frag);
+    if (!fondo) return;
+    fondo.hidden = drawn >= shown.length;
+    // Una finestra alta può avere il fondo ancora in vista dopo il lotto: l'osservatore non riscatta da solo.
+    if (!fondo.hidden) { osservatore.unobserve(fondo); osservatore.observe(fondo); }
+  }
+
+  const osservatore = new IntersectionObserver((voci) => {
+    if (voci.some((v) => v.isIntersecting) && drawn < shown.length) drawMore();
+  }, { rootMargin: '1200px 0px' });
+
+  // Il testo in cui cerca una voce si compone una volta sola, non a ogni lettera per ogni voce.
+  const haystacks = new WeakMap();
+  function haystackOf(it) {
+    let h = haystacks.get(it);
+    if (h === undefined) {
+      h = [
+        formatActionLabel(it.action),
+        formatInput(it.input),
+        it.output || '',
+        it.origin || '',
+        it.model || '',
+      ].join(' ').toLowerCase();
+      haystacks.set(it, h);
     }
+    return h;
   }
 
   function renderItem(it) {
@@ -138,9 +180,12 @@
       const chip = document.createElement('span');
       chip.className = 'sn-history-reuse';
       chip.textContent = I18n.t('history_reuse', String(pct));
-      chip.title = reused > 0
+      // Le scritture le riportano i modelli coi punti di cache espliciti: dicono che la richiesta dopo potrà riusare.
+      const written = Number(it.usage?.cacheWriteTokens) || 0;
+      chip.title = (reused > 0
         ? I18n.t('history_reuse_title', formatTokens(reused), formatTokens(inTok))
-        : I18n.t('history_reuse_none_title', formatTokens(inTok));
+        : I18n.t('history_reuse_none_title', formatTokens(inTok)))
+        + (written > 0 ? ` ${I18n.t('history_cache_written', formatTokens(written))}` : '');
       right.appendChild(chip);
     }
     // Tempi del turno: quando ha cominciato a ragionare, quando ha scritto la
@@ -152,8 +197,12 @@
       const first = tm.firstTextMs != null ? tm.firstTextMs : tm.firstToolMs;
       const chip = document.createElement('span');
       chip.className = 'sn-history-timing';
-      chip.textContent = I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
-      chip.title = I18n.t('history_timing_title');
+      // L'attesa prima della richiesta (stato del computer, saldo) la vive chi aspetta: compare per prima (#1097.1).
+      const prima = tm.preparazioneMs != null;
+      chip.textContent = (prima ? I18n.t('history_timing_prep', fmt(tm.preparazioneMs)) : '')
+        + I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
+      chip.title = I18n.t('history_timing_title')
+        + (prima ? `\n${I18n.t('history_timing_prep_title', fmt(tm.preparazioneMs), fmt(tm.sistemaMs), fmt(tm.saldoMs))}` : '');
       right.appendChild(chip);
     }
 
@@ -174,8 +223,14 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_HISTORY_ENTRY, id: it.id });
       items = r?.items || items.filter((x) => x.id !== it.id);
       // Un tipo d'azione può essere scomparso del tutto: riallinea il filtro.
+      const prima = $('filter').value;
       buildFilterOptions();
-      render();
+      if ($('filter').value !== prima) { render(); return; }
+      // Ridisegnare da capo riporterebbe in cima chi ha scorso fino a questa voce: si toglie solo lei.
+      const i = shown.indexOf(it);
+      if (i >= 0) { shown = shown.filter((x) => x !== it); if (i < drawn) drawn--; }
+      wrap.remove();
+      if (!shown.length) showEmpty();
     });
     right.appendChild(remove);
 
@@ -229,10 +284,16 @@
   // Conteggi di token nel formato dei numeri italiano (1.234), per il
   // suggerimento del riuso.
   function formatTokens(n) {
-    return Number(n || 0).toLocaleString('it-IT');
+    return Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    fondo = document.createElement('div');
+    fondo.className = 'sn-history-fondo';
+    fondo.hidden = true;
+    fondo.style.height = '1px';
+    $('list').after(fondo);
+    osservatore.observe(fondo);
     load();
     $('search').addEventListener('input', render);
     $('filter').addEventListener('change', render);
@@ -251,7 +312,7 @@
       render();
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openHome').addEventListener('click', () => {
       // #252 — indirizzo canonico: una sola scheda per "Aperti per dopo".

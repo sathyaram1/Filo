@@ -30,15 +30,20 @@
     return /^OpenRouter(?:\s+\S+)?\s+402\b/.test(raw) || /insufficient credits|key limit exceeded/i.test(raw);
   }
 
-  // Quanti crediti vale una spesa in dollari, coi parametri del server
-  // (euro per credito, cambio). Per eccesso al decimo: ciò che si scala al
-  // saldo mostrato non deve essere meno di ciò che OpenRouter conta.
-  function creditsForUsd(costUsd, { eurPerCredit, eurUsd } = {}) {
-    const usd = Number(costUsd);
-    if (!Number.isFinite(usd) || usd <= 0) return 0;
+  // Quanti crediti vale un dollaro, coi parametri del server (euro per
+  // credito, cambio): la stessa tariffa scala il saldo e fa le stime (#819).
+  function creditsPerUsd({ eurPerCredit, eurUsd } = {}) {
     const e = Number(eurPerCredit) || 0.0007;
     const fx = Number(eurUsd) || 1.1;
-    return Math.ceil((usd / (e * fx)) * 10 - 1e-6) / 10;
+    return 1 / (e * fx);
+  }
+
+  // Quanti crediti vale una spesa in dollari. Per eccesso al decimo: ciò che
+  // si scala al saldo mostrato non deve essere meno di ciò che OpenRouter conta.
+  function creditsForUsd(costUsd, params = {}) {
+    const usd = Number(costUsd);
+    if (!Number.isFinite(usd) || usd <= 0) return 0;
+    return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
   // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
@@ -147,7 +152,8 @@
 
   // Lo stato nella pagina Crediti: l'ultimo rifiuto, e cosa succede finché la
   // chiave resta lì. `at` è ISO.
-  function ownKeyRefusalNote({ at, status } = {}) {
+  // `usedCredits === false`: il ripiego non ha risposto, niente è stato speso.
+  function ownKeyRefusalNote({ at, status, usedCredits } = {}) {
     let quando = '';
     try {
       const d = new Date(at);
@@ -155,6 +161,9 @@
         quando = ` l'ultima volta il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
       }
     } catch (_) { quando = ''; }
+    if (usedCredits === false) {
+      return `OpenRouter ha rifiutato la tua chiave${quando} (${keyRefusalReason(status)}). Finché resta qui, ogni chiamata prova prima lei; se la rifiuta, Filo usa i tuoi crediti.`;
+    }
     return `OpenRouter ha rifiutato la tua chiave${quando} (${keyRefusalReason(status)}) e Filo ha usato i tuoi crediti. Finché resta qui, ogni chiamata prova prima lei.`;
   }
 
@@ -170,7 +179,7 @@
   // (`account`: { credits, usage } da `GET /api/v1/credits`), e senza nemmeno
   // quello resta la sola spesa.
   function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
-    const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+    const usd = (n) => `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
     const spesa = `Spesi ${usd(usage)}`;
     const conto = account && Number.isFinite(Number(account.credits))
       ? Math.max(0, Number(account.credits) - (Number(account.usage) || 0))
@@ -209,30 +218,49 @@
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
+    // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
+    inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
+    network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
   });
 
-  function redeemMessage(status) {
+  // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
+  function redeemMessage(status, info) {
+    if (status === 'network_cap' && info && info.reopensAt) return networkCapMessage(info);
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
-  // La frase del riscatto riuscito, coi numeri che il server manda: quanti
-  // crediti d'ingresso, quanti del vecchio conteggio locale sono passati e,
-  // se non tutti, perché. Chi aveva 12.000 crediti e ne ritrova 10.000 deve
-  // leggerlo qui, non scoprirlo dal saldo (primo giro di verifica del ramo -b).
+  // Il tetto dei riscatti dalla stessa rete (#1120), coi numeri del server e l'ora locale in cui si libera un posto.
+  // Un'ora che non si legge non diventa «adesso»: resta la frase senza ora.
+  function networkCapMessage({ reopensAt, cap, hours } = {}, nowMs = Date.now()) {
+    const t = Date.parse(String(reopensAt || ''));
+    if (!Number.isFinite(t)) return REDEEM_MESSAGES.network_cap;
+    const n = Math.floor(Number(cap) || 0);
+    const h = Number(hours) || 0;
+    const chi = n === 1 ? 'è già entrata una persona' : (n > 1 ? `sono già entrate ${fmtInt(n)} persone` : 'sono già entrate troppe persone');
+    const finestra = h === 1 ? ' nell’ultima ora' : (h > 0 ? ` nelle ultime ${Number.isInteger(h) ? fmtInt(h) : String(h).replace('.', ',')} ore` : ' di recente');
+    return `Da questa connessione ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
+  }
+
+  function quandoRiapre(t, nowMs) {
+    const d = new Date(t);
+    const ora = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const giorno = (x) => { const g = new Date(x); g.setHours(0, 0, 0, 0); return g.getTime(); };
+    const giorni = Math.round((giorno(t) - giorno(nowMs)) / 86400000);
+    if (giorni <= 0) return `dopo le ${ora}`;
+    if (giorni === 1) return `domani dopo le ${ora}`;
+    return `da ${d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${ora}`;
+  }
+
   function fmtInt(n) {
     return String(Math.max(0, Math.floor(Number(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
-  function redeemOkMessage({ entryCredits, migrated, localRequested, cutReason } = {}) {
+  // La frase del riscatto riuscito dice solo i crediti d'ingresso: il conteggio
+  // locale non passa (#1138), e «nessuno dei 1.000 che avevi» si leggeva come un furto.
+  // `conteggioLocale`: era a schermo come saldo, e la frase dice dove va, senza contarlo (#1353).
+  function redeemOkMessage({ entryCredits, conteggioLocale = false } = {}) {
     const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
-    const got = Math.max(0, Math.floor(Number(migrated) || 0));
-    const asked = Math.max(0, Math.floor(Number(localRequested) || 0));
-    if (!entry || !asked) return REDEEM_MESSAGES.ok;
-    if (got >= asked) return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più i ${fmtInt(got)} che avevi già.`;
-    const why = cutReason === 'global_cap'
-      ? 'oltre non c’è posto in questo periodo'
-      : 'oltre non si portano';
-    const passati = got > 0 ? `${fmtInt(got)} dei ${fmtInt(asked)} che avevi già` : `nessuno dei ${fmtInt(asked)} che avevi già`;
-    return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più ${passati} (${why}).`;
+    const frase = entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
   // Il codice dentro quello che l'utente incolla. Il codice arriva per
@@ -296,8 +324,10 @@
   // il blocco di otto caratteri può cadere sul posto sbagliato: «Ciao Anna» è
   // quattro più quattro, e vince sul link perché viene prima (terzo giro di
   // verifica del #651). L'indirizzo è il segno più forte che ci sia, quindi si
-  // cerca per primo.
-  const LINK_NEL_TESTO = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)*filo\.red\/i\/([a-z0-9-]+)/i;
+  // cerca per primo. Senza il prefisso dello schema e dei sottodomini: non
+  // cambiava il codice catturato, e su un incollaggio lungo faceva crescere la
+  // ricerca col quadrato della lunghezza, nel main (#664).
+  const LINK_NEL_TESTO = /filo\.red\/i\/([a-z0-9-]+)/i;
   const INVITO_NEL_TESTO = /filo:\/*invito\/([a-z0-9-]+)/i;
   function codeFromLinkInText(raw) {
     const s = String(raw == null ? '' : raw);
@@ -309,34 +339,71 @@
     return null;
   }
 
-  // Il blocco di otto caratteri dentro una riga incollata («Codice:
-  // ABCD-EFGH»). Si guardano TUTTI i blocchi, non solo il primo: un messaggio
-  // comincia con un saluto, e «Ciao Anna» è quattro più quattro: fermarsi lì
-  // vuol dire rifiutare un incollaggio giusto perché davanti al codice c'erano
-  // due parole corte (quarto giro di verifica del #651). Il primo blocco che è
-  // davvero un codice vince; se nessuno lo è, `null`.
-  const BLOCCO_OTTO = /(?<![A-Z0-9])([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})(?![A-Z0-9])/g;
-  function codeBlockInText(raw) {
-    const s = String(raw == null ? '' : raw).toUpperCase();
-    BLOCCO_OTTO.lastIndex = 0;
+  // I blocchi di otto caratteri dentro una riga incollata («Codice:
+  // ABCD-EFGH»), TUTTI, dal più simile a un codice: un messaggio comincia con
+  // un saluto, e «Cara Sara» è otto lettere che un codice può avere (#664).
+  // Pesano il trattino (un codice si mostra ABCD-EFGH), una cifra (le parole
+  // non ne hanno) e le sole maiuscole; a pari peso vince chi viene prima.
+  const BLOCCO_OTTO = /(?<![A-Za-z0-9])([A-Za-z0-9]{4})([\s-]*)([A-Za-z0-9]{4})(?![A-Za-z0-9])/g;
+  function codeBlocksInText(raw) {
+    const s = String(raw == null ? '' : raw);
+    const re = new RegExp(BLOCCO_OTTO.source, 'g');
+    const trovati = [];
     let m;
-    while ((m = BLOCCO_OTTO.exec(s))) {
-      const c = normalizeCode(m[1] + m[2]);
-      if (c) { BLOCCO_OTTO.lastIndex = 0; return c; }
-      // Il blocco scartato può aver mangiato metà di quello buono: «ecco ABCD
-      // EFGH» si legge prima come «ECCO ABCD», e «ABCD EFGH» non verrebbe più
-      // guardato. Si riparte dal carattere dopo, non dalla fine del blocco.
-      BLOCCO_OTTO.lastIndex = m.index + 1;
+    while ((m = re.exec(s))) {
+      const otto = m[1] + m[3];
+      const c = normalizeCode(otto);
+      if (c) {
+        const lettere = otto.replace(/[^A-Za-z]/g, '');
+        const peso = (m[2].includes('-') ? 4 : 0) + (/[0-9]/.test(otto) ? 2 : 0) + (lettere === lettere.toUpperCase() ? 1 : 0);
+        trovati.push({ c, peso, ordine: trovati.length });
+      }
+      // Il blocco appena letto può aver mangiato metà di quello buono: «ecco
+      // ABCD EFGH» si legge prima come «ECCO ABCD». Si riparte dal carattere dopo.
+      re.lastIndex = m.index + 1;
     }
-    return null;
+    return trovati.sort((a, b) => (b.peso - a.peso) || (a.ordine - b.ordine)).map((t) => t.c);
   }
 
-  // Quello che l'utente ha messo nel campo dell'invito → il codice, o `null`.
-  // Prima si prova a leggerlo com'è (codice o link); poi si cerca un link
-  // d'invito dentro il testo; da ultimo un blocco di otto caratteri lungo la
-  // riga incollata.
+  // Quello che l'utente ha messo nel campo dell'invito → i codici possibili,
+  // dal più probabile: il testo com'è (codice o link), un link d'invito dentro
+  // il testo, poi i blocchi di otto caratteri. Chi riscatta prova il secondo
+  // quando il server dice che il primo non esiste.
+  function codesFromInput(raw) {
+    const visti = new Set();
+    for (const c of [normalizeCode(raw), codeFromLinkInText(raw), ...codeBlocksInText(raw)]) {
+      if (c) visti.add(c);
+    }
+    return [...visti];
+  }
+
   function codeFromInput(raw) {
-    return normalizeCode(raw) || codeFromLinkInText(raw) || codeBlockInText(raw);
+    return codesFromInput(raw)[0] || null;
+  }
+
+  // Quanti codici di una riga incollata si provano col server, al massimo. Un
+  // messaggio vero ne ha uno o due (saluto, codice); il tetto ferma un testo
+  // lungo incollato per sbaglio, e chi riscatta lo dice col numero.
+  const CODE_TRIES = 5;
+  function tooManyCodesMessage(found, tried) {
+    return `Nel testo ci sono ${fmtInt(found)} blocchi che sembrano codici, e i primi ${fmtInt(tried)} non esistono. Incolla solo il codice, o il link.`;
+  }
+
+  // Un collegamento che porta un invito: il link di filo.red o `filo://invito/…`.
+  // Torna il codice, o `null` se non è un invito o il codice è storto.
+  function inviteCodeFromLink(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (isInviteDeepLink(s)) return inviteCodeFromDeepLink(s);
+    let u;
+    try { u = new URL(s); } catch (_) { return null; }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    const host = u.hostname.toLowerCase();
+    if (host !== 'filo.red' && host !== 'www.filo.red') return null;
+    const m = /^\/i\/([^/]+)\/?$/.exec(u.pathname);
+    if (!m) return null;
+    let pezzo = m[1];
+    try { pezzo = decodeURIComponent(pezzo); } catch (_) { /* resta com'è */ }
+    return normalizeCode(pezzo);
   }
 
   // `filo://invito/<codice>` — il collegamento che porta un invito dentro
@@ -410,7 +477,7 @@
   }
 
   // ── Le manopole dei crediti (#652) ─────────────────────────────────────────
-  // Le sette impostazioni che l'owner può cambiare in `config/credits`: come si
+  // Le impostazioni che l'owner può cambiare in `config/credits`: come si
   // chiamano nella pagina e quanto possono valere. Stanno qui perché le usano
   // in due — la pagina per disegnare i campi, il main per rifiutare un numero
   // storto prima di scriverlo sul server. I tetti sono larghi di proposito: il
@@ -421,9 +488,15 @@
     { chiave: 'dailyCredits', etichetta: 'Crediti al giorno', min: 0, max: 1000000, aiuto: 'La quota che arriva ogni notte a chi ha un portafoglio.' },
     { chiave: 'invitesPerUser', etichetta: 'Inviti per persona', min: 0, max: 1000, aiuto: 'Quanti codici riceve chi entra, da dare ad altri.' },
     { chiave: 'invitesMaxUses', etichetta: 'Persone per invito', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con lo stesso codice. Vale anche per i link già in giro.' },
+    // Il server lo scala di uno a ogni riscatto: è un contatore, ma lo decide l'owner (#854).
+    { chiave: 'invitesRemaining', etichetta: 'Ingressi con invito rimasti', min: 0, max: 10000000, aiuto: 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    { chiave: 'rewardSentPerDay', etichetta: 'Feedback inviati premiati al giorno', min: 0, max: 100000, aiuto: 'Quanti feedback inviati ricevono il premio, per persona e per giorno. Gli altri arrivano senza premio.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
+    // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
+    { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
+    { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione: passata, chi era entrato non conta più.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
@@ -452,8 +525,69 @@
   // italiana. La chat lo scrive uguale, così i due numeri non divergono.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
+
+  // ── Il saldo che dice la chat (#816, #1353) ───────────────────────────────
+  // Il turno non aspetta mai il server: vale l'ultima lettura finita, e una più vecchia di un minuto si rifà in
+  // sottofondo. «Il server non risponde» solo se quella lettura è fallita: un server lento non lo diventa.
+  const SALDO_CHAT_VALIDO_MS = 60 * 1000;
+
+  // `lettura`: l'ultima finita, { at, state } (lo stato della pagina Crediti), o null; `disco`: l'ultimo stato del
+  // server salvato qui. null = nessun portafoglio, e vale il conteggio locale.
+  function saldoPerChat({ lettura = null, disco = null, now = Date.now() } = {}) {
+    const st = lettura && lettura.state ? lettura.state : null;
+    let lettaIl = st ? Number(lettura.at) || null : null;
+    if (st && st.identity && st.identity.lost) return null;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
+      // Una lettura finita senza lo stato del server è fallita; senza nessuna lettura il disco è solo vecchio.
+      if (!disco || !disco.hasWallet) return { balance: null, nonRisponde: Boolean(st) };
+      server = { ...disco, cached: Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
+    }
+    const b = server.balance || {};
+    // Perché non è il saldo di adesso: la lettura fallita, il servizio dei modelli che non ha detto il consumo (come
+    // la pagina), o una lettura solo vecchia.
+    const lastKnown = server.cached ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || now - lettaIl > SALDO_CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
+    const numero = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+    return {
+      balance: numero(b.credits),
+      dailyCredits: numero(server.dailyCredits),
+      lastKnown, readAt: readAt || null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
+  }
+
+  // Le riletture per la chat: una alla volta, solo se l'ultima finita (`ultima()`, { at } o null) ha più di un
+  // minuto, e chi le chiede non le aspetta. `leggi` è la lettura vera, che aggiorna l'ultima da sé.
+  function rilettoreSaldo({ leggi, ultima, now = () => Date.now(), validoMs = SALDO_CHAT_VALIDO_MS } = {}) {
+    let inVolo = null;
+    function rileggi() {
+      const u = ultima();
+      if (u && now() - Number(u.at) <= validoMs) return null;
+      if (inVolo) return inVolo;
+      let p;
+      try { p = Promise.resolve(leggi()); } catch (_) { p = Promise.resolve(null); }
+      inVolo = p.catch(() => null).finally(() => { inVolo = null; });
+      return inVolo;
+    }
+    return { rileggi };
+  }
+
+  // Il conteggio locale sta a schermo come saldo solo senza portafoglio e con una chiave che parte davvero, la
+  // propria o quella di fabbrica (#1138). Chi lo vedeva, al riscatto sente dire dove va (#1353).
+  function conteggioLocaleInVista({ hasWallet = false, keySource = '', identityLost = false } = {}) {
+    return !hasWallet && !identityLost && (keySource === 'own' || keySource === 'factory');
+  }
+  const CONTEGGIO_LOCALE_LASCIA = 'Prendono il posto dei crediti di prova che Filo teneva su questo computer.';
 
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
   // Il premio vero lo accredita il server, e solo a una segnalazione RISOLTA
@@ -484,26 +618,292 @@
     return { announce: false, credits: 0 };
   }
 
+  // ── Il tetto giornaliero dei premi d'invio (#1077) ────────────────────────
+  // Il server paga al più `perDay` invii per portafoglio e giorno UTC. Prima di
+  // promettere un premio si contano i premi d'invio già arrivati oggi più gli
+  // invii di oggi il cui premio non è ancora arrivato (`feedback_sent:<id>`
+  // assente). Senza tetto noto (server vecchio, stato mai letto) non si nega.
+  // { grants, perDay, invii: [{ id, at }], now } → { esaurito, perDay }.
+  function premioInvio({ grants, perDay, invii = [], now = Date.now() } = {}) {
+    const tetto = Number.isInteger(perDay) && perDay >= 0 ? perDay : null;
+    if (tetto === null) return { esaurito: false, perDay: null };
+    const giorno = new Date(now).toISOString().slice(0, 10);
+    const diOggi = (iso) => String(iso || '').slice(0, 10) === giorno;
+    const pagati = new Set((Array.isArray(grants) ? grants : [])
+      .filter((g) => g && String(g.why || '').startsWith('feedback_sent:') && diOggi(g.at))
+      .map((g) => String(g.why)));
+    const inAttesa = (Array.isArray(invii) ? invii : []).filter((x) => x && Number.isFinite(x.at)
+      && diOggi(new Date(x.at).toISOString()) && !(x.id && pagati.has(`feedback_sent:${x.id}`))).length;
+    return { esaurito: pagati.size + inAttesa >= tetto, perDay: tetto };
+  }
+
+  // La frase del messaggio d'invio quando il tetto di oggi è pieno.
+  function premioInvioEsauritoTesto(perDay) {
+    const n = Math.max(0, Math.floor(Number(perDay) || 0));
+    if (n === 0) return 'Per ora i feedback inviati non ricevono premi.';
+    const primi = n === 1 ? 'solo per il primo feedback' : `per i primi ${n} feedback`;
+    return `Il premio vale ${primi} del giorno. Questo non ne riceve.`;
+  }
+
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
   // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
   // il suo pseudonimo con lo stato del portafoglio.
-  function entryNoticeText({ credits } = {}) {
+  function entryNoticeText({ credits, conteggioLocale = false } = {}) {
     const n = Math.max(0, Math.floor(Number(credits) || 0));
-    return n > 0
+    const frase = n > 0
       ? `Sei entrato con un invito: hai ${fmtInt(n)} crediti.`
       : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
+  }
+
+  // ── Chi usa Filo e se il conto OpenRouter regge (#820) ───────────────────
+  // Per la pagina «Inviti e utenti» e per l'avviso all'owner all'avvio, dalla vista del server. Un cambio che manca
+  // dà null, mai un cambio inventato: il numero che ne viene è un trattino, non uno zero.
+  const GIORNO_MS = 24 * 60 * 60 * 1000;
+  const GIORNO_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const giornoUtc = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const numeroO = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+  function creditiDaUsd(usd, cfg = {}) {
+    const u = numeroO(usd); const e = numeroO(cfg.eurPerCredit); const fx = numeroO(cfg.eurUsd);
+    return u == null || !(e > 0) || !(fx > 0) ? null : u / (e * fx);
+  }
+  function usdDaCrediti(crediti, cfg = {}) {
+    const c = numeroO(crediti); const e = numeroO(cfg.eurPerCredit); const fx = numeroO(cfg.eurUsd);
+    return c == null || !(e > 0) || !(fx > 0) ? null : c * e * fx;
+  }
+  function euroDaCrediti(crediti, cfg = {}) {
+    const c = numeroO(crediti); const e = numeroO(cfg.eurPerCredit);
+    return c == null || !(e > 0) ? null : c * e;
+  }
+  function euroDaUsd(usd, cfg = {}) {
+    const u = numeroO(usd); const fx = numeroO(cfg.eurUsd);
+    return u == null || !(fx > 0) ? null : u / fx;
+  }
+
+  // Attivo vuol dire almeno una riga nel registro d'uso nella finestra: un giorno presente in `usage.byDay` conta
+  // anche se la sua spesa è zero. I giorni sono quelli del server (UTC); oggi compreso, 7 giorni sono oggi e i sei prima.
+  function usoPersone(users, now = Date.now()) {
+    const da7 = giornoUtc(now - 6 * GIORNO_MS);
+    const da30 = giornoUtc(now - 29 * GIORNO_MS);
+    const ultimo = Object.create(null);
+    const attivi7 = [];
+    const attivi30 = [];
+    let spesoUsd = 0;
+    let spesoIgnoti = 0;
+    for (const u of Array.isArray(users) ? users : []) {
+      if (!u || typeof u.pseudonym !== 'string') continue;
+      const perGiorno = u.usage && u.usage.byDay && typeof u.usage.byDay === 'object' ? u.usage.byDay : {};
+      const giorni = Object.keys(perGiorno).filter((k) => GIORNO_RE.test(k)).sort();
+      const fine = giorni.length ? giorni[giorni.length - 1] : null;
+      ultimo[u.pseudonym] = fine;
+      if (fine && fine >= da7) attivi7.push(u.pseudonym);
+      if (fine && fine >= da30) attivi30.push(u.pseudonym);
+      const s = numeroO(u.balance && u.balance.usageUsd);
+      if (s == null) spesoIgnoti += 1;
+      else spesoUsd += s;
+    }
+    const nessuno = spesoIgnoti > 0 && spesoIgnoti === (Array.isArray(users) ? users.length : 0);
+    return { attivi7, attivi30, ultimo, spesoUsd: nessuno ? null : spesoUsd, spesoIgnoti };
+  }
+
+  function usd2(n) {
+    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+  }
+  function crediti0(n) {
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 0 }).format(Math.floor(Number(n) || 0));
+  }
+
+  // Il conto lo legge il server (`overview.account`, contratto in messages.js accanto a WALLET_OWNER_OVERVIEW). Senza
+  // il campo, o con un errore, il conto non è letto: nessun numero e nessun allarme, perché non si sa.
+  function contoOwner(overview) {
+    const o = overview && typeof overview === 'object' ? overview : {};
+    const cfg = o.config || {};
+    const tot = o.totals || {};
+    const a = o.account;
+    if (!a || typeof a !== 'object') return { letto: false, motivo: 'assente', allarmi: [] };
+    const caricatoUsd = numeroO(a.totalCreditsUsd);
+    const spesoUsd = numeroO(a.totalUsageUsd);
+    if (a.error || caricatoUsd == null || spesoUsd == null) return { letto: false, motivo: 'errore', allarmi: [] };
+    const restaUsd = Math.max(0, caricatoUsd - spesoUsd);
+    const restaCrediti = creditiDaUsd(restaUsd, cfg);
+    const vivi = numeroO(tot.liveCredits);
+    const margine = restaCrediti != null && vivi != null ? restaCrediti - vivi : null;
+    const tettoUsd = numeroO(tot.maxGrantUsd) != null ? numeroO(tot.maxGrantUsd) : usdDaCrediti(tot.maxGrantCredits, cfg);
+    const allarmi = [];
+    if (margine != null && margine < -1e-6) {
+      allarmi.push({
+        kind: 'vivi_oltre_conto',
+        testo: `Sul conto OpenRouter restano ${usd2(restaUsd)}, cioè ${crediti0(restaCrediti)} crediti, e le persone ne hanno ${crediti0(vivi)} da spendere: se li spendessero tutti il conto si svuoterebbe e Filo smetterebbe di rispondere a tutti, anche a chi ha ancora crediti. Ricarica il conto.`,
+      });
+    }
+    if (tettoUsd != null && tettoUsd > caricatoUsd + 1e-9) {
+      allarmi.push({
+        kind: 'tetto_oltre_caricato',
+        testo: `Il tetto dei crediti da regalare vale ${usd2(tettoUsd)}, più dei ${usd2(caricatoUsd)} caricati sul conto OpenRouter: abbassa il tetto o ricarica il conto.`,
+      });
+    }
+    return {
+      letto: true, caricatoUsd, spesoUsd, restaUsd, restaCrediti, caricatoCrediti: creditiDaUsd(caricatoUsd, cfg),
+      vivi, margine, tettoUsd, readAt: typeof a.readAt === 'string' ? a.readAt : '', allarmi,
+    };
+  }
+
+  // Quali allarmi dire all'owner all'avvio: gli accesi che l'avviso precedente non aveva già detto. Un conto non
+  // letto non cambia niente; uno letto senza allarmi li azzera, così un allarme che torna si ridice.
+  function allarmiDaDire(detti, conto) {
+    const prima = Array.isArray(detti) ? detti.filter((k) => typeof k === 'string') : [];
+    if (!conto || !conto.letto) return { dire: [], detti: prima };
+    const accesi = (conto.allarmi || []).map((a) => a.kind);
+    return { dire: (conto.allarmi || []).filter((a) => !prima.includes(a.kind)), detti: accesi };
+  }
+
+  // ── Gli avvisi all'owner fra le notifiche della home (#855) ─────────────────
+  // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
+  // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
+  const AVVISO_OWNER = 'crediti-owner';
+  const PAGINA_OWNER = 'filo://credits/owner.html';
+  const SOGLIE_TETTO = Object.freeze([80, 95]);
+  const INVITI_POCHI = 2;
+  const PSEUDONIMI_DETTI = 3;
+  const DOVE = 'nella pagina Inviti e utenti';
+  const TITOLI_OWNER = Object.freeze({
+    tetto: 'Tetto dei regali', giornaliera: 'Quota del giorno', inviti: 'Ingressi con invito', scarto: 'Registro d’uso',
+  });
+
+  const alPercento = (p) => (/^(1|8|11|8\d)$/.test(String(p)) ? `all'${p}%` : `al ${p}%`);
+  function elencoBreve(nomi) {
+    const altri = nomi.length - PSEUDONIMI_DETTI;
+    const primi = nomi.slice(0, PSEUDONIMI_DETTI).join(', ');
+    return altri > 0 ? `${primi} e ${altri === 1 ? 'un altro' : `altri ${altri}`}` : primi;
+  }
+
+  function avvisiOwner(overview) {
+    const o = overview && typeof overview === 'object' ? overview : null;
+    if (!o) return [];
+    const cfg = o.config && typeof o.config === 'object' ? o.config : {};
+    const tot = o.totals && typeof o.totals === 'object' ? o.totals : {};
+    // In ordine di gravità: scritti insieme, la home li mostra in quest'ordine.
+    const casi = [];
+
+    const tetto = numeroO(tot.maxGrantCredits);
+    const dati = numeroO(tot.grantedCredits);
+    if (tetto != null && dati != null) {
+      // Un tetto a zero non lascia regalare niente: è già pieno.
+      const cento = (tetto > 0 ? dati / tetto : 1) * 100 + 1e-9;
+      const p = Math.floor(cento);
+      const quanti = `${crediti0(dati)} su ${crediti0(tetto)}`;
+      casi.push({
+        caso: 'tetto', numero: p,
+        marcatori: SOGLIE_TETTO.filter((s) => cento >= s).map((s) => `tetto:${s}`),
+        testo: p >= 100
+          ? `I crediti regalati hanno raggiunto il tetto, ${quanti}. Il server rifiuta la quota del giorno e i nuovi ingressi finché non alzi il tetto ${DOVE}.`
+          : `I crediti regalati sono ${alPercento(p)} del tetto, ${quanti}. Alza il tetto ${DOVE}, o il server rifiuterà la quota del giorno e i nuovi ingressi.`,
+      });
+    }
+
+    const giorno = o.daily && typeof o.daily === 'object' && o.daily.summary && typeof o.daily.summary === 'object' ? o.daily.summary : null;
+    if (giorno) {
+      const r = Math.max(0, Math.floor(numeroO(giorno.refused) || 0));
+      casi.push({
+        caso: 'giornaliera', numero: r,
+        marcatori: r > 0 ? ['giornaliera:rifiuti'] : [],
+        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`} perché il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
+      });
+    }
+
+    const inviti = numeroO(cfg.invitesRemaining);
+    if (inviti != null) {
+      const n = Math.max(0, Math.floor(inviti));
+      casi.push({
+        caso: 'inviti', numero: n,
+        marcatori: n <= INVITI_POCHI ? [`inviti:${INVITI_POCHI}`] : [],
+        testo: n === 0
+          ? `Gli ingressi con invito sono finiti, e chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
+          : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito, poi chi riceve un invito non riesce più a entrare. Aggiungine ${DOVE}.`,
+      });
+    }
+
+    // Ogni portafoglio segnato è un marcatore: uno nuovo si ridice anche se un altro era già segnato.
+    const utenti = Array.isArray(o.users) ? o.users : null;
+    const rs = o.reconcile && typeof o.reconcile === 'object' && o.reconcile.summary && typeof o.reconcile.summary === 'object' ? o.reconcile.summary : null;
+    const riassunto = rs ? numeroO(rs.flagged) : null;
+    if (utenti || riassunto != null) {
+      const segnati = [...new Set((utenti || [])
+        .filter((u) => u && u.reconcile && u.reconcile.flagged && typeof u.pseudonym === 'string' && u.pseudonym)
+        .map((u) => u.pseudonym))].sort();
+      const n = segnati.length || Math.max(0, Math.floor(riassunto || 0));
+      casi.push({
+        caso: 'scarto', numero: n,
+        marcatori: segnati.length ? segnati.map((p) => `scarto:${p}`) : (n > 0 ? ['scarto:?'] : []),
+        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`,
+      });
+    }
+    return casi;
+  }
+
+  // Un marcatore mai detto scrive una carta nuova al posto di quella del suo caso; gli stessi marcatori riscrivono
+  // solo il numero; un caso letto senza marcatori toglie la carta e li scorda, così quando torna si ridice.
+  function avvisiOwnerPiano(detti, casi) {
+    const prima = Array.isArray(detti) ? detti.filter((k) => typeof k === 'string') : [];
+    const elenco = Array.isArray(casi) ? casi.filter((c) => c && typeof c.caso === 'string' && Array.isArray(c.marcatori)) : [];
+    const letti = new Set(elenco.map((c) => c.caso));
+    const piano = { scrivi: [], riscrivi: [], togli: [] };
+    for (const c of elenco) {
+      if (!c.marcatori.length) piano.togli.push(c.caso);
+      else if (c.marcatori.some((k) => !prima.includes(k))) piano.scrivi.push(c);
+      else piano.riscrivi.push(c);
+    }
+    const restano = prima.filter((k) => !letti.has(k.split(':')[0]));
+    return { ...piano, detti: [...restano, ...elenco.flatMap((c) => c.marcatori)] };
+  }
+
+  // Il piano sulle notifiche: `mem` è SN_FILO_MEMORY nel main, un finto negli unit test. I marcatori da salvare li
+  // restituisce: li scrive chi chiama, dopo le notifiche, così una scrittura fallita si rifà alla lettura dopo.
+  async function applicaAvvisiOwner(mem, detti, overview) {
+    const piano = avvisiOwnerPiano(detti, avvisiOwner(overview));
+    const vive = ((await mem.listNotifications()) || []).filter((n) => n && n.action && n.action.tipo === AVVISO_OWNER);
+    const delCaso = (caso) => vive.filter((n) => n.action.caso === caso);
+    let cambiato = false;
+    const togli = async (caso) => {
+      for (const n of delCaso(caso)) { await mem.dismissNotification(n.id); cambiato = true; }
+    };
+    for (const caso of piano.togli) await togli(caso);
+    // Le notifiche nuove vanno davanti: dall'ultimo, così il più grave resta in cima.
+    for (const c of piano.scrivi.slice().reverse()) {
+      await togli(c.caso);
+      await mem.addNotification({
+        kind: 'alert', text: c.testo,
+        action: {
+          tipo: AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, titolo: TITOLI_OWNER[c.caso] || '',
+          apri: PAGINA_OWNER, etichetta: 'Apri Inviti e utenti',
+        },
+      });
+      cambiato = true;
+    }
+    for (const c of piano.riscrivi) {
+      for (const n of delCaso(c.caso)) { if (await mem.setNotificationText(n.id, c.testo)) cambiato = true; }
+    }
+    return { detti: piano.detti, cambiato };
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
-    normalizeCode, formatCode, inviteLink, codeFromInput, isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
+    normalizeCode, formatCode, inviteLink, codeFromInput, codesFromInput, CODE_TRIES, tooManyCodesMessage, inviteCodeFromLink,
+    isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
     inviteView, inviteStateLine, entryNoticeText,
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
-    formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    formatCredits, PREMIO_ATTESA_MS, resolutionReward, premioInvio, premioInvioEsauritoTesto,
+    // Il saldo della chat senza attese, e il conteggio locale che il riscatto sostituisce (#1353)
+    SALDO_CHAT_VALIDO_MS, saldoPerChat, rilettoreSaldo, conteggioLocaleInVista,
+    // Chi usa Filo e se il conto OpenRouter regge (#820)
+    creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
+    // Gli avvisi all'owner nella home (#855)
+    AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

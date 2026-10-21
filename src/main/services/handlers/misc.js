@@ -4,7 +4,8 @@
 const { safeFetch } = require('../safe-fetch');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const { campiSegretiNeiRiquadri } = require('../campiNeiRiquadri');
-const auth = require('../../auth/google-auth');
+const Foto = require('../fotoDellaPagina');
+const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
 const identitaInvio = require('../../auth/identita-invio');
@@ -41,7 +42,9 @@ async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, 
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     // eslint-disable-next-line no-await-in-loop
-    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders, onProgress, shouldStop });
+    const servito = target;
+    const conIndirizzo = onHeaders && ((h) => onHeaders({ ...h, servito }));
+    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders: conIndirizzo, onProgress, shouldStop });
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
@@ -103,7 +106,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       // voce nella barra e per decidere dove far crescere il file parziale.
       let partPath;
       try {
-        partPath = hooks.onHeaders({ filename, totalBytes: total });
+        partPath = hooks.onHeaders({ filename, totalBytes: total, contentType: String(res.headers['content-type'] || '') });
       } catch (e) {
         res.resume();
         try { req.destroy(); } catch (_) {}
@@ -191,6 +194,104 @@ function safeImageFilename(name) {
   return n.slice(0, 200);
 }
 
+// #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
+// da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
+const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
+
+// Il tipo di un'immagine dai suoi primi byte, o '' se non è un'immagine: il download per
+// conto della scheda, coi cookie dell'utente, non restituisce nient'altro (#946).
+function tipoImmagine(b) {
+  const fourcc = (i) => b.toString('latin1', i, i + 4);
+  if (b.length < 4) return '';
+  if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
+  if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
+  if (fourcc(0) === 'GIF8') return 'image/gif';
+  if (fourcc(4) === 'ftyp') {
+    const marca = fourcc(8);
+    if (/^avi[fs]$/.test(marca)) return 'image/avif';
+    if (/^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(marca)) return 'image/heic';
+    return '';
+  }
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+  if (b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return 'image/x-icon';
+  if ((fourcc(0) === 'II*\u0000') || (fourcc(0) === 'MM\u0000*')) return 'image/tiff';
+  if ((b[0] === 0xff && b[1] === 0x0a) || fourcc(4) === 'JXL ') return 'image/jxl';
+  if (fourcc(4) === 'jP  ') return 'image/jp2';
+  return eSvg(b) ? 'image/svg+xml' : '';
+}
+
+// Un SVG comincia con <svg, dopo al più dichiarazione XML, commenti e doctype: una pagina
+// HTML con un'icona SVG dentro non lo è.
+function eSvg(b) {
+  let t = b.toString('utf8', 0, Math.min(b.length, 4096)).replace(/^\uFEFF/, '');
+  for (;;) {
+    t = t.replace(/^\s+/, '');
+    const preambolo = /^(<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)/i.exec(t);
+    if (!preambolo) break;
+    t = t.slice(preambolo[0].length);
+  }
+  return /^<svg[\s>]/i.test(t);
+}
+
+// I byte di un'immagine che la pagina mostra ma che il suo script non può leggere
+// (altra origine): stessa strada di «Salva immagine come…», in un file temporaneo.
+async function byteImmagineRemota({ url, referrer, session }) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { app } = require('electron');
+  let tmp = '';
+  let tipo = '';
+  let troppo = false;
+  try {
+    await fetchToFile({
+      url, referrer, session, kind: 'image',
+      onHeaders: ({ totalBytes, contentType }) => {
+        if (totalBytes > MAX_BYTE_PROVENIENZA) { troppo = true; throw new Error('troppo grande'); }
+        tipo = contentType;
+        tmp = path.join(app.getPath('temp'), `filo-immagine-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        return tmp;
+      },
+      onProgress: (ricevuti) => { if (ricevuti > MAX_BYTE_PROVENIENZA) troppo = true; },
+      shouldStop: () => troppo,
+    });
+    const byte = await fs.promises.readFile(tmp);
+    if (byte.length > MAX_BYTE_PROVENIENZA) troppo = true;
+    if (troppo) throw new Error('troppo grande');
+    const tipoVero = tipoImmagine(byte);
+    if (!tipoVero) return { ok: false, notImage: true, error: `non è un’immagine (${String(tipo || 'tipo ignoto').split(';')[0]})` };
+    return { ok: true, dataUrl: `data:${tipoVero};base64,${byte.toString('base64')}` };
+  } catch (e) {
+    if (troppo) return { ok: false, tooBig: true, error: `immagine oltre ${MAX_BYTE_PROVENIENZA / (1024 * 1024)} MB` };
+    return { ok: false, error: e?.message || 'immagine non scaricabile' };
+  } finally {
+    if (tmp) fs.promises.unlink(tmp).catch(() => {});
+  }
+}
+
+function bytesDaDataUrl(dataUrl) {
+  const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+  if (!m) return null;
+  try {
+    const b = Buffer.from(m[1], 'base64');
+    return b.length ? b : null;
+  } catch (_) { return null; }
+}
+
+// I byte dell'immagine che il sistema tiene negli appunti, PNG prima di tutto; null se non ce n'è.
+async function immagineNegliAppunti() {
+  const voci = await require('electron').clipboard.read();
+  for (const tipo of ['image/png', /^image\//]) {
+    for (const v of voci) {
+      const t = v.types.find((x) => (typeof tipo === 'string' ? x === tipo : tipo.test(x)));
+      if (!t) continue;
+      const b = Buffer.from(await (await v.getType(t)).arrayBuffer());
+      if (b.length && b.length <= MAX_BYTE_PROVENIENZA) return b;
+    }
+  }
+  return null;
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
@@ -224,18 +325,12 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
-    const win = winOf(sender);
-    if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
-    const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
-    if (!tab) return { ok: false, error: 'no active tab' };
-    const wc = tab.view.webContents;
-    // Per un modello (#810.7): con l'immagine, dove stanno i campi segreti dei riquadri incorporati, da coprire.
-    if (msg && msg.campiSegreti) {
-      const [img, riquadri] = await Promise.all([wc.capturePage(), campiSegretiNeiRiquadri(wc)]);
-      return { ok: true, dataUrl: img.toDataURL(), riquadri: riquadri.campi, riquadriNonCoperti: riquadri.nonCoperti };
-    }
+    const wc = Foto.paginaDaFotografare(sender);
+    if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     const img = await wc.capturePage();
-    return { ok: true, dataUrl: img.toDataURL() };
+    if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
+    const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
+    return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
   });
 
   // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>
@@ -290,7 +385,8 @@ module.exports = function register(on, ctx) {
         return { filePath: path.join(testDir, filename) };
       }
       try {
-        const win = BrowserWindow.fromWebContents(wc) || winOf(sender) || null;
+        // Dopo la domanda sul programma la scheda può essere già chiusa.
+        const win = (!wc.isDestroyed() && BrowserWindow.fromWebContents(wc)) || winOf(sender) || null;
         const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
         const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
         // Annullato dall'utente: non è un errore, nessun toast.
@@ -331,25 +427,28 @@ module.exports = function register(on, ctx) {
         kind,
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
-        onHeaders: ({ filename, totalBytes }) => {
+        onHeaders: ({ filename, totalBytes, servito }) => {
           // Nome file sicuro: preferisci il Content-Disposition del server, poi
           // il path dell'URL; neutralizza separatori e tentativi di traversal.
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win) });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito, webContents: wc });
+          // #1311 — un programma passa dalla domanda di Filo PRIMA del dialogo di sistema, che non dice né cos'è né da dove arriva.
+          const via = entry.permesso(name);
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
-          askDest = () => pickDestination(name).then((d) => {
+          // Un no l'ha già chiuso la voce; un trasferimento caduto durante la domanda resta un errore, non un annullamento.
+          askDest = () => via.then((si) => (si ? pickDestination(name).then((d) => {
             // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
             if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
             return d;
-          });
+          }) : null));
           askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
           // Il file parziale cresce nella cartella dove atterrerebbe un download
           // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
           // una rinomina istantanea invece della copia di un filmato intero.
-          partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
+          partPath = downloads.uniquePath(entry.cartella(), `${name}.filo-part`);
           return partPath;
         },
         onProgress: (received, total) => { if (entry) entry.progress(received, total); },
@@ -366,7 +465,9 @@ module.exports = function register(on, ctx) {
 
     // Se il trasferimento è fallito NON chiediamo dove salvare: sarebbe un
     // dialogo per un file che non c'è. Se invece era già aperto lo si aspetta
-    // (non c'è modo di richiuderlo da qui).
+    // (non c'è modo di richiuderlo da qui). La voce si chiude subito: una domanda
+    // ancora aperta sul programma si ritira invece di aspettare per sempre.
+    if (downloadError && !entry.cancelled()) entry.fail();
     if (!downloadError && !entry.cancelled()) ensureDest();
     const dest = destPromise ? await destPromise : null;
     const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
@@ -377,6 +478,8 @@ module.exports = function register(on, ctx) {
       entry.fail(); await dropPart();
       return { ok: false, error: (dest && dest.error) || 'destinazione non disponibile' };
     }
+    // Conta il nome scelto nel dialogo: un nome da programma scritto lì chiede anche lui, e un sì già dato vale.
+    if (!(await entry.permesso(path.basename(dest.filePath)))) { await dropPart(); return { ok: false, cancelled: true }; }
 
     try {
       await moveInto(result.partPath, dest.filePath);
@@ -390,6 +493,50 @@ module.exports = function register(on, ctx) {
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
+
+  // #711 — le etichette di origine di un'immagine, lette dai suoi byte. Nessun
+  // gate d'origine: la risposta parla solo dei byte che il chiamante ha mandato.
+  on(MSG.IMAGE_PROVENANCE, async (msg) => {
+    const byte = bytesDaDataUrl(msg && msg.dataUrl);
+    if (!byte) return { ok: false, error: 'immagine non leggibile' };
+    if (byte.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    const P = globalThis.SN_PROVENIENZA;
+    if (!P) return { ok: false, error: 'controllo non disponibile' };
+    try {
+      const res = await require('../firmatariC2pa').analizzaImmagine(byte);
+      const forte = res.prova === 'firmata' && res.firmatario === 'riconosciuto';
+      return { ok: true, frase: P.frase(res), forte, ...res };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
+  on(MSG.IMAGE_COPIED, async (msg) => {
+    const originale = bytesDaDataUrl(msg && msg.originale);
+    const copia = bytesDaDataUrl(msg && msg.copia);
+    if (!originale || !copia) return { ok: false, error: 'immagine non leggibile' };
+    if (originale.length > MAX_BYTE_PROVENIENZA || copia.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    let negliAppunti = null;
+    try { negliAppunti = await immagineNegliAppunti(); } catch (_) {}
+    try {
+      const ricordata = await require('../firmatariC2pa').ricordaCopia(originale, [copia, negliAppunti]);
+      return { ok: true, ricordata };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
+  on(MSG.IMAGE_BYTES, async (msg, sender) => {
+    const url = String((msg && msg.url) || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    return byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
+  });
 
   // "Salva file" su un link a un file (#410.2). A differenza di
   // DOWNLOAD_IMAGE/MEDIA (byte scaricati a mano nel main), qui facciamo partire
@@ -488,8 +635,8 @@ module.exports = function register(on, ctx) {
     // impila sopra lo screenshot della pagina per ottenere un'immagine di
     // tutta l'app col disegno. I tratti sono già parte del DOM della shell
     // (canvas di disegno), quindi vengono catturati direttamente.
-    const win = winOf(sender);
-    if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
+    const win = Foto.barraDaFotografare(sender);
+    if (!win) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     try {
       const barH = win._filoTabs.topChromeHeight();
       if (barH <= 0) return { ok: false, error: 'no topbar' };
@@ -521,6 +668,13 @@ module.exports = function register(on, ctx) {
         // per cercarsi dentro. Best-effort: un registro mancato costa una
         // ricompensa in ritardo, non un feedback perso.
         try { globalThis.SN_FEEDBACK_MINE?.ricordaId?.(result?.id); } catch (_) {}
+        try {
+          globalThis.SN_SEGNALAZIONI_MIE?.inviata?.(_item?.id, {
+            feedbackId: result?.id,
+            num: globalThis.SN_FEEDBACK?.formatNum?.(result?.seq, 0) || '',
+            titolo: _item?.name || '',
+          })?.catch?.(() => {});
+        } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
         const names = failed.map((f) => f?.name || 'allegato').join(', ');
@@ -543,12 +697,24 @@ module.exports = function register(on, ctx) {
       // secondo piano, su una pagina interna o appena avviato non li vedeva
       // nessuno, e la segnalazione spariva in silenzio lo stesso. Va nella
       // cornice della finestra, dove resta finché non la si chiude.
-      onGiveUp: (_item, motivo) => avvisoNellaFinestra(
-        String(motivo || 'La tua segnalazione non è partita.'),
-      ),
+      onGiveUp: (item, motivo) => {
+        try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'));
+      },
+      // Dopo un giorno di soli tentativi la coda rinuncia: nell'elenco locale non resta «in partenza».
+      onScaduta: (item) => {
+        try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+      },
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.
-      tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
+      // '' = l'accesso non c'è; un errore con la sessione ancora aperta è la rete, e la coda riprova senza dire niente.
+      tokenOwner: Mittente.tokenOwner,
+      onAttesaOwner: (_item, perche) => avvisoNellaFinestra(
+        perche === 'rifiutato'
+          ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
+          : 'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
+        { chiave: 'feedback-attesa-accesso-owner' },
+      ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
@@ -593,17 +759,12 @@ module.exports = function register(on, ctx) {
         };
       }
       const payload = msg.payload || {};
-      // Se l'utente è loggato come admin (l'owner), marca il suo invio come
-      // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
-      // esterni (arancione). L'identità owner è nota solo qui nel main (auth
-      // singleton): il content script che genera il clientId non sa di esserlo.
-      // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
+      // Il mittente lo decide il main, non il payload: il content script non sa di essere dell'owner (#595).
       let dallOwner = false;
       try {
-        if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
-          payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
-          dallOwner = String(payload.clientId || '').startsWith('owner:');
-        }
+        const firmato = Mittente.firma(payload.clientId);
+        payload.clientId = firmato.clientId;
+        dallOwner = firmato.dallOwner;
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
         textLen: (payload.text || '').length,
@@ -614,6 +775,13 @@ module.exports = function register(on, ctx) {
       // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
       // la coda al momento dell'invio (anche offline, col fallback).
       const r = await Outbox.enqueue(payload, { dallOwner });
+      // #986 — la copia per chi l'ha mandata nasce adesso, «in partenza»; dall'incognito non nasce.
+      try {
+        const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+        if (Mie && r?.id) {
+          await Mie.registra({ id: r.id, testo: payload.text, allegati: Mie.nomiAllegati(payload) });
+        }
+      } catch (e) { console.warn('[Filo feedback] copia locale non scritta:', e?.message || e); }
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);

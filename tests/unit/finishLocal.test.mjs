@@ -18,7 +18,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -242,7 +242,7 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
       assert.equal(g('rev-parse', 'HEAD'), prima, 'la prova non tocca il ramo');
       assert.equal(g('status', '--porcelain'), '', 'né l\'albero');
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      togliCartella(dir);
     }
   });
 
@@ -351,7 +351,7 @@ function repoDiProva() {
 }
 
 test.after(() => {
-  for (const d of temporanei) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} }
+  for (const d of temporanei) { try { togliCartella(d); } catch (_) {} }
 });
 
 describe('la spedizione dice DOVE, non solo cosa', () => {
@@ -490,8 +490,8 @@ describe('quale ramo NON si spedisce mai', () => {
 // Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
-import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare } from '../../scripts/finish-local.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare, esitoUnitDelRamo } from '../../scripts/finish-local.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 // `--check` promette solo i controlli: chi verifica lo lancia al posto della
 // suite intera (decisione owner 2026-09-10) e per lui la verifica è per forza
@@ -533,6 +533,92 @@ test('senza verifica superata, o con --check, gli spec si rifanno come sempre', 
   assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: false }), { rilancia: true, nota: '' });
 });
 
+// Chi verifica lancia `--check` per avere gli spec delle aree: un unit rosso, anche uno rosso uguale su main, li
+// saltava tutti e il controllo finiva prima di correrli (#874.1).
+test('--check: un unit rosso del ramo non salta gli spec delle aree, e l\'esito finale resta rosso', () => {
+  const delRamo = { esito: 'rosso_sulla_fusione', mainSha: 'b'.repeat(40), rossi: ['tests/unit/x.test.mjs › rotto'], rossiMain: 0 };
+  const check = esitoUnitDelRamo({ checkOnly: true, prova: delRamo });
+  assert.equal(check.ferma, false);
+  assert.equal(check.rosso, true);
+  assert.match(check.messaggio, /spec delle aree/);
+  assert.match(check.messaggio, /rosso/);
+  const finish = esitoUnitDelRamo({ checkOnly: false, prova: delRamo });
+  assert.equal(finish.ferma, true, 'senza --check non si pubblica e non si paga il resto');
+  assert.match(finish.messaggio, /non pubblico/);
+  assert.match(finish.messaggio, /tests\/unit\/x\.test\.mjs › rotto/, 'si dice quale test ha rotto il ramo');
+
+  const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
+  const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+  const spec = codice.indexOf('runSpecsALotti(blocking');
+  assert.ok(unit > 0 && spec > unit, 'gli spec delle aree vengono dopo gli unit');
+  const fraIDue = codice.slice(unit, spec);
+  assert.match(fraIDue, /esitoUnitDelRamo\(\{ checkOnly, prova \}\)/);
+  assert.doesNotMatch(fraIDue.replace(/if \(esito\.ferma\) process\.exit\(1\);/, ''), /process\.exit\(/,
+    'fra unit e spec l\'unica uscita è quella senza --check');
+  const fineRossa = codice.indexOf('if (unitRossi)', spec);
+  const verde = codice.indexOf('Controlli passati (--check');
+  assert.ok(fineRossa > spec && fineRossa < verde, 'un unit rosso non arriva mai a «Controlli passati»');
+  assert.match(codice.slice(fineRossa, verde), /process\.exit\(1\)/);
+});
+
+// Un rosso del ramo da solo già corretto su main fermava la chiusura, e l'unico rimedio (fondere main) faceva decadere
+// il verdetto: un giro di verifica intero per un test che su main era già verde (#1009). La prova completa sta in
+// finishUnitSulRamo.test.mjs.
+describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su main (#1009)', () => {
+  const M = 'c'.repeat(40);
+  test('verdi sulla fusione con main, o rossi uguali su main da solo: non sono del ramo, e non fermano nemmeno --check', () => {
+    for (const prova of [
+      { esito: 'verde', mainSha: M },
+      { esito: 'verde', mainSha: M, contenuto: true },
+      { esito: 'rosso_anche_su_main', mainSha: M, rossiMain: 2 },
+      { esito: 'rosso_anche_su_main', mainSha: M, rossiMain: 2, contenuto: true },
+    ]) {
+      for (const checkOnly of [false, true]) {
+        const e = esitoUnitDelRamo({ checkOnly, prova });
+        assert.equal(e.ferma, false, JSON.stringify(prova));
+        assert.equal(e.rosso, false, JSON.stringify(prova));
+        assert.match(e.messaggio, /non sono del ramo, proseguo/);
+        assert.doesNotMatch(e.messaggio, /non pubblico/);
+      }
+    }
+    assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M } }).messaggio, /fusione con main cccccccc/);
+    assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'rosso_anche_su_main', mainSha: M } }).messaggio, /anche su main da solo/);
+    const instabili = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, instabili: ['tests/unit/a.test.mjs › lento'] } });
+    assert.match(instabili.messaggio, /tests\/unit\/a\.test\.mjs › lento/, 'gli instabili si nominano');
+  });
+
+  test('rossi anche sulla fusione e verdi su main, o una prova che non si è potuta fare: si ferma come prima, col motivo', () => {
+    const casi = [
+      [{ esito: 'rosso_sulla_fusione', mainSha: M, rossi: ['tests/unit/v.test.mjs › valore'] }, /anche sulla fusione con main/],
+      [{ esito: 'rosso_sulla_fusione', mainSha: M, rossi: ['tests/unit/v.test.mjs › valore'], contenuto: true }, /rossi sul ramo, che contiene già main, e su main da solo passano/],
+      [{ errore: 'git giù', mainSha: M }, /non ho potuto provarli[\s\S]*git giù/],
+      [{ saltata: true, motivo: 'nessun origin da cui prendere main' }, /nessun origin/],
+      [{ esito: 'conflitto', mainSha: M, file: ['a.js'] }, /conflitto/],
+      [{ esito: 'main_contenuto', mainSha: M }, /main_contenuto/],
+      [null, /non ha dato un esito/],
+    ];
+    for (const [prova, motivo] of casi) {
+      const e = esitoUnitDelRamo({ checkOnly: false, prova });
+      assert.equal(e.ferma, true, JSON.stringify(prova));
+      assert.equal(e.rosso, true);
+      assert.match(e.messaggio, /non pubblico/);
+      assert.match(e.messaggio, motivo);
+      const c = esitoUnitDelRamo({ checkOnly: true, prova });
+      assert.equal(c.ferma, false);
+      assert.equal(c.rosso, true, '--check resta rosso alla fine');
+    }
+  });
+
+  test('il rosso del ramo da solo passa dalla prova sul ramo vero, anche quando contiene già main', () => {
+    const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
+    const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+    const esito = codice.indexOf('esitoUnitDelRamo({ checkOnly, prova })', unit);
+    assert.ok(unit > 0 && esito > unit);
+    assert.match(codice.slice(unit, esito), /const puntaProvata = git\(\['rev-parse', 'HEAD'\]\)\.out;\s*const prova = provaUnitSullaFusione\(\{ root: ROOT, punta: puntaProvata, ancheContenuto: true \}\);/);
+    assert.match(codice.slice(esito, codice.indexOf('runSpecsALotti(blocking', esito)), /unitRossi = esito\.rosso;/);
+  });
+});
+
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
   const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);
   assert.deepEqual(r.blocking, ['tests/a', 'tests/b']);
@@ -551,6 +637,19 @@ test('l\'elenco dei rossi noti non marcisce: ogni voce è uno spec che esiste', 
   assert.ok(Array.isArray(j.specs), 'rossi-noti.json deve avere un elenco `specs` (anche vuoto)');
   assert.match(j.nota, /#\d+/, 'la nota cita il feedback da cui l\'elenco dipende');
   for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
+});
+
+// Una voce senza motivo non la toglie nessuno, e un motivo rimasto senza voce racconta un rosso che non c'è più (#650).
+test('ogni rosso noto della macchina dell\'owner ha il suo motivo, e nessun motivo resta senza voce', () => {
+  const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
+  assert.ok(Array.isArray(j.specsMotivi), 'rossi-noti.json deve avere `specsMotivi` (anche vuoto)');
+  const motivi = new Map(j.specsMotivi.map((m) => [m.spec, m]));
+  for (const s of j.specs) {
+    const m = motivi.get(s);
+    assert.ok(m && m.perche && m.perche.length > 20, `${s}: manca il motivo in specsMotivi`);
+    assert.match(String(m.feedback || ''), /#\d+/, `${s}: manca il feedback che lo farà togliere`);
+  }
+  for (const m of j.specsMotivi) assert.ok(j.specs.includes(m.spec), `${m.spec}: motivo senza voce in specs, toglilo`);
 });
 
 // I rossi dei contenitori senza schermo delle routine. Vivevano nella memoria di

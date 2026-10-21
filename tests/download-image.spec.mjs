@@ -18,6 +18,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // PNG 1×1 valido.
 const PNG = Buffer.from(
@@ -47,7 +48,7 @@ test('"Salva immagine come…" su immagine cross-origin scarica il file senza fa
 
     // Flusso utente reale: tasto destro sull'immagine → voce del menu Filo.
     await page.locator('#pic').click({ button: 'right' });
-    const item = page.locator('.sn-menu button', { hasText: 'Salva immagine come' });
+    const item = menuDi(page).locator('.sn-menu button', { hasText: 'Salva immagine come' });
     await expect(item).toBeVisible();
     await item.click();
 
@@ -102,7 +103,7 @@ test('"Salva immagine come…" funziona anche su siti con protezione hotlink (ri
     });
 
     await page.locator('#pic').click({ button: 'right' });
-    const item = page.locator('.sn-menu button', { hasText: 'Salva immagine come' });
+    const item = menuDi(page).locator('.sn-menu button', { hasText: 'Salva immagine come' });
     await expect(item).toBeVisible();
     await item.click();
 
@@ -169,7 +170,7 @@ test('download che si interrompe a metà → l\'utente riceve un messaggio d\'er
     });
 
     await page.locator('#pic').click({ button: 'right' });
-    const item = page.locator('.sn-menu button', { hasText: 'Salva immagine come' });
+    const item = menuDi(page).locator('.sn-menu button', { hasText: 'Salva immagine come' });
     await expect(item).toBeVisible();
     await item.click();
 

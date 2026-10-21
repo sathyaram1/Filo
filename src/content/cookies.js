@@ -13,6 +13,7 @@
   const T_TOKENS = MSG.COOKIES_BANNER_TOKENS || 'cookies_banner_tokens';
   const T_FRAME = MSG.COOKIES_FRAME_BANNER || 'cookies_frame_banner';
   const T_HIDE_FRAME = MSG.COOKIES_HIDE_FRAME || 'cookies_hide_frame';
+  const T_ACCESSO = MSG.COOKIES_ACCESSO || 'cookies_accesso';
 
   const IS_TOP = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
 
@@ -63,13 +64,17 @@
     return ok;
   }
 
-  // querySelector che entra anche negli shadow root aperti dei root indicati.
-  // Alcuni CMP (Usercentrics) montano l'UI dentro uno shadow DOM, irraggiungibile
-  // con un querySelector classico.
+  // `root` è il documento, uno shadow root o un sottoalbero appena entrato in pagina, che può essere lui il pulsante.
+  // Alcuni CMP (Usercentrics) montano l'UI dentro uno shadow DOM, irraggiungibile con un querySelector classico.
+  function pick(root, sel) {
+    if (root.nodeType === 1 && root.matches(sel)) return root;
+    return root.querySelector(sel);
+  }
+
   function queryIn(root, selectors) {
     for (const sel of selectors) {
       let el = null;
-      try { el = root.querySelector(sel); } catch (_) {}
+      try { el = pick(root, sel); } catch (_) {}
       if (el && isVisible(el)) return el;
     }
     return null;
@@ -77,7 +82,7 @@
 
   function existsIn(root, selectors) {
     for (const sel of selectors) {
-      try { if (root.querySelector(sel)) return true; } catch (_) {}
+      try { if (pick(root, sel)) return true; } catch (_) {}
     }
     return false;
   }
@@ -274,6 +279,14 @@
   ];
 
   const HAND_HIDE = CMPS.flatMap((c) => c.hide || []);
+  // Un CMP scritto a mano che monta il suo banner. Non «Impostazioni cookie» né l'involucro: restano in pagina dopo la risposta.
+  const HAND_SIGN = CMPS.flatMap((c) => [
+    ...c.reject, ...(c.rejectInSettings || []), ...(c.showing || []), ...(c.shadowHosts || []).map((id) => '#' + id),
+  ]).join(',');
+
+  function carriesCmp(root) {
+    try { return !!pick(root, HAND_SIGN); } catch (_) { return false; }
+  }
   // Container che hanno l'aria di un consenso cookie (per limitare il fallback).
   const CONSENT_HINT = /(cookie|consent|gdpr|cmp|privacy|consenso|cmpwrapper|didomi|onetrust|cybot|qc-cmp|sp_message|usercentrics|iubenda|truste)/i;
 
@@ -290,8 +303,12 @@
   // «Rifiuta e abbonati» porta alla pagina dell'abbonamento: non è un rifiuto, è l'altra metà di un banner da nascondere.
   const NOT_A_REJECT = /(abbona|abbonati|subscri|abonn|suscri|assin|premium|paga|pay|acquista|compra|buy|accedi|login|log in|sign in|registr)/i;
 
+  // I due controlli in testa scartano senza normalizzare i link che avvolgono un intero blocco (un post, una scheda).
   function isRejectText(el) {
-    const txt = (el.textContent || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (el.childElementCount > 3) return false;
+    const raw = el.textContent || '';
+    if (raw.length > 120) return false;
+    const txt = raw.trim().toLowerCase().replace(/\s+/g, ' ');
     if (!txt || txt.length > 40) return false;
     if (!REJECT_PHRASES.some((p) => txt === p || txt.startsWith(p))) return false;
     return !NOT_A_REJECT.test(txt);
@@ -308,20 +325,25 @@
     } catch (_) { return true; }
   }
 
+  const CLICKABLE = 'button, a[role="button"], [role="button"], a, input[type="button"], input[type="submit"]';
+
   // Un button/link con testo di rifiuto. Dentro `root` qualsiasi; nel resto della pagina solo se
   // sta in un contenitore di consenso. Conservativo per costruzione.
-  function findRejectText(root, inConsentBox) {
-    let nodes = [];
-    try { nodes = root.querySelectorAll('button, a[role="button"], [role="button"], a, input[type="button"], input[type="submit"]'); } catch (_) {}
-    for (const el of nodes) {
-      if (el.__filoCookieClicked) continue;
+  // `seen.hidden` dice se c'era un rifiuto ancora invisibile (un banner che sta entrando in dissolvenza).
+  function findRejectText(root, inConsentBox, seen) {
+    const fits = (el) => {
+      if (el.__filoCookieClicked) return false;
       const probe = el.tagName === 'INPUT' ? { textContent: el.value } : el;
-      if (!isRejectText(probe)) continue;
-      if (el.tagName === 'A' && leavesPage(el)) continue;
-      if (!inConsentBox && !looksLikeConsent(el)) continue;
-      if (!isVisible(el)) continue;
-      return el;
-    }
+      if (!isRejectText(probe)) return false;
+      if (el.tagName === 'A' && leavesPage(el)) return false;
+      if (!inConsentBox && !looksLikeConsent(el)) return false;
+      if (!isVisible(el)) { if (seen) { seen.hidden = true; watchHidden(el); } return false; }
+      return true;
+    };
+    try { if (root.nodeType === 1 && root.matches(CLICKABLE) && fits(root)) return root; } catch (_) {}
+    let nodes = [];
+    try { nodes = root.querySelectorAll(CLICKABLE); } catch (_) {}
+    for (const el of nodes) if (fits(el)) return el;
     return null;
   }
 
@@ -340,10 +362,11 @@
     return { any, skip };
   }
 
-  // Un giro delle regole a mano. Ritorna il nome del CMP su cui ha agito, o null.
-  function handReject() {
+  // Un giro delle regole a mano sul documento, o sui sottoalberi di `scope`; gli shadow root dei CMP sempre.
+  // Ritorna il nome del CMP su cui ha agito, o null.
+  function handReject(scope) {
     for (const cmp of CMPS) {
-      const searchRoots = cmp.shadowHosts ? [document, ...shadowRootsOf(cmp.shadowHosts)] : [document];
+      const searchRoots = [...(scope || [document]), ...(cmp.shadowHosts ? shadowRootsOf(cmp.shadowHosts) : [])];
       for (const root of searchRoots) {
         const btn = queryIn(root, cmp.reject);
         if (btn && clickEl(btn)) return { name: cmp.name, rejected: true };
@@ -497,6 +520,7 @@
   // ─── esiti: il main li mostra nel menu della scheda ─────────────────────────
 
   function noteRejected(via) {
+    settle();
     if (reported.has('rejected')) return;
     reported.add('rejected');
     const go = () => send({ type: T_OUTCOME, outcome: 'rejected', via: String(via || '').slice(0, 60) });
@@ -505,10 +529,12 @@
       if (ok !== false) { go(); return; }
       reported.delete('rejected');
       send({ type: T_OUTCOME, outcome: 'unconfirmed' });
+      wake();
     });
   }
 
   function noteHidden() {
+    settle();
     if (reported.has('hidden')) return;
     reported.add('hidden');
     send({ type: T_OUTCOME, outcome: 'hidden' });
@@ -612,6 +638,7 @@
     const wait = Math.max((seenHidden() ? 0 : FRAME_REPORT_MS) - (now - frameSeenAt), ACTION_GRACE_MS - (now - lastActionAt));
     if (wait > 0) { scheduleScanIn(wait + 20); return; }
     reported.add('frame');
+    settle();
     send({ type: T_FRAME });
   }
 
@@ -695,16 +722,35 @@
     } catch (_) { return null; }
   }
 
+  function rewriteFrame(f) {
+    if (f.__filoNocookie) return;
+    const next = nocookieUrl(f.getAttribute('src') || '');
+    if (next && next !== f.src) {
+      f.__filoNocookie = true;
+      try { f.src = next; } catch (_) {}
+    }
+  }
+
+  // I giri guardano solo i nodi nuovi: un riquadro che riceve l'indirizzo dopo essere entrato (caricamento pigro)
+  // si riscrive quando lo riceve.
+  let srcObserver = null;
+  let srcWatched = new WeakSet();
+
+  function watchSrc(f) {
+    if (srcWatched.has(f)) return;
+    try {
+      if (!srcObserver) srcObserver = new MutationObserver((rs) => { if (active) for (const r of rs) rewriteFrame(r.target); });
+      srcObserver.observe(f, { attributes: true, attributeFilter: ['src'] });
+      srcWatched.add(f);
+    } catch (_) {}
+  }
+
   function rewriteYouTube(root) {
     let frames = [];
-    try { frames = root.querySelectorAll('iframe[src]'); } catch (_) { return; }
+    try { frames = root.nodeName === 'IFRAME' ? [root] : root.querySelectorAll('iframe'); } catch (_) { return; }
     for (const f of frames) {
-      if (f.__filoNocookie) continue;
-      const next = nocookieUrl(f.getAttribute('src') || '');
-      if (next && next !== f.src) {
-        f.__filoNocookie = true;
-        try { f.src = next; } catch (_) {}
-      }
+      rewriteFrame(f);
+      if (active && !f.__filoNocookie) watchSrc(f);
     }
   }
 
@@ -725,51 +771,184 @@
     scanLater = setTimeout(() => { scanLater = null; scheduleScan(); }, Math.max(16, ms | 0));
   }
 
-  function scan() {
-    if (!active) return;
-    try { rewriteYouTube(document); } catch (_) {}
-    if (!banners) return;
+  // ─── la caccia ──────────────────────────────────────────────────────────────
+  //
+  // Il documento intero si ripassa solo mentre si cerca un banner: COM_WINDOW_MS dall'avvio o da un segno di CMP,
+  // finché non arriva l'esito, e finché una regola lavora su un CMP visto. Fuori, solo i sottoalberi nuovi (#1106).
+
+  let huntId = 0;
+  let settledHunt = 0;
+  let huntUntil = 0;
+  let fullScans = 0;
+
+  function wake() {
+    huntId++;
+    huntUntil = Date.now() + COM_WINDOW_MS;
+    hunt();
+    scheduleScan();
+  }
+
+  function settle() { settledHunt = huntId; }
+
+  function hunting(now) {
+    if (settledHunt === huntId) return false;
+    if (now < huntUntil || com.busy) return true;
+    for (const name of com.firstSeen.keys()) if (!com.tried.has(name)) return true;
+    return false;
+  }
+
+  // In una scheda in sottofondo i fotogrammi si fermano e i nodi si accumulano: oltre il tetto si ripassa tutto una volta.
+  const ADDED_MAX = 2000;
+  let addedRoots = [];
+  let addedLost = false;
+
+  function takeAdded() {
+    const out = { roots: addedRoots, lost: addedLost };
+    addedRoots = [];
+    addedLost = false;
+    return out;
+  }
+
+  // Un «rifiuta» visto nascosto resta sorvegliato finché compare: un banner già in pagina può essere mostrato
+  // a caccia chiusa senza nodi nuovi (per classe, per stile, al primo scorrimento).
+  const WATCH_MAX = 50;
+  let watched = [];
+  let watchIo = null;
+
+  function watchHidden(el) {
+    if (watched.includes(el)) return;
+    if (watched.length >= WATCH_MAX) pruneWatched();
+    if (watched.length >= WATCH_MAX) return;
+    watched.push(el);
     try {
-      if (com.busy) return;
-      const hit = handReject();
-      if (hit) { if (hit.rejected) noteRejected(hit.name); return; }
-      const hand = handPresent();
-      const comWorking = comTick(hand.skip);
-      if (comWorking) return;
-      const fb = findRejectText(document, false);
-      if (fb && clickEl(fb)) { noteRejected('testo'); return; }
-      if (IS_TOP) { bannerTick(hand.any || com.firstSeen.size > 0); comHideTick(); }
-      else frameTick(hand.any);
+      if (!watchIo && typeof IntersectionObserver === 'function') {
+        watchIo = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) scheduleScan(); });
+      }
+      if (watchIo) watchIo.observe(el);
     } catch (_) {}
   }
 
-  // Le classi che cambiano servono solo a chiedere le regole della lista; a far ripassare le regole
-  // bastano i nodi nuovi (un banner che compare per classe lo segnala il motore di stile, da cookieBanners.js).
+  function pruneWatched() {
+    watched = watched.filter((el) => {
+      if (el.isConnected && !el.__filoCookieClicked) return true;
+      try { if (watchIo) watchIo.unobserve(el); } catch (_) {}
+      return false;
+    });
+  }
+
+  function stopWatching() {
+    watched = [];
+    if (watchIo) { try { watchIo.disconnect(); } catch (_) {} watchIo = null; }
+  }
+
+  function shownWatched() {
+    if (!watched.length) return null;
+    pruneWatched();
+    for (const el of watched) {
+      const hit = findRejectText(el, false);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  function huntDocument() {
+    fullScans++;
+    const hit = handReject(null);
+    if (hit) { if (hit.rejected) noteRejected(hit.name); else wake(); return; }
+    const hand = handPresent();
+    const comWorking = comTick(hand.skip);
+    if (comWorking) return;
+    const fb = findRejectText(document, false, { hidden: false });
+    if (fb && clickEl(fb)) { noteRejected('testo'); return; }
+    if (IS_TOP) { bannerTick(hand.any || com.firstSeen.size > 0); comHideTick(); }
+    else frameTick(hand.any);
+  }
+
+  // Le stesse regole sui soli nodi nuovi. Un CMP che entra senza un rifiuto già premibile riapre la caccia.
+  function scanAdded(roots) {
+    const signed = roots.filter(carriesCmp);
+    const hit = handReject(signed);
+    if (hit) { if (hit.rejected) noteRejected(hit.name); else wake(); return; }
+    const shown = shownWatched();
+    if (shown && clickEl(shown)) { noteRejected('testo'); return; }
+    const seen = { hidden: false };
+    for (const r of roots) {
+      const fb = findRejectText(r, false, seen);
+      if (fb && clickEl(fb)) { noteRejected('testo'); return; }
+    }
+    if (signed.length || seen.hidden) { wake(); return; }
+    if (IS_TOP) { bannerTick(com.firstSeen.size > 0); comHideTick(); }
+    else frameTick(true);
+  }
+
+  function scan() {
+    if (!active) return;
+    const { roots: all, lost } = takeAdded();
+    const roots = [...new Set(all)].filter((n) => n.isConnected);
+    try {
+      if (lost) rewriteYouTube(document);
+      else for (const r of roots) rewriteYouTube(r);
+    } catch (_) {}
+    if (!banners) return;
+    try {
+      if (com.busy) return;
+      if (lost || hunting(Date.now())) huntDocument();
+      else scanAdded(roots);
+    } catch (_) {}
+  }
+
+  // Le classi che cambiano servono solo a chiedere le regole della lista; a far ripassare le regole bastano i nodi
+  // nuovi e le scritte nei pulsanti (un banner che compare per classe lo segnalano il motore di stile e i «rifiuta» sorvegliati).
   function onMutations(records) {
     const B = IS_TOP && banners ? global.SN_COOKIE_BANNERS : null;
     const surveying = !!(B && B.isRunning());
     let added = false;
+    const push = (n) => { added = true; if (addedRoots.length < ADDED_MAX) addedRoots.push(n); else addedLost = true; };
     for (const r of records) {
       if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
-      if (!r.addedNodes.length) continue;
-      added = true;
-      if (surveying) for (const n of r.addedNodes) if (n.nodeType === 1) B.survey(n, true);
+      if (r.type === 'characterData') { const c = labelled(r.target); if (c) push(c); continue; }
+      for (const n of r.addedNodes) {
+        if (n.nodeType !== 1) { const c = n.nodeType === 3 && labelled(r.target); if (c) push(c); continue; }
+        push(n);
+        if (surveying) B.survey(n, true);
+      }
     }
     if (added) scheduleScan();
   }
 
+  // Una scritta che entra o cambia è una novità del pulsante che la porta: le etichette arrivano anche dopo il pulsante.
+  function labelled(t) {
+    const el = t && (t.nodeType === 1 ? t : t.parentElement);
+    try { return el ? el.closest(CLICKABLE) : null; } catch (_) { return null; }
+  }
+
+  // Gli attributi servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
+  let observedAttrs = false;
   function startObserver() {
-    if (observer) return;
+    const B = global.SN_COOKIE_BANNERS;
+    const attrs = !!(B && B.isRunning());
+    if (observer && observedAttrs === attrs) return;
     try {
-      observer = new MutationObserver(onMutations);
-      observer.observe(document.documentElement || document, {
-        childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'],
-      });
+      if (observer) {
+        const left = observer.takeRecords();
+        observer.disconnect();
+        if (left.length) onMutations(left);
+      } else {
+        observer = new MutationObserver(onMutations);
+      }
+      observedAttrs = attrs;
+      observer.observe(document.documentElement || document, attrs
+        ? { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'id'] }
+        : { childList: true, subtree: true, characterData: true });
     } catch (_) {}
   }
 
   function stopObserver() {
     if (observer) { try { observer.disconnect(); } catch (_) {} observer = null; }
+    if (srcObserver) { try { srcObserver.disconnect(); } catch (_) {} srcObserver = null; }
+    srcWatched = new WeakSet();
+    stopWatching();
+    takeAdded();
   }
 
   // Alcuni CMP montano il banner con ritardo: si ripassa per qualche secondo anche senza mutazioni utili.
@@ -792,7 +971,8 @@
       complex: [...(Array.isArray(cfg.cosmetic.complex) ? cfg.cosmetic.complex : []), ...HAND_HIDE],
       specific: cfg.cosmetic.specific,
       ask: (ids, classes) => ask({ type: T_TOKENS, ids, classes }).then((r) => (r && r.ok && Array.isArray(r.selectors) ? r.selectors : [])),
-      onFound: scheduleScan,
+      // Un banner della lista è un segno di CMP: fuori dalla caccia la riapre.
+      onFound: () => { if (hunting(Date.now())) scheduleScan(); else wake(); },
     });
   }
 
@@ -815,20 +995,54 @@
       if (huntTimer) { clearInterval(huntTimer); huntTimer = null; }
       return;
     }
+    const wasActive = active;
     const wasBanners = banners;
     active = true;
     banners = nextBanners;
-    startObserver();
     if (banners && !wasBanners) startBanners();
     if (!banners && wasBanners) stopBanners();
-    scheduleScan();
-    hunt();
+    startObserver();
+    if (!wasActive) { try { rewriteYouTube(document); } catch (_) {} }
+    wake();
     for (const m of pendingFrames.splice(0)) hideFrame(m);
   }
 
   function applyMode(m) {
     apply({ ...(cfg || {}), mode: m });
   }
+
+  // ─── accesso a un sito (Privacy massima) ───────────────────────────────────
+  //
+  // Solo il gesto: una password scritta dall'utente (evento vero, la pagina non lo fabbrica) che parte col modulo,
+  // con Invio o con un pulsante. Se l'accesso è riuscito, e la proposta «Resta connesso», lo decide il main.
+  let campoPassword = null;
+  let accessoInviatoAt = 0;
+  function bersaglio(e) {
+    try { const p = e.composedPath && e.composedPath(); if (p && p[0]) return p[0]; } catch (_) {}
+    return e.target;
+  }
+  function onPasswordInput(e) {
+    if (!e.isTrusted) return;
+    const t = bersaglio(e);
+    if (t && t.tagName === 'INPUT' && String(t.type).toLowerCase() === 'password') campoPassword = t;
+  }
+  function forseAccesso(e) {
+    if (!e.isTrusted || mode !== 'privacy' || !campoPassword || !campoPassword.value) return;
+    if (e.type === 'keydown' && e.key !== 'Enter') return;
+    if (e.type === 'click') {
+      const t = bersaglio(e);
+      if (!t || !t.closest || !t.closest('button, input[type="submit"], input[type="image"], input[type="button"], [role="button"], a')) return;
+    }
+    const ora = Date.now();
+    if (ora - accessoInviatoAt < 3000) return;
+    accessoInviatoAt = ora;
+    send({ type: T_ACCESSO });
+  }
+  // Anche nei riquadri: c'è chi mette il modulo d'accesso in un iframe (icloud.com, banche). Vale il sito della scheda.
+  try {
+    document.addEventListener('input', onPasswordInput, true);
+    for (const ev of ['submit', 'keydown', 'click']) document.addEventListener(ev, forseAccesso, true);
+  } catch (_) {}
 
   // ─── bootstrap ───────────────────────────────────────────────────────────
 
@@ -854,5 +1068,5 @@
     load();
   }
 
-  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, _state: () => ({ mode, active, banners }) };
+  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, _state: () => ({ mode, active, banners, fullScans, hunting: banners && hunting(Date.now()) }) };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

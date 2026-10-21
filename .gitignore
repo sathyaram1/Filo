@@ -31,8 +31,21 @@ tests/agent/.env
 tests/agent/.out/
 tests/agent/reports/
 test-results/
+# L'esito di una parte della suite (suite.yml) e la loro unione: in GitHub stanno negli artifact.
+blob-report/
+suite-risultati.json
 .DS_Store
 *.log
+# Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
+# salvataggio spedisce tutto. Vanno in os.tmpdir(). Questi nomi li ferma git; con un altro nome la copia
+# la riconosce dalla forma il salvataggio automatico (scripts/copie-in-scena.mjs), e la sentinella dopo.
+*dump*.json
+*dump*.jsonl
+filo-copie/
+filo-feedback/
+# Il clone del server di un lavoro server (#1159) sta fuori dal repo: se finisse dentro, il salvataggio automatico
+# pubblicherebbe il codice privato di filo-security. Difese anche in dispatch (cloneDentroIlRepo).
+filo-security/
 # Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
 # committati per sbaglio insieme al resto (`nf2.err` ha viaggiato in ogni copia
 # del repo per due settimane).
@@ -47,6 +60,8 @@ test-results/
 # Esito della verifica indipendente del lavoro locale: riguarda questa macchina
 # e questo momento (ramo + commit verificato), non ha senso versionarlo.
 .claude/verify-local.json
+# La sua copia per i lavori con il server, nel checkout principale: server:fondi la legge a worktree tolto (#1062).
+.claude/verdetti-server.json
 # Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
 # lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
 .claude/routine-role.json
@@ -67,11 +82,25 @@ test-results/
 # data: serve a non battere più di una volta ogni cinque minuti).
 .claude/routine-beat-hook.stamp
 
+# Dove è arrivata la lettura progressiva dei transcript per il consumo nel battito: numeri, mai testo.
+.claude/routine-consumo.json
+
+# Chi è il worker di questo clone (indice e quanti in parallelo, #1157): lo scrive
+# scripts/clone-worker.mjs, vale per questa cartella e basta.
+.claude/filo-worker.json
+
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
 .claude/routine-state/
 
+# I biglietti delle sessioni locali (#1148, scripts/lib/biglietto-locale.mjs): SEGRETI come quello del giro.
+# Il salvataggio automatico committa tutto: senza questa riga un biglietto finirebbe sul repo pubblico.
+.claude/biglietti/
+
 # Diario locale delle interruzioni di sessione e dump di bash su Windows: macchina, non repo.
 .claude/cap-observations.jsonl
 *.stackdump
+# Il preload delle pagine web impacchettato per la sandbox (src/main/preloadPacchetto.js): lo rigenera
+# electron-builder a ogni pacchetto (build.beforePack), e senza pacchetto Filo lo compone da sé nella cartella dati.
+generato/

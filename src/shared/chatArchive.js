@@ -119,6 +119,28 @@
     return `${head}\n…(parte centrale della conversazione omessa)…\n${tail}`;
   }
 
+  // La trascrizione per CERCA_CHAT con l'id: intera fino a `cap`, oltre testa e coda, e la parte omessa si legge
+  // davvero, a pezzi, richiamando con `da` (#868: il contesto della chat promette di rileggere intero un messaggio tagliato).
+  const PEZZO_RILETTURA = 30000;
+  function transcriptForReading(messages, { da = null, cap = 8000, pezzo = PEZZO_RILETTURA } = {}) {
+    const full = (Array.isArray(messages) ? messages : [])
+      .filter((m) => m && String(m.text || '').trim())
+      .map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${String(m.text).replace(/\s+/g, ' ').trim()}`)
+      .join('\n');
+    const n = full.length;
+    const inizio = Number(da);
+    if (da == null || da === '' || !Number.isFinite(inizio)) {
+      if (n <= cap) return full;
+      const a = Math.floor(cap * 0.6);
+      const b = n - Math.floor(cap * 0.4);
+      return `${full.slice(0, a)}\n…(parte centrale omessa: caratteri ${a}-${b} di ${n}; si legge richiamando CERCA_CHAT con questo id e da = ${a})…\n${full.slice(b)}`;
+    }
+    const a = Math.min(n, Math.max(0, Math.floor(inizio)));
+    const b = Math.min(n, a + pezzo);
+    const dopo = b < n ? `; il seguito con da = ${b}` : '; qui finisce la conversazione';
+    return `…(caratteri ${a}-${b} di ${n}${dopo})…\n${full.slice(a, b)}`;
+  }
+
   // ── Voce d'elenco ────────────────────────────────────────────────────────
   // Quello che la pagina Cronologia deve mostrare senza scaricarsi addosso
   // tutte le conversazioni: titolo, date, tipo, quanti messaggi, e un estratto
@@ -136,6 +158,8 @@
       closedAt: chat.closedAt || null,
       messageCount: messages.length,
       excerpt: excerptOf(messages, chat.title || fallbackTitle(messages)),
+      // Una conversazione di un'altra app (#974): si riapre nel filo o nella sua app, non si continua dalla home.
+      ...(chat.app ? { app: chat.app, dove: typeof chat.dove === 'string' ? chat.dove : '' } : {}),
     };
   }
 
@@ -188,6 +212,13 @@
     return out;
   }
 
+  // Le parole di una richiesta senza la punteggiatura ai bordi: «Lisbona?» cerca «lisbona» (#868.8). Quella dentro la
+  // parola resta («node.js», «dell'albergo»), e così i segni che fanno il nome («c++», «c#»).
+  const PUNTEGGIATURA_AI_BORDI = /^[.,;:!?¿¡…"'`“”‘’«»()[\]{}<>*_]+|[.,;:!?¿¡…"'`“”‘’«»()[\]{}<>*_]+$/g;
+  function paroleDi(s) {
+    return normalizeForSearch(s).split(/\s+/).map((w) => w.replace(PUNTEGGIATURA_AI_BORDI, '')).filter(Boolean);
+  }
+
   function haystackOf(chat) {
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
     return normalizeForSearch([
@@ -200,7 +231,7 @@
   // «coscienza filosofia» trova la chat che parla di entrambe, non quella che
   // nomina solo la prima.
   function matches(chat, query) {
-    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const terms = paroleDi(query);
     if (!terms.length) return true;
     const hay = haystackOf(chat);
     return terms.every((t) => hay.includes(t));
@@ -234,24 +265,71 @@
   // buttano mai a priori: si tolgono solo quando pretenderle tutte non ha
   // trovato niente, e chi chiama SA che la ricerca si è allargata (lo dice a
   // chi guarda, invece di far finta che la richiesta fosse quella).
+  // Una parola corta che non è qui conta (Zen, SQL, IVA): l'elenco è l'unico filtro (#1295).
   const PAROLE_CHE_NON_DISTINGUONO = new Set([
-    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra', 'il', 'lo', 'la', 'i', 'gli', 'le',
+    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra', 'il', 'lo', 'la', 'i', 'gli', 'le', 'li',
     'un', 'uno', 'una', 'del', 'dello', 'della', 'dei', 'degli', 'delle', 'al', 'allo', 'alla',
-    'ai', 'agli', 'alle', 'dal', 'dalla', 'nel', 'nella', 'sul', 'sulla', 'sullo', 'sui', 'sulle',
-    'che', 'chi', 'cosa', 'come', 'quando', 'dove', 'perche', 'non', 'piu', 'mi', 'ti', 'si',
-    'ci', 'vi', 'ne', 'e', 'ed', 'o', 'ma', 'se', 'ho', 'hai', 'ha', 'era', 'erano', 'sono',
+    'ai', 'agli', 'alle', 'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle', 'nel', 'nello', 'nella',
+    'nei', 'negli', 'nelle', 'sul', 'sulla', 'sullo', 'sui', 'sugli', 'sulle', 'col', 'coi',
+    'dell', 'all', 'dall', 'nell', 'sull', 'quell', 'quest', 'po',
+    'che', 'chi', 'cui', 'cosa', 'come', 'quando', 'dove', 'perche', 'non', 'piu', 'mi', 'ti', 'si',
+    'ci', 'vi', 'ne', 'me', 'te', 'se', 'io', 'tu', 'lui', 'lei', 'noi', 'voi', 'loro',
+    'e', 'ed', 'o', 'od', 'ma', 'pure', 'anche', 'poi', 'gia', 'qui', 'qua', 'ora', 'mai',
+    'no', 'ok', 'eh', 'ah', 'oh', 'boh', 'ben', 'tal',
+    'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno', 'era', 'erano', 'ero', 'sono', 'sei', 'siamo',
+    'sia', 'fu', 'fa', 'fai', 'fare', 'va', 'vai', 'so', 'sa', 'sai', 'sto', 'sta', 'stai', 'puo', 'do', 'dai',
     'ieri', 'oggi', 'altro', 'altra', 'volta', 'quella', 'quello', 'questa', 'questo', 'mio',
-    'mia', 'tuo', 'tua', 'chat', 'discussione', 'discussioni', 'conversazione', 'conversazioni',
+    'mia', 'tuo', 'tua', 'suo', 'sua', 'chat', 'discussione', 'discussioni', 'conversazione', 'conversazioni',
     'parlato', 'parlare', 'parlavamo', 'detto', 'dire', 'riprendi', 'riprendere', 'ricordi',
-    'avevamo', 'avevo', 'avevi', 'scorsa', 'scorso', 'settimana', 'fa',
+    'avevamo', 'avevo', 'avevi', 'scorsa', 'scorso', 'settimana',
+    'the', 'of', 'and', 'or', 'to', 'on', 'at', 'by', 'for', 'is', 'my', 'an',
   ]);
 
-  // Le parole della richiesta che davvero restringono il campo: le altre le
-  // scrive chiunque, in qualunque chat.
-  function terminiCheDistinguono(terms) {
-    return (Array.isArray(terms) ? terms : [])
-      .filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
+  // Una sigla scritta in maiuscolo («AI», «PO») conta anche quando si scrive come una parola vuota («ai», «po»); non
+  // quando è maiuscola tutta la frase, che dice il tasto bloccato e non la sigla.
+  function sigleDi(originale) {
+    const s = String(originale == null ? '' : originale);
+    if (!/\p{Ll}/u.test(s)) return new Set();
+    return new Set((s.match(/[\p{L}\p{N}]+/gu) || [])
+      .filter((w) => w.length > 1 && /\p{Lu}/u.test(w) && !/\p{Ll}/u.test(w))
+      .map(normalizeForSearch));
   }
+
+  // Le parole della richiesta che davvero restringono il campo: le altre le
+  // scrive chiunque, in qualunque chat. «sull'IVA» porta «iva»: l'apostrofo e la punteggiatura dividono.
+  // `originale`: la richiesta com'era scritta, per riconoscerne le sigle.
+  function terminiCheDistinguono(terms, originale) {
+    const sigle = sigleDi(originale);
+    const out = [];
+    for (const t of Array.isArray(terms) ? terms : []) {
+      for (const w of String(t == null ? '' : t).split(/[^\p{L}\p{N}]+/u)) {
+        if (w.length > 1 && (sigle.has(w) || !PAROLE_CHE_NON_DISTINGUONO.has(w)) && !out.includes(w)) out.push(w);
+      }
+    }
+    return out;
+  }
+
+  // «Le chat che ho nascosto», «la conversazione che avevo tolto»: chi le chiede così le vuole vedere tutte (#1295).
+  function chiedeLeNascoste(query) {
+    return /(?:^|[^\p{L}])(?:nascost|nascond|tolt|cancellat|eliminat)\p{L}*/u.test(normalizeForSearch(query));
+  }
+
+  // Una parola corta vale dall'inizio di una parola: «iva» trova «IVA» e non «arrivano», «mac» non «tomaccio».
+  const CORTA = 3;
+  const inizi = new Map();
+  function posizioneTermine(hay, t) {
+    const s = String(hay || '');
+    const w = String(t || '');
+    if (w.length > CORTA) return s.indexOf(w);
+    let re = inizi.get(w);
+    if (!re) {
+      re = new RegExp(`(?:^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'u');
+      inizi.set(w, re);
+    }
+    const m = re.exec(s);
+    return m ? m.index + m[0].length - w.length : -1;
+  }
+  const contieneTermine = (hay, t) => posizioneTermine(hay, t) >= 0;
 
   function filtraPerTipo(chats, o) {
     const kind = normalizeKindOrNull(o.kind);
@@ -276,28 +354,28 @@
     const limit = Number(o.limit) > 0 ? Number(o.limit) : 0;
     const taglia = (list) => (limit ? list.slice(0, limit) : list);
     const candidate = filtraPerTipo(chats, o);
-    const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const tutte = paroleDi(query);
     if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
 
-    const hays = new Map(candidate.map((c) => [c.id, haystackOf(c)]));
+    // `o.testo(c)`: dove cercare quando i candidati non sono chat (le pagine del filo), con gli stessi tre passi.
+    const pagliaio = typeof o.testo === 'function' ? (c) => normalizeForSearch(o.testo(c)) : haystackOf;
+    const hays = new Map(candidate.map((c) => [c.id, pagliaio(c)]));
     const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 
-    const forti = terminiCheDistinguono(tutte);
+    const forti = terminiCheDistinguono(tutte, query);
     // Nessuna parola restringe il campo (l'utente ha cercato «di ieri»):
     // allargare vorrebbe dire tirare fuori mezzo archivio spacciandolo per una
     // risposta. Meglio dire che non si è trovato niente.
     if (!forti.length) return { results: [], termini: tutte, allargata: false };
 
-    if (forti.length < tutte.length) {
-      const conForti = candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
-      if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
-    }
+    const conForti = candidate.filter((c) => forti.every((t) => contieneTermine(hays.get(c.id), t)));
+    if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
 
     // Ultimo passo: almeno una parola che distingue. Ordinate per quante ne
     // combaciano, così la chat più pertinente resta in cima.
     const punteggi = candidate
-      .map((c) => ({ c, n: forti.filter((t) => hays.get(c.id).includes(t)).length }))
+      .map((c) => ({ c, n: forti.filter((t) => contieneTermine(hays.get(c.id), t)).length }))
       .filter((x) => x.n > 0)
       .sort((a, b) => b.n - a.n);
     if (!punteggi.length) return { results: [], termini: forti, allargata: true };
@@ -310,7 +388,7 @@
   function snippetFor(chat, query, radius) {
     const r = Number(radius) > 0 ? Number(radius) : 90;
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
-    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const terms = paroleDi(query);
     if (!terms.length) return excerptOf(messages);
     // La parola da mostrare è la prima della richiesta che COMPARE davvero, non
     // la prima scritta: cercando «la coscienza», un frammento costruito attorno
@@ -322,7 +400,7 @@
       let termine = '';
       let at = -1;
       for (const t of terms) {
-        const i = hay.indexOf(t);
+        const i = posizioneTermine(hay, t);
         if (i >= 0 && (at < 0 || t.length > termine.length)) { at = i; termine = t; }
       }
       if (at < 0) continue;
@@ -347,9 +425,14 @@
     const out = { role, text, ts: turn.ts || new Date().toISOString() };
     if (Array.isArray(turn.actions) && turn.actions.length) {
       // Un'azione fermata perché portava fuori un segreto resta fermata (#810): riaperta, la chat non la dà per fatta.
-      out.actions = turn.actions
-        .map((a) => (a && a.type ? (a._output && a._output.blocked === 'segreto' ? 'FERMATA' : String(a.type)) : ''))
-        .filter(Boolean);
+      // Un ricordo ripescato da Filo resta un ricordo, non una ricerca chiesta (#1301); i titoli no: una chat cancellata
+      // non deve sopravvivere nel nome dentro le altre.
+      const nome = (a) => {
+        if (a._output && a._output.blocked === 'segreto') return 'FERMATA';
+        if (a._auto && String(a.type).toUpperCase() === 'CERCA_CHAT') return 'RICORDO_FILO';
+        return String(a.type);
+      };
+      out.actions = turn.actions.map((a) => (a && a.type ? nome(a) : '')).filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;
     // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
@@ -363,6 +446,35 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Arrivata quando la scheda aveva già lasciato la conversazione: nel filo si posa dopo la sua chat (filoCoda).
+      if (turn.tardiva === true) out.tardiva = true;
+      // Un messaggio che Filo ha scritto di sua iniziativa (#869), e le cose successe che l'hanno fatto nascere.
+      if (turn.spontaneo) {
+        out.spontaneo = true;
+        const motivi = (Array.isArray(turn.motivi) ? turn.motivi : [])
+          .filter((m) => m && typeof m.tipo === 'string')
+          .map((m) => ({ tipo: m.tipo.slice(0, 20), testo: String(m.testo == null ? '' : m.testo).slice(0, 300) }));
+        if (motivi.length) out.motivi = motivi.slice(-50);
+        // Riscrive il messaggio spontaneo che lo precede invece di aggiungersi (src/shared/filoCoda.js, siFonde).
+        if (turn.fonde) out.fonde = true;
+      }
+      // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
+      const guardate = [
+        ...(Array.isArray(turn.guardate) ? turn.guardate : []),
+        ...(Array.isArray(turn.actions) ? turn.actions : [])
+          .filter((a) => a && String(a.type || '').toUpperCase() === 'VEDI_SCHERMO' && a._executed !== false && a._output && a._output.testo)
+          .map((a) => a._output.finestra),
+      ].filter((n) => typeof n === 'string' && n.trim()).map((n) => n.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120));
+      if (guardate.length) out.guardate = [...new Set(guardate)].slice(0, 20);
+      // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
+      const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
+      if (cambi.length) out.cambi = cambi;
+      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora.
+      const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
+        .filter((x) => x && typeof x.url === 'string' && x.url)
+        .slice(0, 200)
+        .map((x) => ({ url: x.url, motivo: String(x.motivo || '').slice(0, 200) }));
+      if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
     }
     return out;
   }
@@ -384,7 +496,119 @@
     return `${testa}\n…(${tolti} caratteri dell'esito non conservati)…\n${coda}`;
   }
 
+  // ── Le copie di una chat cancellata (#866) ───────────────────────────────
+  // Una chat cancellata deve sparire anche dalle sue copie: le richieste ai modelli, la cache, il registro grezzo.
+  // Lì un messaggio può stare intero, come stringa JSON, su una riga sola o tagliato in testa o in coda: si confronta
+  // a spazi singoli e si toglie tutto il pezzo che coincide. Un messaggio corto vale solo intero e fra confini di parola.
+  const CHAT_CANCELLATA = '[chat cancellata]';
+  const SEME = 24;
+  const FORTE = 12;
+  // Tanti caratteri uguali di fila sono il messaggio, comunque la copia continui (il registro grezzo ne tiene 200).
+  const LUNGO = 100;
+  const PAROLA = /[\p{L}\p{N}]/u;
+
+  const piano = (s) => s.replace(/\s+/g, ' ').trim();
+
+  function formeDaDimenticare(testi) {
+    const forme = new Set();
+    for (const t of Array.isArray(testi) ? testi : []) {
+      const s = String(t == null ? '' : t).trim();
+      if (!s) continue;
+      const json = (x) => JSON.stringify(x).slice(1, -1);
+      for (const f of [piano(s), piano(json(s)), json(piano(s))]) if (f) forme.add(f);
+    }
+    return [...forme].sort((a, b) => b.length - a.length);
+  }
+
+  // Il testo a spazi singoli e, per ogni suo carattere, dove sta nell'originale.
+  function pianaConPosizioni(s) {
+    let t = '';
+    const pos = [];
+    for (let i = 0; i < s.length; i++) {
+      if (/\s/.test(s[i])) {
+        if (t.endsWith(' ')) continue;
+        t += ' ';
+      } else t += s[i];
+      pos.push(i);
+    }
+    return { t, pos };
+  }
+
+  // Un pezzo tagliato in coda vale se la copia finisce lì o prosegue coi puntini; tagliato in testa, se la copia
+  // comincia lì o dopo i puntini. Oltre LUNGO caratteri uguali vale comunque.
+  function pezzi(s, forme) {
+    const { t, pos } = pianaConPosizioni(s);
+    const trovati = [];
+    const aggiungi = (i, k) => {
+      const solo = t.slice(0, i).trim() === '' && t.slice(i + k).trim() === '';
+      trovati.push({ i: pos[i], k: pos[i + k - 1] + 1 - pos[i], forte: k >= FORTE || solo });
+    };
+    for (const f of forme) {
+      const seme = f.slice(0, Math.min(f.length, SEME));
+      for (let i = t.indexOf(seme); i !== -1; i = t.indexOf(seme, i + 1)) {
+        let k = seme.length;
+        while (k < f.length && i + k < t.length && t[i + k] === f[k]) k++;
+        const intero = k === f.length;
+        const dopo = t.slice(i + k).trimStart();
+        if (!intero && !(dopo === '' || dopo[0] === '…' || k >= LUNGO)) continue;
+        if (i > 0 && PAROLA.test(t[i - 1]) && PAROLA.test(f[0])) continue;
+        if (intero && i + k < t.length && PAROLA.test(t[i + k]) && PAROLA.test(f[f.length - 1])) continue;
+        aggiungi(i, k);
+      }
+      if (f.length <= SEME) continue;
+      const coda = f.slice(-SEME);
+      for (let j = t.indexOf(coda); j !== -1; j = t.indexOf(coda, j + 1)) {
+        const fine = j + SEME;
+        let k = SEME;
+        while (k < f.length && fine - k - 1 >= 0 && t[fine - k - 1] === f[f.length - k - 1]) k++;
+        if (k === f.length) continue;
+        const prima = t.slice(0, fine - k).trimEnd();
+        if (!(prima === '' || prima.endsWith('…') || k >= LUNGO)) continue;
+        if (fine < t.length && PAROLA.test(t[fine]) && PAROLA.test(f[f.length - 1])) continue;
+        aggiungi(fine - k, k);
+      }
+    }
+    return trovati;
+  }
+
+  function stringhe(valore, fn) {
+    if (typeof valore === 'string') return fn(valore);
+    if (Array.isArray(valore)) return valore.map((v) => stringhe(v, fn));
+    if (valore && typeof valore === 'object') {
+      const out = {};
+      for (const k of Object.keys(valore)) out[k] = stringhe(valore[k], fn);
+      return out;
+    }
+    return valore;
+  }
+
+  // Vero se il valore porta un messaggio della chat in modo riconoscibile (lungo, o una stringa che è il messaggio).
+  function riguardaChat(valore, forme) {
+    let si = false;
+    stringhe(valore, (s) => { if (!si && pezzi(s, forme).some((p) => p.forte)) si = true; return s; });
+    return si;
+  }
+
+  function redigiChat(valore, forme) {
+    return stringhe(valore, (s) => {
+      const trovati = pezzi(s, forme).sort((a, b) => a.i - b.i || b.k - a.k);
+      if (!trovati.length) return s;
+      let out = '';
+      let fine = 0;
+      for (const p of trovati) {
+        if (p.i < fine) { fine = Math.max(fine, p.i + p.k); continue; }
+        out += s.slice(fine, p.i) + CHAT_CANCELLATA;
+        fine = p.i + p.k;
+      }
+      return out + s.slice(fine);
+    });
+  }
+
   global.SN_CHAT_ARCHIVE = {
+    CHAT_CANCELLATA,
+    formeDaDimenticare,
+    riguardaChat,
+    redigiChat,
     KIND_TALK,
     KIND_COMMAND,
     KINDS,
@@ -397,14 +621,20 @@
     normalizeKindOrNull,
     parseTriage,
     transcriptForTriage,
+    transcriptForReading,
+    PEZZO_RILETTURA,
     toIndexEntry,
     excerptOf,
     isVisibleByDefault,
     normalizeForSearch,
+    paroleDi,
     matches,
     search,
     searchWide,
     terminiCheDistinguono,
+    chiedeLeNascoste,
+    contieneTermine,
+    posizioneTermine,
     snippetFor,
     toStoredMessage,
   };

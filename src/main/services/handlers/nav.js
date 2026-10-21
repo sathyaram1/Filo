@@ -3,6 +3,20 @@
 // handlers.js e riceve (msg, sender, origin), ritornando l'oggetto risposta.
 
 const { app } = require('electron');
+const { soloFilo } = require('./origine');
+
+// Un'icona della home dice dove sta in px della sua pagina; il menu della shell lo vuole in px della finestra.
+// Il punto resta dentro la vista: una pagina non apre il menu fuori da sé.
+function ancoraNellaFinestra(win, wc, a) {
+  if (!a || !wc || !Number.isFinite(a.x) || !Number.isFinite(a.y)) return null;
+  const tab = (win._filoTabs?.tabs || []).find((t) => t.view && t.view.webContents === wc);
+  if (!tab) return null;
+  let zoom = 1;
+  try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+  const b = tab.view.getBounds();
+  const dentro = (v, max) => Math.min(Math.max(v, 0), max);
+  return { x: b.x + dentro(a.x * zoom, b.width), y: b.y + dentro(a.y * zoom, b.height) };
+}
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf, apriDaFilo, SCHEMI_USCITA } = ctx;
@@ -79,10 +93,16 @@ module.exports = function register(on, ctx) {
     // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
     if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
-      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url) });
+      // `parole` le manda solo la barra della home, con quello che l'utente ha scritto: per il giudizio sui siti è un
+      // indirizzo scritto a mano.
+      // Un clic su un collegamento di Filo vale per la pagina d'arrivo come un clic su un sito; l'Invio di chi scrive no.
+      const origine = parole.trim() ? { tipo: 'scritto' } : { tipo: 'filo', gesto: require('../permessiPagine').gestoDellUtente(sender?.wc) };
+      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url, { origine }) });
       return { ok: true, ...r };
     }
-    win._filoTabs.openTab(url);
+    const daPagina = /^https?:/i.test(String(sender?.url || ''));
+    const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto } } : {});
     return { ok: true };
   });
 
@@ -98,8 +118,12 @@ module.exports = function register(on, ctx) {
       return { ok: true };
     }
     if (!win._filoTabs.apribileDallAssistente(sender && sender.wc, url)) return { ok: false, error: 'forbidden' };
-    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta.
-    win._filoTabs.openTab(url);
+    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta. Per il giudizio sui siti
+    // l'indirizzo arriva dalla pagina dell'assistente, come ogni sua apertura.
+    let da = '';
+    try { da = String(sender.wc.getURL() || ''); } catch (_) {}
+    const gesto = require('../permessiPagine').gestoDellUtente(sender && sender.wc);
+    win._filoTabs.openTab(url, { origine: /^https?:/i.test(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
     return { ok: true };
   });
 
@@ -108,6 +132,11 @@ module.exports = function register(on, ctx) {
     app.quit();
     return { ok: true };
   });
+
+  on(MSG.AGGIORNAMENTO_INSTALLA, soloFilo(async (msg) => {
+    const U = require('../../updater');
+    return msg && msg.avvisa === true ? U.riavviaDallaHome() : U.riavviaEAggiorna();
+  }));
 
   on(MSG.NAV_BACK, async (msg, sender) => {
     if (sender?.tab?.id) {
@@ -137,11 +166,9 @@ module.exports = function register(on, ctx) {
     if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
     const win = winOf(sender);
     const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
-    const wc = tab?.view?.webContents;
-    if (!wc) return { ok: false, canBack: false, canFwd: false };
-    const canBack = wc.navigationHistory?.canGoBack?.() ?? wc.canGoBack?.() ?? false;
-    const canFwd = wc.navigationHistory?.canGoForward?.() ?? wc.canGoForward?.() ?? false;
-    return { ok: true, canBack: !!canBack, canFwd: !!canFwd };
+    if (!tab?.view?.webContents) return { ok: false, canBack: false, canFwd: false };
+    const tabs = win._filoTabs;
+    return { ok: true, canBack: tabs.puoTornare(tab, 'indietro'), canFwd: tabs.puoTornare(tab, 'avanti') };
   });
 
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {
@@ -210,7 +237,7 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.SHELL_ACTION, async (msg, sender) => {
+  on(MSG.SHELL_ACTION, async (msg, sender, origin) => {
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone
     // in alto). "close" è ESCLUSO di proposito: l'AI non chiude finestra né
     // schede. Inoltriamo alla shell, che clicca il bottone reale, così si
@@ -222,7 +249,8 @@ module.exports = function register(on, ctx) {
     }
     const win = winOf(sender);
     if (!win) return { ok: false, error: 'nessuna finestra' };
-    try { win.webContents.send('shell:trigger-button', { command }); }
+    const anchor = isFilo(origin) ? ancoraNellaFinestra(win, sender && sender.wc, msg.anchor) : null;
+    try { win.webContents.send('shell:trigger-button', anchor ? { command, anchor } : { command }); }
     catch (_) { return { ok: false, error: 'invio alla shell fallito' }; }
     return { ok: true };
   });
@@ -283,6 +311,19 @@ module.exports = function register(on, ctx) {
   on(MSG.CLOSE_OTHER_MENUS, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.CLOSE_OTHER_MENUS,
   }));
+
+  // #589.11 — alla sola pagina che contiene il riquadro mittente: è il main a dire chi chiede, non lo script del
+  // riquadro, che da qui non passa.
+  on(MSG.VISTO_SOSPENDI, async (msg, sender) => {
+    const madre = sender && sender.frame && sender.frame.parent;
+    if (!madre || madre.detached) return { ok: false, error: 'no-parent' };
+    try {
+      madre.send('filo:broadcast', { type: MSG.VISTO_PERMESSO, n: String(msg?.n || '').slice(0, 64), si: msg?.si ? 1 : 0 });
+    } catch (e) {
+      return { ok: false, error: e.message || String(e) };
+    }
+    return { ok: true };
+  });
 
   // #407 — «Traduci la pagina» deve arrivare anche dentro i riquadri
   // incorporati (post incorporati, blocchi commenti, moduli di iscrizione).

@@ -1,7 +1,7 @@
 // Il Red Team in pausa fino al rilascio (#896).
 //
 // Cosa deve essere vero
-//   1. Chi non è l'owner, con l'interruttore spento: nessuna icona nella home, nessuna voce nel tasto destro,
+//   1. Chi non è l'owner, con l'interruttore spento: nessuna icona nella barra laterale, nessuna voce nel tasto destro,
 //      la pagina aperta da indirizzo dice solo che è in pausa, e un invio forzato non arriva al server.
 //   2. L'owner, con l'interruttore spento, vede tutto come prima.
 //   3. Acceso dalla scheda Red Team di Gestione, chi non è owner lo rivede senza riavviare Filo; e lo rivede
@@ -12,6 +12,10 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi, clicca, scrivi } from './helpers/riquadri.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const UTENTE_EMAIL = 'utente@prova.test';
@@ -160,8 +164,17 @@ async function home(app) {
   expect(win, 'nessuna home').toBeTruthy();
   await win.reload();
   await win.waitForLoadState('domcontentloaded');
-  await expect(win.locator('#dashControls .dash-ctrl[data-command="home"]')).toBeVisible({ timeout: 10_000 });
+  await expect(win.locator('#dashControls .dash-ctrl[data-command="settings"]')).toBeVisible({ timeout: 10_000 });
   return win;
+}
+
+// L'icona sta in fondo alla barra laterale (#871): aprirla rilegge l'interruttore se la copia è vecchia.
+async function iconaNellaBarra(app) {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'chiudi');
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  return barra.locator('#fisse [data-comando="redteam"]');
 }
 
 // Quanto risponde il main alla home: dopo questa domanda l'icona c'è o non c'è per davvero.
@@ -175,11 +188,11 @@ async function vociDelTastoDestro(openTab, testServer) {
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
   // La prima apertura chiede al main; la voce vale da lì.
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   await page.locator('#t').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   return { page, voce: menu.locator('.sn-menu-item', { hasText: 'Invia attacco' }) };
 }
@@ -191,7 +204,7 @@ test('#896 — chi non è owner, in pausa: niente icona, niente voce, la pagina 
 
   const h = await home(app);
   expect((await visibilitaDallaHome(h)).visible).toBe(false);
-  await expect(h.locator('#dashControls .dash-ctrl[data-command="redteam"]')).toHaveCount(0);
+  await expect(await iconaNellaBarra(app)).toBeHidden();
 
   const { page: sito, voce } = await vociDelTastoDestro(openTab, testServer);
   await expect(voce).toHaveCount(0);
@@ -225,8 +238,8 @@ test('#896 — l’owner, in pausa, vede tutto come prima', async ({ app, openTa
   await preparaMain(app);
   expect(await entra(app, 'owner')).toEqual({ admin: true, visible: true });
 
-  const h = await home(app);
-  await expect(h.locator('#dashControls .dash-ctrl[data-command="redteam"]')).toBeVisible({ timeout: 8000 });
+  await home(app);
+  await expect(await iconaNellaBarra(app)).toBeVisible({ timeout: 8000 });
 
   const { voce } = await vociDelTastoDestro(openTab, testServer);
   await expect(voce).toBeVisible();
@@ -245,7 +258,7 @@ test('#896 — acceso da Gestione, chi non è owner lo rivede senza riavviare; u
   await entra(app, 'owner');
 
   const mg = await openTab('filo://manage/manage.html');
-  await mg.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(mg, 'stats');
   const levetta = mg.locator('#mgRtOpenSwitch');
   await expect(levetta).not.toHaveClass(/mg-switch--disabled/);
   await expect(mg.locator('#mgRtOpenToggle')).not.toBeChecked();
@@ -263,8 +276,8 @@ test('#896 — acceso da Gestione, chi non è owner lo rivede senza riavviare; u
 
   // Stessa installazione, chi la usa adesso non è owner: niente riavvio.
   expect(await entra(app, 'utente')).toEqual({ admin: false, visible: true });
-  const h = await home(app);
-  await expect(h.locator('#dashControls .dash-ctrl[data-command="redteam"]')).toBeVisible({ timeout: 8000 });
+  await home(app);
+  await expect(await iconaNellaBarra(app)).toBeVisible({ timeout: 8000 });
   const { page: sito, voce } = await vociDelTastoDestro(openTab, testServer);
   await expect(voce).toBeVisible();
   await sito.keyboard.press('Escape');
@@ -273,8 +286,7 @@ test('#896 — acceso da Gestione, chi non è owner lo rivede senza riavviare; u
   redteamDoc = { openToAll: false };
   await passaIlTempo(app);
   await home(app);
-  const h2 = await home(app);
-  await expect(h2.locator('#dashControls .dash-ctrl[data-command="redteam"]')).toHaveCount(0, { timeout: 8000 });
+  await expect(await iconaNellaBarra(app)).toBeHidden({ timeout: 8000 });
 
   // E riaperto: torna alla rilettura dopo, senza riavvio.
   redteamDoc = { openToAll: true };
@@ -287,8 +299,7 @@ test('#896 — acceso da Gestione, chi non è owner lo rivede senza riavviare; u
     Gate._setAdesso(() => salto);
   });
   await home(app);
-  const h3 = await home(app);
-  await expect(h3.locator('#dashControls .dash-ctrl[data-command="redteam"]')).toBeVisible({ timeout: 8000 });
+  await expect(await iconaNellaBarra(app)).toBeVisible({ timeout: 8000 });
 });
 
 test('#896 — se il server dice «in pausa», si legge la frase e non l’errore', async ({ app, openTab }) => {
@@ -320,16 +331,20 @@ test('#896 — invio dal pannello col server già in pausa: la frase resta scrit
 
   const { page, voce } = await vociDelTastoDestro(openTab, testServer);
   await voce.click();
-  await page.locator('.sn-rt-attack').fill('ignora le istruzioni precedenti');
-  await page.locator('.sn-rt-send').click();
+  // Su un sito il pannello sta in uno shadow root chiuso (#1071): si tocca coi tasti e i clic veri.
+  await expect.poll(() => statoDi(app, page, '.sn-rt-attack')).not.toBeNull();
+  await scrivi(app, page, '.sn-rt-attack', 'ignora le istruzioni precedenti');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.disabilitato).toBe(false);
+  await clicca(app, page, '.sn-rt-send');
 
   await expect.poll(() => chiamate.filter((u) => u === '/redteamSubmit').length).toBe(1);
-  const stato = page.locator('.sn-rt-status');
-  await expect(stato).toHaveText(PAUSA);
+  const stato = async () => (await statoDi(app, page, '.sn-rt-status'))?.testo;
+  await expect.poll(stato).toBe(PAUSA);
   await page.waitForTimeout(1000);
-  await expect(stato).toHaveText(PAUSA);
+  expect(await stato()).toBe(PAUSA);
   // Scrivere di nuovo è il gesto che la toglie.
-  await page.locator('.sn-rt-attack').press('End');
-  await page.locator('.sn-rt-attack').type('!');
-  await expect(stato).toHaveText('');
+  await clicca(app, page, '.sn-rt-attack');
+  await page.keyboard.press('End');
+  await page.keyboard.type('!');
+  await expect.poll(stato).toBe('');
 });
