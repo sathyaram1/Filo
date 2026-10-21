@@ -367,6 +367,10 @@
           .replace('%1', () => euro(tetto.tenuto))
           .replace('%2', () => euro(tetto.backup))
           .replace('%3', () => bottoneTetto) : '',
+        prev.tettoSceso && typeof prev.tettoSceso.dopo === 'number'
+          ? I18n.t(Number(prev.tettoSceso.prima) > 0 ? 'security_import_tetto_sceso' : 'security_import_tetto_sceso_senza')
+            .replace('%1', () => euro(prev.tettoSceso.prima))
+            .replace('%2', () => euro(prev.tettoSceso.dopo)) : '',
         prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
         prev.proxySenzaCredenziali ? I18n.t('security_import_proxy_senza_credenziali') : '',
       ].filter(Boolean);
