@@ -477,6 +477,38 @@
     return out;
   }
 
+  // Anthropic rifiuta un punto di cache su un testo vuoto o di soli spazi.
+  function haTesto(m) {
+    if (!m) return false;
+    if (typeof m.content === 'string') return m.content.trim() !== '';
+    return Array.isArray(m.content) && m.content.some((p) => p && p.type === 'text' && String(p.text || '').trim());
+  }
+
+  // Dove la richiesta della chat smette di ripetersi (SPEC-CONTESTO § La richiesta): fine della parte fissa del system,
+  // fine del tratto, ultimo messaggio. Solo la chat: un prompt che cambia a ogni chiamata pagherebbe scritture mai rilette.
+  // `caratteri` divide il testo del messaggio e il punto va sulla prima parte. Sentinella: tests/unit/puntiDiCache.test.mjs.
+  function pianoDellaCache(action, messages) {
+    const C = global.SN_CONST;
+    if (!C || !C.ACTIONS || action !== C.ACTIONS.FILO_CHAT || !Array.isArray(messages) || !messages.length) return null;
+    const punti = [];
+    const sys = messages[0];
+    if (sys && sys.role === 'system' && typeof sys.content === 'string') {
+      const inizi = (C.INIZI_VARIABILI_CHAT || []).map((s) => sys.content.indexOf(s)).filter((i) => i > 0);
+      const taglio = inizi.length ? Math.min(...inizi) : sys.content.length;
+      if (sys.content.slice(0, taglio).trim()) {
+        punti.push(taglio < sys.content.length ? { indice: 0, caratteri: taglio, durata: '1h' } : { indice: 0, durata: '1h' });
+      }
+    }
+    const indiceCoda = messages.findIndex((m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(INTESTAZIONE_CODA));
+    let fine = indiceCoda - 1;
+    while (fine > 0 && !haTesto(messages[fine])) fine--;
+    if (fine > 0) punti.push({ indice: fine });
+    let ultimo = messages.length - 1;
+    while (ultimo > 0 && !haTesto(messages[ultimo])) ultimo--;
+    if (ultimo > 0 && !punti.some((p) => p.indice === ultimo)) punti.push({ indice: ultimo });
+    return punti.length ? { punti } : null;
+  }
+
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini,
