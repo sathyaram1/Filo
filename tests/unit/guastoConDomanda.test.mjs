@@ -54,6 +54,19 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
   }
 });
 
+// #1482: un «Riprendi» di chi non ha fermato il feedback, applicato in blocco, lo toglieva dalla verifica o riapriva un fuso.
+test('chi non mette il feedback in attesa non offre «Riprendi» nella domanda di guasto', () => {
+  for (const [ruolo, opts] of GLI_ALTRI.filter(([r]) => r === 'verifier')) {
+    const t = piatto(readRoleInstructions(ruolo, opts));
+    const chi = `${ruolo} ${JSON.stringify(opts)}`;
+    assert.match(t, /Chi non lo mette in attesa non offre «Riprendi»/, chi);
+    assert.doesNotMatch(t, /"tipo": "riprendi"/, `${chi}: il modello con «Riprendi» è solo di chi ferma il feedback`);
+  }
+  for (const [ruolo, opts] of CHI_RISOLVE) {
+    assert.match(readRoleInstructions(ruolo, opts), /"tipo": "riprendi"/, `${ruolo} ${opts.caso || ''}: chi ferma il feedback lo può riprendere`);
+  }
+});
+
 // Due worker sullo stesso guasto devono scrivere lo stesso gruppo: un nome fisso per i noti, causa da una lista chiusa per gli altri.
 test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
   const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
