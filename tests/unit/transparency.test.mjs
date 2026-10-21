@@ -459,6 +459,7 @@ function generaCopia(extra, togli = []) {
   for (const [nome, righe] of Object.entries(extra)) {
     writeFileSync(join(tmp, 'transparency', nome), righe.join('\n'), 'utf8');
   }
+  for (const nome of togli) rmSync(join(tmp, 'transparency', nome));
   execFileSync(process.execPath, [join(tmp, 'scripts', 'build-transparency.mjs')], { encoding: 'utf8' });
   const leggi = (...p) => readFileSync(join(tmp, ...p), 'utf8');
   return { tmp, leggi };
