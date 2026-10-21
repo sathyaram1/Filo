@@ -830,7 +830,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   const chiusa = (s) => (statusToPublic ? statusToPublic(s) : 'open') === 'closed';
   const chiusaPrima = fiduciaTolta && (chiusa(from) || doc.fields?.statusPublic?.stringValue === 'closed');
   if (chiusaPrima && chiusa(to)) {
-    return { ok: false, motivo: `la pratica è chiusa e fidata, e da chiusa la fiducia non si toglie: senza toglierla la nota non la scrivo, perché ${fiduciaTolta}. Non ho toccato niente. La scrive l’owner o una sessione col biglietto pulito; oppure riaprila con la stessa nota, e la fiducia cade prima della nota`, from };
+    return { ok: false, motivo: `la pratica è chiusa e fidata, e da chiusa la fiducia non si toglie: senza toglierla la nota non la scrivo, perché ${fiduciaTolta}. Non ho toccato niente. La scrive una sessione col biglietto pulito; oppure riaprila con la stessa nota, e la fiducia cade prima della nota`, from };
   }
   // La prova a vuoto lo dice solo a chi l'ha chiesta (la riga di comando): server:fondi la usa come controllo prima di scrivere.
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
