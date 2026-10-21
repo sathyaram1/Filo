@@ -254,14 +254,17 @@ function registerIpcHandlers() {
     } catch (_) {}
   });
 
-  // #1054 — il menu del tasto destro di questa scheda si disegna nello strato sopra di lei? Le finestre aperte da un
-  // sito non hanno strato: lì resta nella pagina.
+  // #1054 — il menu del tasto destro di questa scheda, o della finestrella di accesso, si disegna nello strato sopra?
   ipcMain.on('filo:strato-menu', (event) => {
     let si = false;
     try {
       const wc = event.sender;
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
-      si = !!(win && win._filoTabs.strato && win._filoTabs.strato.acceso);
+      if (win) si = !!(win._filoTabs.strato && win._filoTabs.strato.acceso);
+      else {
+        const propria = BrowserWindow.fromWebContents(wc);
+        si = !!(propria && propria.webContents === wc && propria._filoStrato && propria._filoStrato.acceso);
+      }
     } catch (_) {}
     event.returnValue = si;
   });
