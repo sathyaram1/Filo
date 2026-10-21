@@ -5386,7 +5386,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let fotoNelTratto = true;
   const componiFilo = (tetti) => ContestoFilo.componi({
     chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
-    immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat),
+    immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat), soloChat: onbActive,
   });
   try {
     const settingsChat = await getEffectiveSettings();
