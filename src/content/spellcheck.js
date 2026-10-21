@@ -1703,8 +1703,7 @@
       if (!s.cerca) continue;
       const f = Rg.aFrasiIntere(d.testo, s.start, s.end);
       s.cerca = { ...s.cerca, frase: d.testo.slice(f.start, f.end).slice(0, 2000) };
-      // Con la domanda: due «xx» della stessa frase cercano due dati diversi (il p/e di Google e quello del Nasdaq).
-      s.cerca.chiave = [s.segment, s.cerca.frase, s.cerca.domanda, s.cerca.dove].join('\u0000');
+      s.cerca.chiave = Rg.chiaveRicerca(s.segment, s.cerca);
     }
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const ora = Date.now();
