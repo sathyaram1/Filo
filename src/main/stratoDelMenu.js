@@ -385,11 +385,28 @@ class StratoDelMenu {
     this.inCima();
   }
 
+  // Sopra tutto tranne la barra laterale: la sua striscia sul bordo e il pannello aperto restano raggiungibili a menu
+  // aperto, come col menu nella pagina, e un'icona si porta dalla barra al menu (#871).
   inCima() {
     if (!this.aperto || !this.vista || this.vista.webContents.isDestroyed()) return;
     const cv = this.win.contentView;
-    const figli = cv.children || [];
-    if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    let barra = null;
+    try { barra = this.barra(); } catch (_) { barra = null; }
+    const sopra = barra && barra.vista && !barra.vista.webContents.isDestroyed() ? barra.vista : null;
+    const figli = () => cv.children || [];
+    const mia = figli().indexOf(this.vista);
+    const suaPrima = sopra ? figli().indexOf(sopra) : -1;
+    const giusto = sopra && suaPrima >= 0
+      ? mia === figli().length - 2 && suaPrima === figli().length - 1
+      : mia === figli().length - 1;
+    if (giusto) return;
+    cv.addChildView(this.vista);
+    if (sopra && suaPrima >= 0) cv.addChildView(sopra);
+  }
+
+  // Un'icona trascinata dalla barra verso il menu aperto: un gesto dell'utente che il main ha visto, nella barra.
+  gestoDallaBarra() {
+    if (this.aperto) this.gestoAlle = Date.now();
   }
 
   // Esc chiude lo strato prima di ogni altro uso del tasto (schermo intero compreso), da qualunque vista arrivi.
