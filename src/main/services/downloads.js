@@ -902,6 +902,9 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
   return {
     id,
     cancelled: () => !!rec._cancelled,
+    permesso,
+    // Dove far crescere il file parziale: in quarantena finché il programma aspetta la risposta (#588).
+    cartella: () => (rec.state === 'pending' ? quarantineDir() : downloadsDir()),
     progress(received, total) {
       if (rec._final) return;
       rec.receivedBytes = Number(received) || 0;
