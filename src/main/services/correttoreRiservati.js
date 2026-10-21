@@ -6,6 +6,8 @@
 const SEGNAPOSTO = '[dato riservato]';
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
+
 function riservati(testo) {
   const G = globalThis.SN_GUARDIANO_STATICO;
   const X = globalThis.SN_URL_EXFIL;
@@ -16,7 +18,6 @@ function riservati(testo) {
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   return out.map((x) => String((x && x.valore) || '')).filter((v) => v.length >= 4);
 }
-const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
 const formaDi = (valore) => new RegExp(/^\d+$/.test(valore) ? valore.split('').map(esc).join('[\\s-]?') : esc(valore), 'gi');

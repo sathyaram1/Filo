@@ -58,3 +58,8 @@ test('un campo che non torna coi pezzi non conta: vale il testo dei pezzi', () =
   const p = R.richiestaSenzaRiservati({ prima: 'ciao ', nuovo: 'oggi sonno andato', dopo: '', campo: 'la password è sonno', campoDa: 0 });
   assert.equal(p.nuovo, 'oggi sonno andato');
 });
+
+test('mezza carta scritta a gruppi non parte; un anno o un orario sì', () => {
+  assert.equal(R.oscura('la carta è 4111 1111 '), 'la carta è [dato riservato] ');
+  assert.equal(R.oscura('nel 2024 alle 1830 ci vediamo'), 'nel 2024 alle 1830 ci vediamo');
+});

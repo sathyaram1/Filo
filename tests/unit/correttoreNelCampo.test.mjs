@@ -130,7 +130,10 @@ test('il controllo rapido parte dopo mezzo secondo di pausa, e non manda la paro
   await c.passa(200);
   assert.equal(c.rapide().length, 1);
   assert.equal(c.rapide()[0].payload.nuovo.trim(), 'oggi sono andato al');
-  assert.ok(!JSON.stringify(c.rapide()[0].payload).includes('al ma'), 'la parola in scrittura non parte');
+  // Il campo intero arriva al main solo per cercarci i dati riservati, e lì si toglie (correttoreRiservati.js).
+  const { campo, ...parte } = c.rapide()[0].payload;
+  assert.equal(campo, 'oggi sono andato al ma');
+  assert.ok(!JSON.stringify(parte).includes('al ma'), 'la parola in scrittura non parte');
   assert.equal(c.rapide()[0].payload.luogo.sito, 'chat.example');
 });
 
