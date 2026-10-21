@@ -100,7 +100,8 @@ export function statoDelloStrato(app) {
     return {
       ...s,
       visibile: !!v && v.getVisible(),
-      inCima: !!v && figli[figli.length - 1] === v,
+      // Sopra tutte le viste, barra laterale a parte (#871: la si raggiunge anche a menu aperto).
+      inCima: !!v && figli.indexOf(v) >= 0 && figli.slice(figli.indexOf(v) + 1).every((x) => x === win._filoTabs.barra?.vista),
       bounds: v ? v.getBounds() : null,
       tastiera: !!v && webContents.getFocusedWebContents() === v.webContents,
     };
