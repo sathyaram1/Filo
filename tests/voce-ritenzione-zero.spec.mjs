@@ -50,7 +50,7 @@ test('coi crediti la voce senza host a ritenzione zero non parte, e la frase dic
   expect(await app.evaluate(() => globalThis.__voci)).toBe(0);
   expect(r.ok).toBe(false);
   expect(r.errorCode).toBe('NO_ALLOWED_HOST');
-  expect(r.error).toBe(`La funzione «Lettura ad alta voce (sintesi vocale)» non può usare «${VOCE}» perché nessun fornitore ammesso lo ospita senza conservare i dati, e coi crediti di Filo è una condizione. Lo serve solo Deepgram, che non si impegna a non conservarli. Scegline un altro in Opzioni → Modelli per azione.`);
+  expect(r.error).toBe(`La funzione «Lettura ad alta voce (sintesi vocale)» non può usare «${VOCE}» perché nessun fornitore ammesso lo ospita senza conservare i dati, e coi crediti di Filo è una condizione. Lo serve solo DeepInfra, che non si impegna a non conservarli. Scegline un altro in Opzioni → Modelli per azione.`);
 });
 
 test('con la chiave propria la stessa voce parte: decide l\'utente', async ({ app, shell }) => {
