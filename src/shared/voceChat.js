@@ -301,7 +301,7 @@
     }
 
     c.premi = premi;
-    c.api = { bottone: b, premi, scollega, stato: () => c.stato };
+    c.api = { bottone: b, premi, ferma, scollega, stato: () => c.stato };
     controlli.add(c);
     return c.api;
   }
