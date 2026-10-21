@@ -112,7 +112,7 @@ test('senza l\'accesso del proprietario «Annulla» ferma la segnalazione prima 
   await expect.poll(() => inviate(app), { timeout: 10_000 }).toEqual([{ name: 'Un buco', token: null }]);
   const tardi = await chiedi(app, { type: 'CANCEL_AUTO_FEEDBACK', id: secondo.biglietto }, BARRA);
   expect(tardi).toMatchObject({ ok: false, tardi: true });
-  expect(tardi.frase).toContain('Ormai è partita');
+  expect(tardi.frase).toContain('già partita');
 
   // 3. Partita col toast ancora a schermo (il tetto di sicurezza): Annulla dice che è tardi, non finge.
   const terzo = await chiediUnBuco(app, page, avvisi, 3);
