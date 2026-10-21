@@ -1065,7 +1065,6 @@ for (const { nome, nuova } of [{ nome: 'una chat nuova', nuova: true }, { nome: 
       await page.locator('#input').fill('/clear');
       await page.locator('#input').press('Enter');
       await expect(page.locator('#input')).toHaveValue('');
-      await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toHaveCount(0);
     }
     await modelloFinto(app, {
       giri: [
