@@ -335,6 +335,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'highlight.js'));
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
+  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2
