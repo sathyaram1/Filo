@@ -132,12 +132,16 @@
 
   // Toglie una riga dalla memoria senza buttarla: finisce fra le nascoste del quaderno, con le sue fonti, e da lì si
   // rimette o si cancella per sempre. Il prompt non la vede più dal messaggio dopo. Torna l'id della nascosta, o null.
-  async function hideLine(via) {
+  // `fonti`: come per editLine, per ritrovare la riga sotto un campo rimasto aperto mentre il compattatore la riordinava.
+  async function hideLine(via, { fonti = [] } = {}) {
     const ora = new Date().toISOString();
     if (via && via.lezione && typeof via.lezione === 'object') {
       const buf = await getLessonsBuffer();
       const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
-      if (i < 0) return null;
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? hideLine(e) : null;
+      }
       const [l] = buf.splice(i, 1);
       await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
       const meta = await getFonti();
