@@ -13,6 +13,10 @@ const TARDI = 'La segnalazione è già partita e non posso più ritirarla';
 const inAttesa = new Map();
 // biglietto → Promise dell'esito: { id } col documento scritto, { inCoda } aspetta l'owner, {} non è partita.
 const partite = new Map();
+// Gli invii non ancora finiti: l'uscita da Filo li aspetta, o chi non ha detto no perde la segnalazione.
+const inVolo = new Set();
+// Tetto dell'attesa all'uscita: una rete ferma non deve tenere Filo aperto.
+const USCITA_MS = 5000;
 
 function sgancia(biglietto) {
   const voce = inAttesa.get(biglietto);
@@ -42,12 +46,41 @@ function parti(biglietto) {
   const b = String(biglietto || '');
   const voce = sgancia(b);
   if (!voce) return false;
-  partite.set(b, Promise.resolve()
+  const partenza = Promise.resolve()
     .then(voce.spedisci)
     .then((r) => (r && r.queued ? { inCoda: true } : { id: r && r.id ? String(r.id) : '' }))
-    .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', (e && e.message) || e); return {}; }));
+    .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', (e && e.message) || e); return {}; });
+  inVolo.add(partenza);
+  partenza.then(() => inVolo.delete(partenza));
+  partite.set(b, partenza);
   return true;
 }
+
+// Uscire chiude l'avviso senza un no: le trattenute partono, e l'uscita aspetta che arrivino (col tetto).
+function allUscita() {
+  for (const b of Array.from(inAttesa.keys())) parti(b);
+  if (!inVolo.size) return null;
+  return Promise.race([
+    Promise.all(Array.from(inVolo)),
+    new Promise((r) => { setTimeout(r, USCITA_MS); }),
+  ]);
+}
+
+// Chi esce mentre aspettiamo (altri congedi richiamano `app.quit()`) viene fermato anche lui, finché l'attesa non finisce.
+let congedo = '';
+try {
+  const { app } = require('electron');
+  app.on('before-quit', (e) => {
+    if (congedo === 'fatto') return;
+    if (congedo === 'in corso') { e.preventDefault(); return; }
+    const attesa = allUscita();
+    if (!attesa) return;
+    congedo = 'in corso';
+    e.preventDefault();
+    const esci = () => { congedo = 'fatto'; try { app.quit(); } catch (_) {} };
+    attesa.then(esci, esci);
+  });
+} catch (_) {}
 
 async function annulla(biglietto) {
   const b = String(biglietto || '');
@@ -79,4 +112,4 @@ async function annulla(biglietto) {
   }
 }
 
-module.exports = { trattieni, parti, annulla };
+module.exports = { trattieni, parti, annulla, allUscita };

@@ -1,7 +1,10 @@
 // «Annulla» sul toast della segnalazione automatica (F4): la segnalazione parte solo quando l'avviso si chiude, così
 // Annulla la ferma per chiunque (#784.6); partita, la ritira solo l'owner e agli altri lo dice. Un sito non tocca
 // niente (#784.3). Il resto della famiglia di porte la bussa tests/feedback-canali-origine.spec.mjs.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const BARRA = { url: 'filo://shell/shell.html', isShell: true };
 const SITO = { url: 'https://evil.example/pagina' };
@@ -148,3 +151,35 @@ test('con la sessione del proprietario «Annulla» ferma la segnalazione, e una 
   expect((await chiedi(app, { type: 'CANCEL_AUTO_FEEDBACK', id: secondo.biglietto }, BARRA)).ok).toBe(false);
   expect(await scritture(app)).toHaveLength(1);
 });
+
+// Uscire col toast a schermo non è un no: la segnalazione deve arrivare anche se l'invio dura (qui 400 ms, come la rete).
+for (const via of ['esce da Filo', 'chiude l\'ultima finestra']) {
+  test(`chi ${via} col toast a schermo non perde la segnalazione automatica`, async ({ app, shell, avvisi }) => {
+    test.skip(via !== 'esce da Filo' && process.platform === 'darwin', 'su Mac chiudere la finestra non chiude Filo');
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible();
+    await prepara(app, { owner: false });
+    const segno = join(cartellaTemporanea('filo-auto-feedback-'), 'arrivata.txt');
+    await app.evaluate((_e, segno) => {
+      const fs = process.getBuiltinModule('fs');
+      globalThis.SN_FEEDBACK.submit = () => new Promise((ok) => setTimeout(() => {
+        fs.writeFileSync(segno, 'arrivata');
+        ok({ id: 'fb-auto-1' });
+      }, 400));
+    }, segno);
+    await chiediUnBuco(app, page, avvisi, 1);
+    await page.waitForTimeout(1_000);
+
+    const uscita = new Promise((r) => app.process().once('exit', r));
+    await app.evaluate(({ app: a, BrowserWindow }, via) => {
+      setTimeout(() => {
+        if (via === 'esce da Filo') a.quit();
+        else BrowserWindow.getAllWindows().find((w) => w._filoTabs).close();
+      }, 50);
+    }, via);
+    await uscita;
+    expect(existsSync(segno), 'la segnalazione che nessuno ha annullato si è persa all\'uscita').toBe(true);
+  });
+}
