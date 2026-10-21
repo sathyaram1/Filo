@@ -13,7 +13,7 @@ const RADICE = resolve(import.meta.dirname, '..', '..');
 const {
   decidi, comando, installa, registraDecisione, impronta, AL_POSTO_DEL_TESTO, VALIDITA_MS, DURATA_VOCE_MS, AMBIENTE,
   AMBIENTE_TOLTO, ETICHETTA, FILE_REGISTRO, MODELLI, SFORZI, MOTIVO_SOTTOFONDO, MOTIVO_SENZA_BIGLIETTO, MOTIVO_DUE_BIGLIETTI,
-  MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO,
+  MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO, MOTIVO_NOTIFICA, MATCHER_PRIMA,
 } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 
 const B = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
