@@ -387,6 +387,8 @@ function tettiContesto(o) {
     const v = FC ? FC.numeroIn(o && o[k], FC.LIMITI[k]) : null;
     if (v != null) out[k] = k === 'token' ? Math.round(v) : v;
   }
+  const cache = FC ? FC.durataIn(o && o.cache) : null;
+  if (cache) out.cache = cache;
   return out;
 }
 function contestoDiSerie() {
