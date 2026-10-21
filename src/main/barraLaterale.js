@@ -567,6 +567,8 @@ class BarraLaterale {
       trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
+      // Una risposta di Filo da leggere nella scheda davanti (#1432).
+      risposta: this._nav().risposta,
       strisciaPx: this.strisciaPx || STRISCIA,
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
