@@ -344,7 +344,8 @@
           : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
-      note.textContent = noKey
+      // Con la chiave propria il numero qui sopra non è un saldo (#1353).
+      note.textContent = noKey || w.keySource === 'own'
         ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
         : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
       note.hidden = false;
