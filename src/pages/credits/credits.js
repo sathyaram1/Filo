@@ -298,7 +298,7 @@
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
-    if (!has && !noKey) $('refillHint').textContent = rigaRicarica(w.keySource === 'own');
+    if (!noKey) $('refillHint').textContent = rigaSottoIlSaldo(w);
 
     // La gestione (codici, regali, utenti) è una pagina a parte: qui solo il rimando.
     $('ownerLink').hidden = !w.isOwner;
