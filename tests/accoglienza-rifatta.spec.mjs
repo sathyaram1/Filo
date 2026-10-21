@@ -229,6 +229,67 @@ test.describe('utente già accolto', () => {
     await expect(carb.locator('#onbNotice')).toBeHidden();
   });
 
+  test('con l’intervista rifatta a metà, la carbonara ricaricata o aperta dal suo collegamento resta la carbonara; la scheda dell’intervista ricaricata resta l’intervista', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    const carb = await carbonara(app, shell);
+    const id = await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list()).find((c) => JSON.stringify(c.messages || []).includes('carbonara')).id);
+    const intervista = await intervistaRifattaAltrove(app, shell, openTab);
+    await carb.reload();
+    await carb.waitForLoadState('domcontentloaded');
+    await expect(carb.locator('.dash-bubble', { hasText: 'Guanciale, uova' }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(carb.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
+
+    const link = await openTab(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+    await expect(link.locator('.dash-bubble-filo', { hasText: 'Guanciale, uova' })).toBeVisible({ timeout: 15_000 });
+    await expect(link.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
+
+    await intervista.reload();
+    await intervista.waitForLoadState('domcontentloaded');
+    await expect(intervista.locator('.dash-bubble-filo').first()).toContainText('Ciao, sono Filo', { timeout: 15_000 });
+    await expect(intervista.locator('#skipOnboarding')).toBeVisible();
+  });
+
+  test('rifatta, risposta e lasciata chiudendo la sua scheda, una home la offre ancora: «Riprendiamola» la riapre lì con la risposta', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    await pronta(app, shell);
+    const prefs = await openTab('filo://preferences/preferences.html');
+    await prefs.locator('#restartOnboarding').click();
+    const intervista = await newtabPage(app, 1);
+    await expect(intervista.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await queueChat(app, { text: 'Piacere Anna. Come vuoi che ti scriva?', actions: [] });
+    await scrivi(intervista, 'sono Anna, insegno lettere');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Come vuoi che ti scriva' })).toBeVisible({ timeout: 30_000 });
+    await intervista.close();
+
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+    const home = await newtabPage(app, 1);
+    await expect(home.locator('#onbNotice')).toContainText('La presentazione è rimasta a metà', { timeout: 15_000 });
+    await expect(home.locator('body')).not.toHaveAttribute('data-state', 'thread');
+    await home.locator('#onbNoticeRedo').click();
+    await expect(home.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await expect(home.locator('.dash-bubble-user', { hasText: 'sono Anna' })).toBeVisible();
+    await expect(home.locator('.dash-bubble-filo').last()).toContainText('Come vuoi che ti scriva?');
+    await expect(home.locator('#onbNotice')).toBeHidden();
+  });
+
+  test('«No, va bene così» su un’intervista rifatta rimasta a metà la chiude, e la riga non torna', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    const home = await pronta(app, shell);
+    await app.evaluate(async () => {
+      const O = globalThis.SN_ONBOARDING;
+      const s = O.appendTurn(O.appendTurn(O.restart({ done: true }), { role: 'filo', text: O.WELCOME_MESSAGE }), { role: 'user', text: 'sono Anna' });
+      await globalThis.SN_FILO_MEMORY.setOnboarding(O.appendTurn(s, { role: 'filo', text: 'Come vuoi che ti scriva?' }));
+    });
+    await home.reload();
+    await home.waitForLoadState('domcontentloaded');
+    await expect(home.locator('#onbNoticeDismiss')).toBeVisible({ timeout: 15_000 });
+    await home.locator('#onbNoticeDismiss').click();
+    await expect.poll(async () => (await onbState(app)).done, { timeout: 15_000 }).toBe(true);
+    expect((await onbState(app)).notice).toBe('');
+    await home.waitForTimeout(1_500);
+    await expect(home.locator('#onbNotice')).toBeHidden();
+  });
+
   // Tre interviste conservate: due archiviate dai rilanci e quella dell'ultima volta.
   async function treInterviste(app) {
     await app.evaluate(async () => {

@@ -568,3 +568,15 @@ test('dimentica(): via ogni intervista conservata, resta solo il segno «già ac
   assert.equal(d.notice, '');
   assert.equal(O.dimentica(O.emptyState()).done, false);
 });
+
+// Rossa senza il fix: l'intervista rifatta prendeva ogni home che si apriva, anche ricaricata o chiesta per una chat.
+test('rifatta o ripresa, l’intervista porta il segno che la lega alle pagine che l’hanno chiesta; il primo avvio no (#1297)', () => {
+  assert.equal(O.emptyState().rifatta, undefined, 'il primo benvenuto prende ogni home');
+  const rifatta = O.restart(chiusaAMeta());
+  assert.equal(rifatta.rifatta, true);
+  assert.equal(O.normalize(O.appendTurn(rifatta, { role: 'user', text: 'sono Anna' })).rifatta, true, 'resta a ogni turno');
+  assert.equal(O.close(rifatta).rifatta, true);
+  assert.equal(O.riprendi(chiusaAMeta()).rifatta, true, 'ripresa dopo il primo avvio: anche lei');
+  assert.equal(O.dimentica(rifatta).rifatta, true, 'dimenticata a metà resta della sua pagina');
+  assert.equal(O.normalize({ rifatta: 'si' }).rifatta, undefined);
+});
