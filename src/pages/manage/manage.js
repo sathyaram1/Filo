@@ -2878,11 +2878,16 @@
     return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
   }
 
-  // Nei Lavori locali il segno lo dice la sezione; altrove (una pratica che aspetta
-  // l'owner nei Ricevuti, una chiusa) la scheda lo porta, o sembrerebbe una delle routine.
+  // Il segno non sposta di scheda (#1575): l'etichetta lo dice in ogni scheda, o sembrerebbe un lavoro delle routine.
   function localBadgeHtml(fb) {
-    if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
+    if (!MR.isLocalOnly(fb)) return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
+  }
+  // Lo scudo della fiducia (#1575): pieno se fidata, vuoto e tratteggiato se no; il colore lo ripete il bordo destro.
+  function fiduciaSegnoHtml(x) {
+    const s = MR.segnoFiducia(x);
+    return `<span class="mg-fiducia-segno mg-fiducia-segno--${s.classe}" title="${esc(s.testo)}" aria-label="${esc(s.parola)}" role="img">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG.scudo}"/></svg></span>`;
   }
   // Le attese che segue il server: gli unit sulla fusione (#1207); per un lavoro server la suite di filo-security, il PC (#1159).
   const ATTESE_SERVER = Object.freeze({
