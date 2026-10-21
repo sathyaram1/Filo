@@ -158,8 +158,16 @@ module.exports = function register(on, ctx) {
     const R = require('../correttoreRiservati');
     const testo = (v, max) => R.oscura(typeof v === 'string' ? v : '').slice(0, max);
     const dove = typeof s.dove === 'string' && /^(?:web|wiki:[a-z]{2,3})$/.test(s.dove) ? s.dove : 'wiki:en';
-    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove, suRichiesta: s.suRichiesta === true };
+    const g = s.giaLette && typeof s.giaLette === 'object' ? s.giaLette : null;
+    const giaLette = g && typeof g.domanda === 'string' && typeof g.dove === 'string' ? { domanda: testo(g.domanda, 200), dove: g.dove } : null;
+    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove, suRichiesta: s.suRichiesta === true, giaLette };
   }
+  // Le fonti da cui un segnaposto ha avuto il suo valore, per sito e domanda: la stessa x richiesta con altre parole, o
+  // precisata, si rilegge prima lì e ripaga la ricerca solo se lì il dato non c'è. Dati che cambiano: durano mezz'ora.
+  const FONTI_LETTE_MAX = 200;
+  const FONTI_LETTE_MS = 30 * 60 * 1000;
+  const fontiLette = new Map();
+  const chiaveLette = (sito, domanda, dove) => [sito, dove, String(domanda).toLowerCase().replace(/\s+/g, ' ').trim()].join('\u0000');
   async function cercaSegnaposto(sp, { sender, origin, delicata }) {
     const settings = await getEffectiveSettings();
     const corr = settings.correttore || {};
