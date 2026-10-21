@@ -2015,7 +2015,7 @@
       `"prima" è il pezzo più corto che basta a trovare la modifica una volta sola nel testo; per togliere una parola mettila in "prima" con quella accanto, così "dopo" non resta vuoto. Se l'utente ti chiede di riscrivere tutto, una sola correzione con l'intero testo in "prima". L'utente scrive ogni correzione nel campo con un clic: nel "text" non ripetere a parole quelle della lista, e per correggere il campo non usare "highlight" con "fill". Lascia "collapse":false e chiudi con status:"done".\n` +
       `Se nei turni dopo il testo cambia, te lo rimando com'è adesso: le correzioni nuove valgono su quello.\n` +
       ([profilo, preferenze, espansioni, lezioni].some((v) => String(v || '').trim())
-        ? `Quello che Filo sa dell'utente, per capire a chi scrive e come scrive di solito:\n${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n`
+        ? `Quello che Filo sa dell'utente, per capire a chi scrive e come scrive di solito. Il campo lo legge il sito: nelle correzioni non mettere dati suoi che il testo non contiene già, a meno che sia lui a chiedertelo nei suoi messaggi.\n${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n`
         : '') +
       `\n`,
 
