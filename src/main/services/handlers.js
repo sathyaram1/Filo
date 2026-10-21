@@ -3716,8 +3716,8 @@ async function eseguiAzioneFilo(action, {
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
         // Chi è già nella home non ci si porta: ricaricarla butterebbe via il
-        // lavoro e la risposta prima che l'utente li legga (il bottone per
-        // svuotare la conversazione lo mette la chat).
+        // lavoro e la risposta prima che l'utente li legga (il bottone che
+        // chiude la conversazione lo mette la chat).
         if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
           return { executed: true, kept: true, output: { window: 'home', already: true } };
         }
