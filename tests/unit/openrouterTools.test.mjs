@@ -119,7 +119,8 @@ test('non in streaming: le chiamate e il ragionamento del messaggio tornano piat
   assert.equal(body.provider.require_parameters, true, 'anche senza politica sui fornitori');
   assert.equal(r.text, '');
   assert.deepEqual(r.toolCalls, [{ id: 'x1', name: 'SVEGLIA', arguments: '{"time":"07:00"}' }]);
-  assert.deepEqual(r.reasoningDetails, [{ type: 'reasoning.summary', summary: 'sveglia' }]);
+  assert.deepEqual(r.reasoningDetails.slice(0, -1), [{ type: 'reasoning.summary', summary: 'sveglia' }]);
+  assert.equal(r.reasoningDetails.at(-1).type, 'filo.impronta');
   assert.equal(r.finishReason, 'tool_calls');
   assert.equal(r.servedBy, 'Fireworks');
 });
