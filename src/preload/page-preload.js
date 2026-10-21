@@ -23,6 +23,12 @@ try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo
 let riscrittura = null;
 try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
 
+// Prima che nasca un riquadro: chi lo tocca mentre carica il suo indirizzo gli toglie il preload (#1560).
+try {
+  require(path.join(__dirname, '..', 'shared', 'riquadriInArrivo.js'));
+  globalThis.SN_RIQUADRI_IN_ARRIVO.osserva(window);
+} catch (e) { console.error('[Filo CS] riquadri in arrivo', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
