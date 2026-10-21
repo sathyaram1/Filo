@@ -224,7 +224,7 @@
     if (!lista) return;
     const bl = blocchi(scheda);
     const firma = JSON.stringify([scheda, aperta && aperta.ids, [...scelte],
-      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile])])]);
+      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile, d.fiducia])])]);
     if (firma === firmaLista && !lista.hidden) return;
     firmaLista = firma;
     lista.replaceChildren();
