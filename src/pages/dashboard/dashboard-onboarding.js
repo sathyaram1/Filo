@@ -472,9 +472,15 @@
     box.hidden = false;
   }
 
+  // Su un'intervista rimasta aperta «No, va bene così» la chiude, come «Salta l'accoglienza» nella sua scheda.
   async function dismissOnboardingNotice() {
+    const box = $('onbNotice');
+    const aperta = !!box && box.dataset.tipo === 'aperta';
     hideOnboardingNotice();
-    try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
+    try {
+      if (aperta) await send({ type: MSG.FILO_CLOSE_ONBOARDING });
+      await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN });
+    } catch (_) {}
   }
 
   // Riprenderla da qui, nella scheda che l'utente ha davanti: la stessa intervista, dalla domanda rimasta in sospeso e
