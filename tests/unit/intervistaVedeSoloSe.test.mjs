@@ -11,6 +11,7 @@ import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
 import '../../src/shared/filoApp.js';
 import '../../src/shared/filoContesto.js';
+import '../../src/shared/constants.js';
 
 const require = createRequire(import.meta.url);
 globalThis.SN_CONST = { ...(globalThis.SN_CONST || {}), STORAGE_KEYS: { ...((globalThis.SN_CONST || {}).STORAGE_KEYS || {}), FILO_CHATS: 'filo_chats' } };
