@@ -726,7 +726,7 @@ export function avvisoFiduciaTolta(rif, motivo, { dryRun = false } = {}) {
 }
 
 async function bigliettoDiChiScrive() {
-  try { return await sessione.biglietto(); } catch (e) { return { fp: 'x', fiducia: 'non_fidato', errore: String((e && e.message) || e) }; }
+  try { return await sessione.biglietto(); } catch (e) { return { errore: String((e && e.message) || e) }; }
 }
 
 export async function scrivi(id, to, nota, opts = {}) {
