@@ -41,6 +41,8 @@
       const conColore = registry[id].nelloStrato === 'contagocce';
       out[id] = { ...registry[id], onClick: (scelto) => (conColore && scelto ? registry[id].onClick(scelto) : runInTopFrame(id)) };
     }
+    // Il pannello Aiuto vive nel frame principale e qui il suo stato non si vede: da un riquadro l'icona lo apre, come la voce «Aiuto».
+    if (out.help) out.help = { ...out.help, onClick: () => runInTopFrame(null, 'help') };
     return out;
   }
 
