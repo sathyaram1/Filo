@@ -2189,7 +2189,7 @@
       `DOMANDA → rispondi nella bolla. Se ti serve un dato che non hai, usa CERCA_WEB, e se gli snippet non bastano leggi le pagine con LEGGI_PAGINA (vedi sotto).\n` +
       `CONVERSAZIONE → rispondi in modo sostanziale; suggerisci prossimi passi quando appropriato.\n` +
       `RIFERIMENTO ALLA DASHBOARD ("apri il primo") → usa lo STATO (più sotto) per risolvere il riferimento.\n` +
-      `PULIZIA TAB ("riordina le schede", "fai pulizia delle tab", "chiudi le tab che non servono", "archivia le schede vecchie") → usa l'azione PULISCI_TAB: valuta tutte le schede e archivia quelle non più utili, ritrovabili in «Tab archiviate». Se il livello di autonomia lo consente parte subito e l'esito ti dice quante ne ha archiviate; se no compare un bottone che l'utente conferma, e tu spieghi in una frase cosa farà.\n` +
+      `PULIZIA TAB ("riordina le schede", "fai pulizia delle tab", "chiudi le tab che non servono", "archivia le schede vecchie") → usa l'azione PULISCI_TAB: valuta tutte le schede e archivia quelle non più utili, che restano nel filo della home (l'utente le ritrova col campo «Cerca nel filo»). Se il livello di autonomia lo consente parte subito e l'esito ti dice quante ne ha archiviate; se no compare un bottone che l'utente conferma, e tu spieghi in una frase cosa farà.\n` +
       `TENERE SEMPRE APERTO UN SITO ("tienimi sempre aperta WhatsApp", "questa scheda non chiuderla mai", "non archiviare mai Gmail") → TIENI_APERTA {dominio}: da quel momento la pulizia delle schede non archivia mai quel sito. "non tenerla più aperta" → NON_TENERE_APERTA {dominio}. È una regola, non una lezione: non usare SALVA_LEZIONE per questo. Nella risposta di' quale sito hai salvato, come lo dice l'esito.\n` +
       `CANCELLAZIONE ARCHIVIO ("cancella dall'archivio le pagine su X", "elimina definitivamente le schede a tema Y", "rimuovi dalla cronologia tutto ciò che riguarda Z") → proponi l'azione CANCELLA_ARCHIVIO con {query} = la descrizione di cosa cancellare. È DISTRUTTIVA e PERMANENTE: NON cancellare nulla da solo. L'azione cerca le schede pertinenti e mostra l'elenco con un bottone di conferma; spiega in una frase che è un'eliminazione definitiva dall'archivio.\n` +
       `PAGINE VISITATE ("cancella le pagine dell'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine delle ultime 3 ore", "cancella le visite a YouTube", "togli le pagine di repubblica.it di oggi") → emetti CANCELLA_PAGINE con {periodo: "ultima_ora"|"oggi"|"tutto"} oppure {ore: N}, più {sito: "youtube.com"} se l'utente nomina un sito (senza periodo valgono tutte le sue pagine). Filo ricorda le pagine aperte nelle schede (non quelle in incognito); questa azione toglie solo quelle, non le chat né le schede chiuse. Il SISTEMA mostra quante sono e chiede l'OK: non chiederlo a parole e non dire di averlo fatto prima della conferma.\n` +
@@ -2324,7 +2324,7 @@
       `  - action: { type, ...params } — usa lo stesso schema delle azioni di chat (NAVIGA, APRI_FILE, ecc.)\n` +
       `  - importance: 1..5 (vedi scala importanza: 1=passivo, 3=visibile-default, 5=critico)\n` +
       `Massimo 12 suggerimenti totali. Considera: notifiche non gestite, lavori interrotti da riprendere, eventi calendario imminenti, appunti da elaborare, articoli salvati. Ignora tab inattive da molte ore se non rilevanti.\n` +
-      `Se le SCHEDE WEB APERTE sono molte (indicativamente 20+), aggiungi UN suggerimento (icon "web", importance 2-3) che propone di fare pulizia delle schede, con action {"type":"PULISCI_TAB"}: Filo le valuterà e archivierà quelle non più utili (restano in cronologia). Non proporlo se le schede sono poche.\n\n` +
+      `Se le SCHEDE WEB APERTE sono molte (indicativamente 20+), aggiungi UN suggerimento (icon "web", importance 2-3) che propone di fare pulizia delle schede, con action {"type":"PULISCI_TAB"}: Filo le valuterà e archivierà quelle non più utili (restano nel filo della home). Non proporlo se le schede sono poche.\n\n` +
       `Output: SOLO JSON valido, niente markdown, niente \`\`\`:\n` +
       `{\n` +
       `  "message": "<testo centro dashboard>",\n` +
@@ -2769,15 +2769,20 @@
       defaultCountry: 'us',
       lastCountry: '',
     },
-    // §2.1 — auto-archiviazione e riordino: l'LLM decide su TUTTE le schede insieme, e le
-    // archiviate restano riapribili da filo://archive.
+    // §2.1 — auto-archiviazione/riordino delle tab. Filo riordina e archivia da
+    // sé le schede non più necessarie (l'LLM decide su TUTTE le tab insieme). Le
+    // schede archiviate restano nel filo della home.
+    // - enabled: interruttore generale della funzione.
+    // - onIdle: archivia quando Filo resta inattivo (nessuna interazione) a lungo.
+    // - idleHours: soglia di inattività in ore (modificabile).
+    // - onClose: valuta/archivia anche alla chiusura→riapertura di Filo.
     autoArchive: {
       enabled: true,
       onIdle: true,
       idleHours: 6,
       onClose: true,
     },
-    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
+    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nel filo della home per significato. Spento, di una
     // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
     riassuntoSchede: { enabled: true },
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte

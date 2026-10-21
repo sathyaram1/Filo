@@ -319,6 +319,22 @@ test('i formati che Windows monta o esegue senza essere un .exe sono nella lista
   assert.equal(E.eEseguibile('note-ms.txt'), false);
 });
 
+test('i file che al doppio clic connettono, installano dalla rete o eseguono codice sono programmi (#588.6)', () => {
+  for (const nome of ['connessione.rdp', 'app.appinstaller', 'addin.vsto', 'cartella.search-ms',
+    'remoto.searchConnector-ms', 'tool.pyz', 'tool.pyzw', 'tool.pyc', 'tool.pyo', 'db.accde', 'db.mde',
+    'update.msu', 'sito.website']) {
+    assert.equal(E.eEseguibile(nome), true, `manca ${nome}`);
+    assert.equal(E.eEseguibile(`${nome.toUpperCase()}. `), true, `${nome} maiuscolo con punto in coda`);
+    assert.equal(E.eEseguibile(`fattura.pdf.${nome.split('.').pop()}`), true, `${nome} dietro un documento`);
+    assert.equal(E.eImmagineDisco(nome), false, `${nome} non è un disco`);
+  }
+  assert.match(E.testoScarica('connessione.rdp', 'dubbio.example'), /è un programma da dubbio\.example/);
+  // Le parole vicine restano file da leggere: l'attrito va solo dove serve.
+  for (const nome of ['rapporto.rdpx', 'db.accdb', 'db.mdb', 'note.website.txt', 'search.ms', 'pyz.txt']) {
+    assert.equal(E.eEseguibile(nome), false, `falso allarme su ${nome}`);
+  }
+});
+
 test('un’immagine disco si dice immagine disco, non «programma»', () => {
   for (const nome of ['setup.iso', 'disco.IMG', 'win.vhdx', 'app.dmg']) {
     assert.equal(E.eImmagineDisco(nome), true, nome);

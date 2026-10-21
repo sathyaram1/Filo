@@ -42,6 +42,9 @@ testo e tiene solo gli id del tratto.
   resta aperto, e la correzione va alla riga nata da lei (stesse fonti, stesso senso: `erede`), mai a una che ne ha
   assorbite altre.
 - **Due righe uguali in un modulo sono una** (`setMemory`): il quaderno riconosce le righe dal testo.
+- **Il campo della correzione.** Invio, la spunta o uscire dalla riga salvano; Esc e la × accanto annullano; salvata
+  vuota la riga si toglie (fra le nascoste, ritrovata dalle fonti anche dopo un riordino). Un clic dentro la riga o nel
+  menu del tasto destro di Filo non è uscire: salverebbe prima di fare quello che l'utente ha chiesto (#872.4).
 - **Il salto**: il quaderno apre la home con `?evento=<id>`, la home chiede `FILO_DOVE` e va al messaggio
   (`SN_DASH_CODA.vaiA`). Le fonti che il filo non ha più (una chat tolta) spariscono dalla riga.
 - **Le schede chiuse di prima del filo** entrano nel filo alla loro data, legate alla loro voce d'archivio, che tiene

@@ -145,6 +145,7 @@
   }
 
   function riempiRiga(r) {
+    if (r.smonta) r.smonta();
     const it = r.it;
     const el = r.el;
     el.className = `qd-riga${it.tipo === 'nascosta' ? ' qd-nascosta' : ''}`;
@@ -236,14 +237,21 @@
   }
 
   async function togli(it) {
+    // Dal tasto destro su una riga in correzione: quello che c'era nel campo non si salva, si toglie la riga.
+    const aperta = inModifica === chiave(it) ? nodi.get(inModifica) : null;
+    if (aperta && aperta.chiudi) await aperta.chiudi(false);
     const r = await send(it.tipo === 'sito' ? { type: MSG.FILO_MEMORY_FORGET, sempreAperta: it.host } : { type: MSG.FILO_MEMORY_FORGET, ...it.via });
+    tolta(r, it.tipo === 'sito' ? `${it.host} non resta più aperto` : '');
+    await carica();
+  }
+
+  function tolta(r, testo = '') {
     if (r && r.ok && r.tolta) {
       ultimaNascosta = r.id || null;
-      esito(it.tipo === 'sito' ? `${it.host} non resta più aperto` : 'Tolta: non entra più nelle conversazioni', { rimetti: r.id || null });
+      esito(testo || 'Tolta: non entra più nelle conversazioni', { rimetti: r.id || null });
     } else {
       esito('Non c\'era più: ecco com\'è adesso');
     }
-    await carica();
   }
 
   async function rimetti(it) {
@@ -275,9 +283,11 @@
     try { chrome.tabs.create({ url: `filo://dashboard/dashboard.html?evento=${encodeURIComponent(fonte.id)}` }); } catch (_) {}
   }
 
-  // La correzione si scrive sul posto: Invio o uscire dal campo la salvano, Esc lascia com'era.
+  // La correzione si scrive sul posto: Invio, ✓ o uscire dalla riga la salvano (vuota, la toglie); Esc o × lasciano
+  // com'era. Un clic dentro la riga non porta via il fuoco dal campo, sennò salverebbe prima di fare quello che chiede.
   function correggi(r) {
-    if (r.it.tipo !== 'riga' || inModifica === chiave(r.it)) return;
+    if (r.it.tipo !== 'riga') return;
+    if (inModifica === chiave(r.it)) { const c = r.el.querySelector('.qd-campo'); if (c) c.focus(); return; }
     if (inModifica) { const altra = nodi.get(inModifica); if (altra && altra.chiudi) altra.chiudi(true); }
     const k = chiave(r.it);
     inModifica = k;
@@ -290,44 +300,78 @@
     const adatta = () => { campo.style.height = 'auto'; campo.style.height = `${campo.scrollHeight}px`; };
     t.replaceWith(campo);
     r.el.draggable = false;
+    const tasti = r.el.querySelector('.qd-tasti');
+    tasti.replaceChildren(
+      tasto('check', 'Salva la correzione', () => chiudi(true)),
+      tasto('close', 'Annulla la correzione', () => chiudi(false)),
+    );
     adatta();
     campo.focus();
     campo.setSelectionRange(campo.value.length, campo.value.length);
     let finito = false;
+    const tieni = (e) => { if (e.target !== campo) e.preventDefault(); };
+    // Il fuoco che va nel menu del tasto destro di Filo non esce dalla riga: le sue voci agiscono sul campo o sulla
+    // riga. Dopo, il fuoco non torna da sé, e uscire è il primo clic fuori dalla riga.
+    const nostra = (el) => { try { return !!(el && window.SN_FILO_UI && window.SN_FILO_UI.inside(el)); } catch (_) { return false; } };
+    const fuori = (e) => {
+      const verso = e.relatedTarget;
+      if (!finito && !(verso && (r.el.contains(verso) || nostra(verso)))) chiudi(true);
+    };
+    const clicFuori = (e) => {
+      if (finito || r.el.contains(document.activeElement)) return;
+      const t = e.composedPath()[0];
+      if (!r.el.contains(t) && !nostra(t)) chiudi(true);
+    };
+    const smonta = () => {
+      r.el.removeEventListener('mousedown', tieni);
+      r.el.removeEventListener('focusout', fuori);
+      document.removeEventListener('mousedown', clicFuori, true);
+      r.smonta = null;
+    };
     const chiudi = async (salva) => {
       if (finito) return;
       finito = true;
       r.chiudi = null;
       const nuovo = campo.value.replace(/\s+/g, ' ').trim();
-      if (salva && nuovo && nuovo !== r.it.testo) {
+      if (salva && nuovo !== r.it.testo) {
         const fonti = (Array.isArray(r.it.fonti) ? r.it.fonti : []).map((f) => f && f.id).filter(Boolean);
         const res = await send({ type: MSG.FILO_MEMORY_EDIT, via: r.it.via, testo: nuovo, fonti });
         if (!res || !res.ok) {
+          const errore = res && res.rifiuto && res.error ? String(res.error) : 'Non sono riuscito a salvarla: riprova.';
+          if (!campo.isConnected) { smonta(); esito(errore); return; }
+          // Resta lei la riga in correzione, anche se intanto si era aperto il campo di un'altra.
           finito = false;
           r.chiudi = chiudi;
-          r.errore.textContent = res && res.error ? String(res.error) : 'Non sono riuscito a salvarla: riprova.';
+          inModifica = k;
+          r.errore.textContent = errore;
           r.errore.hidden = false;
           campo.focus();
           return;
         }
-        inModifica = null;
-        esito(res.corretta ? 'Corretta: vale dal prossimo messaggio' : 'Non c\'era più: ecco com\'è adesso');
+        smonta();
+        if (inModifica === k) inModifica = null;
+        if ('tolta' in res) tolta(res);
+        else esito(res.corretta ? 'Corretta: vale dal prossimo messaggio' : 'Non c\'era più: ecco com\'è adesso');
         await carica();
-        const dopo = [...nodi.values()].find((x) => x.it && x.it.testo === res.testo);
+        const dopo = res.testo ? [...nodi.values()].find((x) => x.it && x.it.testo === res.testo) : null;
         if (dopo) { dopo.el.classList.remove('qd-viva'); void dopo.el.offsetWidth; dopo.el.classList.add('qd-viva'); }
         return;
       }
+      smonta();
       if (inModifica === k) inModifica = null;
       riempiRiga(r);
       disegna();
     };
     r.chiudi = chiudi;
+    r.smonta = smonta;
+    r.el.addEventListener('mousedown', tieni);
+    r.el.addEventListener('focusout', fuori);
+    document.addEventListener('mousedown', clicFuori, true);
     campo.addEventListener('input', () => { adatta(); r.errore.hidden = true; });
     campo.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chiudi(true); }
       else if (e.key === 'Escape') { e.preventDefault(); chiudi(false); }
     });
-    campo.addEventListener('blur', () => { if (!finito) chiudi(true); });
   }
 
   // ── Tasto destro: le voci della riga nel menu di Filo ────────────────────

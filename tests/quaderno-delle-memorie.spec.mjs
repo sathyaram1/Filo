@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const QUADERNO = 'filo://quaderno/quaderno.html';
 
@@ -398,4 +399,99 @@ test('una riga corretta nel testo di un\'altra diventa una riga sola, e togliend
   await riga(page, 'Ama il tè').locator('.qd-tasto[title="Togli dalla memoria"]').click();
   await expect(page.locator('#esito')).toContainText('Tolta');
   expect((await memoria(app)).PREFERENZE).toBe('');
+});
+
+// #872.4 — i tasti accanto al campo aperto: la × annulla la correzione (non la salva prima), il ✓ la salva, e il tasto
+// destro «Togli dalla memoria» toglie la riga com'era. Prima la × salvava «Ama il caffè» e diceva «Non c'era più».
+test('correggo «Ama il tè» in «Ama il caffè» e ci ripenso: la × accanto al campo annulla, il ✓ salva, il tasto destro toglie la riga com’era', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: '', PREFERENZE: 'Ama il tè\nVive a Lisbona' }));
+  const page = await openTab(QUADERNO);
+  await expect(riga(page, 'Ama il tè')).toHaveCount(1, { timeout: 8_000 });
+  const campo = page.locator('.qd-campo');
+  const inCorrezione = page.locator('.qd-riga', { has: campo });
+
+  await riga(page, 'Ama il tè').locator('.qd-testo').dblclick();
+  await campo.fill('Ama il caffè');
+  await expect(inCorrezione.locator('.qd-tasto')).toHaveCount(2);
+  await expect(inCorrezione.locator('.qd-tasto[title="Togli dalla memoria"]')).toHaveCount(0);
+  await page.screenshot({ path: 'tests/.shots/quaderno-campo-aperto.png' });
+  await inCorrezione.locator('.qd-tasto[title="Annulla la correzione"]').click();
+  await expect(campo).toHaveCount(0);
+  await expect(riga(page, 'Ama il tè')).toHaveCount(1);
+  await expect(riga(page, 'Ama il tè').locator('.qd-tasto[title="Togli dalla memoria"]')).toHaveCount(1);
+  expect((await memoria(app)).PREFERENZE).toBe('Ama il tè\nVive a Lisbona');
+  await expect(page.locator('#esito')).toBeHidden();
+
+  // Da tastiera: Tab porta sui tasti senza salvare, e Invio sulla × annulla.
+  await riga(page, 'Ama il tè').locator('.qd-testo').dblclick();
+  await campo.fill('Ama il caffè');
+  await campo.press('Tab');
+  await expect(inCorrezione.locator('.qd-tasto[title="Salva la correzione"]')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(inCorrezione.locator('.qd-tasto[title="Annulla la correzione"]')).toBeFocused();
+  expect((await memoria(app)).PREFERENZE).toBe('Ama il tè\nVive a Lisbona');
+  await page.keyboard.press('Enter');
+  await expect(campo).toHaveCount(0);
+  expect((await memoria(app)).PREFERENZE).toBe('Ama il tè\nVive a Lisbona');
+
+  // Il ✓ salva.
+  await riga(page, 'Ama il tè').locator('.qd-testo').dblclick();
+  await campo.fill('Ama il caffè');
+  await inCorrezione.locator('.qd-tasto[title="Salva la correzione"]').click();
+  await expect(page.locator('#esito')).toContainText('Corretta');
+  await expect(riga(page, 'Ama il caffè')).toHaveCount(1);
+  expect((await memoria(app)).PREFERENZE).toBe('Ama il caffè\nVive a Lisbona');
+
+  // Il tasto destro sul campo aperto: «Togli dalla memoria» toglie la riga com'era, senza salvare quello che c'era scritto.
+  await riga(page, 'Ama il caffè').locator('.qd-testo').dblclick();
+  await campo.fill('Ama il cioccolato');
+  await campo.click({ button: 'right' });
+  const menu = menuDi(page);
+  await menu.voce('Togli dalla memoria').click();
+  await expect(page.locator('#esito')).toContainText('Tolta');
+  await expect(campo).toHaveCount(0);
+  expect((await memoria(app)).PREFERENZE).toBe('Vive a Lisbona');
+  const fonti = await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getFonti()));
+  expect(fonti).toContain('Ama il caffè');
+  expect(fonti).not.toContain('cioccolato');
+  await page.locator('.qd-nascoste').evaluate((d) => { d.open = true; });
+  await expect(riga(page, 'Ama il caffè')).toBeVisible();
+});
+
+test('svuoto una riga e la confermo: si toglie e si rimette; una correzione troppo lunga lo dice senza parlare di lezioni', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta', PREFERENZE: 'Ama il tè\nRisposte brevi' }));
+  const page = await openTab(QUADERNO);
+  await expect(riga(page, 'Ama il tè')).toHaveCount(1, { timeout: 8_000 });
+  const campo = page.locator('.qd-campo');
+
+  await riga(page, 'Ama il tè').locator('.qd-testo').dblclick();
+  await campo.fill('');
+  await campo.press('Enter');
+  await expect(page.locator('#esito')).toContainText('Tolta: non entra più nelle conversazioni');
+  await expect(page.locator('.qd-gruppo:not([data-gruppo="nascoste"])').locator(riga(page, 'Ama il tè'))).toHaveCount(0);
+  expect((await memoria(app)).PREFERENZE).toBe('Risposte brevi');
+  await page.locator('#esito button', { hasText: 'Rimetti' }).click();
+  await expect(page.locator('#esito')).toContainText('Rimessa in memoria');
+  expect((await memoria(app)).PREFERENZE.split('\n')).toContain('Ama il tè');
+
+  // Solo spazi, e uscire dal campo (che salva): la stessa cosa.
+  await riga(page, 'Risposte brevi').locator('.qd-testo').dblclick();
+  await campo.fill('   ');
+  await page.locator('h1').click();
+  await expect(page.locator('#esito')).toContainText('Tolta');
+  expect((await memoria(app)).PREFERENZE).toBe('Ama il tè');
+
+  // Una riga del profilo corretta oltre il tetto: il messaggio parla della correzione, col numero, e il campo resta.
+  await riga(page, 'Si chiama Marta').locator('.qd-testo').dblclick();
+  await campo.fill('x'.repeat(900));
+  await campo.press('Enter');
+  const errore = page.locator('.qd-errore:not([hidden])');
+  await expect(errore).toHaveText('La correzione è lunga 900 caratteri e il massimo è 800. Accorciala per salvarla.');
+  await expect(campo).toBeFocused();
+  await page.screenshot({ path: 'tests/.shots/quaderno-correzione-lunga.png' });
+  await campo.press('Escape');
+  await expect(campo).toHaveCount(0);
+  expect((await memoria(app)).PROFILO).toBe('Si chiama Marta');
 });

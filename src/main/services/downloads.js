@@ -12,8 +12,8 @@
 // immagine/video come…" (handlers/misc.js) NON passa di qui — deve scaricare i
 // byte a mano per presentare il Referer della pagina — ma dal #436 si iscrive
 // allo STESSO registro via beginManual(): per l'utente i due cammini sono la
-// stessa cosa, quindi devono avere la stessa barra, lo stesso pannello e la
-// stessa cronologia.
+// stessa cosa, quindi devono avere la stessa barra, lo stesso pannello, la
+// stessa cronologia e la stessa domanda sui programmi (#1311).
 //
 // Filosofia: "l'attrito è negativo" + "non salvare mai [a mano]". Per questo NON
 // apriamo un dialogo "Salva come" a ogni file: salviamo direttamente nella
@@ -746,6 +746,8 @@ function finalizeManual(rec, state, savePath) {
   if (rec._final) return;
   rec._final = true;
   liveManual.delete(rec.id);
+  // Una voce chiusa non aspetta più risposte: chi attendeva la domanda prosegue con un no.
+  if (rec._sblocca) rec._sblocca(false);
   rec.endedAt = new Date().toISOString();
   rec.paused = false;
   rec.canResume = false;
@@ -762,7 +764,8 @@ function finalizeManual(rec, state, savePath) {
   // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
 }
 
-function beginManual({ url, filename, totalBytes, scope, servedFrom } = {}) {
+// `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
+function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents } = {}) {
   const id = uuid();
   const nome = safeName(filename || 'download');
   const indirizzo = String(url || '');
@@ -789,19 +792,53 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom } = {}) {
     _scope: scope || '',
   };
   records.set(id, rec);
+  const attese = [];
+  rec._sblocca = (si) => { for (const r of attese.splice(0)) r(si); };
   const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
-  liveManual.set(id, { cancel: requestCancel });
+  // La risposta alla domanda «scaricarlo?», da confirmDownload: un no chiude la voce come «Annulla».
+  const rispondi = (si) => {
+    if (!si) { requestCancel(); return; }
+    rec._consenso = true;
+    rec.state = 'progressing';
+    persist();
+    broadcast('progress', rec);
+    rec._sblocca(true);
+  };
+  liveManual.set(id, { cancel: requestCancel, rispondi });
   persist();
   broadcast('start', rec);
 
-  // Su rete veloce 'data' arriva migliaia di volte al secondo e ogni broadcast attraversa
-  // l'IPC verso ogni finestra: ~8 aggiornamenti al secondo bastano all'occhio.
+  // #1311 — un programma non arriva dove l'ha scelto l'utente senza la domanda dei download da link: la regola è
+  // quella di chiedeConferma, sul nome FINALE; un sì vale per la voce intera, anche se nel dialogo il nome cambia.
+  const permesso = (nome) => {
+    if (rec._final) return Promise.resolve(false);
+    const n = safeName(nome || rec.filename);
+    const exe = marca(() => ESE().eEseguibile(n), true);
+    if (!exe || rec._consenso || !chiedeConferma(rec.site, false, servedFrom)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      attese.push(resolve);
+      if (rec.state === 'pending') return;
+      rec.filename = n;
+      rec.exe = true;
+      rec.state = 'pending';
+      persist();
+      broadcast('progress', rec);
+      chiediNellaFinestra(webContents, rec);
+    });
+  };
+
+  // Su rete veloce l'evento 'data' arriva migliaia di volte al secondo e ogni
+  // broadcast attraversa l'IPC verso ogni finestra: senza freno l'avanzamento
+  // costerebbe più del download. ~8 aggiornamenti al secondo bastano all'occhio.
   const MIN_PUSH_MS = 120;
   let lastPush = 0;
 
   return {
     id,
     cancelled: () => !!rec._cancelled,
+    permesso,
+    // Dove far crescere il file parziale: in quarantena finché il programma aspetta la risposta (#588).
+    cartella: () => (rec.state === 'pending' ? quarantineDir() : downloadsDir()),
     progress(received, total) {
       if (rec._final) return;
       rec.receivedBytes = Number(received) || 0;
@@ -910,6 +947,9 @@ function confirmDownload(id, allow, scope = '') {
   if (!rec || rec.state !== 'pending') {
     return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
   }
+  // «Salva immagine come»: i byte e il file li muove chi l'ha chiesto, che aspetta questa risposta (#1311).
+  const manual = liveManual.get(id);
+  if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, items: listRecords(scope) }; }
   if (!allow) {
     const item = liveItems.get(id);
     rec._final = true;   // il 'done' che segue cancel() non deve riscrivere l'esito

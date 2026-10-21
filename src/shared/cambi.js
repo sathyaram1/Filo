@@ -626,7 +626,24 @@
     return { righe, tolti: lista.length - scelti.length };
   }
 
+  // I cambi che combaciano con una ricerca della chat (CERCA_CHAT), dal più recente, coi tre passi delle conversazioni
+  // (src/shared/chatArchive.js): «cambio tema scuro» trova il tema messo ieri come «tema scuro» (#868.1).
+  function cercaPerChat(eventi, query, { max = 6 } = {}) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query)).length) return { cambi: [], termini: [], allargata: false };
+    const lista = Array.isArray(eventi) ? eventi : [];
+    const candidati = [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const e = lista[i];
+      const f = e && e.id ? frase(e) : '';
+      if (f) candidati.push({ id: e.id, frase: f, date: e.agg || e.ts, testo: `${f} ${frasi(e).join(' ')}` });
+    }
+    const { results, termini, allargata } = CA.searchWide(candidati, query, { testo: (c) => c.testo, limit: max });
+    return { cambi: results.map((c) => ({ id: c.id, frase: c.frase, date: c.date })), termini, allargata };
+  }
+
   global.SN_CAMBI = {
+    cercaPerChat,
     VOCI,
     ESCLUSIONI,
     FINESTRA_FUSIONE_MS,

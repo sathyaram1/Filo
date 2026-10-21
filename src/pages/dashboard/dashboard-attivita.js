@@ -740,10 +740,19 @@
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
     CERCA_CHAT: (a) => {
-      // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni.
+      // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni, ognuna una volta
+      // anche quando ne arrivano più pezzi (#868.2).
       if (a._auto) {
         const r = (a._output && Array.isArray(a._output.results)) ? a._output.results : [];
-        const quali = r.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean);
+        const viste = new Set();
+        const una = r.filter((x) => {
+          const k = (x && x.id) || '';
+          if (!k) return true;
+          if (viste.has(k)) return false;
+          viste.add(k);
+          return true;
+        });
+        const quali = [...new Set(una.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean))];
         return { icon: '💬', text: `Ricordato dal filo${quali.length ? ` · ${quali.join('; ')}` : ''}`, tipo: 'RICORDO_FILO' };
       }
       const q = String(a.query || a.testo || '').trim();
@@ -2263,7 +2272,7 @@
   }
 
   const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-    + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+    + 'Le schede archiviate restano nel filo della home, e le ritrovi cercandole lì.';
   // Il riordino chiesto fuori dalla chat (/pulisci, il suggerimento della home) passa dalla stessa regola della
   // chat: parte nel main, o torna la domanda da fare. `{ annullato }`, o l'esito come lo legge l'utente (`esitoRiordino`).
   async function riordinaSchede() {
@@ -2434,5 +2443,6 @@
     // dopo): resta il racconto di cosa Filo ha fatto.
     summarizeActivity,
     riordinaSchede,
+    activityRowFor,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

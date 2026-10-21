@@ -129,12 +129,16 @@
 
   // Toglie una riga dalla memoria senza buttarla: finisce fra le nascoste del quaderno, con le sue fonti, e da lì si
   // rimette o si cancella per sempre. Il prompt non la vede più dal messaggio dopo. Torna l'id della nascosta, o null.
-  async function hideLine(via) {
+  // `fonti`: come per editLine, per ritrovare la riga sotto un campo rimasto aperto mentre il compattatore la riordinava.
+  async function hideLine(via, { fonti = [] } = {}) {
     const ora = new Date().toISOString();
     if (via && via.lezione && typeof via.lezione === 'object') {
       const buf = await getLessonsBuffer();
       const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
-      if (i < 0) return null;
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? hideLine(e) : null;
+      }
       const [l] = buf.splice(i, 1);
       await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
       const meta = await getFonti();
@@ -147,10 +151,13 @@
     if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
       const mem = await getMemory();
       const testo = typeof mem[via.modulo] === 'string' ? mem[via.modulo] : null;
-      if (testo == null || !via.riga.trim()) return null;
-      const righe = testo.split(/\r?\n/);
+      if (!via.riga.trim()) return null;
+      const righe = testo == null ? [] : testo.split(/\r?\n/);
       const i = righe.findIndex((r) => r.trim() === via.riga.trim());
-      if (i < 0) return null;
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? hideLine(e) : null;
+      }
       const [tolta] = righe.splice(i, 1);
       await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
       const meta = await getFonti();

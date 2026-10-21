@@ -94,10 +94,10 @@ test.describe('tab-auto-archive', () => {
     });
     expect(activeTitle).toBe('Charlie');
 
-    // Toast §2.3 mostrato nella shell.
+    // Toast §2.3 mostrato nella shell: dice dove ritrovare le schede chiuse, il filo della home (#872.4).
     await expect.poll(() => shell.evaluate(() => {
       const el = document.querySelector('.shell-notif.show .shell-notif-msg');
-      return !!(el && /cronologia/i.test(el.textContent || ''));
+      return !!(el && /nel filo della home/.test(el.textContent || ''));
     }), { timeout: 6_000 }).toBe(true);
   });
 

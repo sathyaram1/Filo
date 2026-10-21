@@ -16,6 +16,8 @@
     'ps1', 'ps1xml', 'ps2', 'psc1', 'psc2', 'psm1', 'psd1',
     'reg', 'lnk', 'inf', 'scf', 'url', 'chm', 'gadget', 'application', 'jnlp',
     'appref-ms', 'xll', 'library-ms', 'settingcontent-ms', 'diagcab',
+    // Al doppio clic connettono il computer a quello di un altro, installano dalla rete o eseguono codice (#588.6).
+    'rdp', 'appinstaller', 'vsto', 'search-ms', 'searchconnector-ms', 'accde', 'mde', 'msu', 'website',
     // Immagini disco che Windows monta al doppio clic: il programma sta dentro,
     // e il disco montato non porta la marca di file scaricato (#588.1).
     'iso', 'img', 'vhd', 'vhdx',
@@ -26,7 +28,7 @@
     'sh', 'bash', 'zsh', 'csh', 'ksh', 'run', 'appimage', 'deb', 'rpm',
     'desktop', 'out', 'elf',
     // Interpretati ovunque ci sia l'interprete (su Windows basta il doppio clic).
-    'jar', 'js', 'py', 'pyw',
+    'jar', 'js', 'py', 'pyw', 'pyc', 'pyo', 'pyz', 'pyzw',
   ];
 
   const SET = new Set(ESTENSIONI);

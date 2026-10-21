@@ -264,3 +264,24 @@ test('per il modello: righe con id, provenienza e stato, e il conto di quelle la
   assert.match(righe[1], /annulla c1/);
   assert.equal(K.righePerModello(lista, { adesso, max: 1 }).tolti, 1);
 });
+
+test('la ricerca della chat fra i cambi si allarga come quella fra le conversazioni: una parola in più non fa sparire il cambio (#868.1)', () => {
+  require('../../src/shared/chatArchive.js');
+  const adesso = Date.parse('2026-10-01T10:00:00Z');
+  const lista = [
+    { id: 'c1', ts: new Date(adesso - 86400000).toISOString(), tipo: 'impostazioni', via: 'chat', cambi: [{ chiave: 'theme', prima: 'light', dopo: 'dark' }] },
+    { id: 'c2', ts: new Date(adesso - 3600000).toISOString(), tipo: 'impostazioni', via: 'chat', cambi: [{ chiave: 'cursorBlinkMs', prima: 500, dopo: 900 }] },
+  ];
+  const stretta = K.cercaPerChat(lista, 'tema scuro');
+  assert.deepEqual(stretta.cambi.map((c) => c.id), ['c1']);
+  assert.equal(stretta.allargata, false);
+  for (const q of ['cambio tema scuro', 'rimetti il tema scuro di ieri?', 'il «tema» scuro!']) {
+    const r = K.cercaPerChat(lista, q);
+    assert.deepEqual(r.cambi.map((c) => c.id), ['c1'], q);
+    assert.equal(r.cambi[0].frase, 'tema: chiaro → scuro');
+  }
+  assert.equal(K.cercaPerChat(lista, 'cambio tema scuro').allargata, true, 'il modello deve sapere che ha trovato con meno parole');
+  // Senza una parola che distingue non si tira fuori mezzo registro.
+  assert.deepEqual(K.cercaPerChat(lista, 'di ieri').cambi, []);
+  assert.deepEqual(K.cercaPerChat(lista, 'sveglia').cambi, []);
+});

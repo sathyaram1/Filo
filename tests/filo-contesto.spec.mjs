@@ -864,3 +864,153 @@ test('un modello della chat con la finestra più piccola di tre giorni di filo r
   expect(secondo).toContain('domanda 19.5');
   expect(secondo).toContain('ci sei?');
 });
+
+// #1301 — il ricordo automatico non accumula copie e non nomina due volte la stessa conversazione.
+test('tre domande di fila sullo stesso argomento vecchio: lo scambio arriva una volta, e il blocco nomina la conversazione una volta', async ({ app }) => {
+  test.setTimeout(120_000);
+  const page = await primaScheda(app);
+  await semina(app, {
+    chat: [{
+      id: 'viaggio-lisbona', oreFa: 6 * 24, titolo: 'Viaggio a Lisbona', scambi: [
+        ['segnati il ristorante di Lisbona: Taberna da Rua', 'Fatto, il ristorante è Taberna da Rua, prenota per le 20.'],
+        ['il ristorante di Lisbona è caro?', 'No, il ristorante costa sui 30 euro.'],
+        ["cosa c'è vicino al ristorante?", "Vicino al ristorante c'è il castello."],
+      ],
+    }],
+  });
+  await preparaModello(app, [{ text: 'Si chiamava Taberna da Rua.' }, { text: 'Non era caro.' }, { text: 'Lì vicino trovi il castello.' }]);
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await scrivi(page, 'come si chiamava il ristorante di Lisbona?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Si chiamava Taberna da Rua.' })).toBeVisible({ timeout: 15_000 });
+  const blocco = page.locator('.dash-activity').first();
+  await blocco.locator('.dash-activity-head').click();
+  const riga = blocco.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' });
+  await expect(riga).toContainText('Viaggio a Lisbona');
+  expect(((await riga.textContent()) || '').split('Viaggio a Lisbona').length - 1).toBe(1);
+  await blocco.screenshot({ path: 'tests/.shots/1301-ricordo-una-volta.png' });
+
+  await scrivi(page, 'e il ristorante di Lisbona era caro?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Non era caro.' })).toBeVisible({ timeout: 15_000 });
+  await scrivi(page, "cosa c'è vicino al ristorante di Lisbona?");
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Lì vicino trovi il castello.' })).toBeVisible({ timeout: 15_000 });
+
+  const [primo, secondo, terzo] = await chiamate(app);
+  expect(testo(primo[posContesto(primo)])).toContain('RICORDI DAL FILO');
+  for (const c of [secondo, terzo]) expect(testo(c[posContesto(c)])).not.toContain('RICORDI DAL FILO');
+  const tutto = terzo.map(testo).join('\n');
+  expect(tutto.split('prenota per le 20').length - 1).toBe(1);
+  await expect(page.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' })).toHaveCount(1);
+});
+
+test('una conversazione ripescata e poi cancellata non arriva più al modello, né in quella scheda né in un\'altra', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const a = await primaScheda(app);
+  await semina(app, {
+    chat: [{ id: 'hotel-porto', oreFa: 6 * 24, titolo: 'Hotel a Porto', scambi: [['segnati la prenotazione del ristorante a Lisbona: codice PNR-7Q4XK', 'Segnato il codice PNR-7Q4XK per il ristorante di Lisbona.']] }],
+  });
+  await preparaModello(app, [{ text: 'Eccolo, lo vedi nel blocco.' }, { text: 'Non lo ho più.' }, { text: 'Niente codice.' }]);
+  await a.reload();
+  await expect(a.locator('#input')).toBeVisible();
+  await scrivi(a, 'il codice del ristorante di Lisbona?');
+  await expect(a.locator('.dash-bubble-filo', { hasText: 'Eccolo, lo vedi nel blocco.' })).toBeVisible({ timeout: 15_000 });
+  const [primo] = await chiamate(app);
+  expect(primo.map(testo).join('\n')).toContain('PNR-7Q4XK');
+
+  await app.evaluate(() => globalThis.SN_FILO_CHATS.remove('hotel-porto'));
+  await scrivi(a, 'e adesso cosa ricordi del ristorante di Lisbona?');
+  await expect(a.locator('.dash-bubble-filo', { hasText: 'Non lo ho più.' })).toBeVisible({ timeout: 15_000 });
+  const b = await schedaNuova(app, shell);
+  await expect(b.locator('#input')).toBeVisible();
+  await scrivi(b, 'dimmi il codice della prenotazione');
+  await expect(b.locator('.dash-bubble-filo', { hasText: 'Niente codice.' })).toBeVisible({ timeout: 15_000 });
+  const [, secondo, terzo] = await chiamate(app);
+  expect(secondo.map(testo).join('\n')).not.toContain('PNR-7Q4XK');
+  expect(terzo.map(testo).join('\n')).not.toContain('PNR-7Q4XK');
+});
+
+// #1301 — con un modello dalla finestra piccola la rilettura di una conversazione lunga ci sta fin dal primo tentativo.
+async function seminaTrasloco(app) {
+  const scambi = [];
+  for (let i = 0; i < 60; i++) {
+    scambi.push([`trasloco, punto ${i}: ${'scatoloni e mobili da spostare '.repeat(40)}`, `Punto ${i} segnato. ${'ricordati di etichettare ogni scatola '.repeat(34)}`]);
+  }
+  await semina(app, { chat: [{ id: 'trasloco-lungo', oreFa: 5 * 24, titolo: 'Trasloco', scambi }] });
+}
+
+// Il fornitore rifiuta oltre 110.000 caratteri, come un modello da 32.000 token, e dice le misure come OpenRouter.
+// Il modello finto chiede la rilettura e, con l'esito davanti, risponde.
+async function finestraPiccola(app, { listino }) {
+  await app.evaluate((_e, listino) => {
+    const vero = globalThis.__fetchVeroListino || globalThis.fetch;
+    globalThis.__fetchVeroListino = vero;
+    globalThis.fetch = async (input, init) => {
+      const url = String((input && input.url) || input);
+      if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
+        if (!listino) return new Response('giù', { status: 503 });
+        const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: 32768, pricing: { prompt: '0.0000001', completion: '0.0000002' } }];
+        return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return vero(input, init);
+    };
+    globalThis.__rifiutate = 0;
+    globalThis.__accettate = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
+      const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
+      const n = testi.reduce((s, t) => s + t.length, 0);
+      if (n > 110000) {
+        globalThis.__rifiutate++;
+        const e = new Error(`OpenRouter 400: {"error":{"message":"This endpoint's maximum context length is 32768 tokens. However, you requested about ${Math.ceil(n / 3.5)} tokens. Please reduce the length of the messages.","code":400}}`);
+        e.status = 400;
+        throw e;
+      }
+      globalThis.__accettate.push(testi.join('\n'));
+      if (!messages.some((m) => m.role === 'tool')) {
+        return { ...base, text: '', toolCalls: [{ id: `t${globalThis.__accettate.length}`, name: 'CERCA_CHAT', arguments: JSON.stringify({ id: 'trasloco-lungo' }) }], reasoningDetails: [], finishReason: 'tool_calls' };
+      }
+      try { onDelta && onDelta('Ecco il riassunto del trasloco.'); } catch (_) {}
+      return { ...base, text: 'Ecco il riassunto del trasloco.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  }, listino);
+}
+
+test('con la finestra del modello nota dal listino, rileggere una conversazione lunga non viene mai rifiutato e la risposta arriva', async ({ app }) => {
+  test.setTimeout(120_000);
+  const page = await primaScheda(app);
+  await preparaModello(app, []);
+  await seminaTrasloco(app);
+  await finestraPiccola(app, { listino: true });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await scrivi(page, 'riassumimi la conversazione sul trasloco di qualche giorno fa');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il riassunto del trasloco.' })).toBeVisible({ timeout: 30_000 });
+  expect(await app.evaluate(() => globalThis.__rifiutate)).toBe(0);
+  const ultima = (await app.evaluate(() => globalThis.__accettate)).pop();
+  // La rilettura ha l'inizio e la fine, e dice da dove leggere il mezzo.
+  expect(ultima).toContain('trasloco, punto 0:');
+  expect(ultima).toContain('Punto 59 segnato.');
+  expect(ultima).toMatch(/parte centrale omessa: caratteri \d+-\d+ di \d+; si legge richiamando CERCA_CHAT con questo id e da = \d+/);
+});
+
+test('senza la finestra nota, il rifiuto accorcia la rilettura nello stesso turno: la risposta arriva al primo messaggio, e anche al secondo', async ({ app }) => {
+  test.setTimeout(120_000);
+  const page = await primaScheda(app);
+  await preparaModello(app, []);
+  await seminaTrasloco(app);
+  await finestraPiccola(app, { listino: false });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await scrivi(page, 'riassumimi la conversazione sul trasloco di qualche giorno fa');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il riassunto del trasloco.' })).toBeVisible({ timeout: 30_000 });
+  expect(await app.evaluate(() => globalThis.__rifiutate)).toBe(1);
+  const accettate = await app.evaluate(() => globalThis.__accettate);
+  expect(accettate[accettate.length - 1]).toContain('trasloco, punto 0:');
+  expect(accettate[accettate.length - 1]).toContain('parte centrale omessa');
+  // Il secondo messaggio rilegge sulla finestra che il rifiuto ha detto: nessun rifiuto nuovo.
+  await scrivi(page, 'e rileggila ancora, per favore');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il riassunto del trasloco.' })).toHaveCount(2, { timeout: 30_000 });
+  expect(await app.evaluate(() => globalThis.__rifiutate)).toBe(1);
+});
