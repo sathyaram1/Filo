@@ -71,7 +71,7 @@ test('biglietto sporco: la fiducia si toglie PRIMA della nota, e il terminale lo
     assert.match(r.fiduciaTolta, /sporco/);
   });
   assert.equal(detti.length, 1);
-  assert.match(detti[0], /Fiducia di #553 tolta prima della nota/);
+  assert.match(detti[0], /^Ho tolto la fiducia a #553 prima di scrivere la nota, perché il biglietto della sessione è sporco/);
   assert.match(detti[0], /Gestione/);
   assert.match(detti[0], /Segna fidato/);
 });
@@ -93,7 +93,7 @@ test('toglierla non riesce: nessuna nota scritta, e il motivo lo dice', async ()
     const r = await of.scrivi('f1', 'todo', 'Decisione', { ...OPTS, avviso: () => assert.fail('non è stata tolta') });
     assert.equal(r.ok, false);
     assert.match(r.motivo, /il server non risponde/);
-    assert.match(r.motivo, /la nota da qui non la scrivo/);
+    assert.match(r.motivo, /^non ho potuto togliere la fiducia \(il server non risponde\)\. Senza, su un feedback fidato la nota non la scrivo/);
     assert.equal(scritture.length, 0);
   });
 });
@@ -158,17 +158,16 @@ test('senza testo per chi lavora resta tutto com’è: stato senza nota, solo sp
   assert.ok(!ordine.some((x) => x.startsWith('togli')));
 });
 
-test('prova a vuoto: dice che la toglierebbe, e non la toglie', async () => {
+test('prova a vuoto: sa che la toglierebbe, non la toglie e non lo stampa (server:fondi la usa come controllo)', async () => {
   biglietto = SPORCO;
-  const detti = [];
   await conRete(pratica('f1'), async (scritture) => {
-    const r = await of.scrivi('f1', 'todo', 'Decisione', { ...OPTS, dryRun: true, rif: '553', avviso: (t) => detti.push(t) });
+    const r = await of.scrivi('f1', 'todo', 'Decisione', { ...OPTS, dryRun: true, avviso: () => assert.fail('niente da dire') });
     assert.equal(r.ok, true);
     assert.match(r.fiduciaTolta, /sporco/);
     assert.equal(scritture.length, 0);
   });
   assert.deepEqual(ordine, []);
-  assert.match(detti[0], /^\(prova a vuoto\) toglierei la fiducia a 553/);
+  assert.match(of.avvisoFiduciaTolta('553', 'x', { dryRun: true }), /^\(prova a vuoto\) Toglierei la fiducia a 553 prima di scrivere la nota, perché x/);
 });
 
 test('la nota di un giro (verify-local, orchestratore, server:fondi) passa dalla stessa regola', async () => {
@@ -208,10 +207,10 @@ test('togliFiducia chiede solo «togli», col token dell’owner, e legge l’es
 
 // ── Lo script, come lo lancia una sessione ────────────────────────────────────
 
-function lancia(opzioni) {
+function lancia(opzioni, ...extra) {
   const dir = cartellaTemporanea('nota-fiducia-1428-');
   const rete = reteFinta(dir, { doc: pratica('f1'), ...opzioni });
-  const r = spawnSync(process.execPath, [...rete.importa, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'f1', 'todo', 'Decisione dell’owner'], {
+  const r = spawnSync(process.execPath, [...rete.importa, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'f1', 'todo', 'Decisione dell’owner', ...extra], {
     encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: rete.env,
   });
   return { ...r, chiamate: rete.chiamate() };
@@ -224,7 +223,7 @@ test('npm run feedback da una sessione sporca: toglie la fiducia, poi scrive la 
   assert.deepEqual(chi, ['fiducia', 'scrittura']);
   assert.deepEqual(r.chiamate.find((c) => c.chi === 'fiducia').data, { op: 'togli', feedbackId: 'f1' });
   assert.ok(r.chiamate.find((c) => c.chi === 'scrittura').campi.includes('notes'));
-  assert.match(r.stderr, /Fiducia di f1 tolta prima della nota: il biglietto della sessione è sporco/);
+  assert.match(r.stderr, /Ho tolto la fiducia a f1 prima di scrivere la nota, perché il biglietto della sessione è sporco/);
   assert.match(r.stdout, /^OK: f1/m);
 });
 
@@ -232,7 +231,7 @@ test('npm run feedback, fiducia che non si toglie: nessuna nota, uscita con erro
   const r = lancia({ fiducia: 'non_fidato', togli: 'no' });
   assert.equal(r.status, 3, r.stdout);
   assert.equal(r.chiamate.filter((c) => c.chi === 'scrittura').length, 0);
-  assert.match(r.stderr, /RIFIUTATO: la fiducia non si è tolta \(prova\)/);
+  assert.match(r.stderr, /RIFIUTATO: non ho potuto togliere la fiducia \(prova\)/);
 });
 
 test('npm run feedback da una sessione pulita: la nota si scrive e la fiducia resta', () => {
@@ -240,5 +239,12 @@ test('npm run feedback da una sessione pulita: la nota si scrive e la fiducia re
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.chiamate.filter((c) => c.chi === 'fiducia').length, 0);
   assert.equal(r.chiamate.filter((c) => c.chi === 'scrittura').length, 1);
-  assert.doesNotMatch(r.stderr, /Fiducia/);
+  assert.doesNotMatch(r.stderr, /fiducia/i);
+});
+
+test('npm run feedback --dry-run da una sessione sporca: dice che la toglierebbe, e non tocca niente', () => {
+  const r = lancia({ fiducia: 'non_fidato' }, '--dry-run');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.chiamate.filter((c) => c.chi !== 'biglietto'), []);
+  assert.match(r.stdout, /^\(prova a vuoto\) Toglierei la fiducia a f1 prima di scrivere la nota, perché il biglietto della sessione è sporco/m);
 });

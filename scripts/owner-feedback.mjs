@@ -721,8 +721,8 @@ export function bigliettoNonPulito(b) {
 /** Cosa dice il terminale quando una nota toglie la fiducia (#1428). PURA. */
 export function avvisoFiduciaTolta(rif, motivo, { dryRun = false } = {}) {
   const chi = String(rif ?? '').trim();
-  const prima = dryRun ? `(prova a vuoto) toglierei la fiducia a ${chi} prima della nota` : `Fiducia di ${chi} tolta prima della nota`;
-  return `${prima}: ${motivo}, e chi lavora un feedback legge le note come decisioni dell’owner. `
+  const prima = dryRun ? `(prova a vuoto) Toglierei la fiducia a ${chi}` : `Ho tolto la fiducia a ${chi}`;
+  return `${prima} prima di scrivere la nota, perché ${motivo} e chi lavora un feedback legge le note come decisioni dell’owner. `
     + 'La rimette solo l’owner, in Gestione, col tasto «🤝 Segna fidato» dopo aver letto la nota.';
 }
 
@@ -825,21 +825,19 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (notaNuova && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
     fiduciaTolta = bigliettoNonPulito(await bigliettoDiChiScrive());
   }
-  const avviso = typeof opts.avviso === 'function' ? opts.avviso : (t) => console.error(t);
-  if (opts.dryRun) {
-    if (fiduciaTolta) avviso(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta, { dryRun: true }));
-    return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
-  }
+  // La prova a vuoto lo dice solo a chi l'ha chiesta (la riga di comando): server:fondi la usa come controllo prima di scrivere.
+  if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
   if (fiduciaTolta) {
     const t = await sessione.togliFiducia(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
     if (!t || !t.ok) {
-      return { ok: false, motivo: `la fiducia non si è tolta (${(t && t.motivo) || 'senza motivo'}): ${fiduciaTolta}, e su un feedback fidato la nota da qui non la scrivo. Non ho toccato niente`, from };
+      return { ok: false, motivo: `non ho potuto togliere la fiducia (${(t && t.motivo) || 'senza motivo'}). Senza, su un feedback fidato la nota non la scrivo, perché ${fiduciaTolta}. Non ho toccato niente`, from };
     }
-    avviso(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta));
+    // Ogni porta (riga di comando, giri di verifica, server:fondi, finish) lo dice sul terminale senza doverlo ripetere.
+    (typeof opts.avviso === 'function' ? opts.avviso : console.error)(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta));
     // Il passaggio è stato controllato sullo stato letto prima: se il server ha spostato la pratica, quel controllo non vale più.
     const dopo = await getDoc(id, bearer, ['status']).then((d) => (d ? statoAttuale(d) : { leggibile: false })).catch(() => ({ leggibile: false }));
     if (!dopo.leggibile || dopo.from !== from) {
-      return { ok: false, motivo: `fiducia tolta, ma la pratica ${dopo.leggibile ? `è passata da «${from}» a «${dopo.from}»` : 'non si rilegge'}: la nota non l'ho scritta, rilancia il comando`, from };
+      return { ok: false, motivo: `ho tolto la fiducia, ma la pratica ${dopo.leggibile ? `è passata da «${from}» a «${dopo.from}»` : 'non si rilegge'}: la nota non l'ho scritta, rilancia il comando`, from };
     }
   }
 
@@ -849,7 +847,7 @@ export async function scrivi(id, to, nota, opts = {}) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
   }, { fetchImpl: fetchRitentato });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}${fiduciaTolta ? '. La fiducia è già stata tolta' : ''}` };
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}${fiduciaTolta ? '. La fiducia l’ho già tolta' : ''}` };
   return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
 }
 
@@ -1069,6 +1067,7 @@ if (isMain) {
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}${r.partiAzzerate ? '; le parti del lavoro già su main ripartono da zero' : ''}.`);
+  if (r.dryRun && r.fiduciaTolta) console.log(avvisoFiduciaTolta(riferimento, r.fiduciaTolta, { dryRun: true }));
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });
