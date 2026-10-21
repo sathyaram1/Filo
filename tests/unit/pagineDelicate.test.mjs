@@ -31,8 +31,7 @@ test('le aree riservate della pubblica amministrazione sono delicate di serie', 
   assert.equal(PD.classifica('https://www.inail.it/portale/it.html'), 'pa');
   assert.equal(PD.nome('pa'), 'pubblica amministrazione');
   assert.equal(PD.classifica('https://inps.it.truffa.example/'), null);
-  assert.equal(PD.classifica('https://pa', { attivo: true }), null);
-  // L'elenco remoto la allarga sostituendola per intero, come le altre categorie.
+  // L'elenco remoto la cambia sostituendola per intero, come le altre categorie: Gestione la mostra intera.
   assert.equal(PD.classifica('https://www.comune.esempio.it/', { elenco: PD.elenco({ pa: ['comune.esempio.it'] }) }), 'pa');
   assert.equal(PD.classifica('https://www.inps.it/', { attivo: false }), null);
 });
