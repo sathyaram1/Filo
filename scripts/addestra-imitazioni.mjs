@@ -213,7 +213,7 @@ function sinteticiNomi(etichetta) {
     visti.add(t);
     const suoi = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
     const nomi = [];
-    for (let i = 0; i < 3; i++) nomi.push(`${t}.${pesca(SUFFISSI_NOME)}`);
+    for (let i = 0; i < 5; i++) nomi.push(`${t}.${pesca(SUFFISSI_NOME)}`);
     nomi.push(`${t}.${pesca(suoi.length ? suoi : FINTI_TLD)}.${finto()}`, `${pesca(['login', 'www', 'secure', 'account', 'auth'])}.${t}.${pesca(FINTI_TLD)}.${finto()}`);
     nomi.push(`${t}${pesca(['24', '365', '1', '2', '247', '360', '7'])}.${pesca(SUFFISSI_NOME)}`,
       `${t}-${2020 + Math.floor(caso() * 8)}.${pesca(['com', 'it', 'net', 'online'])}`, `my${t}.${pesca(['com', 'it', 'net', 'app'])}`);
