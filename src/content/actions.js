@@ -471,13 +471,14 @@
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
     }
-    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
-    if (res?.code === 'PAGINA_DELICATA') {
-      ultimaDaDelicata = dataUrl;
+    // Nata su una pagina delicata, o con la descrizione spenta, l'immagine non va al modello: lo screenshot prende data e ora.
+    const senza = res && SENZA_DESCRIZIONE[res.code];
+    if (senza) {
+      ultimaSenza = { dataUrl, etichetta: senza };
       chrome.runtime.sendMessage({
         type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
         dataUrl,
-        description: I18n.t('clipboard_image_delicata'),
+        description: I18n.t(senza),
       }).catch(() => {});
       return null;
     }
