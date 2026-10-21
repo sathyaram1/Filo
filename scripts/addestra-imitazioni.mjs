@@ -32,10 +32,11 @@ const FONTI = [
 const arg = (nome, base) => { const i = process.argv.indexOf(nome); return i > 0 ? process.argv[i + 1] : base; };
 const DATI = path.resolve(arg('--dati', path.join(os.tmpdir(), 'filo-imitazioni')));
 const BIT = Number(arg('--bit', 20));
-const EPOCHE = Number(arg('--epoche', 8));
+const EPOCHE = Number(arg('--epoche', 12));
 const L2 = Number(arg('--l2', 1e-6));
-// Il tetto dei falsi allarmi sui siti noti con cui si sceglie la soglia: uno su duecento.
-const FALSI_AMMESSI = Number(arg('--falsi', 0.005));
+// Il tetto dei falsi allarmi sui siti noti con cui si sceglie la soglia: sette su mille. Gli elenchi di siti noti hanno
+// anche truffe e refusi, e con uno su duecento la soglia lasciava passare i refusi di una lettera (gmaill.com).
+const FALSI_AMMESSI = Number(arg('--falsi', 0.007));
 const PESO_MANO = Number(arg('--peso-mano', 6));
 // I refusi scritti in automatico pesano meno di un'etichetta a mano: a peso pieno spostavano il modello sui refusi e
 // perdeva le imitazioni con altre parole.
@@ -345,14 +346,15 @@ async function avvia() {
   const t0 = Date.now();
   const gruppi = costruisci();
   console.log(`esempi: ${gruppi.filter((g) => g.y === 1).length} imitazioni, ${gruppi.filter((g) => g.y === 0).length} siti noti, ${refusiTolti} refusi di marchi tolti dagli elenchi (${Date.now() - t0} ms)`);
-  // Un decimo da parte per scegliere la soglia su nomi che il modello non ha visto.
-  const caso = rng(11);
-  const parte = gruppi.map(() => caso() < 0.1);
+  // La soglia si sceglie su nomi che il modello non ha visto: ogni nome lo giudica il modello addestrato sugli altri
+  // quattro quinti. Su un decimo solo la decidevano una ventina di siti, e un'etichetta in più la spostava.
   const esempiDi = (gg) => gg.flatMap((g) => (g.y === 1 ? [{ ix: g.ix[0], y: 1, peso: g.peso }] : g.ix.map((ix) => ({ ix, y: 0, peso: g.peso }))));
-  const allena = gruppi.filter((_, i) => !parte[i]);
-  const valida = gruppi.filter((_, i) => parte[i]);
-  const mq0 = quantizza(addestra(esempiDi(allena)));
-  const pv = perHost(valida, mq0);
+  const quinto = gruppi.map((g) => IM.impronta(g.h) % 5);
+  const pv = [];
+  for (let q = 0; q < 5; q++) {
+    const mq0 = quantizza(addestra(esempiDi(gruppi.filter((_, i) => quinto[i] !== q))));
+    pv.push(...perHost(gruppi.filter((_, i) => quinto[i] === q), mq0));
+  }
   const soglia = sogliaPer(pv, FALSI_AMMESSI);
   const mv = misura(pv, soglia);
   console.log(`validazione: soglia ${soglia.toFixed(3)}, prese ${mv.presi}/${mv.truffe} (${(100 * mv.richiamo).toFixed(1)}%), falsi ${mv.falsi}/${mv.noti} (${(100 * mv.tassoFalsi).toFixed(2)}%)`);
