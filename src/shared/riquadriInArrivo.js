@@ -57,9 +57,16 @@
     return !!(altro && altro !== API && typeof altro.inArrivo === 'function' && altro.inArrivo(f));
   }
 
+  // Anche più sotto: chi tocca alla cieca (uno script in ogni frame figlio) raggiunge pure i riquadri dei riquadri.
   function qualcunoInArrivo() {
     if (!stato) return false;
-    for (const f of stato.doc.querySelectorAll('iframe, frame')) if (inArrivo(f)) return true;
+    for (const f of stato.doc.querySelectorAll('iframe, frame')) {
+      if (inArrivo(f)) return true;
+      try {
+        const sotto = finestra(f)?.SN_RIQUADRI_IN_ARRIVO;
+        if (sotto && sotto !== API && sotto.qualcunoInArrivo()) return true;
+      } catch (_) {}
+    }
     return false;
   }
 
