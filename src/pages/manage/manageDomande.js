@@ -215,6 +215,7 @@
     if (tab === 'domande-archivio') li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
     const data = quando(tab === 'domande-archivio' ? (d.modificataIl || d.creataIl) : d.creataIl);
     if (data) li.appendChild(el('span', 'mg-domanda-data', data));
+    li.appendChild(scudo(d));
     return li;
   }
 
