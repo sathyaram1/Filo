@@ -380,15 +380,17 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 15_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  expect(calls).toHaveLength(3);
+  expect(calls).toHaveLength(rivedeEsito ? 3 : 2);
   const nota = /«voce 1» è un segnaposto tuo[^\n]*l'utente non lo vede da nessuna parte[^\n]*non scriverlo mai/;
-  // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
-  const esito = calls[1][calls[1].length - 1];
-  expect(esito.role).toBe('tool');
-  expect(esito.content).toMatch(/^In attesa della conferma/);
-  expect(esito.content).toMatch(nota);
+  if (rivedeEsito) {
+    // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
+    const esito = calls[1].find((m) => m.role === 'tool' && m.tool_call_id === 'l1');
+    expect(esito).toBeTruthy();
+    expect(esito.content).toMatch(/^In attesa della conferma/);
+    expect(esito.content).toMatch(nota);
+  }
   // Al turno dopo, nel riepilogo della conferma arrivata a risposta già scritta.
-  const riepilogo = calls[2].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
+  const riepilogo = calls[calls.length - 1].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
   expect(riepilogo).toContain('ha CONFERMATO');
   expect(riepilogo).toMatch(/- Ricordato: «voce 1»\n/);
   expect(riepilogo).toMatch(nota);
