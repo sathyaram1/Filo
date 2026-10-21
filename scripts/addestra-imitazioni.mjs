@@ -149,10 +149,12 @@ function sinteticiRefusi(etichetta) {
     // iclud, pste, googlea) il modello ne lasciava passare uno su sei.
     for (let i = 1; i < t.length - 1; i++) varianti.push(t.slice(0, i) + t.slice(i + 1));
     varianti.push(t + 'a', t + 'e', t + 'o');
+    // Un refuso del dominio vero che sta fra i siti noti (gmal.com, iclud.com) ci sta per le visite sbagliate e da lì
+    // costruisci() lo toglie: resta un esempio d'imitazione. Un sito vero con quella forma lo dice un'etichetta scritta.
     const nomi = [...new Set(varianti)].filter((v) => v !== t).map((v) => v + suff);
     // E il suffisso sbagliato di una lettera (github.co, paypal.cm), dove il marchio non l'ha preso per sé.
-    if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h)));
-    for (const h of nomi) if (!etichetta.has(h) && !etichetta.has('www.' + h)) out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
+    if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h) && !etichetta.has(h) && !etichetta.has('www.' + h)));
+    for (const h of nomi) out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
   }
   return out;
 }
