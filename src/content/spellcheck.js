@@ -1746,7 +1746,13 @@
     const tenuti = new Set();
     const delCampo = d.riporta(nuovi).filter((n) => {
       if (n.tipo !== 'segnaposto') return true;
-      const prima = state.modello.find((m) => m.fonte === fonte && m.tipo === 'segnaposto' && tocca(m, n) && restaSegnaposto(m));
+      const chiesto = n.cerca && state.modello.find((m) => m.fonte === fonte && m.tipo === 'segnaposto' && m.cerca && tocca(m, n));
+      if (chiesto && chiesto.cerca.chiave !== n.cerca.chiave) {
+        const trovato = ricerche.get(chiesto.cerca.chiave)?.stato === 'trovato';
+        n.cerca = { ...n.cerca, prima: trovato || !chiesto.cerca.prima ? { chiave: chiesto.cerca.chiave, domanda: chiesto.cerca.domanda, dove: chiesto.cerca.dove } : chiesto.cerca.prima };
+        return true;
+      }
+      const prima = chiesto || state.modello.find((m) => m.fonte === fonte && m.tipo === 'segnaposto' && tocca(m, n) && restaSegnaposto(m));
       if (!prima) return true;
       tenuti.add(prima);
       return false;
