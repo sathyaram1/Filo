@@ -907,6 +907,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'descriviImmagini.enabled': return $('descriviImmagini').checked;
       case 'contatori.attivi': return $('contatoriAttivi').checked;
       case 'featureFlags.help': return $('aiutoAcceso').checked;
       case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
