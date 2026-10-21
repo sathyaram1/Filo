@@ -1229,12 +1229,14 @@
     avvisaAscoltatori(state);
   }
 
-  // Il testo di adesso giudicato per intero, coi segni del modello che ne erano usciti.
+  // Il testo di adesso giudicato per intero, coi segni del modello che ne erano usciti. Si ritrova a meno di spazi e
+  // punteggiatura, che non cambiano il giudizio.
   function ricordaGiudicato(state, fonte) {
     const m = state.giudicati[fonte];
     const testo = getEditableText(state.el);
-    m.delete(testo);
-    m.set(testo, state.modello.filter((x) => x.fonte === fonte).map((x) => ({ ...x })));
+    const k = R().ossatura(testo);
+    m.delete(k);
+    m.set(k, { testo, segni: state.modello.filter((x) => x.fonte === fonte).map((x) => ({ ...x })) });
     while (m.size > GIUDICATI_MAX) m.delete(m.keys().next().value);
   }
 
@@ -1242,10 +1244,11 @@
   // chiamata. Vero se ha fatto così.
   function tornaAGiudicato(state, fonte, d) {
     const testo = getEditableText(state.el);
-    const segni = state.giudicati[fonte].get(testo);
-    if (!segni) return false;
+    const g = state.giudicati[fonte].get(R().ossatura(testo));
+    if (!g) return false;
     if (fonte === 'rapido') state.baseRapido = d.testo; else state.baseRagionato = d.testo;
-    state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni.map((x) => ({ ...x }))];
+    const segni = riallineaIssues(g.segni.map((x) => ({ ...x })), g.testo, testo).issues;
+    state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni];
     state.testo = testo;
     renderOverlayContent(state);
     return true;

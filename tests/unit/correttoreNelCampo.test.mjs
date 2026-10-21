@@ -18,7 +18,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     const n = {
       tagName: tag, nodeType: 1, children: [], style: new Proxy({ setProperty() {} }, {}), dataset: {}, isConnected: true, className: '',
       setAttribute() {}, appendChild(c) { if (c.isFrag) n.children.push(...c.children); else n.children.push(c); return c; },
-      remove() { n.isConnected = false; },
+      remove() { n.isConnected = false; const fratelli = sb.document.body.children; if (fratelli.includes(n)) fratelli.splice(fratelli.indexOf(n), 1); },
     };
     Object.defineProperty(n, 'innerHTML', { set() { n.children = []; }, get() { return ''; } });
     let testo = '';
@@ -33,7 +33,8 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     static now() { return ora; }
   }
   const sb = {
-    console, Promise, JSON, Math, RegExp, Array, Object, String, Number, Map, Set, WeakMap, WeakSet, Symbol, Error, Intl, Proxy,
+    // La pagina intorno al campo qui non c'è: chi la cerca lo dice, e qui si tace.
+    console: { ...console, warn() {} }, Promise, JSON, Math, RegExp, Array, Object, String, Number, Map, Set, WeakMap, WeakSet, Symbol, Error, Intl, Proxy,
     Date: FintaData,
     setTimeout: (fn, ms = 0) => { const t = { id: ++tid, fn, at: ora + ms, done: false }; timers.push(t); return t.id; },
     clearTimeout: (id) => { const t = timers.find((x) => x.id === id); if (t) t.done = true; },
@@ -78,7 +79,8 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
       if (!prossimo) break;
       ora = Math.max(ora, prossimo.at);
       prossimo.done = true;
-      await prossimo.fn();
+      // Senza aspettarlo: un controllo resta in viaggio finché la prova non risponde.
+      prossimo.fn();
       await tick();
     }
     ora = fine;
@@ -103,7 +105,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
       for (const c of n.children || []) giro(c);
     };
     for (const o of sb.document.body.children) giro(o);
-    return out;
+    return JSON.parse(JSON.stringify(out));
   }
   const rapide = () => richieste.filter((r) => r.action === 'spellcheck_semantic');
   const ragionate = () => richieste.filter((r) => r.action === 'spellcheck_context');
@@ -111,6 +113,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     sb, richieste, rapide, ragionate, passa, campo, segni, tick,
     entra: (el) => docListeners.focusin.forEach((f) => f({ target: el })),
     esce: (el) => docListeners.focusout.forEach((f) => f({ target: el })),
+    visibile: () => (docListeners.visibilitychange || []).forEach((f) => f()),
     // Scrive come una tastiera: il cursore resta in fondo.
     scrive: (el, v, e = {}) => { el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', e); },
     risponde: async (r, testo) => { r.r({ ok: true, text: testo }); await tick(); await tick(); },
@@ -136,13 +139,17 @@ test('mentre si scrive senza pause parte al più ogni 5 secondi; la pausa lunga 
   const el = c.campo();
   c.entra(el);
   let t = '';
-  for (let i = 0; i < 40; i++) { t += 'ab'[i % 2]; if (i % 5 === 4) t += ' '; c.scrive(el, t); await c.passa(300); }
-  assert.equal(c.rapide().length, 2, `in 12 secondi di battute ${c.rapide().length} controlli`);
+  for (let i = 0; i < 42; i++) { t += 'ab'[i % 2]; if (i % 5 === 4) t += ' '; c.scrive(el, t); await c.passa(300); }
+  assert.equal(c.rapide().length, 2, `in 12,6 secondi di battute ${c.rapide().length} controlli`);
   await c.risponde(c.rapide()[0], '[][][][nessuno]');
   await c.risponde(c.rapide()[1], '[][][][nessuno]');
-  await c.passa(4000);
-  const ultima = c.rapide()[c.rapide().length - 1];
-  assert.ok(ultima.payload.nuovo.trim().endsWith('ababa') || ultima.payload.nuovo.includes('b'), 'la parola lasciata a metà si giudica alla pausa lunga');
+  await c.passa(600);
+  assert.equal(c.rapide().length, 3, 'la pausa breve giudica il resto, tranne la parola a metà');
+  assert.ok(!c.rapide()[2].payload.nuovo.endsWith('ab'));
+  await c.risponde(c.rapide()[2], '[][][][nessuno]');
+  await c.passa(3500);
+  assert.equal(c.rapide().length, 4, 'la pausa lunga giudica la parola lasciata a metà');
+  assert.equal(c.rapide()[3].payload.nuovo, 'ab');
 });
 
 test('una parola fuori dizionario appena chiusa fa partire il controllo subito, coi candidati', async () => {
@@ -156,7 +163,7 @@ test('una parola fuori dizionario appena chiusa fa partire il controllo subito, 
   c.scrive(el, 'ciao quseta ');
   await c.passa(1);
   assert.equal(c.rapide().length, 1, 'il candidato nuovo non aspetta la pausa');
-  assert.deepEqual(c.rapide()[0].payload.candidati.map((x) => x.pezzo), ['quseta']);
+  assert.deepEqual(JSON.parse(JSON.stringify(c.rapide()[0].payload.candidati.map((x) => x.pezzo))), ['quseta']);
   assert.deepEqual(c.segni('sn-errore'), [{ testo: 'quseta', dubbio: true }], 'sbiadito finché non è giudicato');
   await c.risponde(c.rapide()[0], '[quseta][questa][refuso][errore]');
   assert.deepEqual(c.segni('sn-errore'), [{ testo: 'quseta', dubbio: false }], 'confermato si riempie');
@@ -269,5 +276,7 @@ test('a scheda nascosta i controlli aspettano, e partono al ritorno', async () =
   await c.passa(4000);
   assert.equal(c.rapide().length, 0);
   c.sb.document.hidden = false;
-  assert.ok(c.sb.document.addEventListener);
+  c.visibile();
+  await c.passa(10);
+  assert.equal(c.rapide().length, 1, 'tornata davanti, il controllo chiesto parte');
 });
