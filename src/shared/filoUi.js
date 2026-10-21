@@ -340,6 +340,8 @@
       st.gesto = false;
       if (c.value === st.buono) st.sel = selezioneDi(c);
     };
+    c.addEventListener('compositionstart', () => { st.componendo = true; st.tasto = null; }, true);
+    c.addEventListener('compositionend', () => { st.componendo = false; }, true);
     for (const t of ['keydown', 'pointerdown', 'mousedown', 'touchstart']) c.addEventListener(t, muove, true);
     for (const t of ['keyup', 'pointerup', 'mouseup', 'touchend']) c.addEventListener(t, fermo, true);
     daGuardare.add(c);
