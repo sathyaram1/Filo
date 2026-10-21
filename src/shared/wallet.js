@@ -645,11 +645,12 @@
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
   // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
   // il suo pseudonimo con lo stato del portafoglio.
-  function entryNoticeText({ credits } = {}) {
+  function entryNoticeText({ credits, conteggioLocale = false } = {}) {
     const n = Math.max(0, Math.floor(Number(credits) || 0));
-    return n > 0
+    const frase = n > 0
       ? `Sei entrato con un invito: hai ${fmtInt(n)} crediti.`
       : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
   // ── Chi usa Filo e se il conto OpenRouter regge (#820) ───────────────────
