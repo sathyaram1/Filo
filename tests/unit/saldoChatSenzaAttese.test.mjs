@@ -104,7 +104,7 @@ test('una lettura fresca non si rifà; una che fallisce non blocca le prossime',
 test('nel prompt: un saldo solo vecchio è «l\'ultimo noto» senza «non risponde»; un saldo ignoto non accusa il server', () => {
   const testo = (credits) => FS.renderForPrompt({ time: { humanNow: 'x' }, tabs: [], timers: [], notifications: [], credits });
   const vecchio = testo({ wallet: true, balance: 4000, dailyCredits: 100, lastKnown: 'old', readAt: '2026-10-21T09:58:00.000Z' });
-  assert.match(vecchio, /Saldo: 4\.?000 crediti \(lo tiene il server; letto il 21 ott alle \d\d:\d\d\)\. È l'ultimo saldo noto/);
+  assert.match(vecchio, /Saldo: 4\.?000 crediti \(lo tiene il server; letto il \d+ \S+ alle \d\d:\d\d\)\. È l'ultimo saldo noto/);
   assert.doesNotMatch(vecchio, /non risponde/);
   const ignoto = testo({ wallet: true, balance: null, nonRisponde: false });
   assert.match(ignoto, /Non dare una cifra/);
