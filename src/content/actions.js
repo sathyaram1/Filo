@@ -1225,7 +1225,7 @@
     // arriva a download concluso: toast di conferma (o di errore; nessun toast
     // se l'utente annulla il dialogo di salvataggio).
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src });
+      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src, politiche: politicheReferrer(imgEl) });
       if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
       else if (!res?.cancelled) Popup.showToast(I18n.t('toast_image_save_failed'));
     } catch (_) {
