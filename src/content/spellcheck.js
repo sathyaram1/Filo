@@ -1957,6 +1957,72 @@
   }
 
   // ============================================================================
+  // Le correzioni di «Valuta» (#1449)
+  // ============================================================================
+  // Il testo del campo come lo legge il modello, con le sue righe; una correzione è un pezzo scritto su quel testo.
+  function testoDelCampo(el) {
+    try { return el && el.isConnected ? testoDaControllare(el).testo : ''; } catch (_) { return ''; }
+  }
+
+  // Un modello riscrive apostrofi, virgolette, lineette e spazi: se il pezzo esatto non c'è, si cerca con quei segni
+  // resi uguali. `da[k]` è la posizione nel testo vero del carattere k del testo piegato.
+  const PIEGA = {
+    '‘': "'", '’': "'", '‚': "'", 'ʼ': "'", '′': "'",
+    '“': '"', '”': '"', '„': '"', '«': '"', '»': '"',
+    '–': '-', '—': '-', '…': '...',
+  };
+  function piega(s) {
+    let out = '';
+    const da = [];
+    let spazio = false;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (/[­​-‏⁠﻿]/.test(c)) continue;
+      if (/\s/.test(c)) {
+        if (!spazio) { out += ' '; da.push(i); }
+        spazio = true;
+        continue;
+      }
+      spazio = false;
+      for (const ch of PIEGA[c] || c) { out += ch; da.push(i); }
+    }
+    return { out, da };
+  }
+
+  // Fra due pezzi uguali vince quello più vicino a `vicinoA`: lì l'aveva visto il modello, o lì era stato scritto.
+  function cercaPezzo(testo, pezzo, vicinoA) {
+    const tutte = (h, n) => {
+      const r = [];
+      for (let i = n ? h.indexOf(n) : -1; i >= 0; i = h.indexOf(n, i + 1)) r.push(i);
+      return r;
+    };
+    const vicina = (lista) => lista.reduce((m, r) => (Math.abs(r.start - vicinoA) < Math.abs(m.start - vicinoA) ? r : m));
+    const esatte = tutte(testo, pezzo).map((i) => ({ start: i, end: i + pezzo.length }));
+    if (esatte.length) return vicina(esatte);
+    const t = piega(testo);
+    const p = piega(pezzo).out;
+    const piegate = tutte(t.out, p).map((j) => ({ start: t.da[j], end: t.da[j + p.length - 1] + 1 }));
+    return piegate.length ? vicina(piegate) : null;
+  }
+
+  // Scrive `dopo` al posto di `prima` come la correzione del menu (Ctrl+Z la annulla). `{ dove }` è l'inizio del pezzo
+  // nuovo nel testo del campo; `{ manca }` se `prima` non c'è più, `{ fermo }` se il campo non si è lasciato scrivere.
+  function sostituisciNelCampo(el, prima, dopo, vicinoA = 0) {
+    if (!el || !el.isConnected) return { manca: true };
+    const pezzo = String(prima || '');
+    if (!pezzo) return { manca: true };
+    const { testo, riporta } = testoDaControllare(el);
+    const trovato = cercaPezzo(testo, pezzo, Number(vicinoA) || 0);
+    const r = trovato ? riporta([trovato])[0] : null;
+    if (!r) return { manca: true };
+    const campo = getEditableText(el);
+    // Il fuoco sta nell'Aiuto: la selezione di un campo modificabile vale per il browser solo nel campo a fuoco.
+    if (!campoDiTesto(el)) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+    applyFix(el, r, String(dopo == null ? '' : dopo), { expectedSegment: campo.slice(r.start, r.end) });
+    return getEditableText(el) !== campo ? { dove: trovato.start } : { fermo: true };
+  }
+
+  // ============================================================================
   // Suggerimenti correttore nativo (Electron)
   // ============================================================================
   // Ritorna i suggerimenti nativi per `word` se sono recenti e riferiti a quella
