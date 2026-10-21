@@ -351,7 +351,7 @@ module.exports = function register(on, ctx) {
     if (!viaValida(msg && msg.via) || typeof msg.testo !== 'string') return { ok: false, error: 'bad_request' };
     const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
     const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') }, { cosa: 'la correzione' });
-    if (l.rifiuto) return { ok: false, error: `${l.rifiuto[0].toUpperCase()}${l.rifiuto.slice(1)}: accorciala per salvarla.`, rifiuto: true };
+    if (l.rifiuto) return { ok: false, error: `${l.rifiuto[0].toUpperCase()}${l.rifiuto.slice(1)}. Accorciala per salvarla.`, rifiuto: true };
     if (!l.testo) {
       const id = await FiloMem.hideLine(msg.via, { fonti });
       return { ok: true, tolta: !!id, id: id || null };
