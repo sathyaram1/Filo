@@ -92,6 +92,7 @@
         'In chat Filo non aspetta più il server dei crediti prima di risponderti. Usa l\'ultimo saldo letto, lo aggiorna mentre scrivi e, se il server è solo lento, non ti dice più che non risponde. Se paghi con la tua chiave OpenRouter, la pagina Crediti e la chat ti dicono che le richieste le paga la chiave e che quei crediti sono di prova, non soldi che spendi. Quando riscatti un invito, la conferma dice che i crediti di prova lasciano il posto a quelli d\'ingresso.',
         'Una chat che parla di qualcosa con un nome corto, come lo Zen, SQL o l’AI, adesso si ritrova anche con una frase intera («la chat sullo Zen»), sia chiedendolo a Filo sia in «Cerca nel filo».',
         'Se un comando lento finisce dopo che hai cambiato discorso, il suo esito si legge una volta sola, sotto il comando che l’ha chiesto, e non in mezzo alla conversazione nuova.',
+        'Nei riquadri incorporati dello stesso sito, come un blocco commenti, Alt+E e il tasto destro di Filo funzionano sempre. Prima, se il riquadro finiva di caricare dopo la pagina o ci passavi sopra col puntatore mentre caricava, lì dentro Filo non rispondeva più.',
       ],
     },
     {
