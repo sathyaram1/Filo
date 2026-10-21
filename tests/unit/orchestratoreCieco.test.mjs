@@ -187,13 +187,23 @@ test('giro simulato: preflight, ticket e lancio del worker con modello e sforzo 
     });
     assert.equal(t.code, 0, t.se);
     const s = JSON.parse(readFileSync(join(utente, 'settings.json'), 'utf8'));
-    const cmd = s.hooks.PreToolUse.find((g) => g.hooks[0].command.includes(ETICHETTA)).hooks[0].command;
+    const gruppo = s.hooks.PreToolUse.find((g) => g.hooks[0].command.includes(ETICHETTA));
+    for (const nome of ['Agent', 'Task', 'PushNotification', 'SendUserFile']) assert.ok(combacia(gruppo.matcher, nome), `il gancio deve vedere ${nome}`);
+    for (const nome of ['Bash', 'TaskCreate', 'Push']) assert.ok(!combacia(gruppo.matcher, nome), nome);
+    const cmd = gruppo.hooks[0].command;
     const prompt = `Dichiarati routine: \`export FILO_ROUTINE=1\`. Poi lancia \`node "/tmp/filo-strumenti/scripts/dispatch.mjs" --ticket ${JSON.parse(t.so).ticket}\`.`;
-    const r = spawnSync('bash', ['-c', cmd], { input: JSON.stringify(prima(false, {}, { prompt, model: 'opus', effort: 'low' })), encoding: 'utf8' });
+    const corri = (input) => spawnSync('bash', ['-c', cmd], { input: JSON.stringify(input), encoding: 'utf8' });
+    const r = corri(prima(false, {}, { prompt, model: 'opus', effort: 'low' }));
     assert.equal(r.status, 0, r.stderr);
     const h = JSON.parse(r.stdout).hookSpecificOutput;
     assert.equal(h.permissionDecision, 'allow');
     assert.deepEqual([h.updatedInput.model, h.updatedInput.effort], ['sonnet', 'xhigh']);
+    for (const no of [avviso(), avviso({ agent_id: 'w1' })]) {
+      const n = corri(no);
+      assert.equal(n.status, 0, n.stderr);
+      assert.deepEqual(JSON.parse(n.stdout).hookSpecificOutput, { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: MOTIVO_NOTIFICA });
+    }
+    assert.equal(JSON.parse(corri(prima(false, {}, { prompt })).stdout).hookSpecificOutput.permissionDecision, 'allow', 'dopo il rifiuto il worker parte ancora');
   } finally {
     await new Promise((ok) => srv.close(ok));
     togliCartella(utente);
