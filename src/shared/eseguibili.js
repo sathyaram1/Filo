@@ -28,7 +28,7 @@
     'sh', 'bash', 'zsh', 'csh', 'ksh', 'run', 'appimage', 'deb', 'rpm',
     'desktop', 'out', 'elf',
     // Interpretati ovunque ci sia l'interprete (su Windows basta il doppio clic).
-    'jar', 'js', 'py', 'pyw',
+    'jar', 'js', 'py', 'pyw', 'pyc', 'pyo', 'pyz', 'pyzw',
   ];
 
   const SET = new Set(ESTENSIONI);
