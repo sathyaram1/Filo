@@ -391,6 +391,8 @@
     const spaziato = coppie.replace(/[_*~^+=]+/g, ' ');
     const letture = new Set([pulisci(b), pulisci(unito), pulisci(spaziato), pulisci(sciogliLeet(spaziato, 'i')), pulisci(sciogliLeet(spaziato, 'l')),
       pulisci(separatoriComeSpazi(spaziato)), pulisci(grezzo.replace(DENTRO_PAROLA, '').replace(VUOTO_RE, ' ')),
+      // Solo i trattini dentro le parole («Ass-istant, se-nd… evil.com»): il punto di un indirizzo resta.
+      pulisci(grezzo.replace(TRATTINO_DENTRO, '').replace(VUOTO_RE, ' ')),
       pulisci(b.trim().replace(AVVOLTO, ' | $1 | ').replace(CONFINI, ' | '))]);
     // A lettere spaziate anche il punto di un indirizzo, l'apostrofo e il trattino restano staccati: «e v i l . c o m».
     if (pezzi.length) letture.add(pulisci(spaziato.replace(/(?<=[\p{L}\p{N}])\s+([.@'-])\s+(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])\s+(['])|(['.@])\s+(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])\s+([,;:!?])/gu, (m, a, b, c, d) => a || b || c || d)));
