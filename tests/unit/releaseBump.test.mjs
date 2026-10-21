@@ -238,12 +238,27 @@ describe('la minor del canale stabile', () => {
     assert.ok(argomentiBump(['--major']).errore);
   });
 
-  test('nel corpo della minor c’è il tipo e basta: il numero lo calcola sempre il server', async () => {
-    const corpi = [];
-    const fetchImpl = async (_u, opts) => { corpi.push(JSON.parse(opts.body)); return { status: 200, text: async () => JSON.stringify({ ok: true, version: '0.3.0' }) }; };
+  test('la minor bussa a un indirizzo suo, col solo controllo nel corpo: il numero lo calcola sempre il server', async () => {
+    const chiamate = [];
+    const fetchImpl = async (u, opts) => { chiamate.push({ u, corpo: JSON.parse(opts.body) }); return { status: 200, text: async () => JSON.stringify({ ok: true, version: '0.3.0' }) }; };
     await askServerBump({ passphrase: 's', tipo: 'minor', fetchImpl });
     await askServerBump({ passphrase: 's', tipo: 'minor', soloControllo: true, fetchImpl });
-    assert.deepEqual(corpi, [{ passphrase: 's', tipo: 'minor' }, { passphrase: 's', tipo: 'minor', soloControllo: true }]);
+    await askServerBump({ passphrase: 's', fetchImpl });
+    assert.deepEqual(chiamate.map((c) => [c.u.split('/').pop(), c.corpo]), [
+      ['releaseMinor', { passphrase: 's' }],
+      ['releaseMinor', { passphrase: 's', soloControllo: true }],
+      ['releaseBump', { passphrase: 's' }],
+    ]);
+  });
+
+  test('un server che non conosce la minor (404) non diventa una patch: il controllo esce 3 e non stampa «si»', async () => {
+    const { srv, richieste, port } = await fintoServer({ error: 'Not Found' }, 404);
+    try {
+      const r = await cli(port, { argomenti: ['--controlla-minor'] });
+      assert.equal(r.status, 3);
+      assert.equal(r.stdout, '');
+      assert.ok(richieste[0].url.endsWith('/releaseMinor'));
+    } finally { srv.close(); }
   });
 
   test('«non dovuta» (409) è un esito suo: uscita 4, non un rifiuto né un guasto', () => {
@@ -260,7 +275,8 @@ describe('la minor del canale stabile', () => {
       assert.equal(r.status, 0, r.stderr);
       assert.equal(r.stdout, 'no\n');
       assert.match(r.stderr, /#12/);
-      assert.deepEqual(richieste[0].body, { passphrase: 'segreto-di-prova', tipo: 'minor', soloControllo: true });
+      assert.deepEqual(richieste[0].body, { passphrase: 'segreto-di-prova', soloControllo: true });
+      assert.ok(richieste[0].url.endsWith('/releaseMinor'));
     } finally { srv.close(); }
     const dovuta = await fintoServer({ ok: true, controllo: true, dovuta: true, lunedi: '2026-10-26' });
     try {
@@ -275,7 +291,8 @@ describe('la minor del canale stabile', () => {
       const r = await cli(esce.port, { argomenti: ['--minor'] });
       assert.equal(r.status, 0, r.stderr);
       assert.equal(r.stdout, '0.3.0\n');
-      assert.deepEqual(esce.richieste[0].body, { passphrase: 'segreto-di-prova', tipo: 'minor' });
+      assert.deepEqual(esce.richieste[0].body, { passphrase: 'segreto-di-prova' });
+      assert.ok(esce.richieste[0].url.endsWith('/releaseMinor'));
     } finally { esce.srv.close(); }
     const no = await fintoServer({ ok: false, reason: 'minor_gia_uscita' }, 409);
     try {
