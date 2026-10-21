@@ -140,7 +140,15 @@ test('fidata e non fidata si distinguono in ogni scheda dei feedback, nei due te
       visti[t] = c;
       // Il bordo sinistro dice ancora la decisione: lo spam resta arancio sotto la fiducia.
       if (scheda === 'inbox') expect(c.sinistroNonFidata, `${t}: lo spam tiene il suo colore`).toBe('rgb(224, 142, 11)');
-      if (scheda === 'inbox' || scheda === 'queue') {
+      // Senza altro a destra, lo scudo sta sulla riga del titolo e non va a capo da solo.
+      if (scheda === 'resolved' || scheda === 'archived') {
+        for (const f of [si, no]) {
+          const tit = await riga(page, f).locator('.mg-item-title').boundingBox();
+          const sc = await riga(page, f).locator('.mg-fiducia-segno').boundingBox();
+          expect(Math.abs((sc.y + sc.height / 2) - (tit.y + tit.height / 2)), `${t} ${scheda}: scudo sulla riga del titolo`).toBeLessThan(6);
+        }
+      }
+      if (scheda !== 'waiting') {
         await page.locator('#mgListCol').screenshot({ path: `tests/.shots/fiducia-${scheda}-${t}.png` });
       }
     }
