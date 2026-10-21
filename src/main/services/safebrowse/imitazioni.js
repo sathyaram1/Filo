@@ -396,6 +396,8 @@ const TIPO_VERDETTO = {
 function formaCerta(c) {
   if (c.mut) return false;
   // Davanti a un altro sito conta solo col finto suffisso dopo (paypal.com.altro.net): booking.hotel.com è una parola.
+  // Su un suffisso di paese il nome intero è spesso del marchio stesso (ebay.in, mastercard.com.au): lì decide il modello.
+  if (c.tipo === 'esatto' && c.zona === 'sld') return c.ospitato || !/^[a-z]{2}$/.test(c.tld);
   if (c.tipo === 'esatto') return c.zona !== 'sotto' || (c.segue.length <= 3 && /^[a-z]+$/.test(c.segue));
   const lungo = c.mc.token.length >= 5;
   // Un refuso di un marchio che è una parola è spesso un'altra parola (apply, pose, team): lì decide il modello (#728).
