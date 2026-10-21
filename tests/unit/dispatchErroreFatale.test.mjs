@@ -1,6 +1,7 @@
 // #1205.1: quando dispatch muore per un errore che non aveva previsto, la sessione riceve lo stesso testo del guasto
 // dichiarato (domanda di fine sessione e rilascio col guasto), non la sola riga «errore fatale». Giro vero col
 // biglietto, contro un server finto, in un deposito usa-e-getta con i testi dei ruoli copiati e un pezzo tolto.
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
