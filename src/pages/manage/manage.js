@@ -5516,6 +5516,7 @@
     // Giudice che non ha votato in quella run: il cerchio è tratteggiato e
     // cliccarlo dice PERCHÉ, invece di non fare niente. È la stessa regola dei
     // livelli grigi: un buco si spiega, non si tace.
+    const nonVisteRow = MR.immaginiNonViste(fb).map((t) => `<div class="mg-judge-model mg-judge-nonviste">${esc(t)}</div>`).join('');
     if (!v) {
       const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
       const saltati = MR.judgesSkippedText(fb);
@@ -5523,6 +5524,7 @@
         <div class="mg-judge-detail">
           <div class="mg-liv-testo">${saltati ? esc(saltati) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
           ${nota && nota.text && !saltati ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+          ${nonVisteRow}
         </div>
       `);
       return;
@@ -5547,6 +5549,7 @@
       <div class="mg-judge-detail">
         <span class="mg-class-badge ${badgeClass}">${esc(cls || '—')}</span>
         ${modelRow}
+        ${nonVisteRow}
         <div class="mg-reasoning">${
           v.reasoning ? esc(v.reasoning) : '<em>Nessun ragionamento disponibile.</em>'
         }</div>
