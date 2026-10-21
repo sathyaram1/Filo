@@ -1150,15 +1150,15 @@
   // In coda / Risolti l'ordinamento non cambia la lunghezza, quindi basta
   // l'appartenenza (manageTabFor, lo stesso filtro di listForManageTab);
   // Archiviati passa da listArchiveTab perché ha regole e filtri suoi.
-  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli }. PURA.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli, soloNonFidate }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, waiting: 0, resolved: 0, archived: 0 };
     const inbox = [];
-    for (const f of list) {
+    for (const f of filtraFiducia(list, opts && opts.soloNonFidate)) {
       const tab = manageTabFor(f, opts);
       if (tab === 'inbox') inbox.push(f);
-      else if (tab === 'queue' || tab === 'local' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
+      else if (tab === 'queue' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
     counts.inbox = filtraLivelli(inbox, opts && opts.livelli, opts).length;
     counts.archived = listArchiveTab(list, opts).length;
