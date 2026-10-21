@@ -277,7 +277,7 @@
     if (!res || !res.ok) {
       const rifiuto = {
         no_wallet: 'nessuna persona con questo pseudonimo',
-        global_cap: 'si supererebbe il tetto di tutti i regali, alzalo nella pagina «Inviti e utenti» o carica OpenRouter',
+        global_cap: 'si supererebbe il tetto di tutti i regali, alzalo in Gestione, sezione Utenti, o carica OpenRouter',
         missing_exchange_rate: 'manca il cambio del giorno',
         provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
       }[res && res.reason];

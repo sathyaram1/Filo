@@ -200,7 +200,7 @@
       id: 'anteprima-link', nome: 'Il sito di un link, per titolo e descrizione',
       base: [], indirizzo: 'il sito del link',
       quando: 'funzione',
-      occasione: 'quando fai tasto destro su un link; non parte se l’indirizzo sembra portare fuori dati riservati',
+      occasione: 'quando fai tasto destro su un link; non parte se il link è sospetto, se il sito è fra quelli che Filo blocca o se l’indirizzo sembra portare fuori dati riservati',
       riceve: 'una richiesta della pagina del link, senza i tuoi cookie',
       frase: 'Filo chiede subito a quel sito titolo e descrizione della pagina',
       dove: ['src/main/services/handlers/misc.js', 'src/main/services/safe-fetch.js'], prova: 'safeFetch(url',
@@ -367,9 +367,9 @@
     {
       id: 'ricarica-openrouter', nome: 'La pagina dei crediti di OpenRouter',
       base: ['https://openrouter.ai/settings/credits'],
-      occasione: 'solo per il proprietario di Filo, quando dalla sua pagina «Inviti e utenti» apre la ricarica del conto',
+      occasione: 'solo per il proprietario di Filo, quando da «Inviti e utenti» in Gestione apre la ricarica del conto',
       riceve: 'la visita, come ogni sito',
-      dove: ['src/pages/credits/owner.js'],
+      dove: ['src/pages/manage/manageUtenti.js'],
     },
     {
       id: 'sito-filo', nome: 'Il sito di Filo',

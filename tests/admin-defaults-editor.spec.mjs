@@ -1,4 +1,4 @@
-// Editor admin "Modelli predefiniti": il "Prova" di una riga e il combobox
+// Editor admin "Modelli predefiniti" (Gestione → Impostazioni predefinite, #1414): il "Prova" di una riga e il combobox
 // della stringa modello.
 //
 // Bug coperto: il "Prova" inviava SOLO il nickname, che il main cercava nel
@@ -13,11 +13,10 @@
 // inviati per asserire COSA la pagina chiede al main.
 
 import { test, expect } from './fixtures/electron.mjs';
-
-const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 async function openStubbedEditor(openTab, overrides = {}) {
-  const page = await openTab(ADMIN_URL);
+  const page = await openTab(GESTIONE);
   await page.addInitScript((over) => {
     // Un salvataggio vero è un giro di rete: `ritardoSalvataggioMs` lo imita,
     // per provare cosa succede a chi continua a lavorare mentre viaggia.
@@ -101,7 +100,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
   }, overrides);
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   return page;
 }
@@ -391,8 +390,8 @@ test('il menu del catalogo resta sceglibile se il campo torna a fuoco subito, e 
 });
 
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
-  const page = await openTab(ADMIN_URL);
-  await page.waitForSelector('#title', { timeout: 8_000 });
+  const page = await openTab(GESTIONE);
+  await page.waitForSelector('#panel-predefiniti', { state: 'attached', timeout: 8_000 });
 
   const testRes = await page.evaluate(() => window.filo.message({
     type: 'test_default_model', provider: 'openrouter', model: 'qualsiasi/modello',

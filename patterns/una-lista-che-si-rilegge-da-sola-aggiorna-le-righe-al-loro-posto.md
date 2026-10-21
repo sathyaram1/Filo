@@ -37,6 +37,6 @@ ascoltava solo dopo un timer e andava perso se arrivava prima (corretto dal
 #1219); e la vista si rileggeva a ogni movimento di crediti, anche quelli
 dell'accesso all'avvio o di un'altra scheda, rifacendo la tabella da capo. Il
 menu spariva prima del clic, la scheda aperta si richiudeva, il fuoco cadeva.
-Adesso le righe restano quelle (`src/pages/credits/owner.js`), e la prova
+Adesso le righe restano quelle (`src/pages/manage/manageUtenti.js`), e la prova
 `tests/wallet-owner-manopole.spec.mjs` rilegge la vista con il menu e la
 scheda aperti, con una persona che entra e una che esce.

@@ -11,6 +11,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { GESTIONE } from './helpers/gestione.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
@@ -113,7 +114,7 @@ async function simulaOwner(app) {
 
 test('i moduli dell’owner rifiutano con parole di Filo zero codici, crediti con la virgola e pseudonimo vuoto; un utente si conta al singolare', async ({ app, openTab }) => {
   expect(await simulaOwner(app)).toBe(true);
-  const page = await openTab('filo://credits/owner.html');
+  const page = await openTab(`${GESTIONE}#utenti`);
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
   // I numeri calcolati stanno nei riquadri in cima (#652): un utente si conta
   // al singolare.
@@ -180,7 +181,7 @@ test('un invito con un posto occupato su tre resta da dare, col suo link e il co
   ];
   try {
     expect(await simulaOwner(app)).toBe(true);
-    const page = await openTab('filo://credits/owner.html');
+    const page = await openTab(`${GESTIONE}#utenti`);
     await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
 
     const conPosti = page.locator('#ownerCodes > li[data-code="AAAA-2222"]');
@@ -218,7 +219,7 @@ const MIO = 'abcdef0123456789';
 
 async function apriPaginaOwner(app, openTab) {
   expect(await simulaOwner(app)).toBe(true);
-  const page = await openTab('filo://credits/owner.html');
+  const page = await openTab(`${GESTIONE}#utenti`);
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
   await expect(page.locator('#ownerUsers tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
   return page;

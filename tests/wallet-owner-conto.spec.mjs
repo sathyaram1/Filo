@@ -6,6 +6,7 @@
 import { createServer } from 'node:http';
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
@@ -97,7 +98,7 @@ async function simulaOwner(app) {
 
 async function apriOwner(app, openTab) {
   expect(await simulaOwner(app)).toBe(true);
-  const page = await openTab('filo://credits/owner.html');
+  const page = await openTab(`${GESTIONE}#utenti`);
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
   await expect(page.locator('#ownerConto .sn-wallet-numero')).toHaveCount(4, { timeout: 15_000 });
   return page;
@@ -120,7 +121,7 @@ test('il conto che regge: residuo, caricato e speso in dollari, crediti ed euro,
   await page.screenshot({ path: 'tests/.shots/wallet-owner-conto-chiaro.png', fullPage: true });
 
   await page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { theme: 'dark' } }));
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await expect(page.locator('#ownerConto .sn-wallet-numero')).toHaveCount(4, { timeout: 15_000 });
   await page.screenshot({ path: 'tests/.shots/wallet-owner-conto-scuro.png', fullPage: true });
 });
@@ -157,7 +158,7 @@ test('dal conto che non regge si va a ricaricarlo: bottone nell’allarme e tast
 
   // Conto non letto: niente numero da copiare, la ricarica resta.
   stato.account = undefined;
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await expect(page.locator('#ownerConto .sn-wallet-numero')).toHaveCount(4, { timeout: 15_000 });
   await expect(page.locator('#ownerRicarica')).toHaveCount(0);
   await riquadro(page, 'restano sul conto').click({ button: 'right' });
@@ -175,7 +176,7 @@ test('conto non letto: trattini e una frase, mai uno zero; né col campo che man
   await expect(page.locator('#ownerAllarme')).toBeHidden();
 
   stato.account = { error: 'openrouter 503' };
-  await page.reload();
+  await ricaricaSu(page, 'utenti');
   await expect(page.locator('#ownerContoNota')).toContainText('Il saldo del conto OpenRouter non è arrivato', { timeout: 15_000 });
   await expect(riquadro(page, 'restano sul conto').locator('.sn-wallet-numero-valore')).toHaveText('—');
 });
@@ -252,7 +253,9 @@ test('all’avvio l’owner riceve l’allarme del conto una volta sola e da lì
   await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 20_000 });
   expect(await confirmText(home)).toContain('Sul conto OpenRouter restano 4,20 $');
   await clickConfirm(home, 'ok');
-  const owner = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'la pagina dell’owner non si è aperta');
+  // L'allarme porta in Gestione, sulla scheda Inviti e utenti (#1414).
+  const owner = await aspettaFinestra(app, (w) => w.url().startsWith(GESTIONE), 'Gestione non si è aperta');
+  await expect(owner.locator('.mg-tab--active[data-tab="utenti"]')).toBeVisible({ timeout: 15_000 });
   await expect(owner.locator('#ownerAllarme')).toBeVisible({ timeout: 15_000 });
 
   // Stessa situazione: non si ridice, né a chi lo chiede di nuovo né a un'altra lettura del server.

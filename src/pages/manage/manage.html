@@ -44,6 +44,12 @@
   <script src="filo://shared/routineSessioni.js"></script>
   <script src="filo://shared/routineCrediti.js"></script>
   <script src="filo://shared/routineModelli.js"></script>
+  <!-- Per Utenti e Impostazioni predefinite (#1414): gli stessi moduli e lo stesso foglio delle pagine da cui vengono. -->
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/stimaCosto.js"></script>
+  <script src="filo://shared/wallet.js"></script>
+  <script src="filo://shared/campoNumero.js"></script>
+  <link rel="stylesheet" href="filo://credits/credits.css" />
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
@@ -437,6 +443,9 @@
       display: flex; flex-direction: column;
       flex: 1 1 auto; min-height: 0;
     }
+    /* Le pagine spostate dentro Gestione (#1414) tengono la misura che avevano da sole: campi larghi tutta la
+       finestra non si leggono. Allineate a sinistra, sotto le sezioni da cui si aprono. */
+    .mg-pagina { max-width: 960px; }
 
     /* La lente vive in fondo alla barra delle schede e apre la barra di ricerca sotto: i risultati, da QUALUNQUE
        scheda, rimpiazzano la lista a sinistra, mentre il dettaglio al centro resta il solito. */
@@ -1684,6 +1693,8 @@
       <button type="button" class="mg-sezione" data-sezione="domande" role="tab">Domande<span class="mg-sezione-count"></span></button>
       <button type="button" class="mg-sezione mg-sezione--active" data-sezione="feedback" role="tab">Feedback<span class="mg-sezione-count"></span></button>
       <button type="button" class="mg-sezione" data-sezione="routine" role="tab">Routine<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="utenti" role="tab">Utenti<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="predefinite" role="tab">Impostazioni predefinite<span class="mg-sezione-count"></span></button>
       <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
       <button type="button" class="mg-search-toggle" id="mgSearchToggle"
         title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
@@ -1703,6 +1714,8 @@
       <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
       <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
+      <button type="button" class="mg-tab" data-tab="utenti" role="tab" hidden>Inviti e utenti</button>
+      <button type="button" class="mg-tab" data-tab="predefiniti" role="tab" hidden>Modelli predefiniti</button>
     </nav>
 
     <!-- Lo stato viaggia cifrato: senza la chiave dell'owner non si legge, e allora le quattro sezioni non si
@@ -2533,6 +2546,165 @@
       </div>
     </section>
 
+    <!-- Utenti → Inviti e utenti (#1414): la pagina che stava in credits/owner.html, spostata intera. Script: manageUtenti.js. -->
+    <section class="mg-panel mg-pagina" id="panel-utenti" data-panel="utenti">
+      <p class="sn-muted" id="ownerDenied" hidden>Questa pagina è del proprietario di Filo.</p>
+      <section id="ownerSection" class="sn-wallet-owner" hidden>
+        <!-- Il conto OpenRouter che non regge (#820): in cima, prima di ogni numero. -->
+        <p class="sn-wallet-allarme" id="ownerAllarme" role="alert" hidden></p>
+        <!-- I numeri che il server calcola: non si toccano, si guardano. -->
+        <ul class="sn-wallet-numeri" id="ownerNumeri"></ul>
+        <!-- Le copie di Filo che hanno spedito i contatori giornalieri (#969): non dal server dei crediti, da Firestore. -->
+        <ul class="sn-wallet-numeri sn-wallet-installazioni" id="ownerInstallazioni" aria-label="Installazioni attive"></ul>
+        <h3 class="sn-wallet-sub" id="ownerContoTitle" hidden>Conto OpenRouter</h3>
+        <ul class="sn-wallet-numeri" id="ownerConto" hidden></ul>
+        <p class="sn-muted sn-wallet-conto-nota" id="ownerContoNota" hidden></p>
+        <p class="sn-muted" id="ownerTotals"></p>
+
+        <!-- Le manopole (#652): i campi li disegna il JS dalla tabella in
+             src/shared/wallet.js, così nome e limiti stanno in un posto solo. -->
+        <h3 class="sn-wallet-sub" id="ownerKnobsTitle">Quanto vale cosa</h3>
+        <div class="sn-manopole" id="ownerKnobs"></div>
+
+        <div class="sn-wallet-owner-row">
+          <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase di Filo, non la bolla del browser. -->
+          <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off" novalidate>
+            <label for="ownerInviteCount">Nuovi codici</label>
+            <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />
+            <button type="submit" class="sn-btn" id="ownerInvitesBtn">Genera</button>
+          </form>
+          <form id="ownerGrantForm" class="sn-wallet-inline" autocomplete="off" novalidate>
+            <label for="ownerGrantPseudonym">Regala crediti a</label>
+            <input type="text" id="ownerGrantPseudonym" placeholder="pseudonimo" maxlength="16" spellcheck="false" />
+            <input type="number" id="ownerGrantCredits" min="1" placeholder="crediti" />
+            <button type="submit" class="sn-btn" id="ownerGrantBtn">Regala</button>
+          </form>
+        </div>
+        <p class="sn-wallet-msg" id="ownerMsg" role="status" hidden></p>
+        <h3 class="sn-wallet-sub" id="ownerCodesTitle" hidden>I tuoi codici</h3>
+        <ul id="ownerCodes" class="sn-wallet-invites"></ul>
+        <p class="sn-muted sn-wallet-filtro" id="ownerFiltro" role="status" hidden></p>
+        <div class="sn-wallet-table-wrap">
+          <table class="sn-wallet-table" id="ownerUsers" hidden>
+            <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th><th>Ultimo uso</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="sn-muted" id="ownerRuns"></p>
+      </section>
+    </section>
+
+    <!-- Impostazioni predefinite → Modelli predefiniti (#1414): la pagina che stava in admin-defaults/, spostata intera.
+       Script: managePredefiniti.js. -->
+    <section class="mg-panel mg-pagina" id="panel-predefiniti" data-panel="predefiniti">
+      <!-- Mostrato se l'utente non è admin (DEFAULTS_GET ritorna !ok). -->
+      <section id="sec-denied" hidden>
+        <p class="sn-muted" id="denied-msg"></p>
+      </section>
+
+      <div id="editor" hidden>
+        <p class="sn-muted" id="intro"></p>
+
+        <section id="sec-keys">
+          <h2 id="h-keys"></h2>
+          <p class="sn-muted" id="keys-desc"></p>
+
+          <label for="apiKey">OpenRouter API key <span class="sn-muted" id="apiKey-state"></span></label>
+          <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
+
+
+          <label for="apiKeyTavily" style="margin-top: 12px;">Tavily API key <span class="sn-muted" id="apiKeyTavily-state"></span></label>
+          <input type="password" id="apiKeyTavily" placeholder="tvly-..." autocomplete="off" />
+
+          <label for="apiKeySafebrowse" style="margin-top: 12px;" id="apiKeySafebrowse-label">Google Safe Browsing API key <span class="sn-muted" id="apiKeySafebrowse-state"></span></label>
+          <input type="password" id="apiKeySafebrowse" placeholder="AIza..." autocomplete="off" />
+          <p class="sn-muted" id="apiKeySafebrowse-desc" style="margin-top: 4px;"></p>
+        </section>
+
+        <section id="sec-model-registry">
+          <h2 id="h-model-registry"></h2>
+          <p class="sn-muted" id="model-registry-desc"></p>
+          <div id="modelRegistryList"></div>
+          <div class="sn-row" style="margin-top: 10px;">
+            <button class="sn-btn sn-btn-secondary" id="addModelRow" type="button"></button>
+          </div>
+          <label for="providerSort" id="providerSortLabel"></label>
+          <div style="max-width: 280px;"><select id="providerSort"></select></div>
+          <p class="sn-muted" id="providerSortDesc"></p>
+          <!-- Combobox per la "stringa modello": una datalist per provider,
+               popolata dal main con le chiavi predefinite (la pagina non le vede). -->
+          <datalist id="models-list-openrouter"></datalist>
+        </section>
+
+        <section id="sec-models">
+          <h2 id="h-models"></h2>
+          <p class="sn-muted" id="models-desc"></p>
+          <div class="sn-grid-2" id="modelsGrid"></div>
+          <!-- Sotto la griglia e non sopra: cresce e cala mentre si cambiano le catene, e sopra sposterebbe i campi sotto il cursore. -->
+          <div id="openWeightsImpact" role="status" hidden></div>
+          <!-- Non `nicknames-list`: quella è dei Modelli di supporto in Automazioni, e gli id di una pagina sono uno. -->
+          <datalist id="nicknames-list-predefiniti"></datalist>
+        </section>
+
+        <section id="sec-excluded">
+          <h2 id="h-excluded"></h2>
+          <p class="sn-muted" id="excluded-desc"></p>
+          <div id="excludedList"></div>
+          <div class="sn-row" style="margin-top: 10px;">
+            <button class="sn-btn sn-btn-secondary" id="addExcludedRow" type="button"></button>
+          </div>
+          <!-- Compare solo se questa lista NON copre voci escluse dal codice: la lista salvata qui sostituisce quella
+             di build, e senza avviso un'esclusione aggiunta col codice resterebbe lettera morta. -->
+          <div class="sn-info-box" id="excludedDrift" hidden>
+            <div class="sn-info-box-title" id="excludedDriftTitle"></div>
+            <p id="excludedDriftText" style="margin: 0 0 8px;"></p>
+            <button class="sn-btn sn-btn-secondary" id="excludedDriftFix" type="button"></button>
+          </div>
+        </section>
+
+        <section id="sec-delicate">
+          <h2 id="h-delicate"></h2>
+          <p class="sn-muted" id="delicate-desc"></p>
+          <div id="delicateLists"></div>
+        </section>
+
+        <section id="sec-contesto">
+          <h2 id="h-contesto"></h2>
+          <p class="sn-muted" id="contesto-desc"></p>
+          <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
+            <label for="contestoGiorni" id="l-contesto-giorni"></label>
+            <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+            <label for="contestoToken" id="l-contesto-token"></label>
+            <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+            <label for="contestoCache" id="l-contesto-cache"></label>
+            <select id="contestoCache" style="width:240px;">
+              <option value="" id="contestoCacheDiSerie"></option>
+              <option value="5m" id="contestoCache5m"></option>
+              <option value="1h" id="contestoCache1h"></option>
+            </select>
+          </div>
+        </section>
+
+        <section id="sec-lunghezza">
+          <h2 id="h-lunghezza"></h2>
+          <p class="sn-muted" id="lunghezza-desc"></p>
+          <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
+            <label for="lunghezzaConversazioni" id="l-lunghezza-conversazioni"></label>
+            <input type="number" id="lunghezzaConversazioni" min="1024" max="262144" step="1024" style="width:140px;" />
+            <label for="lunghezzaTesti" id="l-lunghezza-testi"></label>
+            <input type="number" id="lunghezzaTesti" min="1024" max="262144" step="1024" style="width:140px;" />
+            <label for="lunghezzaBrevi" id="l-lunghezza-brevi"></label>
+            <input type="number" id="lunghezzaBrevi" min="1024" max="262144" step="1024" style="width:140px;" />
+          </div>
+        </section>
+
+        <div class="sn-toolbar" style="margin-top: 24px;">
+          <button class="sn-btn" id="saveBtn" type="button"></button>
+          <span id="saveStatus" class="sn-muted"></span>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
@@ -2541,5 +2713,7 @@
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>
   <script src="manageCrediti.js"></script>
+  <script src="manageUtenti.js"></script>
+  <script src="managePredefiniti.js"></script>
 </body>
 </html>

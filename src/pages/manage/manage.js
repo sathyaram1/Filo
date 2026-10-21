@@ -8355,6 +8355,17 @@
   }
   window.addEventListener('hashchange', apriDomandaDallIndirizzo);
 
+  // Un indirizzo che nomina una scheda o una sezione la apre, come un clic (#1414: è così che arrivano i vecchi indirizzi
+  // delle pagine dell'owner). Poi torna pulito: riaprendo la scheda scavalcherebbe ogni volta la scelta d'apertura.
+  function apriDaIndirizzo() {
+    const tab = MR.schedaDaIndirizzo(location.hash);
+    if (!tab) return;
+    selectTab(tab);
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+  }
+  window.addEventListener('hashchange', apriDaIndirizzo);
+  apriDaIndirizzo();
+
   // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
   const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);
   // Gli spec devono poter aspettare la FINE del caricamento vero (Firestore)

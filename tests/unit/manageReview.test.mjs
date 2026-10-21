@@ -1825,6 +1825,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
     inbox: 'feedback', queue: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
     automation: 'routine', crediti: 'routine', log: 'routine',
+    utenti: 'utenti', predefiniti: 'predefinite',
   };
   for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
   const tutte = MR.SEZIONI.flatMap((s) => s.schede);
@@ -1833,6 +1834,18 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
   assert.equal(MR.sezioneDiScheda('nessuna'), null);
   assert.equal(MR.schedaPredefinita('feedback'), 'inbox');
   assert.equal(MR.schedaPredefinita('routine'), 'automation');
+});
+
+// #1414: i vecchi indirizzi delle pagine dell'owner arrivano col nome della sezione.
+test('indirizzo: nomina una scheda o una sezione, il resto non apre niente', () => {
+  assert.equal(MR.schedaDaIndirizzo('#utenti'), 'utenti');
+  assert.equal(MR.schedaDaIndirizzo('#predefiniti'), 'predefiniti');
+  assert.equal(MR.schedaDaIndirizzo('#predefinite'), 'predefiniti');
+  assert.equal(MR.schedaDaIndirizzo('#routine'), 'automation');
+  assert.equal(MR.schedaDaIndirizzo('#Log'), 'log');
+  for (const no of ['', '#', '#nessuna', '#__proto__', '#constructor', null, undefined, 42]) {
+    assert.equal(MR.schedaDaIndirizzo(no), null, String(no));
+  }
 });
 
 test('scelta ricordata: torna intera o non torna', () => {

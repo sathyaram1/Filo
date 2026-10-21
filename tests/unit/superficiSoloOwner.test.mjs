@@ -86,3 +86,17 @@ test('mandare un feedback resta una strada di tutti', () => {
   assert.ok(!voce.includes('filo://feedback/feedback.html'),
     'il manifesto mandava l\'utente alla posta dell\'owner, che lui non può aprire');
 });
+
+// #1414: le pagine dell'owner si raggiungono da Gestione e basta. Un'altra voce di menu che porta lì è un secondo
+// ingresso, e il vecchio indirizzo scritto in un menu è una strada che passa dal rimando invece di dire dov'è la cosa.
+test('Modelli predefiniti e Inviti e utenti non hanno ingressi fuori da Gestione', () => {
+  const shell = leggi('src', 'renderer', 'shell.js');
+  const impostazioni = shell.match(/function buildSettings\(\)\s*\{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(impostazioni, 'non trovo buildSettings() in shell.js');
+  assert.ok(!/isAdmin/.test(impostazioni), 'il menu Impostazioni torna a distinguere l\'owner: le sue voci stanno in Gestione');
+  const vecchi = /filo:\/\/admin-defaults\/|filo:\/\/credits\/owner\.html/;
+  for (const file of [['src', 'renderer', 'shell.js'], ['src', 'main', 'menu.js'], ['src', 'main', 'barraLaterale.js'],
+    ['src', 'pages', 'dashboard', 'dashboard.js'], ['src', 'shared', 'wallet.js'], ['src', 'pages', 'credits', 'credits.html']]) {
+    assert.ok(!vecchi.test(leggi(...file)), `${file.join('/')} porta ancora al vecchio indirizzo di una pagina dell'owner`);
+  }
+});

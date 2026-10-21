@@ -744,6 +744,27 @@
     };
   }
 
+  // Un collegamento è anche la zona di una mappa d'immagine e l'<a> di un disegno SVG, anche con l'xlink:href dei disegni
+  // vecchi (#725.6, #725.7). Lì `href` è un oggetto, non l'indirizzo: chi vuole l'indirizzo lo chiede qui.
+  const SELETTORE_COLLEGAMENTO = 'a[href], a[*|href], area[href]';
+  const XLINK = 'http://www.w3.org/1999/xlink';
+  function indirizzoDelLink(el) {
+    if (!el) return '';
+    let h;
+    try { h = el.href; } catch (_) { return ''; }
+    if (typeof h === 'string') return h;
+    const scritto = String((h && h.animVal) || el.getAttribute?.('href') || el.getAttributeNS?.(XLINK, 'href') || '').trim();
+    if (!scritto) return '';
+    try { return new URL(scritto, el.baseURI || location.href).href; } catch (_) { return scritto; }
+  }
+
+  // Il nome con cui il collegamento si presenta: una zona di mappa non ha testo, solo il suo `alt`.
+  function nomeDelLink(el) {
+    if (!el) return '';
+    const testo = el.tagName === 'AREA' ? '' : (el.textContent || '').trim();
+    return testo || String(el.getAttribute?.('alt') || el.getAttribute?.('aria-label') || el.getAttribute?.('title') || '').trim();
+  }
+
   // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
   // resta anche se la spiegazione non arriva mai (#725).
   function mostraAvvisoLink(el, url) {
@@ -798,7 +819,8 @@
         origine.className = 'sn-menu-origine';
         origine.hidden = true;
         el.appendChild(origine);
-        if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
+        const indirizzo = indirizzoDelLink(linkEl);
+        if (indirizzo) mostraAvvisoLink(el, indirizzo);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
         body.textContent = I18n.t('menu_explain_loading');
@@ -811,6 +833,16 @@
           return () => {};
         }
         let cancelled = false;
+        // Il sito in lista lo dice anche l'immagine che fa da link, come il link di testo; la domanda non contatta il sito.
+        if (indirizzo) {
+          chrome.runtime.sendMessage({ type: MSG.LINK_FERMATO, url: indirizzo }).then((r) => {
+            if (cancelled || !r?.bloccato) return;
+            const nota = document.createElement('div');
+            nota.className = 'sn-menu-link-nota';
+            nota.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            el.insertBefore(nota, body);
+          }).catch(() => {});
+        }
         (async () => {
           let dataUrl;
           try {
@@ -863,7 +895,7 @@
     };
   }
 
-  // Sezione inline "Spiega link": niente apertura del link, solo metadati OG e dominio.
+  // Sezione inline "Spiega link": il link non si apre in una scheda; titolo e descrizione li legge il main.
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
@@ -873,8 +905,8 @@
         el.classList.add('sn-menu-inline-loading');
         let cancelled = false;
         (async () => {
-          const url = linkEl.href;
-          const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
+          const url = indirizzoDelLink(linkEl);
+          const anchorText = nomeDelLink(linkEl).slice(0, 200);
           const flags = LinkSospetto.analizza(url);
           el.textContent = '';
           mostraAvvisoLink(el, url);
@@ -883,15 +915,16 @@
           body.textContent = I18n.t('menu_link_loading');
           el.appendChild(body);
 
-          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
-          let ogTitle = '', ogDescription = '';
-          if (!flags.includes('side_effect')) {
-            try {
-              const r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url });
-              if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
-            } catch (_) {}
-          }
+          // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
+          let ogTitle = '', ogDescription = '', r = null;
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url }); } catch (_) {}
           if (cancelled) return;
+          if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
+          else if (r?.bloccato) {
+            el.classList.remove('sn-menu-inline-loading');
+            body.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            return;
+          }
 
           // Streaming spiegazione via AI
           let port;
@@ -1122,8 +1155,8 @@
   async function saveLink(linkEl) {
     const res = await chrome.runtime.sendMessage({
       type: MSG.SAVE_LINK,
-      url: linkEl.href,
-      title: linkEl.textContent?.trim() || linkEl.href,
+      url: indirizzoDelLink(linkEl),
+      title: nomeDelLink(linkEl) || indirizzoDelLink(linkEl),
     });
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
@@ -1209,8 +1242,7 @@
   ]);
   function isDownloadableLink(linkEl) {
     if (!linkEl) return false;
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) { return false; }
+    const href = indirizzoDelLink(linkEl);
     if (!/^https?:/i.test(href)) return false;
     try { if (linkEl.hasAttribute && linkEl.hasAttribute('download')) return true; } catch (_) {}
     let pathname = '';
@@ -1230,8 +1262,7 @@
   // cammini). Nessun toast qui: la conferma è quella condivisa col clic (barra +
   // toast finale dalla shell); avvisiamo solo se il download non parte proprio.
   async function downloadLink(linkEl) {
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) {}
+    const href = indirizzoDelLink(linkEl);
     if (!href) return;
     // data:/blob: nascono nella pagina stessa: lì Chromium onora l'attributo
     // `download` di un <a> e il main non saprebbe risolverli — restano sul
@@ -1269,12 +1300,12 @@
   // copia negli appunti: vale lo stesso discorso di "Copia URL" (#437) — un
   // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
   async function shareLink(linkEl) {
-    const href = linkEl?.href || '';
+    const href = indirizzoDelLink(linkEl);
     if (!isAddress(href)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
       return;
     }
-    const data = { title: linkEl.textContent?.trim() || href, url: href };
+    const data = { title: nomeDelLink(linkEl) || href, url: href };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
@@ -2087,6 +2118,8 @@
     leggiOrigine,
     scaricaImmagine,
     buildInlineExplainLink,
+    SELETTORE_COLLEGAMENTO,
+    indirizzoDelLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,

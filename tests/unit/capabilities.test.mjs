@@ -303,8 +303,8 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
   // admin, per questo l'indirizzo compare ancora nel file.
-  // «Inviti e utenti» si apre dall'allarme del conto che arriva solo all'owner (#820).
-  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html', 'filo://credits/owner.html']);
+  // «Inviti e utenti» (in Gestione dal #1414) si apre dall'allarme del conto che arriva solo all'owner (#820).
+  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
   // Le icone che stavano in alto a destra nella home sono nella barra laterale (#871): stessa regola.
   const barra = readFileSync(join(ROOT, 'src', 'main', 'barraLaterale.js'), 'utf8');
   const pagineBarra = barra.match(/const PAGINE_FISSE = \{([\s\S]*?)\};/)?.[1] || '';

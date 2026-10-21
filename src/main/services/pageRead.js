@@ -19,6 +19,11 @@ const FINESTRA_RIMANDO_MS = 15000;
 // Il seguito di una pagina letta dalla scheda si prende dalla stessa lettura: ricopiarla a ogni pezzo costava minuti.
 const SCHEDA_TTL_MS = 2 * 60 * 1000;
 const TEMPO_ESTRAZIONE_MS = 20000;
+// La lettura di una scheda smette da sé dopo TEMPO e si dichiara parziale (#1574). La SCADENZA esterna resta larga:
+// una pagina enorme su una macchina lenta tiene occupata la scheda per decine di secondi, e scaduta non arriva niente.
+const TEMPO_SCHEDA_MS = 6000;
+const SCADENZA_SCHEDA_MS = 30000;
+const tempi = { scheda: TEMPO_SCHEDA_MS };
 // Quello che Filo ha letto dove l'utente ha fatto l'accesso (la sua scheda, un documento, un comando), per il freno.
 const RISERVATE_TTL_MS = 60 * 60 * 1000;
 const RISERVATE_MAX = 20;
@@ -68,10 +73,15 @@ function chiaveConfronto(url) {
 // Gira DENTRO la pagina: serializza solo ciò che si vede, senza script, entrando nelle shadow root aperte.
 // Deve bastare a sé stessa, perché viaggia come testo (`toString`). Le schede in secondo piano sono grandi 0×0:
 // qui si guarda lo stile calcolato, mai le misure a schermo.
-function serializzaVisibile() {
+function serializzaVisibile(opz) {
   const TETTO = 4000000;
   const MAX_ELEMENTI = 150000;
   const MAX_PROFONDITA = 400;
+  // Oltre `scadenza` (ora assoluta) si smette come oltre il tetto, ma solo dopo `minimo` caratteri: in ritardo arriva
+  // almeno il primo pezzo. Senza scadenza la scheda in ritardo la ferma solo chi aspetta fuori, e non arriva niente.
+  const scadenza = opz && Number(opz.scadenza) > 0 ? Number(opz.scadenza) : Infinity;
+  const minimo = opz && Number(opz.minimo) > 0 ? Number(opz.minimo) : 0;
+  let fuoriTempo = false;
   const SALTA = {
     SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, SVG: 1, CANVAS: 1, VIDEO: 1,
     AUDIO: 1, PICTURE: 1, TEXTAREA: 1, LINK: 1, META: 1, DATALIST: 1,
@@ -153,7 +163,7 @@ function serializzaVisibile() {
     return false;
   };
   const visita = (nodo, prof, csPadre, padre) => {
-    if (n > TETTO || elementi > MAX_ELEMENTI || prof > MAX_PROFONDITA) { tagliata = true; return; }
+    if (fuoriTempo || n > TETTO || elementi > MAX_ELEMENTI || prof > MAX_PROFONDITA) { tagliata = true; return; }
     if (nodo.nodeType === 3) {
       const t = nodo.nodeValue;
       if (!t) return;
@@ -166,6 +176,7 @@ function serializzaVisibile() {
     const tag = String(nodo.tagName || '').toUpperCase();
     if (SALTA[tag]) return;
     elementi++;
+    if ((elementi & 63) === 0 && n >= minimo && Date.now() > scadenza) { fuoriTempo = true; tagliata = true; return; }
     let cs = null;
     try { cs = stile(nodo); } catch (_) {}
     if (cs && (cs.display === 'none' || cs.contentVisibility === 'hidden' || invisibile(cs))) return;
@@ -301,8 +312,12 @@ async function leggiDallaScheda(wc) {
     await new Promise((r) => setTimeout(r, 500));
   }
   if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) return null;
-  const codice = `(${serializzaVisibile.toString()})()`;
-  const r = await conMisuraVera(wc, () => conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), 8000));
+  const r = await conMisuraVera(wc, () => {
+    // La scadenza si fissa qui, non nella pagina: conta anche l'attesa di una pagina ancora occupata a fare altro.
+    const opz = { scadenza: Date.now() + tempi.scheda, minimo: MAX_TEXT_CHARS * 2 };
+    const codice = `(${serializzaVisibile.toString()})(${JSON.stringify(opz)})`;
+    return conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), SCADENZA_SCHEDA_MS);
+  });
   return r && typeof r.html === 'string' ? r : null;
 }
 
@@ -947,6 +962,7 @@ const api = {
   serializzaVisibile,
   MAX_TEXT_CHARS,
   _dip: dip,
+  _tempi: tempi,
   _cache: cache,
   _riservate: riservate,
 };

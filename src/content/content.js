@@ -1837,7 +1837,7 @@
   // era copiato in tutt'e due, lo stesso clic rischiava di dare due menu diversi
   // a seconda che sotto ci fosse o no una parola da correggere.
   function detectContext(target, x, y) {
-    const linkEl = closestAcrossShadow(target, 'a[href]');
+    const linkEl = closestAcrossShadow(target, Actions.SELETTORE_COLLEGAMENTO);
     const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
     // Un solo colpo di hit-test per tutte e tre le famiglie: è la stessa pila di
     // strati, e ripeterlo tre volte costerebbe tre risalite dell'albero a ogni
@@ -1907,8 +1907,8 @@
   }
 
   function findLinkUnder(view, target, contentUnder) {
-    const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
-    const hit = owner || findUnder(view, 'a[href]', target);
+    const owner = contentUnder ? closestAcrossShadow(contentUnder, Actions.SELETTORE_COLLEGAMENTO) : null;
+    const hit = owner || findUnder(view, Actions.SELETTORE_COLLEGAMENTO, target);
     if (!hit) return null;
     try {
       // Un collegamento che non riceve i click per il menu NON ESISTE
@@ -2417,20 +2417,21 @@
   function buildLinkActionItems(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
+    const indirizzo = Actions.indirizzoDelLink(linkEl);
     const out = [];
     // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
-    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(indirizzo)) {
       out.push({
         type: 'item',
         label: I18n.t('menu_redeem_invite'),
-        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: String(linkEl.href) }).catch(() => {}); },
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: indirizzo }).catch(() => {}); },
       });
     }
     out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(indirizzo)),
       },
     );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
@@ -2448,7 +2449,7 @@
       {
         type: 'item',
         label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyUrlToClipboard(linkEl.href),
+        onClick: () => Actions.copyUrlToClipboard(indirizzo),
       },
       {
         type: 'item',
@@ -2462,6 +2463,20 @@
       },
     );
     return out;
+  }
+
+  // L'immagine su cui è disegnata la zona di una mappa: fra quelle che usano la mappa, quella sotto il cursore.
+  function immagineDellaZona(area, view) {
+    if (!area || area.tagName !== 'AREA') return null;
+    const mappa = area.closest('map');
+    const nome = String((mappa && (mappa.getAttribute('name') || mappa.id)) || '').toLowerCase();
+    if (!nome) return null;
+    let usano = [];
+    try {
+      usano = [...area.getRootNode().querySelectorAll('img[usemap]')]
+        .filter((img) => String(img.getAttribute('usemap') || '').toLowerCase() === '#' + nome);
+    } catch (_) {}
+    return usano.find((img) => view?.stack?.includes(img)) || usano[0] || null;
   }
 
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
@@ -2557,6 +2572,17 @@
     }
 
     if (linkEl) {
+      // La zona di una mappa d'immagine è il collegamento cliccato, disegnato su un'immagine (#725.6): prima le sue voci,
+      // poi quelle dell'immagine, e la sezione parla del collegamento, col suo avviso.
+      const immagineZona = immagineDellaZona(linkEl, layers);
+      if (immagineZona) {
+        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        items.push({ type: 'separator' });
+        for (const it of buildImageActionItems(immagineZona)) items.push(it);
+        items.push({ type: 'separator' });
+        items.push(Actions.buildInlineExplainLink(linkEl));
+        return items;
+      }
       // Copertina di un video dentro un link con il player che copre il filmato
       // col suo overlay: il clic destro arriva all'overlay, quindi il <video>
       // non è fra gli antenati e finisce in `mediaUnder`. Per chi guarda è lo
