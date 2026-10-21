@@ -16,12 +16,13 @@ test('una regola proxy dominio salvata si vede nella home col dominio e il paese
   test.setTimeout(60_000);
   const casa = await home(app);
 
-  // Lo stesso salvataggio che fa «apri sempre questo sito dalla Francia», con la tabella delle schede ricaricata.
-  await app.evaluate(async (_e, domain) => {
+  // Lo stesso salvataggio di «apri sempre questo sito dalla Francia» (che senza un proxy configurato si rifiuta).
+  await app.evaluate(async ({ BrowserWindow }, domain) => {
     await globalThis.SN_FILO_MEMORY.setProxyRule(domain, { country: 'fr' });
-    await globalThis.SN_HANDLERS_TEST?.aggiornaRegoleProxy?.();
+    for (const w of BrowserWindow.getAllWindows()) if (w._filoTabs) await w._filoTabs.loadProxyRules();
   }, DOMAIN);
-  expect((await regole(app)).salvate[DOMAIN]?.country).toBe('fr');
+  const prima = await regole(app);
+  expect([prima.salvate[DOMAIN]?.country, prima.vive[DOMAIN]?.country]).toEqual(['fr', 'fr']);
 
   const riga = casa.locator('.dash-cambio', { hasText: DOMAIN });
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
