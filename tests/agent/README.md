@@ -85,6 +85,23 @@ npm run test:daily            # esplora dashboard, editor, shell/tab, history, o
 ```
 Aggrega tutto in `tests/agent/reports/daily-<ts>/INDEX.md`.
 
+## 3. `italiano-chat.mjs` — l'italiano della chat su più modelli (niente Electron)
+
+Dieci turni fissi dell'utente (intervista di benvenuto, poi chat normale) sui
+modelli dati, in parallelo, col prompt e gli strumenti veri della chat. Per ogni
+giro tiene il testo grezzo del fornitore accanto a quello che Filo terrebbe, gli
+strumenti chiamati (anche il testo di una segnalazione), host e costo. Non
+giudica: errori di italiano e frasi fuori luogo li conta chi legge.
+
+```bash
+node tests/agent/italiano-chat.mjs --modelli <predefinito>,<altro>,<altro>
+node tests/agent/italiano-chat.mjs --modelli <id> --corpo '{"temperature":0.6}'   # stessa prova, richiesta cambiata
+# → tests/agent/.out/italiano-chat-<ts>.md (trascrizioni) e .json
+```
+
+`--turni N` ne fa solo i primi N; `--ordine latency|throughput|price` sceglie
+l'host come può farlo la configurazione della chat.
+
 ## Chiave API (OpenRouter)
 
 La chiave si legge da:
