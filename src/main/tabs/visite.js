@@ -10,6 +10,9 @@ const ATTESA_TITOLO_IN_PAGINA = 4_000;
 // attimo: nel primo mezzo minuto si scrive subito, dopo all'uscita, così un titolo che cambia di continuo non riempie il filo.
 const ASSESTAMENTO_TITOLO = 1_500;
 const FINESTRA_TITOLO = 30_000;
+// Una pagina che cambia indirizzo da sola non riempie il filo (#1525): senza un gesto dell'utente o di Filo, un cambio
+// a ridosso del precedente resta la stessa visita, e dopo una fila lunga ogni cambio fino al prossimo tocco.
+const FRENO = Object.freeze({ gesto: 5_000, raffica: 5_000, fila: 30 });
 
 const registrabile = (url) => /^(https?|file):/i.test(String(url || ''));
 const senzaFrammento = (url) => String(url || '').split('#')[0];
