@@ -157,6 +157,34 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, davvero basso. ');
 });
 
+test('due «xx» da cercare nella stessa frase hanno ciascuno la sua ricerca e il suo valore', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    ragionato: { 'Nasdaq aveva': ['[di soli xx][][Alphabet P/E ratio][cerca][web]', '[media un p/e di xx][][Nasdaq dot-com average P/E][cerca][web]'] },
+    fontiWeb: [{ titolo: 'P/E', sito: 'borsa.example', url: 'https://borsa.example/pe', data: '', testo: 'P/E ratios' }],
+    estrai: '[27][P/E di Alphabet][1][20 ottobre 2026]',
+  });
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+    const nasdaq = async (a) => {
+      const t = String(a.messages[a.messages.length - 1].content);
+      if (t.includes('Chi scrive ha messo delle x') && t.includes('Nasdaq dot-com')) {
+        return { text: '[175][P/E medio del Nasdaq nel 2000][1][marzo 2000]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      }
+      return prima(a);
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = nasdaq;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = nasdaq;
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('Google ha un p/e di soli xx, mentre al picco delle dot-com il Nasdaq aveva in media un p/e di xx. ');
+  await expect(valore(page, '27')).toBeVisible({ timeout: 10000 });
+  await expect(valore(page, '175')).toBeVisible({ timeout: 5000 });
+  expect((await globale(app, '__webChieste')).sort()).toEqual(['Alphabet P/E ratio', 'Nasdaq dot-com average P/E']);
+  const menu = await tastoDestroSu(page, ocra(page, 'xx').last());
+  await menu.voce('Correggi tutti gli errori (2)').click();
+  await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, mentre al picco delle dot-com il Nasdaq aveva in media un p/e di 175. ');
+});
+
 test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'è lo dice', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, { web: false, ragionato: { 'p/e di soli xx': ['[di soli xx][][Alphabet P/E ratio][cerca][web]'] } });
   await page.locator('#ta').click();
