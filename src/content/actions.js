@@ -853,7 +853,7 @@
         (async () => {
           let dataUrl;
           try {
-            dataUrl = await scaricaImmagine(src);
+            dataUrl = await scaricaImmagine(src, imgEl);
           } catch (_) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
