@@ -67,7 +67,10 @@ test('riletta una chat vecchia, il collegamento scritto lì dall\'utente si legg
   await page.locator('#input').fill('trovami una trattoria a bologna e poi la ricetta che ti avevo dato');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toBeVisible({ timeout: 30_000 });
-  const rilettura = (await app.evaluate(() => globalThis.__chiamate))[3].filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+  const tutte = await app.evaluate(() => globalThis.__chiamate);
+  console.log('CHIAMATE', tutte.length, JSON.stringify(tutte[tutte.length - 1].filter((m) => m.role === 'tool' || m.role === 'assistant').map((m) => String(m.content || JSON.stringify(m.tool_calls || '')).slice(0, 300))));
+  console.log('SCARICATI', JSON.stringify(await app.evaluate(() => globalThis.__scaricati)));
+  const rilettura = tutte[3].filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
   expect(rilettura).toContain('tienimi questo');
   expect(await app.evaluate(() => globalThis.__scaricati)).toContain(LINK);
 });
