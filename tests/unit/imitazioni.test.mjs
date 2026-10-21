@@ -84,6 +84,27 @@ test('i refusi di una lettera sul nome di un marchio, anche in fondo, danno l’
   assert.deepEqual(persi, []);
 });
 
+test('un marchio corto caduto per caso in un nome generato (cloud, anteprime) non è un’imitazione', () => {
+  const fissi = [
+    'x1tuyb9bunqa2.esempio-ostile.com', 'xg2bukfvpsdh10.esempio-ostile.com', 'xr7in9n26zv16.esempio-ostile.com',
+    'dhl5205f2.cloudfront.net', 'v379gkgj66dthdhl.execute-api.us-east-1.amazonaws.com', '4xe3odby-dh19lk58.vercel.app',
+    'igls2i7v-6xop9h3r.vercel.app',
+  ];
+  assert.deepEqual(fissi.filter((h) => evaluate('https://' + h + '/').imp), []);
+  // E su ventimila nomi così, quasi mai: prima uno su duemila, abbastanza per far cadere a caso un test.
+  let x = 1375;
+  const caso = () => { x = (x * 48271) % 2147483647; return x / 2147483647; };
+  const nome = () => Array.from({ length: 8 + Math.floor(caso() * 8) }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(caso() * 36)]).join('');
+  const presi = [];
+  for (let i = 0; i < 20000; i++) {
+    const h = nome() + ['.esempio.com', '.cloudfront.net', '.vercel.app', '.ngrok.io'][i % 4];
+    if (evaluate('https://' + h + '/').imp) presi.push(h);
+  }
+  assert.ok(presi.length <= 3, `${presi.length} nomi generati presi per imitazioni: ${presi.slice(0, 10).join(', ')}`);
+  // Il marchio corto staccato dal resto resta un'imitazione anche lì.
+  for (const h of ['dhl-x7k2m9q4.vercel.app', 'n26-3fk9x2.esempio.com']) assert.ok(evaluate('https://' + h + '/').imp, h);
+});
+
 test('il menu del link e l’apertura della pagina danno lo stesso verdetto', () => {
   const urls = PROVE.map(([h]) => 'https://' + h + '/').concat([
     'https://paypal.com@wikipedia.evil.net/', 'http://paypal.com@192.168.1.1/login', 'https://mario.rossi@example.com/',
