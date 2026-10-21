@@ -150,6 +150,8 @@ test('il comando installato, dalla shell, acceca e mette la decisione del server
     assert.deepEqual([ok.updatedInput.model, ok.updatedInput.effort, ok.updatedInput.run_in_background], ['haiku', 'medium', false]);
     assert.equal(h(prima(false, {}, { prompt: `--ticket ${ALTRO}` })).permissionDecisionReason, MOTIVO_SCONOSCIUTO);
     assert.equal(h(prima(true)).permissionDecision, 'deny');
+    assert.equal(h(avviso({ agent_id: 'w1' })).permissionDecisionReason, MOTIVO_NOTIFICA);
+    assert.equal(run(JSON.stringify(avviso({ session_id: 's2' }))).stdout, '');
     assert.equal(JSON.parse(run(JSON.stringify(dopo())).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
     assert.equal(JSON.parse(run(JSON.stringify(cambio())).stdout).decision, 'block');
     assert.equal(run(JSON.stringify(dopo({ agent_id: 'w1' }))).stdout, '');
