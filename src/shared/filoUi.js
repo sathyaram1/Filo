@@ -246,6 +246,7 @@
       const g = grafema(a.valore, s, indietro);
       return indietro ? a.valore.slice(0, s - g) + a.valore.slice(e) : a.valore.slice(0, s) + a.valore.slice(e + g);
     }
+    if (/^delete/.test(a.tipo) && a.tipo !== 'deleteByDrag' && s !== e) return a.valore.slice(0, s) + a.valore.slice(e);
     const d = typeof a.dato === 'string' ? a.dato.replace(/\r\n?/g, '\n') : (/^insert(LineBreak|Paragraph)$/.test(a.tipo) ? '\n' : null);
     // Una casella di una riga toglie gli a capo a modo suo: lì vale solo che testa e coda restino.
     if (d === null || (a.riga && d.includes('\n'))) return null;
