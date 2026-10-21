@@ -420,10 +420,10 @@
   // Vale solo il segno spedito dalla finestra di un riquadro di questo documento: chi lo spedisce non sceglie il riquadro.
   function riceviSegno(segno, sorgente) {
     if (typeof segno !== 'string' || !SEGNO.test(segno) || !sorgente || sorgente === window) return;
+    const R = global.SN_RIQUADRI_IN_ARRIVO;
     let ifr = attivo();
-    if (!ifr || !/^i?frame$/i.test(ifr.tagName || '') || ifr.contentWindow !== sorgente) {
-      ifr = [...document.querySelectorAll('iframe, frame')].find((f) => f.contentWindow === sorgente) || null;
-    }
+    if (!R) return;
+    if (!ifr || R.finestra(ifr) !== sorgente) ifr = R.riquadroDi(sorgente, document);
     if (!ifr) return;
     let q = riquadri.get(segno);
     if (!q || q.ifr !== ifr) {
