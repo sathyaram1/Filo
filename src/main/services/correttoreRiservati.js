@@ -80,7 +80,7 @@ function riservati(testo) {
   const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
   try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
-  try { for (const r of richieste(l)) out.push(...valoriRisposta(l.slice(r.fine, r.fine + 600), r.tipo)); } catch (_) {}
+  try { for (const r of richieste(l)) out.push(...valoriRisposta(l.slice(r.fine, r.fine + RISPOSTA_MAX), r.tipo)); } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   return lunghi(out);
