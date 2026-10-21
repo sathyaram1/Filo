@@ -112,6 +112,7 @@ export async function leggiRilasci({
           bozza: !!r?.draft,
           anteprima: !!r?.prerelease,
           allegati: (Array.isArray(r?.assets) ? r.assets : []).map((a) => String(a?.name || '')).filter(Boolean),
+          impronte: impronteDi ? impronteDi(String(r?.body || '')) : {},
         });
       }
       if (lotto.length < 100) return tutti;
