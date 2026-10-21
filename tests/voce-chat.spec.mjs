@@ -536,6 +536,9 @@ test('editor: con la finestra piccola la casella della chat prende tutta la riga
   expect(pos).toEqual({ micSotto: true, invioSotto: true, invioDentro: true });
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-stretta.png` });
+  await ed.addStyleTag({ content: CARATTERE_LARGO });
+  const larga = await misura();
+  expect(larga.sh).toBeLessThanOrEqual(larga.ch);
 });
 
 // In una chat bassa la casella scorre (decisione dell'owner, #256.4) ma non spinge fuori i tasti messi sotto, e
