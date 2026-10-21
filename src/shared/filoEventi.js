@@ -422,7 +422,7 @@
 
   global.SN_FILO_EVENTI = {
     VERSIONE, TIPI, AUTORI, PERIODI,
-    uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat, dove,
+    uuid, valido, crea, riga, analizza, analizzaRiga, nuovoStato, applica, compatta, elencoChat, copiaChat, dove,
     daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, delSito, coperto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
