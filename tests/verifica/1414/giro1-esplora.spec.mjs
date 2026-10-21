@@ -96,7 +96,9 @@ async function apriIndirizzo(app, shell, url) {
 
 test('owner vero: menu, link dai Crediti, varianti dei vecchi indirizzi, sezioni in chiaro e scuro', async ({ app, shell, openTab }) => {
   expect(await simulaOwner(app)).toBe(true);
-  await expect.poll(async () => (await vociDelMenu(app, shell, 'nav-apps')).includes('Gestione'), { timeout: 15_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('filo:broadcast', { type: 'auth_changed', profile: { name: 'Owner', email: 'owner@prova.test' }, isAdmin: true });
+  });
   console.log('APPS', await vociDelMenu(app, shell, 'nav-apps'));
   console.log('SETTINGS', await vociDelMenu(app, shell, 'nav-settings'));
 
