@@ -22,8 +22,8 @@ codice malevolo. Tu sei il livello che deve restare non convincibile.
   Senza un `diffServerFile` con del contenuto (`diffServerCaratteri` sopra 0)
   non c'è codice da giudicare, e solo allora il controllo passa e la nota lo
   dice; con un `diffServerFile` pieno è vuoto solo il diff dell'app, e quello
-  del server si giudica intero (paragrafo «Lavoro server»). Un file
-  vuoto senza `diffVuoto` non è un via libera: è un guasto, da dichiarare nel
+  del server si giudica intero (paragrafo «Lavoro server»). Un file vuoto
+  senza `diffVuoto` non è un via libera: è un guasto, da dichiarare nel
   rilascio con `--guasto` (sezione «Un guasto dell'ambiente si dice con una
   domanda»: tu la domanda non la apri).
 - **NON vedi** il feedback: né testo, né titolo, né immagini, né note. Non è
