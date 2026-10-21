@@ -1,6 +1,6 @@
 // Chiavi, password, codici e numeri di carta scritti in un campo non partono verso i modelli del correttore (#1446): al
 // loro posto va un segnaposto e il resto si controlla lo stesso. Le forme le riconoscono guardianoStatico.js e urlExfil.js.
-// Si cercano nel campo intero, mai pezzo per pezzo. Prove: tests/unit/correttoreRiservati.test.mjs.
+// Si cercano nel campo intero e nel testo sopra, mai pezzo per pezzo. Prove: tests/unit/correttoreRiservati.test.mjs.
 'use strict';
 
 const SEGNAPOSTO = '[dato riservato]';
@@ -8,19 +8,90 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
 
+// Chi risponde a chi chiede una password o un codice non lo annuncia («certo, Gatto2024»): lo annuncia la domanda, o la
+// richiesta senza punto di domanda («mandami il pin», «dimmela», «mi serve la password», «send me the code»).
+const RICHIESTA = new RegExp('(?<!\\p{L})(?:(?:(?:mand|invi|pass|gir|ricord)a|scriv[ei])r?|d[ai][rm])m(?:i|el[ao])(?!\\p{L})'
+  + '|(?<!\\p{L})(?:(?:mi|ci) serv(?:e|irebbe)|ho bisogno|send|give|tell|share)(?!\\p{L})', 'iu');
+const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
+// Come apre una risposta, prima del dato: «certo, …», «eccola: …».
+const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
+  'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
+  'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks']);
+const PAROLE_RISPOSTA = 12;
+// Il campo risponde all'ultima richiesta del testo sopra finché dopo di lei non c'è un'altra domanda né molto altro
+// (l'ora, «visualizzato», un «aspetta» di chi scrive).
+const DOPO_LA_RICHIESTA = 300;
+const SOPRA_MAX = 1500;
+
+function presenta() {
+  const P = globalThis.SN_URL_EXFIL && globalThis.SN_URL_EXFIL.PRESENTA;
+  return P ? [[new RegExp(P.password, 'g'), 'password'], [new RegExp(P.codice, 'g'), 'codice']] : [];
+}
+
+// Dove finisce ogni richiesta di una password o di un codice nel testo (già minuscolo), e di quale dei due.
+function richieste(l) {
+  const out = [];
+  for (const [re, tipo] of presenta()) {
+    for (const m of l.matchAll(re)) {
+      const fine = new RegExp(FINE_FRASE.source, 'g');
+      fine.lastIndex = m.index + m[0].length;
+      const f = fine.exec(l);
+      const a = f ? f.index + f[0].length : l.length;
+      const frase = l.slice(Math.max(0, m.index - 300), m.index).split(/[.!?]+\s|\n/).pop() + l.slice(m.index, a);
+      if ((f && f[0].includes('?')) || RICHIESTA.test(frase)) out.push({ fine: a, tipo });
+    }
+  }
+  return out;
+}
+
+// Le parole della risposta contano come quelle che seguono la parola che presenta il dato (segretiDetti): per una
+// password anche di sole lettere, per un codice se ha cifre.
+function valoriRisposta(risposta, tipo) {
+  const X = globalThis.SN_URL_EXFIL;
+  if (!X || !X.segretiDetti) return [];
+  const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`));
+  const out = [];
+  for (const w of risposta.split(/\s+/).filter(Boolean).slice(0, PAROLE_RISPOSTA)) {
+    const t = w.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    // «Marco:», «eccola:» presentano, non sono il dato.
+    if (!t || w.endsWith(':') || AVVII.has(t) || presentata.some((re) => re.test(t))) continue;
+    out.push(...X.segretiDetti(`${tipo} ${t}`));
+  }
+  return out;
+}
+
+function richiestaAperta(sopra) {
+  const l = sopra.toLowerCase();
+  let ultima = null;
+  for (const r of richieste(l)) if (!ultima || r.fine > ultima.fine || (r.fine === ultima.fine && r.tipo === 'password')) ultima = r;
+  if (!ultima) return null;
+  const dopo = l.slice(ultima.fine);
+  return dopo.trim().length > DOPO_LA_RICHIESTA || /\?(?=\s|$)/.test(dopo) ? null : ultima.tipo;
+}
+
+const valoreDi = (x) => String((x && x.valore) || '');
+const lunghi = (vs) => vs.map(valoreDi).filter((v) => v.length >= 4);
+
 function riservati(testo) {
   const G = globalThis.SN_GUARDIANO_STATICO;
   const X = globalThis.SN_URL_EXFIL;
   const out = [];
+  const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
-  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(testo.toLowerCase())); } catch (_) {}
+  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
+  try { for (const r of richieste(l)) out.push(...valoriRisposta(l.slice(r.fine, r.fine + 600), r.tipo)); } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
-  return out.map((x) => String((x && x.valore) || '')).filter((v) => v.length >= 4);
+  return lunghi(out);
 }
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
-const formaDi = (valore) => new RegExp(/^\d+$/.test(valore) ? valore.split('').map(esc).join('[\\s-]?') : esc(valore), 'gi');
+// Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman».
+function formaDi(valore) {
+  if (/^\d+$/.test(valore)) return new RegExp(valore.split('').join('[\\s-]?'), 'gi');
+  if (/^\p{L}+$/u.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore}(?![\\p{L}\\p{N}])`, 'giu');
+  return new RegExp(esc(valore), 'gi');
+}
 const valoriDi = (testo) => [...new Set(riservati(testo))].sort((a, b) => b.length - a.length);
 
 function oscura(testo, valori = null) {
@@ -32,15 +103,22 @@ function oscura(testo, valori = null) {
 
 // I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
 // metà di un numero di carta, può stare in un pezzo diverso dal valore, o fuori dai pezzi. `campo` e `campoDa` (dove
-// comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito.
-function pezziOscurati(pezzi, campo, campoDa) {
+// comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito. `sopra` è il testo
+// sopra il campo: la domanda a cui il campo risponde, o il messaggio che ha già detto il dato.
+function pezziOscurati(pezzi, campo, campoDa, sopra = '') {
   const unito = pezzi.join('');
   const daCampo = typeof campo === 'string' && Number.isInteger(campoDa) && campoDa >= 0
     && campo.slice(campoDa, campoDa + unito.length) === unito;
   const base = daCampo ? campo : unito;
   const scarto = daCampo ? campoDa : 0;
+  const s = typeof sopra === 'string' ? sopra.slice(-SOPRA_MAX) : '';
+  const tipo = s ? richiestaAperta(s) : null;
   // Anche pezzo per pezzo: due pezzi incollati possono fondere due numeri in uno che non è più una carta.
-  const valori = [...new Set([base, ...pezzi].flatMap(valoriDi))].sort((x, y) => y.length - x.length);
+  const valori = [...new Set([
+    ...[base, ...pezzi].flatMap(valoriDi),
+    ...(s ? valoriDi(s) : []),
+    ...(tipo ? lunghi(valoriRisposta(base.toLowerCase(), tipo)) : []),
+  ])].sort((x, y) => y.length - x.length);
   const coperti = [];
   for (const valore of valori) for (const m of base.matchAll(formaDi(valore))) coperti.push([m.index - scarto, m.index - scarto + m[0].length]);
   let a = 0;
@@ -62,24 +140,27 @@ function pezziOscurati(pezzi, campo, campoDa) {
 }
 
 // Le parti di una richiesta del correttore che portano testo: quello del campo, i candidati, la pagina intorno. Il campo
-// intero serve solo qui: non parte.
+// intero e il testo sopra servono solo qui: non partono.
 function richiestaSenzaRiservati(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const out = { ...p };
   delete out.campo;
   delete out.campoDa;
+  delete out.sopra;
+  // Il testo sopra lo legge la pagina a ogni richiesta; senza, vale quello che parte con lei.
+  const sopra = [p.sopra, p.contesto && p.contesto.prima, p.luogo && p.luogo.conversazione].find((t) => typeof t === 'string') || '';
   const chiavi = ['prima', 'nuovo', 'dopo'];
-  const { pezzi, valori } = pezziOscurati(chiavi.map((k) => (typeof p[k] === 'string' ? p[k] : '')), p.campo, p.campoDa);
+  const { pezzi, valori } = pezziOscurati(chiavi.map((k) => (typeof p[k] === 'string' ? p[k] : '')), p.campo, p.campoDa, sopra);
   chiavi.forEach((k, i) => { if (typeof p[k] === 'string') out[k] = pezzi[i]; });
   const delCampo = (t) => oscura(oscura(t, valori));
   if (Array.isArray(p.candidati)) out.candidati = p.candidati.map((c) => (c && typeof c === 'object' ? { ...c, pezzo: delCampo(c.pezzo) } : c));
   if (p.luogo && typeof p.luogo === 'object') {
     out.luogo = { ...p.luogo };
-    for (const k of ['titolo', 'conversazione']) if (typeof p.luogo[k] === 'string') out.luogo[k] = oscura(p.luogo[k]);
+    for (const k of ['titolo', 'conversazione']) if (typeof p.luogo[k] === 'string') out.luogo[k] = delCampo(p.luogo[k]);
   }
   if (p.contesto && typeof p.contesto === 'object') {
     out.contesto = { ...p.contesto };
-    for (const k of ['prima', 'dopo']) if (typeof p.contesto[k] === 'string') out.contesto[k] = oscura(p.contesto[k]);
+    for (const k of ['prima', 'dopo']) if (typeof p.contesto[k] === 'string') out.contesto[k] = delCampo(p.contesto[k]);
   }
   return out;
 }
