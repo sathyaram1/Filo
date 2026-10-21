@@ -86,27 +86,30 @@ function creaDeposito({ cartella, meseDi }) {
     }
   }
 
-  function leggiMese(mese, testo) {
-    const s = statoDi(mese);
-    for (const riga of testo.replace(/^\uFEFF/, '').split('\n')) {
-      if (!riga.trim()) continue;
-      s.righe++;
-      let o;
-      try { o = JSON.parse(riga); } catch (_) { continue; }
-      if (!o || typeof o !== 'object') continue;
-      if (o.r && typeof o.r === 'object' && typeof o.r.id === 'string' && o.r.id) {
-        const seq = Number.isFinite(o.s) ? o.s : maxSeq + 1;
-        const prima = record.get(o.r.id);
-        if (prima) statoDi(prima.mese).vivi--;
-        record.set(o.r.id, { r: o.r, seq, mese });
-        s.vivi++;
-        if (seq > maxSeq) maxSeq = seq;
-        if (seq < minSeq) minSeq = seq;
-      } else if (typeof o.u === 'string' && o.p && typeof o.p === 'object') {
-        const v = record.get(o.u);
-        if (v && v.mese === mese) v.r = { ...v.r, ...o.p };
-      }
+  function leggiRiga(mese, s, riga) {
+    if (!riga.trim()) return;
+    s.righe++;
+    let o;
+    try { o = JSON.parse(riga); } catch (_) { return; }
+    if (!o || typeof o !== 'object') return;
+    if (o.r && typeof o.r === 'object' && typeof o.r.id === 'string' && o.r.id) {
+      const seq = Number.isFinite(o.s) ? o.s : maxSeq + 1;
+      const prima = record.get(o.r.id);
+      if (prima) statoDi(prima.mese).vivi--;
+      record.set(o.r.id, { r: o.r, seq, mese });
+      s.vivi++;
+      if (seq > maxSeq) maxSeq = seq;
+      if (seq < minSeq) minSeq = seq;
+    } else if (typeof o.u === 'string' && o.p && typeof o.p === 'object') {
+      const v = record.get(o.u);
+      if (v && v.mese === mese) v.r = { ...v.r, ...o.p };
     }
+  }
+
+  // Un mese si legge a righe: intero in una stringa, oltre una certa misura non si leggerebbe pi\u00F9 (#1525).
+  async function leggiMese(mese) {
+    const s = statoDi(mese);
+    return perRiga(fileDi(mese), (riga, i) => leggiRiga(mese, s, i === 0 ? riga.replace(/^\uFEFF/, '') : riga));
   }
 
   async function carica() {
