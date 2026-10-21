@@ -2549,7 +2549,7 @@ async function eseguiAzioneFilo(action, {
       gia = !!radio && radio.acceso === false;
     }
     action._richiestaSistema = { ...q, ...(nome ? { nome } : {}), ...(gia ? { gia: true } : {}) };
-    // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI).
+    // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI in azioniPerModello.js).
     if (nome) action._nomeSistema = nome;
     else delete action._nomeSistema;
   }
@@ -4607,48 +4607,10 @@ function proxyUnavailableForPrompt(actions) {
     + 'Dillo all\'utente in una frase, senza darlo per fatto e senza promettere che succederà da solo, e non riprovare.]';
 }
 
-// I campi che portano un testo salvato da Filo, oltre alle voci colpite
-// (`_targets`, per ogni azione): un'azione nuova che ripete un nome salvato va qui.
-const CAMPI_SALVATI = {
-  TIMER: ['label', 'etichetta'],
-  SVEGLIA: ['label', 'etichetta'],
-  SALVA_LEZIONE: ['testo', 'text', 'lezione'],
-  DIMENTICA: ['_righe'],
-  CORREGGI_MEMORIA: ['_righe', 'nuovo'],
-  ANNULLA_CAMBIO: ['_fraseCambio'],
-  BLUETOOTH: ['_nomeSistema'],
-  WIFI: ['_nomeSistema'],
-  APRI_SALVATA: ['_titolo'],
-};
-
-// I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
-// diventano «voce N», e i testi veri stanno nel recinto sotto, ripuliti.
-function descriviPerModello(action, { fatto = false } = {}) {
-  const Levels = globalThis.SN_ACTION_LEVELS;
-  if (!Levels) return '';
-  const descrivi = fatto && Levels.describeDone ? Levels.describeDone : Levels.describe;
-  const tipo = String((action && action.type) || '').toUpperCase();
-  const voci = [];
-  const voce = (v) => {
-    const s = String(v);
-    if (!voci.includes(s)) voci.push(s);
-    return `voce ${voci.indexOf(s) + 1}`;
-  };
-  const copia = { ...action };
-  for (const campo of ['_targets', ...(CAMPI_SALVATI[tipo] || [])]) {
-    const v = action && action[campo];
-    if (Array.isArray(v)) copia[campo] = v.map(voce);
-    else if (typeof v === 'string' && v.trim()) copia[campo] = voce(v);
-  }
-  const frase = descrivi(copia) || '';
-  const usate = voci.map((v, i) => ({ v, n: i + 1 })).filter(({ n }) => new RegExp(`\\bvoce ${n}\\b`).test(frase));
-  if (!usate.length) return frase;
-  const E = globalThis.SN_ESTERNO;
-  return `${frase}\n${E.imbusta({
-    tipo: 'TESTO_SALVATO',
-    testo: usate.map(({ v, n }) => `voce ${n}: ${E.neutralizza(v, { unaRiga: true })}`).join('\n'),
-  })}`;
-}
+// Le regole stanno in src/shared/azioniPerModello.js (#592.4, #1396).
+const descriviPerModello = (...a) => globalThis.SN_AZIONI_PER_MODELLO.descrivi(...a);
+const interruptedActionsForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.interrotte(...a);
+const confirmedActionsForPrompt = (...a) => globalThis.SN_AZIONI_PER_MODELLO.confermate(...a);
 
 // Le pagine aperte con NAVIGA che si sono spostate da sé su un sito bloccato quando il turno era
 // già finito (la scheda le ha segnate `_output.dopo`): il modello le aveva date per aperte.
@@ -4663,55 +4625,6 @@ function apertureFermateDopoForPrompt(actions) {
   }
   return righe.length
     ? `[Pagine che avevi aperto e che poi si sono spostate da sole su un sito bloccato: Filo le ha fermate, l'utente è rimasto sulla pagina di passaggio e il sito NON l'ha visto; sotto la tua risposta ha «Apri comunque».\n${righe.join('\n')}]`
-    : '';
-}
-
-// Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
-// sono state eseguite PRIMA che tutto si fermasse, e ripeterle vuol dire un
-// secondo timer, un secondo appunto. Dato di sistema, non istruzione.
-// `fermato`: l'ha fermato l'utente col quadrato (#578), non un guasto. Lo si dice anche senza azioni fatte: al turno
-// dopo il modello deve sapere che la risposta di prima non c'è.
-function interruptedActionsForPrompt(actions, { fermato = false } = {}) {
-  if (!Array.isArray(actions)) actions = [];
-  const righe = [];
-  for (const a of actions) {
-    if (!a || a._executed === false || a._confirm) continue;
-    let cosa = String(a.type || '').toUpperCase();
-    try {
-      const d = descriviPerModello(a, { fatto: true });
-      if (d) cosa = d.replace(/\.+\s*$/, '');
-    } catch (_) {}
-    righe.push(`- ${cosa}`);
-  }
-  if (fermato) {
-    return righe.length
-      ? `[L'utente ti ha fermato a metà lavoro, prima che rispondessi. Queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle.]`
-      : '[L\'utente ti ha fermato a metà lavoro, prima che rispondessi.]';
-  }
-  return righe.length
-    ? `[Il tentativo si è interrotto per un guasto, ma queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle: riprendi da qui.]`
-    : '';
-}
-
-// Le azioni che l'utente ha CONFERMATO nel popup dopo che il turno era già
-// finito (livello 2 e 3). Il modello non le vede in nessun altro modo: quando
-// ha emesso l'azione era «in attesa di conferma», e il sì è arrivato dopo. Se
-// al turno dopo l'utente chiede «l'hai attivato?», senza questa riga può solo
-// tirare a indovinare. Dato di sistema, non istruzione.
-function confirmedActionsForPrompt(actions) {
-  if (!Array.isArray(actions)) return '';
-  const righe = [];
-  for (const a of actions) {
-    if (!a || !a._confirmed) continue;
-    let cosa = String(a.type || '').toUpperCase();
-    try {
-      const d = descriviPerModello(a, { fatto: true });
-      if (d) cosa = d.replace(/\.+\s*$/, '');
-    } catch (_) {}
-    righe.push(`- ${cosa}`);
-  }
-  return righe.length
-    ? `[L'utente ha CONFERMATO e il sistema ha eseguito, dopo la tua risposta:\n${righe.join('\n')}\nÈ già fatto: non riproporlo e non dire che è ancora da fare.]`
     : '';
 }
 

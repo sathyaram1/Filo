@@ -120,6 +120,7 @@ require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "te
 // #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
 require(path.join(SHARED, 'autonomia.js'));
 require(path.join(SHARED, 'actionLevels.js'));
+require(path.join(SHARED, 'azioniPerModello.js'));  // come un'azione torna al modello: «voce N» e testi salvati recintati (#592.4)
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'zoomPagina.js'));  // zoom della pagina: passo, limiti, livello↔percentuale (una regola sola per tasti e chat)
