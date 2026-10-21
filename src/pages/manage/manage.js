@@ -2409,9 +2409,10 @@
         });
       }
     }
+    // Solo sul rombo azzurro, come nel dettaglio: lì è l'unica uscita (#1575).
     const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
     if (lavoroLocale) {
-      voci.push({ testo: '💻 Approva come lavoro server', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
+      voci.push({ testo: lavoroLocale.label, titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
     if (isAdmin && MR.fiduciaCheck(fb).ok) {
       voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); impostaFiducia(fb._id, true); } });
