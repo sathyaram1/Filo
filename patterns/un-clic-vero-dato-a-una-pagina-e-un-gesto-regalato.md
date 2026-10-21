@@ -87,6 +87,11 @@ voleva.
   riscrittura), e gli osservatori del documento vecchio tacciono: si riaggancia a ogni `load`. Un riquadro che sta per
   caricare un indirizzo non si tocca prima del `load`: toccato prima, il suo preload non parte e Filo sparisce da lì
   (regola e porte in [riquadri incorporati](riquadri-incorporati-iframe-filo-gira-anche-li.md), #1560). Un riquadro dentro una radice ombra non lo vedono gli osservatori né `window.frames` (#737.1 giro 10): si cerca al
+  caricare un indirizzo non si tocca prima del `load`: toccato prima, il suo preload non parte e Filo sparisce da lì.
+  Basta leggerne `contentWindow` per un confronto, da qualunque script di Filo nella pagina (#1568: il tracciatore
+  dei moduli lo faceva al montaggio, e menu e zoom mancavano nei riquadri arrivati dopo). La prova monta Filo coi
+  riquadri ancora fermi: `tests/helpers/riquadriInRitardo.mjs`.
+  Un riquadro dentro una radice ombra non lo vedono gli osservatori né `window.frames` (#737.1 giro 10): si cerca al
   passaggio del puntatore, prima della pressione. Radice aperta: l'evento porta il riquadro, o si visitano le radici.
   Radice chiusa: il preload conta i figli nell'albero dei frame, e a quelli in più fa presentare il riquadro nel suo
   mondo isolato; alla cieca solo quando nessun riquadro visto è ancora in arrivo. Resta fuori un riquadro di una
