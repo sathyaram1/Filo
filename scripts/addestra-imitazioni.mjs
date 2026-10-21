@@ -171,7 +171,7 @@ function sinteticiParole(etichetta) {
     if (visti.has(t) || !/^[a-z0-9]+$/.test(t)) continue;
     visti.add(t);
     // Un marchio corto attaccato a una parola sta dentro troppe parole vere (ing in login): solo col trattino.
-    const forme = t.length <= 4 ? [(w) => `${w}-${t}`, (w) => `${t}-${w}`]
+    const forme = t.length <= 3 ? [(w) => `${w}-${t}`, (w) => `${t}-${w}`]
       : [(w) => `${w}-${t}`, (w) => `${t}-${w}`, (w) => w + t, (w) => t + w];
     const propri = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
     // Ogni parola con ogni marchio: un marchio che è anche una parola ha contro di sé tutte le parole vere che lo
