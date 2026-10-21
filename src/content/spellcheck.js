@@ -1362,10 +1362,10 @@
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
-    ]) : [];
+    ]).filter(libero) : [];
     const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
     state.codiceTesto = d.testo;
-    state.codiceT2 = [...errori, ...date];
+    state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
     const scrive = inScritturaNelCampo(state);
     return state.codice.some((c) => c.segno === 'errore' && c.dubbio && !verdetto(state, c) && !state.richiesti.has(Rg.chiaveVerdetto(c))
