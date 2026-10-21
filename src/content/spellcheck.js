@@ -2004,6 +2004,11 @@
     if (!state || !segno) return;
     esitoSegno(el, segno, 'rifiutata');
     const ig = chiaveIgnora(segno);
+    // Le x di un segnaposto si ignorano con le parole che le precedono: «di soli xx» non spegne «un p/e di xx».
+    if (segno.tipo === 'segnaposto') {
+      const prima = getEditableText(el).slice(Math.max(0, segno.start - 40), segno.start);
+      ig.segment = (/(?:\S+[^\S\n]+){0,2}$/.exec(prima) || [''])[0] + segno.segment;
+    }
     state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
     renderOverlayContent(state);
     const parola = String(segno.segment || '').trim();
