@@ -358,7 +358,8 @@ function costruisci() {
     }
   }
   for (const h of conflitto) etichetta.delete(h);
-  const scritte = new Map([...sinteticiRefusi(etichetta), ...sinteticiParole(etichetta), ...leggiTsv(ETICHETTE), ...sinteticiEsca()]
+  const scritte = new Map([...sinteticiRefusi(etichetta), ...sinteticiParole(etichetta), ...sinteticiNomi(etichetta), ...leggiTsv(ETICHETTE),
+    ...sinteticiEsca()]
     .map((r) => [r.h, r]));
   const gruppi = [];
   const perSito = new Map();
