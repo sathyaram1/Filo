@@ -241,11 +241,17 @@
           id: ev.id, ts: ev.ts, url: ev.url, titolo: ev.titolo, scheda: ev.scheda ?? null, dispositivo: ev.dispositivo,
           // Una scheda chiusa prima del filo, entrata alla sua data (#872): riassunto e vettore restano nel suo archivio.
           ...(stringa(ev.archivio) ? { archivio: ev.archivio } : {}),
+          // Tagliati alla misura (src/main/services/misurePagine.js): un indirizzo a metà non si riapre come intero.
+          ...(ev.urlTagliato === true ? { urlTagliato: true } : {}),
+          ...(ev.titoloTagliato === true ? { titoloTagliato: true } : {}),
         });
         break;
       case TIPI.TITOLO_PAGINA: {
         const p = stato.pagine.get(ev.visita);
-        if (p) p.titolo = ev.titolo;
+        if (p) {
+          p.titolo = ev.titolo;
+          if (ev.titoloTagliato === true) p.titoloTagliato = true; else delete p.titoloTagliato;
+        }
         break;
       }
       case TIPI.CANCELLAZIONE: {
