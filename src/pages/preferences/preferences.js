@@ -979,6 +979,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'featureFlags.help':
       case 'featureFlags.spellcheck':
