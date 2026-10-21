@@ -489,7 +489,7 @@
     let finishReason = null;
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
-    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0 };
     let generationId = null;
 
     // Una risposta rotta a metà si paga per quanto il modello aveva scritto: l'errore porta con sé l'id per chiederne il costo.
