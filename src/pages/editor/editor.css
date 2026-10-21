@@ -389,8 +389,10 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   flex: 0 0 auto; height: 34px; padding: 0 10px; border: none; border-radius: 8px;
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
 }
-/* Chat stretta (finestra piccola): accanto a microfono e invio la casella teneva due parole spezzate a metà;
-   prende la riga intera e i tasti vanno sotto, a destra. */
+/* Tasti sotto, a destra, e la casella su tutta la riga: sempre in una chat stretta (accanto teneva due parole spezzate
+   a metà), e quando sotto la richiesta si legge intera e accanto no (la regola sta nel modulo chat dell'editor). */
+.ed-chat-input.ed-chat-sotto { flex-wrap: wrap; justify-content: flex-end; --ed-chat-tasti: 38px; }
+.ed-chat-input.ed-chat-sotto textarea { flex-basis: 100%; }
 @container (max-width: 180px) {
   .ed-chat-input { flex-wrap: wrap; justify-content: flex-end; --ed-chat-tasti: 38px; }
   .ed-chat-input textarea { flex-basis: 100%; }
