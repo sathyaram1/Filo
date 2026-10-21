@@ -4176,8 +4176,9 @@
     if (action.kind === 'archive') { payload.archiveOverride = 'archived'; locale.archiveOverride = 'archived'; }
     if (action.kind === 'restore') { payload.archiveOverride = 'keep_open'; locale.archiveOverride = 'keep_open'; }
     if (extra && typeof extra.notes === 'string') { payload.notes = extra.notes; locale.notes = extra.notes; }
-    // #913: il segno e il sì dell'owner nella stessa scrittura dell'approvazione. Il CHI lo mette il main.
-    if (action.locale) { payload.localOnly = true; payload.localApproval = true; }
+    // #913: il segno, e il sì dell'owner a chi ne ha bisogno, nella stessa scrittura dell'approvazione. Il CHI lo
+    // mette il main.
+    if (action.locale) { payload.localOnly = true; if (action.approva) payload.localApproval = true; }
 
     setActionsBusy(true);
     setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
