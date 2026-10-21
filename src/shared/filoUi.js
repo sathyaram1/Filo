@@ -326,8 +326,9 @@
       // L'annuncio vero con un cambio del sito dentro: resta quello che l'utente ha scritto, applicato al suo testo.
       const x = annunciato ? atteso(a) : null;
       if (annunciato) st.annuncio = null;
-      if (x !== null && ESATTI.test(a.tipo)) {
-        const fine = x.length - a.valore.length + a.sel[1];
+      if (x !== null) {
+        const fine = UN_PASSO.test(a.tipo) ? (a.tipo.endsWith('Backward') ? a.sel[0] - (a.valore.length - x.length) : a.sel[0])
+          : x.length - a.valore.length + a.sel[1];
         c.value = x;
         try { c.setSelectionRange(fine, fine); } catch (_) {}
         st.inCorso.push({ e, livello: nostraScrittura });
