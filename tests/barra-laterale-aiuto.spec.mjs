@@ -144,6 +144,49 @@ test('in cima alla barra: un clic apre l\'Aiuto, il secondo detta nella sua case
   expect(await app.evaluate(() => globalThis.__aiuto.chiamate)).toBe(0);
 });
 
+// Giro 1 della verifica: l'icona diceva «Ferma» ma il clic riapriva il pannello, col microfono acceso.
+test('Aiuto ridotto mentre detta: l\'icona dice «Ferma» e il clic ferma, nella barra e nella riga del tasto destro', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  await microfonoFinto(shell);
+  const page = await sito(app, openTab, testServer);
+  const barra = await barraAperta(app);
+  const help = icona(barra);
+  await help.click();
+  const aiuto = page.locator('.sn-sidebar');
+  await expect(aiuto).toBeVisible({ timeout: 8_000 });
+  await help.click();
+  const mic = aiuto.locator('.sn-voce-btn');
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await aiuto.locator('.sn-sidebar-collapse').click();
+  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await expect(help).toHaveAttribute('aria-label', 'Ferma');
+  await help.click();
+  await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
+  // Fermato, a pannello ridotto l'icona torna a dire che lo apre, e lo fa.
+  await expect(mic).toHaveAttribute('data-stato', 'pronto', { timeout: 10_000 });
+  await expect(help).toHaveAttribute('aria-label', 'Aiuto');
+  await help.click();
+  await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
+
+  // La stessa regola per l'icona portata nella riga del tasto destro.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'primary', beforeId: 'translate' }, {}));
+  await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('help');
+  await comandaBarra(app, 'chiudi');
+  await page.locator('h1').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]').click();
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await aiuto.locator('.sn-sidebar-collapse').click();
+  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
+  await page.locator('h1').click({ button: 'right' });
+  const nelMenu = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
+  await expect(nelMenu).toHaveAttribute('aria-label', 'Ferma', { timeout: 8_000 });
+  await nelMenu.click();
+  await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
+});
+
 test('Filo risponde ad Aiuto ridotto: la striscia si accende e si spegne aprendo la risposta', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app);
