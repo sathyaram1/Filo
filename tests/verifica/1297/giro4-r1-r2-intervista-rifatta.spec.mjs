@@ -86,7 +86,7 @@ test('r1 il collegamento diretto alla carbonara apre la carbonara anche con l’
 
 test.describe('utente nuovo', () => {
   test.use({ accoglienzaFatta: false });
-  test('tolta con la × l’intervista chiusa a metà, la home già aperta non offre più di riprenderla', async ({ app, shell, openTab }) => {
+  test('r2 tolta con la × l’intervista chiusa a metà, la home già aperta non offre più di riprenderla', async ({ app, shell, openTab }) => {
     test.setTimeout(150_000);
     const page = await prepara(app, shell);
     await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
