@@ -51,6 +51,7 @@
   <script src="filo://shared/campoNumero.js"></script>
   <link rel="stylesheet" href="filo://credits/credits.css" />
   <script src="filo://shared/compiti.js"></script>
+  <script src="filo://shared/righeVive.js"></script>
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
@@ -1579,8 +1580,12 @@
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent); color: var(--sn-fg);
     }
     .mg-cp-istruzioni { resize: vertical; min-height: 72px; }
-    .mg-cp-scelte { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-    .mg-cp-scelta { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sn-muted); }
+    /* Etichetta sopra ogni scelta, come i menu a tendina di Filo che si dispongono così da soli; i pulsanti in basso. */
+    .mg-cp-scelte { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
+    .sn-page .mg-cp-scelta {
+      display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0;
+      font-size: 12px; font-weight: 400; color: var(--sn-muted);
+    }
     .sn-page .mg-cp-scelta input.mg-auto-number { width: 64px; }
     .mg-cp-parti { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px 28px; align-items: start; }
     .mg-cp-parti[hidden] { display: none; }
@@ -1606,7 +1611,9 @@
     .mg-cp-chiamate { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
     .mg-cp-chiamata { font-size: 12px; color: var(--sn-fg); display: flex; flex-wrap: wrap; gap: 2px 10px; font-variant-numeric: tabular-nums; }
     .mg-cp-guasto { color: var(--sn-error); overflow-wrap: anywhere; }
-    .mg-cp-azioni { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mg-cp-azioni { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 4px; }
+    .mg-cp-azioni:empty { display: none; }
+    .mg-cp-non-fidato { color: var(--mg-urgente-color, #c0392b); }
     .mg-cp-altri { margin-top: 10px; }
     .sn-page button.mg-cp-altri[hidden] { display: none; }
     .mg-automation h2 {
@@ -2184,7 +2191,7 @@
           <button type="button" class="sn-btn sn-btn-secondary" id="mgCpNuovoApri" title="Un compito senza feedback, per un agente delle routine">Nuovo compito</button>
         </div>
         <form class="mg-cp-nuovo" id="mgCpNuovo" hidden autocomplete="off" novalidate>
-          <input type="text" id="mgCpTitolo" class="mg-cp-campo" placeholder="Cosa deve fare" maxlength="300" aria-label="Titolo del compito" />
+          <input type="text" id="mgCpTitolo" class="mg-cp-campo" placeholder="Cosa deve fare" aria-label="Titolo del compito" />
           <textarea id="mgCpIstruzioni" class="mg-cp-campo mg-cp-istruzioni" rows="4" placeholder="Istruzioni" aria-label="Istruzioni"></textarea>
           <div class="mg-cp-scelte">
             <label class="mg-cp-scelta" title="Più alta passa prima. I feedback a priorità 3 stanno da 50 in su, «Gestisci la risposta» a 47.">Urgenza
@@ -2192,6 +2199,7 @@
             </label>
             <label class="mg-cp-scelta">Modello <select id="mgCpModello"></select></label>
             <label class="mg-cp-scelta">Sforzo <select id="mgCpSforzo"></select></label>
+            <label class="mg-cp-scelta" title="lavoro: apre feedback e domande; server: anche il repo del server">Ambito <select id="mgCpAmbito"></select></label>
             <button type="submit" class="sn-btn" id="mgCpCrea">Crea</button>
             <button type="button" class="sn-btn sn-btn-secondary" id="mgCpChiudi">Annulla</button>
             <span class="mg-action-msg" id="mgCpMsg" role="status"></span>

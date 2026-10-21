@@ -15,8 +15,8 @@ const K = globalThis.SN_COMPITI;
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/ownerCompiti';
 const USO = [
   'Uso: node scripts/compito.mjs <comando>',
-  `  crea --titolo "…" [--urgenza N] [--modello m] [--sforzo s] [--istruzioni "…" | --istruzioni -]`,
-  `                         urgenza da ${K.URGENZA.min} a ${K.URGENZA.max} (senza: ${K.URGENZA.nuovo}); modello fra ${K.MODELLI.join(', ')}; sforzo fra ${K.SFORZI.join(', ')}`,
+  `  crea --titolo "…" [--urgenza N] [--modello m] [--sforzo s] [--ambito a] [--istruzioni "…" | --istruzioni -]`,
+  `                         urgenza da ${K.URGENZA.min} a ${K.URGENZA.max} (senza: ${K.URGENZA.nuovo}); modello fra ${K.MODELLI.join(', ')}; sforzo fra ${K.SFORZI.join(', ')}; ambito fra ${K.AMBITI.join(', ')} (server solo da un biglietto fidato)`,
   '  elenco                 gli aperti e in corso, nell\'ordine in cui il server li darebbe, e gli ultimi chiusi',
   '  annulla C-n            un compito scritto a mano ancora in attesa',
 ].join('\n');
@@ -32,7 +32,7 @@ export function leggiArgomenti(argv) {
   if (cmd === 'crea') {
     const out = { cmd, compito: { urgenza: K.URGENZA.nuovo } };
     for (let i = 1; i < a.length; i++) {
-      const m = /^--(titolo|urgenza|modello|sforzo|istruzioni)(?:=(.*))?$/s.exec(a[i]);
+      const m = /^--(titolo|urgenza|modello|sforzo|ambito|istruzioni)(?:=(.*))?$/s.exec(a[i]);
       if (!m) return { errore: `"${a[i].slice(0, 40)}" non vale qui.\n${USO}` };
       const v = m[2] !== undefined ? m[2] : a[++i];
       if (v === undefined) return { errore: `--${m[1]} vuole un valore.` };
@@ -53,7 +53,7 @@ export function nonFidati(compiti) {
 export function formattaElenco(r) {
   const d = K.dividi(r);
   const riga = (c) => {
-    const costo = K.costoTesto(K.costoTotale(c));
+    const costo = K.costoTesto(K.costoTotale(c), K.costoParziale(c));
     const pezzi = [`u ${c.urgenza}`, K.modelloTesto(c.modello, c.sforzo), K.nomeStato(c)];
     if (c.esito) pezzi.push(c.esito);
     if (costo) pezzi.push(costo);

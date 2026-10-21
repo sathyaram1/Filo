@@ -47,9 +47,17 @@
     return somma === null ? null : Math.round(somma * 10000) / 10000;
   }
 
-  function costoTesto(n) {
+  /** La somma non dice tutto: qualche chiamata senza costo, o le più vecchie non tenute. */
+  function costoParziale(c) {
+    const lista = Array.isArray(c && c.biglietti) ? c.biglietti : [];
+    return Number(c && c.bigliettiTolti) > 0 || lista.some((b) => !b || typeof b.costo !== 'number' || !Number.isFinite(b.costo));
+  }
+
+  /** «1,60 $»; «almeno» davanti a una somma parziale, «meno di 0,01 $» per un costo vero ma minimo. */
+  function costoTesto(n, parziale = false) {
     if (typeof n !== 'number' || !Number.isFinite(n)) return '';
-    return `${n.toFixed(2).replace('.', ',')} $`;
+    const cifra = n > 0 && n < 0.005 ? 'meno di 0,01 $' : `${n.toFixed(2).replace('.', ',')} $`;
+    return parziale ? `almeno ${cifra}` : cifra;
   }
 
   /** Una durata leggibile: «40 s», «12 min», «3 h 05». */
@@ -109,6 +117,6 @@
 
   global.SN_COMPITI = Object.freeze({
     NOME_FASE, NOME_STATO, MODELLI, SFORZI, AMBITI, TETTI, URGENZA,
-    etichetta, nomeStato, modelloTesto, costoTotale, costoTesto, durataTesto, urgenzaTesto, dividi, validaNuovo,
+    etichetta, nomeStato, modelloTesto, costoTotale, costoParziale, costoTesto, durataTesto, urgenzaTesto, dividi, validaNuovo,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : self);

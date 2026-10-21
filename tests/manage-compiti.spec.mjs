@@ -50,6 +50,12 @@ async function apri(openTab, { owner = true, elenco = null, falliscono = false }
       if (msg && msg.type === 'compiti_elenco') {
         cp.letture += 1;
         cp.inviati.push(msg);
+        // Una lettura lenta vede lo stato di quando è partita, come quella vera.
+        const fotografia = JSON.parse(JSON.stringify({ aperti: cp.aperti, storico: cp.storico }));
+        if (cp.lento) {
+          await new Promise((r) => setTimeout(r, cp.lento));
+          return { ok: true, aperti: fotografia.aperti, storico: fotografia.storico, altri: true, adesso: Date.now() };
+        }
         if (cp.falliscono) return { ok: false, error: 'Il server non risponde.' };
         if (msg.prima) return { ok: true, aperti: cp.aperti, storico: cp.vecchi, altri: false, adesso: Date.now() };
         return JSON.parse(JSON.stringify(elenco || { ok: true, aperti: cp.aperti, storico: cp.storico, altri: true, adesso: Date.now() }));
@@ -217,7 +223,7 @@ test('una lettura fallita lo dice e non cancella le righe già lette', async ({ 
   await expect(righe(page, 'inAttesa')).toHaveCount(2);
   await page.evaluate(() => { window.__cp.falliscono = false; });
   await page.evaluate(() => window.__mgCompiti.carica());
-  await expect(page.locator('#mgCpStato')).toHaveText('');
+  await expect(page.locator('#mgCpStato')).toHaveText(/^Aggiornati alle \d\d:\d\d$/);
 });
 
 test('a server vuoto ogni parte dice che è vuota, senza inventare numeri', async ({ openTab }) => {
@@ -239,4 +245,45 @@ test('tema scuro: la scheda si legge come in chiaro', async ({ openTab }) => {
   });
   expect(colori.testo).not.toBe(colori.fondo);
   await page.screenshot({ path: 'tests/.shots/manage-compiti-scuro.png' });
+});
+
+test('creato mentre una rilettura è in volo, il compito compare lo stesso, e la tastiera conferma l\'annullamento', async ({ openTab }) => {
+  const page = await apri(openTab);
+  await page.evaluate(() => { window.__cp.lento = 800; window.__mgCompiti.carica(); });
+  await page.locator('#mgCpNuovoApri').click();
+  await page.locator('#mgCpTitolo').fill('Durante la rilettura');
+  await page.locator('#mgCpAmbito').selectOption('server');
+  await page.locator('#mgCpCrea').click();
+  const nuovo = page.locator('.mg-cp-parte[data-parte="inAttesa"] .mg-cp-riga[data-id="C-9"]');
+  await expect(nuovo).toBeVisible();
+  await expect(nuovo).toBeFocused();
+  const crea = await page.evaluate(() => window.__cp.inviati.find((m) => m.type === 'compito_crea'));
+  expect(crea.compito.ambito).toBe('server');
+  await page.evaluate(() => { window.__cp.lento = 0; });
+
+  await nuovo.getByRole('button', { name: 'Annulla il compito' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(nuovo.getByRole('button', { name: 'Sì, annullalo' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.mg-cp-parte[data-parte="storico"] .mg-cp-riga[data-id="C-9"]')).toContainText('annullato');
+});
+
+test('chi ha scritto un compito a mano si vede; un titolo troppo lungo si rifiuta col numero, non si taglia', async ({ openTab }) => {
+  const sessione = { ...MANUALE, id: 'C-8', numero: 8, titolo: 'Da una sessione', creatoDa: 'sessione', fiducia: 'non_fidato' };
+  const page = await apri(openTab, { elenco: { ok: true, aperti: [MANUALE, sessione], storico: [], altri: false, adesso: Date.now() } });
+  await expect(page.locator('.mg-cp-riga[data-id="C-8"] .mg-cp-non-fidato')).toHaveText('da una sessione · non fidato');
+  await expect(page.locator('.mg-cp-riga[data-id="C-7"] .mg-cp-non-fidato')).toHaveCount(0);
+  await page.locator('#mgCpNuovoApri').click();
+  await page.locator('#mgCpTitolo').fill('x'.repeat(320));
+  await page.locator('#mgCpCrea').click();
+  await expect(page.locator('#mgCpMsg')).toHaveText('Il titolo ha 320 caratteri: il massimo è 300.');
+});
+
+test('«Apri il feedback» su un feedback che la pagina non ha lo dice, invece di non fare niente', async ({ openTab }) => {
+  const page = await apri(openTab);
+  await page.evaluate(() => window.__mgTest.setData([]));
+  const r = righe(page, 'inAttesa').first();
+  await r.click();
+  await r.getByRole('button', { name: 'Apri il feedback' }).click();
+  await expect(page.locator('#mgCpStato')).toHaveText('#1196 non è fra i feedback caricati in questa pagina.');
 });
