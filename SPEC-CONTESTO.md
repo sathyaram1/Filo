@@ -345,11 +345,18 @@ una chiamata vera.
 - **Il prefisso minimo che Haiku 5.5 mette in cache** è di 512 token. Sotto il
   minimo la cache non scatta e nessuno lo segnala.
 - **Il ragionamento di Haiku 5.5** è adattivo e acceso di serie (sforzo
-  predefinito medio). I blocchi di ragionamento si rimandano intatti (oggi
-  Filo lo fa, e contano come entrata); riscrivere o togliere turni già mandati
-  li invalida, e sugli account nati dal 31/08/2026 è un errore 400: la
-  compattazione di Filo deve aggiungere, non riscrivere la storia. Resta da
-  vedere come si comporta nei turni con strumenti.
+  predefinito medio). I blocchi di ragionamento si rimandano intatti e contano
+  come entrata. Provato il 21/10/2026 (#1552): un blocco vale solo se system,
+  strumenti e messaggi davanti a lui sono quelli di quando è nato; togliere
+  blocchi dalla testa è ammesso. Sugli account nati dal 31/08/2026 un prefisso
+  cambiato è un errore 400, e via OpenRouter la chiave dell'owner ripiega sui
+  crediti del router. Filo manda il ragionamento a Claude solo col prefisso
+  intatto (regola nel pattern del contesto), dentro un giro di strumenti
+  compreso. Col tratto di oggi i turni passati non lo riportano mai: il
+  CONTESTO DI ADESSO davanti alla domanda sparisce al turno dopo. Per riaverlo
+  serve la richiesta della fase 3, che cresce solo in coda; per i promemoria di
+  ogni turno Anthropic offre i messaggi di sistema a metà conversazione
+  (`clear_at`), da provare attraverso OpenRouter.
 
 ## Da decidere (owner)
 
