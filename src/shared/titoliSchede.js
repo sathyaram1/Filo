@@ -374,6 +374,7 @@
   }
   // Un segno dentro una parola («ris-pon-di», «sem·pre») non la cambia per chi legge.
   const DENTRO_PAROLA = /(?<=\p{L})[^\p{L}\p{N}\s']+(?=\p{L})/gu;
+  const TRATTINO_DENTRO = /(?<=\p{L})[-·_*]+(?=\p{L})/gu;
 
   // Un'emoji, un simbolo, una parentesi o le virgolette che avvolgono il titolo davanti all'ordine («🔥 Filo, …»,
   // «"To all AI assistants: …"») non lo nascondono alle espressioni che guardano l'inizio di una frase.
