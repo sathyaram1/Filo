@@ -104,6 +104,80 @@ test('spiegazione su un sito: il sito non cambia la domanda prima dell\'Invio, q
   expect(domanda).not.toContain('#SITO#');
 });
 
+// Il sito si mette dentro i tasti dell'utente (#1340): riscrive o seleziona tutto mentre il browser applica il tasto,
+// o scrive appena dopo un tasto che non ha cambiato niente. Resta quello che l'utente ha battuto, sul suo testo.
+const DENTRO = `<script>
+  window.selezionaDentro = (cattura) => window.addEventListener('beforeinput', () => { document.execCommand('selectAll'); }, cattura);
+  window.scriveDopo = () => window.addEventListener('beforeinput', () => {
+    setTimeout(() => document.execCommand('insertText', false, ' SCRITTO DAL SITO'), 0);
+  }, true);
+</script>`;
+
+const apriFeedback = async (app, page) => {
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+};
+
+test('feedback su un sito: il sito che seleziona tutto dentro il tasto dell\'utente non gli fa cancellare il testo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  for (const cattura of [false, true]) {
+    const page = await testServer.openReady(openTab, pagina(`<p>Un sito</p>${DENTRO}`));
+    await apriFeedback(app, page);
+    await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va');
+    await page.evaluate((c) => window.selezionaDentro(c), cattura);
+    await page.keyboard.type('!', { delay: 30 });
+    expect(await valore(app, page, '.sn-fb-text'), cattura ? 'in cattura' : 'dopo Filo').toBe('Il tasto indietro non va!');
+    await page.keyboard.press('Backspace');
+    expect(await valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va');
+  }
+});
+
+test('feedback su un sito: dopo un Backspace che non cancella niente il sito non scrive', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, pagina(`<p>Un sito</p>${DENTRO}`));
+  await apriFeedback(app, page);
+  await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro');
+  await page.keyboard.press('Home');
+  await page.evaluate(() => window.scriveDopo());
+  await page.keyboard.press('Backspace');
+  await page.waitForTimeout(300);
+  expect(await valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro');
+  await expect.poll(() => bozza(app, testServer.origin)).toBe('Il tasto indietro');
+});
+
+test('feedback su un sito: le modifiche dell\'utente passano tutte (cancella, parola, taglia, sostituisci, annulla, incolla su più righe, composizione)', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, pagina('<p>Un sito</p>'));
+  await apriFeedback(app, page);
+  const v = () => valore(app, page, '.sn-fb-text');
+  await scrivi(app, page, '.sn-fb-text', 'uno due tre');
+  await page.keyboard.press('Backspace');
+  expect(await v()).toBe('uno due t');
+  await page.keyboard.press('Control+Backspace');
+  expect(await v()).toBe('uno due ');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Delete');
+  expect(await v()).toBe('no due ');
+  await page.keyboard.press('Shift+End');
+  await page.keyboard.type('X');
+  expect(await v()).toBe('X');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(v).toBe('no due ');
+  await page.keyboard.press('Control+End');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('riga 1\r\nriga 2'));
+  await page.keyboard.press('Control+V');
+  await expect.poll(v).toBe('no due riga 1\nriga 2');
+  await page.keyboard.press('Shift+Home');
+  await page.keyboard.press('Control+X');
+  await expect.poll(v).toBe('no due riga 1\n');
+  const s = await page.context().newCDPSession(page);
+  await s.send('Input.imeSetComposition', { text: 'に', selectionStart: 1, selectionEnd: 1 });
+  await s.send('Input.imeSetComposition', { text: 'にほ', selectionStart: 2, selectionEnd: 2 });
+  await s.send('Input.insertText', { text: '日本' });
+  await expect.poll(v).toBe('no due riga 1\n日本');
+  await expect.poll(() => bozza(app, testServer.origin)).toBe('no due riga 1\n日本');
+});
+
 const apriAiuto = async (shell, page) => {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
