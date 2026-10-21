@@ -98,6 +98,20 @@ test('toglierla non riesce: nessuna nota scritta, e il motivo lo dice', async ()
   });
 });
 
+test('se togliendola il server sposta la pratica, la nota non parte: il passaggio era controllato sullo stato di prima', async () => {
+  biglietto = SPORCO;
+  const doc = pratica('f1');
+  of.sessione.togliFiducia = async (id) => { ordine.push(`togli:${id}`); doc.fields.status = { stringValue: 'design' }; return { ok: true }; };
+  const detti = [];
+  await conRete(doc, async (scritture) => {
+    const r = await of.scrivi('f1', 'todo', 'Decisione', { ...OPTS, avviso: (t) => detti.push(t) });
+    assert.equal(r.ok, false);
+    assert.match(r.motivo, /da «todo» a «design»/);
+    assert.equal(scritture.length, 0);
+  });
+  assert.equal(detti.length, 1, 'la fiducia è tolta comunque, e il terminale lo dice');
+});
+
 test('senza biglietto, in attesa, illeggibile o col lettore guasto: tutti la tolgono', async () => {
   for (const b of [null, { ...PULITO, inAttesa: 1 }, { ...PULITO, fiducia: 'non_fidato', errore: 'server giù' }, new Error('rotto')]) {
     biglietto = b;
