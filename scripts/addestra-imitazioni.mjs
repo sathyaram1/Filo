@@ -346,8 +346,8 @@ async function avvia() {
   const gruppi = costruisci();
   console.log(`esempi: ${gruppi.filter((g) => g.y === 1).length} imitazioni, ${gruppi.filter((g) => g.y === 0).length} siti noti, ${refusiTolti} refusi di marchi tolti dagli elenchi (${Date.now() - t0} ms)`);
   // Un decimo da parte per scegliere la soglia su nomi che il modello non ha visto.
-  // Il decimo lo sceglie il nome, non il posto nell'elenco: un'etichetta in più non rimescola la soglia.
-  const parte = gruppi.map((g) => IM.impronta(g.h + '|soglia') % 10 === 0);
+  const caso = rng(11);
+  const parte = gruppi.map(() => caso() < 0.1);
   const esempiDi = (gg) => gg.flatMap((g) => (g.y === 1 ? [{ ix: g.ix[0], y: 1, peso: g.peso }] : g.ix.map((ix) => ({ ix, y: 0, peso: g.peso }))));
   const allena = gruppi.filter((_, i) => !parte[i]);
   const valida = gruppi.filter((_, i) => parte[i]);

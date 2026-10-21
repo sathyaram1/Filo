@@ -92,6 +92,13 @@ function scambioSimile(a, b) {
   return diversi === 1 && simile;
 }
 
+// Il pezzo fra i trattini che contiene la lettera `i` alterna lettere e cifre come un nome generato (dh19lk58).
+function pezzoGenerato(l, i) {
+  let k = 0;
+  while (k + 1 < l.tagli.length - 1 && l.tagli[k + 1] <= i) k++;
+  return (l.crudo.slice(l.tagli[k], l.tagli[k + 1]).match(/(?=[a-z][0-9]|[0-9][a-z])/g) || []).length >= 3;
+}
+
 // Che errore separa a una lettera il pezzo dal marchio: la lettera raddoppiata (gooogle) e quella saltata da una
 // doppia (faceboook, facebok) sono i refusi di chi imita; le altre sono più spesso un'altra parola.
 function tipoErrore(p, t) {
@@ -211,8 +218,7 @@ function candidati(zone, registrable) {
       const { r, l } = meglio;
       // Un marchio corto in mezzo a un nome generato (x72qhcrn02dh18, i nomi che cloud e anteprime danno da soli: lettere
       // e cifre che si alternano) ci è caduto per caso: nessuno lo legge lì.
-      if (t.length <= 4 && !l.tagli.includes(r.inizio) && !l.tagli.includes(r.fine)
-        && (l.crudo.match(/[a-z][0-9]|[0-9][a-z]/g) || []).length >= 3) continue;
+      if (t.length <= 4 && pezzoGenerato(l, r.inizio)) continue;
       let tipo;
       let d = r.d;
       let [inizio, fine] = [r.inizio, r.fine];
@@ -406,6 +412,6 @@ function giudica(norm, { esca } = {}) {
 }
 
 // Le funzioni da cui dipende chi porta un marchio: lo script di addestramento ne tiene i risultati finché non cambiano.
-const FIRMA_CANDIDATI = [tolleranza, scheletroDi, vista, unisci, dentroConErrori, zoneDi, candidati, esempi].map(String).join('\n');
+const FIRMA_CANDIDATI = [tolleranza, scheletroDi, vista, unisci, dentroConErrori, pezzoGenerato, zoneDi, candidati, esempi].map(String).join('\n');
 
 module.exports = { giudica, esempi, escaDi, impronta, distanza, dentroConErrori, scheletroDi, FILE_MODELLO, FIRMA_CANDIDATI };
