@@ -825,30 +825,59 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (notaNuova && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
     fiduciaTolta = bigliettoNonPulito(await bigliettoDiChiScrive());
   }
+  // Il server toglie la fiducia solo a una pratica aperta (MR.fiduciaTogliCheck): chi la riapre la riapre prima e scrive
+  // la nota dopo; chi la lascia chiusa non ha modo di toglierla, quindi la nota non parte.
+  const chiusa = (s) => (statusToPublic ? statusToPublic(s) : 'open') === 'closed';
+  const chiusaPrima = fiduciaTolta && (chiusa(from) || doc.fields?.statusPublic?.stringValue === 'closed');
+  if (chiusaPrima && chiusa(to)) {
+    return { ok: false, motivo: `la pratica è chiusa e fidata, e da chiusa la fiducia non si toglie: senza toglierla la nota non la scrivo, perché ${fiduciaTolta}. Non ho toccato niente. La scrive l’owner o una sessione col biglietto pulito; oppure riaprila con la stessa nota, e la fiducia cade prima della nota`, from };
+  }
   // La prova a vuoto lo dice solo a chi l'ha chiesta (la riga di comando): server:fondi la usa come controllo prima di scrivere.
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  const scriviCampi = async (m) => {
+    const q = m.map((k) => `updateMask.fieldPaths=${k}`).join('&');
+    const corpo = Object.fromEntries(Object.entries(fields).filter(([k]) => m.includes(k)));
+    const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify({ fields: corpo }),
+    }, { fetchImpl: fetchRitentato });
+    return res.ok ? '' : `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}`;
+  };
+  let daScrivere = mask;
+  let riaperta = false;
   if (fiduciaTolta) {
+    if (chiusaPrima) {
+      const errore = await scriviCampi(mask.filter((k) => k !== 'notes'));
+      if (errore) return { ok: false, motivo: `${errore}. Non ho toccato niente`, from };
+      riaperta = true;
+      daScrivere = ['notes', 'updatedAt'];
+    }
+    const giaRiaperta = riaperta ? ` Ho già riaperto la pratica («${from}» → «${to}»): rilancia lo stesso comando, da aperta la fiducia si toglie prima della nota.` : ' Non ho toccato niente.';
     const t = await sessione.togliFiducia(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
     if (!t || !t.ok) {
-      return { ok: false, motivo: `non ho potuto togliere la fiducia (${(t && t.motivo) || 'senza motivo'}). Senza, su un feedback fidato la nota non la scrivo, perché ${fiduciaTolta}. Non ho toccato niente`, from };
+      return { ok: false, motivo: `non ho potuto togliere la fiducia (${(t && t.motivo) || 'senza motivo'}). Senza, su un feedback fidato la nota non la scrivo, perché ${fiduciaTolta}.${giaRiaperta}`, from };
     }
     // Ogni porta (riga di comando, giri di verifica, server:fondi, finish) lo dice sul terminale senza doverlo ripetere.
-    (typeof opts.avviso === 'function' ? opts.avviso : console.error)(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta));
+    (typeof opts.avviso === 'function' ? opts.avviso : console.error)(avvisoFiduciaTolta(opts.rif || numeroDelDoc(doc) || id, fiduciaTolta));
     // Il passaggio è stato controllato sullo stato letto prima: se il server ha spostato la pratica, quel controllo non vale più.
+    const atteso = riaperta ? to : from;
     const dopo = await getDoc(id, bearer, ['status']).then((d) => (d ? statoAttuale(d) : { leggibile: false })).catch(() => ({ leggibile: false }));
-    if (!dopo.leggibile || dopo.from !== from) {
-      return { ok: false, motivo: `ho tolto la fiducia, ma la pratica ${dopo.leggibile ? `è passata da «${from}» a «${dopo.from}»` : 'non si rilegge'}: la nota non l'ho scritta, rilancia il comando`, from };
+    if (!dopo.leggibile || dopo.from !== atteso) {
+      return { ok: false, motivo: `ho tolto la fiducia, ma la pratica ${dopo.leggibile ? `è passata da «${atteso}» a «${dopo.from}»` : 'non si rilegge'}: la nota non l'ho scritta, rilancia il comando`, from };
     }
   }
 
-  const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields }),
-  }, { fetchImpl: fetchRitentato });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}${fiduciaTolta ? '. La fiducia l’ho già tolta' : ''}` };
+  const errore = await scriviCampi(daScrivere);
+  if (errore) return { ok: false, motivo: `${errore}${fiduciaTolta ? `. La fiducia l’ho già tolta${riaperta ? ' e la pratica è riaperta, senza la nota' : ''}` : ''}`, from };
   return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+}
+
+/** «#553» dai campi del documento, '' senza numero: l'avviso deve nominare la pratica come la mostra la Gestione. */
+function numeroDelDoc(doc) {
+  const f = doc?.fields || {};
+  const n = globalThis.SN_FEEDBACK?.formatNum?.(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)) || '';
+  return n ? `#${n}` : '';
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
