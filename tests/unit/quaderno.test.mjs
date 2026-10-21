@@ -227,3 +227,19 @@ test('due righe uguali in un modulo sono una sola, anche quando una correzione l
   assert.equal((await M.getMemory()).PREFERENZE, 'Ama il tè');
   assert.equal((await M.quaderno()).moduli.find((m) => m.nome === 'PREFERENZE').righe.length, 1);
 });
+
+test('una riga corretta in niente si toglie anche se intanto è stata riordinata: va fra le nascoste con le sue fonti', async () => {
+  disco();
+  await M.setMemory({ PROFILO: '', PREFERENZE: '' });
+  await M.appendLesson('L’utente è vegetariano.', { fonti: ['ev-u1', 'ev-f1'] });
+  const [l] = await M.getLessonsBuffer();
+  await compatta('PREFERENZE:\nÈ vegetariano (fonti: L1)');
+  assert.equal(await M.hideLine({ lezione: { ts: l.ts, text: l.text } }), null, 'senza fonti non si indovina');
+  const id = await M.hideLine({ lezione: { ts: l.ts, text: l.text } }, { fonti: ['ev-u1'] });
+  assert.ok(id);
+  assert.equal((await M.getMemory()).PREFERENZE, '');
+  const n = (await M.getFonti()).nascoste.find((x) => x.id === id);
+  assert.equal(n.testo, 'È vegetariano');
+  assert.deepEqual(n.fonti, ['ev-u1', 'ev-f1']);
+  assert.equal(await M.hideLine({ modulo: 'PREFERENZE', riga: 'È vegetariano' }, { fonti: ['ev-u1'] }), null, 'tolta una volta, non ce n’è un’altra');
+});
