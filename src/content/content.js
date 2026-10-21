@@ -2948,6 +2948,8 @@
       else Popup.showToast(I18n.t('err_no_selection'));
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
+    } else if (command === 'aiuto-dalla-barra') {
+      aiutoPasso();
     }
   }
 
