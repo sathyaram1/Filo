@@ -49,7 +49,7 @@ test('gli id sono unici e stabili (kebab-case)', () => {
 });
 
 test('index() è compatto, get()/byCategory()/all() coerenti', () => {
-  const tutti = { redteam: true };
+  const tutti = { redteam: true, bacheca: true, mazzi: true };
   const idx = CAP.index(tutti);
   assert.equal(idx.length, CAP.CAPABILITIES.length);
   for (const e of idx) {
