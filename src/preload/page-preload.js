@@ -713,7 +713,7 @@ try {
     if (seguiti.has(f)) return;
     seguiti.add(f);
     f.addEventListener('load', () => { inAttesa.delete(f); const w = senzaPreload(f, true); if (w) segui(w); }, true);
-    if (inArrivo(f)) inAttesa.add(f);
+    if (conIndirizzo(f)) inAttesa.add(f);
     const w = senzaPreload(f, false);
     if (w) segui(w);
   };
