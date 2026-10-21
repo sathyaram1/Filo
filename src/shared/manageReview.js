@@ -1704,14 +1704,7 @@
     // Una fusione approvata che non è avvenuta (conflitto) pesa quanto una
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
-    if (!ferme.length && fermaDaStato) {
-      return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
-        titolo,
-        righe: [],
-        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
-        azioni: [],
-      }, { richiesta: null, richieste: [], conflitto: false });
-    }
+    if (!ferme.length && fermaDaStato) return l5SenzaRichiesta(fb, opts);
     if (ferme.length) {
       const req = ferme[0];
       const inConflitto = failed.length > 0;
