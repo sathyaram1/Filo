@@ -1,5 +1,5 @@
-// Verifica #1297, giro 4: le porte del giro 3 ri-provate (ricarica e collegamento con l'intervista rifatta aperta,
-// la × e la riga «Riprendiamola» sulla home già aperta).
+// Verifica #1297, giro 4: r1 l'intervista rifatta a metà prende il posto della conversazione chiesta (ricarica,
+// collegamento diretto); r2 la home già aperta offre ancora «Riprendiamola» dopo la × in Preferenze.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
