@@ -1386,19 +1386,29 @@
     return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
   }
 
+  // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
+  // scatto, se la pagina scorre nel frattempo; quelli dei riquadri e dei componenti chiusi li misura il main, che
+  // con campi da coprire manda la foto piena: coperta prima di diventare leggera, il JPEG non sparge le cifre attorno.
+  // Se coprirli non riesce, l'immagine non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, leggera: true });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const prima = Extract.campiSegretiInVista();
+      const r = await chrome.runtime.sendMessage({
+        type: MSG.CAPTURE_VISIBLE_TAB, leggera: true, campiSegreti: true, campiNellaPagina: prima.length,
+      });
+      if (!r?.ok || !r.dataUrl) return null;
+      const campi = prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista());
+      if (!campi.length && !r.fattore) return r.dataUrl;
+      return await coperta(r.dataUrl, campi, r);
     } catch (_) {}
     return null;
   }
 
-  async function coperta(dataUrl, campi) {
-    if (!campi.length) return dataUrl;
+  // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
+  async function coperta(dataUrl, campi, { fattore = 1, qualita = 85 } = {}) {
     // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
     const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
-    const img = await createImageBitmap(new Blob([byte], { type: 'image/png' }));
+    const img = await createImageBitmap(new Blob([byte]));
     const canvas = document.createElement('canvas');
     canvas.width = img.width;
     canvas.height = img.height;
