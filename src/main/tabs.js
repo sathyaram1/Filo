@@ -2388,6 +2388,7 @@ class TabManager {
   reload(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     // Una scheda ancora in coda non ha niente da ricaricare: chi lo chiede la vuole adesso.
     if (tab._rinviata) {
       if (!this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
