@@ -56,6 +56,32 @@ test('feedback:apri: titolo e testo a elenco puntato partono interi', async () =
   assert.equal(visti[1].text, '-- vedi sotto', 'il testo che comincia con due trattini non sparisce dal corpo');
 });
 
+// #1359: senza il `--` npm si prende «- …» e allo strumento non arriva niente: il rifiuto deve dire perché e come passarlo.
+test('feedback:apri da npm col testo a elenco sparito: il rifiuto dice del trattino, dei due trattini e di stdin', async () => {
+  const SCRIPT = await import('../../scripts/claude-feedback.mjs');
+  SCRIPT.ambiente.routine = () => false;
+  const err = console.error; const log = console.log;
+  const prova = async (env) => {
+    const righe = [];
+    const prima = process.env.npm_lifecycle_event;
+    if (env) process.env.npm_lifecycle_event = env; else delete process.env.npm_lifecycle_event;
+    console.error = (...a) => righe.push(a.join(' ')); console.log = () => {};
+    try { return { code: await SCRIPT.main(['Titolo', '--non-locale']), detto: righe.join('\n') }; } finally {
+      console.error = err; console.log = log;
+      if (prima === undefined) delete process.env.npm_lifecycle_event; else process.env.npm_lifecycle_event = prima;
+    }
+  };
+  const npm = await prova('feedback:apri');
+  assert.equal(npm.code, 1);
+  assert.match(npm.detto, /testo mancante/);
+  assert.match(npm.detto, /cominciava con un trattino.*npm l'ha preso per una sua opzione/);
+  assert.match(npm.detto, /npm run feedback:apri -- "titolo" "- …"/);
+  assert.match(npm.detto, /metti "-" al posto del testo e passalo da stdin/);
+  const diretto = await prova('');
+  assert.match(diretto.detto, /testo mancante/);
+  assert.doesNotMatch(diretto.detto, /trattino/, 'lanciato senza npm, npm non c\'entra');
+});
+
 function fintoServer() {
   const ricevuti = [];
   const srv = createServer((req, res) => {
