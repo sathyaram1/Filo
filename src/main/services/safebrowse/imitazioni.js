@@ -216,9 +216,9 @@ function candidati(zone, registrable) {
       }
       if (!meglio) continue;
       const { r, l } = meglio;
-      // Un marchio corto in mezzo a un nome generato (x72qhcrn02dh18, i nomi che cloud e anteprime danno da soli: lettere
-      // e cifre che si alternano) ci è caduto per caso: nessuno lo legge lì.
-      if (t.length <= 4 && pezzoGenerato(l, r.inizio)) continue;
+      // Un marchio corto, o storpiato, in un nome generato (x72qhcrn02dh18, 1eyaho3e: i nomi che cloud e anteprime danno
+      // da soli, lettere e cifre che si alternano) ci è caduto per caso: nessuno lo legge lì.
+      if ((t.length <= 4 || r.d > 0) && pezzoGenerato(l, r.inizio)) continue;
       let tipo;
       let d = r.d;
       let [inizio, fine] = [r.inizio, r.fine];

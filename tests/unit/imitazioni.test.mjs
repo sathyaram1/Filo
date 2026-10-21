@@ -88,7 +88,7 @@ test('un marchio corto caduto per caso in un nome generato (cloud, anteprime) no
   const fissi = [
     'x1tuyb9bunqa2.esempio-ostile.com', 'xg2bukfvpsdh10.esempio-ostile.com', 'xr7in9n26zv16.esempio-ostile.com',
     'dhl5205f2.cloudfront.net', 'v379gkgj66dthdhl.execute-api.us-east-1.amazonaws.com', '4xe3odby-dh19lk58.vercel.app',
-    'igls2i7v-6xop9h3r.vercel.app',
+    'igls2i7v-6xop9h3r.vercel.app', '1eyaho3e.ngrok.io',
   ];
   assert.deepEqual(fissi.filter((h) => evaluate('https://' + h + '/').imp), []);
   // E su ventimila nomi così, quasi mai: prima uno su duemila, abbastanza per far cadere a caso un test.
