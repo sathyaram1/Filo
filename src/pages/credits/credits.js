@@ -34,7 +34,7 @@
     // lo legge dal valore in vigore invece di scriverlo a mano, così se l'importo
     // cambia (o l'owner lo configura) il testo resta veritiero. Stessa simmetria
     // già applicata al costo di riapertura in bacheca.
-    if (window.SN_CONST?.CREDIT?.DAILY_REFILL != null) $('refillHint').textContent = rigaRicarica();
+    if (window.SN_CONST?.CREDIT?.DAILY_REFILL != null) $('refillHint').textContent = rigaSottoIlSaldo(ultimoStato);
 
     // Le due letture non dipendono l'una dall'altra: partono insieme. L'avviso viene dopo, dal saldo appena letto.
     const [r, w] = await Promise.all([
