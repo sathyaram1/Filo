@@ -313,13 +313,7 @@ service cloud.firestore {
     // basta, e la pagina del Red Team deve poter dire «in pausa» a chiunque.
     match /config/redteam {
       allow read: if true;
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['openToAll', 'updatedAt'])
-        && request.resource.data.get('openToAll', false) is bool
-        && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp
-            || (request.resource.data.updatedAt is string
-                && request.resource.data.updatedAt.size() <= 40));
+      allow create, update: if isAdmin() && interruttoreValido(request.resource.data);
       allow delete: if isAdmin();
     }
 
