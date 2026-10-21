@@ -55,6 +55,17 @@
       : ricarica;
   }
 
+  // La riga per l'ultimo stato letto: mentre la pagina rilegge resta quella, non torna per un attimo a quella di serie.
+  let ultimoStato = null;
+  function rigaSottoIlSaldo(w) {
+    const server = w && w.ok ? w.server : null;
+    if (server && server.hasWallet) {
+      const daily = Number(server.dailyCredits) || 0;
+      return daily > 0 ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.` : 'I crediti li tiene il server.';
+    }
+    return rigaRicarica(Boolean(w && w.ok && w.keySource === 'own'));
+  }
+
   // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
   // C'è finché le soglie lo dicono, o finché c'è un rimedio applicato da poter rimettere com'era. La frase
   // dell'ultimo clic resta sotto il suo rimedio anche quando la pagina si ridisegna da sola.
