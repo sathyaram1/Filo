@@ -84,12 +84,19 @@ function stato() {
   const ramo = git(['rev-parse', '--abbrev-ref', 'HEAD']);
   const testa = git(['rev-parse', 'HEAD']);
   const origine = git(['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']);
-  const st = file.length ? git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...file]) : { codice: 0, out: '' };
+  const guardati = file.length ? [...file, ...CONFIGURAZIONE] : [];
+  const st = guardati.length ? git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...guardati]) : { codice: 0, out: '' };
   if (ramo.codice !== 0 || testa.codice !== 0 || st.codice !== 0) return { errore: `git non risponde: ${ramo.err || testa.err || st.err}`, file, progetto };
-  return {
+  const s = {
     ramo: ramo.out.trim() === 'HEAD' ? '' : ramo.out.trim(), testa: testa.out.trim(), origine: origine.codice === 0 ? origine.out.trim() : '',
     file, progetto, toccati: fileToccati(st.out),
   };
+  if (s.origine && s.testa !== s.origine && guardati.length) {
+    const d = git(['diff', '--name-only', '-z', '--no-renames', s.testa, s.origine, '--', ...guardati]);
+    if (d.codice !== 0) return { errore: `non riesco a confrontare i file da pubblicare con origin/main (${d.err.split('\n')[0] || d.codice})`, file, progetto };
+    s.diversi = d.out.split('\0').filter(Boolean);
+  }
+  return s;
 }
 
 function lancia(p) {
