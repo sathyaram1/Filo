@@ -242,22 +242,52 @@
     document.addEventListener('mousedown', docClickHandler, true);
 
     ta.focus();
+    cambiato();
   }
 
   // ---------- Espandi/collassa ----------
 
   function expand({ ai = false } = {}) {
     if (!root) return;
+    // La scelta dell'utente vince su quella del modello: la risposta resta da aprire, e la barra la annuncia.
+    if (ai && (ridottoDallUtente || nascosto)) { aiPrefersOpen = true; return; }
     collapsed = false;
+    ridottoDallUtente = false;
     root.classList.remove('sn-sidebar-collapsed');
     if (ai) aiPrefersOpen = true;
+    if (!nascosto) nonLetta = false;
+    cambiato();
   }
 
   function collapse({ ai = false } = {}) {
     if (!root) return;
     collapsed = true;
+    if (!ai) ridottoDallUtente = true;
     root.classList.add('sn-sidebar-collapsed');
     if (ai) aiPrefersOpen = false;
+    cambiato();
+  }
+
+  // ---------- Lo stato per la barra laterale (#1432) ----------
+
+  function stato() {
+    const visibile = isOpen() && !nascosto;
+    return {
+      pannello: !visibile ? 'chiuso' : collapsed ? 'ridotto' : 'aperto',
+      voce: visibile ? statoVoce : 'pronto',
+      nonLetta: isOpen() && nonLetta,
+    };
+  }
+
+  function cambiato() {
+    if (typeof ascoltaCambi !== 'function') return;
+    try { ascoltaCambi(stato()); } catch (_) {}
+  }
+
+  // L'icona Aiuto della barra: chiuso o ridotto lo apre, aperto detta, mentre detta ferma.
+  function passo(context) {
+    if (!isOpen() || nascosto || collapsed) { open(context); return; }
+    if (voce) voce.premi();
   }
 
   // ---------- Drag header ----------
