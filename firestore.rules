@@ -48,6 +48,16 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
 
+    // Un interruttore «aperto a tutti» dell'owner (config/redteam, config/bacheca,
+    // config/mazzi): solo `openToAll` booleano e la data in cui è cambiato.
+    function interruttoreValido(d) {
+      return d.keys().hasOnly(['openToAll', 'updatedAt'])
+        && d.get('openToAll', false) is bool
+        && (!('updatedAt' in d)
+            || d.updatedAt is timestamp
+            || (d.updatedAt is string && d.updatedAt.size() <= 40));
+    }
+
     // Un richiedente è una routine se è loggato con email verificata ed esiste
     // un documento `routines/<sua-email>`. Ruolo deliberatamente debole.
     function isRoutine() {
