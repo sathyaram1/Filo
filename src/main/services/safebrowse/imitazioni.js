@@ -272,6 +272,9 @@ function caratteristiche(c, zone, info) {
   f.push('tld=' + tld, 'ps=' + suff, 'kt=' + k + '|' + tld, 'kps=' + k + '|' + suff, 'bt=' + t + '|' + tld);
   const truffa = !!resto && soloTruffa(sx) && soloTruffa(dx);
   f.push('tr=' + (resto ? (truffa ? 1 : 0) : 'v') + k, 'trl=' + (truffa ? 1 : 0) + lun + parola);
+  // Il marchio insieme al resto da truffa: imposte e proposte insegnano che «poste» dentro una parola è innocuo, e da
+  // solo quel peso spegneva anche posteonline e poste-sicurezza.
+  f.push('btr=' + t + '|' + (resto ? (truffa ? 1 : 0) : 'v'));
   if (c.straniere) f.push('st=' + k);
   if (c.simile) f.push('si=' + k, 'sil=' + k + lun);
   if (c.errore) f.push('er=' + c.errore + k, 'erl=' + c.errore + lun);
