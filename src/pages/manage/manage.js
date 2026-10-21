@@ -6213,15 +6213,35 @@
     del.textContent = 'Rimuovi';
     del.addEventListener('click', () => { row.remove(); populateSmNicknames(); });
 
+    const warn = document.createElement('div');
+    warn.className = 'sn-model-row-warn';
+    warn.setAttribute('role', 'status');
+    warn.hidden = true;
+
     // Aggiornare nickname o modello ridisegna i suggerimenti dei selettori
     // (un nickname compare tra i suggerimenti solo quando ha anche un modello).
     nickIn.addEventListener('input', () => populateSmNicknames());
-    modelIn.addEventListener('input', () => populateSmNicknames());
+    modelIn.addEventListener('input', () => { populateSmNicknames(); avvisaProduttoreGiudice(row); });
 
     row.appendChild(nickIn);
     row.appendChild(modelWrap);
     row.appendChild(del);
+    row.appendChild(warn);
+    avvisaProduttoreGiudice(row);
     return row;
+  }
+
+  // I giudici girano sul server con la lista di esclusione del codice, la stessa di build qui (un test del server le
+  // confronta): un modello il cui produttore resta fra gli host lo si dice sulla riga (#1059).
+  function avvisaProduttoreGiudice(row) {
+    const warn = row.querySelector('.sn-model-row-warn');
+    const C = window.SN_CONST;
+    if (!warn || !C || typeof C.unexcludedProducer !== 'function') return;
+    const nome = C.unexcludedProducer(row.querySelector('.sn-model-id').value.trim(), C.DEFAULT_EXCLUDED_PROVIDERS);
+    warn.textContent = nome
+      ? `${nome} produce questo modello e i giudici non lo escludono come fornitore: le richieste possono arrivare a lui.`
+      : '';
+    warn.hidden = !nome;
   }
 
   function renderJudgeRegistry(registry) {
