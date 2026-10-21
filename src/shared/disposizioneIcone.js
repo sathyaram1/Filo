@@ -54,7 +54,9 @@
   });
 
   // Nate dopo che qualcuno si era già salvato la disposizione: senza, non le vedrebbe mai.
-  const AGGIUNTE = Object.freeze(['incognito', 'qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab', 'openOptions', 'home', 'editorApp', 'feedbackApp']);
+  const AGGIUNTE = Object.freeze(['incognito', 'qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab', 'openOptions', 'home', 'editorApp', 'feedbackApp', 'help']);
+  // Fra le aggiunte, quelle che arrivano in cima alla barra invece che in fondo.
+  const IN_CIMA = Object.freeze(['help']);
 
   const copia = (l) => ({ primary: [...l.primary], secondary: [...l.secondary], bar: [...l.bar] });
   const uguali = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
