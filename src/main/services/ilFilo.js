@@ -421,7 +421,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   async function esporta(opts) {
     const incog = inIncognito(opts);
     return inCoda(async () => {
-      await carica();
+      await caricaPerLeggere();
       if (incog) return Buffer.from(incognito.eventi.map(E().riga).join(''), 'utf8');
       try { return await fsp.readFile(fileEventi()); } catch (e) { if (e.code === 'ENOENT') return Buffer.alloc(0); throw e; }
     });
