@@ -85,10 +85,16 @@
       if (!Credits || typeof Credits.getPublic !== 'function') return null;
       const pub = await Credits.getPublic();
       if (!pub || typeof pub.balance !== 'number') return null;
-      return { balance: pub.balance };
+      return { balance: pub.balance, chiavePropria: await pagaLaSuaChiave() };
     } catch (_) {
       return null;
     }
+  }
+
+  // Con la chiave propria il conteggio locale non paga niente (#1353): la chat non lo deve dare come soldi suoi.
+  async function pagaLaSuaChiave() {
+    const WM = global.SN_WALLET_MAIN;
+    try { return Boolean(WM && typeof WM.keySource === 'function' && (await WM.keySource()) === 'own'); } catch (_) { return false; }
   }
 
   // Batteria, rete e Bluetooth di adesso (#873): li legge il main, senza modello. `undefined` dove il lettore
