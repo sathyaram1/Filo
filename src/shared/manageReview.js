@@ -555,7 +555,7 @@
         return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
       }
       if (statusReason === 'l5') {
-        return { text: 'Il ramo è fermo al cancello di fusione: aspetta il tuo via libera.', color: REASONS.l5.color };
+        return { text: 'Il ramo è fermo al cancello di fusione: decidi tu nel quadrato.', color: REASONS.l5.color };
       }
       if (statusReason === 'origine_bloccata') {
         return { text: `Fermo perché ${origineText(fb)} è stato bloccato: decidi tu.`, color: REASONS.origine_bloccata.color };
@@ -1847,7 +1847,8 @@
       const l5 = livelloL5(fb, opts);
       return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
         ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : 'Fermo al cancello di fusione: aspetta il tuo via libera');
+        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta: decidi tu se rifarlo o archiviarlo'
+          : 'Fermo al cancello di fusione: aspetta il tuo via libera');
     }
     const { status, statusReason } = normalizeStatus(fb);
     if (!isRicevutiStatus(status)) return null;
