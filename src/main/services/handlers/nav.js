@@ -5,6 +5,19 @@
 const { app } = require('electron');
 const { soloFilo } = require('./origine');
 
+// Un'icona della home dice dove sta in px della sua pagina; il menu della shell lo vuole in px della finestra.
+// Il punto resta dentro la vista: una pagina non apre il menu fuori da sé.
+function ancoraNellaFinestra(win, wc, a) {
+  if (!a || !wc || !Number.isFinite(a.x) || !Number.isFinite(a.y)) return null;
+  const tab = (win._filoTabs?.tabs || []).find((t) => t.view && t.view.webContents === wc);
+  if (!tab) return null;
+  let zoom = 1;
+  try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+  const b = tab.view.getBounds();
+  const dentro = (v, max) => Math.min(Math.max(v, 0), max);
+  return { x: b.x + dentro(a.x * zoom, b.width), y: b.y + dentro(a.y * zoom, b.height) };
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, apriDaFilo, SCHEMI_USCITA } = ctx;
 
@@ -224,7 +237,7 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.SHELL_ACTION, async (msg, sender) => {
+  on(MSG.SHELL_ACTION, async (msg, sender, origin) => {
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone
     // in alto). "close" è ESCLUSO di proposito: l'AI non chiude finestra né
     // schede. Inoltriamo alla shell, che clicca il bottone reale, così si
@@ -236,7 +249,8 @@ module.exports = function register(on, ctx) {
     }
     const win = winOf(sender);
     if (!win) return { ok: false, error: 'nessuna finestra' };
-    try { win.webContents.send('shell:trigger-button', { command }); }
+    const anchor = isFilo(origin) ? ancoraNellaFinestra(win, sender && sender.wc, msg.anchor) : null;
+    try { win.webContents.send('shell:trigger-button', anchor ? { command, anchor } : { command }); }
     catch (_) { return { ok: false, error: 'invio alla shell fallito' }; }
     return { ok: true };
   });

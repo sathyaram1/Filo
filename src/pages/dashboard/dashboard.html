@@ -43,10 +43,10 @@
   <script src="filo://shared/esitoAzione.js"></script>
 </head>
 <body data-state="home">
-  <!-- I controlli del browser stanno dentro la home, non in una barra in alto: ogni icona aziona il comando
-     reale della shell via MSG.SHELL_ACTION. -->
-  <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
+    <!-- I controlli del browser stanno dentro la home, in cima alla sola colonna destra (#1491): ogni icona aziona
+         il comando reale della shell via MSG.SHELL_ACTION. Primi nel DOM per restare primi col Tab. -->
+    <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
 
     <!-- A sinistra quello che accade (Filo lo spinge), a destra quello che l'utente tiene: la differenza è di tempo.
          Le carte le disegna dashboard-carte.js. -->

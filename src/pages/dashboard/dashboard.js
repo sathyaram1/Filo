@@ -2077,7 +2077,11 @@
       btn.addEventListener('click', () => {
         if (typeof it.action === 'function') it.action();
         else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
-        else send({ type: MSG.SHELL_ACTION, command: it.command });
+        else {
+          // Il menu della shell si apre sotto l'icona, ovunque la metta la colonna destra (#1491).
+          const r = btn.getBoundingClientRect();
+          send({ type: MSG.SHELL_ACTION, command: it.command, anchor: { x: r.left, y: r.bottom } });
+        }
       });
       host.appendChild(btn);
       if (it.command === 'account') accountCtrlBtn = btn;
