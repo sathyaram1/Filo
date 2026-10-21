@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 import * as Letture from '../../scripts/lib/letture-esterne.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -174,4 +175,24 @@ test('la verifica cieca non vede il feedback ma legge la modifica intera, e il d
   const punto = (/^4\. \*\*La verifica cieca\.\*\*.*$/m.exec(leggi('transparency', 'security.md')) || [''])[0];
   assert.ok(punto, 'il punto sulla verifica cieca non c\'è più: aggiorna questo test');
   assert.doesNotMatch(punto, /\bmai\b/i, 'il documento promette che la verifica cieca non legga mai testo venuto dal feedback');
+});
+
+// A «le mie chat a chi vanno?» Filo risponde con la pagina Privacy: ci stanno anche le due letture della chat in sottofondo (#1452.2).
+test('a fine chat un modello le dà nome e tipo, dopo ogni scambio un altro sceglie cosa ricordare, e il documento sulla privacy lo dice', () => {
+  const require = createRequire(import.meta.url);
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+  const H = leggi('src', 'main', 'services', 'handlers.js');
+  const tetto = globalThis.SN_CONST.FILO_CHAT_TRIAGE_CHARS;
+  const nomina = H.includes('ChatArchive.transcriptForTriage(messages, SN_CONST.FILO_CHAT_TRIAGE_CHARS)')
+    && H.includes('runOneShot(ACTIONS.FILO_CHAT_TRIAGE, prompt)');
+  legame(nomina, privacy, 'un modello la rilegge per dare un nome alla chat', 'il nome e il tipo dati a una chat finita');
+  // Testa e coda col tetto che il documento dice: una chat lunga perde il centro, non l'inizio né la fine.
+  const lunga = [{ role: 'user', text: `INIZIO ${'a'.repeat(tetto * 2)}` }, { role: 'filo', text: `${'b'.repeat(tetto * 2)} FINE` }];
+  const t = globalThis.SN_CHAT_ARCHIVE.transcriptForTriage(lunga, tetto);
+  assert.ok(t.includes('INIZIO') && t.includes('FINE') && t.length < tetto + 100, 'la chat lunga non va più a pezzi di testa e coda');
+  const migliaia = String(tetto).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  legame(true, privacy, `di una lunga l'inizio e la fine, ${migliaia} caratteri in tutto`, 'il tetto della chat mandata per il nome');
+  const lezioni = /action: ACTIONS\.FILO_LESSON,/.test(H) && H.includes('FiloState.testoConversazioni(FiloState.conversazioniRecenti(');
+  legame(lezioni, privacy, 'con i messaggi recenti, vanno anche a un modello che sceglie cosa ricordare di te', 'lo scambio letto per le memorie');
 });
