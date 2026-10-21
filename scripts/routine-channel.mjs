@@ -991,6 +991,14 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
     if (x.escalated) return sospeso(testa);
     return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta()}`;
   }
+  if (x.motivo === 'altrove') {
+    const a = x.altrove || {};
+    const n = (a.commit || []).length;
+    const ramo = a.ramo ? ` (ramo "${a.ramo}")` : '';
+    const testa = `${quale}: la cartella "${a.cartella}"${ramo} ha ${n === 1 ? 'un commit fatto' : `${n} commit fatti`} dopo l'inizio di questo lavoro che il ramo assegnato "${x.assigned}" non contiene: il lavoro sta lì, e la verifica non lo troverebbe. ${nulla}\n`;
+    if (x.escalated) return sospeso(testa);
+    return `${testa}Portali sul ramo assegnato (\`git -C "${a.radice}" cherry-pick ${(a.commit || []).map((c) => c.slice(0, 12)).join(' ')}\`), poi rilancia lo stesso comando. Se quei commit non sono di questo lavoro, togli quella cartella (\`git worktree remove "${a.cartella}"\`: il suo ramo resta) e rilancia.${conta()}`;
+  }
   if (x.motivo === 'dichiarato') {
     return `${quale}: hai dichiarato il ramo "${x.declared}", ma la cartella è sul ramo "${x.current}". ${nulla} Il ramo lo legge lo strumento dalla cartella: uno dichiarato può solo confermarlo.\n`
       + (x.assigned && x.assigned === x.current

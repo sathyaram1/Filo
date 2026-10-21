@@ -185,8 +185,10 @@ test('da un worktree dello stesso deposito non si consegna: ramo e commit lì no
       assert.equal(ricevuti.length, 0, `attesa=${attesa}: al server non parte niente`);
       // Lo stesso controllo vale per le registrazioni di dispatch, che passano da checkDelivery.
       assert.equal(checkDelivery(work, ASSEGNATO, { da: wt }).ok, false);
-      assert.equal(checkDelivery(work, ASSEGNATO, { da: work }).ok, true);
+      // Dalla cartella posizionata il rifiuto è l'altro: il lavoro sta nel worktree (#772.1), se si sa quando è iniziato.
+      assert.equal(Boolean(checkDelivery(work, ASSEGNATO, { da: work }).altrove), attesa);
       // Da una sottocartella della cartella posizionata si consegna.
+      g(['worktree', 'remove', '--force', wt]);
       const sotto = resolve(work, 'sotto'); mkdirSync(sotto);
       const r = await lanciatore(work, port, sotto)(CONSEGNE.critica);
       assert.equal(r.code, 0, r.se);

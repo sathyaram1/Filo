@@ -696,7 +696,7 @@ export function guardTransition(root, id, { escalate, persist, clear, assigned: 
   const assigned = prev?.branch || String(ripiego || '');
   const v = checkDelivery(root, assigned);
   if (v.ok) return { ok: true, state: prev };
-  const dove = { current: v.current, assigned: v.assigned, ...(v.cartella ? { cartella: v.cartella, radice: v.radice } : {}) };
+  const dove = { current: v.current, assigned: v.assigned, ...(v.cartella ? { cartella: v.cartella, radice: v.radice } : {}), ...(v.altrove ? { altrove: v.altrove } : {}) };
   // Il rebase del ramo assegnato si finisce e poi si registra: non conta verso la sospensione per deriva.
   if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, ...dove, message: `registrazione rifiutata su ${id}: ${v.reason}` };
 
@@ -739,8 +739,8 @@ function nomeRamo(s) {
  * Un ramo dichiarato può solo confermare quello della cartella.
  *
  * @returns {{ok:true, branch:string, id:string, assigned:string}
- *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato'|'cartella', current:string, assigned:string,
- *      cartella?:string, radice?:string,
+ *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato'|'cartella'|'altrove', current:string, assigned:string,
+ *      cartella?:string, radice?:string, altrove?:{cartella:string, ramo:string, radice:string, commit:string[]},
  *      declared?:string, rebaseDi?:string, count?:number, escalated?:boolean}}
  */
 export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
@@ -757,8 +757,8 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
       : checkDelivery(root, assigned);
     if (!g.ok) {
       const cur = g.current || '';
-      const motivo = g.cartella ? 'cartella' : g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
-      const dove = g.cartella ? { cartella: g.cartella, radice: g.radice } : {};
+      const motivo = g.cartella ? 'cartella' : g.altrove ? 'altrove' : g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
+      const dove = g.cartella ? { cartella: g.cartella, radice: g.radice } : g.altrove ? { altrove: g.altrove } : {};
       return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated, ...dove };
     }
     if (g.state && g.state.branch) assigned = g.state.branch;
