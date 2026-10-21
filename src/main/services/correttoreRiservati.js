@@ -43,13 +43,14 @@ function pezziOscurati(pezzi, campo, campoDa) {
     const da = a;
     a += pezzo.length;
     const qui = coperti.map(([x, y]) => [Math.max(x, da) - da, Math.min(y, a) - da]).filter(([x, y]) => y > x).sort((p, q) => p[0] - q[0]);
+    const uniti = [];
+    for (const [x, y] of qui) {
+      const ultimo = uniti[uniti.length - 1];
+      if (ultimo && x <= ultimo[1]) ultimo[1] = Math.max(ultimo[1], y); else uniti.push([x, y]);
+    }
     let v = '';
     let i = 0;
-    for (const [x, y] of qui) {
-      if (y <= i) continue;
-      v += x < i ? '' : pezzo.slice(i, x) + SEGNAPOSTO;
-      i = y;
-    }
+    for (const [x, y] of uniti) { v += pezzo.slice(i, x) + SEGNAPOSTO; i = y; }
     return v + pezzo.slice(i);
   });
   return { pezzi: out, valori };
