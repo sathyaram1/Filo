@@ -306,6 +306,13 @@ html, body {
   border-radius: 2px;
 }
 
+.sn-card-ico {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
 .sn-card-actions {
   display: flex;
   gap: 6px;

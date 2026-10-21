@@ -7,6 +7,7 @@
 //   filo://asset/<path>           → assets/<path>
 //   filo://style/<file>           → src/styles/<file>
 //   filo://shared/<file>          → src/shared/<file>
+//   filo://icone/<nome>           → <cartella dati>/icone/<nome> (src/main/services/copieIcone.js)
 //
 // Privilegi: il protocollo è registrato come "standard, secure, supportsFetchAPI"
 // così la fetch() funziona e le politiche CORS sono ragionevoli.
@@ -106,6 +107,8 @@ async function filoHandler(request) {
 
     const spostato = indirizzoSpostato(host, rel);
     if (spostato) return new Response(null, { status: 302, headers: { Location: spostato } });
+    // Le icone che Filo tiene per pagine salvate e schede archiviate (#1273) stanno nella cartella dati, non nel pacchetto.
+    if (host === 'icone') return require('./services/copieIcone').risposta(rel);
 
     let fsPath;
     if (host === 'shell') {

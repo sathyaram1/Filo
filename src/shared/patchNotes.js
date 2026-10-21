@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
+        'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',
       ],
     },
     {

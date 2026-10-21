@@ -15,14 +15,30 @@ module.exports = function register(on, ctx) {
   // A un sito torna solo ciò che il content script usa: la voce con lo stesso indirizzo può essere già salvata da un altro sito.
   const voceVerso = (entry, origin) => (!entry || isFilo(origin) ? entry : { id: entry.id, category: entry.category || null });
 
+  const schedaDi = (sender) => sender?.win?._filoTabs?.tabs?.find((t) => t.id === sender?.tab?.id) || null;
+  const origineDi = (u) => { try { return new URL(String(u || '')).origin; } catch (_) { return ''; } };
+
+  // L'icona è quella che la scheda ha già scaricato con la sua sessione (#1273): l'indirizzo che manda la pagina non si segue.
+  // Senza mittente chiama il main stesso (la scorciatoia), che icona e proxy della scheda li passa già.
+  // Da una scheda col proxy la voce lo ricorda: un'icona mancante non si chiederà fuori dal proxy.
   on(MSG.SAVE_PAGE, async (msg, sender, origin) => {
-    const entry = await SavedPages.save(msg.page);
+    const page = { ...(msg.page || {}) };
+    let proxy = msg.proxy || null;
+    if (sender) {
+      const tab = schedaDi(sender);
+      page.favicon = tab && tab.favicon && tab._origineIcona === origineDi(page.url) ? tab.favicon : '';
+      proxy = tab ? tab.proxy : null;
+    }
+    const entry = await SavedPages.save(page, { proxy });
     maybeCategorizeAsync(entry, msg.page).catch((e) => console.warn('[Filo] categorize failed', e));
     return { ok: true, entry: voceVerso(entry, origin) };
   });
 
+  // Un link non ha una scheda che ne abbia scaricato l'icona: la chiede una volta il riordino delle icone, se la scheda
+  // da cui lo salvi non passa da un proxy.
   on(MSG.SAVE_LINK, async (msg, sender, origin) => {
-    const entry = await SavedPages.save({ url: msg.url, title: msg.title });
+    const tab = schedaDi(sender);
+    const entry = await SavedPages.save({ url: msg.url, title: msg.title }, { proxy: tab ? tab.proxy : null });
     maybeCategorizeAsync(entry, { url: msg.url, title: msg.title }).catch((e) => console.warn('[Filo] categorize failed', e));
     return { ok: true, entry: voceVerso(entry, origin) };
   });
