@@ -880,7 +880,7 @@
     };
   }
 
-  // Sezione inline "Spiega link": niente apertura del link, solo metadati OG e dominio.
+  // Sezione inline "Spiega link": il link non si apre in una scheda; titolo e descrizione li legge il main.
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
@@ -890,8 +890,8 @@
         el.classList.add('sn-menu-inline-loading');
         let cancelled = false;
         (async () => {
-          const url = linkEl.href;
-          const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
+          const url = indirizzoDelLink(linkEl);
+          const anchorText = nomeDelLink(linkEl).slice(0, 200);
           const flags = LinkSospetto.analizza(url);
           el.textContent = '';
           mostraAvvisoLink(el, url);
@@ -900,15 +900,16 @@
           body.textContent = I18n.t('menu_link_loading');
           el.appendChild(body);
 
-          // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
-          let ogTitle = '', ogDescription = '';
-          if (!flags.includes('side_effect')) {
-            try {
-              const r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url });
-              if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
-            } catch (_) {}
-          }
+          // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
+          let ogTitle = '', ogDescription = '', r = null;
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url }); } catch (_) {}
           if (cancelled) return;
+          if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
+          else if (r?.bloccato) {
+            el.classList.remove('sn-menu-inline-loading');
+            body.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            return;
+          }
 
           // Streaming spiegazione via AI
           let port;
