@@ -384,7 +384,8 @@ module.exports = function register(on, ctx) {
         return { filePath: path.join(testDir, filename) };
       }
       try {
-        const win = BrowserWindow.fromWebContents(wc) || winOf(sender) || null;
+        // Dopo la domanda sul programma la scheda può essere già chiusa.
+        const win = (!wc.isDestroyed() && BrowserWindow.fromWebContents(wc)) || winOf(sender) || null;
         const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
         const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
         // Annullato dall'utente: non è un errore, nessun toast.
@@ -431,19 +432,22 @@ module.exports = function register(on, ctx) {
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito, webContents: wc });
+          // #1311 — un programma passa dalla domanda di Filo PRIMA del dialogo di sistema, che non dice né cos'è né da dove arriva.
+          const via = entry.permesso(name);
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
-          askDest = () => pickDestination(name).then((d) => {
+          // Un no l'ha già chiuso la voce; un trasferimento caduto durante la domanda resta un errore, non un annullamento.
+          askDest = () => via.then((si) => (si ? pickDestination(name).then((d) => {
             // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
             if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
             return d;
-          });
+          }) : null));
           askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
           // Il file parziale cresce nella cartella dove atterrerebbe un download
           // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
           // una rinomina istantanea invece della copia di un filmato intero.
-          partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
+          partPath = downloads.uniquePath(entry.cartella(), `${name}.filo-part`);
           return partPath;
         },
         onProgress: (received, total) => { if (entry) entry.progress(received, total); },
@@ -460,7 +464,9 @@ module.exports = function register(on, ctx) {
 
     // Se il trasferimento è fallito NON chiediamo dove salvare: sarebbe un
     // dialogo per un file che non c'è. Se invece era già aperto lo si aspetta
-    // (non c'è modo di richiuderlo da qui).
+    // (non c'è modo di richiuderlo da qui). La voce si chiude subito: una domanda
+    // ancora aperta sul programma si ritira invece di aspettare per sempre.
+    if (downloadError && !entry.cancelled()) entry.fail();
     if (!downloadError && !entry.cancelled()) ensureDest();
     const dest = destPromise ? await destPromise : null;
     const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
@@ -471,6 +477,8 @@ module.exports = function register(on, ctx) {
       entry.fail(); await dropPart();
       return { ok: false, error: (dest && dest.error) || 'destinazione non disponibile' };
     }
+    // Conta il nome scelto nel dialogo: un nome da programma scritto lì chiede anche lui, e un sì già dato vale.
+    if (!(await entry.permesso(path.basename(dest.filePath)))) { await dropPart(); return { ok: false, cancelled: true }; }
 
     try {
       await moveInto(result.partPath, dest.filePath);
