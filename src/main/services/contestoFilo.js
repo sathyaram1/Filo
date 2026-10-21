@@ -207,11 +207,15 @@ const ancore = { normale: null, incognito: null };
 // `osserva(azioni)` scrive gli esiti per il modello (handlers.js). Ritorna il tratto da mandare e quello che serve alle
 // uscite: le azioni il cui esito arriva al modello, i messaggi che porta (letti, voce dell'utente), i più vecchi.
 // `immagini: false`: il modello ha rifiutato le immagini dei turni passati, al loro posto resta la nota.
-async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true } = {}) {
+// `soloChat`: l'intervista di benvenuto vede solo sé stessa: le altre chat, davanti a un «primo incontro», la facevano
+// parlare d'altro (#1398). Non sposta il punto d'inizio delle chat normali.
+async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true, soloChat = false } = {}) {
   // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
   const chats = await F().chats({ incognito });
-  const tutti = senzaDomanda(messaggiDi(chats), chatId, userMessage);
+  const tuttoIlFilo = senzaDomanda(messaggiDi(chats), chatId, userMessage);
+  const solo = !!(soloChat && chatId);
+  const tutti = solo ? tuttoIlFilo.filter((m) => m.chat === chatId) : tuttoIlFilo;
   potaFoto(tutti);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);
