@@ -479,6 +479,82 @@ test('F3 — la spunta dopo un appunto salvato chiude la conversazione', async (
   await restore(app, '__fakeF3');
 });
 
+// La home chiesta insieme ad altro lavoro: il blocco conta il lavoro vero, e il bottone chiude la conversazione senza
+// svuotare la home, che è la coda del filo (#869). La prova del giro #567 voleva la home vuota, ed era rossa (#831.1).
+test('F4 — la home chiesta insieme a un timer: lavoro e risposta restano, anche dopo aver chiuso', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await fakeProvider(app, [
+    { toolCalls: [
+      { id: 'f4a', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"pasta"}' },
+      { id: 'f4b', name: 'COMANDO_FINESTRA', arguments: '{"comando":"home"}' },
+    ] },
+    { text: 'Timer avviato: sei già nella home.' },
+  ], '__fakeF4');
+
+  await page.evaluate(() => { window.__segnoF4 = 'vivo'; });
+  await page.locator('#input').fill('metti un timer di 5 minuti e portami alla home');
+  await page.locator('#sendBtn').click();
+  const risposta = page.locator('.dash-bubble-filo', { hasText: 'sei già nella home' });
+  await expect(risposta).toBeVisible({ timeout: 10_000 });
+  expect(await page.evaluate(() => window.__segnoF4)).toBe('vivo');
+
+  const activity = page.locator('.dash-activity');
+  await expect(activity).toHaveCount(1);
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Timer avviato' })).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-label')).toContainText('avviato un timer');
+  await expect(activity.locator('.dash-activity-label')).not.toContainText('azionato un comando della finestra');
+
+  await page.locator('.dash-action-btn', { hasText: 'Chiudi e torna alla home' }).click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
+  await expect(page.locator('#input')).toBeFocused();
+  await expect(page.locator('.dash-bubble-user', { hasText: 'metti un timer di 5 minuti' })).toHaveCount(1);
+  await expect(risposta).toHaveCount(1);
+  await expect(activity).toHaveCount(1);
+  const [chiusa] = await chatDi(app, 'metti un timer di 5 minuti e portami alla home');
+  await expect.poll(() => app.evaluate(async (_electron, id) => (await globalThis.SN_IL_FILO.chats()).find((c) => c.id === id)?.finita, chiusa)).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/831-home-chiusa-resta-il-filo.png' });
+
+  await restore(app, '__fakeF4');
+});
+
+test('F5 — un altro comando della finestra chiesto dalla home apre il suo menu e lascia la conversazione', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // Un comando secco chiude il turno al primo giro (#1130): la frase sta con l'azione.
+  await fakeProvider(app, [
+    { text: 'Ecco le impostazioni.', toolCalls: [{ id: 'f5', name: 'COMANDO_FINESTRA', arguments: '{"comando":"settings"}' }] },
+  ], '__fakeF5');
+
+  await page.evaluate(() => { window.__segnoF5 = 'vivo'; });
+  await page.locator('#input').fill('apri le impostazioni');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco le impostazioni.' })).toBeVisible({ timeout: 10_000 });
+
+  // Il menu delle Impostazioni è aperto davvero (un popup della finestra), e la home sotto non si è mossa.
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      if (!w.url().startsWith('data:text/html')) continue;
+      const testo = await w.locator('.menu').innerText({ timeout: 500 }).catch(() => '');
+      if (testo.includes('Preferenze')) return true;
+    }
+    return false;
+  }, { timeout: 8_000 }).toBe(true);
+  expect(await page.evaluate(() => window.__segnoF5)).toBe('vivo');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'apri le impostazioni' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity')).toHaveCount(1);
+
+  await restore(app, '__fakeF5');
+});
+
 test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
