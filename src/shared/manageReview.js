@@ -918,17 +918,17 @@
   // per tutt'e due le pagine perché vive qui.
   function ownerActions(fb, opts) {
     if (statusUnreadable(fb)) return [];
-    const { status } = normalizeStatus(fb);
+    const { status, statusReason } = normalizeStatus(fb);
     const tab = manageTabFor(fb, opts);
     if (tab === 'inbox') {
-      // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
-      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori server' : '→ In coda', primary: true }];
-      // #913: approvarlo come lavoro locale. `locale` dice a chi scrive di aggiungere il segno e il sì dell'owner.
-      // Rimandato nei Ricevuti perché richiede lavoro locale (--serve-locale): la decisione attesa è questa.
-      if (!isLocalOnly(fb) && localApprovalCheck(fb, opts).ok) {
-        const attesa = String((fb && fb.statusReason) || '') === 'locale';
-        if (attesa) acts[0].primary = false;
-        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: attesa, locale: true });
+      // Aspetta una decisione: approvare È scrivere `todo`.
+      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
+      // Il rombo azzurro nato prima di #1358 (`design`/`locale` senza domanda) esce solo come lavoro server: il segno
+      // lo mette ormai il server, e altrove il tasto non c'è (#1575). `approva`: il sì dell'owner (#913) a chi non è
+      // fidato né già approvato.
+      if (status === 'design' && statusReason === 'locale' && !isLocalOnly(fb)) {
+        acts[0].primary = false;
+        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok });
       }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
