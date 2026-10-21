@@ -173,5 +173,5 @@ function registerFiloProtocolForSession(sess) {
 
 module.exports = {
   registerProtocolSchemes, registerFiloProtocol, registerFiloProtocolForSession,
-  filoHandler, relIsUnsafe, FILO_PAGE_CSP, ROOT,
+  filoHandler, relIsUnsafe, FILO_PAGE_CSP, ROOT, INDIRIZZI_SPOSTATI,
 };
