@@ -2777,13 +2777,14 @@
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
+      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
         + alignedCls
         + (progress ? ' mg-item--staged' : '')
-        + (progress && progress.active ? ' mg-item--active-work' : '');
+        + (progress && progress.active ? ' mg-item--active-work' : '')
+        + ` mg-fiducia--${MR.segnoFiducia(fb).classe}`;
       item.dataset.id = fb._id;
       // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa
       // e stesso peso, così si riconosce scorrendo la lista.
