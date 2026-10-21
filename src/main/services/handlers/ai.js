@@ -85,13 +85,36 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // La descrizione che parte da sola (screenshot, immagine copiata o incollata) non esce da una pagina delicata (#1004).
-  // Senza la regola non si sa: nel dubbio vale delicata.
+  // Da una pagina delicata non parte niente di automatico (#1004): né la descrizione di uno screenshot o di un'immagine
+  // copiata, né la spiegazione preparata alla selezione (#1274). Un'immagine nata lì resta fuori anche incollata su un
+  // altro sito: conta la pagina da cui viene. Senza la regola non si sa: nel dubbio vale delicata.
   async function automaticaDaDelicata(msg, sender) {
-    if (!msg || msg.action !== SN_CONST.ACTIONS.DESCRIBE_IMAGE || !msg.payload || !msg.payload.automatica) return false;
+    const A = SN_CONST.ACTIONS;
+    const immagine = Boolean(msg && msg.action === A.DESCRIBE_IMAGE && msg.payload && msg.payload.automatica);
+    const preparata = Boolean(msg && msg.action === A.EXPLAIN && msg.suRichiesta !== true);
+    if (!immagine && !preparata) return false;
     const url = String(sender?.tab?.url || sender?.url || '');
-    if (!/^https?:/i.test(url)) return false;
-    try { return Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) { return true; }
+    let delicata = null;
+    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { return true; }
+    const daQui = /^https?:/i.test(url) && Boolean(delicata(url));
+    if (!immagine) return daQui;
+    const Immagini = require('../immaginiDelicate').perFilo();
+    const dataUrl = msg.payload.dataUrl;
+    if (daQui) {
+      const incognito = Boolean(winOf && winOf(sender)?._filoTabs?.incognito);
+      await Immagini.segna(dataUrl, { incognito }).catch(() => {});
+      return true;
+    }
+    if (delicata.attivo === false) return false;
+    try { return await Immagini.daDelicata(dataUrl); } catch (_) { return true; }
+  }
+
+  // Spenta in Preferenze (#1274), la descrizione di screenshot e immagini copiate non parte: il file prende data e ora.
+  async function descrizioneSpenta(msg) {
+    if (!msg || msg.action !== SN_CONST.ACTIONS.DESCRIBE_IMAGE || !msg.payload || !msg.payload.automatica) return false;
+    let s = null;
+    try { s = await globalThis.SN_STORAGE.getSettings(); } catch (_) { s = null; }
+    return Boolean(s && s.descriviImmagini && s.descriviImmagini.enabled === false);
   }
 
   // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: il controllo di coerenza
