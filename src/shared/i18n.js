@@ -450,8 +450,7 @@
     options_category_pages: '%s schede',
     options_category_name_taken: 'C\'è già «%s»: Rinomina le unisce',
 
-    // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
-    admin_defaults_title: 'Modelli predefiniti',
+    // Gestione → Impostazioni predefinite → "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_intro:
       'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Provider e modelli arrivano subito a tutte le installazioni. Le chiavi no. Nessuna installazione le legge da qui: le incastona la prossima versione pubblicata, e l\'aggiornamento le consegna.',
     admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',
