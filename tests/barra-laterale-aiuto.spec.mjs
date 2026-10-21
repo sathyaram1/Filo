@@ -185,6 +185,12 @@ test('Aiuto ridotto mentre detta: l\'icona dice «Ferma» e il clic ferma, nella
   await expect(nelMenu).toHaveAttribute('aria-label', 'Ferma', { timeout: 8_000 });
   await nelMenu.click();
   await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
+  // Il testo dettato e il cursore rimesso in fondo non riaprono il pannello che l'utente ha ridotto, nemmeno quando la
+  // pagina riprende il fuoco.
+  await expect(mic).toHaveAttribute('data-stato', 'pronto', { timeout: 10_000 });
+  await page.locator('h1').click();
+  await page.waitForTimeout(400);
+  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
 });
 
 test('Filo risponde ad Aiuto ridotto: la striscia si accende e si spegne aprendo la risposta', async ({ app, openTab, testServer }) => {
