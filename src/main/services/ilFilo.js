@@ -106,44 +106,78 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   // Le uniche righe che si tolgono dal file sono quelle coperte da una cancellazione; le altre restano byte per byte.
+  // Due letture a righe, mai il file intero in memoria: la prima decide quali righe restano, la seconda le copia.
   async function compattaFile() {
-    let testo = '';
-    try { testo = await fsp.readFile(fileEventi(), 'utf8'); } catch (e) { if (e.code === 'ENOENT') return 0; throw e; }
-    const coppie = [];
-    for (const r of testo.split('\n')) {
-      if (!r.trim()) continue;
-      let ev = null;
-      try { ev = JSON.parse(r); } catch (_) { continue; }
-      if (!ev || typeof ev !== 'object') continue;
-      coppie.push({ r, ev });
-    }
-    const validi = coppie.filter((c) => E().valido(c.ev)).map((c) => c.ev);
-    const tenuti = new Set(E().compatta(validi));
+    const lette = [];
+    // Di un evento servono solo i campi che decidono cosa copre una cancellazione, non il testo dei messaggi.
+    const sottile = (ev) => ({ tipo: ev.tipo, ts: ev.ts, chat: ev.chat, url: ev.url, visita: ev.visita, pagine: ev.pagine });
+    try {
+      await perRiga(fileEventi(), (r, i) => {
+        if (!r.trim()) return;
+        let ev = null;
+        try { ev = JSON.parse(r); } catch (_) { return; }
+        if (!ev || typeof ev !== 'object') return;
+        lette.push({ i, ev: E().valido(ev) ? sottile(ev) : null });
+      });
+    } catch (e) { if (e.code === 'ENOENT') return 0; throw e; }
+    const tenuti = new Set(E().compatta(lette.filter((x) => x.ev).map((x) => x.ev)));
     // Una riga che questa versione non capisce (una versione più nuova del formato) resta dov'è.
-    const restano = coppie.filter((c) => !E().valido(c.ev) || tenuti.has(c.ev));
+    const restano = new Set(lette.filter((x) => !x.ev || tenuti.has(x.ev)).map((x) => x.i));
     const tmp = fileEventi() + '.tmp';
     const fh = await fsp.open(tmp, 'w');
     try {
-      await fh.writeFile(restano.map((c) => c.r + '\n').join(''), 'utf8');
+      let blocco = '';
+      await perRiga(fileEventi(), (r, i) => {
+        if (!restano.has(i)) return undefined;
+        blocco += r + '\n';
+        if (blocco.length < (1 << 20)) return undefined;
+        const b = blocco;
+        blocco = '';
+        return fh.write(b, null, 'utf8');
+      });
+      if (blocco) await fh.write(blocco, null, 'utf8');
       await fh.datasync().catch(() => {});
     } finally { await fh.close(); }
     await rinomina(tmp, fileEventi());
-    return coppie.length - restano.length;
+    return lette.length - restano.size;
   }
 
   async function caricaDaDisco() {
     const stato = E().nuovoStato();
-    let testo = '';
-    try { testo = await fsp.readFile(fileEventi(), 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-    const { eventi, scartate } = E().analizza(testo);
-    if (scartate) console.warn(`[Filo] filo: ${scartate} righe illeggibili saltate`);
+    let scartate = 0;
     let daCompattare = false;
-    for (const ev of eventi) if (E().applica(stato, ev).tolti) daCompattare = true;
+    let aCapo = true;
+    try {
+      ({ aCapo } = await perRiga(fileEventi(), (r) => {
+        const ev = E().analizzaRiga(r);
+        if (ev === null) scartate++;
+        else if (ev && E().applica(stato, ev).tolti) daCompattare = true;
+      }));
+    } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    if (scartate) console.warn(`[Filo] filo: ${scartate} righe illeggibili saltate`);
     // Una riga lasciata a metà da un guasto non deve incollarsi all'evento che arriva dopo.
-    if (testo && !testo.endsWith('\n')) await scriviInCoda('\n');
+    if (!aCapo) await scriviInCoda('\n');
     // Una cancellazione scritta ma non ancora tolta dal file (l'app è morta in mezzo) si finisce adesso.
     if (daCompattare) await compattaFile();
     return stato;
+  }
+
+  function avvisaIlleggibile(e) {
+    const ora = Date.now();
+    if (ora - avvisi.illeggibile < RIPETI_ILLEGGIBILE_MS) return;
+    avvisi.illeggibile = ora;
+    avvisa(`Filo non riesce a leggere le chat e le pagine visitate: ${causaDi(e)}. Finché non ci riesce non salva niente di nuovo, e riprova a ogni richiesta.`,
+      { chiave: 'filo-illeggibile' });
+  }
+
+  async function avvisaSePesa() {
+    if (avvisi.peso) return;
+    let byte = 0;
+    try { byte = (await fsp.stat(fileEventi())).size; } catch (_) { return; }
+    if (byte <= SOGLIA_AVVISO) return;
+    avvisi.peso = true;
+    avvisa(`Le chat e le pagine visitate occupano ${Math.round(byte / (1024 * 1024))} MB sul disco: cancellare le pagine di un periodo le alleggerisce.`,
+      { chiave: 'filo-pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
   }
 
   // Le chat salvate prima del filo (#525) diventano segmenti: una chat già nel filo non si riscrive, così la
