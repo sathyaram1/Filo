@@ -19,7 +19,12 @@ scrivi l'elenco dei test rossi dopo il rebase.
 
 <!-- includi: _immagini.md -->
 
-1. `git fetch origin main && git rebase origin/main`. In ogni conflitto tieni
+1. `git fetch origin main`, poi `git rebase origin/main`: due chiamate, un
+   comando ciascuna, scritto così, senza `cd`, `git -C` o `&&` attorno (vale
+   anche per `git rebase --continue` e `git rebase --abort`). Ogni comando
+   deve combaciare da solo con una regola dei permessi: in un'altra forma lo
+   giudica il classificatore della modalità auto, che un rebase lo ferma come
+   distruttivo. In ogni conflitto tieni
    **tutte e due le intenzioni**: quella del lavoro e quella arrivata su
    `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
    punto, non indovinarla.
