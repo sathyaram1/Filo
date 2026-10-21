@@ -117,6 +117,17 @@ test('cercare nel filo e scegliere un risultato di ieri porta lì e ci resta', a
   await semina(app, [...ieri(), { id: 'oggi', messaggi: [{ role: 'filo', text: 'Il treno parte alle 9.', ts: pocoFa(1) }] }]);
   const page = await openTab('filo://newtab/');
   await inCima(page, 'Il treno parte');
-  const html = await page.evaluate(() => document.querySelector('.dash-cerca, [class*="cerca"]')?.outerHTML.slice(0, 600) || 'nessuno');
-  console.log('campo', html);
+  await page.locator('#cercaInput').click();
+  await page.locator('#cercaInput').fill('domanda di ieri 3');
+  const voce = page.locator('.dash-cerca-voce').first();
+  await expect(voce).toBeVisible({ timeout: 10_000 });
+  await voce.click();
+  const visibile = async () => {
+    const v = await vista(page);
+    const b = v.bolle.find((x) => x.testo === 'domanda di ieri 3');
+    return !!b && b.giu > 0 && b.su < v.alto;
+  };
+  await expect.poll(visibile).toBe(true);
+  await page.waitForTimeout(800);
+  expect(await visibile()).toBe(true);
 });
