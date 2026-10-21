@@ -131,10 +131,16 @@
   function aggiornaIcona(b, it) {
     b.dataset.id = it.id;
     b.setAttribute('aria-label', it.etichetta);
-    if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
+    // Spenta, il suggerimento dice perché.
+    if (it.spenta && it.motivo) b.dataset.sugg = it.motivo;
+    else if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
     else delete b.dataset.sugg;
     b.setAttribute('aria-disabled', it.spenta ? 'true' : 'false');
     b.classList.toggle('accesa', !!it.accesa);
+    b.classList.toggle('ascolta', !!it.ascolta);
+    b.classList.toggle('risposta', !!it.risposta);
+    if (it.ascolta) b.setAttribute('aria-pressed', 'true');
+    else b.removeAttribute('aria-pressed');
     if (b.dataset.icona !== it.icona) {
       b.dataset.icona = it.icona;
       b.innerHTML = svg(it.icona, 18);
