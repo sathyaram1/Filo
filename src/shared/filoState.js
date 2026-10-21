@@ -159,6 +159,7 @@
   // `sistema: false`: il messaggio della home resta in cache per ore, e una batteria citata lì invecchierebbe.
   // `conversazioni`: i messaggi del filo, per chi non li ha già davanti (vedi conversazioniRecenti).
   // `soloSiti`: delle schede aperte arriva il nome del sito, non il titolo che scrive la pagina (#1297, benvenuto).
+  // `creditiFreschi`: la chiede un turno di chat, che non aspetta il saldo ma ne fa rileggere uno vecchio (#1353).
   async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null, soloSiti = false } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
