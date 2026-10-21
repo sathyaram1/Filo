@@ -291,6 +291,73 @@
     return a.scrollHeight - a.scrollTop - a.clientHeight < 40;
   }
 
+  // ── L'ultimo messaggio in cima (#1487) ────────────────────────────────────
+  // Una home che si apre mostra in cima l'ultimo messaggio e sotto il vuoto: il resto sta sopra. Il vuoto in fondo è
+  // quanto basta perché «in fondo» voglia dire proprio lì, così chi scorre al fondo non trova un salto; quello che
+  // arriva dopo lo consuma. `fissa`: finché l'utente non scorre e non scrive, l'ancora resta in cima anche se la
+  // pagina si ridispone.
+  let ancora = null;
+  let fissa = false;
+  let vuoto = 0;
+  let voluto = 0;
+  const aSchermo = (n) => n.getClientRects().length > 0;
+  const inApertura = () => !d.conversa() && !d.occupata();
+
+  function ultimoMessaggio() {
+    for (let n = d.bubblesEl.lastElementChild; n; n = n.previousElementSibling) {
+      if (n.matches('.dash-bubble, .dash-riga-app') && aSchermo(n)) return n;
+    }
+    return null;
+  }
+
+  function misura() {
+    const a = d.bubblesEl;
+    if (fissa && !inApertura()) fissa = false;
+    if (ancora && !ancora.isConnected) ancora = fissa ? ultimoMessaggio() : null;
+    let serve = 0;
+    let cima = null;
+    if (ancora && a.clientHeight > 0) {
+      const box = a.getBoundingClientRect();
+      const y = (v) => v - box.top - a.clientTop + a.scrollTop;
+      // Il segno del giorno subito sopra va su con lei: dice di quando è. Quello che c'è prima esce intero dalla vista.
+      const prima = ancora.previousElementSibling;
+      const testa = prima && prima.classList.contains('dash-giorno') ? prima : ancora;
+      let sopra = testa.previousElementSibling;
+      while (sopra && !aSchermo(sopra)) sopra = sopra.previousElementSibling;
+      let fondo = ancora;
+      for (let n = a.lastElementChild; n && n !== ancora; n = n.previousElementSibling) if (aSchermo(n)) { fondo = n; break; }
+      cima = sopra ? Math.max(0, Math.ceil(y(sopra.getBoundingClientRect().bottom))) : 0;
+      const base = (parseFloat(getComputedStyle(a).paddingBottom) || 0) - vuoto;
+      serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(fondo.getBoundingClientRect().bottom) - base));
+      // Uno scambio che ha riempito lo schermo ha consumato il vuoto: non torna se poi qualcosa si accorcia.
+      if (!serve && !inApertura()) ancora = null;
+    }
+    if (serve !== vuoto) {
+      vuoto = serve;
+      a.style.setProperty('--dash-vuoto', `${serve}px`);
+    }
+    if (fissa && cima != null) {
+      voluto = Math.min(cima, a.scrollHeight - a.clientHeight);
+      if (Math.abs(a.scrollTop - voluto) > 1) a.scrollTop = voluto;
+    }
+  }
+
+  // Si riparte dall'ultimo messaggio: all'apertura, alla consegna della home pronta, e quando Filo scrive mentre la home
+  // è ancora come si è aperta.
+  function daCapo() {
+    if (!d) return;
+    ancora = ultimoMessaggio();
+    fissa = !!ancora && inApertura();
+    misura();
+    if (!fissa) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+  }
+
+  // Una riga nuova con l'utente in fondo: a home appena aperta diventa la cima se è un messaggio, se no la si segue.
+  function seguiNuove(giu) {
+    if (inApertura() && (fissa || giu)) daCapo();
+    else if (giu) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+  }
+
   // ── I pezzi ───────────────────────────────────────────────────────────────
 
   async function carica() {
@@ -311,7 +378,7 @@
     bottoneRisali();
     aggiornaRisali(lista.length);
     segnaGiorni();
-    d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+    daCapo();
     return res.chatCorrente || null;
   }
 
@@ -368,7 +435,7 @@
       messi++;
     }
     if (messi) segnaGiorni();
-    if (messi && giu) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+    if (messi) seguiNuove(giu);
   }
 
   // Una bolla disegnata dal turno prende il nome che ha nel filo, così una ricerca la ritrova.
@@ -430,7 +497,7 @@
     if (!primo) { primo = v.ts; aggiornaRisali(); }
     if (scorri) {
       segnaGiorni();
-      if (giu) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+      seguiNuove(giu);
     }
   }
 
@@ -445,6 +512,7 @@
       n = trova();
     }
     if (!n) return false;
+    fissa = false;
     n.scrollIntoView({ block: 'center' });
     n.classList.remove('dash-trovato');
     void n.offsetWidth;
@@ -513,8 +581,20 @@
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
+    const occhio = new ResizeObserver(() => misura());
+    occhio.observe(d.bubblesEl, { box: 'border-box' });
+    new MutationObserver((cambi) => {
+      for (const c of cambi) {
+        for (const n of c.removedNodes) if (n.nodeType === 1) occhio.unobserve(n);
+        for (const n of c.addedNodes) if (n.nodeType === 1) occhio.observe(n);
+      }
+      misura();
+    }).observe(d.bubblesEl, { childList: true });
+    for (const ev of ['wheel', 'touchstart', 'pointerdown', 'keydown']) d.bubblesEl.addEventListener(ev, () => { fissa = false; }, { passive: true });
     d.bubblesEl.addEventListener('scroll', () => {
       const a = d.bubblesEl;
+      // Uno scorrimento che non è quello dell'ancora (barra, tasti, un'altra pagina che porta qui) la lascia andare.
+      if (fissa && Math.abs(a.scrollTop - voluto) > 1) fissa = false;
       if (a.scrollTop < 40 && a.scrollHeight > a.clientHeight + 40 && !finito && primo) sali().catch(() => {});
     }, { passive: true });
     document.addEventListener('visibilitychange', () => {
@@ -533,5 +613,5 @@
     } catch (_) {}
   }
 
-  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, togliChat, togliIndirizzo, segnaGiorni, nomeDelGiorno };
+  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, daCapo, togliChat, togliIndirizzo, segnaGiorni, nomeDelGiorno };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
