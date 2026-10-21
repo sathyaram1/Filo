@@ -439,7 +439,10 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     const state = await readState();
-    return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, invitesLocked: r.invitesLocked || null, state };
+    return {
+      ok: true, status, message: W.redeemOkMessage({ ...r, conteggioLocale }), conteggioLocale,
+      credits: r.credits, inviteCodes: r.inviteCodes, invitesLocked: r.invitesLocked || null, state,
+    };
   }
 
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => doRedeem((msg && msg.code) || '')));
