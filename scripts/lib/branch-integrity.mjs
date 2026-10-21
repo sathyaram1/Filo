@@ -566,7 +566,7 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
  *
  * @returns {{ok:boolean, current:string, assigned:string, reason:string}}
  */
-export function checkDelivery(root, assignedBranch, { da } = {}) {
+export function checkDelivery(root, assignedBranch, { da, dal } = {}) {
   const altra = altraCartellaDelDeposito(root, da);
   if (altra) {
     return {
