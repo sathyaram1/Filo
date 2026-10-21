@@ -112,6 +112,7 @@
     // Lo stesso verdetto mentre si sceglie il modello (Opzioni, «Detta» dal tasto destro). %s = modello, funzione, host.
     audio_host_fn_tts: 'la lettura ad alta voce',
     audio_host_fn_stt: 'la dettatura',
+    audio_host_warn_crediti: 'Con «%s» %s non parte coi crediti di Filo: per usarlo metti una tua chiave OpenRouter nella pagina Crediti.',
     audio_host_warn_excluded: 'Con «%s» %s non parte: lo serve solo %s, che Filo esclude.',
     audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
     audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',

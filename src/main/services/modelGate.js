@@ -132,9 +132,10 @@
       return err;
     }
     const DAL_ROUTER = new Set(['complete', 'streamComplete', 'embed']);
-    // La ritenzione zero (#831) ha la frase condivisa su ogni strada; le altre frasi di voce e dettatura restano loro.
-    const zdrDi = (err) => Boolean(err && /^zdr/.test(String(err.reason || '')));
-    const conLaFrase = (err, s, action, method) => (DAL_ROUTER.has(method) || zdrDi(err) ? conLaFunzione(err, s, action) : err);
+    // La ritenzione zero (#831) e la regola dei crediti (#830) hanno la frase condivisa su ogni strada; le altre frasi
+    // di voce e dettatura restano loro.
+    const condivisa = (err) => Boolean(err && /^(zdr|crediti$)/.test(String(err.reason || '')));
+    const conLaFrase = (err, s, action, method) => (DAL_ROUTER.has(method) || condivisa(err) ? conLaFunzione(err, s, action) : err);
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.

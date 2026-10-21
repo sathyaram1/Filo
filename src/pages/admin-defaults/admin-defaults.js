@@ -444,10 +444,8 @@
       // integrate restano pulite e "auto" non gonfia il doc condiviso.
       if (reasoning) entry.reasoning = reasoning;
       if (sort) entry.sort = sort;
-      // Ciò che la riga non modifica ma la voce dichiara resta com'era.
-      for (const k of ['weights', 'inputs', 'outputs']) {
-        if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
-      }
+      // Ciò che la voce dichiara del modello resta solo se il modello è ancora quello.
+      Object.assign(entry, window.SN_CONST.dichiarazioniPerModello(row._entry, model));
       out[nick] = entry;
     }
     return { registry: out, missingNickRows, dupRows };

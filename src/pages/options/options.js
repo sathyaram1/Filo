@@ -753,11 +753,12 @@
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
-      // E ciò che la riga non modifica ma la voce dichiara (pesi aperti,
-      // cosa sa masticare): senza, un salvataggio dalle Opzioni lo perderebbe.
-      for (const k of ['weights', 'inputs', 'outputs', 'reasoning', 'sort']) {
+      // E ciò che la riga non modifica: ordinamento e ragionamento sempre, ciò che la voce dichiara del modello (pesi
+      // aperti, cosa sa masticare) solo se il modello è ancora quello.
+      for (const k of ['reasoning', 'sort']) {
         if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
       }
+      Object.assign(entry, window.SN_CONST.dichiarazioniPerModello(row._entry, model));
       out[nick] = entry;
     }
     return { registry: out, dups, missingNick, missingNickRows, dupRows };
@@ -897,6 +898,8 @@
       const data = await res.json();
       return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
     }));
+    // Gli avvisi di questa pagina riconoscono i pesi aperti come il main, che legge lo stesso catalogo.
+    try { window.SN_CONST.registraCatalogoPesi(lists.flat().map((it) => it.meta)); } catch (_) {}
     return lists.flat();
   }
 

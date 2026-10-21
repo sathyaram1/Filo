@@ -77,7 +77,8 @@ module.exports = function register(on, ctx) {
       // Il tetto e il taglio decidono se accanto alla frase ci va il tasto per le Preferenze (#1097.3).
       const tetto = Number(e && e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {};
       const taglio = e && e.code === 'RISPOSTA_TAGLIATA' ? { finishReason: e.finishReason || null } : {};
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio };
+      const crediti = e && e.reason === 'crediti' ? { reason: 'crediti' } : {};
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio, ...crediti };
     } finally {
       fineLavoro();
     }

@@ -1146,7 +1146,7 @@
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
-      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason, reason: r?.reason }) : null;
       // Il tasto in evidenza è quello che toglie l'ostacolo (#828.1): finché c'è, «Riprova» rimanda lo stesso messaggio
       // allo stesso muro, e resta accanto per dopo, quando l'ostacolo è tolto.
       if (pagina) {
