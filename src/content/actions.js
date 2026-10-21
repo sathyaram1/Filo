@@ -789,6 +789,13 @@
     return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
   }
 
+  // Il Referer che la pagina concede (<meta name="referrer">, l'attributo dell'elemento) vale anche per i byte che il
+  // main scarica per lei; la politica dell'intestazione HTTP la vede il main da sé.
+  function politicheReferrer(el) {
+    const meta = Array.from(document.querySelectorAll('meta[name="referrer" i]'), (m) => m.getAttribute('content') || '');
+    return [meta.join(','), String((el && el.referrerPolicy) || '')].filter(Boolean);
+  }
+
   // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
   // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
   // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
