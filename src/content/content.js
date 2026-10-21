@@ -2869,6 +2869,7 @@
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
         else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
+        else if (msg.surface === 'valuta') valutaDalRiquadro();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
