@@ -1832,6 +1832,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
+  /* In riga con «Cerca nel filo»: il disegno parte all'altezza delle carte di sinistra. */
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 2px;

@@ -63,7 +63,7 @@ test('le due icone stanno solo sopra la colonna destra e il filo parte dall\'alt
   await page.screenshot({ path: join(SHOTS, '1491-home-icone-stretta.png') });
 });
 
-// L'icona in px dello schermo: vista della home dentro la finestra, e il suo zoom.
+// L'icona in px dello schermo: la vista della scheda davanti (la home) dentro la finestra, e il suo zoom.
 async function iconaSulloSchermo(app, page, comando) {
   const r = await page.evaluate((c) => {
     const b = document.querySelector(`#dashControls .dash-ctrl[data-command="${c}"]`).getBoundingClientRect();
@@ -71,7 +71,7 @@ async function iconaSulloSchermo(app, page, comando) {
   }, comando);
   const v = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().startsWith('filo://newtab'));
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
     return { vista: t.view.getBounds(), zoom: t.view.webContents.getZoomFactor(), cb: w.getContentBounds() };
   });
   const x0 = v.cb.x + v.vista.x;
@@ -134,7 +134,7 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   const page = await home(openTab);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    w._filoTabs.tabs.find((x) => x.view.webContents.getURL().startsWith('filo://newtab')).view.webContents.setZoomFactor(1.5);
+    w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.setZoomFactor(1.5);
   });
   await expect.poll(() => page.evaluate(() => devicePixelRatio)).toBeGreaterThanOrEqual(1.5);
 
