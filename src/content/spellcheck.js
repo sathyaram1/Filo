@@ -1892,6 +1892,10 @@
   };
 
   function disegnaValori(state) {
+    if (!state.attivo || !state.overlay) {
+      if (state.valori) { state.valori.remove(); state.valori = null; state.badge.clear(); }
+      return;
+    }
     const ora = Date.now();
     state.lampi = state.lampi.filter((l) => ora - l.lampo < LAMPO_MS);
     const testo = getEditableText(state.el);
