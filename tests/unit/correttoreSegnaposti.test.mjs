@@ -20,7 +20,8 @@ test('«nel 14xx» e le x di un dato annunciato sono candidati, coi puntini del 
   assert.equal(c[1].start, testo.lastIndexOf('xx'));
   assert.ok(c.every((s) => s.segno === 'suggerimento' && s.dubbio && s.fonte === 'segnaposto' && s.tipo === 'segnaposto'));
   for (const t of ['costa 3,xx euro', 'nel xxxx', 'Roma ha x.xxx abitanti', 'cresce del xx%', 'costa $xx', 'circa xx metri',
-    'nel 19XX', 'ha 1.4xx dipendenti', 'pesa xx kg', 'about xx years']) {
+    'nel 19XX', 'ha 1.4xx dipendenti', 'pesa xx kg', 'about xx years', 'Mozart ha scritto xx sinfonie',
+    'la Juve ha vinto xx scudetti', 'Shakespeare scrisse xx opere', 'Messi segnò xx reti', 'Bach wrote xx cantatas']) {
     assert.equal(trovati(t).length, 1, t);
   }
 });
