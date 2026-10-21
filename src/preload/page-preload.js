@@ -764,7 +764,7 @@ try {
     if (figli.length > visti) {
       for (const f of inAttesa) if (!f.isConnected) inAttesa.delete(f);
       // Toccato prima del suo load un riquadro perde il preload: alla cieca solo quando nessuno è in arrivo.
-      if (inAttesa.size) return;
+      if (inAttesa.size || globalThis.SN_RIQUADRI_IN_ARRIVO?.qualcunoInArrivo()) return;
       for (const c of figli) { try { c.executeJavaScriptInIsolatedWorld(MONDO_DEL_PRELOAD, [{ code: PRESENTATI }], false).catch(() => {}); } catch (_) {} }
     }
     figliContati = figli.length;
