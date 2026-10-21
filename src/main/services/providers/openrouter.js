@@ -513,53 +513,57 @@
       }
       throw err;
     });
+    const leggiRiga = (raw) => {
+      const line = raw.trim();
+      if (!line || !line.startsWith('data:')) return;
+      const payload = line.slice(5).trim();
+      if (payload === '[DONE]') return;
+      try {
+        const obj = JSON.parse(payload);
+        if (!generationId && typeof obj.id === 'string') generationId = obj.id;
+        // Chi ha servito arriva in streaming insieme ai chunk (di norma con
+        // l'ultimo): teniamo l'ultimo valore visto.
+        const sb = extractServedBy(obj);
+        if (sb) servedBy = sb;
+        const choice = obj.choices?.[0] || {};
+        const choiceDelta = choice.delta || {};
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+        const reasoning = choiceDelta.reasoning;
+        if (reasoning) {
+          try { onReasoning && onReasoning(reasoning); } catch (_) {}
+        }
+        if (choiceDelta.reasoning_details) details.push(choiceDelta.reasoning_details);
+        if (choiceDelta.tool_calls) calls.push(choiceDelta.tool_calls);
+        const delta = choiceDelta.content;
+        if (delta) {
+          fullText += delta;
+          try { onDelta && onDelta(delta); } catch (_) {}
+        }
+        if (obj.usage) {
+          usage = {
+            promptTokens: obj.usage.prompt_tokens || 0,
+            completionTokens: obj.usage.completion_tokens || 0,
+            cachedPromptTokens: cachedPromptTokens(obj.usage),
+            cacheWriteTokens: cacheWriteTokens(obj.usage),
+            costUsd: costUsdOf(obj.usage),
+            servedBy: servedBy || extractServedBy(obj),
+          };
+        }
+      } catch (_) {
+        // riga malformata, ignora
+      }
+    };
     while (true) {
       const { done, value } = await read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-      for (const raw of lines) {
-        const line = raw.trim();
-        if (!line || !line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const obj = JSON.parse(payload);
-          if (!generationId && typeof obj.id === 'string') generationId = obj.id;
-          // Chi ha servito arriva in streaming insieme ai chunk (di norma con
-          // l'ultimo): teniamo l'ultimo valore visto.
-          const sb = extractServedBy(obj);
-          if (sb) servedBy = sb;
-          const choice = obj.choices?.[0] || {};
-          const choiceDelta = choice.delta || {};
-          if (choice.finish_reason) finishReason = choice.finish_reason;
-          const reasoning = choiceDelta.reasoning;
-          if (reasoning) {
-            try { onReasoning && onReasoning(reasoning); } catch (_) {}
-          }
-          if (choiceDelta.reasoning_details) details.push(choiceDelta.reasoning_details);
-          if (choiceDelta.tool_calls) calls.push(choiceDelta.tool_calls);
-          const delta = choiceDelta.content;
-          if (delta) {
-            fullText += delta;
-            try { onDelta && onDelta(delta); } catch (_) {}
-          }
-          if (obj.usage) {
-            usage = {
-              promptTokens: obj.usage.prompt_tokens || 0,
-              completionTokens: obj.usage.completion_tokens || 0,
-              cachedPromptTokens: cachedPromptTokens(obj.usage),
-              cacheWriteTokens: cacheWriteTokens(obj.usage),
-              costUsd: costUsdOf(obj.usage),
-              servedBy: servedBy || extractServedBy(obj),
-            };
-          }
-        } catch (_) {
-          // riga malformata, ignora
-        }
-      }
+      for (const raw of lines) leggiRiga(raw);
     }
+    // Un flusso che si chiude senza l'a capo finale ha ancora in mano l'ultimo evento: buttarlo taglierebbe la coda della risposta.
+    buffer += decoder.decode();
+    if (buffer) leggiRiga(buffer);
     // Fermato da un errore prima di scrivere qualcosa: è un guasto del servizio, che si riprova o passa al ripiego.
     if (finishReason === 'error' && !fullText && !calls.list().length) {
       const err = new Error('OpenRouter 502: il fornitore si è fermato a metà flusso');
