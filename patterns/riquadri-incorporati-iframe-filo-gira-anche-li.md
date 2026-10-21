@@ -12,26 +12,27 @@ il tasto destro non produce nulla, e per l'utente è un buco nero senza spiegazi
 
 Cinque regole quando si tocca qualcosa che vive nel content script:
 
-- **Un riquadro che carica il suo indirizzo non si tocca fino al suo load**
+- **Un riquadro della stessa origine non si tocca finché non è arrivato**
   (#1560). Leggere da fuori `contentWindow` o `contentDocument`, o mandare uno
   script nel mondo isolato dei frame figli, mentre il riquadro è ancora sul suo
-  documento vuoto iniziale crea lì il mondo di Filo: il preload di quel riquadro
-  non parte più, e dentro Filo sparisce per sempre (Alt+E e tasto destro muti).
-  Riguarda i riquadri dello stesso processo, cioè dello stesso sito; un tocco dal
-  mondo della pagina invece non fa danni. Le porte erano tante e tutte
+  documento vuoto iniziale crea lì il mondo di Filo: il riquadro eredita quella
+  finestra, il suo preload non parte più, e dentro Filo sparisce per sempre
+  (Alt+E e tasto destro muti). Solo la stessa origine eredita la finestra:
+  d'altra origine, anche dello stesso sito, il preload parte lo stesso (provato),
+  e un tocco dal mondo della pagina non fa danni. Le porte erano tante e tutte
   automatiche: il content script che segue i riquadri al suo avvio, il puntatore
   che passa sulla pagina o sul riquadro (lo zoom), la ricerca dei riquadri in
   una radice ombra, il blocco della pubblicità, la traduzione, chi riconosce un
   riquadro dal messaggio che ha mandato. La regola sta in un posto solo,
-  `src/shared/riquadriInArrivo.js` (`SN_RIQUADRI_IN_ARRIVO`): conta i load dal
-  document_start, e chi tocca un riquadro chiede a lui `finestra`, `documento`,
-  `riquadroDi` (chi ha scritto) o `qualcunoInArrivo` (prima di uno script alla
-  cieca). Un riquadro con un indirizzo ha un Filo suo, quindi saltarlo mentre
-  arriva non perde niente: chi lo seguiva lo riprende al load. Restano fuori i
-  riquadri in una radice ombra e quelli dentro un documento che la pagina si è
-  scritta da sé, di cui il load da qui non si vede: lì si fa come prima.
-  Sentinella `tests/unit/riquadriInArrivo.test.mjs`; prova
-  `tests/riquadro-in-arrivo.spec.mjs`.
+  `src/shared/riquadriInArrivo.js` (`SN_RIQUADRI_IN_ARRIVO`): un riquadro è
+  arrivato quando il suo preload parte e lo dice a chi lo ospita, o al suo load;
+  chi tocca un riquadro chiede a lui `finestra`, `documento`, `riquadroDi` (chi
+  ha scritto) o `qualcunoInArrivo` (prima di uno script alla cieca). Saltare un
+  riquadro in arrivo non perde niente: non ha ancora un documento che ascolti, e
+  chi lo seguiva lo riprende quando arriva. Restano come prima i riquadri in una
+  radice ombra e quelli dentro un documento che la pagina si è scritta da sé, di
+  cui da qui l'arrivo non si vede. Sentinella
+  `tests/unit/riquadriInArrivo.test.mjs`; prova `tests/riquadro-in-arrivo.spec.mjs`.
 
 - **Costo pigro.** Una pagina può avere decine di riquadri che l'utente non tocca
   mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
