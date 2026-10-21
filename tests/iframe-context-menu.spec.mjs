@@ -12,6 +12,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, conta } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadriInRitardo, apriConRiquadriInRitardo } from './helpers/riquadriInRitardo.mjs';
 
 const INNER = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
   <p id="inner-text">Testo dentro il riquadro incorporato, lungo abbastanza da poterlo selezionare e spiegare.</p>
