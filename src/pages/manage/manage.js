@@ -2594,6 +2594,8 @@
     const bd = scrivi('domande', nd ? `(${nd.domande})` : '',
       nd ? `${nd.domande} da rispondere${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
     if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
+    // Le schede contano quello che mostrano, col filtro della fiducia; la sezione, come Feedback, a filtro spento.
+    const nt = nd && soloNonFidate ? MR.contaDomande(MR.filtraFiducia(d.domande, true)) : nd;
     for (const tab of DOMANDE_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
