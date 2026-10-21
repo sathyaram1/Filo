@@ -316,9 +316,10 @@ fanno ~5 $ al giorno, compattazioni comprese.
 
 ## Fasi, in ordine
 
-1. **Fornitore Anthropic diretto** con cache esplicita, registro di chi ha
-   servito e dei token in cache. Prima misura sul banco col contesto di oggi:
-   è la base del confronto.
+1. **Cache esplicita** sui blocchi stabili, registro di chi ha servito e dei
+   token letti e scritti in cache. Prima misura sul banco col contesto di
+   oggi: è la base del confronto. Il trasporto Anthropic (chiave dentro
+   OpenRouter o fornitore diretto) segue la risposta sulla chiave.
 2. **Il filo completo**: gli eventi mancanti (azioni con esito, cambi di stato,
    schede, file, sistema) nascono dove si scrive lo stato; `filo_cambi` entra
    nel filo; via il registro vecchio.
