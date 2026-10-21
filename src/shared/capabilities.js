@@ -20,7 +20,7 @@
 //     invoke:   'Come si attiva (shortcut / voce di menu / pagina).', // {tasto:<azione>}: il tasto scelto (#842)
 //     doesNot:  'Confine: cosa NON fa (opzionale, ma prezioso per F4).',
 //     cancello: 'redteam',              // opzionale: la voce esiste solo per chi ha quel cancello aperto
-//   }
+//   }                                   // nei testi, {se:<cancello>}…{altrimenti}…{/se}: vedi visibili()
 //
 // `desc`/`invoke`/`doesNot` sono per l'utente finale, non tecnici.
 
