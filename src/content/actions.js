@@ -959,9 +959,23 @@
     });
   }
 
+  // La foto resta com'è per l'utente; `campi` sono i campi segreti da coprire nella copia che va a un modello (#810.7),
+  // null se non si sono potuti trovare tutti: quella copia allora non parte.
   async function captureVisibleTab() {
     await attendiCompositor();
-    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    const prima = Extract.campiSegretiInVista();
+    const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true, campiNellaPagina: prima.length });
+    if (r?.ok) return { ...r, campi: prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista()) };
+    if (r?.code !== 'segreti') return r;
+    const pura = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+    return pura?.ok ? { ...pura, campi: null } : pura;
+  }
+
+  // Il nome del file lo sceglie un modello guardando la foto: gli arriva coi campi segreti coperti, o non gli arriva.
+  async function descrizioneCoperta(dataUrl, campi, ritaglio = null) {
+    if (!Array.isArray(campi)) return null;
+    const perModello = campi.length ? await Extract.fotoCoperta(dataUrl, campi, { ritaglio }) : dataUrl;
+    return requestImageDescription(perModello, dataUrl);
   }
 
   function buildSavePayload() {
