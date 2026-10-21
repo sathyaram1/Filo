@@ -143,7 +143,7 @@ test('la zona di una mappa d\'immagine verso un sosia: voci del link e dell\'imm
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible();
   await expect(menu.voce('Apri in nuova tab')).toBeVisible();
-  await expect(menu.voce('Copia URL')).toBeVisible();
+  await expect(menu.superficie.getByRole('button', { name: 'Copia URL', exact: true })).toBeVisible();
   await expect(menu.voce('Copia immagine')).toBeVisible();
   const avviso = menu.locator('.sn-menu .sn-menu-inline[data-subject="link"] .sn-menu-link-warn');
   await expect(avviso).toBeVisible({ timeout: 3000 });
@@ -152,7 +152,7 @@ test('la zona di una mappa d\'immagine verso un sosia: voci del link e dell\'imm
   await page.screenshot({ path: 'tests/.shots/1307-mappa-immagine.png' });
   await page.keyboard.press('Escape');
 
-  // Fuori dalla zona l'immagine è solo un'immagine.
+  // Fuori dalla zona l'immagine resta solo un'immagine.
   await page.locator('#mappa').click({ button: 'right', position: { x: 260, y: 40 } });
   await expect(menu.voce('Copia immagine')).toBeVisible();
   await expect(menu.voce('Apri in nuova tab')).toHaveCount(0);
