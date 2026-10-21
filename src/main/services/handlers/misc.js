@@ -462,7 +462,9 @@ module.exports = function register(on, ctx) {
 
     // Se il trasferimento è fallito NON chiediamo dove salvare: sarebbe un
     // dialogo per un file che non c'è. Se invece era già aperto lo si aspetta
-    // (non c'è modo di richiuderlo da qui).
+    // (non c'è modo di richiuderlo da qui). La voce si chiude subito: una domanda
+    // ancora aperta sul programma si ritira invece di aspettare per sempre.
+    if (downloadError && !entry.cancelled()) entry.fail();
     if (!downloadError && !entry.cancelled()) ensureDest();
     const dest = destPromise ? await destPromise : null;
     const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
