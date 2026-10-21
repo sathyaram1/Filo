@@ -5,7 +5,15 @@
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
   const stratoDi = (sender) => {
-    const tabs = sender && sender.wc && winOf(sender)?._filoTabs;
+    if (!sender || !sender.wc) return null;
+    // La finestrella di accesso ha il suo strato, e non sta in una finestra di Filo.
+    if (!sender.win) {
+      let propria = null;
+      try { propria = require('electron').BrowserWindow.fromWebContents(sender.wc); } catch (_) { propria = null; }
+      const s = propria && propria.webContents === sender.wc ? propria._filoStrato : null;
+      return s && s.acceso ? s : null;
+    }
+    const tabs = winOf(sender)?._filoTabs;
     return tabs && tabs.strato && tabs.strato.acceso ? tabs.strato : null;
   };
   const no = { ok: false };
