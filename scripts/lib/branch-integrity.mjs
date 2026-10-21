@@ -617,6 +617,40 @@ export function altraCartellaDelDeposito(root, da = process.cwd()) {
   return { cartella: qui.top, radice: lavoro.top, ramo: currentBranch(da) };
 }
 
+/**
+ * Un altro worktree dello stesso deposito con commit nati da `dal` (l'inizio del lavoro) che la cartella posizionata
+ * non contiene (#772.1): il controllo guarda da dove parte il comando, e la shell dei sotto-agenti torna da sola alla
+ * cartella principale. Non contano la linea principale né i commit già portati qui con un cherry-pick. null se no.
+ * @returns {null | { cartella: string, ramo: string, radice: string, commit: string[] }} i commit dal più vecchio
+ */
+export function lavoroInUnAltroWorktree(root, { dal = '' } = {}) {
+  const inizio = Math.floor(Date.parse(String(dal || '')) / 1000);
+  if (!Number.isFinite(inizio)) return null;
+  const g = gitIn(root);
+  const top = g(['rev-parse', '--show-toplevel']);
+  const elenco = g(['worktree', 'list', '--porcelain']);
+  if (!top.ok || !elenco.ok) return null;
+  const radice = percorsoVero(top.out);
+  const def = g(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok && def.out ? def.out.replace(/^origin\//, '') : 'main';
+  const fuori = [principale, `origin/${principale}`].filter((r) => g(['rev-parse', '--verify', '--quiet', `${r}^{commit}`]).ok);
+  for (const blocco of elenco.out.split(/\r?\n\s*\r?\n/)) {
+    const righe = blocco.split(/\r?\n/);
+    const campo = (nome) => (righe.find((r) => r.startsWith(`${nome} `)) || '').slice(nome.length + 1).trim();
+    const cartella = campo('worktree');
+    const testa = campo('HEAD');
+    // Una cartella sparita (worktree da potare) non è dove si lavora adesso.
+    if (!cartella || !/^[0-9a-f]{7,64}$/i.test(testa) || righe.includes('bare') || !existsSync(cartella)) continue;
+    if (percorsoVero(cartella) === radice) continue;
+    const r = g(['log', '--no-merges', '--right-only', '--cherry-pick', '--format=%H %ct', `HEAD...${testa}`, ...fuori.map((x) => `^${x}`)]);
+    if (!r.ok || !r.out) continue;
+    const commit = r.out.split(/\r?\n/).map((l) => l.trim().split(' '))
+      .filter(([sha, ct]) => sha && Number(ct) >= inizio).map(([sha]) => sha).reverse();
+    if (commit.length) return { cartella: percorsoVero(cartella), ramo: campo('branch').replace(/^refs\/heads\//, ''), radice, commit };
+  }
+  return null;
+}
+
 function percorsoVero(p) {
   try { return realpathSync.native(p); } catch (_) { return p; }
 }
