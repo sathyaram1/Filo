@@ -173,9 +173,10 @@
   // Un indirizzo che il filo ricorda l'ha scritto un sito: si riapre solo se è una pagina web.
   // Una scheda chiusa prima del filo si riapre com'era (scroll, paese), dalla sua voce d'archivio (#872).
   async function riapri(p) {
-    if (!/^https?:\/\//i.test(String(p.url || ''))) return;
-    const riaperta = p.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
-    if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: p.url });
+    const dove = global.SN_FILO_CODA.daAprire(p);
+    if (!dove) return;
+    const riaperta = p.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
+    if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
   }
 
   async function togliPagine(r, ids) {
