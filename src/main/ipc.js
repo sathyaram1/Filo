@@ -310,6 +310,8 @@ function registerIpcHandlers() {
     ...(err.maxTokens ? { maxTokens: err.maxTokens } : {}),
     ...(err.finestra ? { finestra: err.finestra } : {}),
     ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
+    // Il modello che i crediti non pagano (#830) porta il tasto per la pagina Crediti.
+    ...(err.reason === 'crediti' ? { reason: 'crediti' } : {}),
   } : {});
 
   ipcMain.handle('filo:message', async (event, msg) => {

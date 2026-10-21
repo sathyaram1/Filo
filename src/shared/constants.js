@@ -908,8 +908,46 @@
   const OPEN_WEIGHT_MODEL_FAMILIES = [
     'gemma', 'llama', 'qwen', 'deepseek', 'mistral', 'mixtral', 'kimi', 'glm',
     'minimax', 'olmo', 'phi', 'granite', 'nemotron', 'falcon', 'yi', 'command-r',
-    'stablelm', 'smollm', 'whisper', 'step', 'kokoro', 'parakeet', 'bge',
+    'stablelm', 'smollm', 'whisper', 'step', 'kokoro', 'parakeet', 'bge', 'gpt-oss',
+    // Coi crediti (#830) un aperto che manca qui viene fermato: le famiglie aperte del catalogo del router.
+    'qwq', 'devstral', 'magistral', 'pixtral', 'ministral', 'voxtral', 'hermes', 'deephermes', 'ernie', 'hunyuan',
+    'seed-oss', 'longcat', 'jamba', 'lfm2', 'lfm-2', 'intellect', 'ling', 'ring', 'command-a', 'aya', 'trinity',
+    'dolphin', 'apriel', 'cogito', 'mimo', 'tongyi', 'ui-tars',
+    // Ripiego quando il catalogo del router non si legge (la regola vera è lì, registraCatalogoPesi).
+    'wizardlm', 'mythomax', 'l3', 'magnum', 'cydonia', 'rocinante', 'mai-ds', 'tng-r1t', 'deepcoder', 'goliath',
   ];
+  // Il catalogo del router dice, per ogni modello a pesi aperti, dove sono pubblicati (`hugging_face_id`): un modello
+  // che lo porta è aperto qualunque sia il suo nome; per gli altri restano le famiglie qui sotto (#830). Lo registra
+  // chi scarica il catalogo; chi deve decidere prima di spendere può chiederne la lettura (aggiornaCatalogoPesi).
+  let catalogoPesiAperti = null;
+  let caricatoreCatalogo = null;
+  const idDiCatalogo = (id) => String(id == null ? '' : id).trim().toLowerCase().replace(/^~/, '').replace(/:[a-z0-9-]+$/, '');
+  function registraCatalogoPesi(voci) {
+    const aperti = new Set();
+    for (const m of Array.isArray(voci) ? voci : []) {
+      const hf = m && typeof m.hugging_face_id === 'string' ? m.hugging_face_id.trim() : '';
+      if (hf && m && typeof m.id === 'string') aperti.add(idDiCatalogo(m.id));
+    }
+    catalogoPesiAperti = aperti;
+  }
+  function apertoPerCatalogo(id) { return Boolean(catalogoPesiAperti && catalogoPesiAperti.has(idDiCatalogo(id))); }
+  function registraCaricatoreCatalogo(fn) { caricatoreCatalogo = typeof fn === 'function' ? fn : null; }
+  async function aggiornaCatalogoPesi() {
+    if (!caricatoreCatalogo) return false;
+    try { await caricatoreCatalogo(); return true; } catch (_) { return false; }
+  }
+
+  // Famiglie aperte che vendono anche versioni a pesi CHIUSI, solo via API: una di queste parole nel nome dopo la
+  // famiglia la rende chiusa ('qwen3-max', 'mistral-medium-3.1', 'yi-large'). Prove: tests/unit/creditiPolitica.test.mjs.
+  const CLOSED_VARIANTS_OF_OPEN_FAMILIES = {
+    qwen: ['max', 'plus', 'turbo', 'flash'],
+    mistral: ['medium', 'saba'],
+    devstral: ['medium'],
+    magistral: ['medium'],
+    yi: ['large', 'lightning', 'turbo', 'vision'],
+    ernie: ['x1', 'turbo'],
+    hunyuan: ['t1', 'turbo', 'turbos'],
+  };
 
   // Il modello concreto ha i pesi aperti? Guarda l'ULTIMO segmento dell'id (il
   // nome vero: 'deepseek/deepseek-v4-pro' → 'deepseek-v4-pro'), così il prefisso
@@ -917,6 +955,7 @@
   function isOpenWeightsModelId(modelId) {
     const raw = String(modelId == null ? '' : modelId).toLowerCase().trim();
     if (!raw) return false;
+    if (apertoPerCatalogo(raw)) return true;
     const name = raw.split('/').pop();
     // Il nome può portare la versione attaccata alla famiglia ('qwen3-embedding',
     // 'llama4-…', 'gemma3-…'): conta ciò che segue la famiglia, non un
@@ -925,7 +964,9 @@
       const f = String(fam).toLowerCase();
       if (!name.startsWith(f)) return false;
       const rest = name.slice(f.length);
-      return rest === '' || /^[\d\-._:]/.test(rest);
+      if (!(rest === '' || /^[\d\-._:]/.test(rest))) return false;
+      const chiuse = CLOSED_VARIANTS_OF_OPEN_FAMILIES[f] || [];
+      return !rest.split(/[-._:]/).some((parola) => chiuse.includes(parola));
     });
   }
 
@@ -986,6 +1027,60 @@
   // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
   const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), ...NARROW_MODEL_PRODUCERS.map((r) => r.nome)];
 
+  // Coi crediti di Filo girano solo le tre categorie della politica sui modelli: Anthropic, pesi aperti, modelli
+  // stretti ammessi per nome; gli altri solo con la chiave propria (#830). `weights` è quello dichiarato dalla voce
+  // del registro, che vince sul nome come per l'interruttore. PURA. Prove: tests/unit/creditiPolitica.test.mjs.
+  function creditsAllowModel(modelId, weights) {
+    const id = String(modelId == null ? '' : modelId).trim().toLowerCase().replace(/^~/, '');
+    if (producerOnlyRule(id)) return true;
+    if (NARROW_MODEL_PRODUCERS.some((r) => id.startsWith(r.prefix))) return true;
+    return isOpenWeightsEntry({ model: id, weights });
+  }
+  // Come creditsAllowModel, ma un modello che i nomi non riconoscono lo si cerca anche nel catalogo del router, letto
+  // se serve: si paga un'attesa solo sul rifiuto, mai su una richiesta che parte.
+  async function creditsAllowModelLetto(modelId, weights) {
+    if (creditsAllowModel(modelId, weights)) return true;
+    if (!(await aggiornaCatalogoPesi())) return false;
+    return creditsAllowModel(modelId, weights);
+  }
+
+  // Pesi, ingressi e uscite che una voce dichiara valgono per il modello con cui sono stati scritti: chi cambia il
+  // modello di una riga non se li porta dietro (#830). PURA.
+  const DICHIARAZIONI_DEL_MODELLO = ['weights', 'inputs', 'outputs'];
+  const stessoModello = (a, b) => idDiCatalogo(a) !== '' && idDiCatalogo(a) === idDiCatalogo(b);
+  function dichiarazioniPerModello(voce, model) {
+    const out = {};
+    if (!voce || !stessoModello(voce.model, model)) return out;
+    for (const k of DICHIARAZIONI_DEL_MODELLO) if (voce[k] != null) out[k] = voce[k];
+    return out;
+  }
+  // I pesi dichiarati dalla voce per `model`, '' se la voce parla di un altro modello. PURA.
+  function pesiDichiaratiPer(voce, model) {
+    return dichiarazioniPerModello(voce, model).weights || '';
+  }
+  // Il registro personale come lo legge il main: chi usa Filo non ha dove dichiarare i pesi, quindi una dichiarazione
+  // vale solo se il registro condiviso dice la stessa cosa per lo stesso modello (una riga cambiata prima di questa
+  // regola se la porta ancora dietro). PURA.
+  function registroConPesiCondivisi(personale, condiviso) {
+    if (!personale || typeof personale !== 'object') return personale;
+    const dichiarati = new Map();
+    for (const v of Object.values(condiviso || {})) {
+      if (v && v.weights != null && v.model) dichiarati.set(idDiCatalogo(v.model), v.weights);
+    }
+    let cambiato = false;
+    const out = {};
+    for (const [nick, v] of Object.entries(personale)) {
+      if (v && v.weights != null && dichiarati.get(idDiCatalogo(v.model)) !== v.weights) {
+        const { weights: _tolto, ...resto } = v;
+        out[nick] = resto;
+        cambiato = true;
+      } else {
+        out[nick] = v;
+      }
+    }
+    return cambiato ? out : personale;
+  }
+
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {
     const base = Array.isArray(excluded) ? excluded.slice() : [];
@@ -1029,14 +1124,17 @@
   // l'interruttore della chiave propria, la lista per quella chiave (`ownKeyIgnore`, la sceglie il provider dalla
   // chiave con cui parte davvero). null se non c'è niente da dire. PURA.
   // L'ordinamento della voce (`entrySort`) vince su quello globale; `ignore` non dipende mai dall'ordinamento.
-  function providerRoutingFor(effettive, entrySort) {
+  // `entryWeights`: i pesi dichiarati dalla voce, per la regola dei crediti (creditsAllowModel) che il provider applica.
+  function providerRoutingFor(effettive, entrySort, entryWeights) {
     const e = effettive || {};
     const ignore = providerIgnoreList(e.excludedProviders || []);
     const sort = ordinamentoEffettivo(entrySort, e.providerSort);
-    if (!ignore.length && !sort) return null;
+    const weights = typeof entryWeights === 'string' ? entryWeights.trim().toLowerCase() : '';
+    if (!ignore.length && !sort && !weights) return null;
     const routing = {};
     if (ignore.length) routing.ignore = ignore;
     if (sort) routing.sort = sort;
+    if (weights) routing.weights = weights;
     if (Array.isArray(e.excludedProvidersOwnKey)) routing.ownKeyIgnore = providerIgnoreList(e.excludedProvidersOwnKey);
     return routing;
   }
@@ -1390,6 +1488,7 @@
         const attempt = { provider, apiKey, model: concrete };
         if (reasoning) attempt.reasoning = reasoning;
         if (sort) attempt.sort = sort;
+        if (entry && typeof entry.weights === 'string' && entry.weights.trim()) attempt.weights = entry.weights.trim().toLowerCase();
         out.push(attempt);
       }
     }
@@ -3366,6 +3465,14 @@
     OPEN_WEIGHTS_SUBSTITUTES,
     OPEN_WEIGHTS_SUBSTITUTE_MODALITIES,
     OPEN_WEIGHTS_EXTRA_EXCLUDED,
+    creditsAllowModel,
+    creditsAllowModelLetto,
+    registraCatalogoPesi,
+    registraCaricatoreCatalogo,
+    aggiornaCatalogoPesi,
+    dichiarazioniPerModello,
+    pesiDichiaratiPer,
+    registroConPesiCondivisi,
     hasOwnOpenrouterKey,
     ownKeyExcludedProviders,
     excludedProvidersForKey,

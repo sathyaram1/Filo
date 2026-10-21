@@ -34,7 +34,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   getSettings: () => getEffectiveSettings(),
   buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
   modelFor: (s, action) => modelForAction(s, action),
-  routing: (s, a) => providerRouting(s, a && a.sort),
+  routing: (s, a) => providerRouting(s, a && a.sort, a && a.weights),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
   segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
@@ -46,6 +46,8 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   contatore: () => globalThis.SN_CONTATORI_MAIN,
   durataCache: (s) => globalThis.SN_FILO_CONTESTO.tetti(s && s.contestoFilo, Defaults.get().contestoFilo).cache,
 });
+// Coi crediti un modello che i nomi non riconoscono si cerca nel catalogo del router (#830): lo stesso del listino.
+SN_CONST.registraCaricatoreCatalogo(() => require('./costoModelli').listino());
 // Più chiamate che per chi usa Filo sono una richiesta sola (un messaggio coi suoi giri di strumenti, una dettatura
 // coi suoi ripieghi) contano un uso, con l'attesa da quando è partita la richiesta (#969).
 function unUsoContato(action, fn) {
@@ -401,7 +403,8 @@ function withDefaults(settings) {
     const apiKeys = own.openrouter || !personal ? own : { ...own, openrouter: personal };
     // Un fornitore salvato che Filo non ha più (Gemini) spegnerebbe ogni funzione che cerca la sua chiave.
     const provider = Defaults.fornitoreUsabile(settings.provider) ? settings.provider : d.provider;
-    return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, excludedProvidersOwnKey, providerSort, security };
+    const modelRegistry = SN_CONST.registroConPesiCondivisi(settings.modelRegistry, d.modelRegistry);
+    return { ...settings, modelRegistry, provider, apiKeys, openWeightsOnly, excludedProviders, excludedProvidersOwnKey, providerSort, security };
   }
   // OpenRouter (#598): fra la chiave dell'utente e quella di fabbrica c'è la
   // PERSONALE creata dal server al riscatto dell'invito (il suo tetto sono i
@@ -564,7 +567,7 @@ function buildAttemptChain(settings, modelRef, action) {
   // servita da un fornitore escluso.
   for (const a of out) {
     if (a.provider !== 'openrouter') continue;
-    const routing = providerRouting(settings, a.sort);
+    const routing = providerRouting(settings, a.sort, a.weights);
     if (routing) a.providerRouting = routing;
   }
   // Il tetto della risposta per la famiglia della funzione (#1097.3): Preferenze, poi Modelli predefiniti, poi il codice.
@@ -583,8 +586,8 @@ function buildAttemptChain(settings, modelRef, action) {
 // l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
 // Ritorna null se non c'è niente da dire.
 // La regola (la voce vince sul globale, `ignore` resta com'è) sta in SN_CONST.
-function providerRouting(settings, entrySort) {
-  return SN_CONST.providerRoutingFor(settings, entrySort);
+function providerRouting(settings, entrySort, entryWeights) {
+  return SN_CONST.providerRoutingFor(settings, entrySort, entryWeights);
 }
 
 // Cancello della politica per le chiamate che NON passano da buildAttemptChain:

@@ -753,11 +753,12 @@
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
-      // E ciò che la riga non modifica ma la voce dichiara (pesi aperti,
-      // cosa sa masticare): senza, un salvataggio dalle Opzioni lo perderebbe.
-      for (const k of ['weights', 'inputs', 'outputs', 'reasoning', 'sort']) {
+      // E ciò che la riga non modifica: ordinamento e ragionamento sempre, ciò che la voce dichiara del modello (pesi
+      // aperti, cosa sa masticare) solo se il modello è ancora quello.
+      for (const k of ['reasoning', 'sort']) {
         if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
       }
+      Object.assign(entry, window.SN_CONST.dichiarazioniPerModello(row._entry, model));
       out[nick] = entry;
     }
     return { registry: out, dups, missingNick, missingNickRows, dupRows };
@@ -800,8 +801,8 @@
       statusEl.textContent = I18n.t('options_model_no_id');
       return;
     }
+    // Senza una chiave scritta qui la prova usa quella con cui la funzione pagherebbe, i crediti di Filo (#830).
     const apiKey = providerKey(providerId);
-    if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     btn.dataset.inCorso = '1';
@@ -813,11 +814,14 @@
         type: MSG.TEST_PROVIDER,
         provider: providerId,
         apiKey,
+        ...(apiKey ? {} : { chiaveDellUso: true }),
         model: modelId,
         sort: conf.sort || '',
         reasoning: conf.reasoning || '',
       });
-      if (!res?.ok) {
+      if (!res?.ok && res?.code === 'NO_API_KEY') {
+        statusEl.textContent = I18n.t('options_test_no_key');
+      } else if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
@@ -897,6 +901,8 @@
       const data = await res.json();
       return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
     }));
+    // Gli avvisi di questa pagina riconoscono i pesi aperti come il main, che legge lo stesso catalogo.
+    try { window.SN_CONST.registraCatalogoPesi(lists.flat().map((it) => it.meta)); } catch (_) {}
     return lists.flat();
   }
 

@@ -165,7 +165,7 @@ test('complete: senza providerRouting nessun blocco provider con la chiave propr
       const sent = {};
       await withFetch(
         (url, opts) => { Object.assign(sent, JSON.parse(opts.body)); return Promise.resolve(jsonResponse({ choices: [{ message: { content: 'ok' } }], usage: {} })); },
-        () => OpenRouter.complete({ apiKey, model: 'x/y', messages: [{ role: 'user', content: 'x' }] }),
+        () => OpenRouter.complete({ apiKey, model: 'qwen/qwen-y', messages: [{ role: 'user', content: 'x' }] }),
       );
       assert.deepEqual(sent.provider, atteso, apiKey);
     }

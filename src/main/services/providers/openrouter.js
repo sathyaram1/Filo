@@ -57,8 +57,11 @@
   // (#962) il corpo cambia lista di esclusione, e il ripiego sui crediti riparte con l'intera. `ripiegoAmmesso`, se
   // c'è, decide prima del ripiego se i crediti ammettono la chiamata: dove il router non applica la lista (voce,
   // dettatura) la si controlla qui, e se non la ammettono il rifiuto della chiave propria risale com'è.
-  async function fetchWithKey(url, apiKey, makeInit, { ripiegoAmmesso = null } = {}) {
+  // `model` e `providerRouting` servono alla regola dei crediti (#830): coi crediti la richiesta di un modello fuori
+  // politica non parte, e la chiave propria rifiutata non ripiega su di loro.
+  async function fetchWithKey(url, apiKey, makeInit, { ripiegoAmmesso = null, model = '', providerRouting = null } = {}) {
     const startSource = await keySourceOf(apiKey);
+    if (PAGA_FILO.has(startSource) && !(await ammessoCoiCrediti(model, providerRouting))) throw erroreCrediti(model);
     let res = await fetch(url, makeInit(apiKey, { own: startSource === 'own' }));
     let keyUsed = apiKey;
     let keyFallback = null;
@@ -73,6 +76,10 @@
       let alt = null;
       if (W.isKeyRefusal(res.status, detail)) {
         try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
+      }
+      if (alt && alt.key && !(await ammessoCoiCrediti(model, providerRouting))) {
+        try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+        throw erroreCrediti(model, { chiaveRifiutata: res.status });
       }
       if (alt && alt.key && typeof ripiegoAmmesso === 'function') {
         let ammesso = false;
@@ -109,6 +116,31 @@
     // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
     try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
     return { res, keyUsed, keySource, keyFallback };
+  }
+
+  // Chiavi che spendono i crediti di Filo. Una chiave di provenienza ignota ('') è quella dei test senza portafoglio.
+  const PAGA_FILO = new Set(['personal', 'factory']);
+  async function ammessoCoiCrediti(model, routing) {
+    const C = global.SN_CONST;
+    if (!model || !C || typeof C.creditsAllowModelLetto !== 'function') return true;
+    return C.creditsAllowModelLetto(model, routing && routing.weights);
+  }
+  // Il codice e la frase del «nessun host ammesso» (#828); chi conosce la funzione la ricompone (modelGate).
+  function erroreCrediti(model, { chiaveRifiutata = 0 } = {}) {
+    const CE = global.SN_CHAT_ERRORS;
+    const err = new Error(`NO_ALLOWED_HOST ${model}`);
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'crediti';
+    err.provider = 'openrouter';
+    err.model = model;
+    err.hosts = [];
+    if (chiaveRifiutata) err.chiaveRifiutata = chiaveRifiutata;
+    if (CE && typeof CE.motivoCrediti === 'function') {
+      err.motivo = CE.motivoCrediti(!!chiaveRifiutata);
+      err.message = CE.fraseNessunHost({ modello: model, motivo: err.motivo, rimedio: CE.rimedioCrediti('opzioni', !!chiaveRifiutata) });
+    }
+    console.warn(`[Filo policy] "${model}" non è fra i modelli dei crediti di Filo: ${chiaveRifiutata ? 'niente ripiego dalla chiave propria' : 'richiesta non partita'}`);
+    return err;
   }
 
   // Da dove viene una chiave ('own' | 'personal' | 'factory'), per chi tiene le chiavi; '' se non c'è chi lo sa.
@@ -231,7 +263,7 @@
     const tools = !!body.tools;
     const send = (b, key) => fetchWithKey(ENDPOINT, key, (k, { own } = {}) => ({
       method: 'POST', headers: buildHeaders(k), body: payloadFor(b, routing, b.model, own, { tools }), signal,
-    }));
+    }), { model: b.model, providerRouting: routing });
     const { reasoning: _omesso, ...senzaRagionamento } = body;
     const refusalKey = tools && body.reasoning
       ? JSON.stringify([body.model, providerBlock(routing, body.model, { tools }), providerBlock(routing, body.model, { tools, ownKey: true })])
@@ -931,6 +963,8 @@
   // crediti solo se chi serve il modello lo ammette anche la loro (#962).
   async function hostCheckedFetch(url, { apiKey, model, providerRouting, body, signal }) {
     const source = await keySourceOf(apiKey);
+    // Prima degli host: un modello che i crediti non pagano non arriva a chiedere chi lo serve.
+    if (PAGA_FILO.has(source) && !(await ammessoCoiCrediti(model, providerRouting))) throw erroreCrediti(model);
     const own = source === 'own' && !!providerRouting && Array.isArray(providerRouting.ownKeyIgnore);
     await ensureAllowedHost({ apiKey, model, providerRouting, ownKey: own, filoPays: source !== 'own' });
     // Il ripiego sui crediti cambia chi paga: lista intera e ritenzione zero.
@@ -939,7 +973,7 @@
       : null;
     return fetchWithKey(url, apiKey, (key, { own: o } = {}) => ({
       method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, o), signal,
-    }), { ripiegoAmmesso });
+    }), { ripiegoAmmesso, model, providerRouting });
   }
 
   // ─── Lettura ad alta voce ──────────────────────────────────────────────────
@@ -1012,7 +1046,7 @@
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key, { own } = {}) => ({
       method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, own), signal,
-    }));
+    }), { model, providerRouting });
     if (!res.ok) throw await httpError(res, { apiKey, model, providerRouting });
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
