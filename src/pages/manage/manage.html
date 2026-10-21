@@ -249,8 +249,9 @@
       display: grid; grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 12px;
       flex: 1 1 auto; min-height: var(--mg-aree-min);
     }
-    .mg-dom-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
-    .mg-dom-head-nome { flex: 1 1 auto; min-width: 0; }
+    /* Come la lista dei feedback: in una colonna stretta vanno a capo i tasti, mai il nome della scheda sotto di loro. */
+    .mg-dom-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 22px; }
+    .mg-dom-head-nome { flex: 1 1 auto; white-space: nowrap; }
     .mg-dom-head [hidden] { display: none; }
     .mg-dom-sel { margin: 0; flex: 0 0 auto; cursor: pointer; accent-color: var(--sn-accent); }
     .mg-dom-consiglio {
