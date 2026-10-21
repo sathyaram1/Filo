@@ -279,8 +279,8 @@ test('lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori
   await expect.poll(zigzag).toEqual({ ta: 'none', ce: 'none', riga: 'none', gramm: 'none' });
 });
 
-test('una password scritta dopo una pausa e una carta scritta in due tempi non partono verso il modello', async ({ app, openTab, testServer }) => {
-  const page = await apri(app, openTab, testServer, {});
+// Quello che parte davvero verso il modello, domanda per domanda.
+async function spiaPartiti(app) {
   await app.evaluate(() => {
     const vero = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.__partiti = [];
@@ -288,6 +288,12 @@ test('una password scritta dopo una pausa e una carta scritta in due tempi non p
     globalThis.SN_PROVIDERS.completeWithFallback = spia;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = spia;
   });
+  return () => app.evaluate(() => globalThis.__partiti);
+}
+
+test('una password scritta dopo una pausa e una carta scritta in due tempi non partono verso il modello', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  const tutti = await spiaPartiti(app);
   const quante = () => app.evaluate(() => globalThis.__rapide.length);
   await page.locator('#ta').click();
   await page.keyboard.type('ciao Marco, la password del wifi è ');
@@ -348,5 +354,17 @@ test('nella casella di una riga il controllo chiesto col tasto destro non porta 
   await expect.poll(() => app.evaluate(() => globalThis.__rapide.length), { timeout: 5000 }).toBeGreaterThan(0);
   const tutti = await partiti();
   expect(tutti.some((t) => t.includes('[dato riservato]'))).toBe(true);
+  for (const t of tutti) expect(t).not.toContain('Gatto2024');
+});
+
+test('il controllo ragionato, a fine frase, non porta la password data in risposta a chi la chiede', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { suggerimenti: {} });
+  const partiti = await spiaPartiti(app);
+  await page.evaluate(() => { document.querySelector('main p').textContent = 'Marco: mi mandi la password del wifi?'; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('certo, Gatto2024. ');
+  await expect.poll(() => app.evaluate(() => globalThis.__ragionate.length), { timeout: 8000 }).toBeGreaterThan(0);
+  const tutti = await partiti();
+  expect(tutti.some((t) => t.includes('proponi SUGGERIMENTI') && t.includes('certo, [dato riservato].'))).toBe(true);
   for (const t of tutti) expect(t).not.toContain('Gatto2024');
 });
