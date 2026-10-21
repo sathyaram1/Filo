@@ -1855,6 +1855,8 @@
     pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
     quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
     cerchio:   'M8 2.2 A5.8 5.8 0 1 1 7.99 2.2 Z',
+    // Non è un livello: è il segno della fiducia in lista (#1575), una forma che nessun livello usa.
+    scudo:     'M8 1.6 L13.4 3.6 V7.6 C13.4 10.8 11.2 13.3 8 14.5 C4.8 13.3 2.6 10.8 2.6 7.6 V3.6 Z',
   };
 
   // Il motivo di design → il livello che ha fermato la pratica (D93). Il rombo è Claude che chiede.
