@@ -246,6 +246,10 @@
   }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
+  // «Solo non fidate» (#1575) vale per le schede dei feedback e per le Domande; non si ricorda, per lo stesso motivo.
+  let soloNonFidate = false;
+  const mgFiduciaFiltro = document.getElementById('mgFiduciaFiltro');
+  const mgDomandeFiduciaFiltro = document.getElementById('mgDomandeFiduciaFiltro');
   const DOMANDE_TABS = (MR.SEZIONI.find((s) => s.id === 'domande') || { schede: [] }).schede;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
