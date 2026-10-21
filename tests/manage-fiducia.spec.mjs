@@ -103,8 +103,8 @@ async function controllaCoppia(page, fidata, nonFidata, dove) {
   expect(sb.tratteggio, dove).not.toBe('none');
   expect(sa.parola).toBe('Fidata');
   expect(sb.parola).toBe('Non fidata');
-  expect(sa.titolo).toMatch(/^Fidata: /);
-  expect(sb.titolo).toMatch(/^Non fidata: /);
+  expect(sa.titolo).toMatch(/^Fidata\. /);
+  expect(sb.titolo).toMatch(/^Non fidata\. /);
   return { muschio, prugna, sinistroNonFidata: b.sinistro };
 }
 
@@ -157,8 +157,8 @@ test('l’hover dello scudo dice che è la fiducia del feedback, e che il regist
   await apriScheda(page, 'queue');
   const si = riga(page, COPPIE.queue[0]).locator('.mg-fiducia-segno');
   await expect(si).toHaveAttribute('title', /fiducia del feedback/);
-  await expect(si).toHaveAttribute('title', /registro del ramo.*si ferma lo stesso al cancello.*non si legge/);
-  await expect(riga(page, COPPIE.queue[1]).locator('.mg-fiducia-segno')).toHaveAttribute('title', /^Non fidata: è la fiducia del feedback/);
+  await expect(si).toHaveAttribute('title', /registro del ramo, che questa pagina non legge, e se il registro è rotto ferma la fusione lo stesso/);
+  await expect(riga(page, COPPIE.queue[1]).locator('.mg-fiducia-segno')).toHaveAttribute('title', /^Non fidata\. È la fiducia del feedback\./);
   // Lo scudo risponde al puntatore.
   await si.hover();
   await expect.poll(() => si.evaluate((el) => getComputedStyle(el).transform)).not.toBe('none');
@@ -271,7 +271,7 @@ test('Domande: le righe portano lo stesso segno, la pastiglia aperta gli stessi 
     domanda(33, { titolo: 'In lavorazione, pulita', fiducia: 'fidato', stato: 'in_lavorazione' }),
     domanda(34, { titolo: 'In lavorazione, sporca', fiducia: 'non_fidato', stato: 'in_lavorazione' }),
     domanda(35, { titolo: 'Archiviata, pulita', fiducia: 'fidato', stato: 'chiusa', esito: { archiviata: true } }),
-    domanda(36, { titolo: 'Archiviata, sporca', stato: 'chiusa', esito: { archiviata: true } }),
+    domanda(36, { titolo: 'Archiviata, sporca', fiducia: 'non_fidato', stato: 'chiusa', esito: { archiviata: true } }),
   ]);
   const d = (id) => page.locator(`#mgDomandeLista .mg-domanda[data-id="${id}"]`);
   const schede = { domande: ['D-31', 'D-32'], 'domande-lavoro': ['D-33', 'D-34'], 'domande-archivio': ['D-35', 'D-36'] };
@@ -293,7 +293,7 @@ test('Domande: le righe portano lo stesso segno, la pastiglia aperta gli stessi 
     expect(await pastiglia.evaluate((el) => getComputedStyle(el).color)).toBe(await coloreDelToken(page, '--mg-fidata-color'));
     await page.locator('#mgDomandeCol').screenshot({ path: `tests/.shots/fiducia-domande-${t}.png` });
   }
-  await expect(d('D-31').locator('.mg-fiducia-segno')).toHaveAttribute('title', /^Fidata: /);
+  await expect(d('D-31').locator('.mg-fiducia-segno')).toHaveAttribute('title', /^Fidata\. L’ha scritta una sessione/);
   await expect(tabBtn(page, 'domande')).toHaveText('Da rispondere (2)');
   const filtro = page.locator('#mgDomandeFiduciaFiltro');
   await expect(filtro).toBeVisible();

@@ -1902,11 +1902,11 @@ test('fiducia: il segno sulla riga dice la parola, il colore e che è la fiducia
   assert.equal(si.parola, 'Fidata');
   assert.equal(no.classe, 'nonfidata');
   assert.equal(no.parola, 'Non fidata');
-  assert.match(si.testo, /^Fidata: è la fiducia del feedback/);
+  assert.match(si.testo, /^Fidata\. È la fiducia del feedback\./);
   // Il cancello guarda anche il registro del ramo, che la pagina non legge: l'hover non promette la fusione.
   assert.match(si.testo, /registro del ramo/);
-  assert.match(si.testo, /si ferma lo stesso al cancello/);
-  assert.match(no.testo, /^Non fidata: è la fiducia del feedback/);
+  assert.match(si.testo, /non legge, e se il registro è rotto ferma la fusione lo stesso/);
+  assert.match(no.testo, /^Non fidata\. È la fiducia del feedback\./);
   assert.equal(MR.segnoFiducia({ fiducia: 'FIDATO' }).classe, 'nonfidata', 'solo il valore esatto scritto dal server');
   assert.ok(MR.FORME_SVG.scudo);
 });

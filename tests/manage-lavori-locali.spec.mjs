@@ -96,8 +96,9 @@ test('il segno non si mette né si toglie a mano: nessun tasto nel dettaglio, ne
   const chiusaConSegno = fb({ _id: 'p-6', seq: 906, status: 'done', statusPublic: 'closed', localOnly: SEGNO });
   await apri(page, [fidata, conSegno, utente, falso, chiusa, chiusaConSegno]);
   await expect(page.locator('#mgLocalBtn')).toHaveCount(0);
-  // Tutte nell'iter, chiuse comprese (un `done` non ancora uscito): una scheda sola le mostra.
   for (const p of [fidata, conSegno, utente, falso, chiusa, chiusaConSegno]) {
+    // Ognuna nella scheda del suo stato: le chiuse stanno nei Risolti.
+    await page.evaluate((f) => window.__mgTest.setTab(window.SN_MANAGE_REVIEW.manageTabFor(f)), p);
     const riga = page.locator(`.mg-item[data-id="${p._id}"]`);
     await expect(riga, p._id).toHaveCount(1);
     await riga.click();

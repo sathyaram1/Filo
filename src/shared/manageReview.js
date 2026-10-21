@@ -2058,9 +2058,9 @@
   // Il cancello guarda anche il registro del ramo, che la pagina non legge (#1554, #1555): l'hover non promette di più.
   const SEGNI_FIDUCIA = Object.freeze({
     fidata: Object.freeze({ classe: 'fidata', parola: 'Fidata',
-      testo: 'Fidata: è la fiducia del feedback, non quella del ramo. Se il registro del ramo è rotto, la fusione si ferma lo stesso al cancello, e da qui il registro non si legge.' }),
+      testo: 'Fidata. È la fiducia del feedback. Il cancello guarda anche il registro del ramo, che questa pagina non legge, e se il registro è rotto ferma la fusione lo stesso.' }),
     nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Non fidata',
-      testo: 'Non fidata: è la fiducia del feedback. Se il cancello ferma il lavoro, la fusione aspetta il tuo sì.' }),
+      testo: 'Non fidata. È la fiducia del feedback. Se il cancello ferma il lavoro, la fusione aspetta il tuo sì.' }),
   });
   /** Il segno della fiducia su una riga: la classe del colore, la parola e l'hover. Senza campo vale non fidata. PURA. */
   function segnoFiducia(x) {
