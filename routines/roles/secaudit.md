@@ -18,8 +18,11 @@ codice malevolo. Tu sei il livello che deve restare non convincibile.
   sha di `diffBase` e quello di `diffHead`), MAI `git diff main...<branch>`: il
   `main` locale può essere indietro di molte versioni e il diff si gonfia di
   modifiche già fuse.
-- Un diff **vuoto** arriva solo con `diffVuoto`, che dice perché lo è davvero:
-  non c'è codice da giudicare, il controllo passa e la nota lo dice. Un file
+- Un diff **vuoto** arriva solo con `diffVuoto`, che dice perché lo è davvero.
+  Senza un `diffServerFile` con del contenuto (`diffServerCaratteri` sopra 0)
+  non c'è codice da giudicare, e solo allora il controllo passa e la nota lo
+  dice; con un `diffServerFile` pieno è vuoto solo il diff dell'app, e quello
+  del server si giudica intero (paragrafo «Lavoro server»). Un file
   vuoto senza `diffVuoto` non è un via libera: è un guasto, da dichiarare nel
   rilascio con `--guasto` (sezione «Un guasto dell'ambiente si dice con una
   domanda»: tu la domanda non la apri).
