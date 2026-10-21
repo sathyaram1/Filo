@@ -1571,7 +1571,7 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
 
   // Senza nota: lo dice, senza far credere che una richiesta stia arrivando.
   const muta = MR.livelloL5({ status: 'design', statusReason: 'l5' }, lette);
-  assert.match(muta.pannello.testo, /senza aprire una richiesta/);
+  assert.match(muta.pannello.testo, /Nessuna richiesta di fusione è aperta/);
   assert.doesNotMatch(muta.pannello.testo, /ancora/);
   assert.deepEqual(muta.pannello.azioni, ['rimanda', 'archivia']);
   // Elenchi non letti: «nessuna richiesta» sarebbe un'ipotesi, e la lista non lo afferma.

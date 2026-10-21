@@ -83,7 +83,7 @@ test('ferma senza richiesta: il quadrato dice il motivo del server e rimanda in 
   const u = await page.evaluate(() => window.__updates[0]);
   expect(u).toMatchObject({ type: 'feedback_update', id: 'fb-1556', status: 'todo', reviewDecision: 'accepted', reviewComment: 'Rifallo senza toccare le regole.' });
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
-  await expect(page.locator('#mgSide')).not.toHaveClass(/open/);
+  await expect(page.locator('#mgSide')).toBeHidden();
 });
 
 test('ferma senza richiesta: «Archivia» dal quadrato la archivia, e un rifiuto si legge nel pannello', async ({ openTab }) => {
@@ -112,7 +112,7 @@ test('ferma senza richiesta e senza nota: dice che nessuna richiesta è aperta, 
   expect(await card.locator('.mg-fusione-badge').getAttribute('title')).toMatch(/rifarla o archiviarla/);
 
   await apriQuadrato(page, 'fb-1556');
-  await expect(page.locator('#mgSideBody')).toContainText('senza aprire una richiesta di fusione');
+  await expect(page.locator('#mgSideBody')).toContainText('Nessuna richiesta di fusione è aperta');
   await expect(page.locator('#mgL5RimandaBtn')).toBeVisible();
   await expect(page.locator('#mgL5ArchiviaBtn')).toBeVisible();
 });

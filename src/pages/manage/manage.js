@@ -2680,7 +2680,7 @@
     ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
     volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
     decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
-    senza: { etichetta: 'fusione ferma', titolo: 'Ferma al cancello senza una richiesta: decidi tu se rifarla o archiviarla', tooltip: 'ferma al cancello, senza una richiesta da approvare' },
+    senza: { etichetta: 'fusione ferma', titolo: 'Ferma al cancello senza una richiesta aperta: decidi tu se rifarla o archiviarla', tooltip: 'ferma al cancello, nessuna richiesta aperta' },
   };
   function fusioneFerma(fb) {
     return MR.fusioneInAttesa(fb, { fusioni });
