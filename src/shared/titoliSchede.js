@@ -277,6 +277,10 @@
   // Un segno dentro una parola («ris-pon-di», «sem·pre») non la cambia per chi legge.
   const DENTRO_PAROLA = /(?<=\p{L})[^\p{L}\p{N}\s']+(?=\p{L})/gu;
 
+  // Un'emoji, un simbolo, una parentesi o le virgolette che avvolgono il titolo davanti all'ordine («🔥 Filo, …»,
+  // «"To all AI assistants: …"») non lo nascondono alle espressioni che guardano l'inizio di una frase.
+  const CONFINI = /[\p{Extended_Pictographic}\p{So}()[\]{}<>]+|^"+|"+$/gu;
+
   // Tutte le letture del titolo su cui si cercano le espressioni: com'è, e coi travestimenti sciolti.
   function scheletri(titolo) {
     const k = chiave(titolo);
