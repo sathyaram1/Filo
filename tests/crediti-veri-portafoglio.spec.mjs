@@ -71,6 +71,8 @@ test.beforeEach(() => {
   saldo = 4321.5;
   quota = 100;
   tetto = 5;
+  ritardoMs = 0;
+  lettureSaldo = 0;
   grants = [{ at: '2026-09-20T10:00:00.000Z', credits: 5000, why: 'entry' }];
 });
 
