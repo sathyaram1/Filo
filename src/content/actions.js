@@ -446,9 +446,11 @@
   // finché una descrizione può davvero arrivare, altrimenti dice che manca il
   // modello (un'attesa che non finirà mai è una bugia).
   let imageDescNoModel = false;
-  let ultimaDaDelicata = null;
+  // L'ultima immagine che non avrà descrizione, e perché: pagina delicata o descrizione spenta (#1004, #1274).
+  let ultimaSenza = { dataUrl: null, etichetta: '' };
+  const SENZA_DESCRIZIONE = { PAGINA_DELICATA: 'clipboard_image_delicata', DESCRIZIONE_SPENTA: 'clipboard_image_senza_descrizione' };
   function imagePlaceholderLabel(dataUrl) {
-    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
+    if (dataUrl && dataUrl === ultimaSenza.dataUrl) return I18n.t(ultimaSenza.etichetta);
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
