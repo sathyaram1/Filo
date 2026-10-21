@@ -10,8 +10,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { dirname, resolve, join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
