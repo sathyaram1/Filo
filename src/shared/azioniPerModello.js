@@ -105,4 +105,4 @@
   }
 
   global.SN_AZIONI_PER_MODELLO = { CAMPI_SALVATI, descrivi, interrotte, confermate };
-})(typeof globalThis !== 'undefined' ? globalThis : this);
+})(typeof globalThis !== 'undefined' ? globalThis : self);
