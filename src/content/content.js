@@ -2760,6 +2760,34 @@
     Sidebar.open(context);
   }
 
+  // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
+  function aiutoPasso() {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+    Sidebar.passo();
+  }
+
+  // Alla barra laterale: cosa farà il clic sulla sua icona Aiuto, perché è spenta, e la risposta ancora da leggere.
+  // Solo dal frame principale: il pannello vive lì.
+  let aiutoRiferito = '';
+  let rispostaRiferita = null;
+  function riferisciAiuto() {
+    if (IS_SUBFRAME || !Sidebar?.stato) return;
+    const s = Sidebar.stato();
+    const spento = motivoBlocco() || (aiutoAcceso() ? '' : 'aiuto');
+    const firma = `${s.pannello}|${s.voce}|${spento}`;
+    try {
+      if (firma !== aiutoRiferito) {
+        aiutoRiferito = firma;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AIUTO_STATO, pannello: s.pannello, voce: s.voce, spento })).catch(() => {});
+      }
+      if (s.nonLetta !== rispostaRiferita) {
+        rispostaRiferita = s.nonLetta;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RISPOSTA_IN_ATTESA, fonte: 'aiuto', attesa: s.nonLetta })).catch(() => {});
+      }
+    } catch (_) {}
+  }
+  try { Sidebar?.suCambio?.(riferisciAiuto); } catch (_) {}
+
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
