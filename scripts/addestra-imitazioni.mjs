@@ -177,7 +177,8 @@ function sinteticiParole(etichetta) {
       : [(w) => `${w}-${t}`, (w) => `${t}-${w}`, (w) => w + t, (w) => t + w];
     const propri = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
     for (const forma of forme) {
-      for (let k = 0; k < PER_FORMA; k++) {
+      // Un marchio che è anche una parola ha contro di sé tutte le parole vere che lo contengono (imposte, pineapple).
+      for (let k = 0, n = MARCHI_PAROLA.has(t) ? 2 * PER_FORMA : PER_FORMA; k < n; k++) {
         const h = `${forma(pesca(parole))}.${pesca(k === 0 && propri.length ? propri : SUFFISSI_SOSIA)}`;
         if (LEGIT_DOMAINS.has(h) || etichetta.has(h) || etichetta.has('www.' + h)) continue;
         out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
