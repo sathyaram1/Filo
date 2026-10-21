@@ -517,7 +517,7 @@ jobs:
         run: |
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
-          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
@@ -775,7 +775,7 @@ jobs:
         run: |
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
-          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+          cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
