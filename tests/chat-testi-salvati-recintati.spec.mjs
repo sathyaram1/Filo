@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { clickConfirm, CONFIRM_HOST, confirmText, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 // Il nome di una sveglia si ferma a 60 caratteri: l'ago sta tutto dentro.
