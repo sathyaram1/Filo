@@ -29,6 +29,17 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   suoi esiti, in ogni scheda: tolto alla sola penultima cambierebbe a ogni turno un messaggio già in cache. Una
   conversazione ripresa da prima dei tetti riporta i suoi ultimi messaggi dentro un quarto del tetto in token, e la
   finestra si stringe di altrettanto: il tetto vale sempre.
+- **Verso Claude il ragionamento parte solo col prefisso con cui è nato** (#1552). Sui conti Anthropic nati dal
+  31/08/2026 un blocco di ragionamento con davanti un system, strumenti o messaggi diversi da quelli della sua nascita
+  fa rifiutare la richiesta, e via OpenRouter la chiave dell'owner ripiega in silenzio sui crediti del router. Ogni
+  risposta porta l'impronta della richiesta che l'ha fatta nascere (un blocco `filo.impronta` nell'elenco del
+  ragionamento, tolto prima di ogni invio); il fornitore la confronta con quello che precede il messaggio adesso, nel
+  corpo che parte davvero, e per i modelli Anthropic manda il ragionamento solo se coincide. Una regola sola per tutte
+  le porte: taglio del tetto, parte fissa, strumenti, segreti oscurati, compattazione. I ragionamenti davanti contano
+  come il testo: più stretto di Anthropic, che ammette di toglierli dalla testa, mai un blocco in dubbio. Col tratto di
+  oggi i turni passati non passano mai: il CONTESTO DI ADESSO sta davanti alla domanda solo nel suo turno, e nel tratto
+  la domanda prende ora e chat in testa. Partono quelli del giro di strumenti in corso. Per riavere gli altri serve una
+  richiesta che cresce solo in coda (SPEC-CONTESTO, fase 3). Sentinella `tests/unit/ragionamentoRimandato.test.mjs`.
 - **Le letture non vivono più di prima** (#553.2, decisione dell'owner aperta): l'esito di una pagina, un documento,
   un comando, e il ragionamento di una risposta, entrano nel messaggio che li ha prodotti finché è fra gli ultimi
   venti della sua chat, nella scheda di quella chat; nelle altre schede solo finché è anche fra gli ultimi venti del

@@ -11,6 +11,8 @@
 (function (global) {
   'use strict';
 
+  const Ragionamento = require('./ragionamentoRimandato');
+
   const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
   const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
   const SPEECH_ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
@@ -333,11 +335,18 @@
     };
   }
 
+  function daAnthropic(model) {
+    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  }
+
   // I punti di cache del piano (SN_FILO_CONTESTO.pianoDellaCache) li vogliono espliciti solo i modelli Anthropic: gli
   // altri riconoscono da soli il prefisso ripetuto e ricevono i messaggi tali e quali. Anthropic ne accetta al più 4.
   const MAX_PUNTI_CACHE = 4;
-  function vuoleCacheEsplicita(model) {
-    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  const vuoleCacheEsplicita = daAnthropic;
+
+  // I messaggi che partono: punti di cache e, per Claude, solo il ragionamento col prefisso intatto (ragionamentoRimandato.js).
+  function messaggiDaMandare(model, messages, cache, tools) {
+    return Ragionamento.daRimandare(conPuntiDiCache(model, messages, cache), { strumenti: tools, controlla: daAnthropic(model) });
   }
 
   function partiConPunto(content, caratteri, cacheControl) {
@@ -435,7 +444,8 @@
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
-    const body = { model, messages: conPuntiDiCache(model, messages, cache), stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+    const inviati = messaggiDaMandare(model, messages, cache, tools);
+    const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
@@ -449,7 +459,7 @@
     return {
       text,
       toolCalls: flatToolCalls(message.tool_calls),
-      reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
+      reasoningDetails: Ragionamento.conImpronta(message.reasoning_details, inviati.impronta),
       finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
@@ -470,7 +480,8 @@
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
   async function streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages: conPuntiDiCache(model, messages, cache), stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+    const inviati = messaggiDaMandare(model, messages, cache, tools);
+    const reqBody = { model, messages: inviati.messaggi, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -559,7 +570,7 @@
       throw err;
     }
     return {
-      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
+      text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason, servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
     };
   }

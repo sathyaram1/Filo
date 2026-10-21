@@ -5417,7 +5417,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       // Il ragionamento del turno passato torna al modello così com'era
       // arrivato (blocchi strutturati del fornitore): riprende da dove aveva
       // lasciato invece di ripensare tutto. Il fornitore lo reinserisce per i
-      // modelli che lo sanno usare e lo ignora per gli altri.
+      // modelli che lo sanno usare e lo ignora per gli altri; verso Claude solo
+      // col prefisso con cui è nato (providers/ragionamentoRimandato.js).
       if (Array.isArray(m.reasoningDetails) && m.reasoningDetails.length) msg.reasoning_details = m.reasoningDetails;
     }
     threadMessages.push(msg);
