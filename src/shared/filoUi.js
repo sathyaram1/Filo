@@ -264,7 +264,7 @@
     if (!/^delete/.test(a.tipo) || a.tipo === 'deleteByDrag') return true;
     const tolti = v.length - n.length;
     if (tolti < 0) return false;
-    if (/^deleteContent(Backward|Forward)$/.test(a.tipo) && s === e && tolti > PASSO_MAX) return false;
+    if (UN_PASSO.test(a.tipo) && s === e && tolti > grafema(v, s, a.tipo.endsWith('Backward'))) return false;
     if (s !== e) return n === testa + coda;
     if (/Backward$/.test(a.tipo)) return tolti <= s && n === v.slice(0, s - tolti) + coda;
     if (/Forward$/.test(a.tipo)) return n === testa + v.slice(e + tolti);
