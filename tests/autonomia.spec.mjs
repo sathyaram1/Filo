@@ -334,7 +334,11 @@ test('chat a Normale, dopo una ricerca: «dimentica per sempre» vuole la parola
     await chiedi(page, 'cerca il meteo');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Sole.' })).toBeVisible({ timeout: 15000 });
     await chiedi(page, 'dimentica per sempre che vivo a Bologna');
-    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
+    const btn = page.locator('button', { hasText: 'cancellare per sempre' });
+    await expect(btn).toBeVisible({ timeout: 15000 });
+    expect(await lezioni(app)).toContain('Vive a Bologna.');
+    await btn.click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
     expect((await confirmState(page)).hasInput, 'dopo una lettura il «per sempre» vuole la parola, non un OK').toBe(true);
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
