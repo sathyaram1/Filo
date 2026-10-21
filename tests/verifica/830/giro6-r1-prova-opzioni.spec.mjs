@@ -1,10 +1,9 @@
-// Verifica #830 giro 6: sonda sulle strade della chat della home, del «Prova» delle Opzioni e della traduzione.
+// Verifica #830 giro 6, rilievo 1: il «Prova» premuto nelle Opzioni, con i crediti di Filo e nessuna chiave propria.
 import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PERSONAL_KEY = 'sk-or-v1-test-personal';
 const OWN_BAD = 'sk-or-v1-own-rifiutata';
-const OWN_OK = 'sk-or-v1-own-buona';
 const CHIUSO = 'openai/gpt-5';
 
 let server;
@@ -38,7 +37,6 @@ test.beforeAll(async () => {
       }
       if (url === '/api/v1/chat/completions') {
         seen.completions.push({ key: bearer, model: body.model });
-        if (bearer === OWN_BAD) return json(res, 401, { error: { code: 401, message: 'User not found.' } });
         if (body.stream !== true) {
           return json(res, 200, { id: 'gen-1', provider: 'Fake', choices: [{ message: { content: 'RISPOSTA-ROUTER.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.0002 } });
         }
@@ -100,96 +98,35 @@ async function redeemWallet(openTab) {
   return page;
 }
 
-async function newtabPage(app) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('newtab non trovata');
+// Preme il «Prova» della riga col modello `id` e torna il testo che la riga mostra quando la prova è finita.
+async function provaRiga(page, id) {
+  await page.waitForFunction((m) => [...document.querySelectorAll('#modelRegistryList .sn-model-id')].some((i) => i.value === m), id, { timeout: 10_000 });
+  await page.evaluate((m) => {
+    document.querySelectorAll('[data-sonda]').forEach((r) => r.removeAttribute('data-sonda'));
+    const input = [...document.querySelectorAll('#modelRegistryList .sn-model-id')].find((i) => i.value === m);
+    input.closest('.sn-model-row').dataset.sonda = '1';
+  }, id);
+  const riga = page.locator('#modelRegistryList .sn-model-row[data-sonda="1"]');
+  await riga.locator('.sn-model-test').click();
+  const stato = riga.locator('.sn-model-row-status');
+  await expect.poll(async () => (await stato.textContent()) || '', { timeout: 20_000 }).not.toMatch(/in corso|^\s*$/i);
+  return { riga, testo: (await stato.textContent()) || '' };
 }
 
-const fraseDellaBolla = (bolla) => bolla.evaluate((el) => {
-  const c = el.cloneNode(true);
-  c.querySelectorAll('.dash-bubble-actions').forEach((x) => x.remove());
-  return c.textContent.trim();
-});
-
-test('chat della home con un modello chiuso coi crediti: frase condivisa, tasto Crediti, router muto', async ({ app, shell, openTab }) => {
-  test.setTimeout(120_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const home = await newtabPage(app);
-  await redeemWallet(openTab);
-  await prepare(app, 'gpt');
-  await home.bringToFront().catch(() => {});
-  await home.locator('#input').fill('ciao, come stai?');
-  await home.locator('#sendBtn').click();
-  const bolla = home.locator('.dash-bubble-filo', { hasText: 'coi crediti di Filo' });
-  await expect(bolla).toBeVisible({ timeout: 20_000 });
-  const frase = await fraseDellaBolla(bolla);
-  console.log('FRASE CHAT:', frase);
-  expect(frase).toContain(`non può usare «${CHIUSO}» perché coi crediti di Filo questo modello non si usa`);
-  await expect(bolla.getByRole('button', { name: 'Apri Crediti' })).toBeVisible();
-  console.log('TITLE:', await bolla.getByRole('button', { name: 'Apri Crediti' }).getAttribute('title'));
-  await home.screenshot({ path: 'tests/.shots/830-g6-chat.png' }).catch(() => {});
-  expect(seen.completions.filter((c) => c.model === CHIUSO)).toEqual([]);
-});
-
-test('traduzione della selezione coi crediti e modello chiuso: frase condivisa', async ({ app, shell, openTab }) => {
-  test.setTimeout(90_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await redeemWallet(openTab);
-  await prepare(app, 'gpt');
-  const r = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
-    { type: globalThis.SN_MSG.MSG.AI_REQUEST, action: globalThis.SN_CONST.ACTIONS.TRANSLATE_SELECTION, payload: { selection: 'hello world', sentence: 'hello world' } },
-    { url: 'filo://newtab/newtab.html' },
-  ).then((x) => x, (e) => ({ ok: false, error: e.message, code: e.code, reason: e.reason })));
-  console.log('TRADUCI:', JSON.stringify(r));
-  expect(r.ok).toBe(false);
-  expect(r.error).toContain('coi crediti di Filo questo modello non si usa');
-  expect(seen.completions.filter((c) => c.model === CHIUSO)).toEqual([]);
-});
-
-test('«Prova» cliccato nelle Opzioni sulla riga chiusa, coi crediti: la frase', async ({ app, shell, openTab }) => {
+test('r1 il «Prova» delle Opzioni, pagato coi crediti: sul modello chiuso la frase dei crediti, su quello aperto la prova riesce', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await redeemWallet(openTab);
   await prepare(app, 'deepseek-flash');
   const page = await openTab('filo://options/options.html');
-  await page.waitForFunction((id) => [...document.querySelectorAll('#modelRegistryList .sn-model-id')].some((i) => i.value === id), CHIUSO, { timeout: 10_000 });
-  await page.evaluate((id) => {
-    const input = [...document.querySelectorAll('#modelRegistryList .sn-model-id')].find((i) => i.value === id);
-    input.closest('.sn-model-row').dataset.sonda = '1';
-  }, CHIUSO);
-  const riga = page.locator('#modelRegistryList .sn-model-row[data-sonda="1"]');
-  await riga.locator('.sn-model-test').click();
-  const stato = riga.locator('.sn-model-row-status');
-  await expect(stato).toContainText('coi crediti di Filo', { timeout: 20_000 });
-  console.log('PROVA:', await stato.textContent());
-  await riga.scrollIntoViewIfNeeded();
+  const chiuso = await provaRiga(page, CHIUSO);
+  await chiuso.riga.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/830-g6-prova.png' }).catch(() => {});
+  expect(chiuso.testo).toContain(`non può usare «${CHIUSO}» perché coi crediti di Filo questo modello non si usa`);
   expect(seen.completions.filter((c) => c.model === CHIUSO)).toEqual([]);
-});
 
-test('chiave propria buona: il modello chiuso parte; chiave propria rifiutata: nessun ripiego, la chat dice perché', async ({ app, shell, openTab }) => {
-  test.setTimeout(120_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const home = await newtabPage(app);
-  await redeemWallet(openTab);
-  await prepare(app, 'gpt', OWN_OK);
-  await home.locator('#input').fill('prima domanda');
-  await home.locator('#sendBtn').click();
-  await expect(home.locator('.dash-bubble-filo', { hasText: 'RISPOSTA-ROUTER' })).toBeVisible({ timeout: 20_000 });
-  expect(seen.completions.some((c) => c.model === CHIUSO && c.key === OWN_OK)).toBe(true);
-  seen.completions.length = 0;
-  await prepare(app, 'gpt', OWN_BAD);
-  await home.locator('#input').fill('seconda domanda');
-  await home.locator('#sendBtn').click();
-  const bolla = home.locator('.dash-bubble-filo', { hasText: 'coi crediti di Filo' });
-  await expect(bolla).toBeVisible({ timeout: 20_000 });
-  console.log('FRASE RIPIEGO:', await fraseDellaBolla(bolla));
-  expect(await fraseDellaBolla(bolla)).toContain('OpenRouter ha rifiutato la tua chiave');
-  expect(seen.completions.filter((c) => c.key === PERSONAL_KEY)).toEqual([]);
-  await home.screenshot({ path: 'tests/.shots/830-g6-ripiego.png' }).catch(() => {});
+  const aperto = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['deepseek-flash'].model);
+  const esito = await provaRiga(page, aperto);
+  expect(esito.testo).not.toContain('Manca la API key');
+  expect(seen.completions.some((c) => c.key === PERSONAL_KEY && c.model === aperto)).toBe(true);
 });
