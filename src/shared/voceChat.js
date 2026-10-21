@@ -282,6 +282,14 @@
     const doveTasti = ambito || campo;
     doveTasti.addEventListener('keydown', suTasto);
 
+    // La chat sparisce dalla vista senza andarsene (l'Aiuto chiuso mentre Filo risponde): il microfono non resta acceso.
+    function ferma() {
+      c.giro++;
+      smetti();
+      if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
+      if (c.stato !== 'pronto') imposta('pronto');
+    }
+
     function scollega() {
       c.giro++;
       smetti();
