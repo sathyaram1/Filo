@@ -282,10 +282,11 @@
     // sul server: quella chiave non compra più niente. E con la personale e il
     // server non letto: il saldo è del server, e il conteggio locale al suo
     // posto sarebbe un numero che sparisce alla lettura dopo (#1138).
-    const noKey = !has && (w.keySource === 'none' || w.keySource === 'personal' || Boolean(w.identity && w.identity.lost));
+    const noKey = !has && !W.conteggioLocaleInVista({ keySource: w.keySource, identityLost: Boolean(w.identity && w.identity.lost) });
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
+    if (!has && !noKey) $('refillHint').textContent = rigaRicarica(w.keySource === 'own');
 
     // La gestione (codici, regali, utenti) è una pagina a parte: qui solo il rimando.
     $('ownerLink').hidden = !w.isOwner;
