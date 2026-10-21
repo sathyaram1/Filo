@@ -1062,6 +1062,8 @@
       }
     }
     if (!d) return false;
+    // Aprire una domanda precisa la deve far vedere anche col filtro della fiducia acceso.
+    if (soloNonFidate() && MR.isFidato(d) && dip.impostaSoloNonFidate) dip.impostaSoloNonFidate(false);
     // Prima di cambiare scheda: la scheda nuova apre da sé la prima, se quella aperta non è fra le sue.
     apri([d.id]);
     const tab = MR.schedaDomanda(d) || 'domande';
