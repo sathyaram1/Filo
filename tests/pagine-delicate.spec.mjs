@@ -260,6 +260,8 @@ test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità,
   await expect(page.locator('#h-delicate')).toHaveText('Pagine delicate');
   await expect(page.locator('#delicate-banche')).toHaveValue(/intesasanpaolo\.com/);
   await expect(page.locator('label[for="delicate-sanita"]')).toHaveText('Sanità');
+  await expect(page.locator('label[for="delicate-pa"]')).toHaveText('Pubblica amministrazione');
+  await expect(page.locator('#delicate-pa')).toHaveValue(/agenziaentrate\.gov\.it/);
 
   await page.locator('#saveBtn').click();
   await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(1);
