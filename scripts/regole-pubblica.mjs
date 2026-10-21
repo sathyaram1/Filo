@@ -15,6 +15,8 @@ export const BERSAGLI = Object.freeze(['firestore:rules', 'firestore:indexes', '
 const OPZIONI = ['--dry-run', '--controlla'];
 // Il deploy lanciato da qui lo porta: il predeploy di firebase.json senza di esso è un firebase deploy a mano.
 export const SEGNO_GUARDIA = 'FILO_REGOLE_DALLA_GUARDIA';
+// Pubblicati anche loro: le intestazioni della pagina (CSP) stanno in firebase.json, il progetto in .firebaserc.
+export const CONFIGURAZIONE = Object.freeze(['firebase.json', '.firebaserc']);
 
 /** I file che i BERSAGLI pubblicano, letti da firebase.json. PURA. */
 export function fileDaPubblicare(firebaseJson) {
