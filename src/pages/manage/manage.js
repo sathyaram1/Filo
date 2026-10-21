@@ -2633,6 +2633,7 @@
     const sezioni = mostraSezioni();
     if (!sezioni) {
       if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+      aggiornaFiltroFiducia(null);
       currentList = applySortMode(allFeedbacks.slice().sort((a, b) =>
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
       mgListEmpty.textContent = TAB_EMPTY.inbox;
