@@ -99,9 +99,12 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     sandbox: async () => { sandbox++; await new Promise((ok) => setTimeout(ok, 5)); return { verdict: 'clean', redirects: [] }; },
   });
   try {
+    // Nomi fissi e sempre nuovi: lettere a caso possono comporre per caso un marchio corto (dh1, n26), e il sito
+    // diventerebbe un'imitazione invece di un caso dubbio.
+    let nuovi = 0;
     const giro = async (n) => {
       for (let i = 0; i < n; i++) {
-        const url = `http://x${Math.random().toString(36).slice(2)}${i}.esempio-ostile.com/`;
+        const url = `http://sotto-${++nuovi}.esempio-ostile.com/`;
         const v = SB.analyze(url, { daAprire: true }, () => {});
         assert.equal(v.needsLlm, true, url);
       }

@@ -310,7 +310,7 @@ function costruisci() {
     if (!es.length) return;
     // Un refuso del dominio vero di un marchio sta fra i siti più visitati per le visite sbagliate, non perché sia un
     // altro sito (googlee.com, gmaill.com): da un elenco non si impara che è innocuo, lo decide solo un'etichetta scritta.
-    if (fonte === 'elenco' && y === 0 && es.some(({ c }) => c.zona === 'sld' && IM.distanza(c.sk.testo, c.mc.lettura) <= 1
+    if (fonte === 'elenco' && y === 0 && es.some(({ c }) => c.zona === 'sld' && c.tipo === 'typo'
       && c.mc.brand.domains.includes(c.mc.token + '.' + norm.publicSuffix))) { refusiTolti++; return; }
     const mask = (1 << BIT) - 1;
     if (y === 1) {
@@ -364,8 +364,9 @@ async function avvia() {
   const caso = rng(11);
   const parte = gruppi.map(() => caso() < 0.1);
   const esempiDi = (gg) => gg.flatMap((g) => (g.y === 1 ? [{ ix: g.ix[0], y: 1, peso: g.peso }] : g.ix.map((ix) => ({ ix, y: 0, peso: g.peso }))));
-  const allena = gruppi.filter((_, i) => !parte[i]);
-  const valida = gruppi.filter((_, i) => parte[i]);
+  // I nomi casuali si imparano e non si contano per la soglia: facilissimi, la abbasserebbero sui siti veri.
+  const allena = gruppi.filter((g, i) => !parte[i] || g.fonte === 'casuale');
+  const valida = gruppi.filter((g, i) => parte[i] && g.fonte !== 'casuale');
   const mq0 = quantizza(addestra(esempiDi(allena)));
   const pv = perHost(valida, mq0);
   const soglia = sogliaPer(pv, FALSI_AMMESSI);
