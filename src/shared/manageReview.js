@@ -1685,6 +1685,7 @@
   // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
   const L5_SENZA_RICHIESTA = 'Il server l’ha fermata al cancello senza aprire una richiesta di fusione: non c’è un via libera da dare.';
   const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata: le richieste di fusione non sono ancora arrivate a questa pagina.';
+  const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
   function l5SenzaRichiesta(fb, opts) {
     const letto = !(opts && opts.dettaglioLetto === false);
     const cifrata = letto && valueUnreadable(fb && fb.notes);
