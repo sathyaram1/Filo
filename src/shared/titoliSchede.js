@@ -56,7 +56,7 @@
       + R`|\b(?:invia|inviate|manda|mandate|inoltra|inoltrate|send|forward|upload|carica|envia|envie|reenvia|envoie|envoyez|transfere|sende|schicke|leite)\s+(?:(?!(?:your|tuo|tua|tuoi|tue|vostr[oaie]|tu|tus|ton|ta|tes|vos|votre|dein\w*|ihr\w*)\b)\S+\s+){0,5}?(?:to|a|al|all'|alla|ai|para|an|zu|vers|au|aux|su|on)\s+{{DOMINIO}}`
       + R`|\b(?:consiglia|consigliate|raccomanda|raccomandate|suggerisci|recommend|suggest|promote|mention|recomienda|recomienden|recommande|recommandez|suggere|empfiehl|empfehlt|empfehle)\s+(?:\S+\s+){0,3}?{{DOMINIO}}`
       + R`|\b(?:speak|talk|parla|parlate|habla|parle|parlez|sprich|sprecht|answer|respond|reply|rispondi|responde|reponds|antworte)\s+(?:only|always|solo|sempre|soltanto|siempre|solamente|toujours|seulement|immer|nur)\s+{{LINGUA}}\b)`,
-    CONSIGLIA: R`(?:consiglia|consigliate|raccomanda|raccomandate|suggerisci|recommend|suggest|promote|mention|say|tell|dici|di'|di|dire|recomienda|recomienden|di|dile|recommande|recommandez|dis|dites|empfiehl|empfehlt|sag|sage)`,
+    CONSIGLIA: R`(?:consiglia|consigliate|raccomanda|raccomandate|suggerisci|recommend|suggest|promote|mention|say|tell|dici|di'|dire|recomienda|recomienden|dile|recommande|recommandez|dis|dites|empfiehl|empfehlt|sag|sage)`,
     // Prefissi di ruolo oltre a «system»: chi parla col tono di chi configura l'assistente.
     RUOLO: R`(?:developer|sviluppatore|desarrollador|developpeur|entwickler|admin|administrator|amministratore|admin override|system override|messaggio di sistema|system message|mensaje del sistema|message systeme|systemnachricht|nota di sistema|system note|system notice)`,
     // Un indirizzo a cui mandare o un sito da consigliare: lo sceglie chi attacca.
