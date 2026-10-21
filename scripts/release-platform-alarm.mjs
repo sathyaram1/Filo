@@ -375,7 +375,8 @@ async function main() {
   const esiti = leggiEsiti(process.env.ESITI);
   const piattaforma = String(process.env.PIATTAFORMA || '').trim();
   const versione = String(process.env.VERSIONE || '').trim();
-  const rilasci = versione ? await leggiRilasci({ repo: process.env.REPO, token: process.env.GH_TOKEN }) : null;
+  const impronteDi = versione ? await lettoreImpronte() : null;
+  const rilasci = versione ? await leggiRilasci({ repo: process.env.REPO, token: process.env.GH_TOKEN, impronteDi }) : null;
   const { titolo, testo } = componiAllarme({
     piattaforma,
     versione,
