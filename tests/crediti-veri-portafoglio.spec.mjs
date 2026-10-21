@@ -189,6 +189,27 @@ test('server dei crediti lento: il turno parte subito con l\'ultimo saldo, e scr
   await expect.poll(() => statoChat(app), { timeout: 10_000 }).toMatch(/Saldo: 3\.?900 crediti \(lo tiene il server: è il numero/);
 });
 
+// #1353 — vale la lettura del saldo partita per ultima: una lenta partita prima (avvio a freddo, la lettura
+// dell'avvio, la pagina Crediti) che finisce dopo non riporta in chat il saldo vecchio come appena letto.
+test('una lettura del saldo partita prima e finita dopo non prende il posto di quella nuova', async ({ app }) => {
+  await homeDiAvvio(app);
+  await riscatta(app);
+  // La lettura che Filo fa da solo quattro secondi dopo l'avvio è già passata.
+  await new Promise((r) => setTimeout(r, 5_000));
+  const prima = lettureSaldo;
+  saldo = 4000;
+  ritardoMs = 3_000;
+  await app.evaluate(() => { globalThis.SN_WALLET_MAIN.readState().catch(() => {}); });
+  await expect.poll(() => lettureSaldo).toBeGreaterThan(prima);
+  saldo = 3900;
+  ritardoMs = 200;
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.readState());
+  expect(await statoChat(app)).toMatch(/Saldo: 3\.?900 crediti \(lo tiene il server: è il numero/);
+  await new Promise((r) => setTimeout(r, 3_500));
+  expect(await statoChat(app), 'la lettura lenta, partita prima, non sostituisce quella nuova').toMatch(/Saldo: 3\.?900 crediti/);
+  expect(await app.evaluate(() => globalThis.SN_WALLET_MAIN.ultimaLettura().state.server.balance.credits)).toBe(3900);
+});
+
 test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale fermo, il premio lo mostra la pagina Crediti', async ({ app, openTab }) => {
   const page = await homeDiAvvio(app);
   await riscatta(app);
