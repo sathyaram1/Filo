@@ -206,7 +206,7 @@
       try {
         const daMandare = await senzaSegreti(messages);
         r = await providers().completeWithFallback({
-          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
         });
       } catch (e) {
         throw conLaFunzione(e, s, action);
@@ -236,7 +236,7 @@
       try {
         const daMandare = await senzaSegreti(messages);
         r = await providers().streamCompleteWithFallback({
-          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare), tools, toolChoice, signal,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal,
           onDelta: vedendo(m, onDelta), onReasoning: vedendo(m, onReasoning), onToolCall: vedendo(m, onToolCall),
           onFallback, onReset, onTentativoFallito: m.errore,
         });
