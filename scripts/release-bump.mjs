@@ -20,14 +20,17 @@
 //   così non si mescola.
 //
 // USO
-//   node scripts/release-bump.mjs
+//   node scripts/release-bump.mjs                    la patch (canale veloce)
+//   node scripts/release-bump.mjs --minor            la minor del lunedì (canale stabile, SPEC-DOMANDE.md §4.2)
+//   node scripts/release-bump.mjs --controlla-minor  stampa `si` o `no`: la minor di questa settimana è dovuta adesso?
 //
 //   Exit code:
-//     0 → fatto: il numero nuovo è su main (stampato su stdout)
+//     0 → fatto: il numero nuovo è su main (stampato su stdout), o il controllo ha risposto
 //     2 → RIFIUTATO dal server (parola d'ordine, freno anti-raffica, manifesto
 //         che non si legge): niente è cambiato, e insistere darebbe lo stesso no
 //     3 → server non raggiungibile o funzione assente: niente è cambiato,
 //         si può riprovare più tardi
+//     4 → la minor non è dovuta adesso (non è lunedì a Roma, è già uscita, la settimana è saltata per la sicurezza)
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +55,15 @@ export const RELEASE_BUMP_URL = `${BASE}/releaseBump`;
  */
 export function classifyBump(status, body) {
   const b = body || {};
+  if (status === 200 && b.ok === true && b.controllo === true) {
+    return {
+      outcome: 'checked',
+      dovuta: b.dovuta === true,
+      motivo: String(b.motivo || ''),
+      lunedi: String(b.lunedi || ''),
+      aperti: Array.isArray(b.aperti) ? b.aperti.map(String) : [],
+    };
+  }
   if (status === 200 && b.ok === true) {
     const version = String(b.version || '');
     if (!/^\d+\.\d+\.\d+$/.test(version)) {
@@ -62,6 +74,8 @@ export function classifyBump(status, body) {
     return { outcome: 'done', version, previous: String(b.previous || ''), sha: String(b.sha || '') };
   }
   const reason = String(b.reason || '') || `http_${status}`;
+  // 409 = la minor del canale stabile non è dovuta adesso: un «non ora», non un guasto.
+  if (status === 409) return { outcome: 'not_due', reason, detail: String(b.detail || '') };
   // 429 = il freno anti-raffica del server.
   if (status === 429) return { outcome: 'throttled', reason };
   // Una chiamata che non esiste (ancora) è il caso più probabile finché il
@@ -79,7 +93,9 @@ export function classifyBump(status, body) {
  */
 export function exitCodeForBump(reply) {
   switch ((reply || {}).outcome) {
-    case 'done': return 0;
+    case 'done':
+    case 'checked': return 0;
+    case 'not_due': return 4;
     case 'throttled':
     case 'denied':
     case 'rejected':
@@ -88,12 +104,28 @@ export function exitCodeForBump(reply) {
   }
 }
 
+// I motivi con cui il server dice che la minor non è dovuta (canaleStabile.js di filo-security).
+const MOTIVI_MINOR = Object.freeze({
+  minor_fuori_finestra: 'a Roma non è lunedì',
+  minor_gia_uscita: 'questa settimana è già uscita',
+  minor_saltata: 'questa settimana è saltata per un feedback di sicurezza a priorità 3 aperto',
+  minor_sicurezza: 'c\'è un feedback di sicurezza a priorità 3 aperto: la settimana salta',
+  minor_illeggibile: 'non so dire se ci sono feedback di sicurezza aperti',
+});
+
 /** Cosa legge chi guarda il registro del lavoro di pubblicazione. PURA. */
 export function messageForBump(reply) {
   const r = reply || {};
   switch (r.outcome) {
     case 'done':
       return `[release-bump] versione ${r.previous || '?'} → ${r.version} scritta su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`;
+    case 'checked':
+      if (r.dovuta) return `[release-bump] la minor del canale stabile è dovuta (settimana del ${r.lunedi}).`;
+      return `[release-bump] la minor del canale stabile non è dovuta adesso: ${MOTIVI_MINOR[r.motivo] || r.motivo || 'senza motivo'}`
+        + `${r.aperti && r.aperti.length ? ` (${r.aperti.join(', ')})` : ''}.`;
+    case 'not_due':
+      return `[release-bump] la minor non è dovuta adesso: ${MOTIVI_MINOR[r.reason] || r.reason}. Nessun numero consumato.`
+        + `${r.detail ? `\n  ${r.detail}` : ''}`;
     case 'throttled':
       return `[release-bump] RIFIUTATO dal freno del server (${r.reason}): nessun numero consumato.\n`
         + '  È voluto: un aumento a raffica brucia numeri di versione. Riprova al prossimo giro.';
@@ -119,16 +151,20 @@ export function messageForBump(reply) {
  * La domanda al server: "qual è il numero della prossima versione, e scrivilo
  * tu". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerBump({ passphrase, fetchImpl = fetch, url = RELEASE_BUMP_URL } = {}) {
+export async function askServerBump({ passphrase, tipo = 'patch', soloControllo = false, fetchImpl = fetch, url = RELEASE_BUMP_URL } = {}) {
   if (!passphrase) return { outcome: 'no_passphrase' };
+  // Il corpo è la credenziale più il TIPO di aumento: nessun numero, nessun contenuto. Se un giorno qualcuno ci
+  // infilasse la versione da scrivere, il server la ignorerebbe, ma il posto giusto perché non ci sia è questo.
+  const corpo = { passphrase };
+  if (tipo === 'minor') {
+    corpo.tipo = 'minor';
+    if (soloControllo) corpo.soloControllo = true;
+  }
   try {
     const res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Il corpo è solo la credenziale: nessun numero, nessun contenuto. Se un
-      // giorno qualcuno ci infilasse la versione da scrivere, il server la
-      // ignorerebbe — ma il posto giusto perché non ci sia è questo.
-      body: JSON.stringify({ passphrase }),
+      body: JSON.stringify(corpo),
     });
     const text = await res.text();
     let body = {};
@@ -141,13 +177,24 @@ export async function askServerBump({ passphrase, fetchImpl = fetch, url = RELEA
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
+/** Gli argomenti della riga di comando: il tipo e se è solo il controllo. Uno sconosciuto è un errore. PURA. */
+export function argomentiBump(argv) {
+  const a = Array.isArray(argv) ? argv : [];
+  const ignoti = a.filter((x) => x !== '--minor' && x !== '--controlla-minor');
+  if (ignoti.length) return { errore: `argomenti sconosciuti: ${ignoti.join(' ')}` };
+  if (a.includes('--controlla-minor')) return { tipo: 'minor', soloControllo: true };
+  return { tipo: a.includes('--minor') ? 'minor' : 'patch', soloControllo: false };
+}
+
 async function main() {
-  const reply = await askServerBump({ passphrase: parolaDellaCostruzione() });
+  const arg = argomentiBump(process.argv.slice(2));
+  if (arg.errore) { console.error(`[release-bump] ${arg.errore}`); process.exitCode = 2; return; }
+  const reply = await askServerBump({ passphrase: parolaDellaCostruzione(), tipo: arg.tipo, soloControllo: arg.soloControllo });
   const code = exitCodeForBump(reply);
   console.error(messageForBump(reply));
-  // Su stdout SOLO il numero, e solo se c'è: è quello che il lavoro di
+  // Su stdout SOLO il numero (o `si`/`no` del controllo), e solo se c'è: è quello che il lavoro di
   // pubblicazione cattura.
-  if (code === 0) console.log(reply.version);
+  if (code === 0) console.log(reply.outcome === 'checked' ? (reply.dovuta ? 'si' : 'no') : reply.version);
   // `exitCode` e non `exit()`: su Windows lo stdout verso una pipe è
   // asincrono, e uscire di colpo può TRONCARE la riga appena scritta — cioè
   // proprio il numero che il lavoro di pubblicazione deve leggere.

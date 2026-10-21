@@ -17,7 +17,7 @@ const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scr
 const ghExeFinto = (bin) => copyFileSync(process.execPath, join(bin, 'gh.exe'));
 
 const {
-  scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
+  scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, shaDaPubblicare, SOGLIA_ORE, CHIAVE_FERMO,
   oreDalPrimoVerde, testoFermoDopoIlVerde, SOGLIA_VERDE_ORE, CHIAVE_FERMO_DOPO_VERDE, chiaveDelFermo,
   passaIlCancello, LAVORO_UNIT_WINDOWS,
 } = await import('../../scripts/ultima-suite-verde.mjs');
@@ -70,6 +70,15 @@ describe('il commit più nuovo di main con la suite verde', () => {
     assert.equal(verdePiuNuovoDelTag('c2', 'c3', antenato), false, 'un verde vecchio (una corsa rifatta) ripubblicherebbe codice vecchio');
     assert.equal(verdePiuNuovoDelTag('c2', '', antenato), true, 'senza versioni precedenti ogni verde è nuovo');
     assert.equal(verdePiuNuovoDelTag('', 'c3', antenato), false);
+  });
+
+  test('la minor del canale stabile esce anche sul commit dell\'ultima versione, mai su uno più vecchio', () => {
+    const antenato = (a, b) => MAIN.indexOf(a) >= MAIN.indexOf(b);
+    assert.equal(shaDaPubblicare({ verde: 'c3', tagSha: 'c3', eAntenato: antenato }), '', 'il veloce non ripubblica');
+    assert.equal(shaDaPubblicare({ verde: 'c3', tagSha: 'c3', eAntenato: antenato, stabile: true }), 'c3');
+    assert.equal(shaDaPubblicare({ verde: 'c4', tagSha: 'c3', eAntenato: antenato, stabile: true }), 'c4');
+    assert.equal(shaDaPubblicare({ verde: 'c2', tagSha: 'c3', eAntenato: antenato, stabile: true }), '', 'a chi sta sul veloce tornerebbe indietro');
+    assert.equal(shaDaPubblicare({ verde: '', tagSha: 'c3', eAntenato: antenato, stabile: true }), '');
   });
 
   test('di più corse verdi sullo stesso commit si tiene la prima (la più nuova)', () => {
