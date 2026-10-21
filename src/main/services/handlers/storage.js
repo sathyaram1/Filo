@@ -257,6 +257,7 @@ module.exports = function register(on, ctx) {
         downloadMieFuori: stats.downloadMieFuori,
         tettoDownload: opzioniFusione().tettoDownload,
         tettoSpesa: stats.tettoSpesa,
+        tettoSceso: stats.tettoSceso,
         chats: filo.chats,
         pagine: filo.pagine,
         chiavi: haSegreti(parsed.data),
