@@ -80,6 +80,13 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
     // La voce SENZA riuso lo dice esplicitamente: "zero" è l'informazione utile.
     const notReused = page.locator('.sn-history-item', { hasText: 'messaggio senza riuso' });
     await expect(notReused.locator('.sn-history-reuse')).toHaveText('riuso 0%');
+    await expect(notReused.locator('.sn-history-reuse')).not.toHaveAttribute('title', /messi da parte/);
+
+    // La chiamata che ha scritto in cache dice quanto, e chi l'ha servita.
+    const written = page.locator('.sn-history-item', { hasText: 'messaggio che scrive in cache' });
+    await expect(written.locator('.sn-history-meta')).toContainText('via Anthropic');
+    await expect(written.locator('.sn-history-reuse')).toHaveText('riuso 0%');
+    await expect(written.locator('.sn-history-reuse')).toHaveAttribute('title', /41\.000.*38\.500 token messi da parte/);
 
     // Traccia visiva ispezionabile.
     try {
