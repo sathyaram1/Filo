@@ -526,6 +526,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-cerca-sotto { font-size: 11.5px; color: var(--dash-ink-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cerca-quando { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
 .dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-cerca-gruppo { border-top: 1px solid var(--dash-line); margin-top: 4px; }
+.dash-cerca-gruppo:first-child { border-top: none; margin-top: 0; }
 /* La ricerca per significato fra le schede chiuse parte a richiesta: la sua riga resta più quieta dei risultati. */
 .dash-cerca-significato .dash-cerca-titolo { color: var(--dash-ink-soft); }
 .dash-cerca-significato:disabled { cursor: progress; opacity: 0.7; }
@@ -578,6 +580,24 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-cambio:hover .dash-cambio-annulla, .dash-cambio-annulla:focus-visible { opacity: 1; }
 .dash-cambio-annulla:hover { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
+/* Da tastiera il filo si percorre bolla per bolla (#1295): si vede quale ha il fuoco. */
+.dash-bubble[data-chat]:focus { outline: none; }
+.dash-bubble[data-chat]:focus-visible { outline: 2px solid rgba(var(--sn-accent-rgb), 0.55); outline-offset: 2px; }
+/* Al posto di una conversazione appena nascosta (#1295): una riga sottile che la rimette. */
+.dash-nascosta {
+  display: flex; align-items: center; gap: 8px; align-self: stretch; min-width: 0;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 4px 10px; border-radius: 10px;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-nascosta[hidden] { display: none; }
+.dash-nascosta:hover, .dash-nascosta:focus-within { background: var(--dash-line); }
+.dash-nascosta-ico { display: inline-flex; flex: none; }
+.dash-nascosta-rimetti {
+  margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
+  background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-nascosta-rimetti:hover, .dash-nascosta-rimetti:focus-visible { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
 .dash-pagine { align-self: stretch; display: flex; flex-direction: column; }
 .dash-pagine-testa { border: none; background: transparent; font-family: inherit; cursor: pointer; text-align: left; }
 .dash-pagine-aperte .dash-pagine-testa { color: var(--dash-ink-soft); }

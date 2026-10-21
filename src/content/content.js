@@ -1200,8 +1200,8 @@
 
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
-    // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
-    if (e.shiftKey && !(opzioni && opzioni.conMaiusc)) return;
+    // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) return;
     // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
     const sito = statoMenuDelSito(e, opzioni);
 
@@ -2370,7 +2370,9 @@
     ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
-      for (const it of contextItems) items.push(it);
+      // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
+      const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
+      contextItems.forEach((it, i) => items.push(i === prima ? { ...it, primaDaTastiera: true } : it));
     }
 
     // 4. Feedback (alpha) + Red-team (invia attacco)

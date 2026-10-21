@@ -17,6 +17,8 @@
     BLUETOOTH: ['_nomeSistema'],
     WIFI: ['_nomeSistema'],
     APRI_SALVATA: ['_titolo'],
+    TOGLI_CHAT: ['_titolo'],
+    RIMETTI_CHAT: ['_titolo'],
   };
 
   // L'utente vede sempre il testo vero, nel popup come nel diario: un «voce 1» in una risposta gli nomina una cosa

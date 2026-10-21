@@ -911,3 +911,94 @@ test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso'
   expect((await leggiArchivio(app)).length).toBe(1);
 });
 
+
+// ── #1295 — una parola corta che non è vuota conta ───────────────────────────
+//
+// «Riprendi la discussione di ieri sullo Zen»: quando nessuna chat ha tutte le parole la ricerca riprova con quelle
+// che distinguono, e una di tre lettere (Zen, SQL, IVA) ne restava fuori. Vale per Filo e per il campo della home.
+
+async function treChatCorte(app) {
+  await configura(app);
+  await stubProvider(app, {
+    Zen: { tipo: 'conversazione', titolo: 'Meditazione Zen e respiro' },
+    SQL: { tipo: 'conversazione', titolo: 'Indici SQL e prestazioni' },
+    pacchi: { tipo: 'conversazione', titolo: 'Pacchi in ritardo' },
+  });
+  for (const [id, testo] of [
+    ['c-zen', 'Parliamo di Zen: come si imposta la meditazione sul respiro?'],
+    ['c-sql', 'Spiegami gli indici SQL e quando conviene metterli'],
+    ['c-pacchi', 'Quando arrivano i pacchi? Voglio la motivazione del ritardo'],
+  ]) {
+    await turno(app, id, testo);
+    await chiudi(app, id);
+  }
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(3);
+}
+
+// Un avviso del pannello si legge intero: niente gli sta sopra, né al centro né ai bordi.
+const scoperto = (loc) => loc.evaluate((n) => {
+  const r = n.getBoundingClientRect();
+  const punti = [[r.left + 4, r.top + 3], [r.left + r.width / 2, r.top + r.height / 2], [r.right - 4, r.bottom - 3]];
+  return r.width > 0 && r.height > 0 && r.bottom <= innerHeight && punti.every(([x, y]) => {
+    const e = document.elementFromPoint(x, y);
+    return !!e && (e === n || n.contains(e));
+  });
+});
+
+test('una parola corta che non è vuota conta: lo Zen e SQL si ritrovano a parole e nel campo del filo', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await treChatCorte(app);
+  for (const [q, atteso] of [
+    ['riprendi la discussione di ieri sullo Zen', 'c-zen'],
+    ['la chat su SQL', 'c-sql'],
+  ]) {
+    const r = await app.evaluate((_e, query) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query }), q);
+    expect(((r.output || {}).results || []).map((x) => x.id), q).toEqual([atteso]);
+  }
+
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('la chat sullo Zen');
+  await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
+  await expect(risultati(page).first()).toContainText('Zen');
+  const nota = page.locator('#cercaRisultati .dash-cerca-niente').first();
+  await expect(nota).toContainText('«zen»');
+  expect(await scoperto(nota), 'l’avviso sopra i risultati si legge intero').toBe(true);
+  await page.screenshot({ path: 'tests/.shots/1295-parola-corta.png' });
+
+  // Una parola corta vale da inizio parola: «IVA» non trova la chat dove i pacchi «arrivano».
+  await page.locator('#cercaInput').fill('la chat sull’IVA');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente').first()).toContainText('Niente nel filo per «la chat sull’IVA»', { timeout: 10_000 });
+  await expect(risultati(page)).toHaveCount(0);
+});
+
+test('una ricerca senza risultati dice che sono zero, e la riga si legge intera', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaDueChat(app);
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('zabaione');
+  const nota = page.locator('#cercaRisultati .dash-cerca-niente').first();
+  await expect(nota).toHaveText('Niente nel filo per «zabaione»', { timeout: 10_000 });
+  await expect(risultati(page)).toHaveCount(0);
+  expect(await scoperto(nota)).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/1295-ricerca-vuota.png' });
+  // Svuotando la ricerca il filo resta com'era.
+  await page.locator('#cercaInput').fill('');
+  await expect(page.locator('.dash-bubble[data-chat="chat-discussione"]').first()).toBeVisible();
+});
+
+test('una sigla in maiuscolo conta anche se si scrive come una parola vuota: «la chat sull’AI»', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await configura(app);
+  await stubProvider(app, { generativa: { tipo: 'conversazione', titolo: 'AI a scuola' }, goroutine: { tipo: 'conversazione', titolo: 'Server in Go' } });
+  for (const [id, testo] of [['c-ai', 'Cosa pensi dell’AI generativa nelle scuole?'], ['c-go', 'Come si scrive un server in Go con le goroutine?']]) {
+    await turno(app, id, testo);
+    await chiudi(app, id);
+  }
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(2);
+  const r = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'riprendi la chat sull’AI' }));
+  expect(((r.output || {}).results || []).map((x) => x.id)).toEqual(['c-ai']);
+  const page = await openTab(HOME);
+  await page.locator('#cercaInput').fill('la chat sull’AI');
+  await expect(risultati(page)).toHaveCount(1, { timeout: 15_000 });
+  await expect(risultati(page).first()).toContainText('AI');
+});

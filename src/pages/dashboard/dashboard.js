@@ -150,6 +150,7 @@
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
+  const lasciateConRighe = new Set();
   Coda.init({
     send,
     bubblesEl,
@@ -157,6 +158,7 @@
     setBubbleText: (el, t) => setBubbleText(el, t, true),
     righe: Righe,
     chatId: () => chatId,
+    chatLasciata: (c) => lasciateConRighe.has(c),
     occupata: () => sending || Accoglienza.isActive(),
     conversa: () => body.dataset.state === 'thread',
   });
@@ -185,7 +187,13 @@
     // finire: le sue righe le archivia lei.
     if (Accoglienza.isActive()) return null;
     const id = chat || ensureChatId();
-    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }).then(() => Coda.allinea()).catch(() => {}); } catch (_) {}
+    // Una chat che la scheda ha già lasciato: la riga è tardiva, e la bolla già a schermo è la sua (#1295).
+    const tardiva = !!chat && chat !== chatId;
+    if (tardiva) lasciateConRighe.add(chat);
+    try {
+      send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}), ...(tardiva ? { tardiva: true } : {}) })
+        .then(() => Coda.allinea()).catch(() => {});
+    } catch (_) {}
     return id;
   };
   const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
@@ -913,6 +921,13 @@
   // Toglie l'ultima voce SOLO se è davvero quel messaggio: dopo un tentativo
   // interrotto in fondo c'è la traccia di cosa Filo aveva già fatto, e quella
   // deve arrivare al modello.
+  // La chat di adesso è stata nascosta o cancellata (da qui, a parole o altrove): la scheda non se ne porta dietro niente,
+  // né la targa né la memoria dei messaggi, che al turno dopo tornerebbero al modello e nel registro delle richieste (#1295).
+  function lasciaLaChat() {
+    chatId = null;
+    threadHistory = [];
+  }
+
   function historyWithout(userMessage) {
     const h = threadHistory.slice();
     const last = h[h.length - 1];
@@ -1983,6 +1998,22 @@
       Sistema.aggiornato(msg.stato);
     } else if (msg?.type === MSG.FILO_PARLA && msg.chat) {
       filoParla(msg);
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.rimessa) {
+      Coda.rimettiChat(msg.rimessa).catch(() => {});
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.nascosta) {
+      // #1295 — nascosta da qui, da un'altra scheda o a parole: esce dalla vista, e se è quella in corso il messaggio dopo ne apre una nuova.
+      Coda.nascostaAltrove(msg.nascosta);
+      if (msg.nascosta === chatId) {
+        lasciaLaChat();
+        if (body.dataset.state === 'thread') {
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          const riga = [...bubblesEl.querySelectorAll('.dash-nascosta')].some((n) => n.dataset.nascosta === msg.nascosta);
+          nota.textContent = `Questa conversazione è nascosta: la rimetti ${riga ? 'da «Rimetti» qui sopra' : 'cercandola nel filo'}. Quello che scrivi da adesso apre una chat nuova.`;
+          bubblesEl.appendChild(nota);
+          bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        }
+      }
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       Coda.togliChat(msg.cancellata);
       // #525 — qualcuno ha tolto dal filo (un'altra scheda, la chat) la conversazione che
@@ -1992,7 +2023,7 @@
       // lo diciamo, perché una cosa cancellata altrove non deve succedere di
       // nascosto.
       if (msg.cancellata === chatId) {
-        chatId = null;
+        lasciaLaChat();
         if (body.dataset.state === 'thread') {
           const nota = document.createElement('div');
           nota.className = 'dash-bubble-note';

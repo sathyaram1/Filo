@@ -37,6 +37,10 @@ Nessun tetto e nessun taglio.
   riempie il filo. Se ne va con la sua pagina.
 - **Una chat cancellata sparisce anche dalle sue copie**: registro grezzo, cache delle risposte e richieste ai
   modelli (che restano coi costi, senza il testo), anche dove il testo è riscritto su una riga o tagliato in testa o in coda. Sentinella `tests/unit/chatCopieCancellate.test.mjs`.
+- **Nascondere una chat è un evento, non una cancellazione** (`chat.nascosta`, #1295): «cancella questa chat» a
+  parole la nasconde e si rimette; il testo resta. `chats()` e la coda della home non la danno a chi non la chiede
+  (`{ nascoste: true }` tutte, `'solo'` quelle), così esce dalla home, dal contesto di Filo e dai ricordi in un posto
+  solo. Cancellarla per sempre resta la `cancellazione` di sopra.
 - **Un tetto è una cancellazione automatica.** Il vecchio registro grezzo (5000 voci, testi a 200 caratteri)
   è esattamente il taglio silenzioso che le regole del repo vietano.
 

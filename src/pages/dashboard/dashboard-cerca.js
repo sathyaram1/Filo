@@ -41,7 +41,7 @@
   }
 
   function voce(r) {
-    const b = el('button', `dash-cerca-voce dash-cerca-${r.k === 'pagina' ? 'pagina' : 'msg'}`);
+    const b = el('button', `dash-cerca-voce dash-cerca-${r.k === 'pagina' || r.k === 'nascosta' ? r.k : 'msg'}`);
     b.type = 'button';
     b.setAttribute('role', 'option');
     const ic = el('span', 'dash-cerca-ico');
@@ -51,6 +51,11 @@
       corpo.append(el('span', 'dash-cerca-titolo', r.titolo || global.SN_FILO_CODA.sito(r.url)));
       corpo.append(el('span', 'dash-cerca-sotto', r.estratto || global.SN_FILO_CODA.sito(r.url)));
       b.title = r.url;
+    } else if (r.k === 'nascosta') {
+      ic.innerHTML = icona('eyeOff', 13);
+      corpo.append(el('span', 'dash-cerca-titolo', r.titolo || r.testo));
+      corpo.append(el('span', 'dash-cerca-sotto', r.testo));
+      b.title = 'Rimetti la conversazione nel filo';
     } else {
       corpo.append(el('span', 'dash-cerca-titolo', r.testo));
       corpo.append(el('span', 'dash-cerca-sotto', r.role === 'user' ? 'tu' : 'Filo'));
@@ -64,6 +69,7 @@
 
   async function apri(r) {
     if (r.k === 'significato') return significato(r);
+    if (r.k === 'nascosta') return rimetti(r);
     if (r.k === 'pagina') {
       if (!/^https?:\/\//i.test(String(r.url || ''))) return;
       // Una scheda chiusa si riapre com'era (scroll, paese); se la sua voce non c'è più, come una pagina qualunque.
@@ -73,6 +79,15 @@
     }
     chiudi();
     await d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts });
+  }
+
+  // #1295 — una conversazione nascosta si rimette nel filo e ci si va.
+  async function rimetti(r) {
+    const res = await d.send({ type: MSG.FILO_CHAT_NASCONDI, id: r.chat, nascosta: false });
+    if (!res || !res.ok) return;
+    chiudi();
+    if (d.coda.rimettiChat) await d.coda.rimettiChat(r.chat);
+    await d.coda.vaiA({ chat: r.chat, i: r.i, ts: r.ts });
   }
 
   async function togli(r) {
@@ -144,6 +159,15 @@
         pannello.insertBefore(el('div', 'dash-cerca-niente', `Niente con tutte le parole: ecco cosa c'è con «${res.termini.join(' ')}»`), pannello.firstChild);
       }
     }
+    const nascoste = Array.isArray(res.nascoste) ? res.nascoste : [];
+    if (nascoste.length) {
+      pannello.append(el('div', 'dash-cerca-niente dash-cerca-gruppo', nascoste.length === 1 ? 'In una conversazione nascosta' : `In ${nascoste.length} conversazioni nascoste`));
+      for (const r of nascoste) {
+        const b = voce(r);
+        voci.push(b);
+        pannello.append(b);
+      }
+    }
     if (q.length >= 3) {
       const s = vocePerSignificato(q);
       voci.push(s);
@@ -162,6 +186,27 @@
     disegna(res, q);
   }
 
+  // Tutte le conversazioni nascoste, anche senza ricordarne una parola (#1295): dal tasto destro sul campo.
+  async function mostraNascoste() {
+    campo.focus();
+    const mio = ++giro;
+    const res = await d.send({ type: MSG.FILO_CERCA, nascoste: 'tutte' });
+    if (mio !== giro || !res || !res.ok) return;
+    const tutte = Array.isArray(res.nascoste) ? res.nascoste : [];
+    pannello.replaceChildren();
+    voci = [];
+    scelta = -1;
+    pannello.append(el('div', 'dash-cerca-niente dash-cerca-gruppo', !tutte.length ? 'Nessuna conversazione nascosta'
+      : (tutte.length === 1 ? 'Una conversazione nascosta' : `${tutte.length} conversazioni nascoste`)));
+    for (const r of tutte) {
+      const b = voce(r);
+      voci.push(b);
+      pannello.append(b);
+    }
+    pannello.hidden = false;
+    campo.setAttribute('aria-expanded', 'true');
+  }
+
   function evidenzia(i) {
     if (!voci.length) return;
     scelta = (i + voci.length) % voci.length;
@@ -171,9 +216,18 @@
 
   function vociMenu(target) {
     const e = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (e && e.closest && e.closest('.dash-cerca-campo')) {
+      return [{ type: 'item', icon: icona('eyeOff', 16), label: 'Mostra le conversazioni nascoste', onClick: () => { mostraNascoste().catch(() => {}); } }];
+    }
     const b = e && e.closest ? e.closest('.dash-cerca-voce') : null;
     if (!b || !b._risultato) return [];
     const r = b._risultato;
+    if (r.k === 'nascosta') {
+      return [
+        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { rimetti(r).catch(() => {}); } },
+        { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
+      ];
+    }
     if (r.k === 'pagina') {
       return [
         { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => { apri(r).catch(() => {}); } },
@@ -212,8 +266,10 @@
       clearTimeout(attesa);
       attesa = setTimeout(() => { cerca().catch(() => {}); }, 180);
     });
-    campo.addEventListener('focus', () => { if (campo.value.trim().length >= 2) cerca().catch(() => {}); });
-    campo.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== campo) chiudi(); }, 150); });
+    // Col pannello ancora aperto (il fuoco torna da un menu) la scelta fatta con le frecce resta dov'era.
+    campo.addEventListener('focus', () => { if (pannello.hidden && campo.value.trim().length >= 2) cerca().catch(() => {}); });
+    // Il menu di un risultato aperto da tastiera tiene il pannello: chiuso lui, il fuoco torna nel campo.
+    campo.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== campo && !document.activeElement?.closest?.('.sn-menu')) chiudi(); }, 150); });
     campo.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); chiudi({ svuota: true }); campo.blur(); }
       else if (e.key === 'ArrowDown') { e.preventDefault(); evidenzia(scelta + 1); }
@@ -223,6 +279,17 @@
         const b = voci[scelta >= 0 ? scelta : 0];
         if (b) apri(b._risultato).catch(() => {});
       }
+    });
+    // Il risultato scelto con le frecce ha il suo menu anche da tastiera (#1295): Shift+F10 nel campo apre quello, non
+    // il menu del campo. Il menu di Filo cede il passo a chi ha già preso il tasto destro.
+    campo.addEventListener('contextmenu', (e) => {
+      const M = global.SN_MENU;
+      if (scelta < 0 || !voci[scelta] || !M || !(M.daTastiera && M.daTastiera())) return;
+      const items = vociMenu(voci[scelta]);
+      if (!items.length) return;
+      e.preventDefault();
+      const r = voci[scelta].getBoundingClientRect();
+      M.open({ x: r.left + 12, y: r.bottom, items });
     });
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);

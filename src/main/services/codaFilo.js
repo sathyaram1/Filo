@@ -82,22 +82,18 @@ async function serveGiornata(opts) {
 
 // Una frase intera («la discussione di ieri sulla coscienza») non trova niente se pretende ogni parola: allora si cerca
 // con le parole che distinguono, come faceva la Cronologia, e la risposta lo dice (`allargata`).
-async function cerca(q, opts) {
-  const { dati } = await tutte(opts);
-  let schede = [];
-  try { schede = await globalThis.SN_ARCHIVED_TABS.list(); } catch (_) { schede = []; }
-  const fonti = { chats: dati.chats, pagine: dati.pagine, schede };
+function cercaIn(fonti, q) {
   const r = C().cerca(fonti, q);
   if (r.messaggi.length || r.pagine.length) return r;
   const CA = globalThis.SN_CHAT_ARCHIVE;
-  const forti = CA && CA.terminiCheDistinguono ? CA.terminiCheDistinguono(r.termini) : [];
+  const forti = CA && CA.terminiCheDistinguono ? CA.terminiCheDistinguono(r.termini, q) : [];
   if (!forti.length || forti.length >= r.termini.length) return r;
-  const largo = C().cerca(fonti, forti.join(' '));
+  const largo = C().cerca(fonti, forti.join(' '), { largo: true });
   if (largo.messaggi.length || largo.pagine.length) return { ...largo, allargata: true };
   // Ultimo passo: almeno una parola che distingue, prima chi ne ha di più.
   const conti = new Map();
   for (const w of forti) {
-    const uno = C().cerca(fonti, w);
+    const uno = C().cerca(fonti, w, { largo: true });
     for (const v of [...uno.messaggi, ...uno.pagine]) {
       const k = v.k === 'msg' ? `m|${v.chat}|${v.i}` : `p|${v.url}`;
       const c = conti.get(k);
@@ -109,6 +105,41 @@ async function cerca(q, opts) {
   const messaggi = ordine.filter((v) => v.k === 'msg');
   const pagine = ordine.filter((v) => v.k !== 'msg');
   return { messaggi: messaggi.slice(0, 40), pagine: pagine.slice(0, 40), termini: forti, tanti: ordine.length, allargata: true };
+}
+
+// Le conversazioni nascoste (#1295) non stanno fra i risultati: a parte, una riga per conversazione, per rimetterle.
+async function cerca(q, opts) {
+  const { dati } = await tutte(opts);
+  let schede = [];
+  try { schede = await globalThis.SN_ARCHIVED_TABS.list(); } catch (_) { schede = []; }
+  const r = cercaIn({ chats: dati.chats, pagine: dati.pagine, schede }, q);
+  let nascoste = [];
+  try { nascoste = await F().chats({ ...(opts || {}), nascoste: 'solo' }); } catch (_) { nascoste = []; }
+  if (!nascoste.length) return r;
+  const viste = new Set();
+  const trovate = [];
+  for (const m of cercaIn({ chats: nascoste }, q).messaggi) {
+    if (viste.has(m.chat)) continue;
+    viste.add(m.chat);
+    const c = nascoste.find((x) => x.id === m.chat);
+    trovate.push({ ...m, k: 'nascosta', titolo: (c && c.title) || globalThis.SN_CHAT_ARCHIVE.fallbackTitle((c && c.messages) || []) });
+  }
+  return trovate.length ? { ...r, nascoste: trovate.slice(0, 20) } : r;
+}
+
+// Tutte le conversazioni nascoste, dalla più recente: chi ne ha tolta una e non ricorda di cosa parlava la ritrova qui.
+async function nascoste(opts) {
+  let tutte = [];
+  try { tutte = await F().chats({ ...(opts || {}), nascoste: 'solo' }); } catch (_) { tutte = []; }
+  const CA = globalThis.SN_CHAT_ARCHIVE;
+  return tutte
+    .filter((c) => c && Array.isArray(c.messages) && c.messages.length)
+    .map((c) => {
+      const i = Math.max(0, c.messages.findIndex((m) => m && String(m.text || '').trim()));
+      const m = c.messages[i] || {};
+      return { k: 'nascosta', chat: c.id, i, ts: c.closedAt || c.updatedAt || m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, 140), titolo: c.title || CA.fallbackTitle(c.messages) };
+    })
+    .sort((a, b) => (Date.parse(b.ts) || 0) - (Date.parse(a.ts) || 0));
 }
 
 // Una pagina tolta dal filo: si cerca per id fra quelle che il filo ha, mai con ora e indirizzo mandati dalla pagina.
@@ -170,5 +201,5 @@ async function togliIndirizzo(url, opts) {
   return tolte;
 }
 
-module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, togliPagine, togliIndirizzo, togliSchedeChiuse };
+module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, nascoste, togliPagine, togliIndirizzo, togliSchedeChiuse };
 globalThis.SN_CODA_FILO = module.exports;

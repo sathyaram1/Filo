@@ -427,16 +427,20 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_CHAT_DELETE, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    await FiloChats.remove(msg.id);
     // #525 — la conversazione cancellata può essere ancora a schermo in
     // un'altra scheda. Se nessuno glielo dice, quella scheda continua a
     // scrivere sulla stessa targa e la chat RINASCE: stessa targa, i messaggi
     // di prima persi, e di nuovo in Cronologia. L'utente aveva chiesto il
     // contrario. La scheda che la sta vivendo se ne libera e il messaggio dopo
     // apre una conversazione nuova, con una targa sua.
-    ctx.dimenticaChat(msg.id);
-    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: msg.id }); } catch (_) {}
+    await ctx.cancellaChatPerSempre(msg.id);
     return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  on(MSG.FILO_CHAT_NASCONDI, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const chat = await ctx.nascondiChat(msg && msg.id, !(msg && msg.nascosta === false));
+    return chat ? { ok: true, nascosta: !!chat.nascosta } : { ok: false, error: 'chat inesistente' };
   });
 
   // #525 — una riga che Filo ha scritto in chat senza passare da un modello
@@ -466,7 +470,7 @@ module.exports = function register(on, ctx) {
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
-      ...(guardate.length ? { guardate } : {}),
+      ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
     });
     return { ok: true };
   });
@@ -562,7 +566,9 @@ module.exports = function register(on, ctx) {
     if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
     return { ok: true, ...r };
   }));
-  on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
+  on(MSG.FILO_CERCA, soloFilo(async (msg) => (msg && msg.nascoste === 'tutte'
+    ? { ok: true, messaggi: [], pagine: [], nascoste: await Coda.nascoste() }
+    : { ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
   on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
     const url = msg && typeof msg.url === 'string' ? msg.url : '';
     const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);

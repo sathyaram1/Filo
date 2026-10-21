@@ -47,7 +47,8 @@ function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
   if (!chiave || !nuovi.length) return Promise.resolve(null);
   const sogg = R.soggetto(soggetto);
   return F().transazione(async (t) => {
-    const c = R.daContinuare(t.tutte(), { app: nome, rif: chiave, ora: Date.now() });
+    // Una conversazione nascosta (#1295) non si continua: quello che l'app scrive dopo è una riga nuova, in vista.
+    const c = R.daContinuare(t.tutte().filter((x) => !x.nascosta), { app: nome, rif: chiave, ora: Date.now() });
     const id = c ? c.id : globalThis.SN_FILO_EVENTI.uuid();
     const eventi = [];
     if (!c) {
@@ -113,7 +114,7 @@ async function dimentica({ app: nome, rif, prefisso } = {}) {
   const r = rif == null ? '' : String(rif);
   const p = prefisso == null ? '' : String(prefisso);
   if (!r && !p) return [];
-  const tutte = await F().chats();
+  const tutte = await F().chats({ nascoste: true });
   const tolte = tutte.filter((c) => c.app === nome && (r ? c.rif === r : String(c.rif || '').startsWith(p))).map((c) => c.id);
   for (const id of tolte) await globalThis.SN_FILO_CHATS.remove(id);
   if (tolte.length) { try { app.annuncia(tolte); } catch (_) {} }

@@ -959,6 +959,8 @@
     FILO_CHAT_CLOSE: 'filo_chat_close',
     // Cancellazione manuale di una chat, dopo la conferma. { id } → { ok, chats }
     FILO_CHAT_DELETE: 'filo_chat_delete',
+    // #1295 — nascondere una chat (si disfa) o rimetterla nel filo. { id, nascosta: bool } → { ok }
+    FILO_CHAT_NASCONDI: 'filo_chat_nascondi',
     // Ricerca per testo dentro tutte le chat. { query, kind?, limit? }
     // Risposta: { ok, chats } (voci d'elenco, con il frammento che combacia).
     FILO_CHATS_SEARCH: 'filo_chats_search',
@@ -968,6 +970,7 @@
     // quando l'hanno aperta. Con `cancellata: <id>` dice anche QUALE è stata
     // cancellata: la scheda che quella conversazione la sta ancora vivendo
     // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
+    // `nascosta: <id>` e `rimessa: <id>` (#1295): la home la toglie dalla vista o la rimette al suo posto.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
     // #866 — le pagine visitate che il filo ricorda, dalla pagina Sicurezza. Solo pagine filo://: è la cronologia
     // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).

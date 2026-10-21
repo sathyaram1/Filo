@@ -33,6 +33,8 @@
     SALVA_APPUNTO: ['Scritto un appunto', (k) => `Scritti ${n(k)} appunti`, 'appunto'],
     SALVA_LEZIONE: ['Memorizzata una cosa', (k) => `Memorizzate ${n(k)} cose`, 'memoria'],
     DIMENTICA: ['Dimenticata una cosa', (k) => `Dimenticate ${n(k)} cose`, 'memoria'],
+    TOGLI_CHAT: ['Tolta una conversazione', (k) => `Tolte ${n(k)} conversazioni`, 'conversazione'],
+    RIMETTI_CHAT: ['Rimessa una conversazione', (k) => `Rimesse ${n(k)} conversazioni`, 'conversazione'],
     CORREGGI_MEMORIA: ['Corretta una cosa', (k) => `Corrette ${n(k)} cose`, 'memoria'],
     CANCELLA_MEMORIA: ['Cancellata la memoria', (k) => `Cancellata la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_PAGINE: ['Cancellate pagine visitate', (k) => `Cancellate pagine visitate ${n(k)} volte`, 'pagine visitate'],

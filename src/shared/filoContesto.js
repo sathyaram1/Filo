@@ -404,12 +404,12 @@
     const pagliai = lista.map((t) => CA.normalizeForSearch(`${t.titolo || ''} ${t.testo || ''}`));
     const chat = new Set(lista.map((t) => t.chat)).size;
     const comune = Math.max(1, Math.floor(chat * QUOTA_PAROLA_COMUNE));
-    const inQuante = (p) => new Set(lista.filter((_t, i) => pagliai[i].includes(p)).map((t) => t.chat)).size;
-    const parole = [...new Set(CA.terminiCheDistinguono(CA.paroleDi(domanda)))]
+    const inQuante = (p) => new Set(lista.filter((_t, i) => CA.contieneTermine(pagliai[i], p)).map((t) => t.chat)).size;
+    const parole = [...new Set(CA.terminiCheDistinguono(CA.paroleDi(domanda), domanda))]
       .filter((p) => !diCortesia(p))
       .filter((p) => { const n = inQuante(p); return n >= 1 && n <= comune; });
     if (parole.length < MIN_PAROLE_RICORDO) return [];
-    const quante = pagliai.map((s) => parole.filter((p) => s.includes(p)).length);
+    const quante = pagliai.map((s) => parole.filter((p) => CA.contieneTermine(s, p)).length);
     const migliore = quante.reduce((m, n) => Math.max(m, n), 0);
     if (migliore < MIN_PAROLE_RICORDO) return [];
     const presi = lista.filter((_t, i) => quante[i] === migliore);
