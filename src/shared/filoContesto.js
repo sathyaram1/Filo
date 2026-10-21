@@ -51,6 +51,10 @@
       out.da[k] = vu != null ? 'utente' : (vo != null ? 'predefiniti' : 'codice');
     }
     if (out.token % 1) out.token = Math.round(out.token);
+    const cu = durataIn(u.cache);
+    const co = durataIn(o.cache);
+    out.cache = cu ?? co ?? TETTI_DI_SERIE.cache;
+    out.da.cache = cu != null ? 'utente' : (co != null ? 'predefiniti' : 'codice');
     return out;
   }
 
