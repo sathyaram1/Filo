@@ -149,7 +149,7 @@
     { famiglia: 'memoria', re: R`\b(?:salva|aggiungi|scrivi|memorizza|registra|save|add|write|store|guarda|agrega|anade|escribe|enregistre|ajoute|ecris|speichere|fuge|schreibe)\s+(?:\w+\s+){0,2}?{{MEMORIA_TUA}}\s*[:,]?\s*(?:che|that|que|qu'|dass)?\s*{{PERSONA}}` },
     { famiglia: 'memoria', re: R`\b(?:salva|aggiungi|scrivi|memorizza|registra|save|add|write|store|guarda|agrega|anade|escribe|enregistre|ajoute|ecris|speichere|fuge|schreibe)\s+(?:to|in|into|nella|alla|en|a|dans|zu|im|ins)\s+(?:la\s+|the\s+)?(?:memoria|memory|memoire|gedachtnis|speicher)\s*[:,\-–—]?\s*(?:(?:che|that|que|qu'|dass)\s+)?(?:{{PERSONA}}|\b(?:user|utente|usuario|utilisateur|nutzer|benutzer))\s+(?:\w+\s+){0,2}?{{GUSTO}}` },
     { famiglia: 'memoria', re: R`\b(?:salva|save|guarda|enregistre|speichere|impara|learn|memorizza|memorize|ricorda|remember)\s+(?:questa|this|esta|cette|diese)\s+(?:lezione|lesson|leccion|lecon|lektion|preferenza|preference|preferencia|praferenz|regola|rule|regla|regle|regel)\s*[:,\-–—]\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}(?:{{ORDINE}}|{{CONDOTTA}}|{{PERSONA}})` },
-    { famiglia: 'memoria', re: R`\b(?:ricorda(?:ti|te)?|remember|recuerda|souviens-toi|rappelle-toi|merk dir|merke dir|memorizza|memori[sz]e|memoriza|retiens)(?:\s+(?:forever|always|per sempre|sempre|bene|well|siempre|toujours|immer|pour toujours|para siempre))?\s*[,:]?\s*(?:(?:che|that|que|qu'|dass)\s+{{PERSONA}}\s+(?:\w+\s+){0,2}?(?:{{GUSTO}}|is|e|es|est|ist|has|ha|tiene|a|hat|lives|vive|habite|wohnt|works|lavora|trabaja|travaille|arbeitet)|(?:{{PERSONA}}|\buser|\butente)\s+(?:\w+\s+){0,2}?{{GUSTO}})\b` },
+    { famiglia: 'memoria', re: R`\b(?:ricorda(?:ti|te)?|remember|recuerda|souviens-toi|rappelle-toi|merk dir|merke dir|memorizza|memori[sz]e|memoriza|retiens)(?:\s+(?:forever|always|per sempre|sempre|bene|well|siempre|toujours|immer|pour toujours|para siempre))?\s*[,:]?\s*(?:(?:che|that|que|qu'|dass)\s+{{PERSONA}}\s+(?:\S+\s+){0,2}?(?:{{GUSTO}}|is|e|es|est|ist|has|ha|tiene|a|hat|lives|vive|habite|wohnt|works|lavora|trabaja|travaille|arbeitet)|(?:{{PERSONA}}|\buser|\butente)\s+(?:\S+\s+){0,2}?{{GUSTO}})\b` },
     // «Memorize: user's favourite shop is…»: un comando di memoria seguito da una preferenza dell'utente.
     { famiglia: 'memoria', re: R`\b(?:memori[sz]e|memorizza|memoriza|remember|ricorda|recuerda|retiens|merk dir|merke dir|store|salva|save|guarda|enregistre|speichere)(?:\s+(?:this|questa|questo|esta|este|cette|ce|diese[sn]?)(?:\s+(?:preference|preferenza|preferencia|fact|fatto|info|information|informazione|lesson|lezione|rule|regola))?)?\s*:\s*(?:{{PERSONA}}|(?:the\s+)?(?:user|utente|usuario|utilisateur|nutzer|benutzer)(?:'s)?)\b.{0,60}?(?:\bfavou?rite\b|\bpreferred\b|\bpreferit[oa]\b|\bpreferid[oa]\b|\blieblings\w*|{{GUSTO}}|{{DOMINIO}})` },
     { famiglia: 'memoria', re: R`(?:{{PERSONA}}'?s?|{{UTENTE_DI}})\s*(?:preferred|favou?rite)\s+language\s+(?:is|has become)\s+(?:now\s+)?{{LINGUA}}|\blingua preferita\s+{{UTENTE_DI}}\s+(?:e|diventa)\s+(?:ora\s+)?(?:il\s+|l')?{{LINGUA}}` },
@@ -200,6 +200,18 @@
     R`(?:doraimpoi|doramavanti|fromnowon|apartirdeahora|desormais|abjetzt|vonnunan)(?:rispondi|respond|answer|reply|scrivi|write|parla|speak|responde|reponds|antworte|always|sempre|siempre|toujours|immer)`,
     R`(?:rispondi|respond|answer|reply|responde|reponds|antworte)(?:sempre|always|only|solo|siempre|toujours|immer|nur)(?:in|en|auf)`,
     R`(?:lutente|theuser|elusuario|lutilisateur|dernutzer)(?:preferisce|vuole|prefers|wants|prefiere|quiere|prefere|veut|bevorzugt)`,
+    // Sulla lettura tutta attaccata («^» ne segna l'inizio): un assistente chiamato in testa e subito un ordine.
+    R`\^(?:(?:hey|ehi|ok|dear|caro|cara|attention|attenzione)?(?:ai|ia|ki|llm|bot|chatbot|assistant|assistente|asistente|assistent|chatgpt|claude|gemini|copilot|siri|alexa|cortana|system|sistema|systemprompt|developer|developermode|admin)+)(?:please|perfavore|porfavor|bitte)?(?:send|invia|manda|forward|inoltra|open|apri|abre|ouvre|buy|compra|purchase|remember|ricorda|memorize|memorizza|save|salva|delete|cancella|elimina|ignore|ignora|disregard|forget|dimentica|reply|respond|answer|rispondi|responde|reponds|antworte|recommend|consiglia|raccomanda|speak|parla|disable|disattiva|change|cambia|always|sempre|siempre|toujours|immer|fromnowon|doraimpoi|youarenow|seiora|pretend|actas|fingi)[a-z]*?(?:com|net|org|biz|xyz|ru|premium|password|user|utente|usuario|utilisateur|nutzer|memory|memoria|always|sempre|siempre|toujours|immer|recommend|consiglia|english|inglese|french|francese|german|tedesco|spanish|spagnolo|thispage|thissite|questapagina|questosito)`,
+    R`(?:toall|forall|atutti|pergli|ifyouarean|seseiun|sieresuna|sivousetesune)(?:ai|ia|ki|llms?|assistants?|assistenti|agents|agenti|models|modelli)`,
+    R`(?:theassistantmust|theassistantshould|lassistentedeve|elasistentedebe|lassistantdoit|derassistentmuss|aiassistantsmust|gliassistentiaidevono|llmsshould|languagemodels|modellilinguistici)[a-z]{0,40}?(?:com|net|org|biz|xyz|ru|premium|password|user|utente|usuario|utilisateur|nutzer|memory|memoria|always|sempre|siempre|toujours|immer|recommend|consiglia|english|inglese|french|francese|german|tedesco|spanish|spagnolo|thispage|thissite|questapagina|questosito)`,
+    R`\^(?:systemprompt|promptdisistema|messaggiodisistema|systemmessage|mensajedelsistema|messagesysteme|systemnachricht|imstart|instruction|adminoverride|developermode)`,
+    R`(?:rememberthat|ricordache|ricordati|recuerdaque|souviens-?toique|merkedirdass|memorize|memorizza|storethis|savethis|savetomemory|salvanellamemoria)(?:the|l|der|el)?(?:user|utente|usuario|utilisateur|nutzer)`,
+    R`(?:theuser|user|lutente|elusuario|lutilisateur|dernutzer)s?(?:preferred|favou?rite|preferit[oa]|hasinstructed|hasauthorized|haautorizzato)`,
+    R`(?:noteto|notefor|messagefor|importantfor|attention)(?:any|all|every)?(?:ai|ia|llms?|assistants?|agents)`,
+    R`(?:ifyouarean|seseiun|seseiunintelligenza|sieresuna|sivousetesune|wenndueine)`,
+    R`(?:reply|respond|answer|speak|rispondi|parla|responde|habla|reponds|parle|antworte|sprich)[a-z]{0,14}(?:in|en|auf)?(?:italiano|inglese|spagnolo|francese|tedesco|english|italian|spanish|french|german|ingles|espanol|frances|aleman|anglais|italien|espagnol|francais|allemand|englisch|italienisch|spanisch|franzosisch|deutsch)`,
+    R`(?:disregard|ignore|ignora|forget|dimentica|olvida|oublie|vergiss)(?:all|tutte|todas|toutes|alle)?(?:the|le|las|les|die)?(?:your|tue|tus|tes|deine|previous|precedenti|prior)(?:instructions|istruzioni|guidelines|rules|regole|instrucciones|consignes|anweisungen)`,
+    R`(?:send|invia|forward|inoltra|envia|envoie|sende|open|apri|abre|ouvre|offne|buy|compra|kaufe|delete|cancella|borra)[a-z]{0,40}(?:com|net|org|biz|xyz|ru|premium|abo|history|historial|cronologia|password)$`,
   ]);
 
   const REGOLA = Object.freeze({ versione: VERSIONE, frammenti: FRAMMENTI, espressioni: ESPRESSIONI, innocui: INNOCUI, ricomposte: RICOMPOSTE });
@@ -373,9 +385,13 @@
     // Le virgolette o un'emoji intorno all'ordine contano in ogni lettura, non solo nel titolo com'è.
     for (const l of [...letture]) letture.add(pulisci(l.replace(AVVOLTO, ' | $1 | ').replace(CONFINI, ' | ')));
     const attaccate = new Set();
-    for (const p of pezzi) {
-      attaccate.add(sciogliLeet(p, 'i').replace(/[^a-z]/g, ''));
-      attaccate.add(sciogliLeet(p, 'l').replace(/[^a-z]/g, ''));
+    // Nel titolo di una pagina gli spazi doppi diventano uno: «A s s i s t a n t , s e n d…» arriva senza confini fra
+    // le parole, e si rilegge tutto attaccato, dall'inizio. Solo se è spaziato quasi tutto: «S A L D I fino al 50%» no.
+    const spaziate = pezzi.reduce((n, p) => n + p.length, 0);
+    const lettere = (b.match(/[\p{L}\p{N}]/gu) || []).length;
+    for (const p of spaziate >= lettere * 0.7 ? [...pezzi, `^${b}`] : pezzi) {
+      attaccate.add(sciogliLeet(p, 'i').replace(/[^a-z^]/g, ''));
+      attaccate.add(sciogliLeet(p, 'l').replace(/[^a-z^]/g, ''));
     }
     return { letture: [...letture].filter(Boolean), attaccate: [...attaccate].filter((x) => x.length >= 6) };
   }
