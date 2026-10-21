@@ -163,7 +163,7 @@ function serializzaVisibile(opz) {
     return false;
   };
   const visita = (nodo, prof, csPadre, padre) => {
-    if (n > TETTO || elementi > MAX_ELEMENTI || prof > MAX_PROFONDITA) { tagliata = true; return; }
+    if (fuoriTempo || n > TETTO || elementi > MAX_ELEMENTI || prof > MAX_PROFONDITA) { tagliata = true; return; }
     if (nodo.nodeType === 3) {
       const t = nodo.nodeValue;
       if (!t) return;
