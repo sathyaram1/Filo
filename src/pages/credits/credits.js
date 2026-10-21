@@ -464,6 +464,7 @@
   function renderCollega() {
     const btn = $('linkGoogleBtn');
     const note = $('invitesLockedNote');
+    btn.hidden = false;
     btn.disabled = collegaInCorso;
     btn.textContent = collegaInCorso
       ? 'Continua nella scheda di Google…'
@@ -490,15 +491,26 @@
     if (r && r.ok) await load();
   }
 
+  // Un account Google dà un giro di codici solo: spostato qui da un'altra copia di Filo non ne apre un altro, e collegarsi
+  // di nuovo non cambierebbe niente.
+  function renderGiaUsato() {
+    $('linkGoogleBtn').hidden = true;
+    const note = $('invitesLockedNote');
+    note.textContent = 'Il tuo account Google ha già dato i suoi inviti da un’altra copia di Filo: si danno da quella.';
+    note.hidden = false;
+  }
+
   function renderInvites(server) {
     const section = $('invitesSection');
     const list = $('invites');
     list.innerHTML = '';
-    const locked = Boolean(server && server.invitesLocked === 'need_google');
+    const motivo = server && server.invitesLocked;
+    const locked = motivo === 'need_google' || motivo === 'google_used';
     $('invitesLocked').hidden = !locked;
     if (locked) {
       section.hidden = false;
-      renderCollega();
+      if (motivo === 'google_used') renderGiaUsato();
+      else renderCollega();
       return;
     }
     esitoCollega = null;

@@ -201,7 +201,7 @@
     //   propri, se c'è la chiave personale, se l'utente usa una chiave sua.
     //   { } → { ok, identity:{ok,error?}, hasPersonalKey, pseudonym, usingOwnKey,
     //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits,
-    //   canInvite, invitesLocked:'need_google'|null, … }|null, error? }
+    //   canInvite, invitesLocked:'need_google'|'google_used'|null, … }|null, error? }
     WALLET_STATE: 'wallet_state',
     // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
     //   personale e la consegna UNA volta: il main la salva cifrata.

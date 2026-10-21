@@ -82,6 +82,7 @@ const COLLEZIONI = {
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },
   '/wallet-redeem-nets/{hash}': { frase: 'il server segna l\'ora dell\'ingresso sotto un\'impronta della tua connessione' },
+  '/wallet-google-invites/{hash}': { frase: 'serve a dare un solo giro di inviti per account Google' },
   '/identities/{doc}': { frase: 'nell\'elenco dei mittenti del filtro all\'ingresso' },
   '/attacks/{doc}': { frase: 'con il testo ci sono il codice dell\'installazione, browser e sistema' },
   '/judge-verdicts/{doc}': { perche: 'un registro dei giudizi previsto dalle regole, in cui oggi il server non scrive' },

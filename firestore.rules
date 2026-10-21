@@ -879,6 +879,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // A quale portafoglio un account Google (impronta) ha dato il suo giro di codici (#1120): solo il server. Scritto da
+    // fuori, sposterebbe i codici da un portafoglio all'altro.
+    match /wallet-google-invites/{hash} {
+      allow read, write: if false;
+    }
+
     // ── I contatori giornalieri (#969) ───────────────────────────────────────
     //
     // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), quante

@@ -13,6 +13,7 @@ let redeemed = false;
 let linked = false;
 let rifiuto = null;
 let inAttesa = null;
+let giaUsato = false;
 const CODICI = ['AAAA-2222', 'BBBB-3333', 'CCCC-4444'];
 
 function json(res, status, body) {
@@ -38,8 +39,8 @@ test.beforeAll(async () => {
             hasWallet: true, pseudonym: 'abcdef0123456789',
             balance: { credits: 5000, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0, remainingUsd: 4.2, eurUsd: 1.2, eurPerCredit: 0.0007 },
             stale: false, dailyCredits: 100, grants: [],
-            canInvite: linked, invitesLocked: linked ? null : 'need_google',
-            invites: linked ? CODICI.map((code) => ({ code, used: 0, max: 3, uses: [] })) : [],
+            canInvite: linked && !giaUsato, invitesLocked: giaUsato ? 'google_used' : (linked ? null : 'need_google'),
+            invites: linked && !giaUsato ? CODICI.map((code) => ({ code, used: 0, max: 3, uses: [] })) : [],
           },
         });
       }
@@ -71,7 +72,7 @@ const T_ATTESA_RETE = 'primo avvio dal link: se dalla connessione sono già entr
 const T_ATTESA_SENZA_GOOGLE = 'primo avvio dal link senza Google: il benvenuto non promette inviti da dare e dice dove collegarlo';
 
 test.beforeEach(({}, testInfo) => {
-  redeemed = false; linked = false; rifiuto = null; inAttesa = null;
+  redeemed = false; linked = false; rifiuto = null; inAttesa = null; giaUsato = false;
   // L'invito in attesa si chiede all'avvio: va pronto prima che la fixture lanci Filo.
   if (testInfo.title === T_ATTESA_RETE || testInfo.title === T_ATTESA_SENZA_GOOGLE) inAttesa = { status: 'ok', code: 'ABCD-EFGH' };
   if (testInfo.title === T_ATTESA_RETE) rifiuto = { status: 'network_cap', reopensAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), cap: 3, hours: 24 };
@@ -175,6 +176,17 @@ test('accesso fatto ma account Google legato a un\'altra copia di Filo: la pagin
   await expect(collega).toHaveText('Riprova a collegare Google');
   await expect(page.locator('#invites li')).toHaveCount(0);
   await scatto(page, 'inviti-google-legato-altrove');
+});
+
+test('account Google che ha già dato i suoi inviti da un\'altra copia di Filo: niente codici, niente pulsante, e la pagina dice perché', async ({ openTab }) => {
+  linked = true; giaUsato = true;
+  const page = await openTab('filo://credits/credits.html');
+  await entra(page);
+  await expect(page.locator('#invitesSection')).toBeVisible();
+  await expect(page.locator('#invitesLockedNote')).toHaveText('Il tuo account Google ha già dato i suoi inviti da un’altra copia di Filo: si danno da quella.');
+  await expect(page.locator('#linkGoogleBtn')).toBeHidden();
+  await expect(page.locator('#invites li')).toHaveCount(0);
+  await scatto(page, 'inviti-google-gia-usato');
 });
 
 test('i rifiuti nuovi del riscatto si spiegano: invito di chi non ha Google, troppe entrate dalla stessa connessione con l\'ora', async ({ openTab }) => {
