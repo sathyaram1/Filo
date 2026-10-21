@@ -28,7 +28,7 @@ criterio MUST resta Unmet il badge non arriva a «passing»: sono `interact`,
 | license_location | MUST | Met | https://github.com/sathyaram1/Filo/blob/main/LICENSE |
 | documentation_basics | MUST | Met | README (avvio, architettura, prove), SECURITY.md, documenti in `transparency/`. |
 | documentation_interface | MUST | Met | Cosa sa fare Filo, voce per voce: https://github.com/sathyaram1/Filo/blob/main/src/shared/capabilities.js |
-| sites_https | MUST | Met | github.com e filo.red rispondono solo in HTTPS. |
+| sites_https | MUST | Met | Il repository (github.com) e il sito (filo.red) si aprono in HTTPS. |
 | discussion | MUST | **Da decidere** | Le issue di GitHub sono aperte, ma nessuno le legge: i feedback arrivano dall'app. O le issue entrano fra i canali letti, o si dichiara Unmet. |
 | english | SHOULD | Unmet | Documenti e app sono in italiano. |
 | maintained | MUST | Met | Commit ogni giorno, una versione nuova ogni sei ore quando la suite è verde. |
@@ -53,7 +53,7 @@ criterio MUST resta Unmet il badge non arriva a «passing»: sono `interact`,
 |---|---|---|---|
 | report_process | MUST | Met | Dall'app, col canale dei feedback: https://github.com/sathyaram1/Filo/blob/main/SECURITY.md (§6) |
 | report_tracker | SHOULD | Met | Ogni feedback ha un numero e uno stato: https://github.com/sathyaram1/Filo/blob/main/FEEDBACK-STATES.md |
-| report_responses | MUST | Met | Ogni feedback lavorato chiude con una frase per chi l'ha mandato. |
+| report_responses | MUST | Met | Chi manda un feedback ne vede lo stato nell'app, e a lavoro chiuso riceve una frase di risposta quando qualcosa è cambiato. |
 | enhancement_responses | SHOULD | Met | Le richieste di funzioni passano dallo stesso canale e hanno la stessa risposta. |
 | report_archive | MUST | **Da decidere** | La bacheca con i feedback chiusi è pubblica ma sta dentro l'app, non sul web. Met se la bacheca va anche sul sito. |
 | vulnerability_report_process | MUST | Met | https://github.com/sathyaram1/Filo/blob/main/SECURITY.md#come-segnalare-un-problema-di-sicurezza |
@@ -96,7 +96,7 @@ criterio MUST resta Unmet il badge non arriva a «passing»: sono `interact`,
 | delivery_mitm | MUST | Met | Download e aggiornamenti passano solo da HTTPS (filo.red, GitHub Releases). |
 | delivery_unsigned | MUST | Met | L'aggiornamento automatico controlla l'impronta SHA-512 del pacchetto, letta in HTTPS dalla release. |
 | vulnerabilities_fixed_60_days | MUST | **Da decidere** | Il README dice che ci sono problemi di sicurezza noti aperti, e i punti deboli di `transparency/security.md` sono pubblici. Met solo se nessuno di gravità media o più alta è noto da oltre 60 giorni. |
-| vulnerabilities_critical_fixed | SHOULD | Met | I feedback di sicurezza hanno la priorità più alta nella coda. |
+| vulnerabilities_critical_fixed | SHOULD | Met | Una correzione fusa su main arriva a tutti con l'aggiornamento automatico, di regola in qualche ora. |
 | no_leaked_credentials | MUST | Met | Il secret scanning di GitHub non ha avvisi aperti (da ricontrollare il giorno dell'invio). |
 
 ## Analysis

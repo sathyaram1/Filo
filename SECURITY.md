@@ -614,7 +614,7 @@ esempio in una issue o in un commento su GitHub. Questi canali restano privati:
 Scrivi cosa hai trovato, come si riproduce e su quale versione di Filo.
 Trattiamo le segnalazioni di sicurezza con priorità. La correzione però si
 scrive sul repository pubblico, e lì si legge qualche ora prima che arrivi a
-chi usa Filo: è uno dei punti deboli descritti in `transparency/security.md`.
+chi usa Filo. È uno dei punti deboli descritti in `transparency/security.md`.
 
 ---
 
