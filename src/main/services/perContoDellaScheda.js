@@ -218,8 +218,7 @@ async function perContoDellaScheda(sender, url, {
       } catch (e) {
         if (!e || e.message !== 'blocked-private-address') throw e;
         if (i === 0 && lanSeGiaDiPartenza && u.protocol === 'https:') origineLan = u.origin;
-        else if (lanSeLaPaginaCiSta && (paginaDiCasa === null ? (paginaDiCasa = await inReteInterna(ses, pagina)) : paginaDiCasa)) { /* ammesso */ }
-        else throw e;
+        else if (!(lanSeLaPaginaCiSta && await paginaInCasa())) throw e;
       }
     }
     const referer = conReferer ? refererPerConto(pagina, u.href, dette) : '';
