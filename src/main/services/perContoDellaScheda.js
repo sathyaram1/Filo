@@ -233,6 +233,8 @@ async function perContoDellaScheda(sender, url, {
       corrente = prossimo.href;
       continue;
     }
+    // Chi salva un file dice da dove è arrivato davvero, dopo i rimandi.
+    try { Object.defineProperty(passo.risposta, 'url', { value: u.href }); } catch (_) {}
     return passo.risposta;
   }
   throw new Error('too-many-redirects');
