@@ -54,11 +54,13 @@ function cartellaDati() {
 }
 
 // Un'istanza per profilo: il profilo segreto ne aprirà una sua con un'altra cartella, senza vedere questa.
-function creaFilo({ cartella } = {}) {
+// `avvisa(testo, { chiave, azioni })`: il toast nella cornice della finestra (le prove lo raccolgono).
+function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   const dir = () => cartella || path.join(cartellaDati(), 'filo');
   const fileEventi = () => path.join(dir(), FILE_EVENTI);
 
   const normale = { stato: E().nuovoStato(), caricato: false, caricando: null, dispositivo: '' };
+  const avvisi = { illeggibile: 0, peso: false };
   // L'incognito ha un filo suo in memoria: si vede solo da lì e sparisce con l'ultima finestra incognito.
   let incognito = { stato: E().nuovoStato(), eventi: [] };
 
