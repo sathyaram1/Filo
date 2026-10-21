@@ -315,7 +315,8 @@ module.exports = function register(on, ctx) {
     const oggi = new Date(now).toISOString().slice(0, 10);
     inviiSessione = inviiSessione.filter((x) => new Date(x.at).toISOString().slice(0, 10) === oggi);
     const esito = W.premioInvio({ grants: stato && stato.grants, perDay: stato && stato.sentRewardsPerDay, invii: inviiSessione, now });
-    inviiSessione.push({ id: String(id || ''), at: now });
+    // Oltre mille invii in un giorno il tetto è pieno comunque: la lista non cresce senza fine.
+    inviiSessione = [...inviiSessione, { id: String(id || '').slice(0, 200), at: now }].slice(-1000);
     return esito.esaurito ? W.premioInvioEsauritoTesto(esito.perDay) : '';
   }
 
