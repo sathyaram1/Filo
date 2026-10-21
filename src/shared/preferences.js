@@ -1800,6 +1800,22 @@
         return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
+    {
+      scrive: ['contestoFilo.cache'],
+      aiuto: '"5 minuti", "un\'ora" o "predefinito" (quanto il modello tiene da parte le istruzioni fisse della chat; vale coi modelli Anthropic)',
+      keys: ['durata_cache', 'durata della cache', 'cache della chat', 'durata della cache della chat', 'cache del prompt', 'contestofilo.cache'],
+      costo: 2,
+      risk: 'Un\'ora: metterle da parte costa il doppio, ma le rilegge a prezzo basso anche chi scrive un messaggio ogni tanto. Cinque minuti: metterle da parte costa meno, e dopo una pausa più lunga si ripagano per intero.',
+      build(v) {
+        if (predefinito(v)) return { partial: { contestoFilo: { cache: null } }, label: 'Durata della cache della chat → come i predefiniti' };
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const cache = contestoFilo().durataIn(s)
+          || (/\b(1|un|una)\s*(h|or[ae])\b|^un'ora$|\bun'ora\b|^60\s*(m|min)/.test(s) ? '1h' : null)
+          || (/^5\s*(m|min|minuti)?$|\bcinque\s*minuti\b|\b5\s*minuti\b/.test(s) ? '5m' : null);
+        if (!cache) return null;
+        return { partial: { contestoFilo: { cache } }, label: `Durata della cache della chat → ${cache === '1h' ? 'un\'ora' : '5 minuti'}` };
+      },
+    },
     // ── #1097.3: quanto può essere lunga una risposta, per famiglia di funzioni ──
     setterLunghezza('conversazioni', 'la chat e le conversazioni', ['lunghezza_risposte_chat', 'lunghezza delle risposte della chat',
       'risposte della chat', 'tetto delle risposte della chat', 'lunghezzarisposte.conversazioni']),
