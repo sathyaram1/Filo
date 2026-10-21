@@ -46,6 +46,15 @@ test('ogni scostamento rifiuta col suo motivo', () => {
   }
 });
 
+test('main superato da una fusione che non tocca ciò che si pubblica: si pubblica, e lo si dice (#1557)', async () => {
+  const indietro = () => ({ ...buono(), testa: 'b'.repeat(40), diversi: [] });
+  assert.deepEqual(mod.decidi(indietro()), { ok: true });
+  const righe = [];
+  const env = { [mod.SEGNO_GUARDIA]: '1' };
+  assert.equal(await mod.main(['--controlla'], { leggiStato: indietro, esegui: mai, env, log: (m) => righe.push(m), err: () => {} }), 0);
+  assert.match(righe.join('\n'), /main \(bbbbbbbbb\) non è origin\/main \(aaaaaaaaa\), ma ciò che si pubblica è identico/);
+});
+
 test('i file e il progetto vengono dalla configurazione vera del repo', () => {
   const fb = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf8'));
   const rc = JSON.parse(readFileSync(join(ROOT, '.firebaserc'), 'utf8'));
