@@ -249,7 +249,7 @@ test.describe('utente già accolto', () => {
     await expect(intervista.locator('#skipOnboarding')).toBeVisible();
   });
 
-  test('rifatta, risposta e lasciata chiudendo la sua scheda, una home la offre ancora: «Riprendiamola» la riapre lì con la risposta', async ({ app, shell, openTab }) => {
+  test('rifatta, risposta e lasciata tornando alla home, la home la offre ancora: «Riprendiamola» la riapre lì con la risposta', async ({ app, shell, openTab }) => {
     test.setTimeout(150_000);
     await pronta(app, shell);
     const prefs = await openTab('filo://preferences/preferences.html');
