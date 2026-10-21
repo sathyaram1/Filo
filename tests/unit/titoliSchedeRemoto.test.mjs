@@ -56,7 +56,7 @@ test('la regola del documento sostituisce quella del codice', async () => {
   await conDocumento({ titoliSchede }, () => {
     const r = Defaults.regolaTitoli();
     assert.equal(r.versione, 'r12');
-    assert.deepEqual(T.controlla('Banana!', r), { sospetto: true, famiglia: 'rivolto', versione: 'r12' });
+    assert.deepEqual(T.controlla('Banana!', r), { sospetto: true, fuori: true, famiglia: 'rivolto', versione: 'r12' });
     assert.equal(Defaults.regolaTitoli(), r, 'stesso documento, stessa regola già compilata');
   });
 });
