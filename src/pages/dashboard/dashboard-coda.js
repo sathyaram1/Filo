@@ -334,7 +334,7 @@
       a.style.setProperty('--dash-vuoto', `${serve}px`);
     }
     if (fissa && cima != null) {
-      const voluto = Math.min(cima, a.scrollHeight - a.clientHeight);
+      voluto = Math.min(cima, a.scrollHeight - a.clientHeight);
       if (Math.abs(a.scrollTop - voluto) > 1) a.scrollTop = voluto;
     }
   }

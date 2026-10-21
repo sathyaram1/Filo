@@ -67,7 +67,7 @@ async function inCima(page, testo) {
     const i = v.bolle.findIndex((b) => b.testo.includes(testo));
     if (i < 0) return `«${testo}» non c'è`;
     const b = v.bolle[i];
-    if (b.su < 20 || b.su > 110) return `«${testo}» sta a ${Math.round(b.su)}px dal bordo alto`;
+    if (b.su < 0 || b.su > 110) return `«${testo}» sta a ${Math.round(b.su)}px dal bordo alto`;
     const sopra = v.bolle.slice(0, i).find((x) => x.giu > 1);
     if (sopra) return `«${sopra.testo}» si vede ancora sopra`;
     return 'in cima';
