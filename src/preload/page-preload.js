@@ -164,12 +164,21 @@ try {
   for (const tipo of ['keydown', 'keypress', 'keyup']) {
     const ascolto = (e) => {
       const UI = globalThis.SN_FILO_UI;
+      if (UI && typeof UI.primaDelSito === 'function') UI.primaDelSito(e);
       // L'Esc va prima a ogni ascolto di Filo: un sito che lo ferma sulla finestra lasciava aperto il riquadro (#859).
       if (tipo === 'keydown' && e.key === 'Escape') { escPrimaAFilo(e, ascolto, UI); return; }
       if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
     };
     window.addEventListener(tipo, ascolto, { capture: true });
   }
+  // Anche il puntatore e l'inserimento: la selezione che l'utente lascia in una casella di Filo la vede Filo prima del sito (#1340).
+  for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend', 'input']) {
+    window.addEventListener(tipo, (e) => {
+      const UI = globalThis.SN_FILO_UI;
+      if (UI && typeof UI.primaDelSito === 'function') UI.primaDelSito(e);
+    }, { capture: true, passive: true });
+  }
+  globalThis.__snPrimiAscolti = true;
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
 // Solo il tasto dell'utente, o quello che il main ci consegna sopra lo schermo pieno del sito: uno fabbricato dal sito

@@ -266,8 +266,43 @@
     if (d === null || (a.riga && d.includes('\n'))) return null;
     return a.valore.slice(0, s) + d + a.valore.slice(e);
   }
-  function combacia(a, n) {
+  // Quanto `n` ha in comune con `v` in testa e in coda (le due parti non si sovrappongono in `n`).
+  function bordi(v, n) {
+    let p = 0;
+    while (p < v.length && p < n.length && v[p] === n[p]) p++;
+    let q = 0;
+    while (q < v.length - p && q < n.length - p && v[v.length - 1 - q] === n[n.length - 1 - q]) q++;
+    return [p, q];
+  }
+  // `n` è `v` con un pezzo (vuoto se `soloAggiunto`) sostituito da `d`, in qualunque punto: il rilascio cade dove sta il
+  // puntatore, il correttore cambia la parola sbagliata e non la selezione.
+  function sostituito(v, n, d, soloAggiunto) {
+    const fuori = n.length - d.length;
+    if (fuori < 0 || (soloAggiunto && fuori !== v.length)) return false;
+    let p = 0;
+    while (p < v.length && p < n.length && v[p] === n[p]) p++;
+    let q = 0;
+    while (q < v.length && q < n.length && v[v.length - 1 - q] === n[n.length - 1 - q]) q++;
+    for (let i = Math.max(0, fuori - q); i <= Math.min(p, fuori); i++) {
+      if (v.length - (fuori - i) >= i && n.startsWith(d, i)) return true;
+    }
+    return false;
+  }
+  function combacia(a, n, st) {
     const v = a.valore;
+    // Annulla e rifai non si prevedono, ma tornano sempre a un testo già avuto dalla casella.
+    if (/^history(Undo|Redo)$/.test(a.tipo)) return st.storia.has(n);
+    if (a.tipo === 'insertFromDrop' || a.tipo === 'insertReplacementText') {
+      let d = typeof a.dato === 'string' ? a.dato : a.trasferito;
+      if (typeof d !== 'string') return false;
+      d = d.replace(/\r\n?/g, '\n');
+      if (a.riga) d = d.replace(/\n/g, '');
+      return sostituito(v, n, d, a.tipo === 'insertFromDrop');
+    }
+    if (a.tipo === 'deleteByDrag') {
+      const [p, q] = bordi(v, n);
+      return n.length < v.length && p + q >= n.length;
+    }
     const [s, e] = a.sel || [];
     if (typeof s !== 'number' || typeof e !== 'number') return true;
     const testa = v.slice(0, s);
@@ -276,7 +311,7 @@
       const x = atteso(a);
       return x !== null ? n === x : (n.length >= s + coda.length && n.startsWith(testa) && n.endsWith(coda));
     }
-    if (!/^delete/.test(a.tipo) || a.tipo === 'deleteByDrag') return true;
+    if (!/^delete/.test(a.tipo)) return true;
     const tolti = v.length - n.length;
     if (tolti < 0) return false;
     if (UN_PASSO.test(a.tipo) && s === e && tolti > grafema(v, s, a.tipo.endsWith('Backward'))) return false;
@@ -288,7 +323,6 @@
   }
   // La selezione da rimettere con il testo è l'ultima mossa dall'utente (mouse, frecce, Ctrl+A) o da Filo: un `selectAll`
   // del sito prima del suo inserimento lascerebbe tutto selezionato, e il tasto dopo dell'utente lo cancellerebbe.
-  const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
   function ripristina(c, st) {
     const sel = st.sel;
     c.value = st.buono;
@@ -308,20 +342,20 @@
   }
   function guardaCasella(c) {
     if (caselle.has(c)) return;
-    const st = { buono: c.value, sel: selezioneDi(c), annuncio: null, tasto: null, componendo: false, inCorso: [], visto: false, gesto: false };
+    const st = { buono: '', storia: new Set(), caratteri: 0, sel: selezioneDi(c), annuncio: null, tasto: null, componendo: false, inCorso: [], visto: false, gesto: false };
+    vale(st, c.value);
     caselle.set(c, st);
     c.addEventListener('beforeinput', (e) => {
       if (!e.isTrusted) return;
       if (c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
-      // Fra il tasto e il suo annuncio nessun gesto dell'utente sposta la selezione: chi l'ha spostata è il sito.
+      // Fra il tasto e il suo annuncio, o fuori da un gesto, nessuno dell'utente sposta la selezione: chi l'ha spostata è
+      // il sito. Rilascio, correttore e annulla mettono il testo dove dicono loro.
       const t = st.tasto;
-      if (t && t.sel && !st.componendo && !e.isComposing && e.inputType !== 'insertCompositionText' && c.value === st.buono) {
-        const ora = selezioneDi(c);
-        if (ora && (ora[0] !== t.sel[0] || ora[1] !== t.sel[1])) {
-          try { c.setSelectionRange(t.sel[0], t.sel[1]); } catch (_) {}
-        }
-      }
-      const a = { e, tipo: e.inputType, dato: e.data, valore: c.value, sel: selezioneDi(c), riga: c.tagName !== 'TEXTAREA' };
+      const sel = t && t.sel ? t.sel : (st.gesto ? null : st.sel);
+      if (sel && !st.componendo && !e.isComposing && !SELEZIONE_PROPRIA.test(e.inputType) && c.value === st.buono) rimettiSelezione(c, sel);
+      let trasferito = null;
+      try { if (e.dataTransfer) trasferito = e.dataTransfer.getData('text/plain'); } catch (_) {}
+      const a = { e, tipo: e.inputType, dato: e.data, trasferito, valore: c.value, sel: selezioneDi(c), riga: c.tagName !== 'TEXTAREA' };
       st.annuncio = a;
       setTimeout(() => { if (st.annuncio === a) st.annuncio = null; }, 0);
     }, true);
@@ -329,13 +363,13 @@
       const madre = inConsegna(st);
       const a = st.annuncio;
       const annunciato = !madre && e.isTrusted && !!a && a.e.eventPhase === 0 && !a.e.defaultPrevented && a.tipo === e.inputType;
-      const dellUtente = annunciato && combacia(a, c.value);
+      const dellUtente = annunciato && combacia(a, c.value, st);
       const diFilo = madre ? nostraScrittura > madre.livello : nostraScrittura > 0;
       if (dellUtente || diFilo) {
         if (dellUtente) st.annuncio = null;
         st.inCorso.push({ e, livello: nostraScrittura });
-        st.buono = c.value;
-        st.sel = selezioneDi(c);
+        vale(st, c.value);
+        st.sel = st.dopo && st.dopo.e === e ? st.dopo.sel : selezioneDi(c);
         return;
       }
       // L'annuncio vero con un cambio del sito dentro: resta quello che l'utente ha scritto, applicato al suo testo.
@@ -352,34 +386,75 @@
       ripristina(c, st);
       e.stopImmediatePropagation();
     }, true);
-    // Nei riquadri il tasto arriva al campo come copia nostra (tastoNelRiquadro): conta come vero.
-    const muove = (e) => {
-      if (!veroONostro(e)) return;
-      if (e.type === 'keydown') {
-        // Un tasto che passa dal metodo di scrittura (229, Process, i tasti morti) sposta la selezione da sé.
-        const ime = e.isComposing || e.keyCode === 229 || e.key === 'Process' || e.key === 'Dead';
-        const t = ime ? null : { e, sel: selezioneDi(c) };
-        st.tasto = t;
-        if (t) setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
-      } else {
-        st.tasto = null;
-      }
-      if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
-    };
-    const fermo = (e) => {
-      if (!veroONostro(e)) return;
+    c.addEventListener('compositionstart', () => { st.componendo = true; st.tasto = null; }, true);
+    c.addEventListener('compositionend', () => { st.componendo = false; }, true);
+    // Di riserva, dove il ponte di page-preload non c'è; nei riquadri il tasto arriva come copia nostra.
+    const qui = (e) => { if (!global.__snPrimiAscolti && veroONostro(e)) gestoSu(c, st, e); };
+    for (const t of GESTI_CASELLA) c.addEventListener(t, qui, true);
+    daGuardare.add(c);
+    while (daGuardare.size > TETTO_CASELLE) daGuardare.delete(daGuardare.values().next().value);
+    if (!giroCaselle) giroCaselle = global.requestAnimationFrame(controllaCaselle);
+  }
+  // Tasti e puntatore si guardano prima del sito (#1340): il ponte di page-preload, a document_start, chiama
+  // `primaDelSito` prima di ogni suo ascolto. Dal campo, il sito in cattura sulla finestra avrebbe già spostato la selezione.
+  const INIZI = ['keydown', 'pointerdown', 'mousedown', 'touchstart'];
+  const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend'];
+  const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
+  function gestoSu(c, st, e) {
+    if (!INIZI.includes(e.type)) {
       st.tasto = null;
       if (!st.gesto) return;
       st.gesto = false;
       if (c.value === st.buono) st.sel = selezioneDi(c);
-    };
-    c.addEventListener('compositionstart', () => { st.componendo = true; st.tasto = null; }, true);
-    c.addEventListener('compositionend', () => { st.componendo = false; }, true);
-    for (const t of ['keydown', 'pointerdown', 'mousedown', 'touchstart']) c.addEventListener(t, muove, true);
-    for (const t of ['keyup', 'pointerup', 'mouseup', 'touchend']) c.addEventListener(t, fermo, true);
-    daGuardare.add(c);
-    while (daGuardare.size > TETTO_CASELLE) daGuardare.delete(daGuardare.values().next().value);
-    if (!giroCaselle) giroCaselle = global.requestAnimationFrame(controllaCaselle);
+      return;
+    }
+    if (e.type === 'keydown') {
+      // Un tasto che passa dal metodo di scrittura (229, Process, i tasti morti) sposta la selezione da sé.
+      const ime = e.isComposing || e.keyCode === 229 || e.key === 'Process' || e.key === 'Dead';
+      // Fra un gesto e l'altro la selezione la muovono solo l'utente e Filo: quella spostata dal sito torna prima del tasto.
+      if (!ime && !st.gesto && !st.componendo && c.value === st.buono) rimettiSelezione(c, st.sel);
+      const t = ime ? null : { e, sel: selezioneDi(c) };
+      st.tasto = t;
+      if (t) setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
+    } else {
+      st.tasto = null;
+    }
+    if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
+  }
+  function attivo() {
+    let el = null;
+    try { el = document.activeElement; } catch (_) {}
+    for (let giri = 0; el && giri < 8; giri++) {
+      const r = ombre.get(el);
+      if (!r || !r.activeElement || r.activeElement === el) break;
+      el = r.activeElement;
+    }
+    return el;
+  }
+  const SELEZIONE_PROPRIA = /^(insertFromDrop|deleteByDrag|insertReplacementText|historyUndo|historyRedo)$/;
+  function rimettiSelezione(c, sel) {
+    const ora = selezioneDi(c);
+    if (!ora || !sel || typeof sel[0] !== 'number' || (ora[0] === sel[0] && ora[1] === sel[1])) return;
+    const n = c.value.length;
+    try { c.setSelectionRange(Math.min(sel[0], n), Math.min(sel[1], n)); } catch (_) {}
+  }
+  function primaDelSito(e) {
+    try {
+      if (!SCRITTURA_GUARDATA || !e || !e.isTrusted) return;
+      if (e.type === 'input') {
+        // Dove l'inserimento ha lasciato il cursore, prima che un ascolto del sito lo sposti.
+        const c = bersaglio(e);
+        const st = c && caselle.get(c);
+        if (st) st.dopo = { e, sel: selezioneDi(c) };
+        return;
+      }
+      if (!GESTI_CASELLA.includes(e.type)) return;
+      let c = bersaglio(e);
+      // Il mouse rilasciato fuori dalla casella chiude lo stesso la selezione cominciata dentro.
+      if (!caselle.has(c) && !INIZI.includes(e.type)) c = attivo();
+      const st = c && caselle.get(c);
+      if (st) gestoSu(c, st, e);
+    } catch (_) {}
   }
   // Un `value` scritto dal sito non manda eventi (l'Aiuto sta nel suo documento): si rimette a ogni fotogramma.
   function controllaCaselle() {
@@ -517,6 +592,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    soloScritturaVera, valoreVero, ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
+    soloScritturaVera, valoreVero, primaDelSito, ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

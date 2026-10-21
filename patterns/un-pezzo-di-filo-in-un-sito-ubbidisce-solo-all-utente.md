@@ -211,10 +211,19 @@ faceva spendere una chiamata.
   compone), Backspace e Canc tolgono un solo carattere come lo vede l'utente
   (`Intl.Segmenter`), le altre cancellazioni tolgono e basta, attaccate al
   cursore. Se non combacia, Filo rimette il tasto dell'utente sul suo testo.
-  La selezione spostata fra il tasto e il suo annuncio torna dov'era (lo scatto
-  del tasto la fotografa; i tasti del metodo di scrittura no). Annulla, rifai,
-  rilascio di un trascinamento e sostituzione del correttore non si prevedono:
-  passano come prima.
+  Annulla e rifai valgono solo se riportano un testo che la casella ha già avuto;
+  il rilascio di un trascinamento e la sostituzione del correttore solo se il loro
+  testo è entrato in un punto e il resto è rimasto.
+
+  **La selezione la muovono solo l'utente e Filo.** Filo la guarda **prima del
+  sito**: il ponte di `page-preload.js`, registrato a document_start, chiama
+  `SN_FILO_UI.primaDelSito` su tasti, puntatore e inserimenti prima di ogni
+  ascolto del sito, anche in cattura sulla finestra (#1340, giro 2: l'Aiuto sta
+  nel documento, e il sito selezionava tutto nel suo ascolto del tasto). La
+  selezione buona è quella lasciata dalla fine di un gesto dell'utente (tasto o
+  puntatore rilasciati), da un inserimento accettato o da Filo; quella spostata
+  da altri torna al tasto o all'annuncio seguente. Il metodo di scrittura, il
+  rilascio, il correttore e annulla mettono il testo dove dicono loro.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
   l'origine (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in
   `impostazioniPerOrigine.js`), concessa solo al riquadro che ha davvero
