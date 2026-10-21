@@ -334,7 +334,32 @@ test('in incognito la porta della scheda chiede il controllo senza finestra nasc
   } finally {
     globalThis.SN_SAFEBROWSE = prima;
   }
-  assert.deepEqual(presi, [['https://bit.ly/a', { pagina: 'https://sito.com/', incognito: true }]]);
+  assert.deepEqual(presi, [['https://bit.ly/a', { pagina: 'https://sito.com/', incognito: true, rete: null }]]);
+});
+
+// #753.1 — da una scheda aperta da un altro paese la finestra nascosta esce dallo stesso proxy, credenziali comprese.
+test('da una scheda col proxy la porta passa alla finestra nascosta la rete della scheda', () => {
+  class Schede {}
+  installSafebrowse(Schede);
+  const s = new Schede();
+  const ProxyTab = require('../../src/main/services/proxyTab.js');
+  const proxata = { nome: 'sessione proxata' };
+  const normale = { nome: 'sessione normale' };
+  ProxyTab.registraRete('proxy:prova', proxata, { proxyRules: 'socks5://1.2.3.4:1080', bypassRules: '<-loopback>', auth: { username: 'u', password: 'p' } });
+  const presi = [];
+  const prima = globalThis.SN_SAFEBROWSE;
+  globalThis.SN_SAFEBROWSE = { preverifica: (u, ctx) => { presi.push(ctx.rete); return null; } };
+  try {
+    s._sbPreverifica('https://bit.ly/a', 'https://sito.com/', proxata);
+    s._sbPreverifica('https://bit.ly/a', 'https://sito.com/', normale);
+  } finally {
+    globalThis.SN_SAFEBROWSE = prima;
+    ProxyTab.clearPartitionAuth('proxy:prova');
+  }
+  assert.deepEqual(presi, [
+    { proxyRules: 'socks5://1.2.3.4:1080', proxyBypassRules: '<-loopback>', auth: { username: 'u', password: 'p' } },
+    null,
+  ]);
 });
 
 test('al clic sul link controllato la pagina d\'arrivo ha subito il suo avviso; «confermo» lo toglie; una navigazione nuova non lo eredita', async () => {
