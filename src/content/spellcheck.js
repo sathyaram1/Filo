@@ -1819,7 +1819,10 @@
     let res = null;
     try {
       res = await chiedi(ACTIONS.SPELLCHECK_CONTEXT, {
-        segnaposto: { pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}) },
+        segnaposto: {
+          pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}),
+          ...(cerca.prima ? { giaLette: { domanda: cerca.prima.domanda, dove: cerca.prima.dove } } : {}),
+        },
       }, { giorno: new Date().toDateString() });
     } catch (err) {
       console.warn('[SN] correttore, segnaposto:', err);
