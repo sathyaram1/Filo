@@ -309,10 +309,6 @@
       const b = server.balance || {};
       $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
-      const daily = Number(server.dailyCredits) || 0;
-      $('refillHint').textContent = daily > 0
-        ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.`
-        : 'I crediti li tiene il server.';
       $('redeemForm').hidden = true;
       if (w.usingOwnKey) {
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
