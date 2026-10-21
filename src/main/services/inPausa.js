@@ -37,9 +37,9 @@ async function statiSicuri() {
   return Object.fromEntries(coppie);
 }
 
-/** Il solo sì/no di ognuna, senza rileggere: per i manifesti e i menu calcolati al volo. */
+/** Il solo sì/no di ognuna, senza aspettare: per il manifesto dell'agente, calcolato a ogni turno. */
 function aperti() {
-  return Object.fromEntries(NOMI.map((n) => [n, cancelli[n].visibile()]));
+  return Object.fromEntries(NOMI.map((n) => [n, cancelli[n].aggiorna().visible]));
 }
 
 /** `fn(nome, stato)` a ogni cambio di «visibile» di una delle due. */
