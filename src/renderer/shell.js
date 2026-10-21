@@ -321,16 +321,16 @@
     if (!r || !r.ok) return;
     inPausaVisibili = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
   }
-  function refreshInPausa() {
+  function refreshInPausa(attendi = false) {
     if (!MSG_FILO.IN_PAUSA_STATO) return Promise.resolve();
-    return api.message({ type: MSG_FILO.IN_PAUSA_STATO }).then(rifletteInPausa).catch(() => {});
+    return api.message({ type: MSG_FILO.IN_PAUSA_STATO, attendi }).then(rifletteInPausa).catch(() => {});
   }
-  refreshInPausa();
+  refreshInPausa(true);
   if (typeof api.onBroadcast === 'function') {
     api.onBroadcast((m) => {
-      if (m?.type === MSG_FILO.IN_PAUSA_CAMBIATO && m.nome in inPausaVisibili) {
+      if (m?.type === MSG_FILO.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(inPausaVisibili, m.nome)) {
         inPausaVisibili = { ...inPausaVisibili, [m.nome]: m.visible === true };
-      } else if (m?.type === MSG_FILO.AUTH_CHANGED) refreshInPausa();
+      } else if (m?.type === MSG_FILO.AUTH_CHANGED) refreshInPausa(true);
     });
   }
   appsBtn.addEventListener('click', () => { showNativeMenu(appsBtn, buildApps()); refreshInPausa(); });
