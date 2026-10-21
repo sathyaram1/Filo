@@ -390,6 +390,7 @@
     root.classList.toggle('senza-striscia', opzioni().striscia === false);
     // Il puntatore fermo nella fascia del bordo che la vista non vede: la sorveglia il main, e la striscia lo mostra.
     striscia.classList.toggle('bordo', !stato.aperta && !!stato.bordo);
+    striscia.classList.toggle('risposta', !!stato.risposta);
     if (stato.aperta) annullaSpinta();
     else nascondiSuggerimento();
     striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);
