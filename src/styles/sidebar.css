@@ -214,11 +214,18 @@
 .sn-sidebar-correzione-dopo { font-weight: 600; }
 .sn-sidebar-correzione-perche { color: var(--sn-muted); font-size: 11px; }
 .sn-sidebar-correzione-fatta { border-color: var(--sn-accent); }
-.sn-sidebar-correzione-fatta::before {
-  border-color: var(--sn-accent);
-  background: var(--sn-accent);
-  /* La spunta è il bordo di un rettangolo ruotato: niente immagini, segue l'accento scelto. */
-  box-shadow: inset 0 0 0 2px var(--sn-bg);
+.sn-sidebar-correzione-fatta::before { border-color: var(--sn-accent); background: var(--sn-accent); }
+/* La spunta è l'angolo di un rettangolo ruotato: niente immagini, sta dentro il cerchio dell'accento scelto. */
+.sn-sidebar-correzione-fatta::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 9.5px;
+  width: 3px;
+  height: 6px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
 }
 
 /* Il documento trovato (#947.3): un bottone che si apre o si trascina nella pagina, come il file in una cartella. */
