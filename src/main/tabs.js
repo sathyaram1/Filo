@@ -2777,6 +2777,12 @@ class TabManager {
       if (process.env.NODE_ENV !== 'production') {
         console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
       }
+      // Il pannello Aiuto è morto con la pagina (#1432).
+      if (tab.view && tab.view.webContents === wc) {
+        tab.aiuto = null;
+        RisposteInAttesa.dimentica(tab);
+        try { this.barra.aggiornaNav(); } catch (_) {}
+      }
       const NE = globalThis.SN_NET_ERROR;
       const reason = (details && details.reason) || '';
       // clean-exit = chiusura ordinata (nostre close/_recreateView): non è un crash.
