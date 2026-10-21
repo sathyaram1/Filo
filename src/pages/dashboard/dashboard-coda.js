@@ -647,9 +647,10 @@
     if (pagina && gruppo && gruppo._gruppo) {
       const p = gruppo._gruppo.pagine.find((x) => x.id === pagina.dataset.id);
       if (!p) return [];
+      const dove = global.SN_FILO_CODA.daAprire(p);
       return [
-        { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => { riapri(p).catch(() => {}); } },
-        { type: 'item', icon: icona('copy', 16), label: 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(p.url).catch(() => {}); } },
+        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { riapri(p).catch(() => {}); } },
+        { type: 'item', icon: icona('copy', 16), label: dove && dove.sito ? 'Copia l’indirizzo del sito' : 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(dove && dove.sito ? dove.url : p.url).catch(() => {}); } },
         { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togliPagine(gruppo, [p.id]).catch(() => {}); } },
       ];
     }
