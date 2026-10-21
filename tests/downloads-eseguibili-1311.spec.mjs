@@ -78,10 +78,10 @@ const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1
   .filter({ has: shell.locator('.dl-row-ask-nome', { hasText: new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 const risposta = (riga, testo) => riga.locator('.dl-row-btn', { hasText: testo });
 const contenuto = (dir) => (existsSync(dir) ? readdirSync(dir) : []);
-const cartelle = (app) => app.evaluate(() => ({
-  dl: process.env.FILO_DOWNLOAD_DIR,
-  quarantena: require('node:path').join(process.env.FILO_USER_DATA, 'quarantena'),
-}));
+async function cartelle(app) {
+  const env = await app.evaluate(() => ({ dl: process.env.FILO_DOWNLOAD_DIR, dati: process.env.FILO_USER_DATA }));
+  return { dl: env.dl, quarantena: join(env.dati, 'quarantena') };
+}
 async function spiaApertura(app) {
   await app.evaluate(({ shell }) => {
     globalThis.__aperti = [];
