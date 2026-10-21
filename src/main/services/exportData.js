@@ -757,6 +757,7 @@ function mergeImportedData(current, imported, opzioni = {}) {
       const t = tettoSpesa(isPlainObject(cur[k]) ? cur[k].monthlyLimitEur : undefined, imp[k].monthlyLimitEur);
       next = { ...next, monthlyLimitEur: t.tenuto };
       if (t.offerto !== null) stats.tettoSpesa = { tenuto: t.tenuto, backup: t.offerto };
+      if (t.prima !== null) stats.tettoSceso = { prima: t.prima, dopo: t.tenuto };
     }
 
     if (!(k in cur)) {
