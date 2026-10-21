@@ -546,8 +546,9 @@ test('editor: con la finestra piccola la casella della chat prende tutta la riga
 });
 
 // In una chat bassa la casella scorre (decisione dell'owner, #256.4) ma non spinge fuori i tasti messi sotto, e
-// sopra resta in vista la fine dell'ultima risposta di Filo; a 1024x640 la richiesta di una frase e mezza ci sta intera.
-for (const [w, h, intera] of [[1024, 640, true], [960, 600, false], [900, 520, false], [800, 500, false]]) {
+// sopra resta in vista la fine dell'ultima risposta di Filo; a 1024x640 la richiesta di una frase e mezza ci sta intera,
+// e a 1280x720 (chat larga quanto basta per i tasti accanto, ma bassa) ci sta perché i tasti scendono sotto.
+for (const [w, h, intera] of [[1280, 720, true], [1280, 690, true], [1024, 640, true], [960, 600, false], [900, 520, false], [800, 500, false]]) {
   test(`editor: a ${w}x${h} microfono e invio restano dentro la chat anche con una richiesta lunga`, async ({ app, shell, openTab }) => {
     test.setTimeout(60_000);
     await app.evaluate(({ BrowserWindow }, [w, h]) => { BrowserWindow.getAllWindows()[0].setSize(w, h); }, [w, h]);
