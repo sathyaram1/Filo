@@ -236,14 +236,21 @@
   }
 
   async function togli(it) {
+    // Dal tasto destro su una riga in correzione: quello che c'era nel campo non si salva, si toglie la riga.
+    const aperta = inModifica === chiave(it) ? nodi.get(inModifica) : null;
+    if (aperta && aperta.chiudi) await aperta.chiudi(false);
     const r = await send(it.tipo === 'sito' ? { type: MSG.FILO_MEMORY_FORGET, sempreAperta: it.host } : { type: MSG.FILO_MEMORY_FORGET, ...it.via });
+    tolta(r, it.tipo === 'sito' ? `${it.host} non resta più aperto` : '');
+    await carica();
+  }
+
+  function tolta(r, testo = '') {
     if (r && r.ok && r.tolta) {
       ultimaNascosta = r.id || null;
-      esito(it.tipo === 'sito' ? `${it.host} non resta più aperto` : 'Tolta: non entra più nelle conversazioni', { rimetti: r.id || null });
+      esito(testo || 'Tolta: non entra più nelle conversazioni', { rimetti: r.id || null });
     } else {
       esito('Non c\'era più: ecco com\'è adesso');
     }
-    await carica();
   }
 
   async function rimetti(it) {
