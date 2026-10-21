@@ -3,6 +3,7 @@
 // l'etichetta legata al campo e nessun segnaposto, la descrizione degli elementi portava il valore in chiaro.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
@@ -56,13 +57,22 @@ function rigaDelCampo(testo) {
   return (testo.split('\\n').find((r) => r.includes(':: #c')) || '').replace(/\\"/g, '"');
 }
 
-// Su http un modulo con password o carta fa comparire l'avviso del sito sospetto, che rende la pagina inerte
-// finché non si sceglie «Continua»: è quello che farebbe l'utente prima di scrivere.
-async function superaAvviso(page) {
-  const continua = page.getByRole('button', { name: 'Continua' });
-  await expect(continua).toBeVisible({ timeout: 10_000 });
-  await continua.click();
-  await expect(continua).toHaveCount(0, { timeout: 6_000 });
+// Su http un modulo con password o carta fa comparire l'avviso del sito sospetto, in una vista sopra la scheda che
+// la rende inerte finché non si sceglie «Continua»: è quello che farebbe l'utente prima di scrivere. Senza
+// `obbligatorio` si supera solo se c'è: compare secondo i campi che la pagina dichiara.
+async function superaAvviso(app, { obbligatorio = true } = {}) {
+  const coperta = async () => (await copertura(app).catch(() => null))?.coperta === true;
+  const fine = Date.now() + (obbligatorio ? 10_000 : 4_000);
+  while (!(await coperta())) {
+    if (Date.now() > fine) {
+      if (obbligatorio) throw new Error('l’avviso del sito sospetto non è comparso');
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  const avviso = await vistaAvviso(app);
+  await avviso.getByRole('button', { name: 'Continua' }).click();
+  await expect.poll(coperta, { timeout: 6_000 }).toBe(false);
 }
 
 const modulo = (campo) => `<!doctype html><html><head><title>Accesso</title></head><body><h1>Area clienti</h1>
@@ -83,7 +93,7 @@ for (const caso of SEGRETI) {
   test(`${caso.nome}: al modello arriva il campo col suo nome, non quello che c'è scritto`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await testServer.openReady(openTab, modulo(caso.campo));
-    if (caso.avviso) await superaAvviso(page);
+    if (caso.avviso) await superaAvviso(app);
     await page.fill('#c', caso.valore);
     await expect(page.locator('#c')).toHaveValue(caso.valore);
     await preparaModelli(app);
@@ -116,7 +126,7 @@ test('un campo qualunque senza nome continua a farsi riconoscere da quello che c
 test('il clic sul campo della password indicato dall’assistente lo racconta col nome del campo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<label for="c">Password</label> <input id="c" type="password">'));
-  await superaAvviso(page);
+  await superaAvviso(app);
   await page.fill('#c', 'Gatto.Rosso.77');
   await expect(page.locator('#c')).toHaveValue('Gatto.Rosso.77');
   await preparaModelli(app);
@@ -141,7 +151,7 @@ test('il tasto destro sulla password resa visibile non la manda alla correzione'
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<label for="c">Password</label> <input id="c" type="text"> '
     + '<label for="n">Note per la consegna</label> <input id="n">'));
-  await superaAvviso(page);
+  await superaAvviso(app);
   await page.fill('#c', 'Gatto.Rosso.77');
   await page.fill('#n', 'consegnaa domani');
   await preparaModelli(app);
@@ -161,7 +171,7 @@ test('nell’immagine della pagina che va al modello il numero della carta è co
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<label for="c">Numero della carta</label> '
     + '<input id="c" autocomplete="cc-number" style="width:280px;font-size:18px">'));
-  await superaAvviso(page);
+  await superaAvviso(app);
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
   await apriAiuto(shell, page);
@@ -277,7 +287,7 @@ test('il numero di carta selezionato nel suo campo non parte verso la spiegazion
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<label for="c">Numero della carta</label> '
     + '<input id="c" autocomplete="cc-number" style="width:280px"> <label for="n">Note</label> <input id="n" style="width:280px">'));
-  await superaAvviso(page);
+  await superaAvviso(app);
   await page.fill('#c', '4111 1111 1111 1111');
   await page.fill('#n', 'consegna al portone verde');
   await preparaModelli(app);
@@ -299,14 +309,7 @@ test('il numero di carta selezionato nel suo campo non parte verso la spiegazion
   expect(await arrivato(app, page), 'il numero di carta selezionato è partito verso il modello').not.toContain('4111');
 });
 
-// L'avviso del sito sospetto compare secondo i campi che la pagina dichiara: qui si supera solo se c'è.
-async function superaAvvisoSeCe(page) {
-  const continua = page.getByRole('button', { name: 'Continua' });
-  if (await continua.isVisible({ timeout: 4_000 }).catch(() => false)) {
-    await continua.click();
-    await expect(continua).toHaveCount(0, { timeout: 6_000 });
-  }
-}
+const superaAvvisoSeCe = (app) => superaAvviso(app, { obbligatorio: false });
 
 const QUATTRO_CASELLE = '<label for="k1">Numero della carta</label> '
   + [1, 2, 3, 4].map((i) => `<input id="k${i}" maxlength="4" inputmode="numeric" style="width:70px;font-size:18px;outline:0;caret-color:transparent">`).join(' ');
@@ -316,7 +319,7 @@ const QUATTRO_CASELLE = '<label for="k1">Numero della carta</label> '
 test('la carta divisa in quattro caselle non arriva al modello, né nella descrizione né nell’immagine', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, modulo(QUATTRO_CASELLE));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   const immagini = await immaginiConDueCarte(app, shell, page, async (v) => {
     const pezzi = v.split(' ');
     for (let i = 0; i < 4; i++) await page.fill(`#k${i + 1}`, pezzi[i]);
@@ -336,7 +339,7 @@ test('il codice monouso diviso in sei caselle non arriva al modello', async ({ a
   test.setTimeout(60_000);
   const caselle = [1, 2, 3, 4, 5, 6].map((i) => `<input id="o${i}" maxlength="1" inputmode="numeric" style="width:24px">`).join('');
   const page = await testServer.openReady(openTab, modulo(`<p>Inserisci il codice che ti abbiamo mandato</p>${caselle}`));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   for (const [i, c] of [...'739146'].entries()) await page.fill(`#o${i + 1}`, c);
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
@@ -356,7 +359,7 @@ test('nell’immagine è coperto il numero di carta scritto in un campo dentro u
       this.attachShadow({ mode: 'open' }).innerHTML = '<label for="c">Numero della carta</label> '
         + '<input id="c" autocomplete="cc-number" style="width:300px;font-size:18px;outline:0;caret-color:transparent">'; } });
   </script>`));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   const campo = page.locator('carta-pagamento input');
   const immagini = await immaginiConDueCarte(app, shell, page, (v) => campo.fill(v));
   const b = await campo.boundingBox();
@@ -387,7 +390,7 @@ async function campoNelComponente(frame, scostamento = { x: 0, y: 0 }) {
 test('nell’immagine è coperto il numero di carta scritto in un campo dentro un componente chiuso', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, modulo(componenteChiuso));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   const immagini = await immaginiConDueCarte(app, shell, page, (v) => scriviNelComponente(page, v));
   expect(await pixelDiversi(page, immagini, await campoNelComponente(page)),
     'il numero scritto nel componente chiuso si legge nell’immagine').toBe(0);
@@ -401,7 +404,7 @@ test('nell’immagine è coperto il numero di carta del componente chiuso anche 
   const stile = 'width:420px;height:60px;border:3px solid #888;padding:5px';
   const page = await testServer.openReady(openTab, modulo(`<iframe name="stesso" srcdoc="${doc.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" style="${stile}"></iframe>`
     + `<iframe name="altro" src="${fuori}" style="${stile}"></iframe>`));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   const riquadri = ['stesso', 'altro'];
   await expect.poll(() => Promise.all(riquadri.map((n) => page.frame({ name: n })?.evaluate(() => Boolean(window.__radice)).catch(() => false))),
     { timeout: 10_000 }).toEqual([true, true]);
@@ -421,7 +424,7 @@ test('la password resa visibile dal sito non arriva al modello, né nella descri
   const page = await testServer.openReady(openTab, modulo('<div>Hasło</div><input id="c" name="haslo" type="password" '
     + 'style="width:300px;font-size:18px;outline:0;caret-color:transparent"> '
     + '<button type="button" id="occhio" onclick="c.type = c.type === \'password\' ? \'text\' : \'password\'">Mostra</button>'));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
   await apriAiuto(shell, page);
@@ -455,7 +458,7 @@ test('il codice monouso in un campo solo arriva al modello col testo che lo prec
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<p>Inserisci il codice che ti abbiamo mandato via SMS</p>'
     + '<input id="c" maxlength="6" inputmode="numeric">'));
-  await superaAvvisoSeCe(page);
+  await superaAvvisoSeCe(app);
   await page.fill('#c', '739146');
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
