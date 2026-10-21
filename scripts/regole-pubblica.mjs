@@ -1,5 +1,5 @@
-// Pubblica regole e indici di Firestore, regole di Storage e la pagina delle approvazioni da browser solo da main
-// uguale a origin/main, coi file intatti. È l'unica strada: firebase.json la richiama (--controlla) a ogni deploy.
+// Pubblica regole e indici di Firestore, regole di Storage e la pagina delle approvazioni da browser solo da main, coi
+// file pubblicati intatti e uguali a origin/main. È l'unica strada: firebase.json la richiama (--controlla) a ogni deploy.
 // Decisioni: tests/unit/regolePubblica.test.mjs. Uso: npm run regole:pubblica [-- --dry-run]
 
 import { spawnSync } from 'node:child_process';
