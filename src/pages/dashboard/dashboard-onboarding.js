@@ -401,6 +401,7 @@
     closingShownAt = 0;
     clearTimeout(onboardingHomeFallback);
     hideSkipOnboarding();
+    segnaPagina(false);
     // Il filo si rilegge da capo: l'intervista ne è il primo tratto, e il primo messaggio di Filo sta in coda (#869).
     goHome();
     setSuggestions(Array.isArray(msg?.suggestions) ? msg.suggestions : []);
