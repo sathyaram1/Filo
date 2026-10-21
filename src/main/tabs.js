@@ -1153,6 +1153,7 @@ class TabManager {
   _caricaRinviata(tab) {
     if (!tab || !tab._rinviata || !this.tabs.includes(tab)) return false;
     tab._rinviata = false;
+    tab._gestoFiloAt = Date.now();
     let wc;
     try { wc = tab.view.webContents; if (wc.isDestroyed()) return false; } catch (_) { return false; }
     const url = tab.url;
