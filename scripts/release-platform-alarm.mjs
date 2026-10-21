@@ -136,15 +136,20 @@ export function paginaDellaVersione(rilasci, versione) {
   return r ? { esiste: true, allegati: [...r.allegati] } : { esiste: false };
 }
 
-/** L'ultima versione pubblicata prima di `versione` che porta tutti i file della piattaforma, o `null`. PURA. */
-export function ultimaUscita(rilasci, piattaforma, versione) {
-  const conf = PIATTAFORME[String(piattaforma || '').trim()];
+/**
+ * L'ultima versione pubblicata prima di `versione` che porta tutti i file della piattaforma (e, con
+ * `conImpronte`, anche le loro impronte nella pagina), o `null`. PURA.
+ */
+export function ultimaUscita(rilasci, piattaforma, versione, { conImpronte = false } = {}) {
+  const nome = String(piattaforma || '').trim();
+  const conf = PIATTAFORME[nome];
   const v = numeri(versione);
   if (!conf || !v || !Array.isArray(rilasci)) return null;
   let migliore = null;
   for (const r of rilasci) {
     if (!uscitaPer(r) || confronta(numeri(r.tag), v) >= 0) continue;
     if (!conf.attesi.every((f) => r.allegati.includes(f))) continue;
+    if (conImpronte && !(r.impronte && r.impronte[nome] === true)) continue;
     if (!migliore || confronta(numeri(r.tag), numeri(migliore)) > 0) migliore = r.tag;
   }
   return migliore;
