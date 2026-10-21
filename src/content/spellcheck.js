@@ -66,12 +66,15 @@
   function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
   function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
   function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
-  function segnapostiAttivi() { return suggerimentiAttivi() && settings.correttore?.segnaposti !== false; }
+  // I segnaposti (#1448) hanno il loro interruttore: con i suggerimenti spenti il controllo ragionato parte lo stesso, solo
+  // dove ci sono delle x da riempire.
+  function segnapostiAttivi() { return !spentoQui() && settings.correttore?.segnaposti !== false && !!Coerenza(); }
+  const ragionatoAttivo = () => suggerimentiAttivi() || segnapostiAttivi();
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
   }
-  const attivo = () => erroriAttivi() || suggerimentiAttivi() || automaticaAttiva();
+  const attivo = () => erroriAttivi() || suggerimentiAttivi() || segnapostiAttivi();
 
   // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
   // caselle di una riga. Sul sito dove Filo è spento il browser fa da sé.
@@ -133,7 +136,7 @@
     if (!state) { adottaIlFuoco(); return; }
     // Ogni parte si spegne da sola, e le altre restano.
     if (!modelloErrori()) fermaTimer(state, ['timerRapido', 'timerFine']);
-    if (!suggerimentiAttivi()) fermaTimer(state, ['timerRagionato']);
+    if (!ragionatoAttivo()) fermaTimer(state, ['timerRagionato']);
     aggiornaCodice(state);
     // Anche il tema può essere cambiato: i colori dei segni lo leggono dall'overlay.
     syncOverlay(state);
@@ -1439,7 +1442,7 @@
     ].filter(tieni);
     return [
       ...(erroriAttivi() ? Rg.senzaSovrapposti(ordina('errore')) : []),
-      ...(suggerimentiAttivi() ? Rg.senzaSovrapposti(ordina('suggerimento')) : []),
+      ...Rg.senzaSovrapposti(ordina('suggerimento').filter((x) => (x.tipo === 'segnaposto' ? segnapostiAttivi() : suggerimentiAttivi()))),
     ];
   }
 
@@ -1481,7 +1484,7 @@
 
   // Il ragionato: a fine frase, sulle frasi chiuse, e dopo la pausa lunga su quello che è cambiato.
   function programmaRagionato(state, { gesto = false, fineFrase = false } = {}) {
-    if (!suggerimentiAttivi()) return;
+    if (!ragionatoAttivo()) return;
     if (!gesto && !state.timerRagionato) return;
     if (state.timerRagionato) clearTimeout(state.timerRagionato);
     state.timerRagionato = setTimeout(() => {
@@ -1622,7 +1625,7 @@
   }
 
   async function controlloRagionato(state, { fineFrase = false } = {}) {
-    if (!suggerimentiAttivi() || !state.el || !state.el.isConnected) return;
+    if (!ragionatoAttivo() || !state.el || !state.el.isConnected) return;
     if (document.hidden) { state.rimandati.add('ragionato'); return; }
     const Rg = R();
     seguiIlTesto(state);
@@ -1643,7 +1646,10 @@
     state.baseRagionato = g.base;
     const numero = ++state.inviatiRagionato;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
-    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    // Coi suggerimenti spenti il pezzo si manda solo se ha delle x, e la domanda è soltanto sui segnaposti.
+    const soloSegnaposti = !suggerimentiAttivi();
+    if (soloSegnaposti && !candidati.some((c) => c.fonte === 'segnaposto')) { state.baseRagionato = baseDiPrima; return; }
     const contesto = contestoDelCampo(state.el);
     const payload = {
       prima: '', nuovo: d.testo.slice(g.start, g.end), dopo: '', campo: d.testo, campoDa: g.start, sopra: contesto.prima.slice(-CONVERSAZIONE_MAX),
@@ -1651,6 +1657,7 @@
       contesto,
       ripetizioni: ripetizioniAttive(),
       segnaposti: segnapostiAttivi(),
+      ...(soloSegnaposti ? { soloSegnaposti: true } : {}),
       luogo: { sito: luogoDi(state).sito },
     };
     state.inViaggio.push(viaggio);
@@ -1683,7 +1690,9 @@
     const zona = viaggio && !viaggio.perso ? (viaggio.nuovo === undefined ? viaggio : viaggio.nuovo) : null;
     const nuovo = zona ? { start: d.verso(zona.start), end: d.verso(zona.end) } : null;
     const { segni, giusti } = Rg.segniDaRisposta(raw, d.testo, {
-      tipi: rapido ? ['errore'] : ['errore', 'suggerimento', 'contraddizione', ...(segnapostiAttivi() ? ['segnaposto', 'cerca'] : [])],
+      tipi: rapido ? ['errore'] : [
+        ...(suggerimentiAttivi() ? ['errore', 'suggerimento', 'contraddizione'] : []), ...(segnapostiAttivi() ? ['segnaposto', 'cerca'] : []),
+      ],
       citata: (c) => !!contesto && !!Coerenza() && Coerenza().citazioneNelContesto(c, contesto),
       fonte,
       nuovo: nuovo && nuovo.start >= 0 && nuovo.end > nuovo.start ? nuovo : null,
