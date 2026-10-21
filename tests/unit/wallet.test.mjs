@@ -521,3 +521,13 @@ test('premio d\'invio: oltre il tetto del giorno non si promette, e la frase dic
   assert.equal(W.premioInvioEsauritoTesto(1), 'Il premio vale solo per il primo feedback del giorno. Questo non ne riceve.');
   assert.equal(W.premioInvioEsauritoTesto(0), 'Per ora i feedback inviati non ricevono premi.');
 });
+
+// #1077 — la chat risponde dal manifesto: se non sa del tetto dei premi d'invio, non sa spiegare un premio mancato.
+test('il manifesto delle capacità dice che i premi d\'invio hanno un tetto al giorno, e quelli di risoluzione no', () => {
+  require('../../src/shared/capabilities.js');
+  const C = globalThis.SN_CAPABILITIES;
+  const crediti = C.get('credits').desc;
+  assert.match(crediti, /solo per le prime del giorno/);
+  assert.match(crediti, /risolta non ha questo tetto/);
+  assert.match(C.get('feedback').desc, /solo per le prime segnalazioni del giorno/);
+});
