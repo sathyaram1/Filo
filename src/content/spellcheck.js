@@ -1728,8 +1728,9 @@
       });
     }
     const giudicato = viaggio && !viaggio.perso ? viaggio : null;
-    // Un segnaposto già deciso resta suo finché la frase in cui è stato deciso c'è ancora: che la rilettura taccia o lo
-    // scriva con altre parole. Tolta o cambiata una parola, decide la rilettura; un «giusto» lo toglie sempre.
+    // Un segnaposto già deciso: se la rilettura chiede un dato, decide la sua domanda (la stessa lo tiene, un'altra lo
+    // rifà partendo dalle fonti già lette, così parole diverse per lo stesso dato non ripagano la ricerca); se tace, resta
+    // finché la frase è ancora quella (correttoreRegole.stessaFrase). Un «giusto» lo toglie sempre.
     const fraseDiAdesso = (m) => {
       const a = d.verso(m.start);
       const b = d.verso(m.end);
