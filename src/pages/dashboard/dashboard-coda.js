@@ -299,6 +299,7 @@
   let ancora = null;
   let fissa = false;
   let vuoto = 0;
+  let voluto = 0;
   const aSchermo = (n) => n.getClientRects().length > 0;
   const inApertura = () => !d.conversa() && !d.occupata();
 
