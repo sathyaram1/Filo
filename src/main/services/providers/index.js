@@ -99,12 +99,13 @@
   // `tools` / `toolChoice` (tool calling nativo, vedi src/shared/actionTools.js)
   // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
   // streaming) passano tali e quali al provider.
-  async function complete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
+  // `cache`: il piano dei punti di cache (SN_FILO_CONTESTO.pianoDellaCache); ogni fornitore lo scrive nel suo formato.
+  async function complete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
+  async function streamComplete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
   }
 
   async function listModels({ provider, apiKey }) {
