@@ -228,9 +228,11 @@
       campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
       invia, suStato: (s) => { if (!ta.isConnected) return; statoVoce = s; cambiato(); },
     }) || null;
-    // Focus o tasto sull'input → riapri la chat
-    ta.addEventListener('focus', () => expand({ ai: false }));
-    ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });
+    // Focus o tasto sull'input → riapri la chat. Ridotto dall'utente lo riapre solo un suo gesto sulla casella: il
+    // microfono che ci scrive e ci rimette il cursore no, da qualunque icona l'abbia fermato (#1432).
+    ta.addEventListener('focus', () => { if (!ridottoDallUtente) expand({ ai: false }); });
+    ta.addEventListener('pointerdown', (e) => { if (e.isTrusted && collapsed) expand({ ai: false }); });
+    ta.addEventListener('input', (e) => { if (collapsed && (e.isTrusted || !ridottoDallUtente)) expand({ ai: false }); });
 
     // Click fuori dal pannello → collassa (se l'AI non ha richiesto chat aperta)
     docClickHandler = (e) => {
