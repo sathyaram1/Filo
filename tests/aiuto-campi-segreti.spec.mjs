@@ -506,3 +506,59 @@ test('su una pagina grande senza componenti chiusi la foto per l’assistente no
   expect(Math.max(...esito.durate.map((d) => d.ms)), 'ogni foto dell’assistente aspetta la ricerca dei campi').toBeLessThan(1000);
   expect(esito.fermo, 'Filo resta fermo mentre cerca i campi').toBeLessThan(300);
 });
+
+// Lo screenshot del menu: il nome del file lo sceglie un modello guardando la foto. La foto dell'utente resta intera.
+async function screenshotDellUtente(app, page) {
+  let foto = null;
+  await expect.poll(async () => {
+    await page.mouse.click(5, 5);
+    foto = await app.evaluate(async ({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+      const tab = tm.tabs.find((t) => t.title === 'Accesso');
+      return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `(async () => {
+        HTMLAnchorElement.prototype.click = function () { window.__foto = this.href; };
+        window.__foto = null;
+        await SN_ACTIONS.takeScreenshot();
+        return window.__foto;
+      })()` }], true);
+    });
+    return Boolean(foto);
+  }, { timeout: 20_000 }).toBe(true);
+  return foto;
+}
+
+test('lo screenshot di una pagina col numero di carta scritto arriva coperto al modello che sceglie il nome del file', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, modulo('<div>Numero della carta</div> '
+    + '<input id="c" name="number" style="width:280px;font-size:18px">'));
+  await superaAvvisoSeCe(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models }, modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+    });
+  });
+  await modelloFinto(app, [['', 'Pagamento con carta']]);
+
+  const foto = [];
+  for (const valore of ['4111 1111 1111 1111', '5500 0000 0000 0004']) {
+    await page.fill('#c', valore);
+    await app.evaluate(() => globalThis.SN_AI_CACHE.clear());
+    const prima = await app.evaluate(() => globalThis.__visti.length);
+    const utente = await screenshotDellUtente(app, page);
+    const alModello = await app.evaluate((_electron, n) => {
+      const nuove = globalThis.__visti.slice(n);
+      const parte = nuove.flatMap((m) => m).flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+        .find((p) => p.type === 'image_url');
+      return parte ? parte.image_url.url : null;
+    }, prima);
+    expect(alModello, 'la foto deve arrivare al modello del nome').toMatch(/^data:image\//);
+    foto.push({ utente, alModello });
+  }
+  const r = await page.evaluate(() => {
+    const b = document.querySelector('#c').getBoundingClientRect();
+    return { left: b.left + 3, top: b.top + 3, width: b.width - 6, height: b.height - 6 };
+  });
+  expect(await pixelDiversi(page, [foto[0].alModello, foto[1].alModello], r), 'il numero si legge nella foto per il modello').toBe(0);
+  expect(await pixelDiversi(page, [foto[0].utente, foto[1].utente], r), 'lo screenshot dell’utente resta com’è').toBeGreaterThan(0);
+});

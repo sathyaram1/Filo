@@ -1259,9 +1259,8 @@
   const { campoSegreto, etichettaCollegata, etichettaVicina } = Segreti;
   const campiSegretiInVista = Segreti.campiInVista;
 
-  // L'immagine della pagina per un modello, coi campi segreti ridisegnati coperti dai puntini (#810.7). `ritaglio`
-  // ({x, y, w, h} della finestra) se l'immagine ne è solo un pezzo; `fattore` > 1 la rimpicciolisce dopo la copertura,
-  // così il JPEG non sparge le cifre attorno.
+  // La foto per un modello coi campi segreti coperti dai puntini (#810.7); `ritaglio` se è un pezzo della finestra.
+  // `fattore` > 1 la rimpicciolisce dopo la copertura: il JPEG non sparge le cifre attorno.
   async function fotoCoperta(dataUrl, campi, { fattore = 1, qualita = 85, ritaglio = null } = {}) {
     // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
     const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
