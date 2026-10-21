@@ -81,6 +81,17 @@ functions. Qui sotto il perché dei passaggi, per attore.
 - `attack`/`spam` → `unlabeled`: un feedback fidato segnalato per errore torna al ri-giudizio
   (sotto, «Feedback fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
   `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
+- **Un feedback che aspetta una scelta dell'owner non gira** (regola dell'owner del 22/09,
+  #775). Il derivato nato da un rilievo col `?` porta il segno `chiedeDecisione` (in chiaro,
+  lo scrive solo il server alla nascita) e la domanda come turno di Filo nella conversazione.
+  Ogni esito che lo metterebbe in coda o ad aspettare l'origine (sicuro dei giudici, salto dei
+  fidati, origine fusa, chiusa, sparita o non ancora fusa), e anche il verdetto `design` dei
+  giudici, diventa `design` (`statusReason: decisione`): nei Ricevuti, col rombo e la casella. Attacco, spam, origine bloccata e
+  giudizio incompleto vincono come per gli altri; con l'origine si blocca e si sblocca, ma la
+  sua fusione non lo mette in coda. Dopo la risposta va in coda come un feedback normale (non
+  ha un ramo da riprendere) e chi lo prende trova domanda e risposta (`decisioni`). Un
+  `design` che aspetta la risposta (`decisione`, `clarify`) la pipeline non lo sovrascrive:
+  una ri-valutazione non lo rimette in coda.
 
 **Owner**: le sue righe sono le azioni di §4a, una per azione e nessuna in più (sentinella
 `tests/unit/ownerActionsTransizioni.test.mjs`). La tabella ammette all'owner gli stessi
@@ -115,7 +126,8 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità uguale al livello; UNO solo per tutti gli altri (interni messi da parte
+  priorità uguale al livello (quello col `?` aspetta la risposta nei Ricevuti: sopra,
+  Pipeline); UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
   fra loro); —critica con rilievi
   interni da correggere→ resta
@@ -301,6 +313,8 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     fermano resta nei Ricevuti. La prova è `senderProof: 'server'` col prefisso, mai il solo nome:
     un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
     (`priorityManual`, 3): il giudice di priorità non la riscrive.
+  - un derivato col `?` fa eccezione: dove gli altri andrebbero in coda o ad aspettare, lui va nei
+    Ricevuti fermo sulla domanda (`design`, `decisione`: §3, Pipeline).
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
@@ -366,7 +380,9 @@ spento uno qualunque (`resolveAutoApprove`, in entrambe le copie).
 
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
-alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
+alla chat + `statusReason: clarify`); (2b) un derivato nato da un rilievo col `?`
+(`statusReason: decisione`, domanda in chat dalla nascita, #775): alla risposta torna
+`todo` e lo prende un risolutore da capo, con domanda e risposta nelle `decisioni`; (3) la verifica ha trovato un difetto di livello
 3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
 (`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
 decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
