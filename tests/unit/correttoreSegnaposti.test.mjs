@@ -95,18 +95,14 @@ test('la ricerca di un segnaposto è la sua domanda, non la frase: un ritocco de
   assert.notEqual(C.chiaveRicerca('xx', { domanda: 'q', dove: 'web' }), C.chiaveRicerca('xx', { domanda: 'q', dove: 'wiki:en' }));
 });
 
-test('un segnaposto è la sua frase fino alle x: ciò che segue non lo cambia, il soggetto sì', () => {
-  const id = (testo, quale = 0) => {
-    let i = -1;
-    for (let n = 0; n <= quale; n++) i = testo.indexOf('xx', i + 1);
-    return C.identitaSegnaposto(testo, i, i + 2);
-  };
-  const base = id('Google ha un p/e di soli xx, ');
-  assert.equal(base, 'google ha un p e di soli xx');
-  assert.equal(id('Google ha un p/e di soli xx, davvero basso per una azienda così.'), base);
-  assert.equal(id('Prima frase. Google  ha un P/E di soli xx, davero basso.'), base);
-  assert.notEqual(id('Apple ha un p/e di soli xx, davvero basso.'), base);
-  const due = 'Google ha un p/e di soli xx, mentre il Nasdaq aveva un p/e di xx.';
-  assert.notEqual(id(due, 0), id(due, 1));
-  assert.equal(C.identitaSegnaposto('xx', 1, 1), '');
+test('il dato di un segnaposto è di tutta la sua frase: parole aggiunte e refusi no, una parola cambiata prima o dopo le x sì', () => {
+  const allora = 'Google ha un p/e di soli xx, ';
+  assert.ok(C.stessaFrase(allora, 'Google ha un p/e di soli xx, davvero basso per una azienda così.'));
+  assert.ok(C.stessaFrase('Gogle ha un p/e di soli xx, davero basso.', 'Google ha un P/E di soli xx, davvero basso.'));
+  assert.ok(C.stessaFrase('Google ha un p/e di soli xx, dav', 'Google ha un p/e di soli xx, davvero basso.'), 'l\'ultima parola era ancora in scrittura');
+  assert.ok(!C.stessaFrase('Ci sono xx abitanti a Roma.', 'Ci sono xx abitanti a Milano.'), 'il soggetto dopo le x');
+  assert.ok(!C.stessaFrase('Google ha un p/e di soli xx.', 'Apple ha un p/e di soli xx.'), 'il soggetto prima delle x');
+  assert.ok(!C.stessaFrase('Nel 2020 il PIL era di xx miliardi.', 'Nel 2021 il PIL era di xx miliardi.'), 'un numero vale solo uguale');
+  assert.ok(!C.stessaFrase('Google ha un p/e di soli xx, davvero basso.', 'Google ha un p/e di soli xx.'), 'una parola tolta');
+  assert.ok(!C.stessaFrase('', 'Google ha un p/e di xx.'));
 });

@@ -255,6 +255,62 @@ for (const [come, riga] of [['con altre parole', '[di soli xx][][Google P/E rati
   });
 }
 
+// Corretto un refuso prima delle x, che è proprio quello che il correttore segna: il dato è lo stesso.
+for (const [come, riga] of [['con altre parole', '[di soli xx][][Google P/E ratio][cerca][web]'], ['tacendo', '[][][][nessuno]']]) {
+  test(`un refuso prima delle x corretto, la frase riletta ${come}: il dato trovato resta e non si ricerca`, async ({ app, openTab, testServer }) => {
+    const page = await apri(app, openTab, testServer, { ...P_E, ragionato: { 'Gogle ha': P_E.ragionato['p/e di soli xx'], 'Google ha': [riga] } });
+    await webLento(app);
+    await page.locator('#ta').click();
+    await page.keyboard.type('Gogle ha un p/e di soli xx, davvero basso. ');
+    await expect(valore(page, '27')).toBeVisible({ timeout: 10000 });
+    await page.locator('#ta').evaluate((e) => e.setSelectionRange(2, 2));
+    await page.keyboard.type('o');
+    await page.keyboard.press('End');
+    await expect.poll(async () => (await globale(app, '__ragionate')).some((r) => r.nuovo.includes('Google ha')), { timeout: 8000 }).toBe(true);
+    await restaIlValore(page, '27', 3000);
+    expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+  });
+}
+
+// Quello che il dato descrive può stare dopo le x: due frasi che cominciano uguali hanno due dati, e cambiare il
+// soggetto dopo le x cambia il dato.
+test('«Ci sono xx abitanti a Roma.» e «… a Milano.» hanno ciascuna il suo dato, e Roma cambiata in Milano cambia il dato', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    ragionato: {
+      'abitanti a Roma': ['[xx abitanti a Roma][][Popolazione di Roma][cerca][web]'],
+      'abitanti a Milano': ['[xx abitanti a Milano][][Popolazione di Milano][cerca][web]'],
+    },
+    fontiWeb: [{ titolo: 'Istat', sito: 'istat.example', url: 'https://istat.example/x', data: '', testo: 'popolazione dei comuni' }],
+  });
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+    const f = async (a) => {
+      const t = String(a.messages[a.messages.length - 1].content);
+      if (!t.includes('Chi scrive ha messo delle x')) return prima(a);
+      const text = t.includes('Popolazione di Milano') ? '[1370000][Abitanti di Milano][1][2025]' : '[2750000][Abitanti di Roma][1][2025]';
+      return { text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = f;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = f;
+  });
+  const valori = page.locator('.sn-spell-valori .sn-spell-valore:not(.sn-cercando)');
+  const ta = page.locator('#ta');
+  await ta.click();
+  await page.keyboard.type('Ci sono xx abitanti a Roma. ');
+  await expect(valori).toHaveText(['2750000'], { timeout: 10000 });
+  await page.keyboard.type('Ci sono xx abitanti a Milano. ');
+  await expect.poll(async () => (await valori.allTextContents()).sort(), { timeout: 10000 }).toEqual(['1370000', '2750000']);
+  expect((await globale(app, '__webChieste')).sort()).toEqual(['Popolazione di Milano', 'Popolazione di Roma']);
+  await ta.fill('');
+  await page.keyboard.type('Ci sono xx abitanti a Roma. ');
+  await expect(valori).toHaveText(['2750000'], { timeout: 10000 });
+  const i = (await ta.inputValue()).indexOf('Roma');
+  await ta.evaluate((e, i) => e.setSelectionRange(i, i + 4), i);
+  await page.keyboard.type('Milano');
+  await page.keyboard.press('End');
+  await expect(valori).toHaveText(['1370000'], { timeout: 10000 });
+});
+
 test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice, e «Cerca il dato» lo trova', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, P_E);
   await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
