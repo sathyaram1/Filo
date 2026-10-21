@@ -112,4 +112,5 @@ CERCA_CHAT e l'id. Una chat nuova lo eredita con una voce in `APP` di `src/share
 Prove: `tests/unit/filoApp.test.mjs`, `tests/chat-app-nel-filo.spec.mjs`.
 
 Sentinella: `tests/unit/filoEventi.test.mjs` (formato, sola aggiunta, cancellazione byte per byte, incognito,
-migrazione, nessun tetto, velocità con 50.000 eventi). Prove dell'app: `tests/filo-linea-del-tempo.spec.mjs`.
+migrazione, nessun tetto, velocità con 50.000 eventi) e `tests/unit/filoMisureELettura.test.mjs` (misura segnata,
+lettura a righe, filo illeggibile, avviso sopra 256 MB). Prove dell'app: `tests/filo-linea-del-tempo.spec.mjs`.
