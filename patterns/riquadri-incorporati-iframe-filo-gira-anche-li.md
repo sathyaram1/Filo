@@ -31,8 +31,16 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   riquadro in arrivo non perde niente: non ha ancora un documento che ascolti, e
   chi lo seguiva lo riprende quando arriva. Restano come prima i riquadri in una
   radice ombra e quelli dentro un documento che la pagina si è scritta da sé, di
-  cui da qui l'arrivo non si vede. Sentinella
-  `tests/unit/riquadriInArrivo.test.mjs`; prova `tests/riquadro-in-arrivo.spec.mjs`.
+  cui da qui l'arrivo non si vede. Vale anche per il main (#1429): codice
+  eseguito in un riquadro prima del suo primo commit fa lo stesso danno, e chi
+  esegue nei riquadri chiede `riquadroArrivato(f)`
+  (`src/main/services/riquadroArrivato.js`: prima del commit `url` è vuoto).
+  Un riquadro che la pagina toglie o sposta si ricarica da capo e torna in
+  arrivo, anche nel corpo che Filo mette nella pagina (`moveBefore` no: tiene il
+  documento). Resta aperta la porta della pagina stessa: un sito che tocca il
+  suo riquadro prima del load gli toglie Filo uguale. Sentinella
+  `tests/unit/riquadriInArrivo.test.mjs`; prove `tests/riquadro-in-arrivo.spec.mjs`
+  e `tests/iframe-context-menu.spec.mjs`.
 
 - **Costo pigro.** Una pagina può avere decine di riquadri che l'utente non tocca
   mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
