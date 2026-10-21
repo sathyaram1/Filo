@@ -214,8 +214,8 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
   const chats = await F().chats({ incognito });
   const tuttoIlFilo = senzaDomanda(messaggiDi(chats), chatId, userMessage);
-  const solo = !!(soloChat && chatId);
-  const tutti = solo ? tuttoIlFilo.filter((m) => m.chat === chatId) : tuttoIlFilo;
+  const solo = soloChat === true;
+  const tutti = solo ? tuttoIlFilo.filter((m) => !!chatId && m.chat === chatId) : tuttoIlFilo;
   potaFoto(tuttoIlFilo);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);
