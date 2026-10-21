@@ -492,6 +492,22 @@ describe('lo script spedisce quello che ha letto nelle release', () => {
     assert.doesNotMatch(inviato.text, /mancano|404/);
   });
 
+  test('#1348 dal vivo: fermo alle impronte con i file al loro posto, la chiave conta le pagine che le hanno', async () => {
+    const { aggiornaCorpo } = await import('../../scripts/release-impronte.mjs');
+    const riga = (nome) => ({ nome, sha256: 'c'.repeat(64), commit: 'd'.repeat(40), corsa: 'https://github.com/o/Filo/actions/runs/7' });
+    const conImpronte = aggiornaCorpo('', [riga('Filo-Mac.dmg'), riga('Filo-Mac.zip')]).corpo;
+    const ESITI = JSON.stringify({ controllo: { outcome: 'success' }, impronte: { outcome: 'failure' } });
+    const storia = [
+      { ...rilascio('v0.2.303', [...WIN, ...TUTTI_MAC]) }, { ...rilascio('v0.2.302', [...WIN, ...TUTTI_MAC]) },
+      { ...rilascio('v0.2.301', [...WIN, ...TUTTI_MAC]), body: conImpronte },
+    ];
+    const alla302 = await corsa({ PIATTAFORMA: 'Mac', VERSIONE: 'v0.2.302', ESITI }, storia);
+    const alla303 = await corsa({ PIATTAFORMA: 'Mac', VERSIONE: 'v0.2.303', ESITI }, storia);
+    assert.deepEqual(alla302.keys, ['piattaforma:mac:impronte:dopo-v0.2.301']);
+    assert.deepEqual(alla303.keys, alla302.keys, 'lo stesso guasto alle impronte aprirebbe un feedback a ogni versione');
+    assert.match(alla303.name, /non riporta le impronte/);
+  });
+
   test('versione inesistente scritta a mano: lo dice, con una chiave sua', async () => {
     const inviato = await corsa({ PIATTAFORMA: 'Linux', VERSIONE: 'v0.2.9999', ESITI: JSON.stringify({ checkout: { outcome: 'failure' } }) }, [
       rilascio('v0.2.303', [...WIN, ...TUTTI_LINUX]),
