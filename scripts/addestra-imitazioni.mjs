@@ -322,7 +322,7 @@ function costruisci() {
     .map((r) => [r.h, r]));
   const gruppi = [];
   const perSito = new Map();
-  const aggiungi = (h, y, marchio, fonte, url = 'https://' + h + '/') => {
+  const aggiungi = (h, y, marchio, fonte, url = 'https://' + h + '/', peso = 0) => {
     if (prova.has(h)) return;
     const norm = normalize(url);
     if (fonte === 'elenco' && y === 0) {
