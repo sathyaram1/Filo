@@ -1883,7 +1883,7 @@
     const v = strato(state);
     v.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     const corpo = parseFloat(window.getComputedStyle(state.el).fontSize) || 16;
-    v.style.setProperty('--sn-valore-corpo', `${Math.max(10, Math.round(corpo * 0.62))}px`);
+    v.style.setProperty('--sn-valore-corpo', `${corpo}px`);
     const usati = new Set();
     for (const s of valori) {
       const tr = tratto(testo, s);
