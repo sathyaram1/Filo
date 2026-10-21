@@ -81,12 +81,18 @@ function riquadroInVolo(f) {
   // Un altro sito arriva in una finestra nuova: toccare quella vuota di prima non gli toglie niente.
   try { return new URL(src, document.baseURI).origin === location.origin; } catch (_) { return false; }
 }
-// Nel documento e nelle sue ombre aperte; una chiusa non si vede (lo stesso limite dei gesti, più sotto).
-function riquadriInVolo(doc = document) {
+// Nel documento, nelle sue ombre aperte e nei riquadri arrivati; un'ombra chiusa non si vede (lo stesso limite dei
+// gesti, più sotto).
+function riquadriInVolo(doc = document, livello = 0) {
   try {
     const radici = [doc];
     for (let i = 0; i < radici.length; i++) {
-      for (const f of radici[i].querySelectorAll('iframe, frame')) if (riquadroInVolo(f)) return true;
+      for (const f of radici[i].querySelectorAll('iframe, frame')) {
+        if (riquadroInVolo(f)) return true;
+        let d = null;
+        try { d = livello < 4 && f.contentDocument; } catch (_) {}
+        if (d && riquadriInVolo(d, livello + 1)) return true;
+      }
       for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot);
     }
   } catch (_) {}
