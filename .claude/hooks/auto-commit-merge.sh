@@ -231,7 +231,7 @@ spedisci_ramo() {
       # GitHub nega le automazioni a chi non ne ha il permesso, ed e' voluto (#1140): ritentare o cercare un'altra credenziale e' aggirarlo.
       case "$esito" in
         *"create or update workflow"*)
-          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: porta un cambio alle automazioni (.github/workflows), che questa credenziale non puo' spedire, per scelta. Le automazioni le cambia solo l'owner (patterns/le-automazioni-le-cambia-solo-l-owner.md): in una routine il lavoro va ai lavori locali, in locale il ramo lo spinge lui a mano. $(motivo_git "$esito")"
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: porta un cambio alle automazioni (.github/workflows), che questa credenziale non puo' spedire, per scelta. Le automazioni le cambia solo l'owner (ROUTINE-AUTH-SPEC.md, sezione omonima): in una routine il lavoro va ai lavori locali, in locale il ramo lo spinge lui a mano. $(motivo_git "$esito")"
           return 1 ;;
       esac
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"

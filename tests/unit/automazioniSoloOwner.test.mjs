@@ -1,6 +1,6 @@
 // Sentinella del #1140: le automazioni (.github/workflows) le cambia solo l'owner. Le routine lo leggono nei ruoli, il
 // controllo di sicurezza lo boccia, e il no di GitHub a una credenziale senza quel permesso arriva a chi spinge con cosa
-// fare, non come un push da ritentare. Il racconto: patterns/le-automazioni-le-cambia-solo-l-owner.md.
+// fare, non come un push da ritentare. Il racconto: ROUTINE-AUTH-SPEC.md, «Le automazioni le cambia solo l'owner».
 
 import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
@@ -12,7 +12,8 @@ import { rifiutoAutomazioni } from '../../scripts/finish-local.mjs';
 
 const { readRoleInstructions } = await import('../../scripts/dispatch.mjs');
 const piatto = (s) => s.replace(/\s+/g, ' ');
-const PATTERN = 'patterns/le-automazioni-le-cambia-solo-l-owner.md';
+const SEZIONE = "### Le automazioni le cambia solo l'owner";
+const RACCONTO = 'ROUTINE-AUTH-SPEC.md';
 
 // Le tre forme del no di GitHub: token OAuth (gh, Git Credential Manager), token personale, App.
 const NO_DI_GITHUB = [
@@ -26,7 +27,7 @@ describe('npm run finish: il no sulle automazioni dice di spingere a mano', () =
     for (const no of NO_DI_GITHUB) {
       const riga = rifiutoAutomazioni(`To https://github.com/sathyaram1/Filo\n${no}\nerror: failed to push some refs`);
       assert.match(riga, /Spingilo a mano con quella delle automazioni/, no);
-      assert.ok(riga.includes(PATTERN), 'la riga porta dove stanno i passi');
+      assert.ok(riga.includes(RACCONTO), 'la riga porta dove stanno i passi');
     }
   });
 
@@ -51,7 +52,7 @@ describe('il salvataggio automatico: il no sulle automazioni arriva alla session
     assert.equal(r.status, 0);
     const contesto = JSON.parse(rigaJson(r)).hookSpecificOutput.additionalContext;
     assert.match(contesto, /claude\/automazione' NON e' arrivato su origin: porta un cambio alle automazioni/);
-    assert.ok(contesto.includes(PATTERN), 'il contesto porta dove sta la regola');
+    assert.ok(contesto.includes(RACCONTO), 'il contesto porta dove sta la regola');
     assert.match(contesto, /in una routine il lavoro va ai lavori locali, in locale il ramo lo spinge lui a mano/);
     assert.match(contesto, /create or update workflow/, 'col motivo di GitHub');
     assert.match(contesto, /Fermati e dillo all'owner/);
@@ -77,6 +78,15 @@ describe('le istruzioni dicono la regola dove serve', () => {
   test('il documento comune ha la regola e rimanda al racconto', () => {
     const comune = piatto(readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8'));
     assert.match(comune, /Le automazioni \(`\.github\/workflows`\) le cambia solo l'owner/);
-    assert.ok(comune.includes(PATTERN));
+    assert.ok(comune.includes("`ROUTINE-AUTH-SPEC.md`, «Le automazioni le cambia solo l'owner»"));
+  });
+
+  test('la sezione a cui rimandano hook, finish e documento comune esiste, coi passi dell\'owner', () => {
+    const spec = readFileSync(join(ROOT, RACCONTO), 'utf8');
+    const da = spec.indexOf(SEZIONE);
+    assert.ok(da >= 0, `manca «${SEZIONE}» in ${RACCONTO}`);
+    const sezione = piatto(spec.slice(da, spec.indexOf('\n### ', da + SEZIONE.length)));
+    assert.match(sezione, /--remove-scopes workflow/);
+    assert.match(sezione, /credential\.helper= -c credential\.https:\/\/github\.com\.helper= push origin <ramo>/);
   });
 });

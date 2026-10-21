@@ -139,7 +139,7 @@ export function pushArgs(branch) {
 export function rifiutoAutomazioni(uscitaGit) {
   if (!/create or update workflow/i.test(String(uscitaGit || ''))) return '';
   return 'Il ramo cambia le automazioni (.github/workflows), e la credenziale di tutti i giorni non le spedisce, per scelta. '
-    + 'Spingilo a mano con quella delle automazioni (patterns/le-automazioni-le-cambia-solo-l-owner.md), poi rilancia npm run finish.';
+    + 'Spingilo a mano con quella delle automazioni (ROUTINE-AUTH-SPEC.md, «Le automazioni le cambia solo l\'owner»), poi rilancia npm run finish.';
 }
 
 function git(args, opts = {}) {

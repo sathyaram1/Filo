@@ -63,8 +63,8 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
   dentro gira appena un ramo arriva su GitHub, senza fusione. Una routine che
   ne ha bisogno non lo scrive e manda il lavoro ai lavori locali; in locale il
   ramo con quel cambio lo spinge l'owner a mano, con una credenziale a parte.
-  Chi spinge con cosa, e i passi dell'owner:
-  `patterns/le-automazioni-le-cambia-solo-l-owner.md`.
+  Chi spinge con cosa, e i passi dell'owner: `ROUTINE-AUTH-SPEC.md`, «Le
+  automazioni le cambia solo l'owner».
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`…). Se un PNG risulta tracciato: `git rm --cached <file>`.
 - **Fine riga: LF ovunque.** `.gitattributes` (`* text=auto eol=lf`) vince su
