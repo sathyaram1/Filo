@@ -41,11 +41,16 @@ function conFoto(elementi, chats) {
 async function pezzo({ prima = null, fino = null, dopo = null, quanti } = {}, opts) {
   const { dati, elementi } = await tutte(opts);
   const r = C().pezzo(elementi, { prima, fino, dopo, quanti });
-  const ultimo = elementi.length ? elementi[elementi.length - 1] : null;
+  // Il più recente non è sempre l'ultimo: un cambio ritoccato sta all'ora del primo ritocco.
+  let ultimo = null;
+  for (const e of elementi) {
+    const t = e.fine || e.ts;
+    if (ultimo == null || Date.parse(t) > Date.parse(ultimo)) ultimo = t;
+  }
   const out = {
     elementi: conFoto(r.elementi, dati.chats),
     inizio: r.inizio,
-    ultimo: ultimo ? (ultimo.fine || ultimo.ts) : null,
+    ultimo,
   };
   if (prima == null && dopo == null && fino == null) {
     const c = C().chatCorrente(dati.chats);
