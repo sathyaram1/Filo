@@ -332,11 +332,15 @@
         const t = ime ? null : { e, sel: selezioneDi(c) };
         st.tasto = t;
         if (t) setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
+      } else {
+        st.tasto = null;
       }
       if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
     };
     const fermo = (e) => {
-      if (!veroONostro(e) || !st.gesto) return;
+      if (!veroONostro(e)) return;
+      st.tasto = null;
+      if (!st.gesto) return;
       st.gesto = false;
       if (c.value === st.buono) st.sel = selezioneDi(c);
     };
