@@ -226,7 +226,7 @@
     // modulo: il suo invio non manda più niente (#592.6), e il microfono si accende già solo con un gesto vero.
     voce = global.SN_VOCE_CHAT?.collega({
       campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
-      invia, suStato: (s) => { statoVoce = s; cambiato(); },
+      invia, suStato: (s) => { if (!ta.isConnected) return; statoVoce = s; cambiato(); },
     }) || null;
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
