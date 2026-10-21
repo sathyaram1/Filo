@@ -304,6 +304,21 @@ module.exports = function register(on, ctx) {
     } catch (_) { return false; }
   }
 
+  // Gli invii col portafoglio di questa sessione (#1077): il premio d'invio ha
+  // un tetto al giorno e arriva dopo i giudici, quindi l'ultimo stato letto
+  // non li conta ancora tutti. Ritorna la frase da dire se il tetto è pieno.
+  let inviiSessione = [];
+  function notaInvio(id) {
+    const now = Date.now();
+    let stato = lastServer;
+    if (!stato) { try { stato = walletStore.lastServer(); } catch (_) { stato = null; } }
+    const oggi = new Date(now).toISOString().slice(0, 10);
+    inviiSessione = inviiSessione.filter((x) => new Date(x.at).toISOString().slice(0, 10) === oggi);
+    const esito = W.premioInvio({ grants: stato && stato.grants, perDay: stato && stato.sentRewardsPerDay, invii: inviiSessione, now });
+    inviiSessione.push({ id: String(id || ''), at: now });
+    return esito.esaurito ? W.premioInvioEsauritoTesto(esito.perDay) : '';
+  }
+
   // Il saldo che la chat dice (#816): quello della pagina Crediti. `null` =
   // nessun portafoglio, e vale il conteggio locale. `fresco`: la domanda viene
   // da un turno di chat, e una lettura più vecchia di un minuto si rifà
@@ -963,7 +978,7 @@ module.exports = function register(on, ctx) {
     recordUsage, outOfCreditsNotice, flush, readState, keySource, tariffaCrediti,
     // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
     // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
-    haPortafoglio, saldoPerChat,
+    haPortafoglio, saldoPerChat, notaInvio,
     // L'avviso prima che i crediti finiscano (#818) legge l'ultimo stato senza chiederne uno nuovo.
     ultimaLettura: () => ultimaLettura,
     redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },

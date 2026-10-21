@@ -490,6 +490,7 @@
     { chiave: 'invitesRemaining', etichetta: 'Ingressi con invito rimasti', min: 0, max: 10000000, aiuto: 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    { chiave: 'rewardSentPerDay', etichetta: 'Feedback inviati premiati al giorno', min: 0, max: 100000, aiuto: 'Quanti feedback inviati ricevono il premio, per persona e per giorno. Gli altri arrivano senza premio.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
     // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
     { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
@@ -552,6 +553,33 @@
     const closed = Date.parse(String(c.resolvedAt || c.publishedAt || ''));
     if (!Number.isFinite(closed) || Number(now) - closed > PREMIO_ATTESA_MS) return { announce: true, credits: 0 };
     return { announce: false, credits: 0 };
+  }
+
+  // ── Il tetto giornaliero dei premi d'invio (#1077) ────────────────────────
+  // Il server paga al più `perDay` invii per portafoglio e giorno UTC. Prima di
+  // promettere un premio si contano i premi d'invio già arrivati oggi più gli
+  // invii di oggi il cui premio non è ancora arrivato (`feedback_sent:<id>`
+  // assente). Senza tetto noto (server vecchio, stato mai letto) non si nega.
+  // { grants, perDay, invii: [{ id, at }], now } → { esaurito, perDay }.
+  function premioInvio({ grants, perDay, invii = [], now = Date.now() } = {}) {
+    const tetto = Number.isInteger(perDay) && perDay >= 0 ? perDay : null;
+    if (tetto === null) return { esaurito: false, perDay: null };
+    const giorno = new Date(now).toISOString().slice(0, 10);
+    const diOggi = (iso) => String(iso || '').slice(0, 10) === giorno;
+    const pagati = new Set((Array.isArray(grants) ? grants : [])
+      .filter((g) => g && String(g.why || '').startsWith('feedback_sent:') && diOggi(g.at))
+      .map((g) => String(g.why)));
+    const inAttesa = (Array.isArray(invii) ? invii : []).filter((x) => x && Number.isFinite(x.at)
+      && diOggi(new Date(x.at).toISOString()) && !(x.id && pagati.has(`feedback_sent:${x.id}`))).length;
+    return { esaurito: pagati.size + inAttesa >= tetto, perDay: tetto };
+  }
+
+  // La frase del messaggio d'invio quando il tetto di oggi è pieno.
+  function premioInvioEsauritoTesto(perDay) {
+    const n = Math.max(0, Math.floor(Number(perDay) || 0));
+    if (n === 0) return 'Per ora i feedback inviati non ricevono premi.';
+    const primi = n === 1 ? 'solo per il primo feedback' : `per i primi ${n} feedback`;
+    return `Il premio vale ${primi} del giorno. Questo non ne riceve.`;
   }
 
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
@@ -806,7 +834,7 @@
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
-    formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    formatCredits, PREMIO_ATTESA_MS, resolutionReward, premioInvio, premioInvioEsauritoTesto,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)
