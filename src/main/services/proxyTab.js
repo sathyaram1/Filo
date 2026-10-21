@@ -143,11 +143,6 @@ function wireLoginHandler() {
   });
 }
 
-// Registra (o rimuove, con auth=null) le credenziali per una partition proxata.
-function setPartitionAuth(partition, ses, auth) {
-  registraRete(partition, ses, { auth });
-}
-
 // La partition proxata con regole e credenziali di `resolved` (quello di resolve()).
 function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null } = {}) {
   const conAuth = auth && auth.username ? auth : null;
@@ -188,7 +183,6 @@ module.exports = {
   providerHost,
   endpointFor,
   resolve,
-  setPartitionAuth,
   registraRete,
   clearPartitionAuth,
   credenzialiDellaSessione,

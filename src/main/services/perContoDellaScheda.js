@@ -198,6 +198,10 @@ async function perContoDellaScheda(sender, url, {
   let ua = '';
   try { ua = typeof wc.getUserAgent === 'function' ? wc.getUserAgent() : ''; } catch (_) { ua = ''; }
   let paginaDiCasa = null;
+  const paginaInCasa = async () => {
+    if (paginaDiCasa === null) paginaDiCasa = await inReteInterna(ses, pagina);
+    return paginaDiCasa;
+  };
   let corrente = String(url || '');
   let partenza = null;
   let origineLan = null;
