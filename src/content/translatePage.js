@@ -533,6 +533,8 @@
   // Uno ancora in arrivo non si tocca (#1560): non ha sentito la parola di tradurre, quindi non aspetta un giudizio.
   function tellFrames(runId, list, visible) {
     for (const f of list) {
+      // Ancora in arrivo: perderebbe Filo, e senza giudizio tradurrà da sé.
+      if (globalThis.SN_RIQUADRO_IN_VOLO?.(f)) continue;
       try {
         const w = global.SN_RIQUADRI_IN_ARRIVO?.finestra(f);
         if (w) w.postMessage({ filoFrameVerdict: 1, runId: String(runId), visible: !!visible }, '*');
