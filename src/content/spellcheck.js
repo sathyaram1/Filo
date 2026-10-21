@@ -2113,7 +2113,7 @@
     if (!state) return [];
     seguiIlTesto(state);
     return segniInVista(state, { ignoraScrittura: true })
-      .filter((s) => (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando)) && !s.dubbio && !s.svanisce
+      .filter((s) => (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && !s.aggiornando)) && !s.dubbio && !s.svanisce
         && Array.isArray(s.correzioni) && s.correzioni.length);
   }
 
