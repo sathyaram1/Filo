@@ -9,7 +9,10 @@ test('un sito che non manda mai il favicon finisce di caricarsi lo stesso, e la 
   const appese = [];
   const server = createServer((req, res) => {
     if (req.url.startsWith('/favicon.ico')) {
-      const r = { dest: req.headers['sec-fetch-dest'] || '', chiusa: false, at: Date.now() };
+      // L'icona della barra la scarica il main per conto suo: se parte prima, la richiesta della pagina aspetta dietro
+      // di lei nella cache della sessione e qui non arriva mai (#1492). A lei si risponde subito: la prova è sulla pagina.
+      if (req.headers['sec-fetch-dest'] !== 'image') { res.writeHead(404); res.end(); return; }
+      const r = { chiusa: false };
       res.on('close', () => { r.chiusa = true; });
       appese.push({ r, res });
       return;
@@ -34,8 +37,8 @@ test('un sito che non manda mai il favicon finisce di caricarsi lo stesso, e la 
       return w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.isLoading();
     })).toBe(false);
     // Il favicon la pagina lo chiede comunque, e dopo il tetto di attesa la richiesta non resta aperta.
-    await expect.poll(() => appese.filter((a) => a.r.dest === 'image').length, { timeout: 5_000 }).toBeGreaterThan(0);
-    await expect.poll(() => appese.filter((a) => a.r.dest === 'image').every((a) => a.r.chiusa), { timeout: 8_000 }).toBe(true);
+    await expect.poll(() => appese.length, { timeout: 5_000 }).toBeGreaterThan(0);
+    await expect.poll(() => appese.every((a) => a.r.chiusa), { timeout: 8_000 }).toBe(true);
   } finally {
     for (const a of appese) { try { a.res.destroy(); } catch (_) {} }
     try { server.closeAllConnections?.(); } catch (_) {}
