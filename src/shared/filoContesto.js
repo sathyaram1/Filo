@@ -497,16 +497,18 @@
   // Dove la richiesta della chat smette di ripetersi (SPEC-CONTESTO § La richiesta): fine della parte fissa del system,
   // fine del tratto, ultimo messaggio. Solo la chat: un prompt che cambia a ogni chiamata pagherebbe scritture mai rilette.
   // `caratteri` divide il testo del messaggio e il punto va sulla prima parte. Sentinella: tests/unit/puntiDiCache.test.mjs.
-  function pianoDellaCache(action, messages) {
+  // `durata`: quella della parte fissa ('5m' o '1h', da tetti().cache); assente o non valida vale quella di serie.
+  function pianoDellaCache(action, messages, { durata } = {}) {
     const C = global.SN_CONST;
     if (!C || !C.ACTIONS || action !== C.ACTIONS.FILO_CHAT || !Array.isArray(messages) || !messages.length) return null;
     const punti = [];
     const sys = messages[0];
+    const lunga = (durataIn(durata) || TETTI_DI_SERIE.cache) === '1h' ? { durata: '1h' } : {};
     if (sys && sys.role === 'system' && typeof sys.content === 'string') {
       const inizi = (C.INIZI_VARIABILI_CHAT || []).map((s) => sys.content.indexOf(s)).filter((i) => i > 0);
       const taglio = inizi.length ? Math.min(...inizi) : sys.content.length;
       if (sys.content.slice(0, taglio).trim()) {
-        punti.push(taglio < sys.content.length ? { indice: 0, caratteri: taglio, durata: '1h' } : { indice: 0, durata: '1h' });
+        punti.push(taglio < sys.content.length ? { indice: 0, caratteri: taglio, ...lunga } : { indice: 0, ...lunga });
       }
     }
     const indiceCoda = messages.findIndex((m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(INTESTAZIONE_CODA));
