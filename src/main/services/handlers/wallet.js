@@ -411,6 +411,8 @@ module.exports = function register(on, ctx) {
     // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
     // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
     const localCredits = 0;
+    // Chi lo vedeva come saldo deve sentire dove va (#1353): si guarda prima che la chiave personale arrivi.
+    const conteggioLocale = W.conteggioLocaleInVista({ hasWallet: Boolean(lastServer && lastServer.hasWallet), keySource: await keySource() });
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
     // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
