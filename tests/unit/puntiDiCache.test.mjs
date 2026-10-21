@@ -245,3 +245,32 @@ test('la durata della parte fissa segue le impostazioni: cinque minuti tolgono i
   } finally { globalThis.SN_PROVIDERS = prima; }
   assert.deepEqual(visto.punti[0], { indice: 0 });
 });
+
+// Dopo venti messaggi la risposta che esce dalla finestra degli esiti perde il ragionamento: la storia già mandata
+// cambia lì, e il punto della storia deve stare prima, dove il turno dopo la ritrova identica (#1412, secondo giro).
+test('il punto della storia sta sull\'ultimo messaggio che il turno dopo ritrova identico', () => {
+  const ORA = Date.parse('2026-10-21T10:00:00Z');
+  const chat = 'ab12cd34';
+  const filo = Array.from({ length: 40 }, (_, i) => ({
+    role: i % 2 ? 'assistant' : 'user',
+    text: i % 2 ? `Risposta ${i}.` : `Domanda ${i}?`,
+    ts: new Date(ORA - (40 - i) * 60000).toISOString(),
+    chat,
+  }));
+  const ragiona = (m) => (m.role === 'assistant' ? { azioni: [], reasoningDetails: [{ type: 'reasoning.text', text: m.ts, signature: 'f' }] } : null);
+  const richiesta = (n) => {
+    const f = FC.finestra(filo.slice(0, n), { ora: ORA, giorni: 3, token: 100000, chatCorrente: chat, esiti: ragiona });
+    return FC.assembla({
+      tratto: [{ role: 'system', content: PROMPTS.filoChatStatic(BASE) }, ...f.messaggi],
+      contesto: FC.coda({ contesto: `STATO ${n}`, chatCorrente: chat }),
+      domanda: { role: 'user', content: filo[n].text },
+    });
+  };
+  for (const [n, atteso] of [[10, 10], [20, 1], [30, 11]]) {
+    const adesso = richiesta(n);
+    const storia = FC.pianoDellaCache(ACTIONS.FILO_CHAT, adesso).punti.find((p) => p.indice > 0 && p.indice < adesso.length - 1);
+    assert.equal(storia && storia.indice, atteso, `turno ${n}`);
+    const fin = (msgs) => JSON.stringify(msgs.slice(1, storia.indice + 1));
+    assert.equal(fin(richiesta(n + 2)), fin(adesso), `turno ${n}: la storia fino al punto cambia al turno dopo`);
+  }
+});

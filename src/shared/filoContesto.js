@@ -31,6 +31,9 @@
   const TOKEN_PER_IMMAGINE = 1500;
   const MAX_IMMAGINI_RIMANDATE = 16;
   const MAX_CARATTERI_IMMAGINI = 24 * 1024 * 1024;
+  // Il primo messaggio del tratto che al turno dopo perde esito, ragionamento o foto: da lì la storia già mandata
+  // cambia, e un punto di cache più avanti non verrebbe mai riletto (pianoDellaCache). Per identità: al modello non va.
+  const CAMBIANO_AL_TURNO_DOPO = new WeakSet();
 
   function numeroIn(v, [min, max]) {
     if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
@@ -224,11 +227,15 @@
     let inizio = 0;
     while (inizio < n && Date.parse(lista[inizio].ts) < da) inizio++;
     const recente = new Array(n).fill(false);
+    // Recente adesso e non più al turno dopo, che aggiunge domanda e risposta in questa scheda.
+    const scade = new Array(n).fill(false);
     const contati = new Map();
+    const vive = (c, i, quanti) => c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || quanti - i <= MESSAGGI_CON_ESITI);
     for (let i = n - 1; i >= 0; i--) {
       const c = (contati.get(lista[i].chat) || 0) + 1;
       contati.set(lista[i].chat, c);
-      recente[i] = c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || n - i <= MESSAGGI_CON_ESITI);
+      recente[i] = vive(c, i, n);
+      scade[i] = recente[i] && !vive(c + (chatCorrente && lista[i].chat === chatCorrente ? 2 : 0), i, n + 2);
     }
     // Il comando di un esito scritto in chat è l'ultima riga «/…» dell'utente nella sua conversazione.
     const comandi = new Array(n).fill('');
@@ -305,10 +312,16 @@
     const azioni = [];
     const visti = [];
     let prima = null;
+    let cambiaGia = false;
     for (const i of indici) {
       const m = lista[i];
       const e = esitoDi(i);
-      out.push(rendiIl(i, prima));
+      const reso = rendiIl(i, prima);
+      if (!cambiaGia && scade[i] && JSON.stringify(reso) !== JSON.stringify(rendi(m, prima, { tetto: token, esito: null, osserva, foto: null }))) {
+        CAMBIANO_AL_TURNO_DOPO.add(reso);
+        cambiaGia = true;
+      }
+      out.push(reso);
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
       visti.push(m);
       prima = m;
@@ -512,7 +525,9 @@
       }
     }
     const indiceCoda = messages.findIndex((m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(INTESTAZIONE_CODA));
-    let fine = indiceCoda - 1;
+    // La storia regge fino al primo messaggio che il turno dopo cambia: il punto va prima, dove verrà riletto.
+    const cambia = messages.findIndex((m, i) => i > 0 && i < indiceCoda && CAMBIANO_AL_TURNO_DOPO.has(m));
+    let fine = cambia > 0 ? cambia - 1 : indiceCoda - 1;
     while (fine > 0 && !haTesto(messages[fine])) fine--;
     if (fine > 0) punti.push({ indice: fine });
     let ultimo = messages.length - 1;
