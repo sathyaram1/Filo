@@ -2,7 +2,7 @@
 id: security
 title: Sicurezza
 subtitle: Come cerco i problemi, cosa succede quando li trovo, e i limiti di tutto questo.
-updated: 2026-10-11
+updated: 2026-10-21
 order: 3
 ---
 
@@ -24,7 +24,7 @@ La difesa non è un muro solo: sono cinque livelli, e funzionano come le difese 
 1. **Il filtro all'ingresso** (senza AI, sul server). Prima che un modello legga il feedback, un filtro deterministico guarda mittente e comportamento: gli account e i testi con i segni tipici di un inganno vengono fermati e messi in attesa di revisione umana, i comportamenti da spam rallentati. Un attacco ben fatto, da un account con una storia pulita, qui può passare: questo livello non ferma il colpo singolo, impedisce i cento tentativi e l'intasamento. È la pelle: non blocca tutto, ma costringe tutto a passare da pochi ingressi sorvegliati.
 2. **I giudici.** Più modelli, scelti apposta diversi tra loro, leggono il feedback e lo classificano: attacco, spam, fuori linea col design di Filo, o richiesta legittima. Vale il verdetto più severo del gruppo: per passare bisogna ingannarli tutti insieme. Chi viene classificato come attaccante resta fuori.
 3. **L'agente può rifiutare.** Chi scrive il codice non è obbligato a eseguire: ha l'istruzione esplicita di fermarsi e segnalare se un compito, anche a lavoro iniziato, si rivela rischioso, insensato o sospetto.
-4. **La verifica cieca.** Un'istanza separata esamina la modifica senza mai vedere il feedback che l'ha originata: giudica il codice in sé. Anche se esistesse una parola magica capace di prendere il controllo di qualunque modello, questo controllo non la leggerebbe mai.
+4. **La verifica cieca.** Un'istanza separata esamina la modifica senza vedere il feedback che l'ha originata: giudica il codice in sé, senza gli argomenti con cui il feedback l'ha chiesto. Questo non vuol dire che del feedback non le arrivi niente. Legge la modifica intera, prove comprese, e chi l'ha scritta il feedback l'ha letto. Una prova che riproduce quello che l'utente ha scritto, un commento o una riga delle novità possono portarle davanti pezzi di quel testo. Le sue istruzioni lo prevedono, e una frase della modifica rivolta a chi la controlla basta da sola a fermarla. Una parola magica capace di prendere il controllo di qualunque modello passerebbe però anche da qui: prenderebbe prima chi scrive la correzione, che la può copiare nella modifica.
 5. **Il pavimento deterministico.** Controlli senza AI sul codice prodotto, che le parole non possono aggirare: una modifica alle aree critiche si ferma e aspetta una revisione umana, salvo la strada che racconto qui sotto. Per esempio l'aggiornamento automatico, il login, la gestione delle chiavi, le protezioni, l'aggiunta di librerie o di servizi esterni. Sono tarati alla massima paranoia: un falso positivo costa un mio clic, un falso negativo costerebbe molto di più.
 
 A valle dei cinque livelli c'è la pubblicazione, che ha le sue regole. Sul ramo principale del codice non scrive nessun umano e nessun agente: scrive solo il server, con un'identità sua, dopo aver rifatto per conto suo i controlli deterministici sulla versione esatta che fonde. Di regola una modifica alle aree sensibili la sblocco io, con un clic dentro l'app. Una strada però non passa da quel clic:
