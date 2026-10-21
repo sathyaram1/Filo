@@ -269,7 +269,7 @@ test('Aiuto su un sito: il sito non riscrive la casella né quello che parte all
   expect(await nelMondoDiFilo(app, page, () => window.__richieste[1])).toContain('e la mail di recupero');
 });
 
-test('Aiuto su un sito: la selezione spostata dal sito, nel suo ascolto dei tasti o fra un tasto e l\'altro, torna; quella dell\'utente resta (#1340)', async ({ shell, openTab, testServer }) => {
+test('Aiuto su un sito: la selezione spostata dal sito nei suoi ascolti dei tasti e degli inserimenti torna; quella dell\'utente resta (#1340)', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, pagina('<p>Un sito</p>'));
   await apriAiuto(shell, page);
@@ -277,21 +277,24 @@ test('Aiuto su un sito: la selezione spostata dal sito, nel suo ascolto dei tast
   await ta.click();
   await page.keyboard.insertText('dove si cambia la password');
   // Il sito ascolta prima di ogni suo script, in cattura sulla finestra: seleziona tutto a ogni tasto e dopo ogni inserimento.
-  await page.evaluate(() => {
-    const tutto = (e) => {
+  const ascolti = (arma) => page.evaluate((si) => {
+    window.tutto ||= (e) => {
       const t = document.querySelector('.sn-sidebar-input textarea');
       if (e.target === t) t.setSelectionRange(0, t.value.length);
     };
-    window.addEventListener('keydown', tutto, true);
-    window.addEventListener('input', tutto, true);
-    window.addEventListener('keyup', tutto, true);
-  });
+    for (const tipo of ['keydown', 'beforeinput', 'input', 'keyup']) window[si ? 'addEventListener' : 'removeEventListener'](tipo, window.tutto, true);
+  }, arma);
+  await ascolti(true);
   await page.keyboard.type('?!', { delay: 30 });
-  await expect(ta).toHaveValue('dove si cambia la password?!');
-  // Fra un tasto e l'altro, a riposo.
-  await page.evaluate(() => { const t = document.querySelector('.sn-sidebar-input textarea'); t.setSelectionRange(0, 4); });
   await page.keyboard.press('Backspace');
   await expect(ta).toHaveValue('dove si cambia la password?');
+  await ascolti(false);
+  // «Seleziona tutto» della barra dei menu (Cmd+A su Mac) non passa dalla pagina: vale anche lui.
+  await page.keyboard.press('End');
+  await app.evaluate(({ webContents }, url) => webContents.getAllWebContents().find((w) => w.getURL() === url).selectAll(), page.url());
+  await expect.poll(() => ta.evaluate((t) => t.selectionEnd - t.selectionStart)).toBe('dove si cambia la password?'.length);
+  await page.keyboard.type('y');
+  await expect(ta).toHaveValue('y');
   // Il Ctrl+A dell'utente vale: il tasto dopo sostituisce tutto.
   await page.keyboard.press('Control+A');
   await page.keyboard.type('x');

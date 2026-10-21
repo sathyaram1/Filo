@@ -226,13 +226,14 @@
   function scrittaDaFilo(c) {
     const st = caselle.get(c);
     if (!st) return;
+    st.vigila = null;
     vale(st, c.value);
     st.sel = selezioneDi(c);
     fotografa(c, st);
   }
   function selezioneDaFilo(c) {
     const st = caselle.get(c);
-    if (st && c.value === st.buono) { st.sel = selezioneDi(c); fotografa(c, st); }
+    if (st && c.value === st.buono) { st.vigila = null; st.sel = selezioneDi(c); fotografa(c, st); }
   }
   // Una mossa di Filo mentre un tasto o un annuncio dell'utente sono in volo è il punto da cui l'utente riparte.
   function fotografa(c, st) {
@@ -348,10 +349,10 @@
     c.addEventListener('beforeinput', (e) => {
       if (!e.isTrusted) return;
       if (c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
-      // Fra il tasto e il suo annuncio, o fuori da un gesto, nessuno dell'utente sposta la selezione: chi l'ha spostata è
-      // il sito. Rilascio, correttore e annulla mettono il testo dove dicono loro.
+      // Fra il tasto e il suo annuncio, o durante l'annuncio, nessun gesto dell'utente sposta la selezione: chi l'ha
+      // spostata è il sito. Rilascio, correttore e annulla mettono il testo dove dicono loro.
       const t = st.tasto;
-      const sel = t && t.sel ? t.sel : (st.gesto ? null : st.sel);
+      const sel = t && t.sel ? t.sel : (st.prima && st.prima.e === e ? st.prima.sel : null);
       if (sel && !st.componendo && !e.isComposing && !SELEZIONE_PROPRIA.test(e.inputType) && c.value === st.buono) rimettiSelezione(c, sel);
       let trasferito = null;
       try { if (e.dataTransfer) trasferito = e.dataTransfer.getData('text/plain'); } catch (_) {}
@@ -400,9 +401,29 @@
   const INIZI = ['keydown', 'pointerdown', 'mousedown', 'touchstart'];
   const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend'];
   const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
+  // La selezione spostata mentre il sito riceve un tasto o un inserimento dell'utente (fra l'ascolto di Filo, che viene
+  // prima, e la fine del giro) l'ha spostata il sito: torna. Fuori da quei giri la sposta anche la barra dei menu (Cmd+A
+  // su Mac), che la pagina non vede: lì resta il limite del pattern.
+  function vigila(c, st, sel) {
+    const v = { sel };
+    st.vigila = v;
+    setTimeout(() => {
+      if (st.vigila !== v) return;
+      st.vigila = null;
+      if (c.value === st.buono && !st.componendo) rimettiSelezione(c, v.sel);
+    }, 0);
+  }
+  // Il gesto seguente dell'utente può arrivare prima del controllo (il browser passa i tasti avanti ai tempi): lo fa lui.
+  function sciogli(c, st) {
+    const v = st.vigila;
+    st.vigila = null;
+    if (v && c.value === st.buono && !st.componendo) rimettiSelezione(c, v.sel);
+  }
   function gestoSu(c, st, e) {
+    sciogli(c, st);
     if (!INIZI.includes(e.type)) {
       st.tasto = null;
+      if (e.type === 'keyup' && !st.componendo) vigila(c, st, selezioneDi(c));
       if (!st.gesto) return;
       st.gesto = false;
       if (c.value === st.buono) st.sel = selezioneDi(c);
@@ -411,8 +432,6 @@
     if (e.type === 'keydown') {
       // Un tasto che passa dal metodo di scrittura (229, Process, i tasti morti) sposta la selezione da sé.
       const ime = e.isComposing || e.keyCode === 229 || e.key === 'Process' || e.key === 'Dead';
-      // Fra un gesto e l'altro la selezione la muovono solo l'utente e Filo: quella spostata dal sito torna prima del tasto.
-      if (!ime && !st.gesto && !st.componendo && c.value === st.buono) rimettiSelezione(c, st.sel);
       const t = ime ? null : { e, sel: selezioneDi(c) };
       st.tasto = t;
       if (t) setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
@@ -441,11 +460,17 @@
   function primaDelSito(e) {
     try {
       if (!SCRITTURA_GUARDATA || !e || !e.isTrusted) return;
-      if (e.type === 'input') {
-        // Dove l'inserimento ha lasciato il cursore, prima che un ascolto del sito lo sposti.
+      if (e.type === 'beforeinput' || e.type === 'input') {
         const c = bersaglio(e);
         const st = c && caselle.get(c);
-        if (st) st.dopo = { e, sel: selezioneDi(c) };
+        if (!st) return;
+        sciogli(c, st);
+        // La selezione a cui l'annuncio si applica, e dove l'inserimento ha lasciato il cursore.
+        if (e.type === 'beforeinput') st.prima = { e, sel: selezioneDi(c) };
+        else {
+          st.dopo = { e, sel: selezioneDi(c) };
+          if (!st.componendo && !e.isComposing) vigila(c, st, st.dopo.sel);
+        }
         return;
       }
       if (!GESTI_CASELLA.includes(e.type)) return;

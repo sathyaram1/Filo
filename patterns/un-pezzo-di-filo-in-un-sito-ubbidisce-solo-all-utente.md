@@ -215,15 +215,16 @@ faceva spendere una chiamata.
   il rilascio di un trascinamento e la sostituzione del correttore solo se il loro
   testo è entrato in un punto e il resto è rimasto.
 
-  **La selezione la muovono solo l'utente e Filo.** Filo la guarda **prima del
-  sito**: il ponte di `page-preload.js`, registrato a document_start, chiama
-  `SN_FILO_UI.primaDelSito` su tasti, puntatore e inserimenti prima di ogni
-  ascolto del sito, anche in cattura sulla finestra (#1340, giro 2: l'Aiuto sta
-  nel documento, e il sito selezionava tutto nel suo ascolto del tasto). La
-  selezione buona è quella lasciata dalla fine di un gesto dell'utente (tasto o
-  puntatore rilasciati), da un inserimento accettato o da Filo; quella spostata
-  da altri torna al tasto o all'annuncio seguente. Il metodo di scrittura, il
-  rilascio, il correttore e annulla mettono il testo dove dicono loro.
+  **Filo guarda la selezione prima del sito.** Il ponte di `page-preload.js`,
+  registrato a document_start, chiama `SN_FILO_UI.primaDelSito` su tasti,
+  puntatore, `beforeinput` e `input` prima di ogni ascolto del sito, anche in
+  cattura sulla finestra (#1340, giro 2: l'Aiuto sta nel documento, e il sito
+  selezionava tutto nel suo ascolto del tasto). La selezione spostata mentre il
+  sito riceve un tasto, un annuncio o un inserimento dell'utente torna: subito
+  prima dell'annuncio, o alla fine del giro (al più tardi al gesto seguente,
+  che il browser può far passare avanti ai tempi). Fuori da quei giri la
+  selezione la sposta anche «Seleziona tutto» della barra dei menu (Cmd+A su
+  Mac), che la pagina non vede: lì vale, e resta il limite qui sotto.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
   l'origine (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in
   `impostazioniPerOrigine.js`), concessa solo al riquadro che ha davvero
@@ -309,10 +310,10 @@ Scrivere nella casella il sito non può più (#1071.1), ma può spostarne la
 selezione (un `selectAll` fra due tasti), e il tasto dopo dell'utente scrive
 sopra quello che il sito ha selezionato. Dalla pagina non lo si distingue dal
 Cmd+A che su Mac prende la barra dei menu (la pagina non vede il tasto) o da un
-lettore di schermo. Dentro un tasto la selezione invece torna (#1340); restano
-aperti solo i tasti che non si prevedono: dentro un Ctrl+Backspace (o
-Cmd+Backspace) il sito può allargare quello che il tasto toglie fino al cursore,
-dentro un Annulla cambiare il testo. Il testo di una voce si può rendere come
+lettore di schermo. Dentro un tasto, un annuncio o un inserimento la selezione invece torna
+(#1340); resta aperto il tasto che sposta il cursore senza scrivere (frecce,
+Inizio, Fine): il sito che sposta la selezione nel suo ascolto del tasto la fa
+partire da lì. Il testo di una voce si può rendere come
 contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi
