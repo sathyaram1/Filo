@@ -1019,14 +1019,14 @@
     // riquadro (moduli, anteprime, blocchi commenti). Lì il menu deve esserci
     // come ovunque; l'esclusione vale per le pagine di sistema vere.
     const embeddedAbout = IS_SUBFRAME && /^about:(blank|srcdoc)/i.test(url);
-    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
+    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return 'pagina';
     const blocklist = settings?.blocklist || [];
     const matches = (host) => !!host && blocklist.some((d) => host === d || host.endsWith('.' + d));
     // Se l'utente ha spento Filo su un sito, deve restare spento anche nei
     // riquadri che quel sito incorpora: il riquadro ha un'altra origine e da
     // solo non lo saprebbe, quindi guarda l'indirizzo della pagina ospite.
-    if (matches(hostOfUrl(pageUrl))) return true;
-    return matches(location.hostname);
+    if (matches(hostOfUrl(pageUrl))) return 'sito';
+    return matches(location.hostname) ? 'sito' : '';
   }
 
   function hostOfUrl(url) {
