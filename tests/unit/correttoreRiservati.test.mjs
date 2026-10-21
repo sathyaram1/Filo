@@ -63,3 +63,49 @@ test('mezza carta scritta a gruppi non parte; un anno o un orario sì', () => {
   assert.equal(R.oscura('la carta è 4111 1111 '), 'la carta è [dato riservato] ');
   assert.equal(R.oscura('nel 2024 alle 1830 ci vediamo'), 'nel 2024 alle 1830 ci vediamo');
 });
+
+// Chi risponde a chi chiede una password o un codice non lo annuncia: lo annuncia la domanda, sopra il campo (anche
+// arrivata da poco, `sopra` lo legge la pagina a ogni richiesta) o prima nello stesso testo.
+const CHAT = 'Anna: ciao! ci vediamo martedì?\nMarco: mi mandi la password del wifi?';
+const risposta = (campo, sopra = CHAT, altro = {}) => R.richiestaSenzaRiservati({ prima: '', nuovo: campo, dopo: '', campo, campoDa: 0, sopra, ...altro });
+
+test('la password scritta in risposta a chi la chiede non parte; il resto della risposta sì, e il testo sopra no', () => {
+  const p = risposta('certo, Gatto2024 ', CHAT, { luogo: { sito: 'chat.example', conversazione: 'Anna: ciao!' } });
+  assert.equal(p.nuovo, 'certo, [dato riservato] ');
+  assert.equal('sopra' in p, false);
+  assert.ok(!JSON.stringify(p).includes('Gatto2024'));
+  assert.equal(risposta('certo, gattonero').nuovo, 'certo, [dato riservato]');
+  assert.equal(risposta('Ciao Marco! Eccola: Tr7#kq29Lm, a dopo').nuovo.includes('Tr7#kq29Lm'), false);
+  assert.equal(risposta('Gatto2024', 'Marco: mandami la password del wifi\n16:58').nuovo, '[dato riservato]');
+});
+
+test('un pin chiesto parte senza le sue cifre; per un codice le parole senza cifre restano', () => {
+  assert.equal(risposta('è 4821, non dirlo a nessuno', 'Luca: qual è il pin del bancomat?').nuovo, 'è [dato riservato], non dirlo a nessuno');
+  assert.equal(risposta('certo, domani mattina', 'Luca: mi mandi il codice?').nuovo, 'certo, domani mattina');
+});
+
+test('domanda e risposta nello stesso testo: nel campo e nella conversazione che parte', () => {
+  const campo = 'mi hai chiesto la password? eccola: Gatto2024';
+  assert.ok(!risposta(campo, '').nuovo.includes('Gatto2024'));
+  const p = risposta('ok', '', { luogo: { conversazione: 'Marco: mi mandi la password?\nIo: certo, Gatto2024' }, contesto: { prima: 'Marco: il pin?\nIo: 4821' } });
+  assert.ok(!JSON.stringify(p).includes('Gatto2024'));
+  assert.ok(!JSON.stringify(p).includes('4821'));
+});
+
+test('il dato detto da un altro sopra il campo non parte quando chi scrive lo ripete', () => {
+  assert.equal(risposta('Gatto2025 non funziona', 'Marco: la nuova password del wifi è Gatto2025').nuovo, '[dato riservato] non funziona');
+});
+
+test('senza una richiesta, o con la conversazione andata avanti, la risposta parte com\'è', () => {
+  assert.equal(risposta('certo, alle 1830 al bar Gatto2024', 'Anna: ci vediamo martedì?').nuovo, 'certo, alle 1830 al bar Gatto2024');
+  const avanti = 'Marco: mi mandi la password del wifi?\nIo: arriva\nMarco: grazie! a che ora ci vediamo domani?';
+  assert.equal(risposta('alle venti davanti al cinema 2024', avanti).nuovo, 'alle venti davanti al cinema 2024');
+  const lontana = `Marco: mi mandi la password del wifi?\n${'Io: parliamo di altro adesso\n'.repeat(20)}`;
+  assert.equal(risposta('certo, Gatto2024', lontana).nuovo, 'certo, Gatto2024');
+});
+
+test('vale la coda del testo sopra, anche lunghissimo; una parola di sole lettere si toglie intera', () => {
+  const lungo = `${'Anna: bla bla bla.\n'.repeat(2000)}Marco: mi mandi la password del wifi?`;
+  assert.equal(risposta('certo, Gatto2024', lungo).nuovo, 'certo, [dato riservato]');
+  assert.equal(R.oscura('la password è gatto. Il gattopardo dorme'), 'la password è [dato riservato]. Il gattopardo dorme');
+});

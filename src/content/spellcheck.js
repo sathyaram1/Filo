@@ -1041,7 +1041,7 @@
   const esiti = new Map();
   const domandeInViaggio = new Map();
   function chiedi(action, payload, { suRichiesta = false, giorno = '' } = {}) {
-    const chiave = `${action}\u0000${giorno}\u0000${JSON.stringify({ ...payload, campo: undefined })}`;
+    const chiave = `${action}\u0000${giorno}\u0000${JSON.stringify({ ...payload, campo: undefined, sopra: undefined })}`;
     if (esiti.has(chiave)) {
       const r = esiti.get(chiave);
       esiti.delete(chiave);
@@ -1076,11 +1076,12 @@
     return da;
   }
 
-  // I tre pezzi che partono, col campo intero per il main: i dati riservati si cercano lì, perché la parola che presenta
-  // una password può stare fuori dal pezzo che porta il valore (correttoreRiservati.js). Il campo non parte.
-  function pezziDa(testo, start, end) {
+  // I tre pezzi che partono, più campo intero e testo sopra letto adesso, che restano al main: chi presenta una password
+  // può stare fuori dal pezzo, o essere la domanda a cui si risponde (correttoreRiservati.js).
+  function pezziDa(testo, start, end, el) {
     const da = inizioPrima(testo, start);
-    return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), dopo: testo.slice(end, end + DOPO_MAX), campo: testo, campoDa: da };
+    const sopra = el ? contestoDelCampo(el, { soloPrima: CONVERSAZIONE_MAX }).prima : '';
+    return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), dopo: testo.slice(end, end + DOPO_MAX), campo: testo, campoDa: da, sopra };
   }
 
   // Dove si scrive: il sito e la coda del testo della pagina prima del campo (in una chat, gli ultimi messaggi). Si
@@ -1117,7 +1118,7 @@
     const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     for (const c of candidati) state.richiesti.add(Rg.chiaveVerdetto(c));
     const payload = {
-      ...pezziDa(d.testo, g.start, g.end),
+      ...pezziDa(d.testo, g.start, g.end, state.el),
       candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       luogo: luogoDi(state),
     };
@@ -1164,7 +1165,7 @@
     const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     const contesto = contestoDelCampo(state.el);
     const payload = {
-      ...pezziDa(d.testo, g.start, g.end),
+      ...pezziDa(d.testo, g.start, g.end, state.el),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       contesto,
       ripetizioni: ripetizioniAttive(),
@@ -1375,7 +1376,7 @@
     let sito = '';
     try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
     const payload = {
-      ...pezziDa(testo, wordCtx.start, wordCtx.end),
+      ...pezziDa(testo, wordCtx.start, wordCtx.end, el),
       candidati: [{ pezzo: wordCtx.word, perche: t('spell_perche_chiesta') }],
       luogo: { sito },
     };
@@ -1718,7 +1719,7 @@
     return el.ownerDocument.body || el.ownerDocument.documentElement;
   }
 
-  function contestoDelCampo(el) {
+  function contestoDelCampo(el, { soloPrima = 0 } = {}) {
     const vuoto = { prima: '', dopo: '', troncato: false };
     // Nei riquadri di Filo intorno c'è Filo, non la pagina.
     if (!el || radiceDi(el)) return vuoto;
@@ -1772,10 +1773,10 @@
         }
         return s.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim();
       };
-      const dopo = raccogli(true, CONTESTO_DOPO_MAX);
+      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, CONTESTO_DOPO_MAX);
       let testoDopo = cuci(dopo.pezzi);
       if (testoDopo.length > CONTESTO_DOPO_MAX) testoDopo = testoDopo.slice(0, CONTESTO_DOPO_MAX);
-      const tettoPrima = CONTESTO_MAX - testoDopo.length;
+      const tettoPrima = soloPrima || CONTESTO_MAX - testoDopo.length;
       const prima = raccogli(false, tettoPrima);
       let testoPrima = cuci(prima.pezzi.reverse());
       if (testoPrima.length > tettoPrima) testoPrima = testoPrima.slice(-tettoPrima);
