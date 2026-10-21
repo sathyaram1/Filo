@@ -103,14 +103,14 @@ function oscura(testo, valori = null) {
 
 // I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
 // metà di un numero di carta, può stare in un pezzo diverso dal valore, o fuori dai pezzi. `campo` e `campoDa` (dove
-// comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito. `sopra` è il testo
-// sopra il campo: la domanda a cui il campo risponde, o il messaggio che ha già detto il dato.
+// comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito.
 function pezziOscurati(pezzi, campo, campoDa, sopra = '') {
   const unito = pezzi.join('');
   const daCampo = typeof campo === 'string' && Number.isInteger(campoDa) && campoDa >= 0
     && campo.slice(campoDa, campoDa + unito.length) === unito;
   const base = daCampo ? campo : unito;
   const scarto = daCampo ? campoDa : 0;
+  // Sopra il campo stanno la domanda a cui risponde e il messaggio che ha già detto il dato.
   const s = typeof sopra === 'string' ? sopra.slice(-SOPRA_MAX) : '';
   const tipo = s ? richiestaAperta(s) : null;
   // Anche pezzo per pezzo: due pezzi incollati possono fondere due numeri in uno che non è più una carta.
