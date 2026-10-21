@@ -748,7 +748,9 @@
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
-      rimandati: new Set(), inVista: [],
+      rimandati: new Set(), luogo: null, luogoAlle: 0, inVista: [],
+      // I valori dei segnaposti sopra le x e i lampi dei valori appena messi (#1448), in uno strato che riceve il mouse.
+      valori: null, badge: new Map(), lampi: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
       giudicati: { rapido: new Map(), ragionato: new Map() },
       // La correzione automatica (#1447), sulle posizioni del testo come i segni: le parole corrette da sé, l'ultima
