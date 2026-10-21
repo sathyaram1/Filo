@@ -149,7 +149,7 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
   }
   const env = { ...(s.env || {}), ...AMBIENTE };
   for (const k of AMBIENTE_TOLTO) delete env[k];
-  const nuovo = { ...(permessi.length ? unisciPermessi(s, permessi) : s), env, hooks };
+  const nuovo = { ...s, env, hooks };
   try {
     mkdirSync(dir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
