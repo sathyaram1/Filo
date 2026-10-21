@@ -397,7 +397,7 @@
       risultato: true,
     },
     PULISCI_TAB: {
-      description: 'Valuta le schede aperte e archivia quelle non più utili (riapribili da «Tab archiviate»). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede.',
+      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede.',
       properties: {},
       required: [],
     },

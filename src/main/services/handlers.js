@@ -3377,7 +3377,7 @@ async function eseguiAzioneFilo(action, {
         }
       }
       case 'CORREGGI_MEMORIA': {
-        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') });
+        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') }, { cosa: 'la correzione' });
         if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
         if (!rigaDaCorreggere || !l.testo) {
           return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
@@ -4784,7 +4784,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;
     return n > 0
-      ? `Schede riordinate: ${n} archiviate, riapribili da «Tab archiviate». Dillo all'utente in una riga.`
+      ? `Schede riordinate: ${n} archiviate, restano nel filo della home (le ritrova col campo «Cerca nel filo»). Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
   }
   if (type === 'VEDI_SCHERMO') {
@@ -6588,7 +6588,7 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
   const system = [
     'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
     'TENERE aperte e quali ARCHIVIARE. Archiviare NON è perdere: la scheda viene',
-    'chiusa ma salvata in cronologia e resta sempre riapribile. L\'obiettivo è',
+    'chiusa ma resta nel filo della home, sempre riapribile. L\'obiettivo è',
     'liberare la barra dalle schede non più utili, riducendo il rumore.',
     '',
     'Comprendi la NATURA del servizio, non solo le metriche:',

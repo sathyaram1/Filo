@@ -118,7 +118,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
     nascondi: () => ipcRenderer.send('anteprima:nascondi'),
   },
-  // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").
+  // §2.3 — toast informativo (es. dopo il riordino automatico delle schede).
   onToast: (fn) => {
     const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
     ipcRenderer.on('shell:toast', wrapped);

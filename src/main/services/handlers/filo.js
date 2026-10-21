@@ -345,13 +345,17 @@ module.exports = function register(on, ctx) {
     || (typeof via.modulo === 'string' && typeof via.riga === 'string'));
 
   // La correzione passa dagli stessi controlli di una lezione (tetto, caratteri che non si vedono): entra in ogni prompt.
+  // Una riga corretta in niente è tolta, come col suo ×: resta fra le nascoste, e da lì si rimette.
   on(MSG.FILO_MEMORY_EDIT, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
     if (!viaValida(msg && msg.via) || typeof msg.testo !== 'string') return { ok: false, error: 'bad_request' };
-    const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') });
-    if (l.rifiuto) return { ok: false, error: l.rifiuto, rifiuto: true };
-    if (!l.testo) return { ok: false, error: 'vuota' };
     const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
+    const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') }, { cosa: 'la correzione' });
+    if (l.rifiuto) return { ok: false, error: `${l.rifiuto[0].toUpperCase()}${l.rifiuto.slice(1)}. Accorciala per salvarla.`, rifiuto: true };
+    if (!l.testo) {
+      const id = await FiloMem.hideLine(msg.via, { fonti });
+      return { ok: true, tolta: !!id, id: id || null };
+    }
     return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo, { fonti }), testo: l.testo };
   });
 

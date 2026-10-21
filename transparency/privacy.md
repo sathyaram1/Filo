@@ -48,7 +48,7 @@ Filo funziona con modelli linguistici, e un modello risponde solo a quello che g
 
 **Quello che parte senza che tu lo chieda.** Sei funzioni mandano a un modello pezzi delle pagine anche quando non stai chiedendo niente:
 
-- **Il riassunto delle schede chiuse.** Quando chiudi una scheda, il titolo e i primi 2.000 caratteri circa del suo testo, per farne un riassunto; poi titolo e riassunto vanno a un modello che ne fa l'indice, così la ritrovi nella Cronologia anche per significato. Si spegne da Preferenze («Riassumi le schede chiuse») o chiedendolo a Filo. Da spento non parte niente, e le schede chiuse si ritrovano per parole.
+- **Il riassunto delle schede chiuse.** Quando chiudi una scheda, il titolo e i primi 2.000 caratteri circa del suo testo, per farne un riassunto; poi titolo e riassunto vanno a un modello che ne fa l'indice, così la ritrovi nel filo della home anche per significato. Si spegne da Preferenze («Riassumi le schede chiuse») o chiedendolo a Filo. Da spento non parte niente, e le schede chiuse si ritrovano per parole.
 - **La pulizia automatica delle schede.** Per proporti quali archiviare, titolo, indirizzo e i primi 500 caratteri delle schede aperte. Si spegne da Preferenze («Gestione automatica delle schede») o chiedendolo a Filo.
 - **Il riconoscimento dei blocchi geografici.** Il dominio, il titolo e poche righe di una pagina d'errore che non dice chiaramente perché è bloccata. Parte solo se hai configurato l'apertura da un altro paese, e solo su pagine d'errore.
 - **La spiegazione della selezione.** Quando selezioni del testo, anche solo per copiarlo, il testo selezionato e la frase intorno, così la spiegazione è già pronta se poi apri il tasto destro. Si spegne da Preferenze, nelle impostazioni avanzate («Prepara la spiegazione appena selezioni un testo»), o chiedendolo a Filo. Da spenta parte solo quando apri il tasto destro. Non parte in incognito, sulle pagine delicate né sui siti che escludi da Filo (Impostazioni → Altro, «Domini esclusi»).
@@ -59,7 +59,7 @@ Le pagine delicate restano fuori da tutte, tranne il riconoscimento dei blocchi 
 
 Fuori dalle pagine parte da solo anche il nome dei file scaricati, se lo accendi in Preferenze. Manda l'inizio di ogni file che scarichi con un nome che non dice niente, come racconta la voce sul nome dei file, più sopra.
 
-**E le conversazioni più vecchie.** Ogni scambio con Filo più vecchio dei giorni che la chat ha davanti va una volta al modello che fa l'indice della Cronologia, così Filo lo ripesca da solo quando una domanda c'entra. Le pagine visitate no. Cancellare una chat cancella anche il suo indice, e in incognito non si indicizza niente.
+**E le conversazioni più vecchie.** Ogni scambio con Filo più vecchio dei giorni che la chat ha davanti va una volta al modello che fa l'indice delle conversazioni passate, così Filo lo ripesca da solo quando una domanda c'entra. Le pagine visitate no. Cancellare una chat cancella anche il suo indice, e in incognito non si indicizza niente.
 
 Niente di questo passa dal server di Filo, e lì non resta niente. La richiesta va dal tuo computer a OpenRouter, il modello risponde, la risposta torna a te e si salva sul tuo computer.
 

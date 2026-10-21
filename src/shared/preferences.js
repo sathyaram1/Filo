@@ -1826,7 +1826,7 @@
     // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
     {
       scrive: ['riassuntoSchede.enabled'],
-      aiuto: 'true | false (riassunto e indice delle schede chiuse per ritrovarle nella Cronologia; spento, di una scheda chiusa non va niente ai modelli e la si ritrova per parole)',
+      aiuto: 'true | false (riassunto e indice delle schede chiuse per ritrovarle nel filo della home anche per significato; spento, di una scheda chiusa non va niente ai modelli e la si ritrova per parole)',
       costo: 1,
       keys: ['riassunto_schede_chiuse', 'riassunto delle schede chiuse', 'riassunto schede chiuse', 'riassunti delle schede chiuse',
         'riassunto delle schede', 'riassunto schede', 'riassuntoschede'],
@@ -2089,12 +2089,13 @@
 
   // Una lezione è la sorella dello stile (#592): il popup mostra il testo che si
   // salva, e oltre il tetto torna un rifiuto col perché, mai un taglio.
-  function lezioneDaAzione(a) {
+  // `cosa`: come il rifiuto chiama il testo, perché una correzione di una riga del profilo non è una lezione.
+  function lezioneDaAzione(a, { cosa = 'la lezione' } = {}) {
     const testo = testoVisibile(a && (a.testo ?? a.text ?? a.lezione));
     if (!testo) return { testo: '' };
     const C = global.SN_CONST;
     const n = C.agentStyleLength(testo);
-    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${cifre(n)} caratteri e il massimo è ${cifre(C.LESSON_MAX)}` };
+    if (n > C.LESSON_MAX) return { testo, rifiuto: `${cosa} è lunga ${cifre(n)} caratteri e il massimo è ${cifre(C.LESSON_MAX)}` };
     return { testo };
   }
 
