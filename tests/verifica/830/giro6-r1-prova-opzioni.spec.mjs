@@ -3,7 +3,6 @@ import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PERSONAL_KEY = 'sk-or-v1-test-personal';
-const OWN_BAD = 'sk-or-v1-own-rifiutata';
 const CHIUSO = 'openai/gpt-5';
 
 let server;
