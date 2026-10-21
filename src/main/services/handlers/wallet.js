@@ -390,6 +390,7 @@ module.exports = function register(on, ctx) {
     walletStore.metteDaParte();
     lastServer = null;
     ultimaLettura = null;
+    letturaValida = letturePartite;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     return { ok: true, state: await readState() };
