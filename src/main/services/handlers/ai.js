@@ -163,7 +163,7 @@ module.exports = function register(on, ctx) {
   async function cercaSegnaposto(sp, { sender, origin, delicata }) {
     const settings = await getEffectiveSettings();
     const corr = settings.correttore || {};
-    if (settings.featureFlags?.spellcheckContext === false || corr.segnaposti === false) return { ok: false, code: 'SEGNAPOSTI_SPENTI' };
+    if (corr.segnaposti === false) return { ok: false, code: 'SEGNAPOSTI_SPENTI' };
     const R = require('../correttoreRiservati');
     if (delicata || !sp.domanda.trim() || sp.domanda.includes(R.SEGNAPOSTO)) return { text: SENZA_VALORE };
     const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
