@@ -37,9 +37,9 @@ async function editor(openTab) {
 test('in Gestione il salvataggio tiene le dichiarazioni del modello rimasto e le toglie a quello cambiato', async ({ openTab }) => {
   const page = await editor(openTab);
   const righe = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
-  const cambia = righe.filter({ has: page.locator('.sn-model-nick[value="cambia"]') });
-  await expect(cambia).toHaveCount(1);
-  await cambia.locator('.sn-model-id').fill('acme/nuovo');
+  await expect(righe).toHaveCount(2);
+  const nomi = await righe.locator('.sn-model-nick').evaluateAll((els) => els.map((e) => e.value));
+  await righe.nth(nomi.indexOf('cambia')).locator('.sn-model-id').fill('acme/nuovo');
   await page.click('#saveBtn');
   await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
   const reg = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop().config.modelRegistry);
