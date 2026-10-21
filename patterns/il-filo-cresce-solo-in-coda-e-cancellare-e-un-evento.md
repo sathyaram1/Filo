@@ -47,9 +47,11 @@ pagina, ed è segnata accanto.
 - **Una pagina non scrive il filo da sola** (#1525). Una visita nuova chiede un gesto: un input vero sulla scheda
   negli ultimi 5 s, o una navigazione chiesta a Filo (barra, indietro e avanti, preferiti, agente). Il gesto vale per
   la navigazione che lo segue, non per i cambi che la pagina fa dopo. Senza gesto un cambio entro 5 s dal precedente
-  resta la visita aperta (in attesa ne segue l'indirizzo, già scritta lo assorbe), e dopo 30 visite di fila senza
-  gesto tutto resta una visita finché l'utente non tocca la scheda. Vale per i cambi dentro la pagina e per le pagine
-  intere. Sentinella `tests/unit/visiteSchede.test.mjs`.
+  resta la visita aperta: in attesa ne segue l'indirizzo, già scritta assorbe un cambio dentro la pagina. Una pagina
+  intera dopo una visita già scritta (un rinvio del sito, un accesso che passa da tre indirizzi) resta una visita sua,
+  o il filo perderebbe dove l'utente è arrivato. Dopo 30 visite di fila senza gesto tutto resta una visita finché
+  l'utente non tocca la scheda, per i cambi dentro la pagina e per le pagine intere. Sentinella
+  `tests/unit/visiteSchede.test.mjs`.
 - **Indirizzo e titolo hanno una misura**: 8192 e 1024 caratteri (`src/main/services/misurePagine.js`, la stessa
   per l'archivio delle schede chiuse). Li sceglie il sito, e una riga da megabyte a ogni visita farebbe un file che
   non si legge più. Il taglio si segna (`urlTagliato`, `titoloTagliato`), e un indirizzo tagliato non si offre da

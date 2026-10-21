@@ -231,3 +231,25 @@ test('un gesto vale per la pagina che segue, non per i cambi che la pagina fa do
   await attendi(6_000);
   assert.deepEqual(scritte.map((s) => s.url), ['https://giostra.test/scelta']);
 }));
+
+test('un rinvio del sito dopo il caricamento resta una visita sua; quello prima del caricamento porta la visita dov’è arrivata', () => conOrologioFinto(async () => {
+  const { v, scritte } = preparaTitoli();
+  const wc = schedaFinta();
+  await attendi(10);
+  wc.push('https://traccia.test/l?u=arrivo');
+  v.navigata(wc, 1, 'https://traccia.test/l?u=arrivo', { gesto: Date.now() - 5 });
+  v.caricata(wc);
+  await attendi(800);
+  wc.push('https://arrivo.test/');
+  v.navigata(wc, 1, 'https://arrivo.test/', { gesto: Date.now() - 805 });
+  v.caricata(wc);
+  await attendi(10_000);
+  wc.push('https://accesso.test/entra');
+  v.navigata(wc, 1, 'https://accesso.test/entra', gesto());
+  await attendi(300);
+  wc.push('https://app.test/casa');
+  v.navigata(wc, 1, 'https://app.test/casa');
+  v.caricata(wc);
+  await attendi(100);
+  assert.deepEqual(scritte.map((s) => s.url), ['https://traccia.test/l?u=arrivo', 'https://arrivo.test/', 'https://app.test/casa']);
+}));
