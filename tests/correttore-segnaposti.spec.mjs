@@ -320,12 +320,15 @@ async function rilettura(app, righe, valore) {
     const prima = globalThis.SN_PROVIDERS.completeWithFallback;
     const righeDi = new Function('t', `return (${righe})(t);`);
     const valoreDi = new Function('t', `return (${valore})(t);`);
+    const M = globalThis.SN_ESTERNO.marcature('TESTO_IN_PAGINA');
     const f = async (a) => {
       const t = String(a.messages[a.messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
       if (t.includes('Chi scrive ha messo delle x')) return fine(valoreDi(t));
-      if (t.includes('proponi SUGGERIMENTI')) { await prima(a); return fine(righeDi(t).join('\n') || '[][][][nessuno]'); }
-      return prima(a);
+      if (!t.includes('proponi SUGGERIMENTI')) return prima(a);
+      await prima(a);
+      const i = t.indexOf(M.inizio, t.indexOf('TESTO NUOVO:\n')) + M.inizio.length + 1;
+      return fine(righeDi(t.slice(i, t.indexOf(M.fine, i) - 1)).join('\n') || '[][][][nessuno]');
     };
     globalThis.SN_PROVIDERS.completeWithFallback = f;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = f;
