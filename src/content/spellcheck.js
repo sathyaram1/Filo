@@ -1761,8 +1761,182 @@
     const segni = riallineaIssues(g.segni.map((x) => ({ ...x })), g.testo, testo).issues;
     state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni];
     state.testo = testo;
+    avviaRicerche(state);
     renderOverlayContent(state);
     return true;
+  }
+
+  // ============================================================================
+  // I segnaposti (#1448)
+  // ============================================================================
+  // Il valore di un segnaposto da cercare, per segnaposto e frase: lo stesso segnaposto in un campo ripreso, o in un
+  // testo tornato indietro, non ricerca. Una ricerca fallita non resta: «Cerca di nuovo» la rifà.
+  const RICERCHE_MAX = 200;
+  const ricerche = new Map();
+
+  function avviaRicerche(state) {
+    if (!segnapostiAttivi()) return;
+    for (const m of state.modello) if (m.cerca && m.cerca.chiave && !ricerche.has(m.cerca.chiave)) cercaValore(state, m.cerca, m.segment);
+  }
+
+  async function cercaValore(state, cerca, pezzo) {
+    const k = cerca.chiave;
+    ricerche.set(k, { stato: 'cerca' });
+    while (ricerche.size > RICERCHE_MAX) ricerche.delete(ricerche.keys().next().value);
+    let res = null;
+    try {
+      res = await chiedi(ACTIONS.SPELLCHECK_CONTEXT, {
+        segnaposto: { pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove },
+      }, { giorno: new Date().toDateString() });
+    } catch (err) {
+      console.warn('[SN] correttore, segnaposto:', err);
+    }
+    const ok = !!(res && res.ok && typeof res.text === 'string');
+    const v = ok ? R().valoreTrovato(res.text) : null;
+    ricerche.set(k, v ? { stato: 'trovato', ...v } : { stato: ok ? 'nessuno' : 'errore' });
+    if (res && !res.ok) console.warn('[SN] correttore, segnaposto:', res.code, res.error);
+    if (state.attivo) renderOverlayContent(state);
+    avvisaAscoltatori(state);
+  }
+
+  // Un segno da cercare col suo stato: in ricerca, col valore e la fonte, o senza.
+  function conRicerca(m) {
+    if (!m.cerca) return m;
+    const r = ricerche.get(m.cerca.chiave);
+    if (!r || r.stato === 'cerca') return { ...m, cercando: true };
+    if (r.stato === 'trovato') {
+      return { ...m, correzioni: [r.valore], motivo: r.motivo, fonteDato: { nome: r.fonte, data: r.data, url: r.url } };
+    }
+    return { ...m, motivo: t(r.stato === 'errore' ? 'spell_segnaposto_errore' : 'spell_segnaposto_nessuno'), ricercaFallita: r.stato === 'errore' };
+  }
+
+  function cercaDiNuovo(el, segno) {
+    const state = el && monitored.get(el);
+    if (!state || !segno || !segno.cerca) return;
+    ricerche.delete(segno.cerca.chiave);
+    avviaRicerche(state);
+    renderOverlayContent(state);
+  }
+
+  // Il valore al posto delle x, col lampo che dice dove il testo è cambiato. Vero se l'ha messo.
+  function riempi(el, segno) {
+    const state = el && monitored.get(el);
+    const valore = segno && segno.tipo === 'segnaposto' && !segno.cercando && segno.correzioni && segno.correzioni[0];
+    if (!state || !valore) return false;
+    const prima = getEditableText(el);
+    correggi(el, segno, valore);
+    if (getEditableText(el) === prima) return false;
+    seguiIlTesto(state);
+    state.lampi.push({ start: segno.start, end: segno.start + valore.length, lampo: Date.now() });
+    renderOverlayContent(state);
+    return true;
+  }
+
+  // Lo strato dei valori: sopra le x, in piccolo, il valore trovato (o i puntini della ricerca), che si mette con un
+  // clic; e i lampi. Sta fuori dallo specchio, che taglia ai bordi del campo e lascia passare il mouse.
+  function strato(state) {
+    if (state.valori && state.valori.isConnected) return state.valori;
+    const v = document.createElement('div');
+    v.className = 'sn-spell-valori';
+    global.SN_FILO_UI?.mark(v);
+    (radiceDi(state.el) || document.body).appendChild(v);
+    state.valori = v;
+    state.badge.clear();
+    return v;
+  }
+
+  // I riquadri delle righe di [da, a): nello specchio per una casella, sulle parole vere per un campo modificabile.
+  function rettangoliDi(state, da, a) {
+    const radice = campoDiTesto(state.el) ? state.overlay : state.el;
+    if (!radice || a <= da) return [];
+    const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let tot = 0;
+    let iniziato = false;
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const len = n.nodeValue.length;
+      if (!iniziato && da < tot + len) { range.setStart(n, da - tot); iniziato = true; }
+      if (iniziato && a <= tot + len) { range.setEnd(n, a - tot); return [...range.getClientRects()].filter((r) => r.width || r.height); }
+      tot += len;
+    }
+    return [];
+  }
+
+  const dentroAlCampo = (state, r) => {
+    const q = state.riquadro;
+    if (!q) return false;
+    const y = r.top + r.height / 2;
+    const x = r.left + r.width / 2;
+    return y >= q.top && y <= q.top + q.height && x >= q.left && x <= q.left + q.width;
+  };
+
+  function disegnaValori(state) {
+    const ora = Date.now();
+    state.lampi = state.lampi.filter((l) => ora - l.lampo < LAMPO_MS);
+    const testo = getEditableText(state.el);
+    const valori = state.inVista.filter((s) => s.tipo === 'segnaposto' && !s.dubbio && !s.svanisce
+      && (s.cercando || (s.correzioni && s.correzioni[0])));
+    if (!valori.length && !state.lampi.length) {
+      if (state.valori) { state.valori.textContent = ''; state.badge.clear(); }
+      return;
+    }
+    const v = strato(state);
+    v.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    const corpo = parseFloat(window.getComputedStyle(state.el).fontSize) || 16;
+    v.style.setProperty('--sn-valore-corpo', `${Math.max(10, Math.round(corpo * 0.62))}px`);
+    const usati = new Set();
+    for (const s of valori) {
+      const tr = tratto(testo, s);
+      const r = tr && rettangoliDi(state, tr.a, tr.b)[0];
+      if (!r || !dentroAlCampo(state, r)) continue;
+      const k = `${s.start}:${s.end}`;
+      usati.add(k);
+      let b = state.badge.get(k);
+      if (!b) {
+        b = document.createElement('span');
+        b.className = 'sn-spell-valore';
+        b.setAttribute('role', 'button');
+        // Il clic non toglie il fuoco al campo, che altrimenti si staccherebbe col suo strato.
+        b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!e.isTrusted) return;
+          const vivo = b._snSegno;
+          if (vivo && !riempi(state.el, vivo)) renderOverlayContent(state);
+        });
+        state.badge.set(k, b);
+        v.appendChild(b);
+      }
+      b._snSegno = s;
+      b.classList.toggle('sn-cercando', !!s.cercando);
+      const scritto = s.cercando ? '' : s.correzioni[0];
+      if (b.textContent !== scritto) b.textContent = scritto;
+      b.title = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
+      b.style.left = `${r.left + r.width / 2}px`;
+      b.style.top = `${r.top}px`;
+    }
+    for (const [k, b] of state.badge) if (!usati.has(k)) { b.remove(); state.badge.delete(k); }
+    for (const l of v.querySelectorAll('.sn-spell-lampo')) l.remove();
+    for (const l of state.lampi) {
+      for (const r of rettangoliDi(state, l.start, l.end)) {
+        if (!dentroAlCampo(state, r)) continue;
+        const d = document.createElement('span');
+        d.className = 'sn-spell-lampo';
+        d.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;animation-delay:${-(ora - l.lampo)}ms`;
+        v.appendChild(d);
+      }
+    }
+  }
+
+  // Il valore sotto il tasto destro: il menu è quello del suo segnaposto.
+  function valoreSotto(target) {
+    const b = target && target.closest && target.closest('.sn-spell-valore');
+    if (!b || !b._snSegno) return null;
+    const el = activeEl;
+    const state = el && monitored.get(el);
+    if (!state || !state.valori || !state.valori.contains(b)) return null;
+    return { el, segno: b._snSegno };
   }
 
   // ============================================================================
