@@ -837,6 +837,8 @@ module.exports = function register(on, ctx) {
     return null;
   }
 
+  on(MSG.LINK_FERMATO, async (msg) => anteprimaFerma(String((msg && msg.url) || '')) || {});
+
   on('fetch_link_meta', async (msg, sender) => {
     let rinvio = null;
     try {
