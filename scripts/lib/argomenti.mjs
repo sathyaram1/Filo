@@ -38,8 +38,8 @@ export function apreUnElenco(arg) {
 }
 
 /**
- * Il rimedio quando sotto npm manca un titolo o un testo: uno che comincia col trattino npm lo prende per suo
- * opzione se il `--` non arriva (dimenticato, o mangiato dalla conchiglia), senza lasciarne traccia (#1359).
+ * Il rimedio quando sotto npm manca un titolo o un testo: uno che comincia col trattino npm lo prende per sé se il
+ * `--` non arriva (dimenticato, o mangiato dalla conchiglia), senza lasciarne traccia (#1359).
  * '' fuori da npm. PURA.
  */
 export function avvisoTrattinoDaNpm(env = {}) {
