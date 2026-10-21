@@ -32,14 +32,17 @@ export function sembraOpzione(arg) {
   return !/^[-‐-—−]?\d/.test(s.slice(1));
 }
 
+/** Trattini seguiti da uno spazio o da un a capo: un elenco puntato o un inciso, mai un'opzione (#878). PURA. */
+export function apreUnElenco(arg) {
+  return /^[-‐‑‒–—−]+\s/.test(String(arg ?? ''));
+}
+
 /**
- * Come `sembraOpzione`, per il report di una correzione: lì un trattino seguito da uno spazio apre un
- * elenco puntato, non un'opzione. La critica resta sulla regola stretta (cosa accetta il verificatore non
- * cambia). PURA.
+ * Come `sembraOpzione`, per un testo libero (il report di una correzione, il testo di un feedback). La critica
+ * resta sulla regola stretta (cosa accetta il verificatore non cambia). PURA.
  */
 export function sembraOpzioneNelReport(arg) {
-  const s = String(arg ?? '');
-  return sembraOpzione(s) && !/\s/.test(s[1]);
+  return sembraOpzione(arg) && !apreUnElenco(arg);
 }
 
 /** La forma normale di un'opzione: due trattini veri, minuscola. PURA. */
