@@ -73,7 +73,7 @@ test('r1 ricaricata, la scheda della carbonara resta la carbonara anche con l’
   await expect(carb.locator('.dash-bubble', { hasText: 'Guanciale, uova' }).first()).toBeVisible();
 });
 
-test('il collegamento diretto alla carbonara apre la carbonara anche con l’intervista rifatta aperta', async ({ app, shell, openTab }) => {
+test('r1 il collegamento diretto alla carbonara apre la carbonara anche con l’intervista rifatta aperta', async ({ app, shell, openTab }) => {
   test.setTimeout(150_000);
   await carbonara(app, shell);
   const id = await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list()).find((c) => JSON.stringify(c.messages || []).includes('carbonara')).id);
