@@ -338,7 +338,12 @@
     } else if (state.credits) {
       const refill = global.SN_CONST?.CREDIT?.DAILY_REFILL ?? 100;
       lines.push('CREDITI');
-      lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
+      if (state.credits.chiavePropria) {
+        lines.push('L\'utente paga i modelli con la sua chiave OpenRouter: le richieste le paga quella chiave, sul suo conto OpenRouter (spesa e residuo nella pagina Crediti).');
+        lines.push(`Filo tiene anche un conteggio di crediti di prova su questo computer: ${state.credits.balance}, +${refill} ogni giorno a mezzanotte. Non sono soldi che l'utente spende e non sono il suo saldo: se ne parli, dillo così.`);
+      } else {
+        lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
+      }
       lines.push('');
     }
     // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non
