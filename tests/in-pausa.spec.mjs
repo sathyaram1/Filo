@@ -6,6 +6,7 @@
 //   2. L'owner, con gli interruttori spenti, vede tutto come prima.
 //   3. Accesa da Gestione, chi non è owner la rivede senza riavviare Filo; rimessa in pausa, la pagina aperta si chiude
 //      sulle sue segnalazioni. Ogni interruttore vale per la sua funzione.
+//   4. L'agente di chi non le vede non le racconta e non rimette la carta dei Mazzi.
 //
 // Firestore e identità sono un HTTP locale (come in redteam-pausa.spec.mjs).
 

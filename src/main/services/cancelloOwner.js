@@ -1,6 +1,6 @@
 // Una funzione in pausa per chi non è owner (#896, #1592): visibile = interruttore acceso, oppure owner.
 // Non dice mai «visibile» per un interruttore mai letto: assente o illeggibile vale «in pausa», come sul server.
-// Lo usano redteamGate.js e inPausa.js. Prove: tests/unit/redteamGate.test.mjs, tests/unit/inPausa.test.mjs.
+// Lo usano redteamGate.js e inPausa.js; le porte che chiude stanno in tests/in-pausa.spec.mjs e redteam-pausa.spec.mjs.
 
 'use strict';
 
