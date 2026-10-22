@@ -35,7 +35,13 @@ for (const [nome, html, sel, leggiTesto] of CASI) {
     await pronta(app, page);
     const testo = () => page.evaluate(leggiTesto).then((t) => t.replace(/ /g, ' '));
     await page.locator(sel).click();
+    await page.evaluate(() => {
+      window.__ev = { input: 0, before: 0, prevenuti: 0 };
+      document.addEventListener('input', () => window.__ev.input++, true);
+      document.addEventListener('beforeinput', (e) => { window.__ev.before++; setTimeout(() => { if (e.defaultPrevented) window.__ev.prevenuti++; }, 0); }, true);
+    });
     await page.keyboard.type('Ciao marco come va, non so perchè ', { delay: 30 });
+    console.log(nome, 'EVENTI:', JSON.stringify(await page.evaluate(() => window.__ev)));
     await page.waitForTimeout(400);
     const dopo = await testo();
     console.log(nome, 'DOPO SCRITTURA:', JSON.stringify(dopo), 'DOM:', JSON.stringify(await page.locator(sel).innerText()));
