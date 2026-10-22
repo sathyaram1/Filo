@@ -153,6 +153,21 @@ test('troppe chiavi nuove nel mese (#1520): il rifiuto del server si dice, non c
   assert.match(W.redeemMessage('too_many_reissues'), /chiavi nuove/);
 });
 
+// #1503: i rifiuti della nuova chiave non cadono su «qualcosa è andato storto», che invita a riprovare subito.
+test('ogni rifiuto della nuova chiave ha la sua frase, diversa dalle altre e da quella generica', () => {
+  const nuovi = ['busy', 'too_soon', 'suspended', 'empty', 'conflict'];
+  const frasi = nuovi.map((s) => W.redeemMessage(s));
+  for (const [i, s] of nuovi.entries()) {
+    assert.ok(Object.hasOwn(W.REDEEM_MESSAGES, s), s);
+    assert.notEqual(frasi[i], W.REDEEM_MESSAGES.internal, s);
+  }
+  assert.equal(new Set(frasi).size, nuovi.length);
+  assert.match(W.redeemMessage('too_soon'), /dieci minuti/);
+  assert.match(W.redeemMessage('suspended'), /sospesi/);
+  assert.match(W.redeemMessage('empty'), /finiti/);
+  assert.ok(W.redeemMessage('provider_error').length > 10);
+});
+
 // Un invito vale per più persone: un rifiuto per posti finiti non si racconta
 // come «il codice è già stato usato», o chi l'ha ricevuto crede che se lo sia
 // speso chi gliel'ha mandato e va a chiedergliene un altro che non esiste.
