@@ -213,6 +213,11 @@ test('fra i riquadri il clic va solo a quello del lettore che ha il «Salta» so
   assert.deepEqual(await A.clicNelRiquadro(senza.wc, { x: 3, y: 4, url: URL_LETTORE }, { view: vista, ora: 8e6 }), { ok: false, code: 'coperto' });
   assert.deepEqual(d2.clic, []);
   assert.equal(d2.staccato, 1, 'il debugger si stacca anche senza clic');
+  // Un lettore nello stesso processo della pagina non ha una sessione sua: vale il punto confermato dai frame sopra.
+  const stesso = annidati(URL_LETTORE);
+  const d3 = conDebugger(stesso, []);
+  assert.deepEqual(await A.clicNelRiquadro(stesso.wc, { x: 3, y: 4, url: URL_LETTORE, radice: { x: 50, y: 60 } }, { view: vista, ora: 8e6 }), { ok: true });
+  assert.deepEqual(d3.clic[1], ['mousePressed', 50, 60, undefined]);
   assert.equal((await A.clicNelRiquadro(annidati(URL_LETTORE).wc, { x: 3, y: 4 }, { view: vista, ora: 9e6 })).code, 'punto', 'senza l\'indirizzo del lettore');
 });
 

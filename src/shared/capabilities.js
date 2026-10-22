@@ -659,9 +659,9 @@
     },
     {
       id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',
-      desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube, anche nei suoi video incorporati in altri siti, e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina. Lo preme anche quando il video suona in una scheda che non stai guardando o con Filo ridotto a icona, perché la pubblicità si sente anche da lì. Su YouTube, se stai scrivendo in un campo della pagina o tieni premuto il mouse, aspetta che tu abbia finito; se hai scorso più giù e il lettore non si vede, lo preme appena torni a vederlo.',
+      desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube, anche nei suoi video incorporati in altri siti, e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina. Lo preme anche quando il video suona in una scheda che non stai guardando o con Filo ridotto a icona, perché la pubblicità si sente anche da lì, anche se avevi scorso la pagina più giù, e la ritrovi al punto in cui eri. Su YouTube, mentre guardi la pagina, se stai scrivendo in un campo o tieni premuto il mouse aspetta che tu abbia finito; se hai scorso più giù e il lettore non si vede, lo preme appena torni a vederlo.',
       invoke: 'Da solo, acceso di serie. Si spegne in Impostazioni → Sicurezza → «Salta le pubblicità dei video», o chiedendolo a Filo.',
-      doesNot: 'Non accorcia le pubblicità senza «Salta» e non lo preme prima che il lettore lo mostri. Su un video di YouTube incorporato non preme se il sito ci ha messo sopra un suo elemento, e se la sua scheda non si vede aspetta che tu ci torni: lì il clic potrebbe arrivare al sito invece che al video.',
+      doesNot: 'Non accorcia le pubblicità senza «Salta» e non lo preme prima che il lettore lo mostri. Su un video di YouTube incorporato che stai guardando non preme se il sito ci ha messo sopra un suo elemento.',
     },
     {
       id: 'site-permissions', title: 'Permessi dei siti', category: 'navigation',

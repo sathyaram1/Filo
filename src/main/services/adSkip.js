@@ -227,9 +227,12 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now(), tetto = T
     trovato = await entro((async () => {
       attese.push(segui(''));
       while (attese.length) await Promise.all(attese.splice(0));
-      const sid = await sessioneDelLettore(cmd, sessioni, msg);
-      if (!sid) return false;
-      const base = { x: msg.x, y: msg.y };
+      let sid = await sessioneDelLettore(cmd, sessioni, msg);
+      let base = { x: msg.x, y: msg.y };
+      // Un lettore nello stesso processo della pagina non ha una sessione sua: lì il punto nella pagina, confermato dai
+      // frame sopra, arriva giusto anche instradato.
+      if (!sid && msg.radice) { sid = ''; base = { x: msg.radice.x, y: msg.radice.y }; }
+      if (sid === null) return false;
       // Lo spostamento la pagina lo legge al fotogramma dopo, che una scheda nascosta non disegna: la sua risposta non
       // arriverebbe mai. Non lo si aspetta; la pressione, che parte subito, se lo porta dietro nell'ordine giusto.
       cmd('Input.dispatchMouseEvent', { ...base, type: 'mouseMoved', button: 'none' }, sid).catch(() => {});
@@ -268,17 +271,20 @@ async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora 
   if (typeof msg.tag !== 'string' || !msg.tag || msg.tag.length > 64) return { ok: false, code: 'punto' };
   inCorso.add(wc);
   try {
+    let radice = null;
     if (dove && dove.davanti) {
       let p = { x: msg.x, y: msg.y, tag: msg.tag };
+      let nascosta = false;
       for (const a of anelli) {
         const r = await chiedi(wc, a.frame, { tag: p.tag, origine: a.origineFiglio, x: p.x, y: p.y });
         if (!r) return { ok: false, code: 'tempo' };
-        if (r.no === 'nascosta') break;
+        if (r.no === 'nascosta') { nascosta = true; break; }
         if (r.no) return { ok: false, code: r.no };
         p = r;
       }
+      if (!nascosta) radice = { x: p.x, y: p.y };
     }
-    return await clicNelRiquadro(wc, { x: msg.x, y: msg.y, url: urlDelFrame(sender) }, { ...dove, ora });
+    return await clicNelRiquadro(wc, { x: msg.x, y: msg.y, url: urlDelFrame(sender), radice }, { ...dove, ora });
   } finally {
     inCorso.delete(wc);
   }
