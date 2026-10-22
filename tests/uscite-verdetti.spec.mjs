@@ -245,3 +245,83 @@ test('un suggerimento della home verso un sito composto con un titolo di scheda 
   expect(icone.every((x) => x.soloCopie), 'la carta chiede l\'icona al sito prima di ogni clic').toBe(true);
   expect(arrivateA(rete, `zafferano.${RACCOLTA}`)).toEqual([]);
 });
+
+test('sopra un sito l\'anteprima di un collegamento di Filo che al clic chiede l\'OK non contatta il sito; quella di un collegamento del sito sì', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await testServer.openReady(openTab, '<!doctype html><html><body><p>Ciao Mario, ecco il tuo profilo.</p></body></html>', { pubblico: true });
+  await preparaMain(app, rete.port);
+  const codificato = `https://${RACCOLTA}/c?d=aGVsbG8gd29ybGQgZnJvbSBmaWxvIGFuZCBtb3Jl`;
+  const dalSito = (msg) => app.evaluate(async ({ BrowserWindow }, m) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tab = win._filoTabs.tabs.find((t) => String(t.url || '').includes('sito-pubblico.test'));
+    const code = `chrome.runtime.sendMessage(${JSON.stringify({ ...m, type: m.type || globalThis.SN_MSG.MSG.APRI_COLLEGAMENTO_FILO })})`;
+    return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }]);
+  }, msg);
+  // Il clic su quel collegamento scritto da Filo sopra la pagina chiede l'OK: porta un blocco di dati codificato.
+  const clic = await dalSito({ url: codificato });
+  expect(clic).toMatchObject({ ok: true, aperto: false });
+  expect(clic.conferma).toBeTruthy();
+  const r = await dalSito({ type: 'fetch_link_meta', url: codificato, proposta: true, delSito: false });
+  expect(r).toMatchObject({ ok: false, error: 'da_confermare' });
+  await new Promise((res) => setTimeout(res, 800));
+  expect(arrivateA(rete, RACCOLTA), 'l\'anteprima ha mandato al sito un indirizzo che al clic chiede l\'OK').toEqual([]);
+  // Lo stesso indirizzo scritto dalla pagina stessa: il sito sa già dove porta, l'anteprima lo legge.
+  const delSito = await dalSito({ type: 'fetch_link_meta', url: codificato, proposta: false, delSito: true });
+  expect(delSito).toMatchObject({ ok: true, ogTitle: 'Pagina di prova 1505' });
+});
+
+test('un collegamento della spiegazione del tasto destro nella home, mai giudicato, chiede l\'OK al clic', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await preparaMain(app, rete.port);
+  await app.evaluate(async (_e, link) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({ models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.EXPLAIN]: 'deepseek-flash' } });
+    const rispondi = ({ attempts, tools, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
+      const text = Array.isArray(tools) && tools.length
+        ? 'Il progetto Zafferano riguarda le ricette di casa.'
+        : `Zafferano è il nome del progetto: dettagli su [la raccolta](${link}).`;
+      try { onDelta && onDelta(text); } catch (_) {}
+      return { ...base, text, toolCalls: [], finishReason: 'stop' };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => rispondi(o);
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => rispondi(o);
+  }, LINK_RACCOLTA);
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await page.locator('#input').fill('di cosa parla il progetto?');
+  await page.locator('#sendBtn').click();
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'progetto Zafferano' });
+  await expect(bolla).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+  await bolla.evaluate((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const i = n.data.indexOf('Zafferano');
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 'Zafferano'.length);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(r);
+      return;
+    }
+  });
+  const box = await page.evaluate(() => {
+    const r = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  });
+  await page.mouse.click(box.x, box.y, { button: 'right' });
+  const link = menuDi(page).locator('.sn-menu a.filo-md-link', { hasText: 'la raccolta' });
+  await expect(link).toBeVisible({ timeout: 10_000 });
+  await link.click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+  await expect.poll(() => confirmText(page)).toContain('non ho potuto controllare prima di mostrartelo');
+  await page.screenshot({ path: 'tests/.shots/uscite-verdetti-spiega-home.png' });
+  await clickConfirm(page, 'cancel');
+  await page.waitForTimeout(500);
+  expect(await apertoVerso(app, LINK_RACCOLTA), 'annullato: non si apre').toBe(false);
+});
