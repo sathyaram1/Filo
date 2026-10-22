@@ -453,19 +453,15 @@
   const FINESTRA = 20;
 
   // `norm` è il segreto in sola forma alfanumerica minuscola; `nucleo` la stessa senza i pezzi fissi del suo tipo, se è
-  // abbastanza lungo da contare; `da`..`a` dove stanno le finestre che contano: una tutta dentro un pezzo fisso no.
+  // abbastanza lungo da contare; le finestre cominciano fra `da` e `a`, tutte dentro la parte variabile: una che prende
+  // anche il prefisso fisso combacia con un'altra chiave dello stesso tipo appena ne condivide un carattere.
   function partiSegreto(valore) {
     const v = testo(valore).trim();
     const norm = alnumMinuscolo(v);
     const pre = Math.min(norm.length, alnumMinuscolo((v.match(PREFISSO_FISSO) || [''])[0]).length);
     const fine = Math.max(pre, norm.length - alnumMinuscolo((v.match(CODA_FISSA) || [''])[0]).length);
     const nucleo = norm.slice(pre, fine);
-    return {
-      norm,
-      nucleo: nucleo.length >= SEGRETO_MIN && nucleo !== norm ? nucleo : '',
-      da: Math.max(0, pre - FINESTRA + 1),
-      a: Math.min(fine, norm.length - FINESTRA + 1),
-    };
+    return { norm, nucleo: nucleo.length >= SEGRETO_MIN && nucleo !== norm ? nucleo : '', da: pre, a: fine - FINESTRA + 1 };
   }
 
   function finestreDi(parti) {
