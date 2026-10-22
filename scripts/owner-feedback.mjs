@@ -48,7 +48,7 @@
 //   Un segno locale su una pratica chiusa ne toglie la scheda dalla bacheca pubblica: era un lavoro locale.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
-//   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
+//   routine la prende, e in Gestione porta l'etichetta «server». Solo sui feedback
 //   dell'owner o di una sessione con la prova del mittente (#595).
 //   `--non-locale` lo toglie. Su un feedback di un utente il segno si rifiuta:
 //   se richiede lavoro locale, `--serve-locale` lo riporta nei Ricevuti

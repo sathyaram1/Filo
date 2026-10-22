@@ -59,6 +59,14 @@
       --mg-search-gap: 8px;
       /* Il minimo delle tre aree: 300 pixel su una finestra normale, meno su una bassa, invece di uscire dal fondo. */
       --mg-aree-min: min(300px, 60vh);
+      /* La fiducia (#1575): muschio fidata, prugna non fidata, lontani dai colori che dicono già una decisione (rosso,
+         arancio, verde, blu, azzurro). Sul chiaro più scuri per stare sulla carta, sullo scuro più accesi. */
+      --mg-fidata-color: #6f8f2e;
+      --mg-nonfidata-color: #a8418a;
+    }
+    :root[data-sn-theme="dark"] {
+      --mg-fidata-color: #a6bb68;
+      --mg-nonfidata-color: #d070b4;
     }
 
     /* La dashboard sfrutta tutta la larghezza e tutta l'altezza: override locale del `.sn-page { max-width: 960px }`
@@ -227,6 +235,20 @@
     .mg-livello-btn svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
     .mg-livello-count { opacity: 0.8; }
     .mg-livello-count:empty { display: none; }
+    /* «Solo non fidate» sta nelle teste delle colonne, che scrivono in maiuscolo: la pasticca resta come le altre. Lo
+       scudo è quello vuoto delle righe non fidate, nel loro colore. */
+    .mg-fiducia-filtro[hidden] { display: none; }
+    .mg-fiducia-filtro { text-transform: none; letter-spacing: 0; font-weight: 400; flex: 0 0 auto; }
+    .mg-fiducia-filtro svg path { stroke: var(--mg-nonfidata-color); stroke-dasharray: 3 2; }
+    .mg-fiducia-filtro[aria-pressed="true"] {
+      border-color: var(--mg-nonfidata-color);
+      background: color-mix(in srgb, var(--mg-nonfidata-color) 14%, transparent);
+    }
+    .mg-head-tasti[hidden] { display: none; }
+    .mg-head-tasti { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+    /* In una colonna stretta va a capo la pasticca, non il nome della scheda col suo numero. */
+    .mg-list-head-row { flex-wrap: wrap; row-gap: 4px; }
+    #mgListHead { white-space: nowrap; }
 
     /* Domande: elenco a sinistra, la domanda (o il gruppo intero) a destra; tutta l'altezza come la lista dei feedback. */
     #panel-domande.mg-panel--active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -234,8 +256,9 @@
       display: grid; grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 12px;
       flex: 1 1 auto; min-height: var(--mg-aree-min);
     }
-    .mg-dom-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
-    .mg-dom-head-nome { flex: 1 1 auto; min-width: 0; }
+    /* Come la lista dei feedback: in una colonna stretta vanno a capo i tasti, mai il nome della scheda sotto di loro. */
+    .mg-dom-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 22px; }
+    .mg-dom-head-nome { flex: 1 1 auto; white-space: nowrap; }
     .mg-dom-head [hidden] { display: none; }
     .mg-dom-sel { margin: 0; flex: 0 0 auto; cursor: pointer; accent-color: var(--sn-accent); }
     .mg-dom-consiglio {
@@ -260,6 +283,7 @@
       border-left: 3px solid transparent;
       transition: background calc(0.1s * var(--sn-motion, 1));
     }
+    .mg-domanda { border-right: 3px solid transparent; }
     .mg-domanda:hover, .mg-domande-gruppo:hover { background: var(--sn-hover); }
     .mg-domanda:focus-visible, .mg-domande-gruppo:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
     .mg-domanda--aperta, .mg-domande-gruppo--aperto { background: var(--sn-hover); border-left-color: var(--sn-accent); }
@@ -293,8 +317,10 @@
     .mg-dq-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; color: var(--sn-muted); }
     .mg-dq-num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--sn-fg); }
     .mg-dq-prio[data-priorita="bloccante"] { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
-    .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; border: 1px solid var(--sn-border); cursor: help; }
-    .mg-dq-fiducia--no { color: #b9770e; border-color: color-mix(in srgb, #e08e0b 55%, transparent); }
+    /* Gli stessi colori del segno in lista (#1575): la fiducia si legge uguale nell'elenco e nella domanda aperta. */
+    .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; cursor: help;
+      color: var(--mg-fidata-color); border: 1px solid color-mix(in srgb, var(--mg-fidata-color) 55%, transparent); }
+    .mg-dq-fiducia--no { color: var(--mg-nonfidata-color); border-color: color-mix(in srgb, var(--mg-nonfidata-color) 55%, transparent); }
     .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
     .mg-dq-legami-pre { margin-right: 2px; }
     .mg-dq-legame { all: unset; cursor: pointer; color: var(--sn-accent); font-variant-numeric: tabular-nums; }
@@ -848,6 +874,28 @@
     /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «locale»
        insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
+    /* La fiducia (#1575) sta sul bordo destro, perché il sinistro dice già che decisione serve (attacco, spam…), e
+       nello scudo in fondo alla riga: pieno se fidata, vuoto e tratteggiato se no, così non la dice il solo colore. */
+    :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--fidata { border-right: 3px solid var(--mg-fidata-color); }
+    :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--nonfidata { border-right: 3px solid var(--mg-nonfidata-color); }
+    .mg-fiducia-segno[hidden] { display: none; }
+    .mg-fiducia-segno {
+      flex: 0 0 auto; align-self: center; display: inline-flex; margin-left: auto;
+      width: var(--mg-scudo-size, 11px); height: var(--mg-scudo-size, 11px); cursor: help;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-fiducia-segno:hover { transform: scale(1.25); }
+    /* Subito dopo il titolo (Risolti, Archiviati, ricerca) lo scudo resta sulla sua riga: il titolo gli cede il posto
+       invece di mandarlo a capo da solo. */
+    .mg-item-title:has(+ .mg-fiducia-segno) { min-width: min(calc(var(--mg-title-min, 8em) - 20px), 100%); }
+    /* Quello che sta già a destra (priorità, data) tiene lo spazio libero: lo scudo gli si mette accanto. */
+    :is(.mg-priority, .mg-domanda-data, .mg-domanda-prio) ~ .mg-fiducia-segno { margin-left: 0; }
+    .mg-fiducia-segno svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .mg-fiducia-segno svg path { stroke-width: 1.5; stroke-linejoin: round; }
+    .mg-fiducia-segno--fidata { color: var(--mg-fidata-color); }
+    .mg-fiducia-segno--fidata svg path { fill: currentColor; stroke: currentColor; }
+    .mg-fiducia-segno--nonfidata { color: var(--mg-nonfidata-color); }
+    .mg-fiducia-segno--nonfidata svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 3 2; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
     /* Arrivata a pagina aperta: un punto caldo in testa finché non la si apre (con un ordinamento a scelta può
@@ -1356,12 +1404,7 @@
       background: color-mix(in srgb, var(--sn-accent) 22%, var(--sn-bg, transparent));
     }
 
-    /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
-    .mg-local-btn[hidden] { display: none; }
-    .mg-local-btn[aria-pressed="true"] {
-      border-color: var(--sn-fg); color: var(--sn-fg);
-      background: color-mix(in srgb, var(--sn-fg) 8%, var(--sn-bg, transparent));
-    }
+    /* «server»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
     .mg-local-badge {
       flex: none;
       font-size: 10.5px; line-height: 1;
@@ -1667,7 +1710,6 @@
       <button type="button" class="mg-tab" data-tab="domande-archivio" role="tab" hidden>Archivio</button>
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
-      <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori server</button>
       <button type="button" class="mg-tab" data-tab="waiting" role="tab">Aspettano</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
@@ -1708,8 +1750,13 @@
           <!-- Il tasto destro, o il glifo ⇅, apre il menu di riordino (numero / priorità / creatore). -->
           <div class="mg-col-head mg-list-head-row" id="mgListHeadRow">
             <div id="mgListHead">Ricevuti</div>
-            <button type="button" class="mg-sort-btn" id="mgSortBtn"
-              title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+            <span class="mg-head-tasti">
+              <!-- «Solo non fidate» (#1575): vale per tutte le schede dei feedback e per le Domande. Non si ricorda. -->
+              <button type="button" class="mg-livello-btn mg-fiducia-filtro" id="mgFiduciaFiltro" aria-pressed="false"
+                title="Mostra solo le pratiche non fidate" hidden>Solo non fidate<span class="mg-livello-count"></span></button>
+              <button type="button" class="mg-sort-btn" id="mgSortBtn"
+                title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+            </span>
           </div>
           <!-- Ricevuti per livello (SPEC-DOMANDE §2.2): nessuno acceso = tutto, più accesi = unione. Non si ricorda. -->
           <div class="mg-livelli-filtro" id="mgLivelliFiltro" role="group" aria-label="Filtra i Ricevuti per livello" hidden>
@@ -1799,8 +1846,6 @@
                     <!-- «Aspetta #N» (#903): testo, hover e casella dal JS; acceso quando ci sono attese. -->
                     <button type="button" class="mg-star-btn mg-attese-toggle" id="mgAtteseToggle"
                       aria-expanded="false" aria-controls="mgAttese" hidden>⏳ Aspetta</button>
-                    <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
-                    <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                     <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
                        premuto = fidato, e un clic la toglie. Testi e visibilità dal JS. -->
                     <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" aria-pressed="false" hidden>🤝 Segna fidato</button>
@@ -1887,6 +1932,9 @@
           <div class="mg-col-head mg-dom-head">
             <input type="checkbox" class="mg-dom-sel" id="mgDomandeTutte" aria-label="Scegli tutte" title="Scegli tutte" hidden>
             <span class="mg-dom-head-nome" id="mgDomandeTitolo">Da rispondere</span>
+            <!-- Lo stesso «Solo non fidate» della lista dei feedback (#1575): uno stato solo, lo tiene manage.js. -->
+            <button type="button" class="mg-livello-btn mg-fiducia-filtro" id="mgDomandeFiduciaFiltro" aria-pressed="false"
+              title="Mostra solo le domande non fidate" hidden>Solo non fidate<span class="mg-livello-count"></span></button>
             <button type="button" class="mg-dom-consiglio" id="mgDomandeConsiglioSel" hidden>Applica il consiglio</button>
           </div>
           <div class="mg-col-body">

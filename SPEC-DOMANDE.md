@@ -185,7 +185,7 @@ una **barra di sezioni**, ciascuna con le sue schede:
 | Sezione | Schede | Quando |
 |---|---|---|
 | **Domande** | Da rispondere · In lavorazione · Risposte automatiche · Archivio | adesso |
-| **Feedback** | Ricevuti · In coda · Lavori server · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
+| **Feedback** | Ricevuti · In coda · Aspettano · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
 | **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti · Compiti ricorrenti | adesso (spostate più le nuove) |
 | **Utenti** | Inviti e utenti (la pagina che era `credits/owner.html`) | spostata (#1414) |
 | **Impostazioni predefinite** | Modelli predefiniti, poi tutte le impostazioni predefinite di Filo | spostata (#1414); i Modelli di supporto restano in Automazioni (#1110) |

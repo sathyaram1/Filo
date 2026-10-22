@@ -245,7 +245,7 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
-- Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Il segno `localOnly` (#908) non sposta di scheda (#1575): la pratica sta nella scheda del suo stato con l'etichetta «server».
 - Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
@@ -254,9 +254,9 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 
 `localOnly: { by, at }` (in chiaro, `at` in millisecondi, scrive solo l'admin) dice
 che la pratica la lavora solo una sessione locale: la coda delle routine, il recupero
-degli arenati e il pacemaker la saltano, e le superfici la mostrano nei Lavori locali
-invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta comunque
-l'owner), con l'approvazione che dice `→ Lavori locali`.
+degli arenati e il pacemaker la saltano. In Gestione resta nella scheda del suo stato (In
+coda, Aspettano, Ricevuti…) con l'etichetta «server» (#1575): la scheda «Lavori server» non
+c'è più.
 
 - Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
   in Gestione, da riga di comando no), a pratica aperta, non segnalata come
@@ -268,22 +268,23 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   motivo `locale` con `domandaId` è un passo che solo l'owner può fare, chiesto con la domanda.
 - **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
   `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
-  «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
-  feedback), insieme a `todo`, `reviewDecision: accepted` e `localOnly`: il feedback va
-  nei Lavori locali. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
+  «💻 Lavoro server» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
+  feedback), insieme a `todo`, `reviewDecision: accepted` e `localOnly`: il feedback torna
+  In coda col segno. Dal #1575 il tasto c'è solo sui rombi azzurri nati prima del #1358
+  (`design`+`locale` senza `domandaId`), dove è l'unica uscita; su un fidato scrive il solo
+  segno. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
   hanno le credenziali dell'owner e un testo d'utente potrebbe convincerle a darselo. Le regole non distinguono la
   pagina da uno script con lo stesso token: il limite sta negli strumenti (sentinella in
   `tests/unit/lavoroLocaleApprovato.test.mjs`). Lo stesso clic segna anche fidato il
   feedback (#1148, callable `ownerFiducia`): è la fiducia, non il segno, a far registrare L5
   senza fermare (§4b); la sessione lo lega a `start`/`finish --feedback`. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
-  un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
+  un dato. Il sì si scrive solo su chi non è fidato né già approvato; su un
   segnalato l'hover lo dice e serve guardarlo prima.
-  Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
-  (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
+  Togliere il segno locale lascia l'approvazione. Risolto, il feedback di un
   utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
   mandato vede la risoluzione; senza scheda resta solo il lavoro dell'owner e delle sessioni.
-- Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
-  scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
+- In Gestione non si mette né si toglie più a mano (#1575): lo mette il server quando chi
+  lavora lo chiede (#1358). Da riga di comando `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
   feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la
   scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende nessuno).
 - Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
@@ -308,7 +309,7 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
 **fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale fidato (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- lavoro locale fidato (§4b): `todo` col segno, senza nemmeno L0;
 - owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
   coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
   (`priorityManual`), senza scelta la decide il giudice;

@@ -80,10 +80,10 @@
     return isUnprovenSender(fb) ? 'non-provato:' + c : c;
   }
 
-  // ── Lavori locali (#908) ─────────────────────────────────────────────────
-  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno da solo la toglie alle routine;
-  // si mette su un feedback fidato (#1148) o approvato dall'owner come lavoro locale (`localApproval { by, at }`,
-  // #913: lo scrive solo l'admin). Saltare L5 lo decide il server con la fiducia del ramo (fiduciaRamo.js).
+  // ── Lavori server (#908, #1358) ──────────────────────────────────────────
+  // `localOnly { by, at }` toglie la pratica alla coda normale delle routine; in lista resta nella scheda del suo stato
+  // con l'etichetta «server» (#1575). Lo mette il server quando chi lavora lo chiede, o «💻 Lavoro server» su un rombo
+  // azzurro (`localApproval { by, at }`, #913: lo scrive solo l'admin). Saltare L5 lo decide il server (fiduciaRamo.js).
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
@@ -582,8 +582,8 @@
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
         const text = localSenderCheck(fb).ok
-          ? 'Richiede lavoro locale: con «💻 Lavoro server» passa nei Lavori server.'
-          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» passa nei Lavori server.';
+          ? 'Richiede lavoro locale: con «💻 Lavoro server» torna In coda come lavoro server.'
+          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» torna In coda come lavoro server.';
         return { text, color: LOCALE.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
@@ -689,10 +689,8 @@
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
-    if (tab === 'inbox' && aspettaDomanda(fb)) return isLocalOnly(fb) ? 'local' : 'queue';
-    // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
-    // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
-    if (tab === 'queue' && isLocalOnly(fb)) return 'local';
+    if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
+    // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
     // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
     if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
@@ -920,17 +918,17 @@
   // per tutt'e due le pagine perché vive qui.
   function ownerActions(fb, opts) {
     if (statusUnreadable(fb)) return [];
-    const { status } = normalizeStatus(fb);
+    const { status, statusReason } = normalizeStatus(fb);
     const tab = manageTabFor(fb, opts);
     if (tab === 'inbox') {
-      // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
-      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori server' : '→ In coda', primary: true }];
-      // #913: approvarlo come lavoro locale. `locale` dice a chi scrive di aggiungere il segno e il sì dell'owner.
-      // Rimandato nei Ricevuti perché richiede lavoro locale (--serve-locale): la decisione attesa è questa.
-      if (!isLocalOnly(fb) && localApprovalCheck(fb, opts).ok) {
-        const attesa = String((fb && fb.statusReason) || '') === 'locale';
-        if (attesa) acts[0].primary = false;
-        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: attesa, locale: true });
+      // Aspetta una decisione: approvare È scrivere `todo`.
+      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
+      // Il rombo azzurro nato prima di #1358 (`design`/`locale` senza domanda) esce solo come lavoro server: il segno
+      // lo mette ormai il server, e altrove il tasto non c'è (#1575). `approva`: il sì dell'owner (#913) a chi non è
+      // fidato né già approvato.
+      if (status === 'design' && statusReason === 'locale' && !isLocalOnly(fb)) {
+        acts[0].primary = false;
+        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok });
       }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
@@ -944,7 +942,7 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+    if (tab === 'queue' || tab === 'waiting') {
       // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
       if (aspettaDomanda(fb)) return [{ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false }];
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
@@ -1085,16 +1083,16 @@
   //                sotto, il resto per priorità DESC (Claude affronta prima le
   //                alte), poi severità del blocco, poi recenza.
   //   altre      → createdAt DESC.
-  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
+  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti"; `opts.soloNonFidate` è il filtro
+  // della fiducia, `opts.livelli` quello dei Ricevuti.
   function listForManageTab(feedbacks, tab, opts) {
-    const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
+    const items = filtraFiducia((feedbacks || []).filter((f) => manageTabFor(f, opts) === tab), opts && opts.soloNonFidate);
     if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
-    // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
-    // stessa coda, lavorata da un'altra parte; chi aspetta (#903) la stessa coda, più tardi.
-    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+    // volta l'ordine per priorità dentro ogni gruppo. Chi aspetta (#903) è la stessa coda, più tardi.
+    if (tab === 'queue' || tab === 'waiting') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
@@ -1133,8 +1131,8 @@
   function listArchiveTab(feedbacks, opts) {
     const starredOnly = !!(opts && opts.starredOnly);
     const confirmedOnly = !!(opts && opts.confirmedOnly);
-    let items = (feedbacks || []).filter((f) =>
-      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived');
+    let items = filtraFiducia((feedbacks || []).filter((f) =>
+      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived'), opts && opts.soloNonFidate);
     if (confirmedOnly) {
       items = items.filter((f) => String(normalizeStatus(f).status).endsWith('_confirmed'));
     }
@@ -1152,15 +1150,15 @@
   // In coda / Risolti l'ordinamento non cambia la lunghezza, quindi basta
   // l'appartenenza (manageTabFor, lo stesso filtro di listForManageTab);
   // Archiviati passa da listArchiveTab perché ha regole e filtri suoi.
-  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli }. PURA.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli, soloNonFidate }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, waiting: 0, resolved: 0, archived: 0 };
     const inbox = [];
-    for (const f of list) {
+    for (const f of filtraFiducia(list, opts && opts.soloNonFidate)) {
       const tab = manageTabFor(f, opts);
       if (tab === 'inbox') inbox.push(f);
-      else if (tab === 'queue' || tab === 'local' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
+      else if (tab === 'queue' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
     counts.inbox = filtraLivelli(inbox, opts && opts.livelli, opts).length;
     counts.archived = listArchiveTab(list, opts).length;
@@ -1885,6 +1883,8 @@
     pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
     quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
     cerchio:   'M8 2.2 A5.8 5.8 0 1 1 7.99 2.2 Z',
+    // Non è un livello: è il segno della fiducia in lista (#1575), una forma che nessun livello usa.
+    scudo:     'M8 1.6 L13.4 3.6 V7.6 C13.4 10.8 11.2 13.3 8 14.5 C4.8 13.3 2.6 10.8 2.6 7.6 V3.6 Z',
   };
 
   // Il motivo di design → il livello che ha fermato la pratica (D93). Il rombo è Claude che chiede.
@@ -1979,7 +1979,7 @@
   // le pagine dell'owner che avevano un ingresso loro (#1414): i loro vecchi indirizzi li rigira il protocollo.
   const SEZIONI = Object.freeze([
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
-    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
+    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
     { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
     { id: 'utenti', nome: 'Utenti', schede: ['utenti'] },
     { id: 'predefinite', nome: 'Impostazioni predefinite', schede: ['predefiniti'] },
@@ -2072,15 +2072,38 @@
     return items.filter((fb) => scelti.includes(livelloRicevuti(fb, opts)));
   }
 
-  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, a filtro spento; `senza` = nessun livello. PURA. */
+  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, coi livelli spenti e la fiducia di `opts`; `senza` = nessun livello. PURA. */
   function contaLivelliRicevuti(feedbacks, opts) {
     const n = { l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, senza: 0 };
-    for (const fb of (feedbacks || [])) {
+    for (const fb of filtraFiducia(feedbacks, opts && opts.soloNonFidate)) {
       if (manageTabFor(fb, opts) !== 'inbox') continue;
       const l = livelloRicevuti(fb, opts);
       n[l || 'senza']++;
     }
     return n;
+  }
+
+  // ── La fiducia in lista (#1575) ───────────────────────────────────────────
+  // Un filtro solo per pratiche e domande (le due portano `fiducia`), così lista e numeri non divergono: quello che
+  // nasconde non si conta (patterns/contenuto-nascosto-sezioni-chiuse-filtri-collassi-rivelalo.md).
+  /** Con `soloNonFidate` le sole non fidate, altrimenti tutte. PURA. */
+  function filtraFiducia(lista, soloNonFidate) {
+    const items = Array.isArray(lista) ? lista : [];
+    return soloNonFidate ? items.filter((x) => !isFidato(x)) : items.slice();
+  }
+  function contaNonFidate(lista) {
+    return filtraFiducia(lista, true).length;
+  }
+  // Il cancello guarda anche il registro del ramo, che la pagina non legge (#1554, #1555): l'hover non promette di più.
+  const SEGNI_FIDUCIA = Object.freeze({
+    fidata: Object.freeze({ classe: 'fidata', parola: 'Fidata',
+      testo: 'Fidata. È la fiducia del feedback. Il cancello guarda anche il registro del ramo, che questa pagina non legge, e se il registro è rotto ferma la fusione lo stesso.' }),
+    nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Non fidata',
+      testo: 'Non fidata. È la fiducia del feedback. Se il cancello ferma il lavoro, la fusione aspetta il tuo sì.' }),
+  });
+  /** Il segno della fiducia su una riga: la classe del colore, la parola e l'hover. Senza campo vale non fidata. PURA. */
+  function segnoFiducia(x) {
+    return isFidato(x) ? SEGNI_FIDUCIA.fidata : SEGNI_FIDUCIA.nonfidata;
   }
 
   /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
@@ -2122,6 +2145,7 @@
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
+    filtraFiducia, contaNonFidate, segnoFiducia,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
