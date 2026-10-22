@@ -30,6 +30,8 @@ test('r2 nel benvenuto, un testo incollato che cambia lo stile passa dal riquadr
       if (all.includes('integrare le nuove lezioni')) return 'PROFILO:\nAnna.\n\nPREFERENZE:\nRisposte brevi.';
       if (all.includes('analizzare l')) return 'LEZIONE: niente.';
       if (all.includes('preparare la dashboard')) return JSON.stringify({ message: 'Ciao.', suggestions: [] });
+      if (all.includes('Sei il controllo rapido degli errori')) return '';
+      if (all.includes('proponi SUGGERIMENTI')) return '[][][][nessuno]';
       return globalThis.__chatReplies.shift() || JSON.stringify({ text: 'Dimmi pure.', actions: [] });
     };
     P.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
