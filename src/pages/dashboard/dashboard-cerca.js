@@ -235,14 +235,14 @@
   function vociMenu(target) {
     const e = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
     if (e && e.closest && e.closest('.dash-cerca-campo')) {
-      return [{ type: 'item', icon: icona('eyeOff', 16), label: 'Mostra le conversazioni nascoste', onClick: () => { mostraNascoste().catch(() => {}); } }];
+      return [{ type: 'item', icon: icona('eyeOff', 16), label: 'Mostra le conversazioni nascoste', azione: 'chat-archive', onClick: () => { mostraNascoste().catch(() => {}); } }];
     }
     const b = e && e.closest ? e.closest('.dash-cerca-voce') : null;
     if (!b || !b._risultato) return [];
     const r = b._risultato;
     if (r.k === 'nascosta') {
       return [
-        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { rimetti(r).catch(() => {}); } },
+        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { rimetti(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
       ];
     }
@@ -255,7 +255,7 @@
       ];
     }
     return [
-      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', onClick: () => { apri(r).catch(() => {}); } },
+      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
       { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
     ];
   }

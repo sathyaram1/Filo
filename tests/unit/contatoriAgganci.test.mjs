@@ -123,7 +123,11 @@ test('ogni voce del tasto destro che fa un’azione del catalogo la misura, e il
   const menu = leggi('src', 'content', 'menu.js');
   assert.match(menu, /function open\(\{ x, y, items, keepOnScroll, alChiudere \}\) \{\s*misuraLeAzioni\(items\);/);
   assert.match(leggi('src', 'content', 'menuNelloStrato.js'), /Menu\.open = \(o\) => \{ if \(o\) Menu\.misuraLeAzioni\(o\.items\);/);
-  const tutto = contenuti.map(([, s]) => s).join('\n');
+  // Le pagine di Filo danno le loro voci allo stesso menu (SN_VOCI_PAGINA): un'azione lì si misura come nel resto.
+  const pagine = readdirSync(join(ROOT, 'src', 'pages'), { recursive: true }).filter((f) => String(f).endsWith('.js'))
+    .map((f) => leggi('src', 'pages', String(f))).filter((s) => s.includes('SN_VOCI_PAGINA'));
+  assert.ok(pagine.length >= 3, 'le pagine che danno voci al tasto destro si leggono');
+  const tutto = [...contenuti.map(([, s]) => s), ...pagine].join('\n');
   const nelMenu = new Set([...tutto.matchAll(/azione: '([a-z0-9-]+)'/g)].map((m) => m[1]));
   for (const id of nelMenu) assert.ok(C.azioni().includes(id), `«${id}» non è nel catalogo delle azioni`);
   const main = ['ipc.js', 'shortcuts.js', 'menu.js', 'tabs.js', 'barraLaterale.js'].map((f) => leggi('src', 'main', f)).join('\n')
