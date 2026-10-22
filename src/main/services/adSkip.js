@@ -212,14 +212,14 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now(), tetto = T
   return { ok: true };
 }
 
-/**
- * Il lettore incorporato chiede il clic nel suo punto: ogni frame sopra di lui, dal più vicino alla pagina della
- * scheda, ritrova il riquadro figlio, vede che sopra non c'è altro e dà il punto nella sua vista.
- */
 // In una scheda nascosta i frame rispondono al passo dei loro timer, un secondo: il tentativo dopo del lettore
 // arriverebbe con la domanda di prima ancora aperta, e due clic intrecciati non ne fanno nessuno.
 const inCorso = new WeakSet();
 
+/**
+ * Il lettore incorporato chiede il clic nel suo punto: ogni frame sopra di lui, dal più vicino alla pagina della
+ * scheda, ritrova il riquadro figlio, vede che sopra non c'è altro e dà il punto nella sua vista.
+ */
 async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now() } = {}) {
   const wc = sender.wc;
   if (inCorso.has(wc) || ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };

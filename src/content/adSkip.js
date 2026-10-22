@@ -132,8 +132,8 @@
   // Un «Salta» coperto o fuori dalla vista (si sta leggendo più giù) prende un clic dello script, poi si aspetta di vederlo.
   function premi(el, s) {
     if (clicVero && !s.finto) {
-      // In una pagina nascosta Chromium instrada il clic vero con la mappa dell'ultimo fotogramma, e al riquadro può
-      // non arrivare: lo prenderebbe la pagina che lo ospita. Il lettore incorporato aspetta di tornare a schermo.
+      // In una pagina nascosta il clic vero instradato al riquadro a volte non gli arriva e lo riceve la pagina che lo
+      // ospita (#1494): il lettore incorporato aspetta di tornare a schermo.
       if (!inCima && nascosta()) return false;
       if (utenteOccupato()) return false;
       const p = centro(el);
