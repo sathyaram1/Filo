@@ -64,6 +64,9 @@ La regola, in tre pezzi:
   programma che tiene le credenziali dice «generata» nel manifesto del passo
   prima: si segue l'ingrediente, se la sua impronta è quella firmata dal passo
   dopo e se la sua firma regge, e a dichiarare è chi ha firmato quel manifesto.
+  Un componente generato rende l'immagine «modificata», salvo quando è tutta
+  l'immagine: unico ingrediente, stesso certificato, nessuna lavorazione
+  dichiarata dal passo dopo. ChatGPT firma così ogni sua immagine (#946.1).
 - **Dai pixel non si stima niente.** Niente classificatori a percentuale, e il
   modello che descrive l'immagine non parla della sua origine. Un marchio
   invisibile aperto invece è un messaggio fisso che il generatore scrive nei
