@@ -160,6 +160,14 @@ test('nascondere e rimettere una conversazione dal tasto destro contano l’atte
   const home = await openTab(HOME);
   const bolla = home.locator('.dash-bubble[data-chat="c-hegel"]').first();
   await expect(bolla).toBeVisible({ timeout: 15_000 });
+  // La home sposta ancora la bolla dopo averla mostrata: un clic destro prima che si fermi cade nel vuoto.
+  let prima = null;
+  await expect.poll(async () => {
+    const b = await bolla.boundingBox();
+    const ferma = Boolean(b && prima && b.x === prima.x && b.y === prima.y);
+    prima = b;
+    return ferma;
+  }, { timeout: 10_000, intervals: [250] }).toBe(true);
   await bolla.click({ button: 'right' });
   await menuDi(home).voce('Nascondi la conversazione').first().click();
   const riga = home.locator('.dash-nascosta');
