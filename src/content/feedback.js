@@ -620,7 +620,8 @@
     // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
     // fabbricato lo ferma soloGestiVeri, sui siti).
     modal.addEventListener('paste', async (e) => {
-      if (!e.isTrusted) return;
+      // Sui siti arriva la copia nostra del ponte (SN_FILO_UI.eventoNelRiquadro), non l'originale.
+      if (!(global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted)) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const it of items) {
