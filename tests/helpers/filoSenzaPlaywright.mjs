@@ -110,9 +110,13 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 
+  // Un `require('electron')` chiesto prima che il main di Filo lo abbia caricato prende il pacchetto npm al posto
+  // dell'API, e a Filo resta quello: «BrowserWindow is not a constructor». Si aspetta un segno del suo main, senza require.
   try {
     const inizio = Date.now();
-    while (!(await evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoTabs && w._filoTabs.tabs.length > 0)).catch(() => false))) {
+    const pronta = async () => (await grezzo('typeof globalThis.SN_EXECUTE_FILO_ACTION === \'function\'').catch(() => false))
+      && evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoTabs && w._filoTabs.tabs.length > 0)).catch(() => false);
+    while (!(await pronta())) {
       if (Date.now() - inizio > PARTENZA_MS) throw new Error(`la finestra di Filo non è nata\n${uscita()}`);
       await new Promise((ok) => setTimeout(ok, 200));
     }
