@@ -1669,6 +1669,7 @@
     const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
     const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
     if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
+    if (o.cartellaDiRete) return `Cartella su un altro computer · ${o.cartellaDiRete}`;
     const n = Array.isArray(o.risultati) ? o.risultati.length : null;
     const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
     return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
