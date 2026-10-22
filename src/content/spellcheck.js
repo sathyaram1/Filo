@@ -402,6 +402,35 @@
     return true;
   }
 
+  // La parola [start, end) diventa `nuova`. Col cursore subito dopo la parola e quel che l'ha chiusa (spazio, virgola)
+  // si riscrivono insieme, così il cursore resta lì anche negli editor che lo rimettono da sé dal loro modello (Lexical).
+  const CODA_MAX = 20;
+  function sostituisciParola(el, start, end, attesa, nuova) {
+    const testo = getEditableText(el);
+    const pos = cursoreNelCampo(el);
+    const coda = pos >= end ? testo.slice(end, pos) : null;
+    if (coda !== null && coda.length <= CODA_MAX && !/[\n\r]/.test(coda) && testo.slice(start, end) === attesa) {
+      const scritta = campoDiTesto(el) ? coda : coda.replace(/ /g, ' ');
+      applyFix(el, { start, end: pos }, nuova + scritta, { cursor: 'end', expectedSegment: attesa + coda, automatica: true });
+      return;
+    }
+    applyFix(el, { start, end }, nuova, { cursor: 'preserve', expectedSegment: attesa, automatica: true });
+  }
+
+  // Gli editor di testo ricco (ProseMirror, Lexical) tengono un loro annulla e la scorciatoia non arriva al browser:
+  // subito dopo una correzione automatica la prende Filo, prima della pagina, e riporta la parola com'era.
+  function annullaColTasto(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key || '').toLowerCase() !== 'z') return;
+    const el = editabileDellEvento(e);
+    const state = el && monitored.get(el);
+    if (!state || campoDiTesto(el)) return;
+    const u = state.ultimaAutomatica;
+    if (!u || getEditableText(el) !== u.testo) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    annullaAutomatica(el, u.voce);
+  }
+
   // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
   // stesso comando) lo fa il browser, che toglie proprio la correzione: così l'annulla dopo toglie quello che si era
   // scritto. Il browser però riseleziona la parola, e il tasto dopo la cancellerebbe: il cursore torna dov'era.
