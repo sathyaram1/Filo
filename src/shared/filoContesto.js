@@ -206,9 +206,8 @@
     return peggiore;
   }
 
-  // Le risposte di altre conversazioni che il modello ha davanti nel tratto (#1508) hanno la forma di una ricerca fra le
-  // chat, come i ricordi: stato del compito, uscite e accoglienza le contano come la lettura che erano. `visti` sono
-  // messaggi del filo, con `classeLetta` già risolta (src/main/services/contestoFilo.js → messaggiDi). Null se pulite.
+  // Le risposte di altre chat nel tratto (#1508) hanno la forma di una ricerca fra le chat, come i ricordi: stato, uscite e
+  // accoglienza le contano uguali. `classeLetta` è già risolta da src/main/services/contestoFilo.js (messaggiDi).
   function trattoComeAzione(visti, { chatCorrente = null } = {}) {
     const altre = (Array.isArray(visti) ? visti : []).filter((m) => m && !m.riga && m.chat !== chatCorrente);
     const classe = classeDelleRisposte(altre);
