@@ -274,8 +274,7 @@
     attivo = !!(r && r.ok && r.enabled);
     clicVero = attivo && !!r.clicVero;
     if (clicVero) presentati();
-    if (attivo) metti();
-    else togli();
+    if (attivo) { metti(); vegliaNascosta(); } else togli();
   }
 
   function carica() {
