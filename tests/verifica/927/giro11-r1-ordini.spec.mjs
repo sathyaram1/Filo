@@ -1,5 +1,5 @@
 // Verifica #927 giro 11: un ordine con un destinatario, un verbo o una forma fuori dagli elenchi della regola entra nel
-// riepilogo senza box (r1): azione su un indirizzo, memoria, cambio di persona, ordini senza destinatario del giro 10.
+// riepilogo senza box (r1): azione su un indirizzo, memoria, cambio di persona, Filo per nome, porte del giro 10.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const pagina = (titolo) => `<!doctype html><html><head><meta charset="utf-8"><title>${titolo}</title></head><body><p>Una pagina</p></body></html>`;
