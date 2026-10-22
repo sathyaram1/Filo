@@ -1576,3 +1576,28 @@ test.describe('spellcheck-shadow-editable', () => {
       .toBe('word ciao');
   });
 });
+
+// #1509 — Il segno `data-filo-native-word` sull'html del sito diceva la parola sbagliata dell'utente, anche quella scritta
+// in un riquadro di Filo, e si scriveva sempre. Ora solo nelle prove, col segnale del main, e mai da un riquadro.
+test.describe('spellcheck-nei-riquadri', () => {
+  test('tasto destro su una parola sbagliata nel feedback: il menu la corregge, e il sito non legge la parola', async ({ app, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, '<!doctype html><html lang="it"><body style="margin:0;padding:40px"><p>Una pagina.</p></body></html>');
+    await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+    await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+    await clicca(app, page, '.sn-fb-text');
+    await page.keyboard.type('ciiao come stai', { delay: 10 });
+    const casella = await statoDi(app, page, '.sn-fb-text');
+    await page.mouse.click(casella.x + 20, casella.y + 14, { button: 'right' });
+
+    // I suggerimenti del correttore di sistema sono arrivati alla scheda, e il menu li offre.
+    await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.SN_SPELLCHECK.getNativeSuggestions('ciiao')), { timeout: 6000 })
+      .toContain('ciao');
+    const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
+    await expect(corr).toBeVisible({ timeout: 4000 });
+    await expect(corr).toContainText('ciao');
+    expect(await page.evaluate(() => document.documentElement.getAttribute('data-filo-native-word')), 'il sito legge la parola dal suo html').toBeNull();
+
+    await corr.click();
+    await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text')).valore).toBe('ciao come stai');
+  });
+});

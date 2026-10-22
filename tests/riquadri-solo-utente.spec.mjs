@@ -503,11 +503,31 @@ const LETTORE = `<script>
   }
 </script>`;
 
-test('nel feedback su un sito quello che l\'utente scrive, compone, incolla e trascina arriva alla casella, non al sito', async ({ app, openTab, testServer }) => {
+test('nei riquadri su un sito quello che l\'utente scrive, compone, incolla e trascina arriva alla casella, non al sito', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, pagina(`<p id="testo">Una pagina qualsiasi.</p>${LETTORE}`));
+  await contaChiamate(app);
+  const page = await testServer.openReady(openTab, pagina(`<textarea id="campo" style="width:400px;height:80px">Un testo.</textarea><p id="testo">Una pagina qualsiasi.</p>${LETTORE}`));
+  const letti = () => page.evaluate(() => window.__letti);
+
+  // La Modifica, aperta dal tasto destro su un campo del sito.
+  await page.locator('#campo').click();
+  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction')).not.toBeNull();
+  await clicca(app, page, '.sn-editbox-instruction');
+  await page.evaluate(() => { window.__letti = []; });
+  await page.keyboard.type('rendilo formale', { delay: 15 });
+  expect((await statoDi(app, page, '.sn-editbox-instruction')).valore).toBe('rendilo formale');
+  expect(await letti(), 'il sito non ha letto l\'istruzione').toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
+
+  // Il feedback, dal tasto destro sulla pagina.
   await spiaInvii(app, page);
   await page.locator('#testo').click({ button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
   await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Invia feedback' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
   await clicca(app, page, '.sn-fb-text');
@@ -534,24 +554,12 @@ test('nel feedback su un sito quello che l\'utente scrive, compone, incolla e tr
   const data = { items: [], files: [file], dragOperationsMask: 1 };
   for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, ...punto, data });
   await expect.poll(() => conta(app, page, '.sn-fb-file-chip')).toBe(1);
+  togliCartella(cartella);
 
-  expect(await page.evaluate(() => window.__letti), 'il sito non ha visto niente di quello che entrava nella casella').toEqual([]);
+  expect(await letti(), 'il sito non ha visto niente di quello che entrava nella casella').toEqual([]);
   await expect.poll(() => bozzaSalvata(app, chiaveBozza(testServer.origin))).toBe(scritto);
   expect((await statoDi(app, page, '.sn-fb-text')).valore, 'il file non è finito come testo nella casella').toBe(scritto);
   await clicca(app, page, '.sn-fb-send');
   await expect.poll(() => inviati(app, page)).toEqual([scritto]);
-  expect(await page.evaluate(() => window.__letti)).toEqual([]);
-  togliCartella(cartella);
-
-  // La Modifica, aperta dal tasto destro su un campo del sito: l'istruzione non arriva al sito.
-  await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', '<textarea id="campo">Un testo.</textarea>'));
-  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
-  await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
-  await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction')).not.toBeNull();
-  await clicca(app, page, '.sn-editbox-instruction');
-  await page.evaluate(() => { window.__letti = []; });
-  await page.keyboard.type('rendilo formale', { delay: 15 });
-  expect((await statoDi(app, page, '.sn-editbox-instruction')).valore).toBe('rendilo formale');
-  expect(await page.evaluate(() => window.__letti)).toEqual([]);
+  expect(await letti()).toEqual([]);
 });
