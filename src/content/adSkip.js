@@ -240,6 +240,7 @@
   // Un elemento del sito messo sopra al riquadro non deve ricevere il clic vero: allora niente.
   function dove(q) {
     if (!attivo) return { code: 'off' };
+    if (nascosta()) return { code: 'coperto' };
     if (utenteOccupato()) return { code: 'occupato' };
     let f = null;
     let visto = false;
