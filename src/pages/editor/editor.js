@@ -3488,6 +3488,8 @@
     // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
     // pagina è aperta: è un fatto di quel momento, non entra nel documento.
     const noteRipiego = new WeakMap();
+    // Allo stesso modo la riga che dice quanta parte di un documento troppo lungo ha letto la risposta (#1475).
+    const noteTaglio = new WeakMap();
     // Una risposta che non è arrivata: segnata come errore e, finché la pagina è aperta, col tasto per la pagina
     // dove si toglie l'ostacolo (#663). Nel documento resta la frase.
     const errori = new WeakMap();
