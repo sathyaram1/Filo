@@ -36,8 +36,11 @@
   // Clipboard: copia / taglia
   // ------------------------------------------------------------
   function copyToClipboard(text) {
+    console.log('[SNPROBE] copy start', text);
+    setTimeout(() => console.log('[SNPROBE] copy 1s later'), 1000);
     navigator.clipboard.writeText(text).then(
       () => {
+        console.log('[SNPROBE] copy ok');
         Popup.showToast(I18n.t('toast_copied'));
         pushClipboardEntry({ type: 'text', text });
       },
