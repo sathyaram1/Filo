@@ -1,5 +1,6 @@
 // finish:check fissa lo sha all'avvio e prova in una cartella staccata: se la cartella cambia ramo a metà (D-91: un
-// altro worker la portava su main), l'esito resta quello del commit di partenza e lo dice (#1480).
+// altro worker la portava su main), l'esito resta quello del commit di partenza e lo dice (#1480). Gira anche lui
+// dentro quella cartella staccata: node_modules si trova risalendo, mai accanto al repo.
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
@@ -8,11 +9,14 @@ import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
 import { apriProvaSulCommit, pulisciResti, gitIn, togliCollegamento } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// node_modules vero, ovunque giri questo file: anche dalla cartella staccata di finish, che ce l'ha un livello sopra.
+const MODULI = resolve(dirname(createRequire(import.meta.url).resolve('@playwright/test/package.json')), '..', '..');
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 // Il finto unit test dice da dove prova: aspetta che la cartella sia stata spostata, poi legge il segno del commit.
@@ -54,7 +58,7 @@ function deposito() {
   git(casa, 'clone', '-q', '-b', 'claude/prova', origine, lavoro);
   git(lavoro, 'config', 'user.email', 't@t');
   git(lavoro, 'config', 'user.name', 't');
-  symlinkSync(join(REPO, 'node_modules'), join(lavoro, 'node_modules'), 'junction');
+  symlinkSync(MODULI, join(lavoro, 'node_modules'), 'junction');
   appendFileSync(join(lavoro, '.git', 'info', 'exclude'), '\nnode_modules\n');
   return { casa, lavoro };
 }
@@ -105,7 +109,7 @@ test('la cartella di prova: staccata sullo sha, coi moduli raggiungibili, e la p
   } finally {
     assert.equal(albero.chiudi().ok, true);
     assert.equal(existsSync(albero.base), false);
-    assert.ok(existsSync(join(REPO, 'node_modules', '@playwright')), 'node_modules vero intatto');
+    assert.ok(existsSync(join(MODULI, '@playwright')), 'node_modules vero intatto');
     togli(casa, lavoro);
   }
 });
