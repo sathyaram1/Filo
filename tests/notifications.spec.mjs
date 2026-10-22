@@ -5,7 +5,8 @@
 //   1) una notifica a tempo (durata finita) sparisce da sola dopo il timeout;
 //   2) una notifica infinita (durata 0) RESTA e si chiude solo premendo la X;
 //   3) la durata configurata nelle Preferenze viene rispettata dalla shell
-//      (config letta dalle impostazioni, non hard-coded).
+//      (config letta dalle impostazioni, non hard-coded);
+//   4) oltre il tetto nessun avviso si perde: aspetta dietro il «+N» (#1477).
 //
 // Il sistema è esposto sulla shell come window.filoNotify(text, opts): gli
 // stessi blocchi #170.2/#170.3 lo useranno per segnalare gli eventi.
@@ -59,9 +60,11 @@ test('una raffica di notifiche non straripa fuori schermo e resta chiudibile', a
   });
   const vista = await avvisi();
 
-  // 1) Lo stack è limitato, e restano le più recenti.
+  // 1) A schermo restano le più recenti; le altre aspettano dietro il «+N» in cima.
   await expect(vista.locator('.shell-notif')).toHaveCount(5);
   await expect(vista.locator('.shell-notif-msg').last()).toContainText('Sito bloccato #20');
+  const altre = vista.locator('.avvisi-testa [data-pila="apri"]');
+  await expect(altre).toHaveText('+16 avvisi');
 
   // 2) La vista sta dentro la finestra, sotto la barra delle schede: non copre schede né pulsanti.
   const posa = () => app.evaluate(({ BrowserWindow }) => {
@@ -69,11 +72,14 @@ test('una raffica di notifiche non straripa fuori schermo e resta chiudibile', a
     const [W, H] = win.getContentSize();
     return { b: win._filoTabs.avvisi.vista.getBounds(), W, H, alto: win._filoTabs._altezzaCornice() };
   });
-  await expect.poll(async () => (await posa()).b.height).toBeGreaterThan(0);
-  const p = await posa();
-  expect(p.b.y).toBeGreaterThanOrEqual(p.alto);
-  expect(p.b.y + p.b.height).toBeLessThanOrEqual(p.H);
-  expect(p.b.x + p.b.width).toBeLessThanOrEqual(p.W);
+  const dentro = async () => {
+    await expect.poll(async () => (await posa()).b.height).toBeGreaterThan(0);
+    const p = await posa();
+    expect(p.b.y).toBeGreaterThanOrEqual(p.alto);
+    expect(p.b.y + p.b.height).toBeLessThanOrEqual(p.H);
+    expect(p.b.x + p.b.width).toBeLessThanOrEqual(p.W);
+  };
+  await dentro();
 
   // 3) La più recente è in vista con la sua X, e le altre si raggiungono scorrendo.
   const ultima = vista.locator('.shell-notif').last();
@@ -81,11 +87,118 @@ test('una raffica di notifiche non straripa fuori schermo e resta chiudibile', a
   await vista.locator('.shell-notif').first().locator('.shell-notif-close').scrollIntoViewIfNeeded();
   await expect(vista.locator('.shell-notif').first().locator('.shell-notif-close')).toBeInViewport();
 
-  // 4) La X chiude davvero quella notifica.
+  // 4) La X chiude davvero quella notifica, e al suo posto entra la più recente di quelle che aspettavano.
   await vista.locator('.shell-notif').first().locator('.shell-notif-close').click();
-  await expect(shell.locator('.shell-notif')).toHaveCount(4, { timeout: 4000 });
-  await expect(vista.locator('.shell-notif')).toHaveCount(4);
+  await expect(shell.locator('.shell-notif')).toHaveCount(20, { timeout: 4000 });
   await expect(vista.locator('.shell-notif-msg', { hasText: 'Sito bloccato #16,' })).toHaveCount(0);
+  await expect(vista.locator('.shell-notif')).toHaveCount(5);
+  await expect(vista.locator('.shell-notif-msg').first()).toContainText('Sito bloccato #15,');
+  await expect(altre).toHaveText('+15 avvisi');
+
+  // 5) «+15» le mostra tutte, la più vecchia in vista; la vista resta dentro la finestra.
+  await altre.click();
+  await expect(vista.locator('.shell-notif')).toHaveCount(20);
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Sito bloccato #0,' })).toBeInViewport();
+  await dentro();
+
+  // 6) Riduci torna alle cinque più recenti; Chiudi tutti le chiude tutte, anche quelle che aspettavano.
+  await vista.locator('.avvisi-testa [data-pila="riduci"]').click();
+  await expect(vista.locator('.shell-notif')).toHaveCount(5);
+  await expect(altre).toHaveText('+15 avvisi');
+  await altre.click();
+  await expect(vista.locator('.shell-notif')).toHaveCount(20);
+  await vista.locator('.avvisi-testa [data-pila="chiudi-tutti"]').click();
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+  await expect(vista.locator('.shell-notif')).toHaveCount(0);
+});
+
+// #1477 — oltre il tetto un avviso non sparisce senza traccia: aspetta, e si ritrova.
+test('sei avvisi a tempo di fila: il primo aspetta dietro «+1» e compare quando gli altri se ne vanno', async ({ shell, avvisi }) => {
+  // La vista nasce col primo avviso: la si fa nascere prima, così i tempi della prova sono quelli degli avvisi.
+  await shell.evaluate(() => window.filoNotify('pronto', { durationSec: 1 }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'pronto' })).toBeVisible();
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+
+  await shell.evaluate(() => {
+    for (let i = 1; i <= 6; i++) window.filoNotify('Avviso ' + i, { durationSec: 2 });
+  });
+  await expect(vista.locator('.shell-notif')).toHaveCount(5);
+  await expect(vista.locator('.shell-notif-msg').last()).toHaveText('Avviso 6');
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Avviso 1' })).toHaveCount(0);
+  await expect(vista.locator('.avvisi-testa [data-pila="apri"]')).toHaveText('+1 avviso');
+
+  // Il suo tempo non corre finché aspetta: se ne vanno le altre cinque, e lui si fa vedere per intero.
+  const primo = vista.locator('.shell-notif.show .shell-notif-msg', { hasText: 'Avviso 1' });
+  await expect(primo).toBeVisible({ timeout: 6000 });
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Avviso 6' })).toHaveCount(0);
+  await expect(vista.locator('.avvisi-testa')).toBeHidden();
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 6000 });
+});
+
+test('sei avvisi che restano: «+1» mostra il primo, Riduci lo rimette dietro, chiuderne uno lo fa entrare', async ({ shell, avvisi }) => {
+  await shell.evaluate(() => {
+    window.filoNotify('Avviso 1', { durationSec: 0, unica: 'primo' });
+    for (let i = 2; i <= 6; i++) window.filoNotify('Avviso ' + i, { durationSec: 0 });
+  });
+  const vista = await avvisi();
+  const altre = vista.locator('.avvisi-testa [data-pila="apri"]');
+  await expect(vista.locator('.shell-notif')).toHaveCount(5);
+  await expect(altre).toHaveText('+1 avviso');
+
+  await altre.click();
+  await expect(vista.locator('.shell-notif')).toHaveCount(6);
+  await expect(vista.locator('.shell-notif-msg').first()).toHaveText('Avviso 1');
+  await expect(vista.locator('.shell-notif-msg').last()).toHaveText('Avviso 6');
+  await vista.locator('.avvisi-testa [data-pila="riduci"]').click();
+  await expect(vista.locator('.shell-notif')).toHaveCount(5);
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Avviso 1' })).toHaveCount(0);
+
+  // Rinnovato mentre aspetta (lo stesso avviso che ritorna), è la notizia più fresca: torna in vista in fondo.
+  await shell.evaluate(() => window.filoNotify('Avviso 1, di nuovo', { durationSec: 0, unica: 'primo' }));
+  await expect(vista.locator('.shell-notif-msg').last()).toHaveText('Avviso 1, di nuovo');
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Avviso 2' })).toHaveCount(0);
+  await expect(altre).toHaveText('+1 avviso');
+
+  // Chiuso uno a schermo, quello che aspettava entra e il «+1» se ne va.
+  await vista.locator('.shell-notif', { hasText: 'Avviso 6' }).locator('.shell-notif-close').click();
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Avviso 2' })).toBeVisible();
+  await expect(vista.locator('.shell-notif')).toHaveCount(5);
+  await expect(vista.locator('.avvisi-testa')).toBeHidden();
+});
+
+test('tasto destro sul «+N» e su una carta: Mostra tutti e Chiudi tutti fanno quello che fanno i pulsanti', async ({ app, shell, avvisi }) => {
+  await shell.evaluate(() => {
+    for (let i = 1; i <= 7; i++) window.filoNotify('Avviso ' + i, { durationSec: 0 });
+  });
+  const vista = await avvisi();
+  const altre = vista.locator('.avvisi-testa [data-pila="apri"]');
+  await expect(altre).toHaveText('+2 avvisi');
+  const menuCon = async (voce) => {
+    let menu = null;
+    await expect.poll(async () => {
+      for (const w of app.windows()) {
+        try { if (await w.evaluate((v) => [...document.querySelectorAll('button.item')].some((b) => b.textContent.trim() === v), voce)) { menu = w; return true; } } catch (_) {}
+      }
+      return false;
+    }, { timeout: 8_000 }).toBe(true);
+    return menu;
+  };
+  const voci = (menu) => menu.evaluate(() => [...document.querySelectorAll('button.item')].map((b) => b.textContent.trim()));
+  const scegli = (menu, voce) => menu.evaluate((v) => [...document.querySelectorAll('button.item')].find((b) => b.textContent.trim() === v).click(), voce);
+
+  await altre.click({ button: 'right' });
+  let menu = await menuCon('Mostra tutti');
+  expect(await voci(menu)).toEqual(['Mostra tutti', 'Chiudi tutti']);
+  await scegli(menu, 'Mostra tutti');
+  await expect(vista.locator('.shell-notif')).toHaveCount(7);
+
+  await vista.locator('.shell-notif-msg', { hasText: 'Avviso 7' }).click({ button: 'right' });
+  menu = await menuCon('Chiudi tutti');
+  expect(await voci(menu)).toEqual(['Chiudi', 'Chiudi tutti']);
+  await scegli(menu, 'Chiudi tutti');
+  await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
+  await expect(vista.locator('.shell-notif')).toHaveCount(0);
 });
 
 test('Preferenze: i controlli notifiche esistono e persistono', async ({ openTab }) => {
