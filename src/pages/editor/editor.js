@@ -1055,25 +1055,15 @@
       if (f0 && f0.meta) f0.meta.titleAuto = true;
       writeCollection();
     }
-    const letto = docPerIlModello();
-    if (!letto.testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
-    const chat = editorChatMessages();
-    const memory = await filoMemoryText();
-    const parts = [bloccoDocumento(letto)];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
-    const messages = [
+    if (!docPerIlModello().testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    const contesto = contestoDelDocumento(editorChatMessages(), await filoMemoryText());
+    const conDocumento = (letto) => [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
-      { role: 'user', content: parts.join('\n\n') },
+      { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     if (!auto && docSwitchBtn) docSwitchBtn.classList.add('ed-doc-generating');
     try {
-      const r = await sendMessage({
-        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_TITLE || 'editor_title', payload: { messages },
-      });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
       const ok = applyGeneratedTitle(id, rawText);
