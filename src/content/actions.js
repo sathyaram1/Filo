@@ -35,20 +35,37 @@
   // ------------------------------------------------------------
   // Clipboard: copia / taglia
   // ------------------------------------------------------------
-  // Gli appunti li scrive il main, come il «Copia» delle risposte (popup.js): la pagina può non darli, e il visore PDF
-  // lascia la scrittura in sospeso senza dire niente (#1343 r2). Se il main dice no, ci prova la pagina.
-  async function copyToClipboard(text) {
+  // Gli appunti della pagina possono restare in sospeso senza mai rispondere: il visore PDF fa così (#1343 r2), e
+  // l'azione dietro (il file dello screenshot) non partiva più. Il testo lo scrive prima il main, come il «Copia»
+  // delle risposte (popup.js); l'immagine prima la pagina, che ha un attimo, poi il main.
+  const APPUNTI_SOSPESI_MS = 1500;
+  const entroPoco = (promessa) => Promise.race([promessa,
+    new Promise((_, no) => setTimeout(() => no(new Error('appunti sospesi')), APPUNTI_SOSPESI_MS))]);
+
+  // → 'filo' (scritto dal main, che l'ha messo anche in cronologia), 'pagina' (la cronologia tocca a chi chiama), ''.
+  async function scriviTesto(text) {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text });
-      if (r && r.ok) { Popup.showToast(I18n.t('toast_copied')); return; }
+      if (r && r.ok) return 'filo';
     } catch (_) {}
-    navigator.clipboard.writeText(text).then(
-      () => {
-        Popup.showToast(I18n.t('toast_copied'));
-        pushClipboardEntry({ type: 'text', text });
-      },
-      () => {/* niente toast su errore — UX silenziosa */}
-    );
+    try { await entroPoco(navigator.clipboard.writeText(text)); return 'pagina'; } catch (_) { return ''; }
+  }
+
+  async function scriviImmagine(blob, dataUrl) {
+    if (blob && navigator.clipboard?.write) {
+      try { await entroPoco(navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])); return true; } catch (_) {}
+    }
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_IMAGE_TO_CLIPBOARD, dataUrl: dataUrl || (blob ? await blobToDataUrl(blob) : '') });
+      return !!(r && r.ok);
+    } catch (_) { return false; }
+  }
+
+  async function copyToClipboard(text) {
+    const via = await scriviTesto(text);
+    if (!via) return; // niente toast su errore — UX silenziosa
+    Popup.showToast(I18n.t('toast_copied'));
+    if (via === 'pagina') pushClipboardEntry({ type: 'text', text });
   }
 
   // #437 — "Copia URL" (del link, dell'immagine, del filmato) copia un

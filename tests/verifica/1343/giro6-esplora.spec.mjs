@@ -13,10 +13,15 @@ for (const pdf of [false, true]) {
   test(`esplora screenshot e qr pdf=${pdf}`, async ({ app, openTab, testServer }) => {
     await testServer.openReady(openTab, '<!doctype html><title>Prima</title><body style="background:#fff"><h1>Prima</h1></body>');
     if (pdf) { await naviga(app, testServer.asset(readFileSync('tests/fixtures/documenti/documento-con-testo.pdf'), 'application/pdf')); await pausa(2500); }
-    await app.evaluate(({ clipboard }) => clipboard.writeText('niente'));
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+      global.__scaricati = 0;
+      t.view.webContents.session.on('will-download', (e) => { global.__scaricati++; e.preventDefault(); });
+    });
     await (await iconaDellaBarra(app, 'screenshot')).click();
-    await pausa(4000);
-    const img = await app.evaluate(({ clipboard }) => { const i = clipboard.readImage(); return i.isEmpty() ? 0 : i.getSize().width; });
+    await pausa(5000);
+    const img = await app.evaluate(() => global.__scaricati);
     console.log(`ESPLORA pdf=${pdf} screenshot immagine larga ${img}`);
     await (await iconaDellaBarra(app, 'qrCode')).click();
     await pausa(2000);
