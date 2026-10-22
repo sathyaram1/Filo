@@ -44,6 +44,9 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
   const elenco = passi(suite);
   const verdettoJob = senzaCommenti(job('verdetto', SUITE_YML));
   const elencoVerdetto = passi(verdettoJob);
+  const unitJob = senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML));
+  const avvisoJob = senzaCommenti(job('avviso', SUITE_YML));
+  const elencoAvviso = passi(avvisoJob);
   const suitePasso = elenco.find((p) => /npx playwright test/.test(p.corpo));
   const parti = ((suite.match(/^\s+parte:\s*\[([^\]]*)\]\s*$/m) || [])[1] || '').split(',').map((x) => Number(x.trim()));
   const tetto = (testo) => Number((testo.match(/timeout-minutes:\s*(\d+)/) || [])[1]);
