@@ -1172,6 +1172,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
   biglietto (§ 6.4).
 - **Lavori in parallelo dentro la stessa sessione.** Chiede un biglietto, lancia
   il worker in sottofondo, e ripete finché il server dice di sì.
+- **L'identità dell'orchestratore è la sua accensione** (§ 1.2). Con più
+  worker insieme, un biglietto non fidato sporca l'accensione e quindi anche i
+  biglietti dei worker che girano accanto e dopo di lui (#1419).
 - **I posti li conta solo il server.** Un biglietto nuovo esce solo se i lavori
   vivi, di tutti gli orchestratori insieme, sono meno di N. L'orchestratore non
   fa conti: chiede, e il server risponde sì o no. Così più orchestratori
