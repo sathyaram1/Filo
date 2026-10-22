@@ -163,8 +163,22 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
       globalThis.__larghezzeAlClic = [];
       t.view.webContents.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
     }, yt);
+    await filo.evaluate(() => {
+      const A = process.mainModule.require('./services/adSkip');
+      globalThis.__diag = [];
+      const orig = A.clicDalRiquadro;
+      A.clicDalRiquadro = async (s, m, d, o) => {
+        globalThis.__diag.push(['in', Date.now(), m]);
+        const r = await orig(s, m, d, o);
+        globalThis.__diag.push(['out', Date.now(), r]);
+        return r;
+      };
+      const oc = A.clicVero;
+      A.clicVero = (...a) => { const r = oc(...a); globalThis.__diag.push(['vero', Date.now(), r]); return r; };
+    });
     for (const u of [yt, incorporato, ima]) await nel(u, 'window.__mostra()');
     await new Promise((ok) => setTimeout(ok, 5000));
+    console.log('MAIN', JSON.stringify(await filo.evaluate(() => globalThis.__diag)));
     for (const u of [yt, incorporato, ima]) console.log('DIAG', u, JSON.stringify(await nel(u, '({c: window.__clic, s: window.__saltata, v: document.visibilityState, iw: innerWidth})')));
     console.log('OSPITE', JSON.stringify(await filo.evaluate(({ webContents }) => Promise.all(webContents.getAllWebContents().map(async (w) => [w.getURL(), await w.executeJavaScript('({g: window.__gesti, v: document.visibilityState, iw: innerWidth})').catch((e) => String(e))])))));
     for (const u of [yt, incorporato, ima]) await saltata(u);
