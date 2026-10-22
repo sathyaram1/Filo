@@ -235,12 +235,22 @@ const CHIAVE_NUOVA_SE_PRESENTE = (s) => s.replace(
   'JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt',
   "JSON.stringify({ apiKeys, safeBrowsingKey, ...(envKey('FILO_DEFAULT_MAPS_KEY') ? { mapsKey: envKey('FILO_DEFAULT_MAPS_KEY') } : {}), bakedAt",
 );
+const CHIAVE_NUOVA_SE_PRESENTE_NOME_LIBERO = (s) => s.replace(
+  'JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt',
+  'JSON.stringify({ apiKeys, safeBrowsingKey, ...(process.env.GOOGLE_MAPS_KEY ? { mapsKey: process.env.GOOGLE_MAPS_KEY } : {}), bakedAt',
+);
+const CHIAVE_NUOVA_SE_PRESENTE_NOME_COMPOSTO = (s) => s.replace(
+  'JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt',
+  "JSON.stringify({ apiKeys, safeBrowsingKey, ...Object.fromEntries(['MAPS'].map((n) => [`${n.toLowerCase()}Key`, envKey(`FILO_DEFAULT_${n}_KEY`)]).filter(([, v]) => v)), bakedAt",
+);
 
 test('una chiave nuova aggiunta al bake con la sua fonte è rossa, dal job e dal server, e nomina la chiave', async () => {
   for (const [ritocco, campo] of [
     [CHIAVE_NUOVA_NEL_PACCHETTO, 'apiKeys.anthropic'],
     [CHIAVE_NUOVA_FUORI_MAPPA, 'mapsKey'],
     [CHIAVE_NUOVA_SE_PRESENTE, 'mapsKey'],
+    [CHIAVE_NUOVA_SE_PRESENTE_NOME_LIBERO, 'mapsKey'],
+    [CHIAVE_NUOVA_SE_PRESENTE_NOME_COMPOSTO, 'mapsKey'],
   ]) {
     await conBakeRitoccato(ritocco, async (copia) => {
       for (const corsa of [bakeColJob, bakeColServer]) {
