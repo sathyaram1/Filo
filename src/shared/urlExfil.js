@@ -608,7 +608,8 @@
   // e della cartella escono dalla macchina come un indirizzo (#1499). La regola è quella del perimetro, su ogni sistema.
   function diRete(v) {
     const C = global.SN_CMD_CLASSIFY;
-    if (!C || !C.diRete) return /^\s*["'«“‘‹]*\s*[\\/]{2}/.test(String(v ?? ''));
+    // Senza la regola non si sa: si guarda come un'uscita (il controllo dei segreti, niente di più).
+    if (!C || !C.diRete) return !!String(v ?? '').trim();
     return C.diRete(v, { win: true }) || C.diRete(v, { win: false });
   }
 
