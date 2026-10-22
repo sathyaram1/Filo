@@ -874,7 +874,9 @@
 
           // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
           let ogTitle = '', ogDescription = '', r = null;
-          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url }); } catch (_) {}
+          // `proposta`: una frase di Filo coi verdetti, dove un collegamento mai giudicato non si contatta prima dell'OK (#1505).
+          const proposta = !!(linkEl.closest && linkEl.closest('[data-filo-verdetti]'));
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url, proposta }); } catch (_) {}
           if (cancelled) return;
           if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
           else if (r?.bloccato) {

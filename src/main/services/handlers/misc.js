@@ -227,7 +227,7 @@ async function immagineNegliAppunti() {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo, contattabilePrimaDelClic } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
@@ -482,8 +482,14 @@ module.exports = function register(on, ctx) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
       let esito = { ok: false, error: 'download non avviato' };
       const avvisato = String(origin || '').startsWith('filo://');
-      const r = await apriDaFilo(url, { wc, parole, avvisa: avvisato, tipo: 'SCARICA_COLLEGAMENTO', apri: () => { esito = scarica(); } });
-      return r.aperto ? esito : { ok: false, error: 'segreto', frase: r.frase, avvisato };
+      const r = await apriDaFilo(url, {
+        wc, parole, avvisa: avvisato, tipo: 'SCARICA_COLLEGAMENTO', confermato: msg.confermato === true,
+        proposta: avvisato && msg.proposta === true, apri: () => { esito = scarica(); },
+      });
+      if (r.aperto) return esito;
+      // Un collegamento che al clic chiede l'OK lo chiede anche per scaricarlo: la pagina lo mostra e riprova.
+      if (r.conferma) return { ok: false, conferma: r.conferma, parti: r.parti, avvisato };
+      return { ok: false, error: 'segreto', frase: r.frase, avvisato };
     }
     return scarica();
   });
@@ -725,7 +731,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.LINK_FERMATO, async (msg) => anteprimaFerma(String((msg && msg.url) || '')) || {});
 
-  on('fetch_link_meta', async (msg, sender) => {
+  on('fetch_link_meta', async (msg, sender, origin) => {
     let rinvio = null;
     try {
       const url = String(msg.url || '');
@@ -733,7 +739,9 @@ module.exports = function register(on, ctx) {
       const ferma = anteprimaFerma(url);
       if (ferma) return { ok: false, ...ferma };
       // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
-      // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
+      // destro (#810), e un collegamento che al clic chiede l'OK uscirebbe prima dell'OK (#1505). Fermato, la
+      // spiegazione parte senza titolo e descrizione.
+      if (!contattabilePrimaDelClic(url, { proposta: isFilo(origin) && msg.proposta === true })) return { ok: false, error: 'da_confermare' };
       const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
       // Il tempo copre anche il corpo: un sito che lo manda a gocce non tiene aperto il menu in attesa.

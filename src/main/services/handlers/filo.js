@@ -145,7 +145,7 @@ module.exports = function register(on, ctx) {
         const da = schedaDi(tm, sender);
         if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
       },
-      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true, proposta: true,
+      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true, proposta: msg.proposta === true,
     });
     return { ok: true, ...r };
   });

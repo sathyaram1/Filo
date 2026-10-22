@@ -100,30 +100,40 @@
     showToast(frase.charAt(0).toUpperCase() + frase.slice(1), { duration: 6000 });
   }
 
+  // Un collegamento in una frase di Filo che ha il verdetto della porta (la chat della home): senza, chiede l'OK (#1505).
+  const conVerdetto = (el) => !!(el && el.closest && el.closest('[data-filo-verdetti]'));
+
+  // Un OK che il main chiede si dà qui; `false` se l'utente dice di no.
+  async function chiediOk(r) {
+    const Ui = global.SN_CONFIRM_UI;
+    return Ui ? Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : false;
+  }
+
   async function apriCollegamento(a, { sfondo = false } = {}) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return;
-    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo };
+    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo, proposta: conVerdetto(a) };
     let r = null;
     try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
     // Un dato dell'utente in un link scritto sopra una pagina chiede l'OK, come se lo aprisse l'assistente (#868.6).
     if (r && r.conferma) {
-      const Ui = global.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : false;
-      if (!ok) return;
+      if (!(await chiediOk(r))) return;
       try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
     }
     if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
   }
 
-  // Lo scaricamento di un collegamento scritto da un modello passa dalla stessa porta.
+  // Lo scaricamento di un collegamento scritto da un modello passa dalla stessa porta, e chiede lo stesso OK.
   async function scaricaCollegamento(a) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return null;
+    const msg = { type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a), proposta: conVerdetto(a) };
     let r = null;
-    try {
-      r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a) });
-    } catch (_) {}
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    if (r && r.conferma) {
+      if (!(await chiediOk(r))) return { ok: false, annullato: true };
+      try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) showToast(I18n.t('toast_file_save_failed'));
     return r;
   }
