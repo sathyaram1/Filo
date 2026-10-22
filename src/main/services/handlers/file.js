@@ -91,7 +91,7 @@ module.exports = function register(on, ctx) {
   }));
   on(MSG.FILE_MOSTRA_CARTELLA, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
-    if (!p) return nonTrovato();
+    if (!p) return senza(p);
     if (esiste(p)) { try { electron().shell.showItemInFolder(p); return { ok: true }; } catch (_) {} }
     // Il file non c'è più ma la cartella sì: la si mostra, non la si apre. Su Mac aprire una cartella .app lancia il
     // programma, e il percorso può averlo scritto un modello.
