@@ -3,13 +3,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { git, scene, runHookRaw, rigaJson, commitFile, shaOf, stdinEdit, remoto } from '../helpers/scenaHook.mjs';
 
 const BIGLIETTO = 'b'.repeat(43);
 const marcatore = (work, extra = {}) => {
   mkdirSync(resolve(work, '.claude'), { recursive: true });
+  // Come nei giri veri (ensureSessionExcludes): il marcatore non finisce nei commit.
+  appendFileSync(resolve(work, '.git', 'info', 'exclude'), '\n.claude/routine-ticket.json\n');
   writeFileSync(resolve(work, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: BIGLIETTO, since: new Date().toISOString(), ...extra }));
 };
 const MORTO = { morto: { ora: new Date().toISOString(), perche: 'dead_ticket' } };
@@ -27,8 +29,8 @@ test('biglietto morto e storia riscritta: nessun push, nemmeno col lease; il com
   const r = runHookRaw(work, stdinEdit(resolve(work, 'b.js')), { FILO_ROUTINE: '1' });
 
   assert.equal(remoto(work, 'worker/zombie'), a, 'il ramo su origin resta quello di prima: niente --force-with-lease');
-  assert.equal(git(work, ['status', '--porcelain']).split('\n').filter((l) => l && !l.includes('.claude/')).length, 0, 'il salvataggio locale resta');
-  assert.match(git(work, ['log', '-1', '--format=%s']), /b\.js/);
+  assert.equal(git(work, ['status', '--porcelain']), '', 'il salvataggio locale resta');
+  assert.ok(git(work, ['show', '--name-only', '--format=', 'HEAD']).split('\n').includes('b.js'));
   const ctx = JSON.parse(rigaJson(r)).hookSpecificOutput.additionalContext;
   assert.match(ctx, /biglietto di questo lavoro e' finito/);
   assert.match(ctx, /NON spedisco 'worker\/zombie'/);
