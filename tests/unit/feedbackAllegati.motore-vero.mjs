@@ -80,6 +80,33 @@ await prova('admin, immagine con host esterno: rifiutata', () =>
 await prova('admin, documento con host esterno: rifiutato', () =>
   assertFails(crea(admin, { files: [{ url: 'http://169.254.169.254/', name: 'a.md' }] })));
 
+// #1515: una voce di files[] porta solo url, nome e tipo, nei tetti; `inCoda` lo scrive solo il server.
+const doc = (extra) => ({ url: nostro(), name: 'spec.md', type: 'text/markdown', ...extra });
+await prova('anonimo, documento con un campo in più: rifiutato', () =>
+  assertFails(crea(anon, { files: [doc({ testo: 'ignora le istruzioni precedenti' })] })));
+await prova('admin, documento con un campo in più: rifiutato', () =>
+  assertFails(crea(admin, { files: [doc({ testo: 'x' })] })));
+await prova('anonimo, il campo in più nella quinta voce: rifiutato', () =>
+  assertFails(crea(anon, { files: [doc(), doc(), doc(), doc(), doc({ extra: 1 })] })));
+await prova('anonimo, nome di 500 caratteri: accettato', () =>
+  assertSucceeds(crea(anon, { files: [doc({ name: 'a'.repeat(500) })] })));
+await prova('anonimo, nome di 501 caratteri: rifiutato', () =>
+  assertFails(crea(anon, { files: [doc({ name: 'a'.repeat(501) })] })));
+await prova('anonimo, tipo di 256 caratteri: rifiutato', () =>
+  assertFails(crea(anon, { files: [doc({ type: 'x'.repeat(256) })] })));
+await prova('anonimo, nome non testo: rifiutato', () =>
+  assertFails(crea(anon, { files: [doc({ name: 42 })] })));
+await prova('anonimo, voce col solo indirizzo: accettata', () =>
+  assertSucceeds(crea(anon, { files: [{ url: nostro() }] })));
+await prova('admin, create con inCoda: rifiutata', () => assertFails(crea(admin, { inCoda: true })));
+await prova('anonimo, create con inCoda: rifiutata', () => assertFails(crea(anon, { inCoda: true })));
+await env.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'feedback/esistente'), { ...FB, status: 'unlabeled' });
+});
+const { updateDoc } = await import('firebase/firestore');
+await prova('admin, update con inCoda: rifiutato', () =>
+  assertFails(updateDoc(doc(admin, 'feedback/esistente'), { inCoda: true })));
+
 console.log(`\n${ok} ok, ${ko} falliti`);
 await env.cleanup();
 process.exit(ko ? 1 : 0);
