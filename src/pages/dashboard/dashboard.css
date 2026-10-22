@@ -983,7 +983,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-file-btn-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove { opacity: 0.65; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove[hidden] { display: none; }
-/* Il nome dato da Filo: sotto il nome vero, mai al suo posto. */
+/* Il nome dato da Filo: accanto al nome vero, più piano, mai al suo posto. */
 .dash-file-btn-etichetta { opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-etichetta[hidden] { display: none; }
 /* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
