@@ -704,6 +704,7 @@ function onWillDownload(item, webContents, scope = '') {
     site: sito,
     siteUncertain: incerto,
     servedBy: servito,
+    _pagina: paginaDi(webContents),
     _quarantena: attesa,
     _scope: scope || '',
   };
