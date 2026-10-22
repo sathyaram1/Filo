@@ -1,6 +1,6 @@
-// Riassunto per file dell'editor (#379.5): estrazione del testo, quando rigenerare,
-// e l'elenco {titolo, riassunto} che entra nel contesto di Filo al posto del testo.
-// Filo vede i file senza pagarne il testo intero: il contenuto si chiede con LEGGI_FILE.
+// Il testo dei file dell'editor per i modelli: il riassunto per file che entra nel contesto di Filo al posto del testo
+// intero (#379.5), quando rifarlo, e quanto del documento leggono chat, titolo e riassunto (#1475). Logica pura, niente
+// DOM né storage; prove in tests/unit/editorSummary.test.mjs.
 
 (function (global) {
   'use strict';
@@ -15,6 +15,46 @@
   const MAX_SUMMARY = 400;
   // Ripiego finché non c'è un riassunto.
   const EXCERPT_LEN = 200;
+
+  // Quanto del documento leggono i modelli dell'Editor (#1475): i 100.000 token del contesto di serie della chat di Filo,
+  // che stanno anche in un modello da 128.000 insieme al tetto della risposta. Oltre si taglia, e lo si dice a tutti e due.
+  const TESTO_AL_MODELLO_MAX = 350000;
+
+  function testoAlModello(testo, max = TESTO_AL_MODELLO_MAX) {
+    const t = String(testo == null ? '' : testo).trim();
+    if (t.length <= max) return { testo: t, letti: t.length, totale: t.length, tagliato: false };
+    let n = max;
+    const ultimo = t.charCodeAt(n - 1);
+    if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
+    return { testo: t.slice(0, n), letti: n, totale: t.length, tagliato: true };
+  }
+
+  // Un modello dalla finestra più stretta del tetto rifiuta il documento: si rilegge più corto, misurato sul rifiuto con
+  // la regola della chat di Filo. null se non è quel rifiuto, o se quello che resterebbe è troppo poco per servire.
+  const RILETTO_MIN = 2000;
+  function rilettoDopoRifiuto(testo, letto, rifiuto, caratteri) {
+    const FC = global.SN_FILO_CONTESTO;
+    const misure = FC && letto && letto.letti ? FC.troppoLungo(rifiuto) : null;
+    if (!misure) return null;
+    const token = FC.tettoDopoRifiuto({ ...misure, caratteri, caratteriTratto: letto.letti });
+    const max = Math.floor((token || 0) * FC.CARATTERI_PER_TOKEN);
+    if (max < RILETTO_MIN || max >= letto.letti) return null;
+    return testoAlModello(testo, max);
+  }
+
+  const numero = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
+
+  // Per chi scrive, sotto la risposta o nell'avviso; `perCosa` dice quale lavoro ha letto solo l'inizio.
+  function notaTaglio(letto, perCosa = '') {
+    if (!letto || !letto.tagliato) return '';
+    return `Il documento è lungo: ${perCosa ? `${perCosa} ` : ''}ho letto i primi ${numero(letto.letti)} caratteri su ${numero(letto.totale)}.`;
+  }
+
+  // Per il modello, davanti al testo: sa che il resto esiste e non lo inventa.
+  function avvisoTaglio(letto) {
+    if (!letto || !letto.tagliato) return '';
+    return `(Il documento è più lungo: qui ci sono i primi ${numero(letto.letti)} caratteri su ${numero(letto.totale)}. Il resto non lo vedi: se la richiesta lo riguarda, dillo.)`;
+  }
 
   // Albero PM-like (doc → paragraph/heading/list… → text), blocchi separati da newline.
   // Robusto a nodi mancanti o forme inattese.
@@ -127,6 +167,11 @@
     CHANGE_ABS,
     CHANGE_RATIO,
     MAX_SUMMARY,
+    TESTO_AL_MODELLO_MAX,
+    testoAlModello,
+    rilettoDopoRifiuto,
+    notaTaglio,
+    avvisoTaglio,
     plainText,
     fileText,
     countWords,

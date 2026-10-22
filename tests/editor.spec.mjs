@@ -194,3 +194,58 @@ test('Cerca e sostituisci trova le parole con formattazione mista (#228)', async
   await expect(page.locator('#doc')).toHaveText('Nome: OMEGA, OMEGA e OMEGA.');
   await expect(page.locator('[data-sr="count"]')).toHaveText('nessun risultato');
 });
+
+// #1475: un testo lungo incollato entrava una riga per volta e fermava la pagina per minuti. Adesso entra intero, a
+// paragrafi, in pochi secondi, e si annulla; la riga a metà del paragrafo si unisce come prima.
+async function incolla(app, page, testo) {
+  await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), testo);
+  const t0 = Date.now();
+  await page.keyboard.press('Control+V');
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 0)));
+  return Date.now() - t0;
+}
+
+test('un testo di 1.500 righe incollato entra intero, a paragrafi, in pochi secondi', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.locator('#doc').click();
+  const righe = Array.from({ length: 1500 }, (_, i) => (i === 7 ? '' : `Riga ${i}: <b>non grassetto</b> &  due  spazi.`));
+  const ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(5_000);
+  const dentro = await page.evaluate(() => {
+    const ps = [...document.querySelectorAll('#doc > p')];
+    return { n: ps.length, primo: ps[0].textContent, vuoto: ps[7].textContent, ultimo: ps[ps.length - 1].textContent, grassetti: document.querySelectorAll('#doc b').length };
+  });
+  expect(dentro.n).toBe(1500);
+  expect(dentro.primo.replace(/ /g, ' ')).toBe('Riga 0: <b>non grassetto</b> &  due  spazi.');
+  expect(dentro.vuoto).toBe('');
+  expect(dentro.ultimo.replace(/ /g, ' ')).toBe('Riga 1499: <b>non grassetto</b> &  due  spazi.');
+  expect(dentro.grassetti).toBe(0);
+  await page.keyboard.press('Control+Z');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerText.trim())).toBe('');
+});
+
+test('incollato a metà di un paragrafo, il testo lungo si unisce come una riga sola', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.evaluate(() => {
+    const d = document.getElementById('doc');
+    d.innerHTML = '<p>prima<b>GRAS</b>dopo</p>';
+    d.focus();
+    const t = d.querySelector('b').firstChild;
+    const r = document.createRange();
+    r.setStart(t, 2);
+    r.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+  });
+  await incolla(app, page, Array.from({ length: 60 }, (_, i) => `R${i}`).join('\n'));
+  const ps = await page.evaluate(() => [...document.querySelectorAll('#doc > p')].map((p) => p.textContent));
+  expect(ps.length).toBe(60);
+  expect(ps[0]).toBe('primaGRR0');
+  expect(ps[1]).toBe('R1');
+  expect(ps[59]).toBe('R59ASdopo');
+});

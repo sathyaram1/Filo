@@ -13,6 +13,8 @@
       features: [],
       fixes: [
         'Il bottone di un file che Filo ti trova in chat porta sempre il nome vero del file. Il nome che gli dà Filo, come «Bolletta della luce», sta accanto, più piano.',
+        'Nell\'Editor la chat del documento legge tutto il documento, non più solo l\'inizio, e lo stesso fanno il titolo e il riassunto automatici. Prima, su un testo lungo, la chat rispondeva come se il resto non esistesse. Se il documento supera i 350.000 caratteri, o è più lungo di quanto regge il modello che hai scelto, Filo legge l\'inizio e sotto la risposta ti dice quanta parte ha letto.',
+        'Incollare un testo lungo nell\'Editor non blocca più la pagina: anche mille righe entrano in un attimo.',
       ],
     },
     {

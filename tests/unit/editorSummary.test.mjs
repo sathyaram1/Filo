@@ -23,6 +23,7 @@ require(join(SHARED, 'editorVersions.js'));
 require(join(SHARED, 'editorNotes.js'));
 require(join(SHARED, 'editorSummary.js'));
 require(join(SHARED, 'constants.js'));
+require(join(SHARED, 'filoContesto.js'));
 
 const STORE = globalThis.SN_EDITOR_STORE;
 const SUM = globalThis.SN_EDITOR_SUMMARY;
@@ -182,4 +183,72 @@ test('editorFiles.readFile ritorna il contenuto del file richiesto; listFileSumm
   assert.equal(list.length, 2);
   assert.deepEqual(list.map((f) => f.id).sort(), ['f1', 'f2']);
   assert.ok(list.every((f) => f.summary && f.summary.length), 'ogni file ha un riassunto nel contesto');
+});
+
+// #1475 — chat, titolo e riassunto dell'Editor leggono il documento intero: il vecchio tetto di 6000 caratteri tagliava
+// in silenzio, e una domanda sulla fine di un documento lungo non trovava risposta.
+test('un documento lungo arriva intero al modello, fino in fondo', () => {
+  const fondo = 'La chiave del magazzino sta sotto il vaso di gerani.';
+  const lungo = `${'Paragrafo di riempimento sul bilancio. '.repeat(3000)}\n${fondo}`;
+  assert.ok(lungo.length > 100000);
+  const r = SUM.testoAlModello(lungo);
+  assert.equal(r.tagliato, false);
+  assert.ok(r.testo.endsWith(fondo), 'la frase in fondo arriva al modello');
+  assert.equal(SUM.notaTaglio(r), '', 'senza taglio niente nota per chi scrive');
+  assert.equal(SUM.avvisoTaglio(r), '', 'senza taglio niente avviso per il modello');
+});
+
+test('il tetto è largo quanto il contesto di serie della chat di Filo, e oltre il taglio si dice', () => {
+  globalThis.SN_FILO_CONTESTO || require(join(SHARED, 'filoContesto.js'));
+  const FC = globalThis.SN_FILO_CONTESTO;
+  assert.ok(SUM.TESTO_AL_MODELLO_MAX >= FC.TETTI_DI_SERIE.token * FC.CARATTERI_PER_TOKEN,
+    'il documento non legge meno di quanto la chat di Filo legge di serie');
+  const totale = SUM.TESTO_AL_MODELLO_MAX + 12345;
+  const r = SUM.testoAlModello('a'.repeat(totale));
+  assert.equal(r.tagliato, true);
+  assert.equal(r.testo.length, SUM.TESTO_AL_MODELLO_MAX);
+  assert.equal(r.totale, totale);
+  assert.equal(SUM.notaTaglio(r), `Il documento è lungo: ho letto i primi 350.000 caratteri su ${totale.toLocaleString('it-IT')}.`);
+  assert.match(SUM.notaTaglio(r, 'per il titolo'), /^Il documento è lungo: per il titolo ho letto i primi 350\.000 caratteri su /);
+  assert.match(SUM.avvisoTaglio(r), /primi 350\.000 caratteri su .*Il resto non lo vedi/);
+});
+
+test('il taglio non spezza una emoji a metà', () => {
+  const max = 10;
+  const r = SUM.testoAlModello(`${'a'.repeat(max - 1)}😀 e poi altro`, max);
+  assert.equal(r.tagliato, true);
+  assert.equal(r.testo, 'a'.repeat(max - 1), 'la coppia surrogata resta fuori intera');
+  assert.equal(r.letti, max - 1);
+});
+
+test('vuoto o soli spazi: niente da mandare', () => {
+  for (const t of ['', '   \n\t ', null, undefined]) {
+    const r = SUM.testoAlModello(t);
+    assert.equal(r.testo, '');
+    assert.equal(r.tagliato, false);
+  }
+});
+
+// Un modello dalla finestra stretta rifiuta il documento intero: si rimanda più corto, dentro la finestra che il
+// rifiuto dice, e il taglio si dice come oltre il tetto.
+test('dopo un rifiuto per finestra il documento si rilegge dentro la finestra detta', () => {
+  const testo = 'parola '.repeat(30000);
+  const letto = SUM.testoAlModello(testo);
+  const caratteri = letto.letti + 3000;
+  const rifiuto = { ok: false, error: "OpenRouter 400: {\"error\":{\"message\":\"This endpoint's maximum context length is 32768 tokens. However, you requested about 61000 tokens (60000 of text input, 1000 in the output).\"}}" };
+  const corto = SUM.rilettoDopoRifiuto(testo, letto, rifiuto, caratteri);
+  assert.ok(corto && corto.tagliato);
+  assert.ok(corto.letti < letto.letti * (32768 / 61000), `letti ${corto.letti}`);
+  assert.ok(corto.letti > letto.letti * 0.3, `letti ${corto.letti}`);
+  assert.equal(corto.totale, letto.totale);
+  assert.match(SUM.notaTaglio(corto), /ho letto i primi/);
+});
+
+test('un altro errore, o un documento già minimo, non si rilegge', () => {
+  const testo = 'parola '.repeat(30000);
+  const letto = SUM.testoAlModello(testo);
+  assert.equal(SUM.rilettoDopoRifiuto(testo, letto, { ok: false, error: 'OpenRouter 402: insufficient credits' }, letto.letti), null);
+  const corto = SUM.testoAlModello('ciao '.repeat(300));
+  const rifiuto = { ok: false, error: 'maximum context length is 1000 tokens. However, you requested about 5000 tokens' };
+  assert.equal(SUM.rilettoDopoRifiuto('ciao '.repeat(300), corto, rifiuto, corto.letti + 20000), null);
 });

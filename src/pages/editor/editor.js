@@ -1055,29 +1055,20 @@
       if (f0 && f0.meta) f0.meta.titleAuto = true;
       writeCollection();
     }
-    const text = (docPlainText() || '').trim().slice(0, 6000);
-    if (!text) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
-    const chat = editorChatMessages();
-    const memory = await filoMemoryText();
-    const parts = [`DOCUMENTO:\n${text}`];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
-    const messages = [
+    if (!docPerIlModello().testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    const contesto = contestoDelDocumento(editorChatMessages(), await filoMemoryText());
+    const conDocumento = (letto) => [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
-      { role: 'user', content: parts.join('\n\n') },
+      { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     if (!auto && docSwitchBtn) docSwitchBtn.classList.add('ed-doc-generating');
     try {
-      const r = await sendMessage({
-        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_TITLE || 'editor_title', payload: { messages },
-      });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
       const ok = applyGeneratedTitle(id, rawText);
       if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
+      if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
     } catch (_) {
       if (!auto) showEditorToast('Non sono riuscito a generare il titolo.');
@@ -1141,32 +1132,26 @@
     return true;
   }
 
-  async function generateSummaryForActive() {
+  // Con `manuale` chi ha chiesto il riassunto sa com'è andata.
+  async function generateSummaryForActive({ manuale = false } = {}) {
     if (!doc || !doc.meta) return false;
     syncActiveIntoCollection();
     const id = doc.id;
-    const text = (docPlainText() || '').trim().slice(0, 6000);
-    if (!text) return false;
-    const chat = editorChatMessages();
-    const memory = await filoMemoryText();
-    const parts = [`DOCUMENTO:\n${text}`];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
-    const messages = [
+    if (!docPerIlModello().testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
+    const contesto = contestoDelDocumento(editorChatMessages(), await filoMemoryText());
+    const conDocumento = (letto) => [
       { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
-      { role: 'user', content: parts.join('\n\n') },
+      { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
-      const r = await sendMessage({
-        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_SUMMARY || 'editor_summary', payload: { messages },
-      });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) return false;
-      return applyGeneratedSummary(id, rawText);
+      const ok = rawText != null && applyGeneratedSummary(id, rawText);
+      if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
+      if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
+      return ok;
     } catch (_) {
+      if (manuale) showEditorToast('Non sono riuscito a generare il riassunto.');
       return false;
     }
   }
@@ -1242,8 +1227,7 @@
     add('Rigenera riassunto', () => {
       if (autoSummaryBusy) return;
       autoSummaryBusy = true;
-      Promise.resolve(generateSummaryForActive())
-        .then((ok) => { if (!ok) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); })
+      Promise.resolve(generateSummaryForActive({ manuale: true }))
         .finally(() => { autoSummaryBusy = false; });
     });
     add('Storico versioni', () => openVersionHistory());
@@ -2155,8 +2139,40 @@
     const text = cd.getData('text/plain');
     if (!text) return;
     e.preventDefault();
-    document.execCommand('insertText', false, text);
+    const righe = text.split(/\r\n?|\n/);
+    if (righe.length < INCOLLA_A_RIGHE) document.execCommand('insertText', false, text);
+    else incollaLungo(righe);
   });
+  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475); insertHTML è lento uguale in un
+  // blocco vuoto, per questo la prima riga entra da insertText e il suo ultimo carattere torna col resto, nel suo tag.
+  const INCOLLA_A_RIGHE = 50;
+  const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
+  function incollaLungo(righe) {
+    const [prima, ...resto] = righe;
+    document.execCommand('insertText', false, prima);
+    const sel = window.getSelection();
+    let blocco = sel && sel.anchorNode;
+    while (blocco && blocco !== docEl && !(blocco.nodeType === 1 && BLOCCO.test(blocco.tagName))) blocco = blocco.parentNode;
+    if (!blocco || blocco === docEl || !/^(P|DIV|H[1-6])$/.test(blocco.tagName) || (blocco.textContent || '').length < 2) {
+      document.execCommand('insertText', false, `\n${resto.join('\n')}`);
+      return;
+    }
+    sel.modify('extend', 'backward', 'character');
+    let pezzo = spaziVisibili(sel.toString());
+    for (let n = sel.getRangeAt(0).startContainer.parentNode; n && n !== blocco; n = n.parentNode) {
+      const vuoto = n.cloneNode(false).outerHTML;
+      const chiude = vuoto.lastIndexOf('</');
+      pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
+    }
+    const tag = blocco.tagName.toLowerCase();
+    document.execCommand('insertHTML', false, `<${tag}>${pezzo}</${tag}>`
+      + resto.map((r) => `<p>${r ? spaziVisibili(r) : '<br>'}</p>`).join(''));
+  }
+  // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
+  function spaziVisibili(s) {
+    const esc = s.replace(/\t/g, '    ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc.replace(/ {2,}/g, (m) => ` ${'&nbsp;'.repeat(m.length - 1)}`).replace(/^ /, '&nbsp;');
+  }
 
   // ── Zoom del foglio ─────────────────────────────────────────────────
   // Pinch sul trackpad e Ctrl+rotella generano wheel events con ctrlKey=true;
@@ -2701,6 +2717,43 @@
     };
     walk(docEl);
     return out;
+  }
+  // Quello che chat, titolo e riassunto mandano al modello: intero fino al tetto, oltre col taglio detto (#1475).
+  function docPerIlModello() {
+    return window.SN_EDITOR_SUMMARY.testoAlModello(docPlainText());
+  }
+  // `costruisci(letto)` dà i messaggi; se il modello rifiuta il documento perché non gli sta nella finestra, si
+  // rimanda più corto e `letto` dice il taglio a chi lo mostra.
+  async function chiediSulDocumento(action, costruisci, extra = {}) {
+    const testo = docPlainText();
+    let letto = window.SN_EDITOR_SUMMARY.testoAlModello(testo);
+    let r = null;
+    for (let giro = 0; giro < 4; giro++) {
+      const messages = costruisci(letto);
+      r = await sendMessage({ type: MSG.AI_REQUEST, action, payload: { messages }, ...extra });
+      if (r && r.ok) break;
+      const caratteri = window.SN_FILO_CONTESTO ? window.SN_FILO_CONTESTO.caratteriDi(messages) : 0;
+      const corto = window.SN_EDITOR_SUMMARY.rilettoDopoRifiuto(testo, letto, r, caratteri);
+      if (!corto) break;
+      letto = corto;
+    }
+    return { r, letto };
+  }
+  function notaTaglio(letto, perCosa) {
+    return window.SN_EDITOR_SUMMARY.notaTaglio(letto, perCosa);
+  }
+  function contestoDelDocumento(chat, memory) {
+    const parts = [];
+    if (chat.length) {
+      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
+        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
+    }
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
+    return parts;
+  }
+  function bloccoDocumento(letto) {
+    const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
+    return `DOCUMENTO:\n${avviso ? `${avviso}\n` : ''}${letto.testo}`;
   }
   function textStats() {
     const text = (docPlainText() || '').replace(/ /g, ' ').trim();
@@ -3473,6 +3526,8 @@
     // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
     // pagina è aperta: è un fatto di quel momento, non entra nel documento.
     const noteRipiego = new WeakMap();
+    // Allo stesso modo la riga che dice quanta parte di un documento troppo lungo ha letto la risposta (#1475).
+    const noteTaglio = new WeakMap();
     // Una risposta che non è arrivata: segnata come errore e, finché la pagina è aperta, col tasto per la pagina
     // dove si toglie l'ostacolo (#663). Nel documento resta la frase.
     const errori = new WeakMap();
@@ -3501,6 +3556,13 @@
           const n = document.createElement('div');
           n.className = 'ed-chat-note';
           n.textContent = parti[parti.length - 1];
+          log.appendChild(n);
+        }
+        const taglio = noteTaglio.get(msg);
+        if (taglio) {
+          const n = document.createElement('div');
+          n.className = 'ed-chat-note';
+          n.textContent = taglio;
           log.appendChild(n);
         }
         const nota = noteRipiego.get(msg);
@@ -3560,15 +3622,13 @@
       const thinking = { role: 'assistant', content: '…' };
       m.data.messages.push(thinking);
       renderLog();
-      const docText = docPlainText().slice(0, 6000);
-      const messages = [
-        { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + docText },
-        ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
-      ];
+      const turni = m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content }));
+      const conDocumento = (letto) => {
+        const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
+        return [{ role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + (avviso ? `${avviso}\n\n` : '') + letto.testo }, ...turni];
+      };
       try {
-        const r = await sendMessage({
-          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages }, diceRipiego: true,
-        });
+        const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_CHAT || 'editor_chat', conDocumento, { diceRipiego: true });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
           thinking.content = erroreInChat(r, 'nessuna risposta');
@@ -3578,6 +3638,7 @@
             noteRipiego.set(thinking, r.keyFallback.line);
             sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
           }
+          if (letto.tagliato) noteTaglio.set(thinking, notaTaglio(letto));
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
           const parsed = parseFormatActions(raw);
