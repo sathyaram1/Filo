@@ -275,7 +275,11 @@ test('lato main: i campi segreti nei riquadri non toccano un riquadro in arrivo,
     if (!parent) f.top = f;
     return f;
   };
-  const pagina = (...riquadri) => ({ mainFrame: { framesInSubtree: [riquadri[0].top, ...riquadri] } });
+  const pagina = (...riquadri) => {
+    const mainFrame = riquadri[0].top;
+    mainFrame.framesInSubtree = [mainFrame, ...riquadri];
+    return { mainFrame };
+  };
 
   const top = frame('pagina', 'https://esempio.test/', null);
   const carta = frame('carta', 'https://carta.test/', top);
