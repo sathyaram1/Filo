@@ -42,6 +42,7 @@ test('r1 la risposta arriva mentre si è in un’altra applicazione: tornati, l�
   await fuoco(app, page.url(), false);
   expect((await spiega(app, page.url(), 'mare')).ok).toBe(true);
   await page.waitForTimeout(1000);
+  expect(await page.locator('.sn-toast').count(), 'senza fuoco l’avviso non si mostra').toBe(0);
   await fuoco(app, page.url(), true);
   await page.mouse.click(5, 5);
   expect((await spiega(app, page.url(), 'monte')).ok).toBe(true);
