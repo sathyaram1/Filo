@@ -183,6 +183,7 @@ test('un’immagine di ChatGPT firmata prima del congelamento dice che la dichia
 
   const riga = menu.locator(RIGA);
   await expect(riga).toHaveAttribute('aria-label', FRASE_PROVV, { timeout: 10000 });
+  await expect(riga).toHaveAttribute('title', /elenco provvisorio, poi congelato/);
   await expect(riga).toBeVisible();
   await expect(riga).not.toHaveClass(/sn-menu-origine-debole/);
   await page.screenshot({ path: 'tests/.shots/provenienza-immagine-provvisorio.png' }).catch(() => {});

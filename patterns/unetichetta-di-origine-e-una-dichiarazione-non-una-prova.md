@@ -34,6 +34,16 @@ La regola, in tre pezzi:
   la cui firma regge e la cui autorità sta nel secondo elenco ufficiale, quello
   delle autorità di marcatura (#946). Senza una marca così, il certificato
   scaduto rende le credenziali «incomplete».
+- **L'elenco provvisorio vale solo per il passato, e si nomina.** Prima del
+  programma ufficiale il C2PA (col verificatore di riferimento) riconosceva un
+  elenco provvisorio, congelato il 1° gennaio 2026: autorità come Truepic,
+  Microsoft e Adobe G2, più singoli certificati ammessi per impronta esatta. Ci
+  arrivano le immagini di ChatGPT, Firefly e Bing di prima, che altrimenti non
+  direbbero mai chi le ha fatte. Filo lo scarica col resto e lo usa solo se
+  l'elenco ufficiale non riconosce il firmatario, solo per le firme di prima del
+  congelamento (lo dice una marca che regge; senza, il certificato deve essere
+  nato prima), e la frase lo dice: «Il firmatario è riconosciuto dall'elenco
+  provvisorio del C2PA» (#946.1, scelta dell'owner).
 - **«Non so verificarla» non è «non è valida».** «La firma non è valida» si
   dice solo quando la verifica è stata fatta e ha fallito. Una forma che Filo non
   sa leggere (un algoritmo che non conosce, una chiave che il motore crittografico
