@@ -119,6 +119,18 @@ test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subit
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
 
+test('un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ta').click();
+  await page.keyboard.type('ok perchè ');
+  expect(await valore(page)).toBe('ok perché ');
+  await page.keyboard.press('Control+z');
+  expect(await valore(page)).toBe('ok perchè ');
+  await page.keyboard.press('Control+z');
+  expect(await valore(page)).not.toContain('perché');
+  expect((await valore(page)).length).toBeLessThan('ok perchè '.length);
+});
+
 test('nel campo modificabile il cursore resta dopo lo spazio, e la punteggiatura chiude la parola subito', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ce').click();

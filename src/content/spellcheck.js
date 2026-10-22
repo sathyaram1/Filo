@@ -341,10 +341,9 @@
     if (tipo !== 'insertText' && tipo !== 'insertLineBreak' && tipo !== 'insertParagraph') return;
     const G = global.SN_GESTO;
     const el = state.el;
-    // Dentro un riquadro chiuso di Filo il tasto si vede cadere sul suo host.
-    const riquadro = radiceDi(el);
-    const qui = G && G.dentro(el);
-    if (!G || !G.prendi('automatica', G.CHIUDE, (l) => qui(l) || (!!riquadro && l.el === riquadro.host))) return;
+    // In un riquadro chiuso di Filo il sito non arriva, e i tasti non escono dall'ombra (SN_FILO_UI): lì scrive solo
+    // l'utente. Altrove serve un tasto vero che chiude la parola, dentro questa casella.
+    if (radiceDi(el) ? !evento.isTrusted : !(G && G.prendi('automatica', G.CHIUDE, G.dentro(el)))) return;
     const testo = getEditableText(el);
     const pos = cursoreNelCampo(el);
     const fine = A().fineDellaParola(testo, pos);
@@ -365,6 +364,8 @@
 
   function correggiDaSe(state, c) {
     const el = state.el;
+    const testoPrima = getEditableText(el);
+    const cursorePrima = cursoreNelCampo(el);
     suppressAutocorrect = true;
     try {
       applyFix(el, { start: c.start, end: c.end }, c.corretta, { cursor: 'preserve', expectedSegment: c.originale, automatica: true });
@@ -378,29 +379,63 @@
     seguiIlTesto(state);
     const voce = { id: ++progressivo, start: c.start, end, segment: c.corretta, originale: c.originale, fonte: c.fonte };
     state.automatiche = [...state.automatiche.filter((x) => !(x.start < end && x.end > c.start)), voce].slice(-AUTOMATICHE_MAX);
-    state.ultimaAutomatica = { id: voce.id, testo };
+    state.ultimaAutomatica = { voce, testo, testoPrima, cursorePrima };
     lampo(state, c.start, end);
     return true;
   }
 
-  // La correzione di una parola già corretta da sé, riportata com'era scritta: dall'annulla subito dopo o dal tasto
-  // destro. Conta come un rifiuto. Vero se l'ha riportata.
+  // Dal tasto destro, anche dopo aver scritto altro: la parola corretta da sé torna com'era scritta. Vero se è tornata.
   function annullaAutomatica(el, voce) {
     const state = el && monitored.get(el);
     if (!state || !voce) return false;
     seguiIlTesto(state);
     const v = state.automatiche.find((x) => x.id === voce.id);
-    const prima = getEditableText(el);
-    if (!v || prima.slice(v.start, v.end) !== v.segment) return false;
+    if (!v || getEditableText(el).slice(v.start, v.end) !== v.segment) return false;
     suppressAutocorrect = true;
     try {
       applyFix(el, { start: v.start, end: v.end }, v.originale, { cursor: 'preserve', expectedSegment: v.segment, automatica: true });
     } finally {
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
-    const end = v.start + v.originale.length;
-    if (getEditableText(el).slice(v.start, end) !== v.originale) return false;
+    if (getEditableText(el).slice(v.start, v.start + v.originale.length) !== v.originale) return false;
     seguiIlTesto(state);
+    rifiutata(state, v);
+    return true;
+  }
+
+  // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
+  // stesso comando) lo fa il browser, che toglie proprio la correzione: così l'annulla dopo toglie quello che si era
+  // scritto. Il browser però riseleziona la parola, e il tasto dopo la cancellerebbe: il cursore torna dov'era.
+  function primaDellAnnulla(state, e) {
+    if (!e || e.inputType !== 'historyUndo') return;
+    const u = state.ultimaAutomatica;
+    state.annullando = u && getEditableText(state.el) === u.testo ? u : null;
+  }
+  function dopoLAnnulla(state) {
+    const u = state.annullando;
+    state.annullando = null;
+    const el = state.el;
+    if (getEditableText(el) !== u.testoPrima) return;
+    mettiCursore(el, u.cursorePrima);
+    seguiIlTesto(state);
+    rifiutata(state, u.voce);
+  }
+  function mettiCursore(el, pos) {
+    try {
+      if (campoDiTesto(el)) { el.setSelectionRange(pos, pos); return; }
+      const sel = window.getSelection();
+      const r = document.createRange();
+      placeCaretAtOffset(el, pos, r);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch (_) {}
+  }
+
+  // Una correzione automatica riportata indietro è un rifiuto: quell'occorrenza non si ricorregge, e alla soglia la
+  // parola non si corregge più da sé (e, se è una parola che Filo può imparare, non si segna più).
+  function rifiutata(state, v) {
+    const el = state.el;
+    const end = v.start + v.originale.length;
     state.automatiche = state.automatiche.filter((x) => x.id !== v.id);
     state.ultimaAutomatica = null;
     state.rifiutateQui = [...state.rifiutateQui, { id: ++progressivo, start: v.start, end, segment: v.originale }].slice(-AUTOMATICHE_MAX);
@@ -410,16 +445,6 @@
       if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola)) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
       return null;
     });
-    return true;
-  }
-
-  // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
-  // stesso comando): l'annulla del browser riselezionerebbe la parola, e il tasto dopo la cancellerebbe.
-  function primaDellAnnulla(state, e) {
-    if (!e || e.inputType !== 'historyUndo') return;
-    const u = state.ultimaAutomatica;
-    if (!u || getEditableText(state.el) !== u.testo) return;
-    if (annullaAutomatica(state.el, { id: u.id })) e.preventDefault();
   }
 
   // La parola corretta da sé sotto il tasto destro, finché è ancora come l'ha messa Filo.
@@ -675,7 +700,7 @@
       giudicati: { rapido: new Map(), ragionato: new Map() },
       // La correzione automatica (#1447), sulle posizioni del testo come i segni: le parole corrette da sé, l'ultima
       // (che l'annulla subito dopo riporta indietro), quelle riportate indietro e le parole contate per impararle.
-      automatiche: [], ultimaAutomatica: null, rifiutateQui: [], contate: [],
+      automatiche: [], ultimaAutomatica: null, annullando: null, rifiutateQui: [], contate: [],
     };
     monitored.set(el, state);
     return state;
@@ -725,6 +750,7 @@
   }
 
   function suInput(state, evento) {
+    if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
     fineParolaBattuta(state, evento);
     state.ultimoTasto = Date.now();
     seguiIlTesto(state);
