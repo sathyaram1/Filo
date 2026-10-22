@@ -532,7 +532,7 @@
     return out;
   }
 
-  function oscuraTesto(s, chiavi) {
+  function oscuraTesto(s, chiavi, finestre) {
     // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
     if (/^data:image\//i.test(s.slice(0, 16))) return s;
     let t = s;
@@ -545,7 +545,8 @@
       if (/^data:image\//i.test(tok)) return tok;
       const contiene = (x) => {
         const forme = decodifiche(x.replace(/\s+/g, '')).map(alnumMinuscolo);
-        return chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov)));
+        return forme.some((f) => haFinestra(f, finestre))
+          || chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov) || (!!c.nucleo && f.includes(c.nucleo))));
       };
       if (!contiene(tok)) return tok;
       // Le righe in coda che non servono a ricomporre il segreto restano: sono il testo che segue.
