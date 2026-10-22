@@ -1080,7 +1080,7 @@
 
     // 1. Credenziali firmate: l'unica cosa che può valere come attribuzione.
     if (cont.c2pa && cont.c2pa.length) {
-      const esito = daC2pa(cont.c2pa, b, ancore, ancoreTsa);
+      const esito = daC2pa(cont.c2pa, b, ancore, ancoreTsa, provvisorio);
       if (esito) return esito;
     }
 
