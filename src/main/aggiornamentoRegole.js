@@ -255,5 +255,5 @@ module.exports = {
   MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI, COLLEZIONE_ANCORE,
   confrontaVersioni, etichettaCoincide, fileDellaRelease, releaseCoerente, modoScelto, piano, sceltaNonVale, haPulsante,
   ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, tagDiGitHubAccettato, fileDiRilascio,
-  impronteDellAncora, esitoAncora, improntaDaRicordare,
+  impronteDellAncora, fileDaAncorare, esitoAncora, improntaDaRicordare,
 };
