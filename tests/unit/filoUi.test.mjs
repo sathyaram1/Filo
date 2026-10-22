@@ -152,7 +152,7 @@ test('bersaglio(): dall\'host scende al nodo sotto il puntatore, o al fuoco se i
   assert.equal(UI.bersaglio(altro), bottone, 'fuori dai riquadri resta il nodo dell\'evento');
 });
 
-// #1509 — inserimenti, composizione, incolla e rilascio nati in un riquadro chiuso portavano il testo al sito: si fermano
+// #1509 — inserimenti, composizione, incolla e trascinamento nati in un riquadro chiuso portavano il testo al sito: si fermano
 // sulla finestra e al campo arriva una copia che resta dentro. Il ponte a document_start ascolta proprio questi tipi.
 test('il ponte di page-preload ascolta tutti e soli gli EVENTI_DEL_RIQUADRO', () => {
   const sorgente = readFileSync(new URL('../../src/preload/page-preload.js', import.meta.url), 'utf8');
@@ -161,7 +161,7 @@ test('il ponte di page-preload ascolta tutti e soli gli EVENTI_DEL_RIQUADRO', ()
   const ciclo = sorgente.slice(sorgente.lastIndexOf('for (const tipo of [', i), i);
   const tipi = [...ciclo.slice(0, ciclo.indexOf(']')).matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
   assert.deepEqual([...tipi].sort(), [...UI.EVENTI_DEL_RIQUADRO].sort());
-  for (const t of ['beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'drop', 'textInput']) {
+  for (const t of ['beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'dragstart', 'drop', 'textInput']) {
     assert.ok(UI.EVENTI_DEL_RIQUADRO.includes(t), t);
   }
 });

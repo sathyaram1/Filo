@@ -211,7 +211,8 @@ test('verso un sito la spinta porta solo i tipi che il suo content script ascolt
 });
 
 test('un avviso da mostrare arriva a un sito solo nel frame principale della scheda in primo piano', () => {
-  const avviso = { type: 'show_toast', text: 'Feedback inviato, ma non sono riuscito a caricare: estratto-conto.pdf' };
+  // Un avviso della pagina stessa: quelli di Filo che non la riguardano vanno nella barra (#1509).
+  const avviso = { type: 'show_toast', text: 'Le chiamate automatiche su questa pagina sono arrivate al tetto' };
   assert.equal(W.messaggioPerDestinazione(avviso, 'https://sito.example/', undefined, { inVista: true }), avviso);
   assert.equal(W.messaggioPerDestinazione(avviso, 'https://sito.example/'), null, 'scheda sullo sfondo');
   assert.equal(W.messaggioPerDestinazione(avviso, 'https://sito.example/', undefined, { inVista: false }), null);
