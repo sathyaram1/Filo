@@ -15,6 +15,7 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const R = require(join(ROOT, 'src', 'main', 'aggiornamentoRegole.js'));
 const U = require(join(ROOT, 'src', 'main', 'updater.js'));
+const A = require(join(ROOT, 'src', 'main', 'ancoraRilascio.js'));
 // Niente Firestore nelle prove: dove non si dice altro, nessuna àncora in tutta la raccolta.
 U.ancoraPerProva();
 const { AppUpdater } = require('electron-updater/out/AppUpdater');
@@ -493,13 +494,13 @@ test('leggiAncora: il documento del tag, e se manca se la raccolta ha almeno un\
     return r;
   };
   const doc = { fields: { file: { mapValue: { fields: { 'Filo-Setup.exe': { mapValue: { fields: { sha512: { stringValue: 'S' } } } } } } } } };
-  assert.deepEqual(await U.leggiAncora(TAG, con(risposta(200, doc))), { letta: true, impronte: Object.assign(Object.create(null), { 'Filo-Setup.exe': 'S' }), altre: true });
+  assert.deepEqual(await A.leggiAncora(TAG, con(risposta(200, doc))), { letta: true, impronte: Object.assign(Object.create(null), { 'Filo-Setup.exe': 'S' }), altre: true });
   assert.match(chieste[0], /\/documents\/ancoreRilascio\/v0\.2\.240\?key=/);
   assert.equal(R.COLLEZIONE_ANCORE, 'ancoreRilascio');
 
-  assert.deepEqual(await U.leggiAncora(TAG, con(risposta(404), risposta(200, {}))), { letta: true, impronte: null, altre: false });
+  assert.deepEqual(await A.leggiAncora(TAG, con(risposta(404), risposta(200, {}))), { letta: true, impronte: null, altre: false });
   assert.match(chieste.at(-1), /\/documents\/ancoreRilascio\?pageSize=1&/);
-  assert.deepEqual(await U.leggiAncora(TAG, con(risposta(404), risposta(200, { documents: [{ name: 'x' }] }))), { letta: true, impronte: null, altre: true });
+  assert.deepEqual(await A.leggiAncora(TAG, con(risposta(404), risposta(200, { documents: [{ name: 'x' }] }))), { letta: true, impronte: null, altre: true });
 
   for (const [cosa, f] of [
     ['regola non pubblicata', con(risposta(403))],
@@ -508,5 +509,5 @@ test('leggiAncora: il documento del tag, e se manca se la raccolta ha almeno un\
     ['elenco rifiutato', con(risposta(404), risposta(403))],
     ['elenco senza rete', con(risposta(404), new Error('ECONNRESET'))],
     ['risposta non JSON', async () => ({ status: 200, ok: true, json: async () => { throw new Error('non JSON'); } })],
-  ]) assert.deepEqual(await U.leggiAncora(TAG, f), { letta: false }, cosa);
+  ]) assert.deepEqual(await A.leggiAncora(TAG, f), { letta: false }, cosa);
 });
