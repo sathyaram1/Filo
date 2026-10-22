@@ -41,15 +41,17 @@ async function apri(app, openTab, testServer, opz = {}) {
       return t.slice(a, t.indexOf(M.fine, a) - 1);
     };
     const finto = async ({ messages }) => {
+      // Le regole del ragionato stanno nel system, il testo nel messaggio dell'utente (#1580).
+      const sistema = String(messages[0].content);
       const t = String(messages[messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
       if (t.includes('Chi scrive ha messo delle x')) {
         globalThis.__estrazioni.push(t);
         return fine(globalThis.__estrai);
       }
-      if (t.includes('proponi SUGGERIMENTI')) {
-        const nuovo = busta(t, 'TESTO NUOVO:\n');
-        globalThis.__ragionate.push({ nuovo, prompt: t, candidati: busta(t, 'Candidati del controllo automatico') });
+      if (sistema.includes('proponi SUGGERIMENTI')) {
+        const nuovo = busta(t, 'TESTO DA RILEGGERE:\n');
+        globalThis.__ragionate.push({ nuovo, prompt: `${sistema}\n${t}`, candidati: busta(t, 'Candidati del controllo automatico') });
         const out = Object.entries(globalThis.__ragionato).filter(([p]) => nuovo.includes(p)).flatMap(([, righe]) => righe);
         return fine(out.join('\n') || '[][][][nessuno]');
       }
