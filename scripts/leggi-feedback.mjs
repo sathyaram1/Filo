@@ -240,18 +240,28 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     cartella: dove,
   });
   // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
-  const motivi = motiviDiLettura({ fiducia: f.fiducia?.stringValue || '', notes: pieno.notes });
-  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
+  const motivi = motiviDiLettura({ fiducia, notes: pieno.notes });
+  const maiGiudicato = g.esito === 'mai_giudicato' ? g.motivo : '';
+  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove), { maiGiudicato }), ...allegati].join('\n'), motivi, numero };
+}
+
+/** Gli argomenti: un riferimento, e l'opzione per un mai giudicato dei Ricevuti. null se non tornano. PURA. */
+export function argomentiLettura(argv) {
+  const opz = argv.filter((a) => String(a).startsWith('-'));
+  const rif = argv.filter((a) => !String(a).startsWith('-'));
+  if (rif.length !== 1 || opz.some((o) => o !== ANCHE_MAI_GIUDICATO)) return null;
+  return { rif: rif[0], ancheMaiGiudicato: opz.includes(ANCHE_MAI_GIUDICATO) };
 }
 
 async function main(argv) {
-  if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>'); return 1; }
+  const a = argomentiLettura(argv);
+  if (!a) { console.error(`USO: npm run feedback:leggi -- <numero|id> [${ANCHE_MAI_GIUDICATO}]`); return 1; }
   try {
     const bearer = await acquireBearer();
-    const r = await risolviFeedback(argv[0], { bearer, base: FIRESTORE_BASE });
+    const r = await risolviFeedback(a.rif, { bearer, base: FIRESTORE_BASE });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); return 3; }
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
-    const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
+    const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq, ancheMaiGiudicato: a.ancheMaiGiudicato });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
     if (esito.motivi.length) console.error(await rigaSporco(`letto #${esito.numero}`, esito.motivi));
     console.log(esito.testo);
