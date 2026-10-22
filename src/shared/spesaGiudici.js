@@ -1,0 +1,136 @@
+// Il tetto di spesa dei giudici per i mittenti non fidati (#1515): tetto e lunghezza giudicabile in config/automation,
+// la spesa del giorno nel contatore che tiene il server. Logica pura: Gestione e main rifiutano gli stessi valori, il
+// server applica gli stessi intervalli. Prove: tests/unit/spesaGiudici.test.mjs.
+
+(function (global) {
+  'use strict';
+
+  // I campi di config/automation e il documento del contatore (identities/, scritto solo dal server). L'id senza
+  // due punti: nell'indirizzo REST di Firestore i due punti aprono un metodo.
+  const CAMPI = Object.freeze({ tetto: 'judgeBudgetUsd', caratteri: 'judgeMaxChars' });
+  const DOC_SPESA = 'identities/spesa-giudici';
+  // Il motivo che il server scrive su un feedback non fidato che i giudici non hanno visto, e che aspetta l'owner.
+  const MOTIVI = Object.freeze({ tetto: 'budget_giudici', lunghezza: 'lunghezza_giudici' });
+
+  // Oltre 130.000 caratteri il numero non dice niente: il server non accetta più di 10.000 di testo e 120.000 di
+  // documenti. Sotto i 1.000 nessun feedback con un allegato arriverebbe più ai giudici.
+  const REGOLE = Object.freeze({
+    tetto: Object.freeze({ min: 0, max: 1000, fabbrica: 2, etichetta: 'Tetto di spesa dei giudici' }),
+    caratteri: Object.freeze({ min: 1000, max: 130000, fabbrica: 40000, etichetta: 'Lunghezza giudicata' }),
+  });
+
+  function numero(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v === 'string' && v.trim()) {
+      const n = Number(v.trim().replace(/\s/g, '').replace(',', '.'));
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  }
+  const centesimi = (n) => Math.round(n * 100) / 100;
+
+  /** Le impostazioni come le legge il server: un campo assente o storto vale il numero di fabbrica. */
+  function leggiImpostazioni(doc) {
+    const d = doc && typeof doc === 'object' ? doc : {};
+    const t = numero(d[CAMPI.tetto]);
+    const c = numero(d[CAMPI.caratteri]);
+    const dentro = (n, r) => n !== null && n >= r.min && n <= r.max;
+    return {
+      tettoUsd: dentro(t, REGOLE.tetto) ? centesimi(t) : REGOLE.tetto.fabbrica,
+      maxCaratteri: dentro(c, REGOLE.caratteri) ? Math.round(c) : REGOLE.caratteri.fabbrica,
+    };
+  }
+
+  function cifra(n, decimali) {
+    try {
+      return new Intl.NumberFormat('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali }).format(n);
+    } catch (_) { return n.toFixed(decimali); }
+  }
+
+  /**
+   * I soli campi ricevuti (`tettoUsd`, `maxCaratteri`), controllati. Vuoto torna al numero di fabbrica; un valore
+   * storto NON si aggiusta in silenzio: si rifiuta dicendo l'intervallo.
+   * @returns {{ok:true, valori:Object}|{ok:false, testo:string}} `valori` per nome di campo del documento.
+   */
+  function valida(patch) {
+    const p = patch && typeof patch === 'object' ? patch : {};
+    const valori = {};
+    for (const [chiave, regola, campo, decimali] of [
+      ['tettoUsd', REGOLE.tetto, CAMPI.tetto, 2],
+      ['maxCaratteri', REGOLE.caratteri, CAMPI.caratteri, 0],
+    ]) {
+      if (!(chiave in p) || p[chiave] === undefined) continue;
+      const v = p[chiave];
+      if (v === null || (typeof v === 'string' && !v.trim())) { valori[campo] = regola.fabbrica; continue; }
+      const n = numero(v);
+      if (n === null) return { ok: false, testo: `${regola.etichetta}: ci vuole un numero. Non salvato.` };
+      if (n < regola.min || n > regola.max) {
+        return { ok: false, testo: `${regola.etichetta}: da ${cifra(regola.min, decimali)} a ${cifra(regola.max, decimali)}. Non salvato.` };
+      }
+      if (decimali === 0 && !Number.isInteger(n)) {
+        return { ok: false, testo: `${regola.etichetta}: ci vuole un numero intero. Non salvato.` };
+      }
+      valori[campo] = decimali ? centesimi(n) : n;
+    }
+    return { ok: true, valori };
+  }
+
+  /** Il giorno del contatore: quello di Greenwich, uguale per il server e per ogni computer che lo legge. */
+  function giorno(ms) {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
+  /** L'istante in cui il contatore riparte, dopo `ms`. */
+  function prossimoGiornoMs(ms) {
+    const d = new Date(ms);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  }
+
+  /**
+   * La spesa di oggi dal documento del contatore. `null` = non letto (si mostra un trattino, non uno zero); un
+   * documento assente o di un altro giorno = niente speso oggi.
+   * @returns {{spesoUsd:number, prenotatoUsd:number}|null}
+   */
+  function spesaDiOggi(doc, oraMs) {
+    if (doc === null || doc === undefined) return null;
+    const d = typeof doc === 'object' ? doc : {};
+    if (d.giorno !== giorno(oraMs)) return { spesoUsd: 0, prenotatoUsd: 0 };
+    const pos = (v) => { const n = numero(v); return n !== null && n > 0 ? n : 0; };
+    return { spesoUsd: pos(d.spesoUsd), prenotatoUsd: pos(d.prenotatoUsd) };
+  }
+
+  /** Dollari come li legge l'owner: «1,95 $». */
+  function usd(n) {
+    const v = numero(n);
+    return v === null ? '—' : `${cifra(v, 2)} $`;
+  }
+
+  /**
+   * La riga di Gestione sulla spesa di oggi.
+   * @returns {{testo:string, quota:number|null, pieno:boolean, dettaglio:string}}
+   */
+  function rigaSpesa(spesa, tettoUsd, oraMs) {
+    const tetto = numero(tettoUsd);
+    if (!spesa || tetto === null) {
+      return { testo: `Oggi: — su ${usd(tetto)}`, quota: null, pieno: false, dettaglio: 'La spesa di oggi non si è potuta leggere.' };
+    }
+    const impegnato = spesa.spesoUsd + spesa.prenotatoUsd;
+    const pieno = impegnato >= tetto;
+    const riparte = new Date(prossimoGiornoMs(oraMs)).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const prenotato = spesa.prenotatoUsd > 0 ? `, più ${usd(spesa.prenotatoUsd)} prenotati per i giudizi in corso` : '';
+    const dettaglio = pieno
+      ? `Tetto raggiunto: i nuovi feedback dei non fidati aspettano te fino alle ${riparte}.`
+      : `Il contatore riparte da zero alle ${riparte}.`;
+    return {
+      testo: `Oggi: ${usd(spesa.spesoUsd)} su ${usd(tetto)}${prenotato}`,
+      quota: tetto > 0 ? Math.min(1, impegnato / tetto) : 1,
+      pieno,
+      dettaglio,
+    };
+  }
+
+  global.SN_SPESA_GIUDICI = Object.freeze({
+    CAMPI, DOC_SPESA, MOTIVI, REGOLE,
+    leggiImpostazioni, valida, giorno, prossimoGiornoMs, spesaDiOggi, usd, rigaSpesa,
+  });
+})(typeof globalThis !== 'undefined' ? globalThis : self);
