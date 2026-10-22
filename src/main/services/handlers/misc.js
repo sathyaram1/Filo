@@ -344,9 +344,9 @@ module.exports = function register(on, ctx) {
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
         onHeaders: ({ filename, totalBytes, servito }) => {
-          // Nome file sicuro: preferisci il Content-Disposition del server, poi
-          // il path dell'URL; neutralizza separatori e tentativi di traversal.
-          const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
+          // Il nome dal server è dato ostile: la regola è quella dei download da link, e dialogo, file
+          // parziale e voce nella barra mostrano lo stesso nome (#1510).
+          const name = downloads.safeName(filename || filenameFromUrl(url) || fallbackName, fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
           entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito, webContents: wc });
