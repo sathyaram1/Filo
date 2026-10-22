@@ -144,6 +144,21 @@ test('il pezzo si ritrova a meno di spazi multipli e di apostrofi dritti o curvi
   assert.equal(segni[0].start, testo.indexOf('sonno'));
 });
 
+// Quello che fa «Correggi» su ogni errore della risposta: il pezzo segnato prende la prima correzione.
+const corretto = (testo, raw) => C.segniDaRisposta(raw, testo).segni.filter((s) => s.segno === 'errore' && s.correzioni.length)
+  .reduceRight((t, s) => t.slice(0, s.start) + s.correzioni[0] + t.slice(s.end), testo);
+
+test('una correzione che cambia solo spazi o apostrofi non è un errore, e nessuna correzione ristretta cancella parole', () => {
+  const spazi = "[l'altro  giorno][l'altro giorno][spazio doppio][errore]";
+  for (const testo of ["ieri l'altro  giorno ho visto Marco", "ieri l'altro giorno ho visto Marco"]) {
+    assert.deepEqual(C.segniDaRisposta(spazi, testo).segni, [], testo);
+  }
+  assert.deepEqual(C.segniDaRisposta("[l’altro giorno][l'altro giorno][apostrofo][errore]", "ieri l'altro giorno").segni, []);
+  // Ristretta ai soli spazi, la correzione vale per il pezzo intero: «a  b» diventa «a x b», non «x».
+  assert.equal(corretto('a  b c', '[a  b][a x b][manca x][errore]'), 'a x b c');
+  assert.equal(corretto('io penso dire di sì', '[penso dire][penso di dire][manca «di»][errore]'), 'io penso di dire di sì');
+});
+
 test('un pezzo ripetuto vale nell\'occorrenza che tocca il testo nuovo di quella chiamata', () => {
   const testo = 'ho sonno, ma oggi sonno andato al mare';
   const nuovo = { start: testo.indexOf('oggi'), end: testo.length };
