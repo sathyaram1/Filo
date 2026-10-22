@@ -2106,7 +2106,7 @@ async function finalizeBucket(bucket, fromServer) {
         // facendo — con il giro che esce dicendo che è andato tutto bene.
         return emitHalt('permanent', pos.message);
       }
-      return emitHalt('transient', pos.message);
+      return emitHalt('transient', pos.message, { vivo: !!pos.vivo });
     }
   }
 
