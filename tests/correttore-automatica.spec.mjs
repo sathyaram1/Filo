@@ -4,6 +4,9 @@
 // parola fuori dizionario scritta tre volte non si segna più, «qual'è» resta un errore; una correzione scelta tre volte
 // diventa automatica. Il testo che mette uno script non si tocca. Nessuna chiamata esce dalla macchina.
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
