@@ -76,10 +76,12 @@ module.exports = function register(on, ctx) {
   const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
   on(MSG.FILE_APRI, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
-    if (!p || !esiste(p)) return nonTrovato();
+    if (!p) return senza(p);
+    // Il tipo si guarda sul nome, prima di chiedere niente al disco.
     if (!apribile(p)) {
       return { ok: false, errore: 'tipo', frase: 'Da qui Filo apre solo documenti e immagini: questo file aprilo dalla sua cartella' };
     }
+    if (!esiste(p)) return nonTrovato();
     try {
       const errore = await electron().shell.openPath(p);
       return errore ? { ok: false, errore: 'sistema', frase: 'Il computer non ha un programma per aprire questo file' } : { ok: true };
