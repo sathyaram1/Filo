@@ -39,22 +39,24 @@ module.exports = function register(on, ctx) {
 
   const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
   // Un percorso relativo non ha una cartella a cui riferirsi: si accetta intero, o con ~ per la cartella personale.
+  // null: porta a un altro computer, e il disco non si tocca (#1499).
   function percorsoDi(msg, sender) {
     if (msg && msg.downloadId) return DL().percorsoDi(msg.downloadId, ambito(sender));
-    const p = msg && typeof msg.percorso === 'string' ? msg.percorso.trim() : '';
-    if (!p || (!path.isAbsolute(p) && !/^~([\\/]|$)/.test(p))) return '';
-    return require('../documentRead').normalizePath(p);
+    return require('../documentRead').percorsoDelFile(msg && msg.percorso);
   }
   const nonTrovato = () => ({ ok: false, errore: 'non_trovato', frase: 'Il file non c’è più: forse è stato spostato o cancellato' });
+  const senza = (p) => (p === null
+    ? { ok: false, errore: 'rete', frase: 'Il file sta su un altro computer della rete: Filo apre solo i file di questo computer' }
+    : nonTrovato());
 
   on(MSG.FILE_NOME_STATO, soloFilo(async () => ({ ok: true, disponibile: await disponibile() })));
   on(MSG.FILE_NOME_PROPONI, soloFilo(async (msg, sender) => {
     const p = percorsoDi(msg, sender);
-    return p ? NomiFile.proponi(p) : nonTrovato();
+    return p ? NomiFile.proponi(p) : senza(p);
   }));
   on(MSG.FILE_RINOMINA, soloFilo(async (msg, sender) => {
     const p = percorsoDi(msg, sender);
-    return p ? NomiFile.rinomina(p, msg.nome) : nonTrovato();
+    return p ? NomiFile.rinomina(p, msg.nome) : senza(p);
   }));
   on(MSG.FILE_RIMETTI_NOMI, soloFilo(async (msg) => {
     const coppie = (Array.isArray(msg.coppie) ? msg.coppie : [])
