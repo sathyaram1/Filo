@@ -176,8 +176,10 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
       const oc = A.clicVero;
       A.clicVero = (...a) => { const r = oc(...a); globalThis.__diag.push(['vero', Date.now(), r]); return r; };
     }, join(APP_ROOT, 'src', 'main', 'services', 'adSkip.js'));
+    await nel(ima, "document.getElementById('salta').addEventListener('click', () => { const b = document.getElementById('salta'); (window.__pile = window.__pile || []).push(new Error().stack + ' disp=' + getComputedStyle(b.parentNode).display); })");
     for (const u of [yt, incorporato, ima]) await nel(u, 'window.__mostra()');
     await new Promise((ok) => setTimeout(ok, 5000));
+    console.log('PILE', JSON.stringify(await nel(ima, 'window.__pile')));
     console.log('MAIN', JSON.stringify(await filo.evaluate(() => globalThis.__diag)));
     for (const u of [yt, incorporato, ima]) console.log('DIAG', u, JSON.stringify(await nel(u, '({c: window.__clic, s: window.__saltata, v: document.visibilityState, iw: innerWidth})')));
     console.log('OSPITE', JSON.stringify(await filo.evaluate(({ webContents }) => Promise.all(webContents.getAllWebContents().map(async (w) => [w.getURL(), await w.executeJavaScript('({g: window.__gesti, v: document.visibilityState, iw: innerWidth})').catch((e) => String(e))])))));
