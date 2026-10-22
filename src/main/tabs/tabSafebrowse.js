@@ -5,6 +5,7 @@
 const { pageHints } = require('../../content/safebrowseHints.js');
 const Permessi = require('../services/permessiPagine');
 const { riquadroArrivato } = require('../services/riquadroArrivato');
+const ProxyTab = require('../services/proxyTab');
 
 // Un programma che parte entro questo tempo dall'ultimo clic o tasto vero nella scheda (in qualunque riquadro, o sul link
 // che l'ha aperta), anche dopo pagine di passaggio, è voluto. Oltre, o senza, è partito da solo (#814).
@@ -112,9 +113,10 @@ const safebrowseMethods = {
     return globalThis.SN_SAFEBROWSE.analyze(url, { ...ctx, incognito: !!this.incognito }, onUpdate);
   },
 
-  // Lo stesso per un link non ancora aperto: in incognito niente finestra nascosta.
-  _sbPreverifica(url, pagina) {
-    return globalThis.SN_SAFEBROWSE.preverifica(url, { pagina, incognito: !!this.incognito });
+  // Lo stesso per un link non ancora aperto: in incognito niente finestra nascosta, e da una scheda col proxy la
+  // finestra esce dal suo proxy (#753.1).
+  _sbPreverifica(url, pagina, ses) {
+    return globalThis.SN_SAFEBROWSE.preverifica(url, { pagina, incognito: !!this.incognito, rete: ProxyTab.reteDellaSessione(ses) });
   },
 
   // Il puntatore fermo mezzo secondo su un link accorciato o di rimando ne prepara il verdetto prima del clic (#966).
@@ -135,7 +137,7 @@ const safebrowseMethods = {
       timer = setTimeout(() => {
         timer = null;
         if (wc.isDestroyed()) return;
-        try { this._sbPreverifica(url, wc.getURL()); } catch (_) {}
+        try { this._sbPreverifica(url, wc.getURL(), wc.session); } catch (_) {}
       }, SOSTA_MS);
     };
     wc.on('input-event', (_e, input) => {

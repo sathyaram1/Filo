@@ -124,7 +124,8 @@ function resolve(country, { tier, settings, env } = {}) {
 // (authInfo.isProxy). Mappiamo la session della partition proxata alle sue
 // credenziali; l'handler globale risponde solo per le session registrate.
 
-const authBySession = new Map(); // partition → { ses, auth }
+// Accanto alle credenziali, le regole: chi esce per conto della scheda (la finestra nascosta dei link) le ripete uguali.
+const authBySession = new Map(); // partition → { ses, auth, rete: { proxyRules, proxyBypassRules } | null }
 let loginWired = false;
 
 function wireLoginHandler() {
@@ -135,28 +136,60 @@ function wireLoginHandler() {
   loginWired = true;
   app.on('login', (event, webContents, _request, authInfo, callback) => {
     if (!authInfo || !authInfo.isProxy || !webContents) return;
-    for (const { ses, auth } of authBySession.values()) {
-      if (webContents.session === ses) {
-        event.preventDefault();
-        try { callback(auth.username, auth.password); } catch (_) {}
-        return;
-      }
-    }
+    const auth = credenzialiDellaSessione(webContents.session);
+    if (!auth) return;
+    event.preventDefault();
+    try { callback(auth.username, auth.password); } catch (_) {}
   });
 }
 
-// Registra (o rimuove, con auth=null) le credenziali per una partition proxata.
-function setPartitionAuth(partition, ses, auth) {
-  if (auth && auth.username) {
-    authBySession.set(partition, { ses, auth });
-    wireLoginHandler();
-  } else {
-    authBySession.delete(partition);
-  }
+// Le ultime regole e credenziali date a ogni sessione, anche dopo clearPartitionAuth: la sessione le ricorda lei.
+const ultimaReteDi = new WeakMap();
+
+// Chromium ricorda la password del proxy per indirizzo: un fornitore col paese nel nome utente ha lo stesso indirizzo
+// per ogni paese, e senza dimenticare le credenziali vecchie si uscirebbe dal paese di prima (#1272).
+function dimenticaSeCambia(ses, chiave) {
+  if (!ses || typeof ses !== 'object') return null;
+  const prima = ultimaReteDi.get(ses);
+  ultimaReteDi.set(ses, chiave);
+  if (prima === undefined || prima === chiave) return null;
+  return Promise.resolve()
+    .then(() => (typeof ses.clearAuthCache === 'function' ? ses.clearAuthCache() : null))
+    .then(() => (typeof ses.closeAllConnections === 'function' ? ses.closeAllConnections() : null))
+    .catch(() => {});
+}
+
+// La partition proxata con regole e credenziali di `resolved` (quello di resolve()). Torna la promessa da aspettare
+// prima di caricare quando le credenziali vecchie vanno dimenticate, altrimenti null.
+function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null } = {}) {
+  const conAuth = auth && auth.username ? auth : null;
+  const rete = proxyRules ? { proxyRules, ...(bypassRules ? { proxyBypassRules: bypassRules } : {}) } : null;
+  const dimentica = dimenticaSeCambia(ses, JSON.stringify([proxyRules, bypassRules, conAuth && conAuth.username, conAuth && conAuth.password]));
+  if (!conAuth && !rete) { authBySession.delete(partition); return dimentica; }
+  authBySession.set(partition, { ses, auth: conAuth, rete });
+  if (conAuth) wireLoginHandler();
+  return dimentica;
 }
 
 function clearPartitionAuth(partition) {
   authBySession.delete(partition);
+}
+
+function voceDellaSessione(ses) {
+  if (!ses) return null;
+  for (const v of authBySession.values()) if (v.ses === ses) return v;
+  return null;
+}
+
+function credenzialiDellaSessione(ses) {
+  const v = voceDellaSessione(ses);
+  return v && v.auth ? v.auth : null;
+}
+
+// { proxyRules, proxyBypassRules?, auth } della sessione proxata, o null per una sessione che esce come il sistema.
+function reteDellaSessione(ses) {
+  const v = voceDellaSessione(ses);
+  return v && v.rete ? { ...v.rete, auth: v.auth } : null;
 }
 
 module.exports = {
@@ -169,6 +202,8 @@ module.exports = {
   providerHost,
   endpointFor,
   resolve,
-  setPartitionAuth,
+  registraRete,
   clearPartitionAuth,
+  credenzialiDellaSessione,
+  reteDellaSessione,
 };

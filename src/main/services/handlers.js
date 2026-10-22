@@ -201,7 +201,8 @@ function testoDelTurnoAutomatico(payload) {
   });
 }
 
-async function buildMessages(action, payload) {
+// `sender`: la scheda per conto della quale si legge quello che serve al prompt (l'llms.txt dell'Aiuto).
+async function buildMessages(action, payload, { sender = null } = {}) {
   if (payload && Array.isArray(payload.messages) && payload.messages.length) {
     return payload.messages;
   }
@@ -227,7 +228,7 @@ async function buildMessages(action, payload) {
       catch (_) { return ''; }
     })();
     const [llmsRes, pathsRes] = await Promise.all([
-      domain ? LlmsTxt.get(domain).catch(() => null) : Promise.resolve(null),
+      domain ? LlmsTxt.get(domain, { sender }).catch(() => null) : Promise.resolve(null),
       domain ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
     ]);
     const siteKnowledge = (llmsRes && llmsRes.present && llmsRes.text) ? llmsRes.text : '';
@@ -777,7 +778,7 @@ async function handleAIRequest({ intera = false, ...opts }) {
   return r;
 }
 
-async function chiamaIlModello({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
+async function chiamaIlModello({ action, payload, origin, sender = null, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
@@ -799,7 +800,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
   } catch (e) {
     if (e && e.code === 'NO_MODEL_FOR_ACTION') throw e;
   }
-  let messages = await buildMessages(action, { ...payload, modelName });
+  let messages = await buildMessages(action, { ...payload, modelName }, { sender });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
   // `noCache` salta la LETTURA della cache (la scrittura resta: una risposta

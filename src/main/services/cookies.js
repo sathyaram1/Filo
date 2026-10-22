@@ -302,7 +302,11 @@ function ensureRequestHook(ses) {
     callback({ cancel: false });
   });
   // Nessun altro ascolta la fine delle richieste: una seconda registrazione sostituirebbe questa.
-  ses.webRequest.onCompleted((details) => { if (esitoFn) { try { esitoFn(details, true); } catch (_) {} } });
+  ses.webRequest.onCompleted((details) => {
+    // La Referrer-Policy di un documento la pagina non la legge: la ricorda il main per chi scarica per lei (#1272).
+    try { require('./perContoDellaScheda').ricordaPoliticaDocumento(details); } catch (_) {}
+    if (esitoFn) { try { esitoFn(details, true); } catch (_) {} }
+  });
   ses.webRequest.onErrorOccurred((details) => { if (esitoFn) { try { esitoFn(details, false); } catch (_) {} } });
   return state;
 }
