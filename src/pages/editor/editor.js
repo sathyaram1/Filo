@@ -1078,6 +1078,7 @@
       if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
       const ok = applyGeneratedTitle(id, rawText);
       if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
+      if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
     } catch (_) {
       if (!auto) showEditorToast('Non sono riuscito a generare il titolo.');
