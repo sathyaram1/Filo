@@ -107,9 +107,16 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
   const q = unaRiga(cosa, COSA_MAX);
   if (!q) return { ok: false, errore: 'vuota' };
   const c = String(cartella == null ? '' : cartella).trim().slice(0, CARTELLA_MAX);
-  const perche = fuoriPerimetro(c);
-  const sito = !daFilo(origine);
+  let ch = { percorso: '', serie: false, rete: false };
+  if (c) { try { ch = await deps.cartellaChiesta(c); } catch (_) {} }
   const s = statoDi(wc);
+  // Una cartella su un altro computer non si cerca (#1499): lo si dice senza chiedere un sì che non porterebbe a niente.
+  if (ch.rete) {
+    s.dati = { cercato: q, risultati: [], indice: indicePerLaPagina(null), fermata: false, cartellaMancante: '', cartellaDiRete: c };
+    return { ok: true, cercato: q, candidati: [], indice: s.dati.indice, fermata: false, cartellaMancante: '', cartellaDiRete: unaRiga(c, 200) };
+  }
+  const perche = fuoriPerimetro(c, ch.serie ? '' : ch.percorso);
+  const sito = !daFilo(origine);
   if (sito || perche) {
     // Una domanda alla volta per scheda: chi ne chiede altre mentre una aspetta non accoda popup all'utente.
     if (s.chiede) return { ok: false, errore: 'in attesa' };
