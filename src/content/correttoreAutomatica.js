@@ -333,6 +333,6 @@
   global.SN_CORRETTORE_AUTO = {
     NOMI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome,
     soloMaiuscole, correzioneAFineParola, stileDi, scriveMinuscolo, distanza, imparabile, memoria, accettata, annullata,
-    riscritta, corretta, dimentica, INIZIO_FRASE,
+    riscritta, corretta, dimentica, inizioDiFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
