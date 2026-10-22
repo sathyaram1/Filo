@@ -118,6 +118,12 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   require('../../src/shared/i18n.js');
   const desc = globalThis.SN_I18N.t('options_security_delicate_desc');
   for (const cosa of [/pubblica amministrazione/, /chat/, /screenshot/, /spiegazione/]) assert.match(desc, cosa);
+  // #1004.1 — l'owner tiene il correttore acceso anche qui: la protezione non deve promettere che non parte niente.
+  assert.match(desc, /correttore resta acceso/);
+  require('../../src/shared/capabilities.js');
+  const cap = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'pagine-delicate');
+  assert.match(cap.desc, /tranne il correttore/);
+  assert.match(cap.doesNot, /Non ferma il correttore/);
   const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');
   assert.deepEqual(d.partial, { descriviImmagini: { enabled: false } });
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
