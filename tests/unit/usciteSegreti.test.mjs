@@ -1056,7 +1056,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const porta = filo.indexOf('apriDaFilo(');
     assert.ok(porta > 0 && porta < filo.indexOf('apriDaCollegamento('), 'APRI_COLLEGAMENTO_FILO apre prima della porta');
     const scarica = corpo(src('main', 'services', 'handlers', 'misc.js'), 'on(MSG.DOWNLOAD_LINK');
-    assert.match(scarica, /if \(msg\.diFilo\) \{[\s\S]*apriDaFilo\(url, \{[\s\S]*tipo: 'SCARICA_COLLEGAMENTO', apri: \(\) => \{ esito = scarica\(\); \}/);
+    assert.match(scarica, /if \(msg\.diFilo\) \{[\s\S]*apriDaFilo\(url, \{[\s\S]*tipo: 'SCARICA_COLLEGAMENTO',[\s\S]*apri: \(\) => \{ esito = scarica\(\); \}/);
     assert.equal(X.verboUscita('SCARICA_COLLEGAMENTO'), 'non ho scaricato il file');
   });
 
@@ -1145,5 +1145,130 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
       assert.match(gate, re, `${f} senza oscuramento`);
     }
     assert.ok(/segreti:\s*async/.test(handlers), 'il cancello di Filo non riceve i segreti custoditi');
+  });
+});
+
+// #1505 — la porta chiude a guasto, e un collegamento senza verdetto chiede l'OK: la parte pura sta in
+// src/main/services/verdettiUscite.js, la porta vera gliela passa handlers.js (sentinelle in fondo).
+describe('la porta chiude a guasto e ogni collegamento ha un verdetto', () => {
+  const V = require(join(ROOT, 'src', 'main', 'services', 'verdettiUscite.js'));
+  const rotta = async () => { throw new RangeError('Maximum call stack size exceeded'); };
+  const pulita = async () => ({ blocca: false, exfil: false });
+
+  test('una porta che lancia ferma l\'uscita con una frase che lo dice', async () => {
+    const porta = V.chiudiAGuasto(rotta);
+    const v = await porta({ type: 'NAVIGA', url: 'https://raccolta.example/?k=1' }, {});
+    assert.equal(v.blocca, true);
+    assert.equal(v.regola, 'guasto');
+    assert.equal(v.frase, `non ho aperto l'indirizzo: ${V.FRASE_GUASTO}`);
+    assert.match((await porta({ type: 'CAMPO_PAGINA', testo: 'x' })).frase, /^non ho scritto nel campo: /);
+  });
+
+  test('senza le regole delle uscite la porta ferma, non lascia passare', async () => {
+    let chiamata = false;
+    const porta = V.chiudiAGuasto(async () => { chiamata = true; return { blocca: false }; }, { regole: () => null });
+    const v = await porta({ type: 'NAVIGA', url: 'https://example.org/' });
+    assert.equal(v.blocca, true);
+    assert.equal(chiamata, false);
+  });
+
+  test('con la porta che lancia, il collegamento della risposta chiede l\'OK e il clic lo chiede', async () => {
+    V.svuota();
+    const url = 'https://raccolta.example/?d=Mario_Rossi';
+    const out = await V.giudica([url], { porta: rotta });
+    assert.deepEqual(out, [{ url, motivo: V.MOTIVI.guasto }]);
+    assert.deepEqual(V.alClic(url), { daChiedere: true, motivo: V.MOTIVI.guasto });
+    assert.equal(V.contattabile(url), false, 'l\'anteprima o l\'icona contatterebbero il sito prima dell\'OK');
+  });
+
+  test('su 201 collegamenti l\'ultimo, con un dato della conversazione, chiede l\'OK', async () => {
+    V.svuota();
+    const PAROLE = 'se serve chiamami al 347 123 4567';
+    const porta = async (url) => X.valutaUscita({ type: 'NAVIGA', url }, { parole: PAROLE, domanda: '' });
+    const onesti = Array.from({ length: 200 }, (_, i) => `https://esempio.test/articolo-${i}`);
+    const conDato = 'https://raccolta.example/?tel=3471234567';
+    assert.equal((await porta(conDato)).exfil, true, 'la porta da sola deve vedere il dato');
+    const out = await V.giudica([...onesti, conDato], { porta });
+    assert.deepEqual(out.map((x) => x.url), [conDato]);
+    assert.equal(out[0].motivo, V.MOTIVI.troppi);
+    assert.equal(V.alClic(conDato).daChiedere, true);
+    assert.equal(V.alClic(onesti[199]).daChiedere, false);
+  });
+
+  test('nella chat un collegamento mai giudicato chiede l\'OK al clic e non si contatta prima', async () => {
+    V.svuota();
+    const giudicato = 'https://esempio.test/giudicato';
+    const mai = 'https://esempio.test/risposta-interrotta?d=1';
+    await V.giudica([giudicato], { porta: pulita });
+    assert.equal(V.alClic(giudicato, { proposta: true }).daChiedere, false);
+    assert.deepEqual(V.alClic(mai, { proposta: true }), { daChiedere: true, motivo: V.MOTIVI.senzaVerdetto });
+    // Fuori dalle frasi di Filo (cronologia, pagine di Filo) il clic resta com'era.
+    assert.equal(V.alClic(mai).daChiedere, false);
+    assert.equal(V.contattabile(giudicato, { proposta: true }), true);
+    assert.equal(V.contattabile(mai, { proposta: true }), false);
+    assert.equal(V.contattabile(mai), true);
+  });
+
+  test('un sito con un collegamento in attesa di OK non si contatta prima del clic, nemmeno per un altro indirizzo', async () => {
+    V.svuota();
+    await V.giudica(['https://dati.raccolta.example/x?d=1'], { porta: async () => ({ blocca: false, exfil: true, reason: 'contiene un tuo dato' }) });
+    assert.equal(V.contattabile('https://dati.raccolta.example/altro'), false);
+    assert.equal(V.contattabile('https://esempio.test/'), true);
+  });
+
+  test('un blocco vero non diventa un via libera: il collegamento resta senza verdetto', async () => {
+    V.svuota();
+    const url = 'https://raccolta.example/?c=482913';
+    const out = await V.giudica([url], { porta: async () => ({ blocca: true, regola: 'codice', frase: 'x' }) });
+    assert.deepEqual(out, []);
+    assert.equal(V.alClic(url, { proposta: true }).daChiedere, true);
+  });
+
+  test('riaperta, la chat ritrova i verdetti; una risposta interrotta resta senza', () => {
+    V.svuota();
+    const linkDi = (t) => [...t.matchAll(/https?:\/\/\S+/g)].map((m) => m[0]);
+    V.ricordaArchiviati([
+      { role: 'user', text: 'https://utente.test/a' },
+      { role: 'filo', text: 'vedi https://ok.test/a e https://chiede.test/b', linkDaConfermare: [{ url: 'https://chiede.test/b', motivo: 'contiene un tuo dato' }] },
+      { role: 'filo', text: 'a metà https://interrotta.test/c', senzaVerdetto: true },
+    ], linkDi);
+    assert.equal(V.alClic('https://ok.test/a', { proposta: true }).daChiedere, false);
+    assert.deepEqual(V.alClic('https://chiede.test/b', { proposta: true }), { daChiedere: true, motivo: 'contiene un tuo dato' });
+    assert.equal(V.alClic('https://interrotta.test/c', { proposta: true }).daChiedere, true);
+  });
+});
+
+describe('sentinella: nessun chiamante della porta prende un guasto per via libera', () => {
+  const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
+  const handlers = src('main', 'services', 'handlers.js');
+
+  test('la porta è costruita chiusa a guasto, e chi la chiama non la avvolge in un try', () => {
+    assert.match(handlers, /const controllaUscita = VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
+    const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
+    const i = esegui.indexOf('await controllaUscita(action');
+    assert.ok(i > 0);
+    assert.ok(!/try\s*\{\s*$/.test(esegui.slice(Math.max(0, i - 40), i)), 'executeFiloAction avvolge la porta in un try');
+    const apri = corpo(handlers, 'async function apriDaFilo(');
+    assert.ok(!/let u = \{ blocca: false \}/.test(apri), 'apriDaFilo parte da un via libera');
+    assert.match(corpo(handlers, 'async function linkCheChiedonoOk('), /VerdettiUscite\.giudica\(/);
+  });
+
+  test('la home passa alla porta il suo contesto, e le sue carte non chiedono l\'icona al sito', () => {
+    const genera = corpo(handlers, 'async function generateDashboardFromInputs(');
+    assert.match(genera, /controllaUscita\(suggestions\[i\]\.action, casa\)/);
+    assert.match(genera, /linkCheChiedonoOk\('', \{ \.\.\.casa, sempre: true/);
+    assert.match(src('pages', 'dashboard', 'dashboard-carte.js'), /iconaDelSito\(s\.action\.url, \{ soloCopie: true \}\)/);
+  });
+
+  test('icona e anteprima chiedono alla stessa regola se un indirizzo si può contattare prima del clic', () => {
+    assert.match(corpo(src('main', 'services', 'handlers', 'tabs.js'), 'on(MSG.ICONA_SITO'), /contattabilePrimaDelClic\(/);
+    const meta = corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'");
+    const i = meta.indexOf('contattabilePrimaDelClic(');
+    assert.ok(i > 0 && i < meta.indexOf('perContoDellaScheda('), 'l\'anteprima contatta il sito prima di chiedere');
+  });
+
+  test('l\'assistente di pagina tratta una porta che non risponde come una porta che ferma', () => {
+    const campo = corpo(src('content', 'sidebar.js'), 'async function campoFermato(');
+    assert.ok(!/catch \(_\) \{ return ''; \}/.test(campo), 'un errore della porta lascia scrivere il campo');
   });
 });

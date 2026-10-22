@@ -1,6 +1,6 @@
 // Il verdetto della porta delle uscite (#810): la chiusura a guasto e il registro dei collegamenti che un modello mostra
 // (#868.6, #1505). Una porta che non risponde ferma l'uscita; un collegamento senza verdetto chiede l'OK al clic.
-// Niente Electron: le regole si provano in tests/unit/verdettiUscite.test.mjs, la porta vera gliela passa handlers.js.
+// Niente Electron: le regole si provano in tests/unit/usciteSegreti.test.mjs, la porta vera gliela passa handlers.js.
 
 // Largo: una risposta onesta ha pochi collegamenti, e ognuno costa una passata della porta. Oltre, si chiede l'OK.
 const MAX_GIUDICATI_PER_TESTO = 200;
