@@ -1178,8 +1178,8 @@
   // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw, c.win).slice(1);
-    if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
+    const args = argomenti(raw, c).slice(1);
+    if (prog === 'popd' || args.some((a) => a.variabile || a.ignoto)) return { ...c, cwd: null };
     let dest = null;
     for (let i = 0; i < args.length; i++) {
       const t = args[i].testo;
