@@ -644,7 +644,7 @@
     return '';
   }
   async function apriProposta(url, vicino = null, chiedi = '') {
-    const proposta = !!(vicino && vicino.closest && vicino.closest('[data-filo-verdetti]'));
+    const proposta = self.SN_MARKDOWN ? self.SN_MARKDOWN.scrittoDaUnModello(vicino) : !!(vicino && vicino.closest && vicino.closest('[data-filo-verdetti]'));
     const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url), proposta };
     let r = null;
     try { r = await send(msg); } catch (_) {}

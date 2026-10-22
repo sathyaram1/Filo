@@ -100,8 +100,10 @@
     showToast(frase.charAt(0).toUpperCase() + frase.slice(1), { duration: 6000 });
   }
 
-  // Un collegamento in una frase di Filo che ha il verdetto della porta (la chat della home): senza, chiede l'OK (#1505).
-  const conVerdetto = (el) => !!(el && el.closest && el.closest('[data-filo-verdetti]'));
+  // Scritto da un modello (src/shared/filoMarkdown.js): nelle pagine di Filo, senza verdetto, chiede l'OK (#1505).
+  const conVerdetto = (el) => (global.SN_MARKDOWN?.scrittoDaUnModello
+    ? global.SN_MARKDOWN.scrittoDaUnModello(el)
+    : !!(el && el.closest && el.closest('a.filo-md-link, [data-filo-verdetti]')));
 
   // Un OK che il main chiede si dà qui; `false` se l'utente dice di no.
   async function chiediOk(r) {
@@ -138,8 +140,8 @@
     return r;
   }
 
-  // Nelle pagine di Filo la porta sta già su ogni apertura nel main, e la chat ha la sua: lì il clic arriva in bolla,
-  // dopo quella, e basta aprire. Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
+  // Nelle pagine di Filo la chat ha la sua porta: lì il clic arriva in bolla, dopo quella, e chiede al main come sui
+  // siti, col segno del modello (#1505). Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
   // lascerebbe al collegamento l'apertura da sé, senza porta.
   const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
@@ -152,7 +154,6 @@
     // Sui siti un clic fabbricato sull'host di un riquadro chiuso arriva qui col bersaglio sotto le sue coordinate:
     // il collegamento lo apre solo il clic dell'utente (#1071).
     if (!inPaginaDiFilo && !global.SN_FILO_UI?.veroONostro?.(e)) return;
-    if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
   if (inPaginaDiFilo) document.addEventListener('click', suCollegamento);
