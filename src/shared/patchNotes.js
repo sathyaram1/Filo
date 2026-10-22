@@ -46,7 +46,7 @@
     {
       version: '0.2.246', date: '2026-10-22',
       features: [
-        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola sua che scrivi tre volte uguale smette di essere segnata. Le parole imparate le vedi e le togli in Gestisci correttore.',
+        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
       ],
       fixes: [
         'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
