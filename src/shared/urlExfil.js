@@ -721,6 +721,11 @@
     const verbo = verboUscita(tipo);
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
     if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
+    // Una ricerca fra i documenti esce dal computer solo con una cartella su un altro computer: esce il suo nome.
+    if (tipo === 'CERCA_DOCUMENTI') {
+      if (!diRete(action.cartella)) return niente;
+      action = { type: tipo, cartella: action.cartella };
+    }
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
     const u = formeDi(uscente);
