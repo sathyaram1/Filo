@@ -27,6 +27,8 @@ const SONDA_LONTANO_MS = 150;
 const QUIETE_MS = 600;
 // Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
 const PAGINE_NEL_MENU = 15;
+// Quanto un'azione della pagina aspetta che Filo arrivi in una pagina lenta: oltre, il clic è vecchio.
+const ATTESA_DELLA_PAGINA_MS = 20_000;
 
 const FISSE = new Set(['history', 'apps', 'redteam', 'settings', 'account']);
 const MENU_DELLA_SHELL = new Set(['apps', 'settings', 'account']);
