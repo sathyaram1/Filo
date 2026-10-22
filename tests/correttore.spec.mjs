@@ -279,8 +279,8 @@ test('lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori
   await expect.poll(zigzag).toEqual({ ta: 'none', ce: 'none', riga: 'none', gramm: 'none' });
 });
 
-test('una password scritta dopo una pausa e una carta scritta in due tempi non partono verso il modello', async ({ app, openTab, testServer }) => {
-  const page = await apri(app, openTab, testServer, {});
+// Quello che parte davvero verso il modello, domanda per domanda.
+async function spiaPartiti(app) {
   await app.evaluate(() => {
     const vero = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.__partiti = [];
@@ -288,6 +288,12 @@ test('una password scritta dopo una pausa e una carta scritta in due tempi non p
     globalThis.SN_PROVIDERS.completeWithFallback = spia;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = spia;
   });
+  return () => app.evaluate(() => globalThis.__partiti);
+}
+
+test('una password scritta dopo una pausa e una carta scritta in due tempi non partono verso il modello', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  const tutti = await spiaPartiti(app);
   const quante = () => app.evaluate(() => globalThis.__rapide.length);
   await page.locator('#ta').click();
   await page.keyboard.type('ciao Marco, la password del wifi è ');
@@ -298,10 +304,57 @@ test('una password scritta dopo una pausa e una carta scritta in due tempi non p
   await page.waitForTimeout(400);
   await page.keyboard.type('1111 1111 grazie');
   await expect.poll(quante, { timeout: 5000 }).toBe(3);
-  const partiti = await app.evaluate(() => globalThis.__partiti);
+  const partiti = await tutti();
   expect(partiti.some((t) => t.includes('[dato riservato]'))).toBe(true);
   for (const t of partiti) {
     expect(t).not.toContain('Gatto2024');
     expect(t).not.toMatch(/1111/);
   }
+});
+
+// #1446.1 — chi risponde a chi chiede la password la scrive senza annunciarla: l'annuncio è la domanda sopra il campo.
+
+test('una password scritta in chat come risposta a chi la chiede non parte, anche con la domanda appena arrivata', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  const partiti = await spiaPartiti(app);
+  const quante = () => app.evaluate(() => globalThis.__rapide.length);
+  await page.locator('#ta').click();
+  await page.keyboard.type('a martedì allora ');
+  await expect.poll(quante, { timeout: 5000 }).toBe(1);
+  // Il messaggio parte e subito arriva la domanda: la conversazione letta un attimo fa non la contiene.
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.press('Backspace');
+  await page.evaluate(() => {
+    const p = document.createElement('p');
+    p.textContent = 'Marco: mi mandi la password del wifi?';
+    document.querySelector('#ta').before(p);
+  });
+  await page.keyboard.type('certo, Gatto2024 ');
+  await expect.poll(async () => (await partiti()).some((t) => t.includes('certo, [dato riservato]')), { timeout: 5000 }).toBe(true);
+  for (const t of await partiti()) expect(t).not.toContain('Gatto2024');
+});
+
+test('nella casella di una riga il controllo chiesto col tasto destro non porta la password data in risposta', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  const partiti = await spiaPartiti(app);
+  await page.evaluate(() => { document.querySelector('main p').textContent = 'Marco: mi mandi la password del wifi?'; });
+  await page.locator('#riga').click();
+  await page.keyboard.type('Gatto2024');
+  await page.locator('#riga').click({ button: 'right', position: { x: 20, y: 8 } });
+  await expect.poll(() => app.evaluate(() => globalThis.__rapide.length), { timeout: 5000 }).toBeGreaterThan(0);
+  const tutti = await partiti();
+  expect(tutti.some((t) => t.includes('[dato riservato]'))).toBe(true);
+  for (const t of tutti) expect(t).not.toContain('Gatto2024');
+});
+
+test('il controllo ragionato, a fine frase, non porta la password data in risposta a chi la chiede', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { suggerimenti: {} });
+  const partiti = await spiaPartiti(app);
+  await page.evaluate(() => { document.querySelector('main p').textContent = 'Marco: mi mandi la password del wifi?'; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('certo, Gatto2024. ');
+  await expect.poll(() => app.evaluate(() => globalThis.__ragionate.length), { timeout: 8000 }).toBeGreaterThan(0);
+  const tutti = await partiti();
+  expect(tutti.some((t) => t.includes('proponi SUGGERIMENTI') && t.includes('certo, [dato riservato].'))).toBe(true);
+  for (const t of tutti) expect(t).not.toContain('Gatto2024');
 });
