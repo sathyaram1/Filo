@@ -8,6 +8,7 @@
   const { MSG } = global.SN_MSG;
   const { ACTIONS, STORAGE_KEYS } = global.SN_CONST;
   const R = () => global.SN_CORRETTORE;
+  const A = () => global.SN_CORRETTORE_AUTO;
   const Coerenza = () => global.SN_COERENZA;
   const t = (k, ...a) => (global.SN_I18N ? global.SN_I18N.t(k, ...a) : k);
 
