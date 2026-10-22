@@ -453,6 +453,10 @@
     const el = state.el;
     if (getEditableText(el) !== u.testoPrima) return;
     mettiCursore(el, u.cursorePrima);
+    // Un editor che rimette la selezione dal suo modello (Lexical) lo fa dopo: lì il cursore si rimette una volta ancora.
+    setTimeout(() => {
+      if (getEditableText(el) === u.testoPrima && cursoreNelCampo(el) !== u.cursorePrima) mettiCursore(el, u.cursorePrima);
+    }, 0);
     seguiIlTesto(state);
     rifiutata(state, u.voce);
   }
