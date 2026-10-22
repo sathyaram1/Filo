@@ -21,7 +21,10 @@ module.exports = function register(on, ctx) {
     const tab = win && win._filoTabs && Array.isArray(win._filoTabs.tabs)
       ? win._filoTabs.tabs.find((t) => t.view && t.view.webContents === sender.wc)
       : null;
-    return tab ? { win, view: tab.view } : null;
+    if (!tab) return null;
+    let davanti = false;
+    try { davanti = win._filoTabs.activeId === tab.id && win.isVisible() && !win.isMinimized(); } catch (_) { davanti = false; }
+    return { win, view: tab.view, davanti };
   }
 
   on(MSG.AD_SKIP_CLICK, async (msg, sender) => {
