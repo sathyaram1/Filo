@@ -1007,6 +1007,7 @@
       }
       else if (/^c2pa\.ingredient(\.v\d+)?$/.test(etichetta)) {
         const ing = cborTesta(dati);
+        out.tuttiIngredienti++;
         const rif = ing && (ing.activeManifest || ing.c2pa_manifest);
         if (rif && typeof rif.url === 'string' && RELAZIONI.has(String(ing.relationship))) {
           out.ingredienti.push({ relazione: String(ing.relationship), url: rif.url, hash: u8(rif.hash), alg: rif.alg || claim.alg || 'sha256' });
