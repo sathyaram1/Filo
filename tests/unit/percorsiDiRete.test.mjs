@@ -85,8 +85,8 @@ test('nelle cartelle di sempre e nella cartella personale la ricerca resta liber
 
 test('il popup dice la cartella che si leggerà, non quella scritta col segno davanti', () => {
   const a = { type: 'CERCA_DOCUMENTI', cosa: 'fattura', cartella: '«/etc', _cartella: '/etc', _perimetro: CONTESTI[1].perimetro };
-  const testo = [].concat(AL.describe ? AL.describe(a) : AL.descrivi(a)).map((x) => (typeof x === 'string' ? x : (x && x.citazione) || '')).join('');
-  assert.match(testo, /nella cartella \/etc/);
+  const testo = AL.describe(a);
+  assert.match(testo, /nella cartella \/etc\n/);
   assert.doesNotMatch(testo, /«\/etc/);
 });
 
