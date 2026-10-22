@@ -33,7 +33,8 @@ module.exports = function register(on, ctx) {
     if (!modo) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const dove = vistaDellaScheda(sender);
     if (!dove) return { ok: false, code: 'scheda' };
-    if (modo === 'riquadro') return AdSkip.clicDalRiquadro(sender, msg, dove);
+    // Il clic al riquadro di una scheda che non si vede può finire alla pagina che lo ospita (src/content/adSkip.js).
+    if (modo === 'riquadro') return dove.davanti ? AdSkip.clicDalRiquadro(sender, msg, dove) : { ok: false, code: 'nascosta' };
     return AdSkip.clicVero(sender.wc, msg, dove);
   });
 
