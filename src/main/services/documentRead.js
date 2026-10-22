@@ -887,6 +887,8 @@ module.exports = {
   readDocument,
   // esportati per gli unit test e per chi formatta l'osservazione
   normalizePath,
+  percorsoDiRete,
+  percorsoDelFile,
   chiaveTollerante,
   nomiCombaciano,
   risolviTollerante,
