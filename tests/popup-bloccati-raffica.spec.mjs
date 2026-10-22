@@ -62,16 +62,25 @@ test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi a
   expect(p.b.x + p.b.width).toBeLessThanOrEqual(p.W);
   expect(p.b.width).toBeLessThanOrEqual(400);
 
-  // La più recente è in vista con la sua X; ogni altra si raggiunge scorrendo, e la sua X la chiude.
+  // La più recente è in vista con la sua X, e il «+N» si raggiunge scorrendo.
   await expect(vista.locator('.shell-notif').last().locator('.shell-notif-close')).toBeInViewport();
-  for (let resto = 5; resto > 0; resto--) {
-    const x = vista.locator('.shell-notif.show').first().locator('.shell-notif-close');
+  await altre.scrollIntoViewIfNeeded();
+  await expect(altre).toBeInViewport();
+
+  // Tutte e dieci si chiudono con la loro X: chiusa una a schermo, entra una di quelle che aspettavano.
+  for (let resto = 10; resto > 0; resto--) {
+    const nid = await vista.locator('.shell-notif.show').first().getAttribute('data-nid');
+    const x = vista.locator(`.shell-notif[data-nid="${nid}"] .shell-notif-close`);
     await x.scrollIntoViewIfNeeded();
     await expect(x).toBeInViewport();
     await x.click();
     await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(resto - 1, { timeout: 4000 });
     // La chiusura torna alla pila disegnata con un viaggio in più: senza aspettarla si riclicca la carta che sparisce.
-    await expect(vista.locator('.shell-notif.show')).toHaveCount(resto - 1, { timeout: 4000 });
+    await expect(vista.locator(`.shell-notif.show[data-nid="${nid}"]`)).toHaveCount(0, { timeout: 4000 });
+    await expect(vista.locator('.shell-notif.show')).toHaveCount(Math.min(5, resto - 1), { timeout: 4000 });
+    const fuori = resto - 1 - 5;
+    if (fuori > 0) await expect(altre).toHaveText(`+${fuori} ${fuori === 1 ? 'avviso' : 'avvisi'}`);
+    else await expect(vista.locator('.avvisi-testa')).toBeHidden();
   }
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
 });
