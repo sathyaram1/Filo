@@ -5880,6 +5880,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
   const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
   if (dalTratto) azioniViste.push(dalTratto);
+  // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
+  const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
+  LETTURE_DI_UNA_NUOVA.set(azioniViste, [...(filo ? filo.perUnaNuova || [] : []), ...(tuttoIlTratto ? [tuttoIlTratto] : [])]);
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
   // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello. Né la riga di una
   // conversazione di un'altra app, che scrive Filo, né quello che l'utente ha scritto nell'Aiuto sopra un sito (#1508).
