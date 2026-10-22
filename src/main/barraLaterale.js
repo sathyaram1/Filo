@@ -520,9 +520,10 @@ class BarraLaterale {
       const sp = dallaPagina && dallaPagina[id];
       if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
-        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || nav.spento));
+        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || nav.spento || nav.senzaFilo));
       const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      const perche = d.tipo === 'pagina' && nav.spento ? 'Filo è spento su questo sito' : '';
+      const perche = d.tipo !== 'pagina' ? '' : nav.spento ? 'Filo è spento su questo sito'
+        : nav.senzaFilo ? 'Su questa pagina Filo non può agire' : '';
       out.push({ id, icona, etichetta, tasto, perche, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', contagocce: !!d.contagocce });
     }
     return out;
