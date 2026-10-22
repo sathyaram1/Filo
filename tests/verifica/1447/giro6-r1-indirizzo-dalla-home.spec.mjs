@@ -14,7 +14,7 @@ test('r1 aperto un indirizzo dalla home, nella home non resta traccia del testo 
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === `http://${typed}`; } catch (_) { return false; } }),
     { timeout: 10_000 }).toBe(true);
   await expect(input).toHaveValue('');
-  await expect.poll(() => dash.evaluate((addr) =>
-    Array.from(document.querySelectorAll('.sn-spell-overlay')).some((o) => (o.textContent || '').includes(addr)), typed),
-  { timeout: 3000 }).toBe(false);
+  const resta = await dash.evaluate((addr) =>
+    Array.from(document.querySelectorAll('.sn-spell-overlay')).some((o) => (o.textContent || '').includes(addr)), typed);
+  expect(resta, 'svuotata la casella, lo strato dei segni non tiene più il testo di prima').toBe(false);
 });
