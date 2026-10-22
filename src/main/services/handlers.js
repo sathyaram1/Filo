@@ -3327,10 +3327,16 @@ async function eseguiAzioneFilo(action, {
         const cosa = String(action.cosa ?? action.query ?? action.testo ?? action.q ?? '').trim();
         const cartella = String(action.cartella ?? '').trim();
         const Indice = require('./documentiIndice');
+        // Come LEGGI_DOCUMENTO: la cartella risolta si rimisura prima di toccarla, e se il gate ne ha misurata un'altra
+        // senza OK non si legge (#1499).
+        const C = globalThis.SN_CMD_CLASSIFY;
+        const fuori = (p) => (confirmed || decisione.conCosto(2) === 'si' ? ''
+          : (!C ? 'non si sa dove legge' : C.fuoriPerimetro(p, action._perimetro)));
         let r;
         try {
           r = await Indice.cerca(cosa, {
             cartella,
+            fuori,
             segnale,
             avanzamento: avanzamento ? (st) => {
               if (!st || st.fase !== 'lettura') return;
