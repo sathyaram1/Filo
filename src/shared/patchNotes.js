@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
+        'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che l\'assistente ti propone. Le password e le carte che metti in un modulo non arrivano al modello.',
       ],
     },
     {

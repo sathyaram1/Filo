@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
-    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
+    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto, ricordaPropostaDellAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const { soloFilo: soloSuperficiDiFilo } = require('./origine');
@@ -182,6 +182,7 @@ module.exports = function register(on, ctx) {
     const testo = String((msg && msg.testo) || '');
     if (!testo.trim()) return { ok: true, blocca: false };
     const u = await controllaUscita({ type: 'CAMPO_PAGINA', testo }, { sender, parole: paroleDa(msg) });
+    if (!u.blocca) ricordaPropostaDellAiuto(sender, testo);
     return { ok: true, blocca: !!u.blocca, frase: u.blocca ? u.frase : '' };
   });
 
