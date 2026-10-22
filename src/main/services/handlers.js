@@ -3317,6 +3317,7 @@ async function eseguiAzioneFilo(action, {
               allargata,
               results,
               ...(daFuori.length ? { daFuori } : {}),
+              ...(classeLetta > 1 ? { classeLetta } : {}),
               ...(pagine.length ? { pagine } : {}),
               ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
               ...(cambiTrovati.length && cambiCercati.allargata ? { cambiCercatiCon: cambiCercati.termini } : {}),
