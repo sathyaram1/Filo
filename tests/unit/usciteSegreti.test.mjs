@@ -549,6 +549,37 @@ describe('una pagina piena di codici finti nascosti non nasconde quello vero', (
   });
 });
 
+// #1505 — un token di milioni di caratteri con la forma di una chiave finiva la pila delle regex: la porta lanciava, e
+// chi la chiamava lo prendeva per via libera. Regex provate in Node, non nel processo di Electron.
+describe('un token lunghissimo nella pagina dà un verdetto, e in fretta', () => {
+  const LUNGO = `sk-${'a'.repeat(8000000)}`;
+  test('la porta risponde su un token di otto milioni di caratteri, senza lanciare', () => {
+    const t = Date.now();
+    const v = X.valutaUscita({ type: 'NAVIGA', url: 'https://raccolta.example/?k=482913' }, { pagina: { testo: LUNGO, host: 'riquadro.example' }, daPagina: true });
+    assert.equal(v.blocca, false);
+    assert.ok(Date.now() - t < 3000, `verdetto in ${Date.now() - t} ms`);
+  });
+  for (const testa of ['sk-', 'ghp_', 'AIza', 'AKIA', 'xoxb-', 'github_pat_', 'sk_live_']) {
+    test(`${testa}… oltre il tetto: il testo è saturo, e la chiave vera accanto si trova`, () => {
+      const corpo = testa === 'AKIA' ? 'A'.repeat(3000000) : 'a'.repeat(3000000);
+      const trovati = G.segretiNelTesto(`${testa}${corpo}\nla tua chiave: ${TOKEN_GH}`);
+      assert.equal(trovati.saturo, true);
+      assert.ok(trovati.some((x) => x.valore === TOKEN_GH), 'la chiave vera dopo il token lungo non si trova');
+    });
+  }
+  test('saturo per un token lungo, un pezzo con una cifra che sta nella pagina si ferma', () => {
+    const pagina = { testo: `${LUNGO}\nIban del fornitore IT60X0542811101000000123456`, host: 'riquadro.example' };
+    assert.equal(X.valutaUscita({ type: 'NAVIGA', url: 'https://raccolta.example/?i=000000123456' }, { pagina }).blocca, true);
+    assert.equal(X.valutaUscita({ type: 'NAVIGA', url: 'https://example.org/guida' }, { pagina }).blocca, false);
+  });
+  test('una chiave di lunghezza vera resta intera, e il testo non è saturo', () => {
+    const vera = `sk-${'b1'.repeat(80)}`;
+    const trovati = G.segretiNelTesto(`chiave: ${vera} fine`);
+    assert.equal(trovati.saturo, false);
+    assert.ok(trovati.some((x) => x.valore === vera));
+  });
+});
+
 describe('quello che da fuori arriva a un modello conta come letto, per qualunque strada e dopo un riavvio', () => {
   require(join(ROOT, 'src', 'shared', 'contenutoEsterno.js'));
   const E = globalThis.SN_ESTERNO;
