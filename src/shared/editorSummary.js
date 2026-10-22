@@ -29,6 +29,19 @@
     return { testo: t.slice(0, n), letti: n, totale: t.length, tagliato: true };
   }
 
+  // Un modello dalla finestra più stretta del tetto rifiuta il documento: si rilegge più corto, misurato sul rifiuto con
+  // la regola della chat di Filo. null se non è quel rifiuto, o se quello che resterebbe è troppo poco per servire.
+  const RILETTO_MIN = 2000;
+  function rilettoDopoRifiuto(testo, letto, rifiuto, caratteri) {
+    const FC = global.SN_FILO_CONTESTO;
+    const misure = FC && letto && letto.letti ? FC.troppoLungo(rifiuto) : null;
+    if (!misure) return null;
+    const token = FC.tettoDopoRifiuto({ ...misure, caratteri, caratteriTratto: letto.letti });
+    const max = Math.floor((token || 0) * FC.CARATTERI_PER_TOKEN);
+    if (max < RILETTO_MIN || max >= letto.letti) return null;
+    return testoAlModello(testo, max);
+  }
+
   const numero = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
 
   // Per chi scrive, sotto la risposta o nell'avviso; `perCosa` dice quale lavoro ha letto solo l'inizio.
