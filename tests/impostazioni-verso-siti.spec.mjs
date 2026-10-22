@@ -298,7 +298,8 @@ test('un campo nuovo dentro una sezione ammessa non arriva al sito', async ({ ap
 
 // Un avviso di sistema lo mostra solo la scheda in primo piano: il sito sullo
 // sfondo non ne riceve il testo, quello davanti sì.
-test('un avviso di sistema arriva al sito in primo piano e non a quello sullo sfondo', async ({ app, openTab, testServer }) => {
+// #1509: l'avviso dei crediti finiti sta nella barra di Filo, col tasto per Crediti; nessun sito lo riceve.
+test('un avviso di sistema non arriva a nessun sito, né davanti né sullo sfondo: lo mostra la barra di Filo', async ({ app, openTab, testServer, avvisi }) => {
   const spia = `
     globalThis.__spia589t = [];
     chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'show_toast') globalThis.__spia589t.push(m.text); });
