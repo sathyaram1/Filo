@@ -1624,19 +1624,34 @@
           : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
         if (btn) btn.click();
       });
+      if (api.avvisi.onPila) api.avvisi.onPila((dati) => comandoPila(dati && dati.azione));
       try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
     }
-    // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
-    // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
-    function enforceCap() {
-      const h = hostEl();
-      const live = Array.from(h.children).filter((c) => c.dataset.closing !== '1');
-      const over = live.length - MAX_STACK;
-      for (let i = 0; i < over; i++) {
-        const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._tempo) c._tempo.annulla();
-        uscita(c);
-        try { c.remove(); } catch (_) {}
+    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
+    // Oltre il tetto aspettano le più vecchie: fuori vista e col tempo fermo, che parte intero quando tocca a loro.
+    function disponi() {
+      const live = vive();
+      if (live.length <= MAX_STACK) aperta = false;
+      const nascoste = aperta ? 0 : live.length - MAX_STACK;
+      live.forEach((c, i) => {
+        const attesa = i < nascoste;
+        if (attesa === (c.dataset.attesa === '1')) return;
+        if (attesa) {
+          c.dataset.attesa = '1';
+          if (c._tempo) c._tempo.annulla();
+          c._tempo = null;
+        } else {
+          delete c.dataset.attesa;
+          avviaTempo(c, c._durata);
+        }
+      });
+    }
+    function comandoPila(azione) {
+      if (azione === 'apri' || azione === 'riduci') {
+        aperta = azione === 'apri';
+        disponi();
+      } else if (azione === 'chiudi-tutti') {
+        for (const c of vive()) dismiss(c);
       }
     }
     function uscita(card) {
