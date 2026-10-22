@@ -561,10 +561,8 @@ function openWeightsBlockReason(settings, entry) {
 // registrarlo, l'esclusione è solo una speranza. Viola la politica un host
 // escluso e, per un modello da comprare solo dal produttore, un host che non è
 // suo (#904): Claude servito da Amazon Bedrock o da Azure.
-// Ritorna { servedBy, violation }. Con l'interruttore "solo pesi aperti" acceso
-// il caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
-// garanzia caduta in silenzio è peggio dell'interruttore assente — quindi lo
-// vede anche a schermo, e la voce di cronologia resta marchiata.
+// Ritorna { servedBy, violation }. Il caso non resta nei log: la voce di cronologia
+// resta marchiata e chi usa Filo lo vede in un avviso (#1478).
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
   const model = (result && result.model) || '';
