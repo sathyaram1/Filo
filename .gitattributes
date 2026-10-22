@@ -53,4 +53,6 @@
 *.heic binary
 
 # I dizionari del correttore e le loro sorgenti (GPL: vanno distribuite com'erano, CRLF e Latin-1 compresi).
-assets/dizionari/** binary
+# `-text` tiene i byte com'erano senza renderli opachi: le sorgenti sono testo, e un diff deve mostrarle.
+assets/dizionari/** -text
+assets/dizionari/*.bdic binary
