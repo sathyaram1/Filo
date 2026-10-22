@@ -69,10 +69,6 @@
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
   }
-  function soglia(k) {
-    const C = global.SN_CONST;
-    return C.soglieCorrettore ? C.soglieCorrettore(settings)[k] : A().SOGLIE[k];
-  }
   const attivo = () => erroriAttivi() || suggerimentiAttivi() || automaticaAttiva();
 
   // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
@@ -267,24 +263,14 @@
     } catch (_) { imparato = A().memoria(null); }
   }
 
-  // Ogni passo rilegge la memoria salvata e la riscrive, in fila: due schede che imparano insieme non si cancellano i
-  // conti. `passo(memoria)` → { memoria, … }; `poi(esito)` agisce su quello che il passo ha deciso.
-  let codaImparato = Promise.resolve();
+  // Un passo di quello che Filo impara lo fa il main, in una fila sola per tutte le schede e la pagina del correttore
+  // (src/main/services/correttoreImpara.js). `poi(esito)` agisce su quello che il passo ha deciso.
   function impara(passo, poi) {
-    const K = STORAGE_KEYS.CORRETTORE_IMPARATO;
-    codaImparato = codaImparato.then(async () => {
-      let esito = null;
-      try {
-        const d = await chrome.storage.local.get(K);
-        esito = passo(A().memoria(d?.[K]));
-        imparato = esito.memoria;
-        await chrome.storage.local.set({ [K]: esito.memoria });
-      } catch (_) {
-        if (!esito) { esito = passo(imparato || A().memoria(null)); imparato = esito.memoria; }
-      }
-      if (poi) { try { await poi(esito); } catch (_) {} }
-    });
-    return codaImparato;
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, ...passo })).then(async (esito) => {
+      if (!esito || !esito.ok) return;
+      if (Array.isArray(esito.rifiutate) && A()) imparato = { ...(imparato || A().memoria(null)), rifiutate: esito.rifiutate };
+      if (poi) await poi(esito);
+    }).catch(() => {});
   }
 
   function nomeDi(parola) {
@@ -441,7 +427,7 @@
     state.rifiutateQui = [...state.rifiutateQui, { id: ++progressivo, start: v.start, end, segment: v.originale }].slice(-AUTOMATICHE_MAX);
     if (A().soloMaiuscole(v.originale, v.segment)) stilePagina.minuscoli += 2;
     const parola = v.originale;
-    impara((m) => A().annullata(m, parola, soglia('annulliPerImparare')), (r) => {
+    impara({ passo: 'annullata', parola }, (r) => {
       if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola)) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
       return null;
     });
@@ -468,7 +454,7 @@
     if (!parolaImparabile(parola)) return;
     state.contate = [...state.contate, { id: ++progressivo, start: w.start, end: w.end, segment: parola }].slice(-AUTOMATICHE_MAX);
     const inizioFrase = A().inizioDiFrase(testo, w.start);
-    impara((m) => A().riscritta(m, parola, { inizioFrase }, soglia('riscrittePerImparare')), (r) => {
+    impara({ passo: 'riscritta', parola, inizioFrase }, (r) => {
       if (!r || !r.impara) return null;
       state.contate = state.contate.filter((x) => x.segment.toLowerCase() !== parola.toLowerCase());
       return aggiungiImparata(r.impara);
@@ -478,7 +464,7 @@
   // Una correzione scelta dall'utente (menu, «Correggi tutti»): alla soglia diventa una sua correzione automatica.
   function accettata(parola, correzione) {
     if (!A()) return;
-    impara((m) => A().accettata(m, parola, correzione, soglia('accettiPerImparare')), (r) => {
+    impara({ passo: 'accettata', parola, correzione }, (r) => {
       if (r && r.impara) return setAutocorrect(r.impara.parola, r.impara.correzione);
       return null;
     });
@@ -1209,7 +1195,7 @@
     if (state.contate.length) {
       const restano = riallineaIssues(state.contate, prima, ora).issues;
       const vive = new Set(restano.map((x) => x.id));
-      for (const x of state.contate) if (!vive.has(x.id)) impara((m) => ({ memoria: A().corretta(m, x.segment) }));
+      for (const x of state.contate) if (!vive.has(x.id)) impara({ passo: 'corretta', parola: x.segment });
       state.contate = restano;
     }
     // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche

@@ -1,6 +1,6 @@
 // Per test:shoot (#1447): la correzione automatica a fine parola e il suo lampo, su una pagina servita su
 // http://127.0.0.1:47812/ (/scuro: pagina scura; con SCENARIO_SCURO=1 anche Filo è scuro). Uso:
-// main-file:tests/agent/scenari/correttore-automatica.js; tab:http://127.0.0.1:47812/; click-view:#ta; type:Domani vedo marco perchè ; shot:lampo
+// main-file:tests/agent/scenari/correttore-automatica.js; tab:http://127.0.0.1:47812/; click-view:#ta; type:Domani vedo marco e poi; key:Space; type:perchè,; shot:lampo
 await globalThis.SN_STORAGE.updateSettings({
   theme: process.env.SCENARIO_SCURO === '1' ? 'dark' : 'light',
   featureFlags: { spellcheck: true, spellcheckContext: false },

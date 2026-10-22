@@ -1,6 +1,6 @@
 // #1447 — la correzione automatica a fine parola senza DOM: quando una parola è finita, cosa si corregge (errori fissi,
 // correzioni dell'utente, maiuscola di nomi e marchi), dove si scrive tutto minuscolo apposta, e cosa Filo impara dai
-// rifiuti senza imparare mai gli errori su parole vere.
+// rifiuti (in una fila sola nel main) senza imparare mai gli errori su parole vere.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -222,4 +222,29 @@ test('alle schede va solo quello che il content script usa: i conti a metà rest
   assert.deepEqual(S.ritaglia({ sn_personal_dict: { newValue: ['ciuruglio'] }, settings: { newValue: {} } }), { sn_personal_dict: ['ciuruglio'] });
   assert.deepEqual(S.ritaglia({ sn_autocorrect: { newValue: undefined } }), { sn_autocorrect: {} }, 'tolte tutte, la mappa vuota');
   assert.equal(S.ritaglia({ settings: { newValue: {} } }), null);
+});
+
+test('quello che si impara passa da una fila sola nel main: tre schede insieme non si cancellano i conti', async () => {
+  const mem = {};
+  const prima = { chrome: globalThis.chrome, SN_STORAGE: globalThis.SN_STORAGE };
+  globalThis.chrome = { storage: { local: {
+    get: async (k) => { await new Promise((ok) => setTimeout(ok, 2)); return { [k]: mem[k] }; },
+    set: async (o) => { await new Promise((ok) => setTimeout(ok, 2)); Object.assign(mem, o); },
+  } } };
+  globalThis.SN_STORAGE = { getSettings: async () => ({ correttore: { riscrittePerImparare: 3, annulliPerImparare: 2 } }) };
+  try {
+    const I = require('../../src/main/services/correttoreImpara.js');
+    const esiti = await Promise.all([1, 2, 3].map(() => I.passo({ passo: 'riscritta', parola: 'ciuruglio' })));
+    assert.deepEqual(esiti.map((e) => e.impara), [null, null, 'ciuruglio']);
+    await I.passo({ passo: 'rifiuta', parola: 'Marco' });
+    assert.equal((await I.passo({ passo: 'rifiuta', parola: 'marco' })).gia, true);
+    assert.equal((await I.passo({ passo: 'rinominaRifiutata', parola: 'marco', nuova: 'luca' })).ok, true);
+    assert.deepEqual((await I.passo({ passo: 'togliRifiutata', parola: 'luca' })).rifiutate, []);
+    for (const q of [{ passo: 'cancella', parola: 'x' }, { passo: 'annullata', parola: '' }, { passo: 'annullata', parola: 'a'.repeat(500) },
+      { passo: 'accettata', parola: 'propio' }, { passo: '__proto__', parola: 'x' }, null]) {
+      assert.equal((await I.passo(q)).ok, false, JSON.stringify(q));
+    }
+  } finally {
+    Object.assign(globalThis, prima);
+  }
 });

@@ -48,6 +48,10 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Quello che il correttore impara (#1447): una fila sola nel main, perché le schede e la pagina del correttore
+  // riscrivono la stessa chiave. Lo chiedono i content script dei siti, che sono quelli che vedono scrivere.
+  on(MSG.CORRETTORE_IMPARA, async (msg) => require('../correttoreImpara').passo(msg));
+
   on('_storage:clear', async (msg, sender, origin) => {
     // Azzerare tutti i dati non è mai legittimo per una pagina web: solo le pagine interne.
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };

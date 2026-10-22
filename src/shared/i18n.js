@@ -995,7 +995,7 @@
     spell_page_autocorrect_desc: 'Quando finisci di scrivere una di queste parole, Filo la sostituisce con la correzione. Qui arrivano anche le correzioni che scegli più volte per la stessa parola.',
     spell_page_autocorrect_empty: 'Nessuna correzione automatica.',
     spell_page_dict_h: 'Parole imparate',
-    spell_page_dict_desc: 'Il correttore non le segna. Sono quelle che aggiungi, che ignori o che scrivi più volte uguali; con la maiuscola, Filo la mette anche quando scrivi la parola minuscola.',
+    spell_page_dict_desc: 'Il correttore non le segna: quelle che aggiungi, che ignori o che scrivi più volte uguali. Se una ha la maiuscola, Filo gliela mette anche quando la scrivi minuscola.',
     spell_page_dict_empty: 'Nessuna parola imparata.',
     spell_page_rifiutate_h: 'Da non correggere da sé',
     spell_page_rifiutate_desc: 'Parole di cui hai annullato la correzione automatica: Filo le lascia come le scrivi.',

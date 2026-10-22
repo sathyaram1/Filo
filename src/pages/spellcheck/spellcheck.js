@@ -87,18 +87,10 @@
   // ----------------------------------------------------------------------
   // Quello che il correttore impara (#1447): tolta o cambiata una parola, Filo ricomincia da zero su di lei.
   // ----------------------------------------------------------------------
-  const Auto = () => window.SN_CORRETTORE_AUTO;
-  async function leggiImparato() {
-    const d = await chrome.storage.local.get(STORAGE_KEYS.CORRETTORE_IMPARATO);
-    return Auto().memoria(d[STORAGE_KEYS.CORRETTORE_IMPARATO]);
-  }
-  async function scriviImparato(m) {
-    await chrome.storage.local.set({ [STORAGE_KEYS.CORRETTORE_IMPARATO]: m });
-  }
+  // Si scrive dalla fila del main, la stessa delle schede che imparano (src/main/services/correttoreImpara.js).
+  const passo = (q) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CORRETTORE_IMPARA, ...q });
   async function dimenticaParole(...parole) {
-    let m = await leggiImparato();
-    for (const p of parole) if (p) m = Auto().dimentica(m, p);
-    await scriviImparato(m);
+    for (const p of parole) if (p) await passo({ passo: 'dimentica', parola: p });
   }
 
   // Una riga con una parola sola, che si cambia scrivendoci e si toglie con «Rimuovi». `rinomina(vecchia, nuova)` dice
@@ -339,7 +331,7 @@
   function renderRifiutate(memoria) {
     const list = $('rifiutateList');
     list.innerHTML = '';
-    const parole = Auto() ? [...Auto().memoria(memoria).rifiutate].sort((a, b) => a.localeCompare(b)) : [];
+    const parole = (Array.isArray(memoria && memoria.rifiutate) ? memoria.rifiutate.map(String) : []).sort((a, b) => a.localeCompare(b));
     $('rifiutateEmpty').hidden = parole.length > 0;
     for (const w of parole) {
       list.appendChild(rigaParola(w, {
@@ -351,23 +343,17 @@
   }
 
   async function removeRifiutata(word) {
-    const m = await leggiImparato();
-    const k = Auto().chiave(word);
-    m.rifiutate = m.rifiutate.filter((w) => w !== k);
-    await scriviImparato(Auto().dimentica(m, word));
-    renderRifiutate(m);
+    const r = await passo({ passo: 'togliRifiutata', parola: word });
+    if (r && r.ok) renderRifiutate({ rifiutate: r.rifiutate });
   }
 
   async function renameRifiutata(vecchia, nuova) {
-    const m = await leggiImparato();
-    const da = Auto().chiave(vecchia);
-    const a = Auto().chiave(nuova);
-    if (da !== a && m.rifiutate.includes(a)) {
+    const r = await passo({ passo: 'rinominaRifiutata', parola: vecchia, nuova });
+    if (!r || !r.ok) return false;
+    if (r.gia) {
       showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_dict_conflict', nuova));
       return false;
     }
-    m.rifiutate = [...m.rifiutate.filter((w) => w !== da), a];
-    await scriviImparato(m);
     return true;
   }
 
@@ -375,16 +361,14 @@
     const raw = $('newRifiutata').value.trim();
     if (!raw) return;
     if (/\s/.test(raw)) { showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_una_parola')); return; }
-    const m = await leggiImparato();
-    const k = Auto().chiave(raw);
-    if (m.rifiutate.includes(k)) {
+    const r = await passo({ passo: 'rifiuta', parola: raw });
+    if (!r || !r.ok) return;
+    if (r.gia) {
       showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_dict_conflict', raw));
       $('newRifiutata').select();
       return;
     }
-    m.rifiutate = [...m.rifiutate, k];
-    await scriviImparato(m);
-    renderRifiutate(m);
+    renderRifiutate({ rifiutate: r.rifiutate });
     $('newRifiutata').value = '';
     $('newRifiutata').focus();
   }
