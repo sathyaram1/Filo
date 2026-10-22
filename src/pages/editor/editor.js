@@ -2722,6 +2722,23 @@
   function docPerIlModello() {
     return window.SN_EDITOR_SUMMARY.testoAlModello(docPlainText());
   }
+  // `costruisci(letto)` dà i messaggi; se il modello rifiuta il documento perché non gli sta nella finestra, si
+  // rimanda più corto e `letto` dice il taglio a chi lo mostra.
+  async function chiediSulDocumento(action, costruisci, extra = {}) {
+    const testo = docPlainText();
+    let letto = window.SN_EDITOR_SUMMARY.testoAlModello(testo);
+    let r = null;
+    for (let giro = 0; giro < 4; giro++) {
+      const messages = costruisci(letto);
+      r = await sendMessage({ type: MSG.AI_REQUEST, action, payload: { messages }, ...extra });
+      if (r && r.ok) break;
+      const caratteri = window.SN_FILO_CONTESTO ? window.SN_FILO_CONTESTO.caratteriDi(messages) : 0;
+      const corto = window.SN_EDITOR_SUMMARY.rilettoDopoRifiuto(testo, letto, r, caratteri);
+      if (!corto) break;
+      letto = corto;
+    }
+    return { r, letto };
+  }
   function notaTaglio(letto, perCosa) {
     return window.SN_EDITOR_SUMMARY.notaTaglio(letto, perCosa);
   }
