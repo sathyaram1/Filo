@@ -1043,10 +1043,10 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const su = corpo(popup, 'const suCollegamento = (e) =>');
     assert.match(su, /a\.filo-md-link/);
     assert.match(su, /apriCollegamento\(a/);
-    // Un window.open da sé solo nelle pagine di Filo, dove la porta sta sull'apertura nel main.
-    assert.equal((popup.match(/window\.open\(/g) || []).length, 1, 'il popup apre un collegamento da sé');
-    assert.match(su, /if \(inPaginaDiFilo\) \{ try \{ window\.open\(/);
+    // Anche nelle pagine di Filo il collegamento lo apre il main, col segno del modello: senza verdetto chiede l'OK (#1505).
+    assert.equal((popup.match(/window\.open\(/g) || []).length, 0, 'il popup apre un collegamento da sé');
     assert.match(popup, /const inPaginaDiFilo = location\.protocol === 'filo:';/);
+    assert.match(corpo(popup, 'async function apriCollegamento('), /proposta: conVerdetto\(a\)/);
     assert.match(corpo(popup, 'async function apriCollegamento('), /type: MSG\.APRI_COLLEGAMENTO_FILO, url, parole:/);
     assert.match(corpo(popup, 'async function scaricaCollegamento('), /type: MSG\.DOWNLOAD_LINK, url, diFilo: true, parole:/);
     const menu = corpo(src('content', 'content.js'), 'function buildLinkActionItems(');
