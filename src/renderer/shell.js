@@ -1590,7 +1590,7 @@
         }
         new MutationObserver(rispecchia).observe(host, {
           childList: true, subtree: true, characterData: true,
-          attributes: true, attributeFilter: ['class', 'data-closing'],
+          attributes: true, attributeFilter: ['class', 'data-closing', 'data-attesa'],
         });
       }
       return host;
