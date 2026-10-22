@@ -1187,13 +1187,17 @@
       origine = storia.origine;
       chi = { firma: storia.firma, generatore: storia.generatore };
     }
-    const firmataInTempo = chi.firma.marca && marcaValida(chi.firma.marca, chi.firma.certificati[0], ancoreTsa);
+    let fid = fiducia(chi.firma, ancore, ancoreTsa, provvisorio);
+    const firmataInTempo = chi.firma.marca && marcaValida(chi.firma.marca, chi.firma.certificati[0], fid.ancoreTsa);
     if (chi.firma.scaduto && !firmataInTempo) avvisi.push('certificato_scaduto');
     if (chi.firma.catenaIntegra === false) avvisi.push('catena_rotta');
 
     // Un file cambiato dopo la firma chiama in causa chi ha firmato QUEI byte, cioè l'ultimo passo.
-    if (avvisi.includes('file_cambiato')) chi = { firma, generatore: letto.generatore };
-    const firmatario = statoFirmatario(chi.firma.certificati, ancore);
+    if (avvisi.includes('file_cambiato')) {
+      chi = { firma, generatore: letto.generatore };
+      fid = fiducia(chi.firma, ancore, ancoreTsa, provvisorio);
+    }
+    const firmatario = fid.stato;
     const dichiarante = nomeLeggibile(chi.firma.soggetto) || chi.generatore || '';
     // Un manifesto valido che non dice niente sull'origine non è una notizia:
     // si tace e si lascia parlare le altre etichette del file.
