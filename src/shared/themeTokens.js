@@ -269,7 +269,7 @@
       default: '0.4',
     },
     // Il tetto di ogni scheda nella fila in alto, attiva compresa (#1493): lo legge shell.js, nessuna variabile CSS.
-    // Il minimo è la larghezza minima della scheda attiva (MIN_ATTIVA in shell.js).
+    // Il minimo è quello della scheda attiva (tests/unit/tabLarghezzaMassima.test.mjs).
     'tab.larghezza': {
       label: 'Larghezza massima delle schede',
       type: 'pixel',
