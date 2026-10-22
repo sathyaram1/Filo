@@ -2140,18 +2140,39 @@
     if (!text) return;
     e.preventDefault();
     const righe = text.split(/\r\n?|\n/);
-    if (righe.length < INCOLLA_A_PARAGRAFI) { document.execCommand('insertText', false, text); return; }
-    document.execCommand('insertHTML', false, incollaComeParagrafi(righe));
+    if (righe.length < INCOLLA_A_RIGHE) document.execCommand('insertText', false, text);
+    else incollaLungo(righe);
   });
-  // insertText spende una pausa per ogni a capo, e un testo di mille righe fermava la pagina per minuti (#1475): oltre
-  // la soglia le righe entrano in un colpo solo, come paragrafi, e l'annulla resta uno.
-  const INCOLLA_A_PARAGRAFI = 50;
-  function incollaComeParagrafi(righe) {
-    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
-    const spazi = (s) => esc(s.replace(/\t/g, '    ')).replace(/ {2,}/g, (m) => ` ${' '.repeat(m.length - 1)}`).replace(/^ /, ' ');
+  // insertText spende una pausa per ogni a capo, e mille righe fermavano la pagina per minuti (#1475): oltre la soglia la
+  // prima riga entra da insertText, il resto in un colpo come paragrafi. insertHTML in un blocco vuoto è lento uguale,
+  // per questo l'ultimo carattere della prima riga si rimette insieme al resto, nel tag del suo blocco.
+  const INCOLLA_A_RIGHE = 50;
+  const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
+  function incollaLungo(righe) {
     const [prima, ...resto] = righe;
-    return spazi(prima) + resto.map((r) => `<p>${r ? spazi(r) : '<br>'}</p>`).join('');
+    document.execCommand('insertText', false, prima);
+    const sel = window.getSelection();
+    let blocco = sel && sel.anchorNode;
+    while (blocco && blocco !== docEl && !(blocco.nodeType === 1 && BLOCCO.test(blocco.tagName))) blocco = blocco.parentNode;
+    if (!blocco || blocco === docEl || !/^(P|DIV|H[1-6])$/.test(blocco.tagName) || (blocco.textContent || '').length < 2) {
+      document.execCommand('insertText', false, `\n${resto.join('\n')}`);
+      return;
+    }
+    sel.modify('extend', 'backward', 'character');
+    let pezzo = spaziVisibili(sel.toString());
+    for (let n = sel.getRangeAt(0).startContainer.parentNode; n && n !== blocco; n = n.parentNode) {
+      const vuoto = n.cloneNode(false).outerHTML;
+      const chiude = vuoto.lastIndexOf('</');
+      pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
+    }
+    const tag = blocco.tagName.toLowerCase();
+    document.execCommand('insertHTML', false, `<${tag}>${pezzo}</${tag}>`
+      + resto.map((r) => `<p>${r ? spaziVisibili(r) : '<br>'}</p>`).join(''));
+  }
+  // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
+  function spaziVisibili(s) {
+    const esc = s.replace(/\t/g, '    ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc.replace(/ {2,}/g, (m) => ` ${'&nbsp;'.repeat(m.length - 1)}`).replace(/^ /, '&nbsp;');
   }
 
   // ── Zoom del foglio ─────────────────────────────────────────────────
