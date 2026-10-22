@@ -17,6 +17,15 @@ function killTree(child) {
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
 
+// Le variabili segrete di Filo (chiave dei feedback, chiavi di fabbrica) non arrivano ai comandi: un `env` le
+// stamperebbe davanti al modello (#1507). Restano quelle che i comandi di sistema leggono (FILO_SIS_*) e quelle dell'utente.
+const VARIABILE_SEGRETA = /^FILO_(?!SIS_)\w*(?:KEY|SECRET|TOKEN|PASSWORD)/i;
+function ambienteComandi(base = process.env) {
+  const out = {};
+  for (const [k, v] of Object.entries(base || {})) if (!VARIABILE_SEGRETA.test(k)) out[k] = v;
+  return out;
+}
+
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
 // Fuori da Windows è la shell di SISTEMA, non bash: dev'essere lo stesso
