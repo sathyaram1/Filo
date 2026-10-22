@@ -75,7 +75,7 @@ function buildSource({ hybrid = false } = {}) {
         }
         if (r) log('richiesta ' + JSON.stringify(r));
         var p;
-        try { p = orig.call(navigator.credentials, usa); }
+        try { p = orig.apply(this, [usa]); }
         catch (e) { if (r) log('esito ' + nome + ' eccezione ' + (e && e.name) + ': ' + (e && e.message)); throw e; }
         if (r && p && typeof p.then === 'function') {
           p.then(function (cred) { log('esito ' + nome + ' ok tipo=' + (cred && cred.type) + ' attacco=' + (cred && cred.authenticatorAttachment)); },
@@ -83,6 +83,12 @@ function buildSource({ hybrid = false } = {}) {
         }
         return p;
       };
+      try {
+        Object.defineProperty(avvolta, 'name', { value: orig.name, configurable: true });
+        Object.defineProperty(avvolta, 'length', { value: orig.length, configurable: true });
+      } catch (e) {}
+      originali.set(avvolta, orig);
+      sede[nome] = avvolta;
     }
     avvolgi('get');
     avvolgi('create');
