@@ -741,9 +741,12 @@ module.exports = function register(on, ctx) {
       // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
       // destro (#810), e un collegamento che al clic chiede l'OK uscirebbe prima dell'OK (#1505). Fermato, la
       // spiegazione parte senza titolo e descrizione.
-      if (!contattabilePrimaDelClic(url, { proposta: isFilo(origin) && msg.proposta === true })) return { ok: false, error: 'da_confermare' };
       const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
+      const contattabile = await contattabilePrimaDelClic(url, {
+        sender, porta, daFilo: isFilo(origin), proposta: msg.proposta === true, delSito: msg.delSito === true,
+      });
+      if (!contattabile) return { ok: false, error: 'da_confermare' };
       // Il tempo copre anche il corpo: un sito che lo manda a gocce non tiene aperto il menu in attesa.
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);

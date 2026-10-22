@@ -1665,7 +1665,14 @@ const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
 // verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova
 // nel registro di verdettiUscite.js, che vale anche per icona e anteprima (#1505).
 const sitoDaConfermare = (url) => VerdettiUscite.sitoDaConfermare(url);
-const contattabilePrimaDelClic = (url, opzioni) => VerdettiUscite.contattabile(url, opzioni);
+// Prima del clic (icona, anteprima) un indirizzo si contatta solo se al clic si aprirebbe senza OK (#1505). Da una pagina
+// di Filo decide il registro; da un sito, per un collegamento non suo (`delSito` falso), anche la decisione di apriDaFilo.
+async function contattabilePrimaDelClic(url, { sender = null, daFilo = false, proposta = false, delSito = false, porta = null } = {}) {
+  if (!VerdettiUscite.contattabile(url, { proposta: daFilo && proposta })) return false;
+  if (daFilo || delSito) return true;
+  const u = porta || await controllaUscita({ type: 'NAVIGA', url }, { sender });
+  return !u.blocca && !(await exfilChiedeOk(String(url || ''), u, { wc: sender?.wc || null, pagina: paginaDi(sender?.wc) || sender?.url || '' }));
+}
 const ricordaVerdettiArchiviati = (messages) => VerdettiUscite.ricordaArchiviati(messages, indirizziCliccabili);
 // Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
 const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
@@ -1702,30 +1709,36 @@ async function linkCheChiedonoOk(testo, { sender = null, contesto = null, proven
   });
 }
 
-// `proposta`: il collegamento sta in una frase di Filo che riceve i verdetti (la chat della home): se non ne ha uno,
-// perché la risposta si è interrotta o il controllo non è arrivato, chiede l'OK (#1505).
+function paginaDi(wc) {
+  try { return wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { return ''; }
+}
+
+// Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente in un collegamento di Filo chiede l'OK come per
+// NAVIGA. La stessa domanda la fa l'anteprima prima del clic (contattabilePrimaDelClic).
+async function exfilChiedeOk(indirizzo, u, { wc = null, pagina = '' } = {}) {
+  if (!u || !u.exfil || !/^https?:/i.test(pagina) || !/^https?:/i.test(indirizzo)) return false;
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  let impostazioni = {};
+  try { impostazioni = await Storage.getSettings(); } catch (_) {}
+  const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
+  return !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+}
+
+// `proposta`: il collegamento l'ha scritto un modello in una pagina di Filo (src/shared/filoMarkdown.js): se non ha un
+// verdetto, perché la risposta si è interrotta o nessuno l'ha giudicato, chiede l'OK (#1505).
 async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false, proposta = false } = {}) {
   const indirizzo = String(url || '').trim();
-  let pagina = '';
-  try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
+  const pagina = paginaDi(wc);
   const u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
   if (u.blocca) {
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
-  // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente nel link chiede l'OK come per NAVIGA.
   const daSito = /^https?:/i.test(pagina);
   const k = VerdettiUscite.chiave(indirizzo);
   const v = /^https?:/i.test(indirizzo) ? VerdettiUscite.alClic(indirizzo, { chiedi, proposta }) : { daChiedere: false, motivo: '' };
   const motivo = v.motivo;
-  let daChiedere = v.daChiedere;
-  if (!daChiedere && daSito && u.exfil && /^https?:/i.test(indirizzo)) {
-    const Levels = globalThis.SN_ACTION_LEVELS;
-    let impostazioni = {};
-    try { impostazioni = await Storage.getSettings(); } catch (_) {}
-    const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
-    daChiedere = !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
-  }
+  const daChiedere = v.daChiedere || await exfilChiedeOk(indirizzo, u, { wc, pagina });
   if (daChiedere) {
     const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
     const ok = confermato && (!chiesti || chiesti.delete(k));

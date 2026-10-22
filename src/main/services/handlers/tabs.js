@@ -196,7 +196,7 @@ module.exports = function register(on, ctx) {
     const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
     // Un indirizzo che al clic chiede l'OK (#848, #1505): né il suggerimento né la sua icona contattano il sito prima.
     const url = msg && msg.url;
-    const soloCopie = (msg && msg.soloCopie === true) || !contattabilePrimaDelClic(url, { proposta: !!(msg && msg.proposta === true) });
+    const soloCopie = (msg && msg.soloCopie === true) || !(await contattabilePrimaDelClic(url, { daFilo: true, proposta: !!(msg && msg.proposta === true) }));
     const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito, soloCopie });
     return { ok: true, dato };
   }));
