@@ -511,3 +511,10 @@ test('leggiAncora: il documento del tag, e se manca se la raccolta ha almeno un\
     ['risposta non JSON', async () => ({ status: 200, ok: true, json: async () => { throw new Error('non JSON'); } })],
   ]) assert.deepEqual(await A.leggiAncora(TAG, f), { letta: false }, cosa);
 });
+
+test('l\'àncora si legge con la sessione di rete di electron-updater: proxy e filtri sono quelli con cui legge GitHub', () => {
+  const { NET_SESSION_NAME } = require('electron-updater/out/electronHttpExecutor');
+  const src = readFileSync(join(ROOT, 'src', 'main', 'ancoraRilascio.js'), 'utf8');
+  assert.ok(src.includes(`fromPartition('${NET_SESSION_NAME}'`),
+    `electron-updater usa la sessione «${NET_SESSION_NAME}»: un'àncora letta da un'altra strada può non passare dove passa GitHub`);
+});
