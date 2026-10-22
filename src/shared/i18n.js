@@ -289,6 +289,10 @@
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
       'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
+    toast_served_excluded:
+      'Questa risposta è arrivata da «%s», un fornitore che Filo esclude. Segnalalo: la lista di esclusione va aggiornata.',
+    toast_served_not_producer:
+      'Questa risposta è arrivata da «%s», ma Filo questo modello lo prende solo da %s. Segnalalo: la regola va aggiornata.',
     // Il tetto per scheda sulle chiamate automatiche (#1070): il numero è quello del tetto.
     toast_tetto_spiegazioni:
       'Da questa pagina sono partite più di %s spiegazioni automatiche in un minuto. Le fermo per un minuto, col tasto destro funzionano sempre.',
