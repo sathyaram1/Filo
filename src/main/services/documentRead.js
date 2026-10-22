@@ -85,19 +85,46 @@ const KNOWN_BINARY = {
  * di verifica). Senza cartella nota si ripiega sulla home, che è da dove il
  * terminale parte, mai sulla cartella del programma.
  */
-function normalizePath(input, base) {
-  let p = String(input == null ? '' : input).trim();
+function normalizePath(input, base, { path: P = path, casa = os.homedir() } = {}) {
+  // Gli LLM incartano volentieri i percorsi tra virgolette o apici: la pulizia è quella del perimetro.
+  let p = classificatore().pulisciPercorso(input);
   if (!p) return '';
-  // Gli LLM incartano volentieri i percorsi tra virgolette o apici.
-  if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith('\'') && p.endsWith('\''))) {
-    p = p.slice(1, -1).trim();
-  }
-  if (p === '~') p = os.homedir();
-  else if (p.startsWith('~/') || p.startsWith('~\\')) p = path.join(os.homedir(), p.slice(2));
+  if (p === '~') p = casa;
+  else if (p.startsWith('~/') || p.startsWith('~\\')) p = P.join(casa, p.slice(2));
   if (!p) return '';
-  if (path.isAbsolute(p)) return path.resolve(p);
+  if (P.isAbsolute(p)) return P.resolve(p);
   const dove = String(base || '').trim();
-  return path.resolve(path.isAbsolute(dove) ? dove : os.homedir(), p);
+  return P.resolve(P.isAbsolute(dove) ? dove : casa, p);
+}
+
+function classificatore() {
+  return globalThis.SN_CMD_CLASSIFY || (require('../../shared/cmdClassify.js'), globalThis.SN_CMD_CLASSIFY);
+}
+
+/**
+ * Il percorso porta a un altro computer della rete (#1499): anche un solo stat fa presentare Windows a quel computer
+ * con l'identità dell'utente, quindi chi tocca il disco lo chiede PRIMA. Regola del perimetro (cmdClassify) più le
+ * lettere d'unità che puntano alla rete (shell.unitaDiRete). Si chiede per il percorso scritto e per quello risolto.
+ */
+function percorsoDiRete(percorso, { win = process.platform === 'win32', reti = null } = {}) {
+  const C = classificatore();
+  const p = C.pulisciPercorso(percorso);
+  if (!p) return false;
+  const lettere = reti ? reti(p) : require('./shell').unitaDiRete(p, { win });
+  return C.diRete(p, { win, reti: lettere });
+}
+
+/**
+ * Il file di un bottone della chat o di un'azione sul file: assoluto o con ~, risolto. '' se non è un percorso di
+ * questo tipo, null se porta a un altro computer (nessun accesso al disco).
+ */
+function percorsoDelFile(v, { win = process.platform === 'win32', casa = os.homedir(), reti = null } = {}) {
+  const P = win ? path.win32 : path.posix;
+  const p = classificatore().pulisciPercorso(typeof v === 'string' ? v : '');
+  if (!p || (!P.isAbsolute(p) && !/^~([\\/]|$)/.test(p))) return '';
+  const full = normalizePath(p, '', { path: P, casa });
+  if (!full) return '';
+  return percorsoDiRete(p, { win, reti }) || percorsoDiRete(full, { win, reti }) ? null : full;
 }
 
 // ── Quando il nome è QUASI giusto ────────────────────────────────────────────
