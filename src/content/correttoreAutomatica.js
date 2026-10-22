@@ -142,7 +142,7 @@
     const qui = () => (visto === null ? (visto = typeof minuscolo === 'function' ? !!minuscolo() : !!minuscolo) : visto);
     const da = Math.max(0, fine - 2000);
     const vicino = testo.slice(da, Math.min(testo.length, fine + 200));
-    if (R().zoneEscluse(vicino).some(([a, b]) => da + a < fine && da + b >= fine)) return null;
+    if (R().zoneEscluse(vicino).some(([a, b]) => da + a < fine && da + b >= fine) || dentroCodice(testo, fine)) return null;
     const p = chiavePersonale(testo, fine, personali);
     if (p && !rifiutate.has(chiave(p.key))) {
       const originale = testo.slice(p.start, fine);
@@ -229,12 +229,29 @@
   }
 
   // Una parola che Filo può imparare: non un errore fisso e non il refuso di una parola vera («propio», a un tasto da
-  // «proprio»). Una parola cortissima ha sempre una parola vera a un tasto: lì il refuso così non si riconosce.
+  // «proprio»). Quanto vicino conta come refuso dipende dalla lunghezza: una parola cortissima ha sempre una parola vera
+  // a un tasto («nn», «cmq»), e lì vale solo lo scambio di due lettere («teh»); una lunga sbaglia anche di due
+  // («metereologia»).
+  const stesseLettere = (a, b) => [...a].sort().join('') === [...b].sort().join('');
   function imparabile(parola, proposte = []) {
     const k = chiave(parola);
     if (!k || R().FISSI.has(k)) return false;
-    if ([...k].length < 4) return true;
-    return !(proposte || []).some((p) => { const q = chiave(p); return q && q !== k && distanza(q, k, 1) <= 1; });
+    const n = [...k].length;
+    const vicina = (q) => {
+      if (n < 4) return q.length === k.length && stesseLettere(q, k) && distanza(q, k, 1) <= 1;
+      const tetto = n >= 8 ? 2 : 1;
+      return distanza(q, k, tetto) <= tetto;
+    };
+    return !(proposte || []).some((p) => { const q = chiave(p); return q && q !== k && vicina(q); });
+  }
+
+  // Dentro un blocco di codice aperto («```» senza la chiusura) o un codice in linea non ancora chiuso nella riga: lì
+  // non si corregge niente.
+  function dentroCodice(testo, pos) {
+    const prima = String(testo ?? '').slice(0, pos);
+    if ((prima.match(/```/g) || []).length % 2 === 1) return true;
+    const riga = prima.slice(prima.lastIndexOf('\n') + 1).replace(/```/g, '');
+    return (riga.match(/`/g) || []).length % 2 === 1;
   }
 
   const LIMITE_CONTI = 5000;
@@ -342,7 +359,7 @@
 
   global.SN_CORRETTORE_AUTO = {
     NOMI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome,
-    soloMaiuscole, correzioneAFineParola, stileDi, scriveMinuscolo, scriveMinuscoloQui, distanza, imparabile, memoria, accettata, annullata,
+    soloMaiuscole, correzioneAFineParola, dentroCodice, stileDi, scriveMinuscolo, scriveMinuscoloQui, distanza, imparabile, memoria, accettata, annullata,
     riscritta, corretta, dimentica, inizioDiFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
