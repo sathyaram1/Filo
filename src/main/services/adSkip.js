@@ -224,7 +224,7 @@ async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora 
       if (r.no) return { ok: false, code: r.no };
       p = r;
     }
-    return await clicNelRiquadro(wc, p, { ...dove, ora: adesso() });
+    return await clicNelRiquadro(wc, p, { ...dove, ora });
   } finally {
     inCorso.delete(wc);
   }
