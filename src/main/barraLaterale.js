@@ -622,15 +622,12 @@ class BarraLaterale {
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
       const nav = this._nav();
-      if (!attiva || !nav.pagina || nav.spento) return;
+      if (!attiva || !nav.pagina || nav.spento || nav.senzaFilo) return;
       this.chiudi();
       this._restituisciTastiera();
-      // Il clic è nella barra, non nella pagina: vale come un gesto dato a Filo su quella scheda (i suoi appunti), mai
-      // come un gesto della pagina, che non apre finestre né permessi.
-      try { require('./services/permessiPagine').gestoDiFilo(attiva.view.webContents); } catch (_) {}
-      const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
       const conColore = d.contagocce && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? { colore: testo(colore) } : {};
-      try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true, ...conColore }); } catch (_) {}
+      this.comandoInAttesa = { tabId: attiva.id, iconId: id, ...conColore, scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+      this._consegnaInAttesa();
       return;
     }
     const daTastiera = this.motivo === 'tasto';
