@@ -384,6 +384,8 @@
     const indici = [...ripresi.indici, ...Array.from({ length: n - inizio }, (_, k) => inizio + k)];
     const out = [];
     const azioni = [];
+    // Gli esiti che avrebbe davanti anche una conversazione nuova: quelli fra gli ultimi messaggi di tutto il filo.
+    const perUnaNuova = [];
     const visti = [];
     let prima = null;
     let cambiaGia = false;
@@ -397,6 +399,7 @@
       }
       out.push(reso);
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
+      if (e && Array.isArray(e.azioni) && n - i <= MESSAGGI_CON_ESITI) perUnaNuova.push(...e.azioni);
       visti.push(m);
       prima = m;
     }
