@@ -4470,6 +4470,7 @@ function rilettura(chat, { da = null, cap }) {
     ...(!conDa && transcript.length <= cap ? { intera: true } : {}),
     linkUtente: PageRead.linkNelTesto(scrittoDallUtente),
     ...(daFuori.length ? { daFuori } : {}),
+    ...(classeLetta > 1 ? { classeLetta } : {}),
   };
 }
 
