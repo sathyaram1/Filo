@@ -172,9 +172,9 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
     expect(await nel(yt, 'document.visibilityState'), 'la scheda è rimasta dietro').toBe('hidden');
 
     // Filo ridotto a icona, con la canzone davanti.
-    await filo.evaluate(({ BrowserWindow, webContents }, u) => {
+    await filo.evaluate(({ BrowserWindow }, u) => {
       const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-      tm.activate(tm.tabs.find((t) => t.view.webContents === webContents.getAllWebContents().find((w) => w.getURL() === u)).id);
+      tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
     }, yt);
     await quando(async () => (await nel(yt, 'document.visibilityState')) === 'visible', 'la canzone non è tornata davanti');
     await filo.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).hide());
