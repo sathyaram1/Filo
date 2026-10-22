@@ -32,7 +32,7 @@
 //     traccia di chi gira in questa directory.
 //   - STATO PER BRANCH (verdetti, contatore bocciature, esito sicurezza): lo
 //     tiene il SERVER. Il file locale <stateDir>/<id>.json è un ripiego che si
-//     riallinea a ogni busta ricevuta.
+//     riallinea a ogni busta ricevuta: il ramo dalla busta, i punti fermi dal posizionamento.
 //   - INTERRUTTORE MASTER (`config/routines.enabled`): lo guarda il preflight
 //     (prima del setup) e lo applica il server (niente biglietti nuovi da
 //     spento). Un biglietto già emesso si porta a termine: il feedback in
