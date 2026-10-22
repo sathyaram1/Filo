@@ -2229,24 +2229,21 @@ async function eseguiAzioneFilo(action, {
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
-  try {
-    const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
-    if (u.blocca) {
-      const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
-      return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
+  // La porta non lancia: un suo guasto arriva qui come blocco e l'azione non parte (#1505).
+  const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
+  if (u.blocca) {
+    const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
+    return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...(u.regola === 'guasto' ? { guasto: true } : {}), ...comando } };
+  }
+  if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
+  if (u.nonCompare) {
+    action._nonCompare = true;
+    if (u.datiReason) action._exfilReason = u.datiReason;
+    // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
+    // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
+    if (!confirmed && !u.insiste && !soloConferma) {
+      return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
     }
-    if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
-    if (u.nonCompare) {
-      action._nonCompare = true;
-      if (u.datiReason) action._exfilReason = u.datiReason;
-      // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
-      // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
-      if (!confirmed && !u.insiste && !soloConferma) {
-        return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
-      }
-    }
-  } catch (e) {
-    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
 
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
