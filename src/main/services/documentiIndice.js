@@ -53,14 +53,15 @@ function cartellaDiSerie(chiave) {
 }
 
 /** La voce dell'impostazione com'è scritta → chiave di serie o percorso assoluto; '' se non è una cartella. PURA. */
-function voceCartella(v) {
-  let s = String(v == null ? '' : v).trim().replace(/^["'«]+|["'»]+$/g, '').trim();
+function voceCartella(v, { path: P = path, casa = os.homedir() } = {}) {
+  // La pulizia è quella del perimetro: il costo misura la cartella che si legge qui (#1499).
+  let s = classifica().C.pulisciPercorso(v);
   if (!s) return '';
   const chiave = SINONIMI_CARTELLE[s.toLowerCase()];
   if (chiave) return chiave;
-  if (s === '~') return os.homedir();
-  if (/^~[\\/]/.test(s)) s = path.join(os.homedir(), s.slice(2));
-  return path.isAbsolute(s) ? path.resolve(s) : '';
+  if (s === '~') return casa;
+  if (/^~[\\/]/.test(s)) s = P.join(casa, s.slice(2));
+  return P.isAbsolute(s) ? P.resolve(s) : '';
 }
 
 function nomeDellaVoce(voce) {
