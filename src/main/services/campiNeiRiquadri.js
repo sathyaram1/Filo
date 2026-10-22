@@ -41,7 +41,8 @@ function misuraRiquadro(el) {
 // un messaggio, e il messaggio porta solo un segnale usa e getta.
 async function boxNelGenitore(figlio) {
   const genitore = figlio.parent;
-  if (!genitore) return null;
+  // Un genitore ancora in arrivo perderebbe Filo per uno script: meglio la foto ferma che un riquadro muto.
+  if (!riquadroArrivato(genitore)) return null;
   const segnale = `filo-riquadro-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   const risposta = genitore.executeJavaScript(`new Promise((ok) => {
     const misura = ${misuraRiquadro};
