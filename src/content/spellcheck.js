@@ -45,9 +45,9 @@
   let suppressAutocorrect = false;
   // Quello che Filo impara dai rifiuti (#1447), com'è salvato: conti e parole da non correggere più da sé.
   let imparato = null;
-  // Come si scrive in questa pagina: gli inizi di frase dei testi già mandati e le maiuscole annullate. Resta alla pagina.
+  // Come si scrive in questo sito: gli inizi di frase dei testi già mandati e le maiuscole annullate. Il main lo tiene per
+  // sito, così riaperta la chat Filo lo sa già.
   const stilePagina = { minuscoli: 0, maiuscoli: 0 };
-  const STILE_PAGINA_MAX = 40;
   const AUTOMATICHE_MAX = 200;
   let progressivo = 0;
 
