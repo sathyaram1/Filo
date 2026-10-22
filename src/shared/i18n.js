@@ -942,6 +942,7 @@
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
     history_cache_written: '%s token messi da parte per le richieste che seguono.',
     history_policy_violation: '⚠ fornitore non ammesso',
+    history_policy_violation_title: 'Filo non ammette questo fornitore per questa richiesta: la risposta non doveva arrivare da lì.',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
