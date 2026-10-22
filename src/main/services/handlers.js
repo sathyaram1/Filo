@@ -5865,9 +5865,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const fuori = FCx.letturaDaFuori(m);
     if (fuori) azioniViste.push(fuori);
   }
+  // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
+  const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
+  if (dalTratto) azioniViste.push(dalTratto);
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
-  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
-  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello. Né la riga di una
+  // conversazione di un'altra app, che scrive Filo, né quello che l'utente ha scritto nell'Aiuto sopra un sito (#1508).
+  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello && !m.riga && !m.daPagina).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
   // Gli indirizzi che il modello ha davanti, per la regola dell'indirizzo scritto (#553, src/main/services/pageRead.js).
   const provenienza = PageRead.contestoChat();
