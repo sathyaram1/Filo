@@ -658,6 +658,18 @@
     if (state && state.attivo) aggiornaCodice(state);
   }
 
+  // Il campo che ha già il fuoco quando il correttore parte o si accende (autofocus, la chat di casa): il suo focusin
+  // è passato prima che ci fosse chi lo ascolta.
+  function adottaIlFuoco() {
+    if (!attivo()) return;
+    let el = document.activeElement;
+    try { while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement; } catch (_) {}
+    const campo = findSupportedEditable(el);
+    if (!campo || campo === activeEl) return;
+    attach(campo);
+    rileggiMemorie();
+  }
+
   function onFocusOut(e) {
     const el = editabileDellEvento(e);
     if (!el) return;
