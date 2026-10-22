@@ -163,9 +163,12 @@
   }
   // Lo stesso testo quando torna dall'archivio (un ricordo, una ricerca, una rilettura): l'azione che lo riporta lo
   // dichiara in `_output.daFuori`, e uscite e conferme lo contano come la lettura che era (urlExfil, actionLevels).
+  // Così le parole scritte nell'Aiuto sopra un sito (`daPagina`, src/shared/filoApp.js → conProvenienza, #1508).
+  const ESTERNO_AIUTO = "dall'Aiuto, in un messaggio scritto sopra un sito";
+  const daPaginaIl = (m) => !!m && m.role === 'user' && m.daPagina === true;
   function daFuoriDi(messaggi) {
-    return (Array.isArray(messaggi) ? messaggi : []).filter(daFuoriIl)
-      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: m.esterno }))
+    return (Array.isArray(messaggi) ? messaggi : []).filter((m) => daFuoriIl(m) || daPaginaIl(m))
+      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: daPaginaIl(m) ? ESTERNO_AIUTO : m.esterno }))
       .filter((x) => x.testo.trim());
   }
 
@@ -182,6 +185,62 @@
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
     return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+  }
+
+  // La classe che il testo di un messaggio porta a chi lo rilegge da un'altra conversazione (#1508): una risposta di
+  // Filo vale la peggiore che la sua conversazione aveva letto quando l'ha scritta (`classeLetta`); una salvata prima
+  // del campo, la peggiore fra le fonti della sua chat. Testi da fuori e parole dell'utente li conta daFuoriDi.
+  function classeDelMessaggio(m, fontiDellaChat = null) {
+    if (!m || m.role === 'user' || daFuoriIl(m)) return 1;
+    const c = Number(m.classeLetta);
+    if (Number.isInteger(c) && c >= 1 && c <= 5) return c;
+    let peggiore = 1;
+    for (const f of Array.isArray(fontiDellaChat) ? fontiDellaChat : []) {
+      const k = Number(f && f.classe);
+      if (Number.isInteger(k) && k > peggiore && k <= 5) peggiore = k;
+    }
+    return peggiore;
+  }
+  function classeDelleRisposte(messaggi, fontiDellaChat = null) {
+    let peggiore = 1;
+    for (const m of Array.isArray(messaggi) ? messaggi : []) peggiore = Math.max(peggiore, classeDelMessaggio(m, fontiDellaChat));
+    return peggiore;
+  }
+
+  // Le risposte di altre conversazioni che il modello ha davanti nel tratto (#1508) hanno la forma di una ricerca fra le
+  // chat, come i ricordi: stato del compito, uscite e accoglienza le contano come la lettura che erano. `visti` sono
+  // messaggi del filo, con `classeLetta` già risolta (src/main/services/contestoFilo.js → messaggiDi). Null se pulite.
+  function trattoComeAzione(visti, { chatCorrente = null } = {}) {
+    const altre = (Array.isArray(visti) ? visti : []).filter((m) => m && !m.riga && m.chat !== chatCorrente);
+    const classe = classeDelleRisposte(altre);
+    if (classe <= 1) return null;
+    return { type: 'CERCA_CHAT', _tratto: true, _executed: true, _output: { tratto: true, classeLetta: classe } };
+  }
+
+  // Cosa porta nel compito una conversazione dell'archivio riletta per intero (#1508): i testi da fuori, le parole
+  // dell'utente (per la regola dell'indirizzo scritto, #553) e la classe peggiore delle risposte di Filo.
+  function provenienzaDellaChat(chat) {
+    const A = global.SN_FILO_APP;
+    const msgs = A ? A.conProvenienza(chat) : (Array.isArray(chat && chat.messages) ? chat.messages : []);
+    return {
+      daFuori: daFuoriDi(msgs),
+      parole: msgs.filter((m) => m && m.role === 'user' && !m.daModello && !daPaginaIl(m)).map((m) => String(m.text || '')).join('\n'),
+      classeLetta: classeDelleRisposte(msgs, chat && chat.fonti),
+    };
+  }
+
+  // Di una conversazione trovata dalla ricerca torna solo il frammento: porta la lettura dei messaggi da cui viene. Se
+  // non si riconosce da dove, vale la chat intera.
+  function provenienzaDelFrammento(chat, frammento) {
+    const A = global.SN_FILO_APP;
+    const msgs = A ? A.conProvenienza(chat) : (Array.isArray(chat && chat.messages) ? chat.messages : []);
+    const pezzo = String(frammento || '').replace(/^…|…$/g, '').trim();
+    const da = pezzo ? msgs.filter((m) => m && String(m.text == null ? '' : m.text).replace(/\s+/g, ' ').includes(pezzo)) : [];
+    const fuori = daFuoriDi(da);
+    return {
+      daFuori: fuori.length ? [{ testo: pezzo, fonte: fuori[0].fonte }] : [],
+      classeLetta: classeDelleRisposte(da.length ? da : msgs, chat && chat.fonti),
+    };
   }
 
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
