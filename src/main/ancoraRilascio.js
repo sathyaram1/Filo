@@ -7,11 +7,13 @@ const R = require('./aggiornamentoRegole');
 
 const TETTO_MS = 15000;
 
-// Lo stack di rete di Chromium, come electron-updater: un proxy di sistema che lascia passare GitHub lascia passare questa.
+// La sessione di rete di electron-updater (NET_SESSION_NAME): proxy e filtri sono quelli con cui ha letto GitHub, così
+// una rete che lascia passare l'aggiornamento lascia passare anche la sua àncora.
 function richiestaRete(url, opzioni) {
   try {
-    const { net } = require('electron');
-    if (net && typeof net.fetch === 'function') return net.fetch(url, opzioni);
+    const { session } = require('electron');
+    const ses = session && session.fromPartition('electron-updater', { cache: false });
+    if (ses && typeof ses.fetch === 'function') return ses.fetch(url, opzioni);
   } catch (_) {}
   return fetch(url, opzioni);
 }
