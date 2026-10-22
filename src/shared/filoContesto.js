@@ -187,9 +187,8 @@
     return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
   }
 
-  // La classe che il testo di un messaggio porta a chi lo rilegge da un'altra conversazione (#1508): una risposta di
-  // Filo vale la peggiore che la sua conversazione aveva letto quando l'ha scritta (`classeLetta`); una salvata prima
-  // del campo, la peggiore fra le fonti della sua chat. Testi da fuori e parole dell'utente li conta daFuoriDi.
+  // Una risposta di Filo riletta altrove vale la classe peggiore che la sua chat aveva letto (#1508); una salvata prima
+  // del campo, la peggiore fra le fonti della chat. Testi da fuori e parole dell'utente li conta daFuoriDi.
   function classeDelMessaggio(m, fontiDellaChat = null) {
     if (!m || m.role === 'user' || daFuoriIl(m)) return 1;
     const c = Number(m.classeLetta);
