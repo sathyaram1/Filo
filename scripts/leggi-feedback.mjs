@@ -30,13 +30,26 @@ const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'statu
 const MAX_IN_LINEA = 60000;
 const TIPO_TESTO = /^(text\/|application\/(json|x-yaml|yaml)\b)/i;
 
-/** '' se il testo si può leggere, altrimenti il motivo. `pipeline` decifrato, se c'è. PURA. */
-export function vietatoLeggere(status, pipeline) {
+/** Il giudizio per chi legge (MR.giudizioPerLettura). `pipeline` decifrato, se c'è; `fiducia` in chiaro. PURA. */
+export function giudizioDelTesto(status, pipeline, fiducia) {
+  return MR.giudizioPerLettura({ status: String(status || '').trim(), pipeline, fiducia });
+}
+
+/**
+ * '' se il testo si può leggere, altrimenti il motivo. Nei Ricevuti un mai giudicato si legge solo con
+ * `ancheMaiGiudicato`: da fuori, chi lo manda ci arriva riempiendo le raffiche (#1514). PURA.
+ */
+export function vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato = false } = {}) {
   const s = String(status || '').trim();
   if (!FS.isCanonical(s)) return 'stato non decifrabile: non so se è segnalato come attacco';
-  const segnalato = MR.segnalatoComeAttacco({ status: s, pipeline });
-  return segnalato ? `${segnalato}: per regola una sessione non lo legge` : '';
+  const g = giudizioDelTesto(s, pipeline, fiducia);
+  if (g.esito === 'segnalato') return `${g.motivo}: per regola una sessione non lo legge`;
+  if (g.esito !== 'mai_giudicato' || ancheMaiGiudicato || !MR.isRicevutiStatus(s)) return '';
+  const strada = s === 'unlabeled' ? 'In Gestione «Ri-valuta i non filtrati» lo manda ai giudici' : 'Decide l’owner, in Gestione';
+  return `nei Ricevuti e mai passato dai giudici (${g.motivo}): per regola una sessione non lo legge. ${strada}; per leggerlo lo stesso, rilancia con ${ANCHE_MAI_GIUDICATO}`;
 }
+
+export const ANCHE_MAI_GIUDICATO = '--anche-mai-giudicato';
 
 /** Il giudizio grezzo del documento: stringa (cifrata o JSON), mappa in chiaro, o niente. */
 function giudizioGrezzo(f) {
