@@ -162,9 +162,10 @@ test('worker in parallelo (#1157): il battito nominato da un marcatore di un\'AL
     assert.equal(readBeat(a).pid, 6001);
     assert.equal(readBeat(b).pid, 6002);
 
-    // Nella stessa cartella, invece, un biglietto nuovo spegne ancora quello vecchio.
-    startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
-    assert.deepEqual(uccisi, [6002]);
+    // Nella stessa cartella un biglietto nuovo davanti a un battito vivo si ferma, senza spegnerlo (#1480).
+    const r2 = startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
+    assert.equal(r2.why, 'altro_vivo');
+    assert.deepEqual(uccisi, []);
   } finally {
     process.kill = killVero;
     togliCartella(a);
