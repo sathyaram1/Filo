@@ -3472,6 +3472,16 @@ async function eseguiAzioneFilo(action, {
         return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte, perSempre: action.per_sempre === true } };
       }
       case 'APRI_FILE': {
+        // Un file su un altro computer non diventa un bottone: al clic Windows si presenterebbe a quel computer con
+        // l'identità dell'utente, e il nome lo sceglie il modello (#1499). Ogni campo dove il bottone può trovarlo.
+        const DR = require('./documentRead');
+        if ([action.percorso, action.path].some((v) => DR.percorsoDelFile(v) === null)) {
+          return {
+            executed: false,
+            kept: true,
+            output: { error: 'il file sta su un altro computer della rete', detail: 'Filo mostra solo i file di questo computer: dillo all\'utente' },
+          };
+        }
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
         const p = String(action.percorso ?? action.path ?? '').trim();
         let dove = '';
