@@ -65,8 +65,10 @@
   // della shell (--accent, --fg, …) al boot e live a ogni cambio impostazioni
   // (stesso canale SETTINGS_UPDATED usato dalle pagine).
   const ThemeTokens = window.SN_THEME_TOKENS;
+  let tokenShell = {};
   function applyShellTokens(tokens) {
-    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
+    tokenShell = tokens && typeof tokens === 'object' ? tokens : {};
+    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokenShell, { shell: true });
   }
   // Parametri "Colore identità delle tab" per il fondo delle schede non attive.
   const TabColor = window.SN_TAB_COLOR;
