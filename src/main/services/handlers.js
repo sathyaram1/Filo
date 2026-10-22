@@ -3477,9 +3477,14 @@ async function eseguiAzioneFilo(action, {
         // Un file su un altro computer non diventa un bottone: al clic Windows si presenterebbe a quel computer con
         // l'identità dell'utente, e il nome lo sceglie il modello (#1499). Ogni campo dove il bottone può trovarlo.
         const DR = require('./documentRead');
-        if ([action.percorso, action.path].some((v) => DR.percorsoDelFile(v) === null)) {
+        const percorsi = [action.percorso, action.path].map((v) => DR.percorsoDelFile(v));
+        if (percorsi.some((v) => v === null)) {
           return { executed: false, kept: false, output: { rete: true, error: 'il file sta su un altro computer della rete' } };
         }
+        // Il bottone porta il percorso che si aprirà, pulito come lo pulisce il disco: fra virgolette la chat non lo
+        // riconosceva come file e ne faceva un collegamento morto.
+        const pulito = percorsi.find(Boolean);
+        if (pulito) { action.percorso = pulito; if (action.path) action.path = pulito; }
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
         const p = String(action.percorso ?? action.path ?? '').trim();
         let dove = '';
