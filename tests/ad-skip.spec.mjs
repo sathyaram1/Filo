@@ -157,17 +157,11 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
     await apriScheda(testServer.html('<title>Altra</title><p>altra scheda</p>'), true);
     for (const u of [yt, incorporato, ima]) await nascosta(u);
 
-    await filo.evaluate(({ webContents }, u) => {
-      const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+    await filo.evaluate(({ BrowserWindow }, u) => {
+      const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.view.webContents.getURL() === u);
       globalThis.__larghezzeAlClic = [];
-      const t = require('electron').BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.view.webContents === wc);
-      wc.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
-    }, yt).catch(() => filo.evaluate(({ BrowserWindow, webContents }, u) => {
-      const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
-      const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.view.webContents === wc);
-      globalThis.__larghezzeAlClic = [];
-      wc.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
-    }, yt));
+      t.view.webContents.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
+    }, yt);
     for (const u of [yt, incorporato, ima]) await nel(u, 'window.__mostra()');
     for (const u of [yt, incorporato, ima]) await saltata(u);
     expect((await clic(yt)).every((c) => c.vero)).toBe(true);
