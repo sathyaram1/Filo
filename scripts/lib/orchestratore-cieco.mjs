@@ -17,6 +17,9 @@ export const FILE_REGISTRO = 'filo-decisioni-worker.json';
 export const MODELLI = Object.freeze(['opus', 'sonnet', 'haiku', 'fable']);
 export const SFORZI = Object.freeze(['low', 'medium', 'high', 'xhigh', 'max']);
 export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti arriva: sei cieco per design. Il passo dopo lo decidi solo dal canale, come dice il tuo ruolo.';
+// Claude Code sposta in sottofondo un sotto-agente che dura troppo (CLAUDE_AUTO_BACKGROUND_TASKS, circa due minuti) e
+// lo strumento torna con status async_launched: il worker lavora ancora (#1480, D-90).
+export const AL_POSTO_VIVO = 'Worker ANCORA VIVO: Claude Code lo ha spostato in sottofondo mentre lavorava, non è finito. Non rilasciare il suo biglietto, non toccare la cartella, non chiedere biglietti e non lanciare altri worker: chiudi il turno senza fare altro e aspetta la notifica di fine del worker. Quando arriva, riparti dal passo 0 del tuo ruolo, come dopo un worker finito.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_LANCIO = 'Worker in primo piano, con modello e sforzo decisi dal server (quelli della sua definizione se il server non ne ha detti).';
 export const MOTIVO_IMPOSTAZIONI = 'Durante il giro le impostazioni utente non cambiano: portano il gancio che rende cieco chi guida il giro.';
@@ -76,13 +79,17 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
     return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: MOTIVO_LANCIO, updatedInput: nuovo } };
   }
   if (input.hook_event_name === "PostToolUse") {
-    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: AL_POSTO_DEL_TESTO } };
+    const r = input.tool_response;
+    const stato = r && typeof r === "object" && typeof r.status === "string" ? r.status : "";
+    const finito = stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: finito ? AL_POSTO_DEL_TESTO : AL_POSTO_VIVO } };
   }
   return null;
 }
 
 const PRELUDIO = `/*${ETICHETTA}*/const VALIDITA_MS=${VALIDITA_MS},DURATA_VOCE_MS=${DURATA_VOCE_MS},`
   + `MODELLI=${JSON.stringify(MODELLI)},SFORZI=${JSON.stringify(SFORZI)},AL_POSTO_DEL_TESTO=${JSON.stringify(AL_POSTO_DEL_TESTO)},`
+  + `AL_POSTO_VIVO=${JSON.stringify(AL_POSTO_VIVO)},`
   + `MOTIVO_SOTTOFONDO=${JSON.stringify(MOTIVO_SOTTOFONDO)},MOTIVO_LANCIO=${JSON.stringify(MOTIVO_LANCIO)},`
   + `MOTIVO_IMPOSTAZIONI=${JSON.stringify(MOTIVO_IMPOSTAZIONI)},MOTIVO_SENZA_BIGLIETTO=${JSON.stringify(MOTIVO_SENZA_BIGLIETTO)},`
   + `MOTIVO_DUE_BIGLIETTI=${JSON.stringify(MOTIVO_DUE_BIGLIETTI)},MOTIVO_REGISTRO=${JSON.stringify(MOTIVO_REGISTRO)},`

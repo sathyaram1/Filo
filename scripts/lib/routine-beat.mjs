@@ -122,24 +122,13 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
 
   const vecchio = readBeat(root);
   if (beatIsLive(vecchio, t, { now, alive })) return { started: false, why: 'already_live' };
-  // Un battito rimasto acceso su un ALTRO biglietto va spento ADESSO: fra una
-  // riga il marcatore viene sovrascritto, e da quel momento nessuno saprebbe
-  // più come raggiungerlo mentre lui continua a tenere vivo un semaforo che non
-  // serve a nessuno. In una cartella lavora un worker alla volta, quindi un
-  // biglietto nuovo qui vuol dire che il precedente ha finito; ma con i worker
-  // in parallelo (#1157) ognuno ha il suo clone, e un marcatore arrivato da
-  // un'ALTRA cartella (un clone fatto per copia) nomina il battito vivo di un
-  // altro worker: quello non si tocca.
-  //
-  // Ma solo se il marcatore è ancora CREDIBILE. Un marcatore vecchio di giorni
-  // nomina un numero di processo che il sistema ha già riassegnato a qualcun
-  // altro, e ammazzeremmo un estraneo: riprodotto dal vivo con un marcatore di
-  // tre giorni prima. Il controllo d'età è lo stesso di `beatIsLive`, che è il
-  // punto: due strade che decidono la stessa cosa non devono usare due criteri.
+  // Il battito vivo di un ALTRO biglietto in questa cartella è un worker che lavora ancora: non si spegne e il suo
+  // marcatore non si sovrascrive (#1480, D-90). Un biglietto finito il battito lo spegne col rilascio. Un marcatore
+  // arrivato da un'altra cartella (un clone per copia, #1157) non descrive questa; l'età la giudica `beatIsLive`.
   const diQui = !vecchio || !vecchio.root || stessaCartella(vecchio.root, root);
   if (vecchio && diQui && String(vecchio.ticket || '') !== t
       && beatIsLive(vecchio, vecchio.ticket, { now, alive })) {
-    try { process.kill(Number(vecchio.pid)); } catch (_) { /* già morto */ }
+    return { started: false, why: 'altro_vivo', pid: Number(vecchio.pid), altro: String(vecchio.ticket || '').slice(0, 8) };
   }
 
   try {

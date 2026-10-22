@@ -59,9 +59,11 @@ test('senzaSchermo guarda solo Linux', () => {
 test('finish-local lancia gli spec passando dal lancio preparato, e controlla prima degli unit test', () => {
   const src = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
   assert.doesNotMatch(src, /run\(\s*'npx'\s*,\s*\[\s*'playwright'/, 'un npx playwright lanciato a mano salta xvfb');
-  assert.match(src, /preparaLancioElectron\('npx', \['playwright', 'test'/);
+  assert.doesNotMatch(src, /run\([^)]*cli\.js/, 'nemmeno il Playwright della cartella di prova');
+  // Nella cartella staccata dei controlli (#1480) Playwright si chiama dal node_modules collegato, sempre dal lancio preparato.
+  assert.match(src, /preparaLancioElectron\(process\.execPath, \[join\(albero\.moduli, '@playwright', 'test', 'cli\.js'\), 'test'/);
   const controllo = src.indexOf("preparaLancioElectron('npx', [])");
-  const unit = src.indexOf("run('npm', ['run', 'test:unit']");
+  const unit = src.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
   assert.ok(controllo > 0 && controllo < unit, 'senza xvfb ci si ferma prima degli unit test, non dopo');
 });
 

@@ -37,7 +37,8 @@ porta solo l'ultima.
    codice), è un lavoro intero: vale il ruolo di chi risolve, criteri
    compresi.
 2. Prima di consegnare lancia `npm run finish:check`, in sottofondo mentre
-   lavori. La cartella delle prove dei giri non la rilanciare: la corre per
+   lavori, e aspettane l'esito prima di consegnare e rilasciare. La cartella
+   delle prove dei giri non la rilanciare: la corre per
    intero chi verifica, subito dopo di te, ed è l'unica corsa del giro. Lancia
    la singola prova del rilievo che stai chiudendo, prima e dopo, col percorso
    relativo alla radice del repo e le barre normali (in ogni altra forma dice

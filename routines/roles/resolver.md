@@ -61,7 +61,8 @@ fa — lo scrivi nel report e diventerà un feedback suo. È ciò che una
 correzione aggiunge a generare i rilievi del giro dopo.
 
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
-un rosso lì ti tornerebbe indietro come rilievo grave.
+un rosso lì ti tornerebbe indietro come rilievo grave. Il suo esito lo leggi
+prima di consegnare, e il rilascio aspetta che sia finito.
 
 **La prova che tiene chiuso il difetto va dove verrà rilanciata per sempre**:
 `tests/<feature>.spec.mjs`, o `tests/unit/` per la logica pura. Non in
