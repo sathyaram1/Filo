@@ -21,6 +21,7 @@ const deps = {
   chiediSi: (wc, richiesta) => require('../confermeSopraPagina').chiediDalMain(wc, richiesta),
   cerca: (cosa, opzioni) => require('./documentiIndice').cerca(cosa, opzioni),
   doveSta: (p) => require('./documentiIndice').doveSta(p),
+  cartellaChiesta: (c) => require('./documentiIndice').cartellaChiesta(c),
 };
 function configura(d) { Object.assign(deps, d || {}); }
 
