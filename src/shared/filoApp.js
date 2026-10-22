@@ -140,6 +140,6 @@
   }
 
   global.SN_FILO_APP = {
-    APP, PAUSA_MS, eApp, soggetto, titolo, testoRiga, testoPerModello, inizio, daContinuare, perLaHome, vista,
+    APP, PAUSA_MS, eApp, soggetto, titolo, testoRiga, testoPerModello, conProvenienza, inizio, daContinuare, perLaHome, vista,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
