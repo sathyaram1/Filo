@@ -368,6 +368,7 @@ html, body {
   margin-left: 8px;
   color: var(--sn-error);
   font-weight: 600;
+  cursor: help;
 }
 
 /* Quota di testo in ingresso riusata da una richiesta precedente: dato di servizio, discreto accanto
