@@ -1702,7 +1702,7 @@
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
     // actions: [{ label, onClick }], unica, alChiudere }. Senza opts usa la config delle Preferenze.
-    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, tetto).
+    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, «Chiudi tutti»).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
     function show(text, opts) {
