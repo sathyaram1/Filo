@@ -126,7 +126,7 @@
     return '';
   }
 
-  // L'articolo o la preposizione attaccati col'apostrofo: il nome è quello che segue («l'italia» → «l'Italia»).
+  // L'articolo o la preposizione attaccati con l'apostrofo: il nome è quello che segue («l'italia» → «l'Italia»).
   const ELISIONE = /^(?:l|d|un|dell|dall|nell|sull|all|coll|pell|quell|quest|bell|sant)['’](?=[\p{L}])/iu;
 
   // L'apostrofo al posto dell'accento («perche'», «piu'», «sara'»): la forma accentata che il dizionario conosce, o ''.
