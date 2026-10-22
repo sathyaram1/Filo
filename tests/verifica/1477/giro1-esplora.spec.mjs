@@ -41,6 +41,7 @@ test('aperto con avvisi a tempo: chi arriva intanto si vede, e finiti tutti non 
   const vista = await avvisi();
   await vista.locator('.avvisi-testa [data-pila="apri"]').click();
   await expect(vista.locator('.shell-notif')).toHaveCount(8);
+  await vista.mouse.move(1, 1);
   await shell.evaluate(() => window.filoNotify('Avviso nuovo', { durationSec: 2 }));
   await expect(vista.locator('.shell-notif-msg', { hasText: 'Avviso nuovo' })).toBeInViewport();
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 12_000 });
