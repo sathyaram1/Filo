@@ -3603,6 +3603,7 @@
             noteRipiego.set(thinking, r.keyFallback.line);
             sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
           }
+          if (letto.tagliato) noteTaglio.set(thinking, notaTaglio(letto));
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
           const parsed = parseFormatActions(raw);
