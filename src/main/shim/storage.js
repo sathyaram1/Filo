@@ -120,7 +120,7 @@ const INCOGNITO = {
 // Allowlist FAIL-CLOSED: dal disco l'incognito legge SOLO queste chiavi di configurazione.
 // Qualunque altra, comprese quelle future, è invisibile: la finestra parte vuota.
 const INCOGNITO_READABLE = new Set([
-  'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
+  'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_correttore_imparato', 'sn_icon_layout',
   // La disposizione delle carte della home (#870): come le icone, la scelta dell'utente vale anche in incognito.
   'filo_carte_home',
 ]);

@@ -19,8 +19,12 @@ const CAMPI_WEB = Object.freeze({
   menuDelSito: Object.freeze({ siti: true }),
   // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
   featureFlags: Object.freeze({ spellcheck: true, spellcheckContext: true, help: true }),
-  // Il correttore (#1446): la parte del modello, le ripetizioni e i tempi dei due controlli.
-  correttore: Object.freeze({ modelloErrori: true, ripetizioni: true, pausaRapidoMs: true, ogniRapidoMs: true, pausaRagionatoMs: true }),
+  // Il correttore (#1446): la parte del modello, le ripetizioni e i tempi dei due controlli; la correzione automatica e
+  // quante volte serve per imparare (#1447).
+  correttore: Object.freeze({
+    modelloErrori: true, ripetizioni: true, pausaRapidoMs: true, ogniRapidoMs: true, pausaRagionatoMs: true,
+    automatica: true, accettiPerImparare: true, annulliPerImparare: true, riscrittePerImparare: true,
+  }),
   // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
   spiegaAnticipata: true,
   // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
@@ -71,6 +75,7 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'settings',
   'sn_personal_dict',
   'sn_autocorrect',
+  'sn_correttore_imparato',
   'sn_icon_layout',
   'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',

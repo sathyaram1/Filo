@@ -1,5 +1,5 @@
-// «Gestisci correttore»: autocorrect e dizionario personale, letti e scritti su
-// chrome.storage.local; il content script reagisce via chrome.storage.onChanged.
+// Pagina "Gestisci correttore": le correzioni automatiche dell'utente, le parole imparate (il dizionario personale) e
+// quelle da non correggere più da sé (#1447). Scrive in chrome.storage.local; i content script seguono da onChanged.
 
 (function () {
   'use strict';
@@ -17,9 +17,14 @@
 
     fillStaticText();
 
-    const data = await chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT]);
+    await rileggi();
+  }
+
+  async function rileggi() {
+    const data = await chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT, STORAGE_KEYS.CORRETTORE_IMPARATO]);
     renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
     renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
+    renderRifiutate(data[STORAGE_KEYS.CORRETTORE_IMPARATO]);
   }
 
   function fillStaticText() {
@@ -39,6 +44,12 @@
     $('dictEmpty').textContent = I18n.t('spell_page_dict_empty');
     $('newDictWord').placeholder = I18n.t('spell_page_placeholder_dict_word');
     $('addDict').textContent = I18n.t('spell_page_add');
+
+    $('h-rifiutate').textContent = I18n.t('spell_page_rifiutate_h');
+    $('desc-rifiutate').textContent = I18n.t('spell_page_rifiutate_desc');
+    $('rifiutateEmpty').textContent = I18n.t('spell_page_rifiutate_empty');
+    $('newRifiutata').placeholder = I18n.t('spell_page_placeholder_dict_word');
+    $('addRifiutata').textContent = I18n.t('spell_page_add');
   }
 
   const inlineTimers = Object.create(null);
@@ -70,6 +81,65 @@
 
   function showDictConflictMessage(word) {
     showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
+  }
+
+  // ----------------------------------------------------------------------
+  // Quello che il correttore impara (#1447): tolta o cambiata una parola, Filo ricomincia da zero su di lei.
+  // ----------------------------------------------------------------------
+  const Auto = () => window.SN_CORRETTORE_AUTO;
+  async function leggiImparato() {
+    const d = await chrome.storage.local.get(STORAGE_KEYS.CORRETTORE_IMPARATO);
+    return Auto().memoria(d[STORAGE_KEYS.CORRETTORE_IMPARATO]);
+  }
+  async function scriviImparato(m) {
+    await chrome.storage.local.set({ [STORAGE_KEYS.CORRETTORE_IMPARATO]: m });
+  }
+  async function dimenticaParole(...parole) {
+    let m = await leggiImparato();
+    for (const p of parole) if (p) m = Auto().dimentica(m, p);
+    await scriviImparato(m);
+  }
+
+  // Una riga con una parola sola, che si cambia scrivendoci e si toglie con «Rimuovi». `rinomina(vecchia, nuova)` dice
+  // se il cambio è valido; uno scartato rimette la parola com'era.
+  function rigaParola(word, { rinomina, togli, avviso }) {
+    const row = document.createElement('div');
+    row.className = 'sn-spell-row sn-spell-row-dict';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'sn-spell-word';
+    input.spellcheck = false;
+    input.value = word;
+    row.appendChild(input);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'sn-btn sn-btn-secondary';
+    removeBtn.type = 'button';
+    removeBtn.textContent = I18n.t('spell_page_remove');
+    removeBtn.addEventListener('click', () => togli(word));
+    row.appendChild(removeBtn);
+
+    const commit = async () => {
+      const nuova = input.value.trim();
+      if (nuova === word) return;
+      if (!nuova || /\s/.test(nuova)) {
+        input.value = word;
+        avviso(I18n.t(nuova ? 'spell_page_una_parola' : 'spell_page_word_empty'));
+        return;
+      }
+      if (await rinomina(word, nuova)) word = nuova;
+      else input.value = word;
+    };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(commit));
+    input.addEventListener('change', () => { campoAlVolo.confermato(); commit(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    return row;
+  }
+
+  // Una lista non si ridisegna mentre ci si scrive dentro: butterebbe via quello che si sta scrivendo.
+  function siScriveIn(listId) {
+    const a = document.activeElement;
+    return !!(a && a.closest && a.closest(`#${listId}`));
   }
 
   // ----------------------------------------------------------------------
@@ -234,27 +304,12 @@
     $('dictEmpty').hidden = true;
 
     for (const w of sorted) {
-      list.appendChild(dictRow(w));
+      list.appendChild(rigaParola(w, {
+        rinomina: renameDictWord,
+        togli: removeDictWord,
+        avviso: (t) => showInlineMessage('dictConflict', 'dictList', t),
+      }));
     }
-  }
-
-  function dictRow(word) {
-    const row = document.createElement('div');
-    row.className = 'sn-spell-row sn-spell-row-dict';
-
-    const span = document.createElement('span');
-    span.className = 'sn-spell-word';
-    span.textContent = word;
-    row.appendChild(span);
-
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'sn-btn sn-btn-secondary';
-    removeBtn.type = 'button';
-    removeBtn.textContent = I18n.t('spell_page_remove');
-    removeBtn.addEventListener('click', () => removeDictWord(word));
-    row.appendChild(removeBtn);
-
-    return row;
   }
 
   async function removeDictWord(word) {
@@ -265,6 +320,80 @@
     );
     await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: arr });
     renderDict(arr);
+    await dimenticaParole(word);
+  }
+
+  // La forma nuova prende il posto della vecchia; se la parola c'è già in un'altra riga il cambio non vale.
+  async function renameDictWord(vecchia, nuova) {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
+    const arr = (data[STORAGE_KEYS.PERSONAL_DICT] || []).map(String);
+    const da = vecchia.toLowerCase();
+    const a = nuova.toLowerCase();
+    if (da !== a && arr.some((w) => w.toLowerCase() === a)) {
+      showDictConflictMessage(nuova);
+      return false;
+    }
+    const out = arr.filter((w) => w.toLowerCase() !== da);
+    out.push(nuova);
+    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: out });
+    await dimenticaParole(vecchia, nuova);
+    return true;
+  }
+
+  // ----------------------------------------------------------------------
+  // Parole da non correggere da sé: quelle di cui l'utente ha annullato la correzione automatica (#1447)
+  // ----------------------------------------------------------------------
+  function renderRifiutate(memoria) {
+    const list = $('rifiutateList');
+    list.innerHTML = '';
+    const parole = Auto() ? [...Auto().memoria(memoria).rifiutate].sort((a, b) => a.localeCompare(b)) : [];
+    $('rifiutateEmpty').hidden = parole.length > 0;
+    for (const w of parole) {
+      list.appendChild(rigaParola(w, {
+        rinomina: renameRifiutata,
+        togli: removeRifiutata,
+        avviso: (t) => showInlineMessage('rifiutateConflict', 'rifiutateList', t),
+      }));
+    }
+  }
+
+  async function removeRifiutata(word) {
+    const m = await leggiImparato();
+    const k = Auto().chiave(word);
+    m.rifiutate = m.rifiutate.filter((w) => w !== k);
+    await scriviImparato(Auto().dimentica(m, word));
+    renderRifiutate(m);
+  }
+
+  async function renameRifiutata(vecchia, nuova) {
+    const m = await leggiImparato();
+    const da = Auto().chiave(vecchia);
+    const a = Auto().chiave(nuova);
+    if (da !== a && m.rifiutate.includes(a)) {
+      showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_dict_conflict', nuova));
+      return false;
+    }
+    m.rifiutate = [...m.rifiutate.filter((w) => w !== da), a];
+    await scriviImparato(m);
+    return true;
+  }
+
+  async function addRifiutataFromInput() {
+    const raw = $('newRifiutata').value.trim();
+    if (!raw) return;
+    if (/\s/.test(raw)) { showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_una_parola')); return; }
+    const m = await leggiImparato();
+    const k = Auto().chiave(raw);
+    if (m.rifiutate.includes(k)) {
+      showInlineMessage('rifiutateConflict', 'rifiutateList', I18n.t('spell_page_dict_conflict', raw));
+      $('newRifiutata').select();
+      return;
+    }
+    m.rifiutate = [...m.rifiutate, k];
+    await scriviImparato(m);
+    renderRifiutate(m);
+    $('newRifiutata').value = '';
+    $('newRifiutata').focus();
   }
 
   async function addDictFromInput() {
@@ -311,6 +440,10 @@
     $('newDictWord').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addDictFromInput();
     });
+    $('addRifiutata').addEventListener('click', addRifiutataFromInput);
+    $('newRifiutata').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addRifiutataFromInput();
+    });
     $('back').addEventListener('click', () => {
       chrome.runtime.openOptionsPage();
     });
@@ -318,20 +451,17 @@
     // Un backup importato in un'altra scheda porta parole sue: compaiono senza riaprire la pagina (#1256).
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== window.SN_MSG.MSG.DATI_IMPORTATI) return;
-      chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT]).then((data) => {
-        renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
-        renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
-      }).catch(() => {});
+      rileggi().catch(() => {});
     });
 
-    // Aggiornamento live se cambia da un altro tab.
+    // Aggiornamento live se cambia da un altro tab, o se Filo impara una parola mentre la pagina è aperta.
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
-      if (changes[STORAGE_KEYS.AUTOCORRECT]) {
-        renderAutocorrect(changes[STORAGE_KEYS.AUTOCORRECT].newValue || {});
-      }
-      if (changes[STORAGE_KEYS.PERSONAL_DICT]) {
+      if (changes[STORAGE_KEYS.PERSONAL_DICT] && !siScriveIn('dictList')) {
         renderDict(changes[STORAGE_KEYS.PERSONAL_DICT].newValue || []);
+      }
+      if (changes[STORAGE_KEYS.CORRETTORE_IMPARATO] && !siScriveIn('rifiutateList')) {
+        renderRifiutate(changes[STORAGE_KEYS.CORRETTORE_IMPARATO].newValue);
       }
     });
   });

@@ -636,6 +636,16 @@
     return { partial: { correttore: { [campo]: n } }, label: etichetta(cifre(n)) };
   }
 
+  // Quante volte serve per imparare, nella correzione automatica (#1447): un numero intero dentro i limiti.
+  function volteCorrettore(v, campo, etichetta) {
+    const n = parseItalianNumber(String(v == null ? '' : v).trim().toLowerCase().replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const volte = Math.round(n);
+    const { min, max } = global.SN_CONST.CORRETTORE_SOGLIE[campo];
+    if (volte < min || volte > max) return { rifiuto: `${cifre(volte)} volte è fuori dai limiti: da ${cifre(min)} a ${cifre(max)}` };
+    return { partial: { correttore: { [campo]: volte } }, label: etichetta(cifre(volte)) };
+  }
+
   function msBarra(v, campo, etichetta) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
@@ -1131,6 +1141,38 @@
       aiuto: 'millisecondi 1000-30000 (pausa nello scrivere prima del controllo dei suggerimenti)',
       keys: ['pausa suggerimenti', 'controllo ragionato dopo', 'attesa suggerimenti'],
       build(v) { return msCorrettore(v, 'pausaRagionatoMs', (n) => `Controllo dei suggerimenti dopo ${n} ms di pausa`); },
+    },
+    {
+      scrive: ['correttore.automatica'],
+      aiuto: 'true | false (la correzione automatica a fine parola: «perchè» → «perché», «marco» → «Marco»; si annulla subito dopo con la scorciatoia di annulla o col tasto destro sulla parola)',
+      costo: 1,
+      keys: ['correzione automatica', 'autocorrezione', 'autocorrect', 'correggi da solo', 'correggi in automatico', 'correzione a fine parola', 'maiuscole dei nomi'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { automatica: b } }, label: `Correzione automatica → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
+      scrive: ['correttore.accettiPerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una correzione scelta dal tasto destro per la stessa parola serve perché diventi automatica)',
+      keys: ['correzioni accettate', 'accetti per imparare', 'volte per correzione automatica', 'quante volte accettare'],
+      build(v) { return volteCorrettore(v, 'accettiPerImparare', (n) => `Una correzione scelta ${n} volte diventa automatica`); },
+    },
+    {
+      scrive: ['correttore.annulliPerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una correzione automatica annullata per la stessa parola serve perché non torni più)',
+      keys: ['correzioni annullate', 'annulli per imparare', 'quante volte annullare'],
+      build(v) { return volteCorrettore(v, 'annulliPerImparare', (n) => `Una correzione automatica annullata ${n} volte non torna più`); },
+    },
+    {
+      scrive: ['correttore.riscrittePerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una parola che il correttore non conosce, scritta uguale e non corretta, serve perché non sia più segnata)',
+      keys: ['parole imparate', 'riscritte per imparare', 'quante volte riscrivere', 'impara le parole'],
+      build(v) { return volteCorrettore(v, 'riscrittePerImparare', (n) => `Una parola scritta uguale ${n} volte non è più segnata`); },
     },
     {
       scrive: ['featureFlags.help'],

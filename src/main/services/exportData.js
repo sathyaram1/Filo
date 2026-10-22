@@ -551,6 +551,7 @@ const REGOLE_IMPORT = {
   CLIPBOARD_HISTORY: 'appunti',
   PERSONAL_DICT: 'contenuto',
   AUTOCORRECT: 'contenuto',
+  CORRETTORE_IMPARATO: 'contenuto',
   ICON_LAYOUT: 'contenuto',
   OPEN_TABS: 'stato',
   FILO_RAW_LOG: 'stato',

@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniAvvisoSchermoPieno, tempiCorrettore } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -871,6 +871,10 @@
       case 'correttore.pausaRapidoMs': return tempoCorrettoreDelCampo('pausaRapidoMs');
       case 'correttore.ogniRapidoMs': return tempoCorrettoreDelCampo('ogniRapidoMs');
       case 'correttore.pausaRagionatoMs': return tempoCorrettoreDelCampo('pausaRagionatoMs');
+      case 'correttore.automatica': return $('correttoreAutomatica').checked;
+      case 'correttore.accettiPerImparare': return sogliaCorrettoreDelCampo('accettiPerImparare');
+      case 'correttore.annulliPerImparare': return sogliaCorrettoreDelCampo('annulliPerImparare');
+      case 'correttore.riscrittePerImparare': return sogliaCorrettoreDelCampo('riscrittePerImparare');
       default: return undefined;
     }
   }
@@ -880,6 +884,9 @@
   // I tempi del correttore (#1446): campo per chiave; limiti e predefiniti in SN_CONST.CORRETTORE_TEMPI.
   const CAMPI_TEMPI_CORRETTORE = { pausaRapidoMs: 'correttorePausaRapido', ogniRapidoMs: 'correttoreOgniRapido', pausaRagionatoMs: 'correttorePausaRagionato' };
   const tempoCorrettoreDelCampo = (campo) => tempiCorrettore({ correttore: { [campo]: $(CAMPI_TEMPI_CORRETTORE[campo]).value } })[campo];
+  // Quante volte serve per imparare (#1447): limiti e predefiniti in SN_CONST.CORRETTORE_SOGLIE.
+  const CAMPI_SOGLIE_CORRETTORE = { accettiPerImparare: 'correttoreAccetti', annulliPerImparare: 'correttoreAnnulli', riscrittePerImparare: 'correttoreRiscritte' };
+  const sogliaCorrettoreDelCampo = (campo) => soglieCorrettore({ correttore: { [campo]: $(CAMPI_SOGLIE_CORRETTORE[campo]).value } })[campo];
   const interruttore = (s, nome, diSerie) => {
     const v = s.featureFlags && s.featureFlags[nome];
     return diSerie ? v !== false : v === true;
@@ -950,6 +957,10 @@
       case 'correttore.pausaRapidoMs':
       case 'correttore.ogniRapidoMs':
       case 'correttore.pausaRagionatoMs': return tempiCorrettore(s)[k.split('.')[1]];
+      case 'correttore.automatica': return !(s.correttore && s.correttore.automatica === false);
+      case 'correttore.accettiPerImparare':
+      case 'correttore.annulliPerImparare':
+      case 'correttore.riscrittePerImparare': return soglieCorrettore(s)[k.split('.')[1]];
       case 'featureFlags.help':
       case 'featureFlags.spellcheck':
       case 'featureFlags.spellcheckContext':
@@ -1160,6 +1171,11 @@
     const tempiCorr = tempiCorrettore(settings);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       if (vuole(`correttore.${campo}`)) $(id).value = String(tempiCorr[campo]);
+    }
+    if (vuole('correttore.automatica')) $('correttoreAutomatica').checked = corr.automatica !== false;
+    const soglieCorr = soglieCorrettore(settings);
+    for (const [campo, id] of Object.entries(CAMPI_SOGLIE_CORRETTORE)) {
+      if (vuole(`correttore.${campo}`)) $(id).value = String(soglieCorr[campo]);
     }
 
     if (vuole('timerRingtone')) {
@@ -1835,6 +1851,11 @@
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(tempiCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
+    }
+    $('correttoreAutomatica').addEventListener('change', persist);
+    for (const [campo, id] of Object.entries(CAMPI_SOGLIE_CORRETTORE)) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(soglieCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
     }
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);

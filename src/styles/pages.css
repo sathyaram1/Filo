@@ -577,7 +577,8 @@ html, body {
   margin-top: 12px;
 }
 .sn-spell-add-row:has(#newDictWord),
-section:has(#dictList) .sn-spell-add-row {
+section:has(#dictList) .sn-spell-add-row,
+section:has(#rifiutateList) .sn-spell-add-row {
   grid-template-columns: 1fr auto;
 }
 
