@@ -285,6 +285,22 @@ test('#1511 — git, cd e le altre shell misurano gli stessi percorsi', () => {
   assert.equal(lvl('Get-Content AppData\\Roaming\\Filo\\storage.json', { ...WIN, shell: 'powershell' }), 2);
 });
 
+test('#1511 — dove sh può essere dash, `\\\'` dentro `$\'…\'` chiude la stringa: anche quella lettura chiede', () => {
+  // dash: `cat '$a\' .ssh/id_rsa` legge la chiave; bash vede un nome solo. Vale il più severo dei due.
+  for (const ctx of [LINUX, MAC, { ...LINUX, shell: 'sh' }]) {
+    for (const cmd of ["cat $'a\\' .ssh/id_rsa #'", "head $'x\\' .ssh/id_rsa ''", "grep $'a\\' .netrc #'",
+      "head -n $'1\\' .ssh/id_rsa #'", "cat $'a\\c\\' .ssh/id_rsa #'"]) {
+      assert.equal(lvl(cmd, ctx), 2, `${cmd} ${JSON.stringify(ctx)}`);
+    }
+  }
+  // Con bash scelta apposta la lettura è una sola.
+  assert.equal(lvl("cat $'a\\' .ssh/id_rsa #'", { ...LINUX, shell: 'bash' }), 1);
+  assert.equal(lvl("cat $'it\\'s.txt'", LINUX), 1);
+  // `\c\` è 0x1c e la barra dopo resta un separatore, come in bash: la cartella nascosta si vede.
+  assert.equal(lvl("cat ~/$'\\c\\/.ssh/config'", { ...LINUX, shell: 'bash' }), 2);
+  assert.equal(lvl("cat $'\\c\\\\nota.txt'", { ...LINUX, shell: 'bash' }), 1);
+});
+
 // #1072 — un percorso di rete (UNC, `\\?\UNC\`, `//server`) fa aprire a Windows una connessione verso
 // quel computer: anche una sola lettura di nomi chiede un OK, e il popup dice perché. Gemello: #810.13.
 test('#1072 — le letture su un percorso di rete chiedono un OK col motivo «rete»', () => {
