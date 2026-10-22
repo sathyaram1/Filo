@@ -1914,6 +1914,8 @@ function positionOnBranch(bucket) {
   // giro passato ignorando quello assegnato dal server (#507, seconda porta).
   const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
+  const vivo = lavoroVivo(ROOT, { mio: readRoutineTicket(ROOT) });
+  if (vivo.vivo) return { ok: false, kind: 'transient', vivo: true, message: testoLavoroVivo(vivo, `posizionato la cartella su ${branch}`) };
 
   // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
   // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
