@@ -151,6 +151,66 @@ test('bersaglio(): dall\'host scende al nodo sotto il puntatore, o al fuoco se i
   assert.equal(UI.bersaglio(altro), bottone, 'fuori dai riquadri resta il nodo dell\'evento');
 });
 
+// #1509 — inserimenti, composizione, incolla e rilascio nati in un riquadro chiuso portavano il testo al sito: si fermano
+// sulla finestra e al campo arriva una copia che resta dentro. Il ponte a document_start ascolta proprio questi tipi.
+test('il ponte di page-preload ascolta tutti e soli gli EVENTI_DEL_RIQUADRO', () => {
+  const sorgente = readFileSync(new URL('../../src/preload/page-preload.js', import.meta.url), 'utf8');
+  const i = sorgente.indexOf('UI.eventoNelRiquadro(e)');
+  assert.ok(i > 0, 'il ponte chiama eventoNelRiquadro');
+  const ciclo = sorgente.slice(sorgente.lastIndexOf('for (const tipo of [', i), i);
+  const tipi = [...ciclo.slice(0, ciclo.indexOf(']')).matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
+  assert.deepEqual([...tipi].sort(), [...UI.EVENTI_DEL_RIQUADRO].sort());
+  for (const t of ['beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'drop', 'textInput']) {
+    assert.ok(UI.EVENTI_DEL_RIQUADRO.includes(t), t);
+  }
+});
+
+test('eventoNelRiquadro(): il vero si ferma e al campo va una copia nostra non composed; il finto si ferma e basta', () => {
+  const prima = globalThis.InputEvent;
+  globalThis.InputEvent = class { constructor(tipo, init) { Object.assign(this, init, { type: tipo, isTrusted: false }); } };
+  try {
+    const arrivate = [];
+    const campo = { dispatchEvent: (ev) => { arrivate.push(ev); ev.defaultPrevented = ev.data === 'annulla'; return true; } };
+    const host = elemento(true);
+    host.attachShadow = () => ({ elementFromPoint: () => null, activeElement: campo });
+    UI.ombra(host);
+    const evento = (extra) => {
+      const e = { type: 'beforeinput', composedPath: () => [host], target: host, cancelable: true, getTargetRanges: () => [], ...extra };
+      e.stopImmediatePropagation = () => { e.fermato = true; };
+      e.preventDefault = () => { e.annullato = true; };
+      return e;
+    };
+    const vero = evento({ isTrusted: true, data: 'segreto', inputType: 'insertText' });
+    UI.eventoNelRiquadro(vero);
+    assert.equal(vero.fermato, true, 'il sito non lo vede');
+    assert.equal(arrivate.length, 1);
+    assert.equal(arrivate[0].data, 'segreto');
+    assert.equal(arrivate[0].inputType, 'insertText');
+    assert.equal(arrivate[0].composed, false, 'la copia non esce dallo shadow');
+    assert.equal(UI.veroONostro(arrivate[0]), true, 'gli ascolti di Filo la accettano');
+    assert.notEqual(vero.annullato, true);
+
+    const annullato = evento({ isTrusted: true, data: 'annulla' });
+    UI.eventoNelRiquadro(annullato);
+    assert.equal(annullato.annullato, true, 'una copia annullata annulla l\'originale');
+
+    const finto = evento({ isTrusted: false, data: 'dal sito' });
+    UI.eventoNelRiquadro(finto);
+    assert.equal(finto.fermato, true);
+    assert.equal(arrivate.length, 2, 'un evento finto non diventa nostro');
+
+    const fuori = evento({ isTrusted: true, composedPath: () => [elemento(true)], data: 'del sito' });
+    UI.eventoNelRiquadro(fuori);
+    assert.notEqual(fuori.fermato, true, 'fuori dai riquadri non si tocca niente');
+
+    const esc = evento({ type: 'keyup', isTrusted: true, key: 'Escape' });
+    UI.eventoNelRiquadro(esc);
+    assert.notEqual(esc.fermato, true, 'l\'Esc resta di tutti');
+  } finally {
+    globalThis.InputEvent = prima;
+  }
+});
+
 test('chiaveDiBozza(): la bozza porta l\'origine del sito; le pagine di Filo tengono la loro; senza origine niente', () => {
   const prima = globalThis.location;
   try {
