@@ -54,18 +54,23 @@
 
   // Le chiavi si riconoscono dal prefisso che il loro emittente ci mette
   // apposta: cercare «stringa lunga e casuale» prenderebbe mezzo web.
+  // Una chiave vera sta in poche centinaia di caratteri: il corpo si legge fino a MAX_TOKEN, e il gruppo dopo dice
+  // che il token prosegue. Lì il testo è costruito apposta e chi controlla un'uscita lo tratta da saturo.
+  const MAX_TOKEN = 1024;
   const FORME_CHIAVE = [
-    /\bsk-[A-Za-z0-9_-]{16,}/,
-    /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}/,
-    /\bgh[pousr]_[A-Za-z0-9]{20,}/,
-    /\bgithub_pat_[A-Za-z0-9_]{20,}/,
-    /\bxox[baprs]-[A-Za-z0-9-]{10,}/,
-    /\bAIza[A-Za-z0-9_-]{20,}/,
-    /\bAKIA[A-Z0-9]{12,}/,
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-    // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
-    new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n(?=[A-Za-z0-9+/])){20,}`),
-  ];
+    ['\\bsk-', '[A-Za-z0-9_-]', 16],
+    ['\\b(?:sk|pk|rk)_(?:live|test)_', '[A-Za-z0-9]', 10],
+    ['\\bgh[pousr]_', '[A-Za-z0-9]', 20],
+    ['\\bgithub_pat_', '[A-Za-z0-9_]', 20],
+    ['\\bxox[baprs]-', '[A-Za-z0-9-]', 10],
+    ['\\bAIza', '[A-Za-z0-9_-]', 20],
+    ['\\bAKIA', '[A-Z0-9]', 12],
+  ].map(([testa, corpo, min]) => new RegExp(`${testa}${corpo}{${min},${MAX_TOKEN}}(${corpo})?`))
+    .concat([
+      /-----BEGIN [A-Z ]{0,64}PRIVATE KEY-----/,
+      // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
+      new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n(?=[A-Za-z0-9+/])){20,}`),
+    ]);
 
   // Il pezzo che ogni chiave dello stesso tipo ha uguale: dice di che tipo è, non quale. Di un JWT lo sono intestazione e
   // dichiarazioni (l'emittente e la chiave di firma sono quelli di tutti): il segreto è la firma.
