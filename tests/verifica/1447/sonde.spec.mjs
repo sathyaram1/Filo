@@ -47,7 +47,9 @@ for (const [nome, html, sel, leggiTesto] of CASI) {
     console.log(nome, 'DOPO SCRITTURA:', JSON.stringify(dopo), 'DOM:', JSON.stringify(await page.locator(sel).innerText()));
     console.log(nome, 'ATTR:', await page.locator(sel).evaluate((el) => el.outerHTML.slice(0, 300) + ' spellcheck=' + el.spellcheck));
     await page.waitForTimeout(1500);
-    console.log(nome, 'SEGNI:', await page.locator('.sn-spell-overlay .sn-errore').count());
+    console.log(nome, 'SEGNI:', await page.locator('.sn-spell-overlay .sn-errore').count(), 'OVERLAY:', await page.locator('.sn-spell-overlay').count());
+    console.log(nome, 'MONDO:', await nelMondoDelMenu(app, page, `(() => { const S = globalThis.SN_SPELLCHECK; const el = document.activeElement; const f = S.findSupportedEditable(el); return JSON.stringify({ f: f && f.id, escl: S.campoEscluso(el), att: S.erroriAttivi(), auto: S.automaticaAttiva(), errori: (S.erroriDaCorreggere(el) || []).length, gesto: typeof globalThis.SN_GESTO }); })()`));
+    console.log(nome, 'ATTIVO:', await page.evaluate(() => document.activeElement && (document.activeElement.id || document.activeElement.className)));
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(300);
     const annullato = await testo();
