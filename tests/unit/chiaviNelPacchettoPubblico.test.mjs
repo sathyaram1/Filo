@@ -187,6 +187,10 @@ test('le regole: un campo in più è rosso e nomina la chiave', () => {
 test('le regole: una chiave fuori dalla mappa apiKeys o dentro una lista è rossa uguale', () => {
   const errori = controllaPacchetto(con((g) => { g.extra = { chiavi: ['k1'] }; g.openrouter = 'or'; return g; }));
   assert.deepEqual(errori.map((e) => e.split(':')[0]).sort(), ['extra.chiavi[0]', 'openrouter']);
+
+  const travestita = controllaPacchetto(con((g) => { g['apiKeys.tavily'] = 'tav-2'; return g; }));
+  assert.equal(travestita.length, 1);
+  assert.match(travestita[0], /^\["apiKeys\.tavily"\]: campo fuori elenco/);
 });
 
 test('le regole: una voce ammessa sparita senza revoca è rossa e nomina la chiave', () => {
