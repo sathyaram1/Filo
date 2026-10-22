@@ -569,21 +569,23 @@
         }
       }
     }
-    return t;
+    return haFinestra(piatto, finestre) ? togliFinestre(t, finestre) : t;
   }
 
   function oscuraSegreti(valore, segreti) {
     const chiavi = [];
+    const finestre = new Set();
     for (const x of Array.isArray(segreti) ? segreti : []) {
       const v = testo(x).trim();
-      const norm = alnumMinuscolo(v);
-      if (v.length < SEGRETO_MIN || norm.length < SEGRETO_MIN) continue;
-      chiavi.push({ v, norm, rov: rovescio(norm), re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
+      const p = partiSegreto(v);
+      if (v.length < SEGRETO_MIN || p.norm.length < SEGRETO_MIN) continue;
+      chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nucleo: p.nucleo, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
+      for (const f of finestreDi(p)) finestre.add(f);
     }
     if (!chiavi.length || valore == null) return valore;
     // Lo stesso oggetto quando non c'è niente da togliere: chi lo riceve non paga una copia.
     const giro = (v, n) => {
-      if (typeof v === 'string') return oscuraTesto(v, chiavi);
+      if (typeof v === 'string') return oscuraTesto(v, chiavi, finestre);
       if (n > 12 || !v || typeof v !== 'object') return v;
       let cambiato = false;
       const o = Array.isArray(v) ? [] : {};
