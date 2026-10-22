@@ -274,6 +274,52 @@ export function richiestaDaLettura(testo) {
   return [pezzo('Titolo'), pezzo('Testo')].filter(Boolean).join('\n\n');
 }
 
+/**
+ * La regola di verify-local start --feedback per il lavoro `num`, col rifiuto già scritto (#1514). Senza credenziali è un
+ * no detto, non un'uscita del processo: l'orchestratore ferma la pratica e prosegue.
+ */
+async function praticaVera(num) {
+  const auth = await import('./lib/firestore-auth.mjs');
+  if (!auth.loadServiceAccount() && !auth.findAdminRefreshToken()) {
+    return { ok: false, motivo: 'nessuna credenziale per leggere la pratica (FILO_ADMIN_REFRESH_TOKEN o service account): non so di chi è' };
+  }
+  const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
+  const { praticaPerLaSessione, rifiutoPratica } = await import('./owner-feedback.mjs');
+  const bearer = await auth.acquireBearer();
+  const r = await risolviFeedback(String(num), { bearer, base: auth.FIRESTORE_BASE });
+  if (!r.ok) return { ok: false, motivo: r.motivo };
+  const l = await praticaPerLaSessione(r.id, { bearer });
+  return l.ok ? { ok: true, fiducia: l.fiducia, id: r.id } : { ...l, motivo: rifiutoPratica(r.id, l) };
+}
+
+/**
+ * Mette in coda i lavori `nums` nello stato `s`, che modifica: prima di tutto di chi è la pratica (#1514), e un rifiuto
+ * la lascia fuori. Un ramo già di un altro lavoro scelto con --slug è un errore. → { righe, rifiutate }.
+ */
+export async function aggiungiInCoda(s, nums, opz, { praticaDi, ora = '' }) {
+  const righe = [];
+  const rifiutate = [];
+  for (const n of nums) {
+    if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { righe.push(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
+    // Due lavori aperti sullo stesso ramo dividerebbero worktree, verifica e fusione.
+    const di = (slug) => Object.values(s.pratiche).find((q) => q && q.num !== n && q.fase !== 'fuso' && q.slug === slug);
+    let slug = opz.slug || '';
+    if (slug && di(slug)) throw new Error(`il ramo claude/${slug} è già del lavoro #${di(slug).num}: scegli un altro --slug`);
+    let r;
+    try { r = await praticaDi(n); } catch (e) { r = { ok: false, motivo: String((e && e.message) || e) }; }
+    if (!r || !r.ok) {
+      rifiutate.push(n);
+      righe.push(`#${n} non messo in coda:\n${(r && r.motivo) || 'pratica non controllata'}`);
+      continue;
+    }
+    if (!slug) for (let k = 1; !slug || di(slug); k += 1) slug = k === 1 ? slugDi(n) : `${slugDi(n)}-${k}`;
+    s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: opz.richiesta, file: opz.file, ora });
+    s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
+    righe.push(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
+  }
+  return { righe, rifiutate };
+}
+
 function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
   return new Promise((ok) => {
     const bin = cmd === 'node' ? process.execPath : cmd;
@@ -412,6 +458,7 @@ function depVere(P, opz, log) {
       return annotaPratica(id, testo);
     },
     richiestaDi: async (num) => richiestaDaLettura((await esegui('node', ['scripts/leggi-feedback.mjs', String(num)], { cwd: ROOT })).stdout),
+    praticaDi: praticaVera,
   };
 }
 
@@ -460,6 +507,7 @@ function depAVuoto(P, stato, log) {
     },
     annota: async () => {},
     richiestaDi: async (num) => `(la richiesta del feedback #${num})`,
+    praticaDi: async (num) => { log(`[a vuoto] controllo di chi è la pratica #${num}: la prova la dà per lavorabile`); return { ok: true, fiducia: 'fidato' }; },
   };
 }
 
@@ -490,19 +538,10 @@ async function main(argv) {
     if (!nums.length) throw erroreDiUso('aggiungi vuole almeno un numero di feedback');
     if (nums.length > 1 && (opz.slug || opz.richiesta)) throw erroreDiUso('aggiungi: --slug e --richiesta valgono per un lavoro solo');
     const s = store.leggi();
-    for (const n of nums) {
-      if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { console.log(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
-      // Due lavori aperti sullo stesso ramo dividerebbero worktree, verifica e fusione.
-      const di = (slug) => Object.values(s.pratiche).find((q) => q && q.num !== n && q.fase !== 'fuso' && q.slug === slug);
-      let slug = opz.slug || '';
-      if (slug && di(slug)) throw new Error(`il ramo claude/${slug} è già del lavoro #${di(slug).num}: scegli un altro --slug`);
-      if (!slug) for (let k = 1; !slug || di(slug); k += 1) slug = k === 1 ? slugDi(n) : `${slugDi(n)}-${k}`;
-      s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: opz.richiesta, file: opz.file, ora: ora() });
-      s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
-      console.log(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
-    }
+    const { righe, rifiutate } = await aggiungiInCoda(s, nums, opz, { praticaDi: praticaVera, ora: ora() });
     store.scrivi(s);
-    return 0;
+    for (const r of righe) (/ non messo in coda:/.test(r) ? console.error : console.log)(r);
+    return rifiutate.length ? 1 : 0;
   }
 
   // Il pid dell'orchestratore vivo, 0 se nessuno: un lavoro rimasto a metà da uno chiuso non lo guida più nessuno.
