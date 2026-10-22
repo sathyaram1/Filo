@@ -289,7 +289,10 @@
     window.addEventListener('blur', () => { premuto = false; });
     window.addEventListener('message', suMessaggio);
     // Tornando sulla pagina (finestra ridotta a icona e riaperta) si riprova subito, anche dove i tentativi erano finiti.
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') riprova(); });
+    document.addEventListener('visibilitychange', () => {
+      vegliaNascosta();
+      if (document.visibilityState === 'visible') riprova();
+    });
     chrome.runtime.onMessage.addListener((m) => {
       if (m && m.type === T_UPDATE) carica();
       else if (m && m.type === T_WHERE && typeof m.id === 'string') send({ type: T_HERE, id: m.id, ...dove(m) });
