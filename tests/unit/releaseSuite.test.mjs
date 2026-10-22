@@ -228,7 +228,8 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob]]) {
         assert.doesNotMatch(testo, /secrets\.|environment:/, `\`${nome}\` fa girare il codice provato: niente segreti né ambiente`);
       }
-      assert.doesNotMatch(avvisoJob, /npm-ci-ritenta|npm (ci|install)\b|npx /, 'in `avviso` niente installazione: lo stesso lavoro che legge la parola non esegue dipendenze');
+      assert.doesNotMatch(avvisoJob, /npm-ci-ritenta|^\s*(?:run:\s*)?(?:npm|npx|yarn|pnpm)\s/m,
+        'in `avviso` niente installazione: lo stesso lavoro che legge la parola non esegue dipendenze');
       assert.match(allarme.corpo, /PARTI_ESITO:\s*\$\{\{\s*needs\.suite\.result\s*\}\}/, 'l\'allarme deve sapere se una parte è rossa fuori dalla suite');
     });
 
