@@ -168,12 +168,11 @@ test('«Salva immagine come» salva col nome vero, senza caratteri che capovolgo
     expect(readdirSync(dir).filter((n) => /[​-‏‪-‮⁦-⁩]/.test(n))).toEqual([]);
 
     // La voce nella barra dice lo stesso nome del file su disco.
-    const voce = await expect.poll(async () => {
+    await expect.poll(async () => {
       const r = await shell.evaluate(() => window.filoShell.downloads.list());
       const v = ((r && r.items) || []).find((it) => it.url === imgUrl);
       return v && v.state === 'completed' ? { filename: v.filename, savePath: v.savePath } : null;
     }, { timeout: 10000 }).toEqual({ filename: 'ricordogpj.png', savePath: file });
-    void voce;
 
     if (process.platform === 'win32') {
       const marca = readFileSync(`${file}:Zone.Identifier`, 'utf8');
