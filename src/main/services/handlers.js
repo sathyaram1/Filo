@@ -5860,8 +5860,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         rawActions.push(a);
         // Fermata (#810): l'archivio la salva come tale.
         if (res.output && res.output.blocked === 'segreto') a._output = res.output;
-        // Contiene la home con il nome utente: serve solo al gate, non alla chat.
+        // Contengono la home con il nome utente: servono solo al gate, non alla chat.
         delete a._perimetro;
+        delete a._cartella;
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
