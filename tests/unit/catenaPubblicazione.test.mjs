@@ -16,16 +16,15 @@ const WORKFLOW = readdirSync(CARTELLA)
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 
 const AMBIENTE = 'rilascio';
-// Su un ramo l'ambiente respingerebbe il job: chi lavora anche sui rami lo dichiara solo su main.
-const AMBIENTE_SOLO_MAIN = "${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}";
-const SU_MAIN = "github.ref == 'refs/heads/main'";
 
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
 
+/** I segreti che un testo nomina, GITHUB_TOKEN escluso; anche quelli passati in blocco (`toJSON(secrets)`, `secrets: inherit`). */
 function segreti(testo) {
-  return [...senzaCommenti(testo).matchAll(/secrets\.([A-Za-z_][A-Za-z0-9_]*)/g)]
-    .map((m) => m[1])
-    .filter((n) => n !== 'GITHUB_TOKEN');
+  const righe = senzaCommenti(testo);
+  const nomi = [...righe.matchAll(/secrets\.([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]).filter((n) => n !== 'GITHUB_TOKEN');
+  if (/secrets\s*\[|toJSON\(\s*secrets\s*\)|^\s*secrets:\s*inherit\b/m.test(righe)) nomi.push('(tutti)');
+  return nomi;
 }
 
 function jobs(testo) {
