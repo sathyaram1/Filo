@@ -2244,6 +2244,7 @@ function fraseNo(ing, decisione, sender) {
     regola: decisione.regola, elenco: ing.elenco, segreto: ing.segreto, dove: ing.dove,
     fonte: decisione.stato && decisione.stato.fonte, livello: decisione.livello,
     daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
+    nuovaUguale: !!decisione.nuovaUguale,
   });
 }
 
