@@ -3520,6 +3520,13 @@
           n.textContent = parti[parti.length - 1];
           log.appendChild(n);
         }
+        const taglio = noteTaglio.get(msg);
+        if (taglio) {
+          const n = document.createElement('div');
+          n.className = 'ed-chat-note';
+          n.textContent = taglio;
+          log.appendChild(n);
+        }
         const nota = noteRipiego.get(msg);
         if (nota) {
           const n = document.createElement('div');
