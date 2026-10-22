@@ -39,6 +39,9 @@ for (const [nome, html, sel, leggiTesto] of CASI) {
     await page.waitForTimeout(400);
     const dopo = await testo();
     console.log(nome, 'DOPO SCRITTURA:', JSON.stringify(dopo), 'DOM:', JSON.stringify(await page.locator(sel).innerText()));
+    console.log(nome, 'ATTR:', await page.locator(sel).evaluate((el) => el.outerHTML.slice(0, 300) + ' spellcheck=' + el.spellcheck));
+    await page.waitForTimeout(1500);
+    console.log(nome, 'SEGNI:', await page.locator('.sn-spell-overlay .sn-errore').count());
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(300);
     const annullato = await testo();
