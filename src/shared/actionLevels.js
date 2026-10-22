@@ -476,8 +476,9 @@
           ? { classe: 5, campo: 'web', chiave: 'visitate:riassunti', motivo: 'ho letto il riassunto di una pagina che avevi aperto, fatto col testo del sito' }
           : { classe: 3, campo: 'web', chiave: 'visitate:titoli', motivo: 'ho letto i titoli delle pagine che hai visitato, scritti dai siti' };
         const c = Number(out.classeLetta);
+        // Quelle del tratto le ha davanti anche una conversazione nuova: `ereditata` toglie quella strada dal «no».
         const risposte = Number.isInteger(c) && c > 1 && c <= 5
-          ? { classe: c, campo: null, chiave: 'filo:altra-chat', motivo: c === 2 ? 'ho riletto risposte di altre conversazioni nate dai tuoi file' : 'ho riletto risposte di altre conversazioni nate da testo scritto da altri' }
+          ? { classe: c, campo: null, chiave: 'filo:altra-chat', motivo: c === 2 ? 'ho riletto risposte di altre conversazioni nate dai tuoi file' : 'ho riletto risposte di altre conversazioni nate da testo scritto da altri', ...(out.tratto ? { ereditata: true } : {}) }
           : null;
         return viste && (!risposte || viste.classe >= risposte.classe) ? viste : risposte;
       },
