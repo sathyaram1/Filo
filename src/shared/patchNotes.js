@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.246', date: '2026-10-22',
+      features: [],
+      fixes: [
+        'Quando rifai o riprendi l\'intervista di benvenuto, Filo non ti tratta più come appena arrivato e resta su quello che vi dite, senza tirare in ballo cose delle conversazioni passate.',
+      ],
+    },
+    {
       version: '0.2.245', date: '2026-10-22',
       features: [],
       fixes: [
