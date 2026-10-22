@@ -1,27 +1,6 @@
-// Gestione cookie / consenso (processo main).
-//
-// Un solo interruttore a 3 stati (settings.security.cookies.mode):
-//   - 'manual'  → nessuna gestione automatica.
-//   - 'default' → "Automatico": GPC + rifiuto CMP + YouTube nocookie (content
-//                 script) + BLOCCO a monte dei tracker noti (Google Analytics,
-//                 ad network, social pixel…). I cookie funzionali/di prima parte
-//                 (login, preferenze, le tue scelte) NON vengono cancellati: le
-//                 tue scelte restano. All'uscita ripulisce solo eventuali cookie
-//                 di domini-tracker rimasti.
-//   - 'privacy' → come default + ogni sito ha un cookie jar isolato ed effimero
-//                 (partizione Electron dedicata, senza 'persist:'). I "siti
-//                 fidati" (trustedSites) ricevono invece una partizione isolata
-//                 ma PERSISTENTE ('persist:filo-priv-…'), così resti connesso
-//                 anche in Privacy senza rinunciare all'isolamento per-sito.
-//
-// Questo modulo si occupa SOLO della parte main-process:
-//   - emette l'header Sec-GPC: 1 sulle sessioni (onBeforeSendHeaders);
-//   - blocca le richieste ai tracker noti (onBeforeRequest);
-//   - risolve la sessione/partizione per ogni navigazione top-level;
-//   - ripulisce i cookie dei tracker (wipe mirato, modalità 'default').
-// Il rifiuto dei banner CMP e la riscrittura degli embed YouTube vivono nel
-// content script src/content/cookies.js. L'iniezione di
-// navigator.globalPrivacyControl avviene in tabs.js (mondo della pagina).
+// Cookie e consenso, lato main: GPC, blocco dei tracker, partizione per sito, wipe mirato.
+// Modalità in settings.security.cookies.mode: manual, default, privacy.
+// Banner CMP ed embed YouTube stanno in src/content/cookies.js; l'iniezione GPC in tabs.js.
 
 'use strict';
 
@@ -31,21 +10,9 @@ const Google = require('../../shared/dominiGoogle');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
-// ─── lista tracker (curata) ────────────────────────────────────────────────
-//
-// Domini/host di tracciamento noti. Bloccare la RICHIESTA verso questi host
-// impedisce allo script di tracciamento di caricarsi del tutto: niente cookie
-// (es. il _ga di Google Analytics non viene mai creato perché googletagmanager
-// non si scarica), niente dati inviati. È più efficace del cancellare il cookie
-// dopo: lo intercetta a monte.
-//
-// REGOLA: includere solo host DEDICATI al tracciamento. Mai domini "buoni" come
-// google.com o facebook.com, altrimenti si bloccherebbe il sito intero. Per i
-// servizi che vivono su un dominio legittimo si elenca l'host specifico
-// (es. 'analytics.google.com', non 'google.com'). Il match è per host:
-// host === voce  oppure  host che termina con '.' + voce.
+// Solo host DEDICATI al tracciamento: un dominio buono (google.com) blocca il sito intero.
+// Bloccare la richiesta batte cancellare: lo script non si carica e il cookie non nasce.
 const TRACKER_HOSTS = [
-  // Google: analytics, tag manager, ads (host/dominî dedicati)
   'google-analytics.com',
   'analytics.google.com',
   'googletagmanager.com',
@@ -54,7 +21,6 @@ const TRACKER_HOSTS = [
   'googleadservices.com',
   'doubleclick.net',
   'adservice.google.com',
-  // Social pixel / insight tag (host dedicati; i domini base restano leciti)
   'connect.facebook.net',
   'analytics.tiktok.com',
   'static.ads-twitter.com',
@@ -62,7 +28,6 @@ const TRACKER_HOSTS = [
   'px.ads.linkedin.com',
   'snap.licdn.com',
   'ct.pinterest.com',
-  // Analytics / heatmap / session replay di terze parti
   'hotjar.com',
   'mixpanel.com',
   'mxpnl.com',
@@ -75,7 +40,6 @@ const TRACKER_HOSTS = [
   'scorecardresearch.com',
   'quantserve.com',
   'quantcount.com',
-  // Ad network / RTB
   'adnxs.com',
   'criteo.com',
   'criteo.net',
@@ -91,7 +55,6 @@ function hostnameOf(url) {
   try { return new URL(url).hostname.toLowerCase(); } catch (_) { return ''; }
 }
 
-// true se l'host è (o è un sottodominio di) un host-tracker noto.
 function isTrackerHost(host) {
   if (!host) return false;
   host = String(host).toLowerCase().replace(/^\./, '');
@@ -207,17 +170,12 @@ function sessioneEffimera(site) {
   return siteSessions.get(partitionForSite(site, false)) || null;
 }
 
-// ─── GPC: header Sec-GPC: 1 ───────────────────────────────────────────────
-//
-// Una sola registrazione onBeforeSendHeaders per sessione (Electron consente un
-// solo listener per evento/sessione: una seconda registrazione SOSTITUISCE la
-// prima). Emette l'header Sec-GPC: 1, gated dal flag enabled nella mappa
-// (accendi/spegni senza ri-registrare).
+// Electron ammette un solo onBeforeSendHeaders per sessione: una seconda registrazione
+// sostituisce la prima, quindi si registra una volta e si accende col flag nella mappa.
 
 const gpcState = new WeakMap(); // session → { enabled }
 
-// Registra (se manca) l'unico listener onBeforeSendHeaders della sessione,
-// SENZA toccare lo stato GPC.
+// Registra il listener se manca, SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
   if (!ses || !ses.webRequest) return null;
   let state = gpcState.get(ses);
@@ -325,14 +283,10 @@ function coverAdblock(ses) {
   if (state) state.filtri = true;
 }
 
-// ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
-
 const { registerFiloProtocolForSession } = require('../protocol');
 
 const siteSessions = new Map(); // partition name → session
 
-// Ritorna (creando se serve) la sessione effimera/persistente per la partizione
-// data, registrandovi il protocollo filo:// e applicando GPC + blocco tracker.
 function ensureSiteSession(partition, { gpc } = {}) {
   let ses = siteSessions.get(partition);
   if (!ses) {
@@ -346,10 +300,8 @@ function ensureSiteSession(partition, { gpc } = {}) {
   }
   const on = gpc !== false;
   applyGpc(ses, on);
-  // applyTrackerBlocking registra l'UNICO onBeforeRequest che copre sia il
-  // blocco tracker sia il motore ad-blocking (vedi la nota lì): così anche i
-  // jar per-sito della modalità privacy ricevono l'ad-blocking, non solo la
-  // sessione di default.
+  // L'unico onBeforeRequest copre anche l'ad-blocking: così lo ricevono pure i jar per-sito
+  // della modalità privacy, non solo la sessione di default.
   applyTrackerBlocking(ses, on);
   return ses;
 }
@@ -597,12 +549,8 @@ function partitionForTab(url, { mode, incognito, trusted } = {}) {
   return { partition };
 }
 
-// ─── configurazione globale (GPC + blocco tracker) ─────────────────────────
-
-// Applica GPC e blocco tracker alla sessione di default in base alla modalità.
-// Chiamato all'avvio e a ogni UPDATE_SETTINGS. Le sessioni per-sito ricevono lo
-// stesso trattamento quando vengono create (ensureSiteSession). In manual tutto
-// è spento.
+// Chiamato all'avvio e a ogni UPDATE_SETTINGS; le sessioni per-sito ricevono lo stesso
+// trattamento alla creazione. In manual tutto è spento.
 function configureForMode(mode) {
   const on = mode !== MODES.MANUAL;
   applyGpc(session.defaultSession, on);
@@ -758,14 +706,8 @@ function wipeOnExit() {
   return wipeTrackerCookies({ security: { cookies: _cached } });
 }
 
-// ─── wipe mirato dei cookie-tracker (modalità default) ──────────────────────
-//
-// In 'default' (Automatico) NON cancelliamo i cookie funzionali: le scelte e i
-// login dell'utente devono restare. Ripuliamo solo eventuali cookie il cui
-// dominio è un tracker noto (per lo più già bloccati a monte, ma possono essere
-// rimasti da prima di attivare l'Automatico o da una sessione precedente). In
-// 'privacy' le sessioni sono effimere e non serve. In 'manual' non tocchiamo
-// nulla.
+// In 'default' i cookie funzionali restano (login e scelte dell'utente): si ripuliscono solo
+// quelli di dominio tracker. In privacy le sessioni sono effimere, in manual non si tocca.
 async function wipeTrackerCookies(settings) {
   if (getMode(settings) !== MODES.DEFAULT) return { removed: 0, skipped: true };
   const ses = session.defaultSession;

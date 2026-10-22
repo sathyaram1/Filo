@@ -1232,9 +1232,7 @@
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(Math.round(Number(n) || 0));
   }
-  // Crediti con al più un decimale: mostra "137" per un valore intero e "0,3"
-  // per una frazione, così un consumo sotto il credito resta visibile invece di
-  // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
+  // Al più un decimale: un consumo sotto il credito deve restare visibile, non sparire a zero.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);

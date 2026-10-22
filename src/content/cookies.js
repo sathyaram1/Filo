@@ -35,8 +35,6 @@
   let lastActionAt = 0;
   const reported = new Set();
 
-  // ─── util ──────────────────────────────────────────────────────────────────
-
   function isVisible(el) {
     if (!el) return false;
     try {
@@ -753,8 +751,6 @@
       if (active && !f.__filoNocookie) watchSrc(f);
     }
   }
-
-  // ─── scan + observer ────────────────────────────────────────────────────────
 
   let scanScheduled = false;
   let scanLater = null;

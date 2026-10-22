@@ -52,14 +52,12 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
   }
 
-  // Ultimi parametri del server (euro per credito, cambio, quota): servono a
-  // scalare i crediti nelle righe del registro e a comporre i messaggi.
+  // Ultimi parametri del server: servono a scalare i crediti nelle righe del registro e a
+  // comporre i messaggi.
   let lastServer = null;
 
-  // ── Callable ──────────────────────────────────────────────────────────────
-  // `asOwner`: le funzioni riservate all'owner vogliono il token dell'account
-  // Google (è lì che sta l'email nella allowlist admin); tutto il resto usa
-  // l'identità dell'installazione.
+  // `asOwner`: le funzioni riservate vogliono il token Google, dov'è l'email in allowlist;
+  // tutto il resto usa l'identità dell'installazione.
   async function callable(name, data = {}, { asOwner = false } = {}) {
     const idToken = asOwner ? await auth.getIdToken() : await identity.getIdToken();
     if (!idToken) throw new Error(asOwner ? 'not_signed_in' : 'no_identity');
@@ -79,10 +77,8 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  // Da dove viene la chiave OpenRouter che parte davvero: 'own' (scritta
-  // dall'utente), 'personal' (creata dal server), 'factory' (incastonata,
-  // solo installazioni vecchie), 'none'. Lo legge la pagina Crediti e lo
-  // usano i test.
+  // Da dove viene la chiave che parte davvero: 'own' dell'utente, 'personal' dal server,
+  // 'factory' incastonata, 'none'.
   async function keySource() {
     try {
       const s = await ctx.getEffectiveSettings();
@@ -272,8 +268,7 @@ module.exports = function register(on, ctx) {
       out.identity.unreadable = e && e.code === 'identity_unreadable';
       out.identity.unreachable = e && e.code === 'servizio_non_raggiungibile';
       out.identity.offline = e && e.code === 'offline';
-      // Offline (o identità che non si rinnova) con la chiave personale qui:
-      // l'ultimo stato letto vale anche adesso. Il campo dell'invito e il
+      // Offline con la chiave personale qui: vale l'ultimo stato letto — il campo dell'invito e un
       // saldo locale a chi ha già il portafoglio sarebbero due bugie.
       const cached = out.hasPersonalKey && !out.identity.lost ? walletStore.lastServer() : null;
       if (cached && cached.hasWallet) out.server = { ...cached, stale: true, cached: true };
@@ -291,9 +286,7 @@ module.exports = function register(on, ctx) {
       }
     } catch (e) {
       out.error = /callable \w+ 5\d\d|fetch failed|ENOTFOUND|ECONN/i.test(String(e?.message || e)) ? 'not_reachable' : String(e?.message || e);
-      // Server muto ma chiave personale qui: si mostra l'ultimo stato letto,
-      // dichiarato vecchio. Il campo dell'invito e il saldo locale a chi ha
-      // già il portafoglio sarebbero due bugie.
+      // Server muto ma chiave personale qui: si mostra l'ultimo stato letto, dichiarato vecchio.
       const cached = out.hasPersonalKey ? walletStore.lastServer() : null;
       if (cached && cached.hasWallet) {
         out.server = { ...cached, stale: true, cached: true };
@@ -396,9 +389,8 @@ module.exports = function register(on, ctx) {
     return { ok: true, state: await readState() };
   }));
 
-  // L'identità dell'installazione non si crea (provider anonimo spento su
-  // Firebase, rete assente): è un problema diverso da «il server dei crediti
-  // non risponde», e il messaggio deve dirlo, non mandare a guardare la rete.
+  // L'identità dell'installazione che non si crea è un problema diverso da «il server non
+  // risponde»: il messaggio deve dirlo, invece di mandare a guardare la rete.
   async function identityProblem() {
     try { await identity.getIdToken(); return null; } catch (e) {
       return `Non riesco a preparare l'identità di questa installazione: ${String(e?.message || e)}.`;

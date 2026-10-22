@@ -1,12 +1,6 @@
-// Pagina Crediti del profilo: saldo corrente, grafico a torta del consumo per
-// TIPO D'USO (non per modello) e movimenti recenti. Il costo in € non viene MAI
-// mostrato — la vista pubblica del motore crediti (publicView) lo elimina già a
-// monte. Vedi src/main/services/creditStore.js + handlers/credits.js.
-//
-// Crediti sul server (#598): se questa installazione ha un portafoglio, il
-// saldo grande è quello che dice il server (tetto della chiave OpenRouter
-// personale meno consumo), non il conteggio locale. Se non lo ha, in cima c'è
-// il campo per riscattare un codice d'invito. Sotto, i propri codici da dare.
+// Pagina Crediti: saldo, torta del consumo per tipo d'uso e movimenti recenti.
+// Il costo in € non si mostra MAI: la vista pubblica del motore crediti lo toglie a monte.
+// Col portafoglio sul server (#598) il saldo grande è quello del server, non il locale.
 
 (function () {
   'use strict';
@@ -17,9 +11,8 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Palette delle fette: scelta a mano per restare distinguibile su tema chiaro
-  // e scuro. Le fette ciclano su questi colori nell'ordine (decrescente) della
-  // legenda, così colore↔etichetta combaciano tra torta e legenda.
+  // Palette scelta a mano per restare distinguibile su chiaro e scuro; le fette seguono
+  // l'ordine della legenda, così colore ed etichetta combaciano.
   const PALETTE = ['#c45a3b', '#3b82c4', '#3bbf7a', '#c9a13b',
     '#8a4fc4', '#c43b87', '#3bbdc4', '#7d8a3b'];
 
@@ -112,10 +105,8 @@
 
   function render(r, w) {
     const credits = r.credits || {};
-    // Saldo con precisione fino a 1 decimale: un uso leggero consuma frazioni di
-    // credito, e arrotondare all'intero le nasconderebbe (il saldo resterebbe
-    // fermo a 1000 pur avendo l'utente usato Filo). balanceExact conserva la
-    // frazione; ripiego su balance per retrocompatibilità.
+    // Saldo a un decimale: un uso leggero consuma frazioni di credito e l'intero le
+    // nasconderebbe. balanceExact conserva la frazione, `balance` è il ripiego.
     const bal = credits.balanceExact != null ? credits.balanceExact : (credits.balance || 0);
     $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
@@ -126,12 +117,8 @@
     renderMoves(credits.rewards || [], w);
   }
 
-  // ── Crediti sul server (#598) ──────────────────────────────────────────────
-  // Una conferma (riscatto riuscito, nuova chiave) deve restare leggibile: nello
-  // stesso istante arriva l'avviso di saldo cambiato e la pagina si ridisegna da
-  // sola, e un ridisegno che nasconde la nota cancellava la frase prima che
-  // l'utente la leggesse (primo giro di verifica del ramo -b). La conferma vive
-  // qui e vince su ogni ridisegno finché l'utente non fa un'altra azione.
+  // Una conferma deve restare leggibile: l'avviso di saldo cambiato arriva nello stesso
+  // istante e il ridisegno cancellava la frase. La conferma vince finché non si fa altro.
   let confirmation = null;
   function showConfirmation(text) {
     confirmation = text || null;
@@ -647,8 +634,7 @@
       // Il modulo dell'invito sparisce col portafoglio: la frase (coi crediti
       // d'ingresso) resta nella nota, fuori dal modulo.
       showConfirmation(r.message || 'Fatto.');
-      // Il saldo grande e i codici arrivano dallo stato nuovo. La vista owner
-      // sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
+      // La vista owner sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
       return;
     }
@@ -659,12 +645,8 @@
   }
 
   function renderUsage(byUsage) {
-    // Solo i gruppi con consumo > 0, in ordine decrescente. NON arrotondare
-    // all'intero: il motore fornisce già i crediti per gruppo con precisione al
-    // decimo (round1 in publicView), apposta per non perdere il consumo sotto
-    // il credito. Arrotondando qui, un uso leggero (frazioni di credito per
-    // gruppo) sparirebbe dalla torta e la pagina direbbe "non hai ancora
-    // consumato crediti" pur avendo l'utente usato Filo.
+    // Solo i gruppi con consumo > 0, e NON arrotondati all'intero: il motore dà i crediti al
+    // decimo, e un uso leggero sparirebbe dalla torta come «non hai consumato».
     const groups = Object.entries(byUsage)
       .map(([label, v]) => ({ label, credits: (v && v.credits) || 0, calls: (v && v.calls) || 0 }))
       .filter((g) => g.credits > 0)
@@ -680,9 +662,8 @@
     drawLegend(groups);
   }
 
-  // Disegna la torta come un <path> per fetta (data-group = nome del gruppo) così
-  // un test può asserire le fette attese. Con un solo gruppo disegna un cerchio
-  // pieno (l'arco da 0 a 2π collasserebbe).
+  // Un <path> per fetta (data-group) così un test può asserirle. Con un solo gruppo un
+  // cerchio pieno: l'arco da 0 a 2π collasserebbe.
   function drawChart(groups, total) {
     const chart = $('chart');
     chart.innerHTML = '';

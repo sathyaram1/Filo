@@ -1,5 +1,5 @@
-// Handler di dominio: richieste AI one-shot, sintesi vocale, test dei
-// provider/modelli dalle Opzioni, ricerca web e raccolta dei path "Aiuto".
+// Handler di dominio AI: richieste one-shot, sintesi vocale, prove dei modelli dalle
+// Opzioni, ricerca web e raccolta dei percorsi «Aiuto».
 
 module.exports = function register(on, ctx) {
   const {
@@ -11,9 +11,8 @@ module.exports = function register(on, ctx) {
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
 
-  // Cache in-memoria dell'audio TTS: rileggere lo stesso testo (stessa voce,
-  // stesso modello) torna istantaneo invece di rifare la chiamata lenta al
-  // modello. Vive per tutta la sessione dell'app. Vedi src/shared/ttsCache.js.
+  // Cache audio in memoria: rileggere lo stesso testo con la stessa voce e lo stesso modello
+  // è istantaneo invece di rifare la chiamata lenta. Dura quanto la sessione.
   const crypto = require('node:crypto');
   const ttsCache = globalThis.SN_TTS_CACHE
     ? globalThis.SN_TTS_CACHE.createTtsCache({ maxBytes: 64 * 1024 * 1024 })
@@ -21,14 +20,8 @@ module.exports = function register(on, ctx) {
   const ttsKey = (model, voice, text) =>
     crypto.createHash('sha1').update(`${model}\u0000${voice}\u0000${text}`).digest('hex');
 
-  // ─── Stato globale "sta leggendo" (TTS) ───────────────────────────────────
-  // Una lettura ad alta voce vive nel content script della scheda dove è partita
-  // (l'<audio> suona lì). Perché "Interrompi lettura" compaia anche nei menu
-  // delle ALTRE schede, il main fa da fonte di verità condivisa: ogni scheda che
-  // legge segnala reading:true/false, il main tiene il set delle schede che
-  // leggono e ribroadcast TTS_GLOBAL_READING { active } a tutte. Lo stop globale
-  // (TTS_STOP_READING) viene inoltrato come TTS_STOP a tutte le schede: solo
-  // quella che legge davvero ha qualcosa da fermare.
+  // Una lettura vive nel content script della scheda dov'è partita: il main tiene il set di
+  // chi legge e ribroadcast, o «Interrompi lettura» non comparirebbe nelle altre schede.
   const readingWcs = new Set();      // id dei webContents attualmente in lettura
   const readingCleanups = new Map(); // id → funzione che stacca i listener
   let lastGlobalReading = false;
@@ -51,8 +44,8 @@ module.exports = function register(on, ctx) {
     if (reading) {
       if (!readingWcs.has(id)) {
         readingWcs.add(id);
-        // Se la scheda che legge viene chiusa o naviga altrove, l'<audio> muore
-        // ma il "reading:false" potrebbe non arrivare mai: ripuliamo noi.
+        // Se la scheda che legge si chiude o naviga, l'audio muore ma il «reading:false» può non
+        // arrivare mai: si ripulisce qui.
         const onNav = (_e, _url, isInPlace, isMainFrame) => { if (isMainFrame) clearReading(id); };
         const onGone = () => clearReading(id);
         try { wc.on('did-start-navigation', onNav); } catch (_) {}
@@ -78,9 +71,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.TTS_STOP_READING, async () => {
-    // Inoltra lo stop a tutte le schede; quella che legge si ferma e poi segnala
-    // reading:false (che azzera lo stato globale). Azzeriamo anche subito qui per
-    // reattività: il flag tornerà comunque coerente al prossimo report.
+    // Azzerato subito per reattività: il flag torna coerente al prossimo report.
     broadcastToTabs({ type: MSG.TTS_STOP });
     return { ok: true };
   });
@@ -319,9 +310,8 @@ module.exports = function register(on, ctx) {
   // una volta (firstFallback:true), un motivo DIVERSO sì (#713: altro modello escluso). Si riarma a ogni sintesi riuscita.
   let ttsFallbackAnnounced = '';
 
-  // Voci che il router ha DICHIARATO per un modello che non è nei cataloghi
-  // ("Unknown voice … Supported voices: a, b, c"): dalla seconda richiesta in
-  // poi valgono come catalogo, senza pagare un altro 400. Per sessione.
+  // Voci che il router ha dichiarato in un errore, per i modelli fuori dai cataloghi noti:
+  // dalla seconda richiesta valgono come catalogo, senza pagare un altro 400.
   const learnedVoices = new Map(); // modelId → [voce, …]
 
   // Sintesi con recupero della voce: se il router rifiuta la voce elencando
@@ -352,9 +342,7 @@ module.exports = function register(on, ctx) {
         err.code = 'TTS_VOICE_REQUIRED';
         throw err;
       }
-      // Un nome scritto a mano (non è in nessun catalogo) che il modello
-      // rifiuta con un 400: è un errore di battitura, non un guasto. Dirlo
-      // evita di far cercare un problema di rete.
+      // Un nome scritto a mano rifiutato con un 400 è un refuso, non un guasto: va detto così.
       const handWritten = voice && Voices && !Voices.isKnownVoice(voice, model)
         && !(learnedVoices.get(model) || []).includes(voice);
       // Il 400 si legge dallo status o, se manca, dal testo dell'errore.
@@ -394,14 +382,8 @@ module.exports = function register(on, ctx) {
     // Speech). `msg.lang` è la lingua del testo (la dichiara la pagina) e
     // sceglie la voce, salvo una voce scelta a mano in Preferenze.
 
-    // Seam di test OPT-IN: nel CI headless non esiste né una chiave Gemini né un
-    // motore vocale del sistema, quindi nessuna lettura potrebbe mai partire
-    // davvero. Quando un test attiva esplicitamente `globalThis.__filoTestTtsCanned`
-    // (via app.evaluate), ritorniamo qualche secondo di PCM silenzioso così il
-    // content script riproduce un <audio> reale e lo stato "sta leggendo"
-    // (ttsBusy) diventa verificabile in modo deterministico. È OPT-IN per non
-    // alterare i test che verificano il degrado senza chiave (fallback voce
-    // browser): quelli non settano il flag e ricevono { ok:false } come in prod.
+    // Seam di test OPT-IN: nel CI headless non c'è né chiave né motore vocale, quindi si torna
+    // PCM silenzioso. Opt-in per non alterare i test del degrado senza chiave.
     if (process.env.NODE_ENV === 'test' && globalThis.__filoTestTtsCanned) {
       const rate = 8000, seconds = 6;
       const audioBase64 = Buffer.alloc(rate * seconds * 2).toString('base64'); // PCM16 mono
@@ -418,16 +400,13 @@ module.exports = function register(on, ctx) {
         attempts = buildAttemptChain(settings, model, SN_CONST.ACTIONS.TTS);
         await modelGate.ensureUnderLimit(settings);
       } catch (e) {
-        // Nessun modello di sintesi vocale configurato (o la scorciatoia citata
-        // non esiste): si legge con la voce del browser, ma il motivo VERO viene
-        // passato al content script così l'avviso dice cosa manca invece di un
-        // codice interno.
+        // Nessun modello di sintesi configurato: si legge col browser, ma il motivo vero passa al
+        // content script, così l'avviso dice cosa manca invece di un codice interno.
         return ttsFallback(e?.message || 'no_tts_model', e?.code);
       }
       const Voices = globalThis.SN_TTS_VOICES;
       const ttsPrefs = (settings && settings.tts) || {};
-      // Voce: quella scelta in Preferenze se c'è, altrimenti quella della
-      // lingua del testo; se la pagina non la dichiara, la lingua dell'app.
+      // Voce: quella delle Preferenze, altrimenti la lingua del testo, altrimenti quella dell'app.
       const chosen = String(msg.voice || ttsPrefs.modelVoice || '').trim();
       let locale = '';
       try { locale = require('electron').app.getLocale(); } catch (_) { locale = ''; }
@@ -445,8 +424,6 @@ module.exports = function register(on, ctx) {
         const voice = Voices
           ? Voices.resolveVoice({ chosen, lang, modelId: a.model, learned: learnedVoices.get(a.model) })
           : chosen;
-        // Cache hit: stesso testo+voce+velocità+modello già sintetizzato in
-        // questa sessione → ritorno immediato, niente chiamata al modello.
         const key = ttsCache ? ttsKey(a.model, `${voice}@${speed}`, text) : null;
         if (key) {
           const hit = ttsCache.get(key);
@@ -489,11 +466,8 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
-  // quale modello legge (il primo della catena), il suo catalogo raggruppato
-  // per lingua (vuoto se non lo conosciamo o sceglie da sé), e la voce scelta
-  // finora. `chosen` torna anche se non è nel catalogo: è un nome scritto a
-  // mano, e la pagina lo mostra nel campo di testo.
+  // Per la tendina delle Preferenze: quale modello legge, il suo catalogo per lingua e la
+  // voce scelta. `chosen` torna anche fuori catalogo: è scritta a mano e va mostrata.
   on(MSG.TTS_VOICES, async () => {
     const Voices = globalThis.SN_TTS_VOICES;
     let model = '';
@@ -503,15 +477,13 @@ module.exports = function register(on, ctx) {
       const attempts = buildAttemptChain(settings, ref, SN_CONST.ACTIONS.TTS);
       model = (attempts[0] && attempts[0].model) || '';
     } catch (e) {
-      // Nessun modello di lettura (o catena non risolvibile): la pagina lo
-      // dice, invece di fingere che un modello scelga da sé.
+      // Nessun modello di lettura: la pagina lo dice invece di fingere che uno scelga da sé.
       return { ok: true, model: '', catalog: '', required: true, groups: [], error: e?.message || String(e) };
     }
     const cat = Voices ? Voices.catalogFor(model) : null;
     let groups = cat ? Voices.groupedByLang(model) : [];
     if (!cat && learnedVoices.has(model)) {
-      // Catalogo imparato dal router in questa sessione: nomi nudi, una lingua
-      // se il nome la dichiara ("-it"), altrimenti tutte insieme.
+      // Catalogo imparato dal router: nomi nudi, con una lingua solo se il nome la dichiara.
       const list = learnedVoices.get(model);
       const byLang = new Map();
       for (const id of list) {
@@ -534,25 +506,14 @@ module.exports = function register(on, ctx) {
     };
   });
 
-  // Modello con cui provare un fornitore quando la prova non ne indica uno
-  // (pulsante «Prova» accanto alla chiave). Prima era un nome scritto qui: si
-  // finiva per provare un modello che magari nessuno usa, e nessuno poteva
-  // cambiarlo. Ora è la funzione «Prova di un fornitore», impostabile come
-  // tutte le altre; della sua catena si prende il primo modello servito dal
-  // fornitore in prova.
-  // NB: qui NON si passa da buildAttemptChain. Quella scarta i modelli dei
-  // fornitori senza chiave salvata — che è esattamente il caso della prova: la
-  // chiave si sta ancora digitando e arriva nel messaggio, non dalle
-  // impostazioni. Risolviamo quindi il nickname direttamente sul registro
-  // configurato, che resta l'unica sorgente del modello.
+  // Qui NON si passa da buildAttemptChain: quella scarta i fornitori senza chiave salvata,
+  // che è il caso della prova, dove la chiave si sta digitando e arriva nel messaggio.
   async function testModelFor(provider, settings) {
     const s = settings || await getEffectiveSettings();
     const action = SN_CONST.ACTIONS.PROVIDER_TEST;
     const registry = s.modelRegistry || {};
     let refs = SN_CONST.parseModelRefs(modelForAction(s, action));
-    // Stessa potatura delle richieste vere: a interruttore acceso la prova parte
-    // sull'equivalente a pesi aperti, non sul modello proprietario che quella
-    // funzione userebbe altrimenti.
+    // A interruttore acceso la prova parte sull'equivalente aperto, come le richieste vere.
     if (s.openWeightsOnly === true) {
       refs = SN_CONST.applyOpenWeightsPolicy(refs, registry, action).refs;
     }
@@ -628,9 +589,8 @@ module.exports = function register(on, ctx) {
         },
       });
       const totalMs = performance.now() - startMs;
-      // Stream concluso senza alcun contenuto (capita ad alcuni endpoint
-      // gratuiti): per l'utente il modello NON funziona, quindi è un errore,
-      // non un "OK — null ms".
+      // Stream concluso senza contenuto (capita su certi endpoint gratuiti): per l'utente il
+      // modello non funziona, quindi è un errore, non un OK.
       if (charCount === 0) return { ok: false, error: 'Il modello ha risposto vuoto' };
       const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
       const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
@@ -709,10 +669,8 @@ module.exports = function register(on, ctx) {
     return { provider: 'openrouter', model: '' };
   }
 
-  // Il mestiere di un modello decide COME provarlo: a uno di testo si chiede di
-  // contare, a uno di voce di dire una frase, a uno di indicizzazione un
-  // vettore, a uno di dettatura di ascoltare un secondo di silenzio. Provarli
-  // tutti con una chat fallirebbe su tre mestieri su quattro.
+  // Il mestiere decide COME provare un modello: provarli tutti con una chat fallirebbe su
+  // tre mestieri su quattro.
   function modelKind(provider, model, entry) {
     const Caps = globalThis.SN_MODEL_CAPS;
     if (!Caps) return 'text';
@@ -783,10 +741,8 @@ module.exports = function register(on, ctx) {
     return { ok: false, error: 'Tipo di modello non riconosciuto' };
   }
 
-  // Chiave per il provider con la stessa precedenza di withDefaults: prima la
-  // predefinita (build/override admin via Firestore), poi quella personale
-  // dell'utente come fallback — indipendentemente da useDefaultModels, perché
-  // qui si testano i modelli PREDEFINITI.
+  // Stessa precedenza di withDefaults: prima la chiave predefinita (build o override admin),
+  // poi la personale come ripiego; qui si provano i modelli PREDEFINITI.
   async function defaultKeyFor(provider, d) {
     const fromDefaults = ((d && d.apiKeys) || {})[provider] || '';
     if (fromDefaults) return fromDefaults;
@@ -813,13 +769,10 @@ module.exports = function register(on, ctx) {
         provider = 'openrouter';
         modelId = explicitModel;
       } else {
-        // Lista read-only delle Opzioni: risolve il nickname nel registry
-        // PREDEFINITO (costanti + override Firestore), non nei settings
-        // personali — il nickname di un default deve trovarsi anche se
-        // l'utente gestisce i propri modelli (useDefaultModels OFF).
+        // Il nickname si risolve nel registry PREDEFINITO, non nei settings personali: deve
+        // trovarsi anche quando l'utente gestisce i propri modelli.
         if (!nickname) return { ok: false, error: 'Nickname mancante' };
-        // Solo il registry PREDEFINITO effettivo: se un nickname non c'è più, il
-        // tasto "Prova" deve dirlo, non provare un modello scritto nel codice.
+        // Se un nickname non c'è più, «Prova» deve dirlo invece di provare un modello del codice.
         const registry = d.modelRegistry || {};
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
@@ -830,21 +783,14 @@ module.exports = function register(on, ctx) {
         modelId = single.model || '';
         if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
       }
-      // "Solo modelli a pesi aperti" (#461). Queste righe sono i modelli che
-      // Filo userebbe: provarne uno è una richiesta vera, pagata con le chiavi
-      // predefinite. Con l'interruttore acceso quelle proprietarie non partono —
-      // altrimenti la pagina dove si accende l'interruttore sarebbe l'unico
-      // posto da cui l'interruttore si può scavalcare.
+      // Prove pagate con le chiavi predefinite: stesso cancello (vedi openWeightsBlockReason).
       const eff = await getEffectiveSettings();
-      // La voce intera, non solo fornitore+stringa: se l'owner ha classificato a
-      // mano quel modello come a pesi aperti, la prova lo rispetta come lo
-      // rispettano le richieste vere.
+      // Si passa la voce intera: se l'owner ha classificato a mano quel modello come aperto,
+      // la prova lo rispetta come fanno le richieste vere.
       const blocked = openWeightsBlockReason(eff, { ...(regEntry || {}), provider, model: modelId });
       if (blocked) return { ok: false, error: blocked };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
-      // Il modello del registry va passato così com'è: stesso percorso
-      // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
       // L'editor e le Opzioni mandano l'ordinamento già risolto dalla pagina (al clic: la misura va a quello, anche se
@@ -874,7 +820,6 @@ module.exports = function register(on, ctx) {
         },
       });
       const totalMs = performance.now() - startMs;
-      // Come in TEST_PROVIDER: stream vuoto = modello inutilizzabile = errore.
       if (charCount === 0) return { ok: false, error: 'Il modello ha risposto vuoto' };
       const tokens = (result?.usage?.completionTokens) || Math.max(1, Math.round(charCount / 4));
       const tps = tokens > 0 && totalMs > 0 ? (tokens / (totalMs / 1000)) : 0;
@@ -901,9 +846,8 @@ module.exports = function register(on, ctx) {
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
-      // Il catalogo OpenRouter è pubblico: la chiave è facoltativa. La lista
-      // semplice ha solo i modelli di testo: voce, dettatura e indicizzazione si
-      // chiedono a parte, per modalità.
+      // Il catalogo OpenRouter è pubblico: la chiave è facoltativa. La lista semplice ha solo
+      // i modelli di testo; voce, dettatura e indicizzazione si chiedono per modalità.
       const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
       const queries = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
       const lists = await Promise.all(queries.map(async (q) => {
@@ -969,17 +913,14 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // «Da qui si raccoglie?» — la domanda che il riquadrino «Ha funzionato?» si
-  // fa prima di comparire. Non ha potere: dice soltanto, su un indirizzo che
-  // chi chiede ha già davanti, se una risposta servirebbe a qualcosa. La
-  // risposta la dà la stessa porta della raccolta (#584, settimo giro).
+  // Non ha potere: dice solo, su un indirizzo che chi chiede ha già davanti, se una risposta
+  // servirebbe a qualcosa. Risponde la stessa porta della raccolta (#584).
   on(MSG.PATH_COLLECTABLE, async (msg) => {
     try {
       const r = await PathsCollector.raccoglibile(msg?.payload?.url);
       return { ok: true, raccoglibile: !!r.ok, reason: r.reason || '' };
     } catch (e) {
-      // Nel dubbio non si promette niente: meglio non chiedere che chiedere
-      // per niente.
+      // Nel dubbio non si promette niente: meglio non chiedere che chiedere per niente.
       return { ok: true, raccoglibile: false, reason: e?.message || String(e) };
     }
   });

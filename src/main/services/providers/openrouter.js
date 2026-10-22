@@ -28,7 +28,7 @@
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
-      // OpenRouter raccomanda questi header (opzionali ma utili per rate limit fairness)
+      // Header raccomandati da OpenRouter: opzionali, utili per la fairness dei rate limit.
       'HTTP-Referer': 'https://filo.local',
       'X-Title': 'Filo',
     };
@@ -300,11 +300,8 @@
     return out;
   }
 
-  // In streaming le chiamate arrivano a pezzi: un delta porta l'indice, i
-  // primi anche id e nome, gli altri frammenti degli argomenti da accodare.
-  // `onStart(call)` avvisa appena si conosce il NOME di una chiamata nuova: la
-  // chat lo usa per dire subito «Cerco sul web…», prima che gli argomenti
-  // siano finiti di arrivare.
+  // In streaming le chiamate arrivano a pezzi: indice, poi id e nome, poi i frammenti da
+  // accodare. `onStart` avvisa appena si conosce il NOME, per dire subito «Cerco sul web…».
   function createToolCallAccumulator(onStart) {
     const calls = [];
     const byIndex = new Map();
@@ -335,12 +332,8 @@
     };
   }
 
-  // Il ragionamento arriva anche come blocchi strutturati (`reasoning_details`:
-  // testo, riassunto o blocchi cifrati con firma), a frammenti indicizzati. Li
-  // ricomponiamo per indice concatenando i campi testuali, così da poterli
-  // RIMANDARE tali e quali nel messaggio dell'assistente al giro dopo: il
-  // fornitore li reinserisce e il modello riprende da dove aveva lasciato
-  // invece di ripensare tutto.
+  // I `reasoning_details` si ricompongono per indice per RIMANDARLI tali e quali al giro dopo:
+  // il fornitore li reinserisce e il modello riprende invece di ripensare tutto.
   function createReasoningDetailsAccumulator() {
     const items = [];
     const byIndex = new Map();
@@ -459,7 +452,7 @@
       id: m.id,
       name: m.name,
       pricing: m.pricing && {
-        // OpenRouter espone i prezzi in USD per token. Riconvertiamo in USD per 1M.
+        // OpenRouter espone i prezzi in USD per token: si riconverte in USD per 1M.
         input: parseFloat(m.pricing.prompt) * 1_000_000,
         output: parseFloat(m.pricing.completion) * 1_000_000,
       },
@@ -588,7 +581,6 @@
             };
           }
         } catch (_) {
-          // riga malformata, ignora
         }
       }
     }
@@ -1004,10 +996,8 @@
     };
   }
 
-  // ─── Dettatura ────────────────────────────────────────────────────────────
-  // `audioBase64` sono i byte grezzi del file (niente data URI); `format` è
-  // l'estensione ('wav', 'mp3', 'webm', …). `language` è un codice ISO-639-1
-  // ('it'): se manca, il modello la riconosce da sé.
+  // `audioBase64` sono i byte grezzi, niente data URI; senza `language` il modello riconosce
+  // la lingua da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
@@ -1025,20 +1015,15 @@
         completionTokens: 0,
         cachedPromptTokens: 0,
         seconds: Number(usage.seconds) || 0,
-        // Il router riporta il costo in dollari: per l'audio è l'unico numero
-        // che abbia senso (non ci sono token), e va registrato tale e quale.
+        // Per l'audio non ci sono token: l'unico numero sensato è il costo in dollari del router.
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
         keySource, keyFallback,
       },
     };
   }
 
-  // ─── Indicizzazione (embedding) ───────────────────────────────────────────
-  // Ritorna i vettori nell'ordine dei testi. `dim` chiede vettori accorciati
-  // (i modelli addestrati "a matrioska" lo permettono); se il fornitore ignora
-  // la richiesta e ne manda di più lunghi, si tagliano qui: le prime `dim`
-  // componenti sono comunque quelle che contano, e la ricerca lavora su
-  // vettori tutti della stessa lunghezza.
+  // `dim` chiede vettori accorciati; se ne arrivano di più lunghi si tagliano qui: contano le
+  // prime componenti, e la ricerca vuole vettori tutti della stessa lunghezza.
   async function embed({ apiKey, model, texts, dim, providerRouting, signal }) {
     const input = (texts || []).map((t) => String(t == null ? '' : t));
     const body = { model, input };
@@ -1102,11 +1087,8 @@
     };
   }
 
-  // ─── Chi ha servito, a posteriori ─────────────────────────────────────────
-  // Per voce e dettatura il router non mette il fornitore nella risposta: lo
-  // si chiede con l'id della generazione, che diventa consultabile qualche
-  // secondo dopo (finché non lo è risponde 404). Ritorna
-  // { servedBy, costUsd } oppure null se ancora non c'è.
+  // Per voce e dettatura il fornitore non è nella risposta: si chiede con l'id della
+  // generazione, consultabile qualche secondo dopo. Torna { servedBy, costUsd } o null.
   async function lookupServedBy({ apiKey, generationId, signal }) {
     if (!generationId) return null;
     const res = await fetch(`${GENERATION_ENDPOINT}?id=${encodeURIComponent(generationId)}`, {

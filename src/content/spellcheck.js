@@ -1462,12 +1462,8 @@
     return { word, start, end, sentence, prev: ctx.prev, next: ctx.next };
   }
 
-  // Variante per <input type=text/search> (single-line, non "supportati"
-  // dall'overlay blu ma che meritano comunque il suggerimento di correzione nel
-  // menu tasto destro — feedback alpha: la vecchia estensione lo mostrava anche
-  // qui, la nuova app no perché si affidava ai soli suggerimenti nativi che non
-  // sempre arrivano). Estrae la parola sotto il punto e ritorna lo stesso shape
-  // di getWordAt, così openSpellWordMenu la gestisce identica a textarea/CE.
+  // Anche su <input>: niente overlay blu, ma il suggerimento nel menu ci deve essere, perché
+  // i soli nativi non arrivano sempre. Stesso shape di getWordAt.
   function getInputWordAt(el, clientX) {
     if (!el || el.tagName !== 'INPUT') return null;
     const text = el.value || '';
@@ -1484,8 +1480,8 @@
     return { word, start, end, sentence, prev: ctx.prev, next: ctx.next };
   }
 
-  // Offset di carattere nel valore di un <input> single-line a partire da una
-  // coordinata X viewport. Misura col canvas imitando il font dell'elemento.
+  // Offset di carattere in un <input> da una X del viewport, misurato col canvas imitando
+  // il font dell'elemento.
   function inputCharOffset(el, clientX) {
     const text = el.value || '';
     if (!text) return 0;
@@ -1531,7 +1527,7 @@
   // a partire da coordinate viewport. Funziona sia per textarea che per contenteditable.
   function caretCharOffsetFromPoint(el, clientX, clientY) {
     if (el.tagName === 'TEXTAREA') {
-      // Per la textarea il caretPositionFromPoint non torna utile (offsetNode non è il textarea).
+      // Per la textarea caretPositionFromPoint non serve: offsetNode non è la textarea.
       return textareaCharOffset(el, clientX, clientY);
     }
     const doc = el.ownerDocument || document;
@@ -1552,24 +1548,18 @@
         total += n.nodeValue.length;
       }
     }
-    // La domanda "che carattere c'è in questo punto" si ferma al confine dei
-    // componenti web (shadow root): dentro un blocco isolato la risposta cade
-    // nel light DOM — fuori dall'editabile — o non arriva affatto. Lì (e in
-    // qualunque altro caso in cui la risposta non è utilizzabile) misuriamo noi
-    // l'elemento che abbiamo già in mano. Vedi #438.
+    // «Che carattere c'è in questo punto» si ferma al confine dei componenti web: dentro uno
+    // shadow root la risposta è inutilizzabile, e lì misuriamo noi l'elemento (#438).
     return caretCharOffsetByRects(el, clientX, clientY);
   }
 
-  // Quanti caratteri misurare uno per uno prima di passare alla ricerca binaria:
-  // in un editabile lungo (una mail, un documento) il nodo di testo sotto al
-  // cursore può essere enorme e un rettangolo per carattere costerebbe troppo.
+  // Quanti caratteri misurare uno per uno prima della ricerca binaria: su un nodo di testo
+  // enorme un rettangolo per carattere costerebbe troppo.
   const RECT_SCAN_MAX = 400;
   const RECT_SCAN_WINDOW = 64;
 
-  // Offset di carattere ricavato dalla sola geometria: confronta i rettangoli
-  // dei caratteri dell'editabile col punto cliccato. Non chiede nulla al
-  // documento, quindi funziona ovunque viva l'editabile (componenti web
-  // compresi). Ritorna -1 se il punto non cade su nessun testo.
+  // Offset ricavato dalla sola geometria, confrontando i rettangoli dei caratteri col punto:
+  // non chiede niente al documento, quindi vale anche nei componenti web. -1 se non cade lì.
   function caretCharOffsetByRects(el, clientX, clientY) {
     const doc = el.ownerDocument || document;
     let range;
@@ -1581,8 +1571,8 @@
       if (!len) continue;
       let box = null;
       try { range.selectNodeContents(n); box = range.getBoundingClientRect(); } catch (_) {}
-      // Considera solo i nodi la cui banda verticale contiene il punto: senza
-      // questo filtro misureremmo tutto il testo dell'editabile.
+      // Solo i nodi la cui banda verticale contiene il punto: senza il filtro misureremmo tutto
+      // il testo dell'editabile.
       if (box && (box.width || box.height)
           && clientY >= box.top - 2 && clientY <= box.bottom + 2) {
         const hit = charOffsetInTextNode(range, n, clientX, clientY);
@@ -1594,7 +1584,6 @@
     return best;
   }
 
-  // Carattere di un singolo nodo di testo sotto al punto (o il più vicino).
   function charOffsetInTextNode(range, node, clientX, clientY) {
     const len = node.nodeValue.length;
     const rectOf = (i) => {
@@ -1648,8 +1637,8 @@
     return { exact: false, index: best, dist: bestDist };
   }
 
-  // Misura la posizione di carattere in una textarea ricostruendo il word-wrap
-  // con un canvas che imita lo stile dell'elemento. Costoso ma corretto.
+  // Posizione di carattere in una textarea, ricostruendo il word-wrap con un canvas che
+  // imita lo stile dell'elemento: costoso ma corretto.
   function textareaCharOffset(el, clientX, clientY) {
     const text = el.value;
     if (!text) return 0;
@@ -1665,7 +1654,6 @@
     const ctx = canvas.getContext('2d');
     ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
 
-    // Suddivisione del testo in righe rispettando i \n e il word-wrap.
     const wrap = cs.whiteSpace !== 'pre' && cs.whiteSpace !== 'nowrap';
     const lines = [];
     const paragraphs = text.split('\n');
@@ -1712,7 +1700,6 @@
     const line = lines[lineIdx];
     if (!line) return 0;
 
-    // Ricerca binaria del char nella riga
     let lo = 0, hi = line.text.length;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
@@ -1849,14 +1836,11 @@
 
   function applyFix(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
-    // 'end' = caret a fine inserzione (popup correttore manuale).
-    // 'preserve' = caret resta dove era (autocorrect: l'utente ha appena digitato
-    // lo spazio, vogliamo che il caret resti dopo lo spazio, non dentro la parola).
+    // 'end' = caret a fine inserzione (popup del correttore). 'preserve' = caret dov'era:
+    // nell'autocorrect si è appena digitato lo spazio e il caret deve restare dopo di esso.
     const cursorMode = opts.cursor || 'end';
-    // Validazione "segment": se il chiamante passa il testo originale che ci aspettiamo
-    // di trovare a [start, end), aborta se non corrisponde più (testo cambiato dopo lo
-    // scan). Questo previene il bug "Risolvi cancella tutta la frase" causato da issue
-    // con offset stale.
+    // Se il testo atteso a [start, end) non corrisponde più si abortisce: è la guardia contro
+    // «Risolvi cancella tutta la frase» con offset vecchi.
     const expected = typeof opts.expectedSegment === 'string' ? opts.expectedSegment : null;
     const currentText = getEditableText(el);
     if (expected !== null) {
@@ -1868,9 +1852,8 @@
     }
     if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
       const v = el.value;
-      // Validazione: se il range è fuori bounds o l'inizio è >= fine, usciamo.
-      // Senza questo, v.slice(range.end) con range.end > v.length restituisce ""
-      // e il salvataggio cancella tutto il testo dopo range.start.
+      // Range fuori dai limiti o inizio ≥ fine: si esce. Senza, lo slice oltre la lunghezza
+      // torna vuoto e il salvataggio cancella tutto il testo dopo range.start.
       if (typeof range.start !== 'number' || typeof range.end !== 'number' ||
           range.start < 0 || range.end > v.length || range.end <= range.start) {
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
@@ -1897,7 +1880,6 @@
       }
       // Salva l'offset originale del caret, per ripristinarlo in modalità 'preserve'.
       const caretBefore = cursorMode === 'preserve' ? contenteditableCaretOffset(el) : -1;
-      // Trova i text node di start e end via walker.
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       let cur = 0, startNode = null, startOff = 0, endNode = null, endOff = 0, n;
       while ((n = walker.nextNode())) {
@@ -1913,7 +1895,6 @@
       }
       if (!startNode || !endNode) return;
 
-      // Posiziona la selezione sul range da rimpiazzare.
       const sel = window.getSelection();
       const r = document.createRange();
       try {
@@ -1926,11 +1907,8 @@
       sel.removeAllRanges();
       sel.addRange(r);
 
-      // Tentativo 1: execCommand('insertText'). Passa per il pipeline di
-      // beforeinput/input nativo del browser, così editor "controllati"
-      // (Slate/Lexical/Discord, ecc.) aggiornano il loro modello interno
-      // invece di resettare la mutazione DOM. Solo se fallisce ricadiamo
-      // sul fallback DOM-mutation diretto (per editor "uncontrolled").
+      // Prima execCommand('insertText'): passa dal pipeline beforeinput/input nativo, così gli
+      // editor controllati (Slate, Lexical) aggiornano il modello invece di resettare il DOM.
       let ok = false;
       try {
         if (safeReplacement.length > 0) {
@@ -2000,16 +1978,8 @@
     return lastNative.suggestions.slice();
   }
 
-  // Registra un callback chiamato (una volta) per la prossima notifica nativa
-  // di spellcheck, qualunque sia la parola. Utile su `<input>` dove non
-  // conosciamo a priori la parola sotto il cursore: aspettiamo che Electron
-  // ce la dica via `wc.on('context-menu')`. Ritorna una funzione per annullare.
-  //
-  // `opts.since` (timestamp ms): se passato, e se `lastNative` è arrivato dopo
-  // quell'istante, serviamo subito il dato già in cache invece di aspettare un
-  // nuovo broadcast. Serve perché `openNormalMenuAt` ha un `await` su
-  // getClipboardHistory() PRIMA di registrare il waiter: il broadcast nativo
-  // può quindi arrivare in mezzo, e senza questa scorciatoia andava perso.
+  // Callback una-tantum per la prossima notifica nativa, qualunque sia la parola: su un
+  // <input> quale sia lo dice Electron. `opts.since` recupera il broadcast arrivato in mezzo.
   function onNextNativeSuggestion(cb, opts = {}) {
     const timeoutMs = typeof opts === 'number' ? opts : (opts.timeoutMs || 600);
     const since = (typeof opts === 'object' && opts.since) || 0;
@@ -2033,10 +2003,8 @@
     return finish;
   }
 
-  // Registra un callback chiamato (una volta) quando arrivano i suggerimenti
-  // nativi per `word`, se non sono già disponibili al momento dell'apertura del
-  // menu (il broadcast dal main può arrivare con qualche ms di ritardo). Ritorna
-  // una funzione per annullare l'attesa.
+  // Callback una-tantum per i suggerimenti nativi di `word` quando non ci sono già: il
+  // broadcast dal main può ritardare di qualche ms. Ritorna la funzione per annullare.
   function onNativeSuggestions(word, cb, timeoutMs = 800) {
     const have = getNativeSuggestions(word);
     if (have.length) { setTimeout(() => cb(have), 0); return () => {}; }

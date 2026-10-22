@@ -1,22 +1,13 @@
-// Ponte main → editor per gli appunti.
-//
-// La collezione dei file dell'editor vive nel renderer (localStorage, per
-// l'autosalvataggio sincrono) MA viene rispecchiata sull'archivio dell'app
-// (storage.json, via chrome.storage.local — lo stesso archivio che il main usa).
-// Lo storico versioni ci vive già da sempre. Grazie a questo mirror il MAIN può
-// leggere la collezione, scriverci dentro un appunto (con punti di ripristino) e
-// avvisare l'editor aperto, che ricarica e mostra il nuovo testo.
-//
-// Le chiavi sono le stesse usate da src/pages/editor/editor.js.
+// Ponte main → editor: la collezione vive nel renderer (localStorage) ed è rispecchiata
+// su chrome.storage.local, ed è quel mirror a renderla leggibile e scrivibile dal main.
+// Le chiavi sono le stesse di src/pages/editor/editor.js.
 
 const COLLECTION_KEY = 'filo.editor.collection';
 const VERSIONS_KEY = 'filo.editor.versions';
 const POINTER_KEY = 'filo.editor.notesPointer';
 const MIGRATED_KEY = 'filo.editor.notesMigrated';
-// Vecchio archivio appunti (pre-editor). Non esiste più codice che ci scriva:
-// l'unico a toccarlo è la migrazione qui sotto, che lo svuota una volta sola.
-// Per questo la chiave la leggiamo direttamente invece di tenere in piedi un
-// CRUD di cui nessun altro ha più bisogno.
+// Archivio appunti pre-editor: lo tocca solo la migrazione qui sotto, che lo svuota una
+// volta sola, quindi la chiave si legge direttamente invece di tenere in piedi un CRUD.
 function legacyNotesKey() {
   try { return globalThis.SN_CONST.STORAGE_KEYS.FILO_NOTES; } catch (_) { return 'filo_notes'; }
 }
@@ -32,17 +23,14 @@ async function getKey(key, fallback) {
   } catch (_) { return fallback; }
 }
 
-// Ritorna true se la scrittura è andata a buon fine: chi sta per BUTTARE via i
-// dati sorgente (la migrazione degli appunti) deve poter distinguere "salvato"
-// da "archivio non disponibile", altrimenti li perderebbe.
+// true solo se la scrittura è riuscita: chi sta per buttare i dati sorgente (la migrazione)
+// deve distinguere «salvato» da «archivio non disponibile», o li perde.
 async function setKeys(obj) {
   try { await chrome.storage.local.set(obj); return true; } catch (_) { return false; }
 }
 
-// Carica la collezione dall'archivio. Se non esiste ancora (l'editor non è mai
-// stato aperto), ritorna una collezione VUOTA — NON sintetizza un file bianco:
-// lo farebbe l'editor stesso all'apertura, e un bianco creato qui apparirebbe
-// come file fantasma accanto ai documenti reali dell'utente dopo il merge.
+// Collezione assente: si torna vuoto e NON si sintetizza un file bianco, che dopo il merge
+// comparirebbe come file fantasma accanto ai documenti veri. Lo crea l'editor all'apertura.
 async function loadCollection() {
   const Store = STORE();
   const raw = await getKey(COLLECTION_KEY, null);
@@ -50,8 +38,6 @@ async function loadCollection() {
   return { version: Store.COLLECTION_VERSION, activeId: null, files: [] };
 }
 
-// Scrive un appunto in un file dell'editor (crea/append secondo l'argomento).
-// opts: { text, topic, forceNew }. Ritorna { wrote, fileId, createdFile, title }.
 async function writeNote(opts) {
   const Notes = NOTES();
   const Store = STORE();
@@ -60,8 +46,7 @@ async function writeNote(opts) {
   const text = String(o.text == null ? '' : o.text);
   if (!text.trim()) return { wrote: false };
 
-  // Prima di ogni scrittura assicura che i vecchi appunti siano già migrati,
-  // così non si sdoppiano su file diversi.
+  // I vecchi appunti vanno migrati prima di ogni scrittura, o si sdoppiano su file diversi.
   await migrateNotesToEditor();
 
   const collection = await loadCollection();
@@ -86,10 +71,8 @@ async function writeNote(opts) {
   return { wrote: true, fileId: res.fileId, createdFile: res.createdFile, title: res.title };
 }
 
-// MIGRAZIONE una-tantum: sposta i vecchi appunti dell'archivio separato in un
-// file "Appunti" dell'editor, poi svuota l'archivio. Idempotente grazie al flag
-// MIGRATED_KEY. Non lancia mai. È l'ULTIMO punto del codice che conosce la
-// vecchia chiave: nessun altro la legge né la scrive.
+// Migrazione una-tantum, idempotente e che non lancia mai: è l'ULTIMO punto del codice
+// che conosce la vecchia chiave.
 async function migrateNotesToEditor() {
   try {
     if (await getKey(MIGRATED_KEY, false)) return { migrated: false, already: true };
@@ -106,10 +89,8 @@ async function migrateNotesToEditor() {
         Store.addFile(collection, file);
         const versions = await getKey(VERSIONS_KEY, {});
         const pointer = { fileId: file.id, topic: '' };
-        // L'archivio vecchio si svuota (e la migrazione si marca fatta) SOLO
-        // dopo che il file "Appunti" è stato scritto davvero: se la scrittura
-        // non riesce, gli appunti restano dove sono e ci si riprova al prossimo
-        // avvio. Nessun percorso porta a perderli.
+        // Si svuota (e si marca la migrazione) SOLO dopo che il file Appunti è stato scritto:
+        // se la scrittura non riesce gli appunti restano dove sono e si riprova al prossimo avvio.
         const saved = await setKeys({
           [COLLECTION_KEY]: collection,
           [VERSIONS_KEY]: versions,
@@ -128,10 +109,8 @@ async function migrateNotesToEditor() {
   }
 }
 
-// Riassunti dei file per il contesto di Filo (#379.5): ritorna
-// [{ id, title, summary, source }] per OGNI file della collezione — il riassunto
-// AI se c'è, altrimenti un estratto grezzo. È ciò che entra nel contesto di Filo
-// al posto del testo integrale.
+// Riassunti per il contesto (#379.5): il riassunto AI se c'è, altrimenti un estratto grezzo.
+// È questo a entrare nel contesto al posto del testo integrale.
 async function listFileSummaries() {
   const Summary = globalThis.SN_EDITOR_SUMMARY;
   if (!Summary) return [];
@@ -141,13 +120,8 @@ async function listFileSummaries() {
   } catch (_) { return []; }
 }
 
-// Testo dei file dell'editor per il CORPUS anti-esfiltrazione (#379.10). Gli
-// appunti non vivono più in un archivio separato: sono file dell'editor come gli
-// altri, e Filo li "vede" (via riassunti, e può leggerli per intero on-demand).
-// Quindi il materiale personale-persistente da proteggere quando NAVIGA forgia un
-// URL è ora il CONTENUTO di questi file — non più il vecchio silo `filo_notes`,
-// che dopo la migrazione è vuoto. Ritorna il testo concatenato di TUTTI i file
-// (appunti inclusi) o '' se non c'è nulla. Best-effort: non lancia mai.
+// Corpus anti-esfiltrazione (#379.10): il materiale personale da proteggere quando Filo
+// apre un URL forgiato è il contenuto di questi file. Best-effort: non lancia mai.
 async function notesCorpusText() {
   const Summary = globalThis.SN_EDITOR_SUMMARY;
   const Store = STORE();
@@ -159,9 +133,7 @@ async function notesCorpusText() {
   } catch (_) { return ''; }
 }
 
-// Lettura ON-DEMAND del contenuto completo di UN file (azione LEGGI_FILE): Filo
-// vede solo i riassunti e, quando decide che vale la pena leggere un file per
-// intero, ne chiede il testo con l'id. Ritorna { ok, id, title, text }.
+// Filo vede solo i riassunti e chiede il testo intero (LEGGI_FILE) quando vale la pena.
 async function readFile(fileId) {
   const Summary = globalThis.SN_EDITOR_SUMMARY;
   const Store = STORE();

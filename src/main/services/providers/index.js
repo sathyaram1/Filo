@@ -1,23 +1,11 @@
-// Router multi-provider con fallback in catena.
-//
-// Concetto: il chiamante passa una lista di "attempts" — ciascuno con
-// { provider, apiKey } — e il router prova in ordine, catturando l'errore di
-// quelli che falliscono e ripiegando sul successivo. Il primo che risponde OK
-// vince e ritorna il risultato (con info su quale provider è stato usato).
-//
-// Se nessuno funziona, viene rilanciato l'ultimo errore con prefisso.
+// Router multi-provider con fallback in catena: si provano gli attempts in ordine, vince il
+// primo che risponde OK; se nessuno funziona si rilancia l'ultimo errore.
 
 (function (global) {
   'use strict';
 
-  // Un solo fornitore: il router (OpenRouter), che smista verso host
-  // indipendenti secondo la lista di esclusione. L'API diretta di Google, che
-  // qui c'era, è stata tolta: era l'API del produttore, e la politica sui
-  // modelli non la ammette. Lettura ad alta voce, dettatura e indicizzazione,
-  // che erano le tre funzioni rimaste solo lì, passano ora dal router.
-  // Un fornitore si trova per nome su globalThis (SN_PROVIDER_<NOME>): oggi
-  // c'è solo 'openrouter'; un fornitore nuovo (es. modelli in locale) si
-  // aggiunge registrando il suo modulo, senza toccare questo elenco.
+  // Un solo fornitore, il router: l'API diretta di un produttore non è ammessa dalla politica
+  // sui modelli. Un fornitore nuovo si registra su globalThis, senza toccare questo elenco.
   function getProvider(name) {
     const key = 'SN_PROVIDER_' + String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
     const p = name && global[key];
@@ -25,11 +13,8 @@
     throw new Error(`Provider non supportato: ${name}`);
   }
 
-  // #360 — un buco di rete di un istante (WiFi che salta, DNS lento) non deve
-  // diventare un errore in faccia all'utente: prima di ripiegare sul provider
-  // successivo ritentiamo LO STESSO tentativo dopo una breve pausa. Solo per i
-  // guasti PASSEGGERI (nessuna risposta HTTP arrivata): un 400 o un 401
-  // ritornerebbero identici, ritentarli sarebbe solo attesa buttata.
+  // Un buco di rete di un istante non deve diventare un errore per l'utente: si ritenta
+  // LO STESSO tentativo. Solo sui guasti passeggeri: un 400 o un 401 tornerebbero identici.
   const RETRY_NETWORK_MAX = 1;      // ritentativi extra per tentativo
   const RETRY_NETWORK_DELAY_MS = 700;
 
@@ -86,9 +71,8 @@
     }
   }
 
-  // Crediti finiti (#598): OpenRouter risponde 402 finché il tetto della
-  // chiave non sale. Non si ritenta e non si passa al tentativo successivo
-  // (userebbe la stessa chiave): si avvisa una volta e si esce subito.
+  // Crediti finiti: il router risponde 402 finché il tetto non sale. Non si ritenta e non si
+  // passa al tentativo dopo, che userebbe la stessa chiave: si avvisa una volta e si esce.
   function stopOnOutOfCredits(err) {
     const W = global.SN_WALLET;
     if (!W || !W.isOutOfCredits(err)) return false;
@@ -169,10 +153,8 @@
       const aModel = a.model || model;
       let emitted = false;
       try {
-        // Ritentativo sui guasti di rete passeggeri (#360). Se lo stream era già
-        // partito (delta o reasoning usciti) il buffer del chiamante va azzerato
-        // prima di ricominciare, esattamente come nel ripiego su un altro
-        // provider (#273): se non sa farlo, non ritentiamo.
+        // Ritentativo sui guasti di rete passeggeri: se lo stream era partito il buffer va azzerato
+        // prima di ricominciare. Se il chiamante non sa farlo, non si ritenta.
         const r = await withNetworkRetry(
           () => Promise.resolve(getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,

@@ -188,7 +188,6 @@
     menu_link_blocked: 'Porta a %s, che è nella tua lista dei siti bloccati. Filo non l’ha contattato.',
     menu_link_blocked_lists: 'Porta a %s, uno dei siti di pubblicità e tracciamento che Filo blocca. Filo non l’ha contattato.',
 
-    // Edit box
     edit_box_title: 'Modifica testo',
     edit_box_original: 'Originale',
     edit_box_proposed: 'Proposta',
@@ -204,7 +203,6 @@
     edit_box_loading: 'Sto pensando…',
     edit_box_replaced: 'Testo sostituito',
 
-    // Coming soon
     coming_soon: 'Prossimamente',
     feature_off_help: 'Attiva "Aiuto" nelle Opzioni → Funzionalità sperimentali',
 
@@ -256,48 +254,37 @@
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
     err_model_where_owner: 'Lo imposti in Gestione → Automazioni, fra i Modelli di supporto.',
 
-    // Toast
     toast_saved: 'Salvata in: %s',
     toast_saved_open: 'Apri la lista',
     toast_save_failed: 'Salvataggio non riuscito',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
-    // #437 — la sorgente di un'immagine/filmato o l'href di un link possono
-    // essere qualsiasi cosa il sito ci abbia messo (un frammento di codice, un
-    // data: lunghissimo, niente). Dirlo è meglio che riempire gli appunti con
-    // una stringa che altrove non apre nulla.
+    // #437 — src di un'immagine o href di un link possono essere qualsiasi cosa: dirlo è meglio
+    // che riempire gli appunti con una stringa che altrove non apre niente.
     toast_not_an_address: 'Questo non è un indirizzo: non c\'è niente da copiare',
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
-    // Il sito ha continuato ad aggiungere testo anche mentre traducevamo, e a
-    // un certo punto smettiamo di rincorrerlo: "Pagina tradotta" sarebbe di
-    // nuovo falso, con le righe nuove in inglese sotto gli occhi.
+    // Il sito aggiunge testo mentre traduciamo, e a un certo punto si smette di rincorrerlo.
+    // Qui sotto si dice sempre cosa è rimasto in inglese: «Pagina tradotta» sarebbe falso.
     toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
-    // #439 — parti della pagina che NESSUNO script può leggere (i siti moderni
-    // possono chiudere a chiave i propri componenti). Non si traducono, e dirlo
-    // è l'unica cosa onesta: "Pagina tradotta" sarebbe falso.
+    // #439 — parti della pagina che nessuno script può leggere (componenti chiusi a chiave).
     toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
     toast_only_closed_components: 'Il testo di questa pagina vive dentro componenti chiusi del sito: non riesco a leggerlo, e resta nella lingua originale.',
-    // #407 — un riquadro incorporato (post incorporato, blocco commenti, modulo
-    // di iscrizione) che nessuno script può toccare: il sito lo chiude a chiave
-    // con l'attributo `sandbox`. È un rettangolo intero che resta in inglese in
-    // mezzo a una pagina italiana: dirlo è l'unica cosa onesta.
+    // #407 — un riquadro incorporato che il sito chiude con `sandbox`: un rettangolo intero
+    // che resta in inglese in mezzo a una pagina italiana.
     toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
-    // Traduzione interrotta a metà (#408): mai "Pagina tradotta" quando non lo
-    // è. Dice quanto ne manca, perché si è fermata e come riprendere.
+    // Traduzione interrotta a metà (#408): quanto manca, perché si è fermata, come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
-    // Pagina più lunga di quanta ne entri in un giro solo: non è un guasto, è
-    // un lavoro a tratti. Dire "Pagina tradotta" con la coda ancora in inglese
-    // sarebbe la stessa bugia di una traduzione interrotta.
+    // Più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.
     toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
-    // Fermata prima che cambiasse qualcosa sullo schermo: "Originale
-    // ripristinato" parlerebbe di un ritorno che non c'è stato.
+    // Fermata prima che cambiasse qualcosa sullo schermo: «Originale ripristinato» parlerebbe
+    // di un ritorno che non c'è stato.
     toast_translation_cancelled: 'Traduzione annullata',
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
@@ -920,7 +907,6 @@
     security_wipe_in_corso: 'Cancello e riavvio Filo…',
     security_wipe_fail: 'Non sono riuscito a cominciare, e non ho cancellato niente. Riprova.',
 
-    // Home
     home_title: 'Aperti per dopo',
     home_search_placeholder: 'Cerca per titolo o URL…',
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
@@ -939,7 +925,6 @@
     home_moved: 'Spostata in «%s»',
     home_move_failed: 'Non si è spostata: nel frattempo l’elenco è cambiato. Riprova da qui.',
 
-    // History
     history_title: 'Cronologia AI',
     history_search_placeholder: 'Cerca…',
     history_filter_all: 'Tutte',

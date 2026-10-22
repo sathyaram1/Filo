@@ -119,8 +119,7 @@
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
-    // Recupera i feedback accodati e non ancora inviati (es. app riavviata mentre
-    // era offline) e prova subito a smaltirli.
+    // Un feedback accodato offline riparte al prossimo avvio.
     load().then(() => { if (queue.length) scheduleFlush(0); }).catch(() => {});
   }
 
@@ -221,8 +220,7 @@
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
-          // Titolo breve generato al momento dell'invio (offline ripiega sul
-          // fallback), calcolato UNA volta e riusato dai ritentativi.
+          // Titolo calcolato UNA volta all'invio e riusato dai ritentativi (offline: ripiego).
           if (!it.prepared) {
             let name = '';
             if (prepareFn) {
@@ -296,7 +294,7 @@
     flush,
     accessoCambiato,
     size: () => queue.length,
-    // ---- helper per i test (logica pura, nessun effetto in produzione) ----
+    // helper per i test (logica pura, nessun effetto in produzione)
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
