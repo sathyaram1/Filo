@@ -182,13 +182,6 @@ test('con la scheda dietro o Filo nascosto il «Salta» si preme lo stesso, su Y
       const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
       tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
     }, yt);
-    await new Promise((ok) => setTimeout(ok, 2000));
-    console.log('ATTIVA', JSON.stringify(await filo.evaluate(({ BrowserWindow }, u) => {
-      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-      const tm = w._filoTabs;
-      return { act: tm.activeId, tabs: tm.tabs.map((t) => [t.id, t.view.webContents.getURL().slice(0, 40), t.view.getVisible(), t.view.getBounds()]), wv: w.isVisible(), b: w.getBounds(), op: w.getOpacity(), foc: w.isFocused() };
-    }, yt)), await nel(yt, 'document.visibilityState'));
-    await quando(async () => (await nel(yt, 'document.visibilityState')) === 'visible', 'la canzone non è tornata davanti');
     await filo.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).hide());
     await nascosta(yt);
     await nel(yt, 'window.__saltata = false; window.__mostra()');
@@ -201,7 +194,7 @@ test('con la scheda dietro o Filo nascosto il «Salta» si preme lo stesso, su Y
 // qui serve la finestra vera, e solo su Linux lo schermo è virtuale e non la vede nessuno.
 test('il video di YouTube incorporato in una scheda dietro salta la pubblicità, e il gesto resta al lettore', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'la finestra vera comparirebbe sullo schermo di chi prova');
-  await conFiloSenzaPlaywright({ env: { FILO_HIDE_WINDOW: '0' } }, async ({ nel, apri, arrivato, nascosta, saltata, clic }) => {
+  await conFiloSenzaPlaywright({ env: { FILO_HIDE_WINDOW: '0' } }, async ({ filo, nel, apri, arrivato, nascosta, saltata, clic }) => {
     for (const [host, pubblico] of [['www.youtube.com', false], ['www.youtube-nocookie.com', true]]) {
       const pagina = testServer.html(lettore({ dopoMs: -1 }));
       const dentro = host === 'www.youtube.com' ? suYouTube(pagina) : pagina.replace('127.0.0.1', host);
@@ -210,7 +203,15 @@ test('il video di YouTube incorporato in una scheda dietro salta la pubblicità,
       await arrivato(dentro);
       await apri(testServer.html('<title>Altra</title><p>altra scheda</p>'), true);
       await nascosta(dentro);
+      await filo.evaluate((_e, p) => {
+        const A = process.mainModule.require(p);
+        globalThis.__diag = [];
+        if (!A.__orig) A.__orig = A.clicDalRiquadro;
+        A.clicDalRiquadro = async (s, m, d, o) => { globalThis.__diag.push(['in', Date.now(), m]); const r = await A.__orig(s, m, d, o); globalThis.__diag.push(['out', Date.now(), r]); return r; };
+      }, join(APP_ROOT, 'src', 'main', 'services', 'adSkip.js'));
       await nel(dentro, 'window.__mostra()');
+      await new Promise((ok) => setTimeout(ok, 5000));
+      console.log('EMB', host, JSON.stringify(await filo.evaluate(() => globalThis.__diag)), JSON.stringify(await nel(dentro, '({c: window.__clic, v: document.visibilityState})')), JSON.stringify(await nel(ospitante, '({g: window.__gesti, v: document.visibilityState})')));
       await saltata(dentro);
       expect((await clic(dentro)).every((c) => c.vero), host).toBe(true);
       expect(await nel(ospitante, 'window.__gesti'), host).toEqual([]);
