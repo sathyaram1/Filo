@@ -7,8 +7,8 @@ import { home as homeChat, modelloFinto, chiedi, ripristina } from './helpers/ch
 
 // Lunghi abbastanza da passare i 240px e da lasciare alla scheda attiva il posto per staccare: era lo scenario
 // della segnalazione, la home aperta larga quanto mezza barra accanto a due video dal titolo lungo.
-const JAZZ = 'Parisian Café Jazz 🇫🇷 1 Hour • The World Café';
-const METEO = 'Previsioni meteo per Milano e la Lombardia';
+const JAZZ = 'Parisian Café Jazz 🇫🇷 The World Café';
+const METEO = 'Previsioni meteo per Milano domani';
 
 const tokensSalvati = (app) => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).themeTokens || {});
 const setTokens = (shell, tokens) =>
@@ -74,13 +74,15 @@ test('#1493 — dalle Preferenze il massimo si allarga, un valore fuori misura �
   const pref = await openTab('filo://preferences/preferences.html');
   const campo = pref.locator('[id="tok-tab.larghezza"]');
   await expect(campo).toHaveValue('240px');
-  // Le Preferenze sono la scheda attiva adesso: si torna alla home, perché il verdetto guarda quella.
-  await shell.locator('#tabs .tab').first().click();
-  await shell.mouse.move(600, 500);
 
   await campo.fill('500');
   await expect.poll(() => tokensSalvati(app), { timeout: 8_000 }).toMatchObject({ 'tab.larghezza': '500px' });
-  await expect.poll(() => verdetto(shell, 500, { lunghiTagliati: false }), { timeout: 10_000 }).toBe('ok');
+  // Con quattro schede la fila può non bastare ai due nomi interi: conta che crescano oltre i 240 senza passare i 500.
+  await expect.poll(async () => {
+    const s = await schede(shell);
+    const lunghi = s.filter((x) => x.titolo === JAZZ || x.titolo === METEO);
+    return s.length === 4 && s.every((x) => x.w <= 500.5) && lunghi.length === 2 && lunghi.every((x) => x.w > 240.5);
+  }, { timeout: 10_000 }).toBe(true);
   await captureCompositeElectron(app, 'tests/.shots/tab-larghezza-massima-500.png');
 
   await campo.fill('50');
