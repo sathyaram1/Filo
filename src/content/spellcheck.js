@@ -392,7 +392,7 @@
     if (!v || getEditableText(el).slice(v.start, v.end) !== v.segment) return false;
     suppressAutocorrect = true;
     try {
-      applyFix(el, { start: v.start, end: v.end }, v.originale, { cursor: 'preserve', expectedSegment: v.segment, automatica: true });
+      sostituisciParola(el, v.start, v.end, v.segment, v.originale);
     } finally {
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
