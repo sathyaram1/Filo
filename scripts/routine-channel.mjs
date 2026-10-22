@@ -33,11 +33,13 @@
 //   il server non è stato chiamato.
 //
 //   node scripts/routine-channel.mjs probe <parola-d-ordine>
-//       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
-//         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
+//       → c'è lavoro? Non prende semafori. Apre l'accensione del contenitore e ne ricorda l'identificativo
+//         (lib/accensione.mjs, #1498). Exit 0 = sì, 2 = niente da fare, 3 = guasto.
 //
 //   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
+//         Ogni richiesta porta l'accensione; senza, fa prima il sondaggio da sé: un biglietto chiesto senza nasce
+//         non fidato.
 //         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
 //         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
 //         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
