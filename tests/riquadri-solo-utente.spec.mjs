@@ -487,3 +487,71 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   await expect.poll(async () => (await inviati(app, page)).length).toBe(1);
   expect((await inviati(app, page))[0]).toContain('Il tasto indietro non va');
 });
+
+// #1509 — Inserimenti, composizione, incolla e rilascio nati nella casella di un riquadro chiuso uscivano dallo shadow
+// verso la finestra del sito col testo e i file: uno script che ascolta lì ricostruiva quello che l'utente scrive.
+const LETTORE = `<script>
+  window.__letti = [];
+  const tipi = ['beforeinput', 'input', 'textInput', 'compositionstart', 'compositionupdate', 'compositionend', 'paste', 'drop'];
+  for (const t of tipi) for (const dove of [window, document]) for (const cattura of [true, false]) {
+    dove.addEventListener(t, (e) => {
+      let porta = e.data || '';
+      try { if (e.clipboardData) porta += e.clipboardData.getData('text/plain'); } catch (_) {}
+      try { if (e.dataTransfer) porta += e.dataTransfer.getData('text/plain') + [...e.dataTransfer.files].map((f) => f.name).join(); } catch (_) {}
+      window.__letti.push(t + ':' + porta);
+    }, cattura);
+  }
+</script>`;
+
+test('nel feedback su un sito quello che l\'utente scrive, compone, incolla e trascina arriva alla casella, non al sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, pagina(`<p id="testo">Una pagina qualsiasi.</p>${LETTORE}`));
+  await spiaInvii(app, page);
+  await page.locator('#testo').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Invia feedback' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await clicca(app, page, '.sn-fb-text');
+  await page.evaluate(() => { window.__letti = []; });
+
+  await page.keyboard.type('Il conto ', { delay: 15 });
+  await page.keyboard.insertText('è 1234 ');
+  // Una tastiera con composizione (giapponese, cinese, accenti morti): la riga si compone e poi entra.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.imeSetComposition', { text: 'ka', selectionStart: 2, selectionEnd: 2 });
+  await cdp.send('Input.imeSetComposition', { text: 'かん', selectionStart: 2, selectionEnd: 2 });
+  await cdp.send('Input.insertText', { text: '漢 ' });
+  await app.evaluate(({ clipboard }) => clipboard.writeText('IBAN IT60X0542811101000000123456'));
+  await page.keyboard.press('Control+V');
+  const scritto = 'Il conto è 1234 漢 IBAN IT60X0542811101000000123456';
+  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text')).valore).toBe(scritto);
+
+  // Un file trascinato da fuori sul riquadro diventa un allegato.
+  const cartella = cartellaTemporanea('filo-1509-');
+  const file = join(cartella, 'estratto-conto.txt');
+  writeFileSync(file, 'saldo segreto');
+  const box = await statoDi(app, page, '.sn-fb-modal');
+  const punto = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const data = { items: [], files: [file], dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, ...punto, data });
+  await expect.poll(() => conta(app, page, '.sn-fb-file-chip')).toBe(1);
+
+  expect(await page.evaluate(() => window.__letti), 'il sito non ha visto niente di quello che entrava nella casella').toEqual([]);
+  await expect.poll(() => bozzaSalvata(app, chiaveBozza(testServer.origin))).toBe(scritto);
+  expect((await statoDi(app, page, '.sn-fb-text')).valore, 'il file non è finito come testo nella casella').toBe(scritto);
+  await clicca(app, page, '.sn-fb-send');
+  await expect.poll(() => inviati(app, page)).toEqual([scritto]);
+  expect(await page.evaluate(() => window.__letti)).toEqual([]);
+  togliCartella(cartella);
+
+  // La Modifica, aperta dal tasto destro su un campo del sito: l'istruzione non arriva al sito.
+  await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', '<textarea id="campo">Un testo.</textarea>'));
+  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
+  await page.locator('#campo').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction')).not.toBeNull();
+  await clicca(app, page, '.sn-editbox-instruction');
+  await page.evaluate(() => { window.__letti = []; });
+  await page.keyboard.type('rendilo formale', { delay: 15 });
+  expect((await statoDi(app, page, '.sn-editbox-instruction')).valore).toBe('rendilo formale');
+  expect(await page.evaluate(() => window.__letti)).toEqual([]);
+});
