@@ -620,9 +620,10 @@
     // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
     const results = lista.map((r) => ({ id: r.tratto.chat, title: r.tratto.titolo || '', date: r.tratto.ts, snippet: testoRicordo(r.tratto) }));
     const daFuori = lista.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
+    const classeLetta = lista.reduce((c, r) => Math.max(c, Number(r.tratto.classeLetta) || 1), 1);
     return {
       type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Number(ora).toString(36)}`, _executed: true,
-      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
+      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}), ...(classeLetta > 1 ? { classeLetta } : {}) },
     };
   }
 
