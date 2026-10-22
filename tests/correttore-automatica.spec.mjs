@@ -404,6 +404,74 @@ test('nella pagina del correttore una parola imparata si cambia scrivendoci, e u
   await expect.poll(async () => (await imparato(app))?.rifiutate).toEqual(['marco']);
 });
 
+// Gli editor di testo ricco veri tengono un loro modello del testo, del cursore e dell'annulla: Lexical (WhatsApp Web)
+// rimette il cursore da sé, ProseMirror (ChatGPT) prende la scorciatoia di annulla.
+const EDITORI = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'editori');
+const editore = (nome, avvio) => `<!doctype html><meta charset="utf-8"><body style="padding:20px;font:22px sans-serif" lang="it">
+<div id="m" contenteditable="true" style="width:700px;border:1px solid #999;min-height:80px"></div>
+<script>${fs.readFileSync(path.join(EDITORI, `${nome}.js`), 'utf8')}</script><script>${avvio}(document.getElementById('m'));</script></body>`;
+
+async function apriEditore(app, openTab, testServer, html) {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: true },
+    });
+  });
+  const page = await testServer.openReady(openTab, html, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  return page;
+}
+
+test('nell\'editor Lexical la parola dopo una correzione resta staccata, e l\'annulla e il tasto destro la riportano com\'era', async ({ app, openTab, testServer }) => {
+  const page = await apriEditore(app, openTab, testServer, editore('lexical', 'avviaLX'));
+  const testo = () => page.evaluate(() => window.lxText().replace(/ /g, ' '));
+  await page.locator('#m').click();
+  await page.keyboard.type('Ciao marco come va, non so perchè ');
+  await expect.poll(testo).toBe('Ciao Marco come va, non so perché ');
+  await page.keyboard.press('Control+z');
+  await expect.poll(testo).toBe('Ciao Marco come va, non so perchè ');
+  await page.keyboard.type('ok');
+  await expect.poll(testo).toBe('Ciao Marco come va, non so perchè ok');
+  const p = await page.evaluate(() => {
+    const t = [...document.querySelectorAll('#m span')].find((s) => s.textContent.includes('Marco')).firstChild;
+    const i = t.nodeValue.indexOf('Marco');
+    const r = document.createRange();
+    r.setStart(t, i + 1); r.setEnd(t, i + 4);
+    const q = r.getBoundingClientRect();
+    return { x: q.left + q.width / 2, y: q.top + q.height / 2 };
+  });
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  await menuDi(page).voce('Annulla correzione').click();
+  await expect.poll(testo).toBe('Ciao marco come va, non so perchè ok');
+});
+
+test('nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la parola com\'era, e quello dopo non la rimette', async ({ app, openTab, testServer }) => {
+  const page = await apriEditore(app, openTab, testServer, editore('prosemirror', 'avviaPM'));
+  const testo = () => page.evaluate(() => window.pmView.state.doc.textContent.replace(/ /g, ' '));
+  await page.locator('#m .ProseMirror').click();
+  await page.keyboard.type('Domani vedo marco perchè ');
+  await expect.poll(testo).toBe('Domani vedo Marco perché ');
+  await page.keyboard.press('Control+z');
+  await expect.poll(testo).toBe('Domani vedo Marco perchè ');
+  await page.keyboard.type('va bene');
+  await expect.poll(testo).toBe('Domani vedo Marco perchè va bene');
+  await page.keyboard.press('Control+z');
+  await expect.poll(testo).not.toContain('perché');
+});
+
+test('nel campo modificabile semplice un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ce').click();
+  await page.keyboard.type('ok perchè ');
+  await expect(page.locator('#ce')).toHaveText('ok perché ');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#ce')).toHaveText('ok perchè ');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => page.locator('#ce').innerText()).not.toContain('perché');
+});
+
 // Una chat come tante: Invio manda il messaggio e la pagina svuota la casella da sé, senza un input.
 const CHAT = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
