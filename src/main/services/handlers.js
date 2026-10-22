@@ -2526,6 +2526,13 @@ async function eseguiAzioneFilo(action, {
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
+  // #1499 — il costo misura la cartella che l'indice leggerà, risolta qui come la risolve lui (sopra quella arrivata col
+  // modello). Una su un altro computer non si cerca: lo si dice subito, senza chiedere un OK che non porterebbe a niente.
+  if (type === 'CERCA_DOCUMENTI') {
+    const ch = await require('./documentiIndice').cartellaChiesta(action.cartella);
+    action._cartella = ch.serie ? '' : ch.percorso;
+    if (ch.rete) return { executed: false, kept: true, output: ricercaSuAltroComputer(action) };
+  }
   // Il comando si giudica come lo legge la shell che lo eseguirà, e parte con quella stessa (#1072.1: cmd toglie i `^`).
   if (type === 'ESEGUI_COMANDO') action._perimetro.shell = await shellDeiComandi();
 
