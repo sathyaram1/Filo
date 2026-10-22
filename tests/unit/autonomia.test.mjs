@@ -311,7 +311,10 @@ test('ogni tipo che urlExfil.contestoDaAzioni tratta come non fidato ha una font
   const X = globalThis.SN_URL_EXFIL;
   const src = readFileSync(join(ROOT, 'src', 'shared', 'urlExfil.js'), 'utf8');
   const corpo = src.slice(src.indexOf('function contestoDaAzioni('), src.indexOf('\n  }\n', src.indexOf('function contestoDaAzioni(')));
-  const tipi = [...new Set([...corpo.matchAll(/type === '([A-Z_]+)'/g)].map((m) => m[1]))];
+  // I rami del giro sui tipi: quelli che accendono `nonFidato`.
+  const rami = corpo.split(/\bif \(type === /).slice(1);
+  const tipi = [...new Set(rami.filter((r) => /nonFidato = true/.test(r.split(/\} else if \(type === /)[0]))
+    .flatMap((r) => [...r.split('{')[0].matchAll(/'([A-Z_]+)'/g)].map((m) => m[1])))];
   assert.ok(tipi.length >= 9, `tipi letti da contestoDaAzioni: ${tipi.join(', ')}`);
   for (const t of tipi) assert.equal(typeof (AL.REGISTRY[t] && AL.REGISTRY[t].fonte), 'function', `${t} senza fonte nel registro`);
   // Un esito con testo di altri, per ogni tipo: le uscite lo dicono non fidato e il compito lo legge sporco.
