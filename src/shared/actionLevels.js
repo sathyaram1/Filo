@@ -403,6 +403,7 @@
       campo: null,
       describe: (a) => {
         if (a && /^(true|1|si|sì|yes)$/i.test(String(a.autonomia ?? ''))) return 'Mostrarti i livelli di autonomia, da scegliere tu';
+        if (a && /^(true|1|si|sì|yes)$/i.test(String(a.privacy ?? ''))) return 'Mostrarti i livelli di privacy, da scegliere tu';
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
         const ids = Array.isArray(a?.spunta) ? a.spunta : [];
         return ids.length ? ['Segnare come fatto nell’intervista di benvenuto:\n', elenco(ids)] : 'Segnare come fatto nell’intervista di benvenuto';

@@ -116,8 +116,12 @@
         'sec-safebrowse-network': 'security.safeBrowse.networkSignals',
         'sec-safebrowse-llm': 'security.safeBrowse.llmJudge',
         'sec-safebrowse-sandbox': 'security.safeBrowse.sandbox',
-        'sec-delicate': 'security.pagineDelicate.enabled',
         'sec-delicate-sites': 'security.pagineDelicate.siti',
+        'privacy-livello-anticipo': 'security.privacy.livello',
+        'privacy-livello-delicate': 'security.privacy.livello',
+        'privacy-livello-sempre': 'security.privacy.livello',
+        'privacy-incognito': 'security.privacy.incognito',
+        'privacy-siti-anticipo': 'security.privacy.sitiAnticipo',
         'sec-auto-feedback': 'security.autoFeedback',
         'sec-riquadri-modello': 'security.riquadriRotti.modello',
         'cookie-mode-manual': 'security.cookies.mode',
@@ -128,7 +132,7 @@
         'fp-mode-default': 'security.fingerprint.mode',
         'fp-mode-privacy': 'security.fingerprint.mode',
       },
-      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites' },
+      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'privacy-chiedi': 'security.privacy.chiedi', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites' },
       altrove: { 'sec-perm-list': 'permessiSiti' },
       fuori: {
         'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
@@ -378,7 +382,9 @@
       // I siti cercati vengono per primi: oltre il tetto restano visibili, ed è questo che promette la nota.
       const siti = paroleSito(cerca);
       const cercati = siti.length ? tutti.filter((x) => sitoCombacia(x, siti)) : [];
-      const l = cercati.concat(tutti.filter((x) => !cercati.includes(x))).map(sitoLeggibile);
+      // Un elenco che non è di siti (le categorie della privacy) si legge col nome che gli dà la sua voce.
+      const leggi = voce && typeof voce.leggibile === 'function' ? voce.leggibile : sitoLeggibile;
+      const l = cercati.concat(tutti.filter((x) => !cercati.includes(x))).map(leggi);
       const altri = l.length > MAX_ELENCO ? ` e altri ${l.length - MAX_ELENCO} (chiedi con una parola del sito per vederli)` : '';
       const trovati = cercati.length ? `, con la ricerca: ${cercati.map(sitoLeggibile).join(', ')}` : '';
       return `${l.length} ${l.length === 1 ? 'voce' : 'voci'}${trovati ? `${trovati}; elenco` : ''}: ${l.slice(0, MAX_ELENCO).join(', ')}${altri}`;

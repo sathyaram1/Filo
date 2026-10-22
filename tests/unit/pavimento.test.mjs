@@ -1,0 +1,204 @@
+// #1589 — il pavimento: password, carte e CVV, codici usa e getta, chiavi e token (anche in un indirizzo) non arrivano a
+// nessun modello, a nessun livello. L'IBAN e il testo qualunque restano com'erano.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+globalThis.self = globalThis;
+const P = require('../../src/shared/pavimento.js');
+const S = P.SEGNAPOSTO;
+
+test('una password annunciata, una carta e il suo CVV diventano il segnaposto', () => {
+  const t = P.oscura('La tua password: Tr7#kq29Lm. Carta 4111 1111 1111 1111, CVV 123, scade 12/28.');
+  assert.ok(!t.includes('Tr7#kq29Lm'));
+  assert.ok(!/4111/.test(t));
+  assert.ok(!/\b123\b/.test(t));
+  assert.ok(t.includes(S));
+  assert.ok(t.includes('scade 12/28'), 'il resto della frase resta');
+});
+
+test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
+  const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
+  assert.ok(!t.includes('482913'));
+  assert.ok(!t.includes('sk-abcdefghijklmnop1234567890'));
+});
+
+test('il codice di verifica di una mail e un PIN non escono; un codice qualunque sì', () => {
+  assert.ok(!P.oscura('Il tuo codice di verifica è 482913').includes('482913'));
+  assert.ok(!P.oscura('Your verification code: 7731').includes('7731'));
+  assert.ok(!P.oscura('PIN: 4821').includes('4821'));
+  const t = 'Ordine numero 482913, codice cliente RSSMRA80A01H501U, CAP 20100.';
+  assert.equal(P.oscura(t), t);
+});
+
+test('dentro un indirizzo: la password prima della chiocciola e i parametri col nome di una credenziale', () => {
+  const t = P.oscura('Apri https://mario:Segreta99@esempio.it/reset?token=a8F3kL0pQ2zX9vB7&lang=it e poi https://x.it/?code=it');
+  assert.ok(!t.includes('Segreta99'));
+  assert.ok(!t.includes('a8F3kL0pQ2zX9vB7'));
+  assert.ok(t.includes('lang=it'), 'un parametro qualunque resta');
+  assert.ok(t.includes('code=it'), 'un valore corto non è una credenziale');
+  const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+  assert.ok(!P.oscura(`Authorization: Bearer ${jwt}`).includes(jwt));
+});
+
+test('l\'IBAN, i numeri qualunque e le frasi sulla password restano', () => {
+  const t = 'Il mio IBAN è IT60X0542811101000000123456. Come cambio la password di Gmail? Ordine 1234567890123.';
+  assert.equal(P.oscura(t), t);
+  assert.deepEqual(P.trova('Password dimenticata?'), []);
+});
+
+test('una password con l\'etichetta accanto non esce: tabella, colonna, etichetta sopra, parole in mezzo, senza cifre', () => {
+  const casi = [
+    ['Nome rete | CasaRossi\nPassword | Girasole2024', 'Girasole2024'],
+    ['| Utente | Password |\n|---|---|\n| mario | Tulipano!88 |', 'Tulipano!88'],
+    ['Utente\tPassword\nmario\tGirasole2024', 'Girasole2024'],
+    ['Password\tFiloPass99!', 'FiloPass99'],
+    ['Password amministratore\nMela!Verde77', 'Mela!Verde77'],
+    ['Password per il wifi: casaMia2019', 'casaMia2019'],
+    ['La password del wifi è casaMia2019', 'casaMia2019'],
+    ['Password: hunter', 'hunter'],
+    ['Nuova password: correcthorsebatterystaple', 'correcthorsebatterystaple'],
+    ['Check-in dalle 15.\n\nPassword\n\nGirasole2024\n\nBuona permanenza', 'Girasole2024'],
+    ['Le tue credenziali: utente mario, password Mela!Verde77', 'Mela!Verde77'],
+    ['Password del router (admin): Faro#Blu55', 'Faro#Blu55'],
+    ['Password - Nuvola2023', 'Nuvola2023'],
+    ['Password → Nuvola2023', 'Nuvola2023'],
+  ];
+  for (const [t, segreto] of casi) assert.ok(!P.oscura(t).includes(segreto), t);
+});
+
+test('le frasi e le etichette di un modulo intorno alla password restano: un falso allarme toglierebbe la parola ovunque', () => {
+  for (const t of [
+    'Password dimenticata?\nAccedi',
+    'Password\nMostra',
+    'La password è cambiata.',
+    'Password: obbligatoria',
+    'Password: almeno 8 caratteri',
+    'Filo ha visto un campo password o carta: valgono solo per quel sito',
+    'Non salva e non propone password né altre email: solo quella dell\'account',
+    '| Password manager | Prezzo |\n|---|---|\n| Bitwarden | 10 euro |',
+    'Password - Guida',
+    'Password\n\nL\'accesso è protetto da due passaggi',
+    'Cambia la password e-mail ogni 90 giorni',
+    'Imposta una password sicura!',
+    `Password: ${S}, e il resto del dato`,
+  ]) assert.equal(P.oscura(t), t, t);
+  assert.equal(P.oscura('Password: Girasole2024 (cambiala al primo accesso)'), `Password: ${S} (cambiala al primo accesso)`);
+});
+
+test('nei messaggi annidati cambia solo la stringa che ha un segreto; le foto non si toccano', () => {
+  const foto = { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } };
+  const msg = [{ role: 'user', content: [{ type: 'text', text: 'Password: Kx82mPq!z' }, foto] }, { role: 'system', content: 'ciao' }];
+  const out = P.oscuraTutto(msg);
+  assert.notEqual(out, msg);
+  assert.ok(!JSON.stringify(out).includes('Kx82mPq!z'));
+  assert.equal(out[0].content[1], foto);
+  assert.equal(out[1], msg[1]);
+  const pulito = [{ role: 'user', content: 'niente da togliere' }];
+  assert.equal(P.oscuraTutto(pulito), pulito);
+});
+
+// La regola sulla forma non dipende dalla disposizione: bottoni accanto, parole in mezzo, altre etichette, altre lingue.
+test('una password con la sua forma vicino a qualunque etichetta di credenziale non esce, comunque sia disposta', () => {
+  const casi = [
+    ['Password\nGirasole2024   Copia', 'Girasole2024'],
+    ['Password: casa mia al mare 2019', 'casa mia al mare 2019'],
+    ['Pass: Corallo5Neve', 'Corallo5Neve'],
+    ['Chiave di sicurezza di rete: Brezza7Mare', 'Brezza7Mare'],
+    ['WPA2 Key: Onda4Lunga', 'Onda4Lunga'],
+    ['Mot de passe : Rondine8Sud', 'Rondine8Sud'],
+    ['Passwort: Tanne3Grün', 'Tanne3Grün'],
+    ['La password per entrare nel portale aziendale di Mario è Ponte9Grigio', 'Ponte9Grigio'],
+    ['Codice di accesso: Lampo4Verde', 'Lampo4Verde'],
+    ['Password del wifi\n\n\nGirasole2024', 'Girasole2024'],
+    ['Password:Girasole2024', 'Girasole2024'],
+  ];
+  for (const [t, segreto] of casi) assert.ok(!P.oscura(t).includes(segreto), t);
+  assert.equal(P.oscura('Password:Girasole2024'), `Password:${S}`, 'il separatore resta');
+});
+
+test('un codice di accesso con le lettere esce intero, non solo le sue cifre; l\'anno altrove resta', () => {
+  const t = P.oscura('Codice di accesso: Girasole2024. Contratto firmato nel 2024.');
+  assert.ok(!t.includes('Girasole'));
+  assert.ok(t.includes('nel 2024'));
+});
+
+// La regola sulla forma vale anche per i codici: il codice prima della sua etichetta, col nome del servizio in mezzo,
+// sulla riga sotto, a gruppi o col prefisso. Un numero qualunque vicino a «codice» resta, e l'anno resta.
+test('un codice usa e getta non esce comunque sia disposto rispetto alla sua etichetta', () => {
+  const casi = [
+    ['551902 is your Instagram code', '551902'],
+    ['G-738214 è il tuo codice di verifica Google', '738214'],
+    ['Il tuo codice Amazon è 640317', '640317'],
+    ['Il tuo codice di verifica\n\n904127\n\nScade tra 10 minuti.', '904127'],
+    ['Il codice di verifica è 482 913', '482 913'],
+    ['WhatsApp code 482-913', '482-913'],
+    ['Your verification code: 48-29-13', '48-29-13'],
+    ['Usa il codice 482913 per accedere', '482913'],
+    ['Carta virtuale\nScadenza 12/27\nCodice di sicurezza 318', '318'],
+  ];
+  for (const [t, segreto] of casi) assert.ok(!P.oscura(t).includes(segreto), t);
+  for (const t of [
+    'Codice prodotto 48213 disponibile',
+    'Il codice della strada del 1992 dice',
+    'Il tuo codice sconto vale 1000 euro',
+    'Prezzo 1299 euro, codice articolo 556677',
+    'Il tuo ordine 12345678 è stato spedito. Codice di tracciamento AB12',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
+// Il codice lo dice la frase: col suo nome conta senza altre parole (gli SMS di Telegram, delle banche, dei pagamenti),
+// senza nome conta dopo «usa» o «enter»; un identificativo che non apre niente (prenotazione, ordine, cliente) resta.
+test('un codice usa e getta non esce come lo scrivono gli SMS; i codici che non aprono niente restano', () => {
+  for (const [t, segreto] of [
+    ['Telegram code: 48291', '48291'],
+    ['Intesa Sanpaolo: il codice per autorizzare l\'operazione è 73829164', '73829164'],
+    ['Inserisci il codice 615204 per completare l\'acquisto', '615204'],
+    ['PosteID: codice 482913', '482913'],
+    ['Usa 902817 per verificare il tuo account', '902817'],
+    ['Use 337164 to verify your account', '337164'],
+    ['Enter 482913 on the sign in page', '482913'],
+    ['Google\nVerify your identity\nG-482913', '482913'],
+    ['Il tuo codice di sblocco è 4829-1736-5521', '4829-1736-5521'],
+    ['Il PIN della SIM è 1234 e il PUK 48291736', '48291736'],
+    ['psw: Girasole2024', 'Girasole2024'],
+  ]) assert.ok(!P.oscura(t).includes(segreto), t);
+  for (const t of [
+    'Il tuo codice di prenotazione: 482913',
+    'Codice ordine: 4829-1736',
+    'Il tuo codice cliente è 551902',
+    'Il codice sconto ESTATE20 è valido fino al 30-06-26',
+    'Art. 1218 codice civile',
+    'Codice errore 4829: riprova',
+    'Verificato da 1532 utenti',
+    'Verifica lo stato della tua spedizione 48291736',
+    'Chiamaci al numero verde 800 482 913 per accedere al servizio',
+    'Prenotazione 551902 confermata',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
+// Al posto del valore una parola qualunque conta anche in mezzo alla riga e sotto i bottoni, se sta da sola.
+test('una password nel posto del valore non esce: in mezzo alla riga, con una parentesi dopo, sotto i bottoni', () => {
+  const casi = [
+    ['Utente: mario Password: tramonto', 'tramonto'],
+    ['Password: sunflower (non condividerla)', 'sunflower'],
+    ['Rete: CasaRossi · Password: tramonto · Canale 6', 'tramonto'],
+    ['Password\nMostra\nGirasole2024', 'Girasole2024'],
+    ['Password\n••••••••\nCopia\nGirasole2024', 'Girasole2024'],
+    ['Username\nmario\nPassword\nsunflower', 'sunflower'],
+  ];
+  for (const [t, segreto] of casi) assert.ok(!P.oscura(t).includes(segreto), t);
+  for (const t of ['Password\nAccedi', 'Password\nAccedi\nPassword dimenticata?', 'Password: Ciao, come stai?']) assert.equal(P.oscura(t), t, t);
+});
+
+test('le etichette corte e le frasi intorno restano quando il valore non ha la forma di una password', () => {
+  for (const t of [
+    'Green pass: valido',
+    'Ski pass 3 giorni: 120 euro',
+    'Password: deve avere almeno otto caratteri, una maiuscola e un numero',
+    'Scrivi a mario.rossi@esempio.it per la password',
+  ]) assert.equal(P.oscura(t), t, t);
+  assert.equal(P.oscura('Password: Girasole2024 (cambiala al primo accesso)'), `Password: ${S} (cambiala al primo accesso)`);
+});

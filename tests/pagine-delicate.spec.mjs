@@ -1,8 +1,9 @@
-// #1004 — le pagine delicate non partono verso i modelli nelle funzioni automatiche, e il riassunto delle schede
-// chiuse si spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
+// #1004 — le pagine delicate non partono verso i modelli nelle funzioni automatiche quando il livello di privacy lo dice
+// (#1589: di serie «Tutto in anticipo», qui spesso «Chiedi sulle delicate»), e il riassunto delle schede chiuse si
+// spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmText, CONFIRM_HOST, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
@@ -33,6 +34,9 @@ async function modelliFinti(app) {
 }
 
 const mandato = (app) => app.evaluate(() => globalThis.__mandato.slice());
+// Il livello di privacy (#1589) come lo scrive Sicurezza.
+const livelloPrivacy = (app, livello, altro = {}) => app.evaluate(({}, p) => globalThis.SN_STORAGE.updateSettings({ security: { privacy: p } }),
+  { livello, ...altro });
 // Nel mondo dei content script della scheda (quello del preload): come lo chiama Filo dopo uno screenshot o una copia.
 const nelContenutoDi = (app, titolo, codice) => app.evaluate(async ({ BrowserWindow }, { titolo, codice }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
@@ -54,8 +58,9 @@ async function apriEChiudi({ app, shell, openTab, testServer }, titolo, corpo) {
 
 const CON_PASSWORD = `<p>${SEGRETO}</p><form><input name="utente"><input type="password" name="pw"></form>`;
 
-test('chiusa una pagina con un campo password, al modello del riassunto e all\'indice non arriva niente', async ({ app, shell, openTab, testServer }) => {
+test('a «Chiedi sulle delicate», chiusa una pagina con un campo password, al modello del riassunto e all\'indice non arriva niente', async ({ app, shell, openTab, testServer }) => {
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Il mio conto', CON_PASSWORD);
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
   await t.chiudi();
@@ -73,9 +78,8 @@ test('chiusa una pagina con un campo password, al modello del riassunto e all\'i
   expect(partito.some((m) => m.testo.includes('Saldo disponibile') || m.testo.includes('Il mio conto'))).toBe(false);
 });
 
-test('con l\'interruttore delle pagine delicate spento, il testo della stessa pagina arriva al riassunto', async ({ app, shell, openTab, testServer }) => {
+test('di serie («Tutto in anticipo») il testo di una pagina con un campo password arriva al riassunto', async ({ app, shell, openTab, testServer }) => {
   await modelliFinti(app);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { enabled: false } } }));
   const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Il mio conto', CON_PASSWORD);
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
   await t.chiudi();
@@ -111,6 +115,7 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
 
 test('la pulizia automatica delle schede: di una pagina delicata al modello va solo il tipo, mai titolo, indirizzo o testo', async ({ app }) => {
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   await app.evaluate(() => globalThis.SN_TAB_TRIAGE_DECIDE({
     trigger: 'idle',
     tabs: [
@@ -124,9 +129,22 @@ test('la pulizia automatica delle schede: di una pagina delicata al modello va s
   expect(chiamata.testo).not.toContain('482913');
   expect(chiamata.testo).not.toContain('mail.google.com');
   expect(chiamata.testo).toContain('Gatto - Wikipedia');
+
+  // #1589 — di serie la posta parte in anticipo: il titolo sì, il codice di verifica no (il pavimento vale a ogni livello).
+  await livelloPrivacy(app, 'anticipo');
+  await app.evaluate(() => { globalThis.__mandato = []; });
+  await app.evaluate(() => globalThis.SN_TAB_TRIAGE_DECIDE({
+    trigger: 'idle',
+    tabs: [{ url: 'https://mail.google.com/mail/u/0/#inbox', title: 'Posta in arrivo (3)', contentExtract: 'Il tuo codice di verifica è 482913', idleMin: 400 }],
+  }));
+  const [inAnticipo] = (await mandato(app)).filter((m) => m.tipo === 'altro');
+  expect(inAnticipo.testo).toContain('Posta in arrivo (3)');
+  expect(inAnticipo.testo).not.toContain('482913');
+  expect(inAnticipo.testo).toContain('[dato riservato]');
 });
 
 test('nella chat una scheda delicata aperta entra solo col nome del sito', async ({ app, openTab, testServer }) => {
+  await livelloPrivacy(app, 'delicate');
   await testServer.openReady(openTab,
     `<!doctype html><html><head><title>Movimenti di Mario Rossi</title></head><body>${CON_PASSWORD}</body></html>`,
     { pubblico: true });
@@ -141,15 +159,11 @@ test('nella chat una scheda delicata aperta entra solo col nome del sito', async
 
 const impostazioni = async (shell) => (await shell.evaluate(() => window.filoShell.message({ type: 'get_settings' }))).settings;
 
-test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interruttore si spegne da lì', async ({ app, shell, openTab, testServer }) => {
+test('in Sicurezza un sito aggiunto all\'elenco chiede sempre, anche a «Tutto in anticipo»', async ({ app, shell, openTab, testServer }) => {
   await modelliFinti(app);
   const sicurezza = await openTab('filo://security/security.html');
-  await expect(sicurezza.locator('#sec-delicate')).toBeChecked({ timeout: 8000 });
-  await expect(sicurezza.locator('#sec-delicate-label')).toHaveText('Non mandare ai modelli le pagine delicate');
-  // La casella dei siti è figlia dell'interruttore: rientra come la sua descrizione, non sta allineata alle voci sorelle.
-  const sinistra = (sel) => sicurezza.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().left));
-  expect(await sinistra('#sec-delicate-sites')).toBe(await sinistra('#sec-delicate-desc'));
-  expect(await sinistra('#sec-delicate-sites')).toBeGreaterThan(await sinistra('#sec-delicate'));
+  await expect(sicurezza.locator('#privacy-livello-anticipo')).toBeChecked({ timeout: 8000 });
+  await expect(sicurezza.locator('#sec-delicate-sites-label')).toHaveText('Siti dove Filo chiede sempre, uno per riga');
   // Un nome con lo spazio si ridice intero anche accanto a un sito sulla stessa riga (#718.3).
   await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi\nmario bianchi, altro-studio.test');
   await sicurezza.locator('#sec-delicate-sites').blur();
@@ -162,11 +176,6 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   await expect.poll(() => voceDi(app, 'Area clienti dello studio'), { timeout: 8_000 })
     .toEqual({ delicata: 'utente', summary: '', snippet: '', embedding: false });
   expect((await mandato(app)).some((m) => m.testo.includes('Saldo disponibile'))).toBe(false);
-
-  await sicurezza.bringToFront();
-  await sicurezza.locator('#sec-delicate').uncheck();
-  await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.enabled, { timeout: 4000 }).toBe(false);
-  await expect(sicurezza.locator('#sec-delicate-sites')).toBeDisabled();
 });
 
 test('in Preferenze il riassunto delle schede chiuse si spegne e si riaccende', async ({ shell, openTab }) => {
@@ -180,6 +189,7 @@ test('in Preferenze il riassunto delle schede chiuse si spegne e si riaccende', 
 
 test('il testo letto da una pagina delicata non parte sotto l\'indirizzo della pagina dopo, anche se quella non ha testo', async ({ app, shell, openTab, testServer }) => {
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   // blocked.test risponde dal mini server: un altro sito pubblico, qui con una pagina senza testo (un'immagine, un PDF).
   const vuota = testServer.html('<!doctype html><html><head><title>Immagine</title></head><body></body></html>')
     .replace('127.0.0.1', 'blocked.test');
@@ -205,6 +215,7 @@ test('il testo letto da una pagina delicata non parte sotto l\'indirizzo della p
 
 test('il titolo di una pagina delicata non resta sulla scheda quando la pagina dopo non ne ha uno', async ({ app, shell, openTab, testServer }) => {
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   const IBAN = 'IT60X0542811101000000123456';
   const senzaTitolo = testServer.html('<!doctype html><html><head></head><body><p>Una pagina pubblica qualunque.</p></body></html>')
     .replace('127.0.0.1', 'blocked.test');
@@ -295,13 +306,23 @@ const titoloDavanti = (shell) => shell.evaluate(async () => {
 
 test('in Sicurezza si vedono i siti segnati per il campo password: uno tolto torna al riassunto, e si rimette', async ({ app, shell, openTab, testServer }) => {
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
 
   const sicurezza = await openTab('filo://security/security.html');
   const riga = sicurezza.locator('#sec-delicate-campi-list li', { hasText: 'sito-pubblico.test' });
   await expect(sicurezza.locator('#sec-delicate-campi-title')).toHaveText('Siti dove Filo ha visto un campo password o carta', { timeout: 8000 });
+  // Toglierlo alza quanto esce (#1589): vuole «conferma»; annullato resta delicato.
   await riga.getByRole('button', { name: 'Non è delicato' }).click();
+  await expect(sicurezza.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5000 });
+  await clickConfirm(sicurezza, 'cancel');
+  await expect(riga.getByRole('button', { name: 'Non è delicato' })).toBeEnabled();
+  expect((await impostazioni(shell)).security.pagineDelicate.nonDelicati || []).toEqual([]);
+  await riga.getByRole('button', { name: 'Non è delicato' }).click();
+  await fillConfirmInput(sicurezza, 'conferma');
+  await scrollConfirmToEnd(sicurezza);
+  await clickConfirm(sicurezza, 'danger');
   await expect(riga).toContainText('non delicato per te');
   await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.nonDelicati, { timeout: 4000 })
     .toEqual(['sito-pubblico.test']);
@@ -436,7 +457,7 @@ test('screenshot e immagini copiate da una pagina delicata non vanno al modello 
   await expect.poll(() => voce(`${PNG}#b`), { timeout: 4_000 }).toBe('Immagine da una pagina delicata');
   expect((await immagini()).length, 'nessuna immagine nuova al modello').toBe(1);
 
-  // La descrizione chiesta aprendo il tasto destro su un'immagine resta com'è.
+  // Chiesta col clic su «Descrivi» del tasto destro, la descrizione parte anche da qui.
   const chiesta = await nelContenuto('Il mio conto', `chrome.runtime.sendMessage({ type: SN_MSG.MSG.AI_REQUEST,
     action: SN_CONST.ACTIONS.DESCRIBE_IMAGE, payload: { dataUrl: ${JSON.stringify(`${PNG}#c`)} } })`);
   expect(chiesta.ok).toBe(true);
@@ -482,9 +503,10 @@ const puntoDi = (page, id, pezzo) => page.evaluate(([i, w]) => {
 }, [id, pezzo]);
 
 // #1274 — copiare un IBAN è il gesto più comune su una banca: la spiegazione non si prepara, quella chiesta resta.
-test('su una pagina delicata la selezione non prepara la spiegazione; il tasto destro la chiede una volta', async ({ app, openTab, testServer }) => {
+test('su una pagina delicata la selezione non prepara la spiegazione; il tasto destro la chiede al clic su «Spiega»', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await modelliFinti(app);
+  await livelloPrivacy(app, 'delicate');
   const IBAN = 'IT60X0542811101000000123456';
   const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Il mio conto</title></head>
@@ -500,6 +522,12 @@ test('su una pagina delicata la selezione non prepara la spiegazione; il tasto d
   expect(await spiegazioni()).toEqual([]);
 
   await page.mouse.click(p.x, p.y, { button: 'right' });
+  // #1589 — aperto il menu non parte niente: c'è «Spiega», e parte al clic.
+  const spiega = menuDi(page).locator('.sn-menu .sn-menu-inline-explain .sn-menu-inline-chiedi-tasto');
+  await expect(spiega).toHaveText('Spiega', { timeout: 10_000 });
+  await pausa(800);
+  expect(await spiegazioni()).toEqual([]);
+  await spiega.click();
   await expect(menuDi(page).locator('.sn-menu .sn-menu-inline-explain')).toContainText('Riassunto finto della pagina', { timeout: 10_000 });
   expect((await spiegazioni()).length).toBe(1);
 

@@ -99,7 +99,15 @@
     if (!v) return;
     const btn = r.querySelector('.dash-cambio-annulla');
     btn.disabled = true;
-    const res = await d.send({ type: MSG.CAMBI_ANNULLA, id: v.annullatoDa || v.id });
+    const id = v.annullatoDa || v.id;
+    let res = await d.send({ type: MSG.CAMBI_ANNULLA, id });
+    // Rimetterlo com'era alza quanto esce verso i modelli (#1589): la parola scritta, come in Sicurezza.
+    if (res && res.error === 'conferma' && res.conferma) {
+      const C = global.SN_CONFIRM_UI;
+      const ok = C ? await C.confirmTyped(res.conferma).catch(() => false) : false;
+      if (!ok) { btn.disabled = false; return; }
+      res = await d.send({ type: MSG.CAMBI_ANNULLA, id, confermato: true });
+    }
     btn.disabled = false;
     if (!res || !res.ok) {
       btn.textContent = 'non riuscito';

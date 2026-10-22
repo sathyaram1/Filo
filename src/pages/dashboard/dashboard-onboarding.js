@@ -97,12 +97,13 @@
       pushHistory({ role, text: m.text });
       const bolla = makeBubble({ role, text: m.text, markdown: role === 'filo' });
       bubblesEl.appendChild(bolla);
-      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia()
-        : (role === 'filo' && m.contatori ? sceltaContatori() : null);
-      if (scelta) {
+      const scelte = role === 'filo'
+        ? [m.autonomia ? sceltaAutonomia() : null, m.privacy ? sceltaPrivacy() : null, m.contatori ? sceltaContatori() : null].filter(Boolean)
+        : [];
+      if (scelte.length) {
         const wrap = document.createElement('div');
         wrap.className = 'dash-bubble-actions';
-        wrap.appendChild(scelta);
+        wrap.append(...scelte);
         bolla.appendChild(wrap);
       }
     }
@@ -146,20 +147,51 @@
     renderOnboardingThread(state);
   }
 
-  // ── La scelta dell'autonomia (#1188) ──────────────────────────────────────
-  // Filo la mostra sotto la sua domanda, il livello lo sceglie l'utente con le regole di Preferenze (alzarlo vuole
+  // ── Le scelte a livelli: autonomia (#1188) e privacy (#1589) ──────────────
+  // Filo la mostra sotto la sua domanda, il livello lo sceglie l'utente con le regole delle Impostazioni (alzarlo vuole
   // «conferma»). Finché la domanda è in sospeso il clic è anche la risposta, e la conversazione va avanti.
-  async function livelloSalvato() {
-    try {
-      const s = await global.SN_STORAGE.getSettings();
-      return (s && s.autonomia && s.autonomia.livello) || '';
-    } catch (_) { return ''; }
+  // `tacche(i, n)`: quante piene ha il livello i, così la riga dice da sé il verso (più autonomia, più cose che escono).
+  const SCELTE = {
+    autonomia: {
+      aria: 'Quanto Filo fa da solo',
+      pronta: () => Boolean(global.SN_AUTONOMIA),
+      livelli: () => global.SN_AUTONOMIA.livelliSelezionabili(),
+      info: (id) => global.SN_AUTONOMIA.infoLivello(id),
+      attivo: (v) => global.SN_AUTONOMIA.livelloAttivo(v),
+      salvato: (s) => (s && s.autonomia && s.autonomia.livello) || '',
+      serve: (s, attuale, nuovo) => global.SN_AUTONOMIA.richiestaCambioLivello(attuale, nuovo),
+      conferma: (nuovo) => global.SN_AUTONOMIA.confermaAlzata(nuovo),
+      scrivi: (nuovo) => ({ autonomia: { livello: nuovo } }),
+      tacche: (i) => i + 1,
+    },
+    privacy: {
+      aria: 'Quanto Filo manda ai modelli',
+      pronta: () => Boolean(global.SN_LIVELLI_PRIVACY),
+      livelli: () => global.SN_LIVELLI_PRIVACY.LIVELLI,
+      info: (id) => {
+        const L = global.SN_LIVELLI_PRIVACY;
+        return { nome: L.nomeLivello(id), frase: L.frase(id) };
+      },
+      attivo: (v) => (global.SN_LIVELLI_PRIVACY.ORDINE.includes(v) ? v : global.SN_LIVELLI_PRIVACY.PREDEFINITA.livello),
+      salvato: (s) => (s ? global.SN_LIVELLI_PRIVACY.regola(s).livello : ''),
+      serve: (s, _attuale, nuovo) => {
+        const L = global.SN_LIVELLI_PRIVACY;
+        const r = L.regola(s || {});
+        return L.alza(r, { livello: nuovo }) ? 'conferma' : 'si';
+      },
+      conferma: (nuovo) => global.SN_LIVELLI_PRIVACY.confermaAlzata({ livello: nuovo }),
+      scrivi: (nuovo) => ({ security: { privacy: { livello: nuovo } } }),
+      tacche: (i, n) => n - i,
+    },
+  };
+
+  async function impostazioni() {
+    try { return await global.SN_STORAGE.getSettings(); } catch (_) { return null; }
   }
 
   function mostraFrase(box, id) {
-    const A = global.SN_AUTONOMIA;
     const frase = box.querySelector('.dash-autonomia-frase');
-    if (frase) frase.textContent = A.infoLivello(id || box.dataset.livello).frase;
+    if (frase) frase.textContent = SCELTE[box.dataset.scelta].info(id || box.dataset.livello).frase;
   }
 
   function segnaLivello(box, livello) {
@@ -172,11 +204,13 @@
     if (!box.matches(':hover') && !box.contains(document.activeElement)) mostraFrase(box);
   }
 
-  function aggiornaSceltaAutonomia(livello) {
-    const A = global.SN_AUTONOMIA;
-    if (!A) return;
-    for (const box of document.querySelectorAll('.dash-autonomia-scelta')) segnaLivello(box, A.livelloAttivo(livello));
+  function aggiornaScelta(tipo, livello) {
+    const S = SCELTE[tipo];
+    if (!S || !S.pronta()) return;
+    for (const box of document.querySelectorAll(`.dash-autonomia-scelta[data-scelta="${tipo}"]`)) segnaLivello(box, S.attivo(livello));
   }
+  const aggiornaSceltaAutonomia = (livello) => aggiornaScelta('autonomia', livello);
+  const aggiornaSceltaPrivacy = (livello) => aggiornaScelta('privacy', livello);
 
   // Solo se è ancora la domanda in sospeso: dopo un messaggio dell'utente il clic cambia il livello e basta.
   function rispondiConScelta(box, livello) {
@@ -184,26 +218,27 @@
     const dopo = [...bubblesEl.querySelectorAll('.dash-bubble-user')]
       .some((u) => box.compareDocumentPosition(u) & Node.DOCUMENT_POSITION_FOLLOWING);
     if (dopo) return;
-    if (rispondi(`Scelgo ${global.SN_AUTONOMIA.infoLivello(livello).nome}.`)) box.dataset.risposto = '1';
+    if (rispondi(`Scelgo ${SCELTE[box.dataset.scelta].info(livello).nome}.`)) box.dataset.risposto = '1';
   }
 
   async function scegliLivello(box, nuovo) {
-    const A = global.SN_AUTONOMIA;
+    const S = SCELTE[box.dataset.scelta];
     if (box.dataset.occupato === '1') return;
     box.dataset.occupato = '1';
     try {
-      const attuale = A.livelloAttivo((await livelloSalvato()) || box.dataset.livello);
-      const serve = A.richiestaCambioLivello(attuale, nuovo);
+      const s = await impostazioni();
+      const attuale = S.attivo(S.salvato(s) || box.dataset.livello);
+      const serve = S.serve(s, attuale, nuovo);
       if (serve === 'no') return;
       if (serve === 'conferma') {
         const Ui = global.SN_CONFIRM_UI;
-        if (!Ui || !(await Ui.confirmTyped(A.confermaAlzata(nuovo)))) return;
+        if (!Ui || !(await Ui.confirmTyped(S.conferma(nuovo)))) return;
       }
       if (nuovo !== attuale) {
-        const r = await send({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
+        const r = await send({ type: MSG.UPDATE_SETTINGS, settings: S.scrivi(nuovo) });
         if (!r || r.ok === false) return;
       }
-      aggiornaSceltaAutonomia(nuovo);
+      aggiornaScelta(box.dataset.scelta, nuovo);
       rispondiConScelta(box, nuovo);
     } catch (_) {
     } finally {
@@ -211,16 +246,17 @@
     }
   }
 
-  function sceltaAutonomia(livello) {
-    const A = global.SN_AUTONOMIA;
-    if (!A) return null;
+  function sceltaLivelli(tipo, livello) {
+    const S = SCELTE[tipo];
+    if (!S || !S.pronta()) return null;
     const box = document.createElement('div');
     box.className = 'dash-autonomia-scelta';
+    box.dataset.scelta = tipo;
     const gruppo = document.createElement('div');
     gruppo.className = 'dash-autonomia-livelli';
     gruppo.setAttribute('role', 'group');
-    gruppo.setAttribute('aria-label', 'Quanto Filo fa da solo');
-    const livelli = A.livelliSelezionabili();
+    gruppo.setAttribute('aria-label', S.aria);
+    const livelli = S.livelli();
     livelli.forEach((l, i) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -229,9 +265,10 @@
       const tacche = document.createElement('span');
       tacche.className = 'dash-autonomia-tacche';
       tacche.setAttribute('aria-hidden', 'true');
+      const piene = S.tacche(i, livelli.length);
       for (let j = 0; j < livelli.length; j++) {
         const t = document.createElement('span');
-        t.className = `dash-autonomia-tacca${j <= i ? ' piena' : ''}`;
+        t.className = `dash-autonomia-tacca${j < piene ? ' piena' : ''}`;
         tacche.appendChild(t);
       }
       const nome = document.createElement('span');
@@ -252,7 +289,7 @@
       const misura = document.createElement('span');
       misura.className = 'dash-autonomia-frase-misura';
       misura.setAttribute('aria-hidden', 'true');
-      misura.textContent = A.infoLivello(l.id).frase;
+      misura.textContent = S.info(l.id).frase;
       posto.appendChild(misura);
     }
     const frase = document.createElement('div');
@@ -260,10 +297,22 @@
     frase.setAttribute('aria-live', 'polite');
     posto.appendChild(frase);
     box.append(gruppo, posto);
-    segnaLivello(box, A.livelloAttivo(livello));
+    segnaLivello(box, S.attivo(livello));
     // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
-    livelloSalvato().then((lv) => { if (lv) segnaLivello(box, A.livelloAttivo(lv)); });
+    impostazioni().then((s) => { const lv = S.salvato(s); if (lv) segnaLivello(box, S.attivo(lv)); });
     return box;
+  }
+  const sceltaAutonomia = (livello) => sceltaLivelli('autonomia', livello);
+  const sceltaPrivacy = (livello) => sceltaLivelli('privacy', livello);
+  // Le scelte che un'azione ONBOARDING ha mostrato, sotto la risposta del turno: una o tutte e due.
+  function scelteDi(output) {
+    const o = output || {};
+    const el = [o.sceltaAutonomia ? sceltaAutonomia(o.livello) : null, o.sceltaPrivacy ? sceltaPrivacy(o.livelloPrivacy) : null].filter(Boolean);
+    if (el.length < 2) return el[0] || null;
+    const wrap = document.createElement('div');
+    wrap.className = 'dash-scelte-accoglienza';
+    wrap.append(...el);
+    return wrap;
   }
 
   // ── La scelta dei contatori anonimi (#1461) ───────────────────────────────
@@ -608,5 +657,8 @@
     aggiornaSceltaAutonomia,
     sceltaContatori,
     aggiornaSceltaContatori,
+    sceltaPrivacy,
+    aggiornaSceltaPrivacy,
+    scelteDi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

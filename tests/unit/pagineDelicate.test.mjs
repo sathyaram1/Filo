@@ -1,5 +1,5 @@
 // #1004 — quali pagine sono delicate: campo password visto, dominio negli elenchi di serie o remoti, dominio aggiunto
-// dall'utente. Di queste i lavori automatici non mandano testo ai modelli.
+// dall'utente. Cosa ne parte da solo lo decidono i livelli di privacy (#1589), che il filtro del main applica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,7 +33,6 @@ test('le aree riservate della pubblica amministrazione sono delicate di serie', 
   assert.equal(PD.classifica('https://inps.it.truffa.example/'), null);
   // L'elenco remoto la cambia sostituendola per intero, come le altre categorie: Gestione la mostra intera.
   assert.equal(PD.classifica('https://www.comune.esempio.it/', { elenco: PD.elenco({ pa: ['comune.esempio.it'] }) }), 'pa');
-  assert.equal(PD.classifica('https://www.inps.it/', { attivo: false }), null);
 });
 
 test('un nome che contiene quello di una banca non è la banca, e una pagina qualunque non è delicata', () => {
@@ -66,13 +65,6 @@ test('un sito che ha mostrato un campo password o carta è delicato', () => {
   assert.equal(PD.classifica('https://altro.example/', { campi: (h) => visti.has(h) }), null);
 });
 
-test('l\'interruttore spento: nessuna pagina è delicata, nemmeno la banca', () => {
-  const s = conSiti(['studiorossi.it'], false);
-  assert.equal(PD.attivo(s), false);
-  assert.equal(PD.classifica('https://www.intesasanpaolo.com/', { attivo: PD.attivo(s) }), null);
-  assert.equal(PD.attivo({}), true, 'mai scritto vale acceso');
-});
-
 test('la configurazione remota sostituisce una categoria per intero e ne può aggiungere', () => {
   const el = PD.elenco({ banche: ['MiaBanca.example', 'www.altra.example'], pa: ['inps.it'], posta: 'non un elenco' });
   assert.deepEqual(el.banche, ['miabanca.example', 'altra.example']);
@@ -83,47 +75,61 @@ test('la configurazione remota sostituisce una categoria per intero e ne può ag
   assert.deepEqual(PD.elenco(null).banche, PD.PREDEFINITI.banche);
 });
 
+const livello = (l, privacy = {}) => ({ security: { privacy: { livello: l, ...privacy } } });
+
 test('main: il campo password segna tutto il sito per la sessione, dall\'accesso alla pagina del conto', async () => {
   Delicate.segnaCampi('https://accesso.banca-di-prova.example/login');
-  const fuori = await Delicate.filtro({});
-  assert.equal(fuori('https://online.banca-di-prova.example/movimenti'), 'campi');
-  assert.equal(fuori('https://un-altro-sito.example/'), null);
-  const spento = await Delicate.filtro(conSiti([], false));
-  assert.equal(spento('https://online.banca-di-prova.example/movimenti'), null);
+  const delicate = await Delicate.filtro(livello('delicate'));
+  assert.equal(delicate('https://online.banca-di-prova.example/movimenti'), 'campi');
+  assert.equal(delicate('https://un-altro-sito.example/'), null);
+  // #1589 — di serie il testo parte, l'immagine no: il pavimento vale a ogni livello.
+  assert.equal((await Delicate.filtro({}))('https://online.banca-di-prova.example/movimenti'), null);
+  assert.equal((await Delicate.filtro({}, { tipo: 'immagine' }))('https://online.banca-di-prova.example/movimenti'), 'campi');
+  assert.equal((await Delicate.filtro(livello('anticipo', { chiedi: [] }), { tipo: 'immagine' }))('https://un-altro-sito.example/'), null);
 });
 
-test('main: una scheda archiviata porta il suo motivo, che vale finché l\'interruttore è acceso', async () => {
-  const acceso = await Delicate.filtro({});
-  const spento = await Delicate.filtro(conSiti([], false));
+test('main: il pavimento delle immagini guarda la pagina della scheda, non il ricordo del sito', async () => {
+  const scheda = {};
+  Delicate.segnaCampi('https://accounts.google.com/signin');
+  const f = await Delicate.filtro({}, { tipo: 'immagine', wc: scheda });
+  assert.equal(f('https://mail.google.com/mail/u/0/'), null, 'da Gmail l\'immagine parte anche dopo un accesso a Google');
+  Delicate.mostraCampi(scheda, 'https://accounts.google.com/signin');
+  assert.equal(f('https://accounts.google.com/signin'), 'campi');
+  assert.equal(f('https://mail.google.com/mail/u/0/'), null, 'cambiata pagina, il campo non è più a schermo');
+});
+
+test('main: una scheda archiviata porta quello che era, e si decide coi livelli di adesso', async () => {
+  const delicate = await Delicate.filtro(livello('delicate'));
+  const serie = await Delicate.filtro({});
   const voce = { url: 'https://sito-qualunque.example/', delicata: 'campi' };
-  assert.equal(acceso.voce(voce), 'campi');
-  assert.equal(spento.voce(voce), null);
-  assert.equal(acceso.voce({ url: 'https://mail.google.com/' }), 'posta');
-  assert.equal(acceso.voce({ url: 'https://it.wikipedia.org/' }), null);
+  assert.equal(delicate.voce(voce), 'campi');
+  assert.equal(serie.voce(voce), null);
+  assert.equal(delicate.voce({ url: 'https://mail.google.com/' }), 'posta');
+  assert.equal(serie.voce({ url: 'https://mail.google.com/' }), null, 'la posta parte in anticipo di serie');
+  assert.equal(serie.voce({ url: 'https://www.miodottore.it/' }), 'sanita', 'la sanità chiede di serie');
+  assert.equal(serie.voce({ url: 'https://it.wikipedia.org/', delicata: 'sempre' }), null, '«sempre» è una decisione, non una classe');
+  assert.equal((await Delicate.filtro(livello('sempre'))).voce({ url: 'https://it.wikipedia.org/' }), 'sempre');
 });
 
-test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si aggiunge un sito delicato', () => {
+test('main: in incognito vale il livello dell\'incognito, di serie «Chiedi sempre»', async () => {
+  const f = await Delicate.filtro({}, { incognito: true });
+  assert.equal(f('https://it.wikipedia.org/wiki/Gatto'), 'incognito');
+  assert.equal(f('filo://newtab/'), null);
+  assert.equal(await Delicate.chiede('https://it.wikipedia.org/', { incognito: false }), null);
+});
+
+test('a parole: si spegne il riassunto, si cambia il livello di privacy, si aggiunge un sito delicato', () => {
   for (const m of ['constants', 'contenutoEsterno', 'storage', 'nomiSito', 'preferences', 'cambi']) require(`../../src/shared/${m}.js`);
   const P = globalThis.SN_PREF;
   const r = P.buildPreferencePartial('riassunto_schede_chiuse', 'no');
   assert.deepEqual(r.partial, { riassuntoSchede: { enabled: false } });
   assert.equal(r.costo, 1);
-  const p = P.buildPreferencePartial('pagine_delicate', 'spento');
-  assert.deepEqual(p.partial, { security: { pagineDelicate: { enabled: false } } });
+  const p = P.buildPreferencePartial('pagine_delicate', 'tutto in anticipo', { attuali: livello('delicate') });
+  assert.deepEqual(p.partial, { security: { privacy: { livello: 'anticipo' } } });
   assert.equal(p.costo, 2);
-  assert.equal(p.allenta, true, 'spegnere la protezione abbassa una difesa (#530)');
-  assert.match(p.risk, /saldi, movimenti, mail e referti/);
-  // #1274 — chi lo spegne sa tutto quello che torna ai modelli, non solo il riassunto.
-  for (const cosa of [/titoli delle schede di banca e posta/, /screenshot/, /spiegazione si prepara/]) assert.match(p.risk, cosa);
-  require('../../src/shared/i18n.js');
-  const desc = globalThis.SN_I18N.t('options_security_delicate_desc');
-  for (const cosa of [/pubblica amministrazione/, /chat/, /screenshot/, /spiegazione/]) assert.match(desc, cosa);
-  // #1004.1 — l'owner tiene il correttore acceso anche qui: la protezione non deve promettere che non parte niente.
-  assert.match(desc, /correttore resta acceso/);
-  require('../../src/shared/capabilities.js');
-  const cap = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'pagine-delicate');
-  assert.match(cap.desc, /tranne il correttore/);
-  assert.match(cap.doesNot, /Non ferma il correttore/);
+  assert.equal(p.allenta, true, 'mandare di più abbassa una difesa (#530)');
+  // Chi alza sa cosa torna ai modelli, e che il pavimento resta.
+  for (const cosa of [/posta, banca e sanità/, /correttore/, /password, carte e codici/i]) assert.match(p.risk, cosa);
   const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');
   assert.deepEqual(d.partial, { descriviImmagini: { enabled: false } });
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
@@ -141,7 +147,7 @@ test('main: il campo password visto resta dopo un riavvio, e dall\'incognito non
   globalThis.SN_STORAGE = {
     getRaw: async (k, d) => (k in disco ? JSON.parse(JSON.stringify(disco[k])) : d),
     setRaw: async (k, v) => { disco[k] = JSON.parse(JSON.stringify(v)); },
-    getSettings: async () => ({}),
+    getSettings: async () => livello('delicate'),
   };
   const nuovo = () => {
     delete require.cache[require.resolve('../../src/main/services/pagineDelicate.js')];
@@ -209,7 +215,7 @@ test('la pagina Privacy, fra quello che parte senza che lo si chieda, nomina anc
   const sezione = testo.slice(da, testo.indexOf('\n\n', testo.indexOf('\n- ', da) + 1) + 1 || undefined);
   const voci = sezione.split('\n').filter((r) => r.startsWith('- **'));
   assert.ok(voci.some((r) => /selezion/i.test(r)), 'manca la spiegazione preparata quando si seleziona del testo');
-  const numeri = { tre: 3, quattro: 4, cinque: 5, sei: 6 };
+  const numeri = { tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9 };
   const detto = /\*\* (\p{L}+) funzioni/u.exec(sezione);
   assert.equal(numeri[(detto && detto[1] || '').toLowerCase()], voci.length, 'il numero detto e le voci elencate coincidono');
 });

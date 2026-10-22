@@ -27,6 +27,7 @@
   <script src="filo://shared/dominiGoogle.js"></script>
   <script src="filo://shared/eseguibili.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/livelliPrivacy.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
 </head>
@@ -146,22 +147,57 @@
         </div>
       </div>
 
-      <div class="sn-toggle-row" style="margin-top:16px">
-        <label>
-          <input type="checkbox" id="sec-delicate" />
-          <span id="sec-delicate-label"></span>
-        </label>
-        <span class="sn-muted" id="sec-delicate-desc"></span>
-        <div id="sec-delicate-sub" style="margin-top: 8px; margin-left: 24px;">
+      <section id="sec-privacy" style="margin-top:20px">
+        <h2 id="sec-privacy-title" style="font-size:1.05rem;margin-bottom:8px"></h2>
+        <div class="sn-cookie-modes" role="radiogroup" aria-labelledby="sec-privacy-title">
+          <label class="sn-cookie-mode">
+            <input type="radio" name="privacy-livello" id="privacy-livello-anticipo" value="anticipo" />
+            <span>
+              <span class="sn-cookie-mode-label" id="privacy-livello-anticipo-label"></span>
+              <span class="sn-muted sn-cookie-mode-desc" id="privacy-livello-anticipo-desc"></span>
+            </span>
+          </label>
+          <label class="sn-cookie-mode">
+            <input type="radio" name="privacy-livello" id="privacy-livello-delicate" value="delicate" />
+            <span>
+              <span class="sn-cookie-mode-label" id="privacy-livello-delicate-label"></span>
+              <span class="sn-muted sn-cookie-mode-desc" id="privacy-livello-delicate-desc"></span>
+            </span>
+          </label>
+          <label class="sn-cookie-mode">
+            <input type="radio" name="privacy-livello" id="privacy-livello-sempre" value="sempre" />
+            <span>
+              <span class="sn-cookie-mode-label" id="privacy-livello-sempre-label"></span>
+              <span class="sn-muted sn-cookie-mode-desc" id="privacy-livello-sempre-desc"></span>
+            </span>
+          </label>
+        </div>
+        <div class="sn-privacy-riga" id="privacy-chiedi-riga">
+          <span class="sn-muted" id="privacy-chiedi-label"></span>
+          <div class="sn-privacy-categorie" id="privacy-chiedi" role="group" aria-labelledby="privacy-chiedi-label"></div>
+        </div>
+        <div class="sn-privacy-riga">
+          <label class="sn-muted" id="privacy-incognito-label" for="privacy-incognito"></label>
+          <select id="privacy-incognito">
+            <option value="anticipo" id="privacy-incognito-anticipo"></option>
+            <option value="delicate" id="privacy-incognito-delicate"></option>
+            <option value="sempre" id="privacy-incognito-sempre"></option>
+          </select>
+        </div>
+        <div id="sec-delicate-sub" style="margin-top: 12px;">
           <label class="sn-muted" id="sec-delicate-sites-label" for="sec-delicate-sites" style="display: block; margin-bottom: 4px;"></label>
           <textarea id="sec-delicate-sites" rows="3" style="width: 100%;"></textarea>
           <div id="sec-delicate-sites-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
+          <label class="sn-muted" id="privacy-siti-anticipo-label" for="privacy-siti-anticipo" style="display: block; margin: 12px 0 4px;"></label>
+          <textarea id="privacy-siti-anticipo" rows="2" style="width: 100%;"></textarea>
+          <div id="privacy-siti-anticipo-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
           <div id="sec-delicate-campi" style="margin-top:12px" hidden>
             <div class="sn-muted" id="sec-delicate-campi-title" style="margin-bottom:4px"></div>
             <ul id="sec-delicate-campi-list" style="list-style:none;padding:0;margin:0"></ul>
           </div>
         </div>
-      </div>
+        <p class="sn-muted" id="privacy-pavimento" style="margin:12px 0 0"></p>
+      </section>
 
       <div class="sn-toggle-row">
         <label>

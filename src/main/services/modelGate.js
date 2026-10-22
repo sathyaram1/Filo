@@ -147,11 +147,19 @@
     // contiene diventano letti, e la porta delle uscite li ferma (#810).
     async function senzaSegreti(messages) {
       try { ricordaEsterni(messages); } catch (_) {}
+      return pavimento(await custoditiFuori(messages));
+    }
+    async function custoditiFuori(valore) {
       const G = global.SN_GUARDIANO_STATICO;
-      if (!G || typeof G.oscuraSegreti !== 'function') return messages;
+      if (!G || typeof G.oscuraSegreti !== 'function') return valore;
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
-      return G.oscuraSegreti(messages, lista);
+      return G.oscuraSegreti(valore, lista);
+    }
+    // Il pavimento della privacy (#1589): password, carte, codici usa e getta, chiavi e token non arrivano a nessun
+    // modello, da qualunque strada vengano, anche scritti dall'utente.
+    function pavimento(valore) {
+      return (global.SN_PAVIMENTO || require('../../shared/pavimento.js')).oscuraTutto(valore);
     }
 
     // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
@@ -378,7 +386,7 @@
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
       const G = global.SN_GUARDIANO_STATICO;
-      const oscura = (v) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, lista) : v);
+      const oscura = (v) => pavimento(G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, lista) : v);
       const richieste = (Array.isArray(requests) ? requests : []).map((r) => ({
         state: oscura(r && r.state), questions: oscura(r && r.questions),
       }));

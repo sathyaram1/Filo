@@ -119,8 +119,9 @@ module.exports = function register(on, ctx) {
   on(MSG.CAMBI_ANNULLA, soloDaFilo(async (msg) => {
     const id = String((msg && msg.id) || '').trim();
     if (!id) return { ok: false, error: 'manca il cambio' };
-    const r = await Registro.annulla(id, Registro.corrente() || { via: 'interfaccia' });
-    return r.ok ? { ok: true, id: r.id, eventi: r.eventi, saltati: r.saltati } : { ok: false, error: r.motivo };
+    const r = await Registro.annulla(id, { ...(Registro.corrente() || { via: 'interfaccia' }), confermato: msg.confermato === true });
+    if (r.ok) return { ok: true, id: r.id, eventi: r.eventi, saltati: r.saltati };
+    return { ok: false, error: r.motivo, ...(r.conferma ? { conferma: r.conferma } : {}) };
   }));
 
   // Primo dispatch (non confermato) di una singola azione di Filo richiesta

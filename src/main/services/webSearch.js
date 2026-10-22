@@ -91,9 +91,18 @@
     });
   }
 
+  // Il pavimento della privacy (#1589): una domanda con una password, una carta, un codice usa e getta o una chiave non
+  // esce, chiunque l'abbia scritta. Si dice, invece di cercare un'altra cosa.
+  const FRASE_PAVIMENTO = 'La ricerca conteneva un dato riservato (una password, una carta, un codice o una chiave): Filo non l\'ha mandata.';
+  function conDatoRiservato(q) {
+    const P = global.SN_PAVIMENTO || (typeof require === 'function' ? require('../../shared/pavimento.js') : null);
+    try { return Boolean(P && P.trova(q).length); } catch (_) { return true; }
+  }
+
   async function search({ query, tavilyKey, maxResults = 5 }) {
     const q = (query || '').trim().slice(0, MAX_QUERY_LEN);
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
+    if (conDatoRiservato(String(query || ''))) return { ok: false, results: [], reason: FRASE_PAVIMENTO, pavimento: true };
 
     if (tavilyKey) {
       try {

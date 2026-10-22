@@ -20,6 +20,10 @@
     return /^-?\d+$/.test(i) ? `${intero(Number(i))}${d ? `,${d}` : ''}` : String(Number(v)).replace('.', ',');
   };
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
+  // I livelli di privacy (#1589) coi nomi che l'utente vede in Sicurezza.
+  const LIVELLI_PRIVACY = { anticipo: 'tutto in anticipo', delicate: 'chiedi sulle delicate', sempre: 'chiedi sempre' };
+  const CATEGORIE_PRIVACY = { posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'enti pubblici', campi: 'pagine con una password' };
+  const nomeCategoria = (c) => CATEGORIE_PRIVACY[c] || String(c);
   const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
 
   function etichettaColoreTab(k) {
@@ -177,9 +181,12 @@
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },
     'security.downloads.confirmExecutables': { nome: 'domanda prima di scaricare un programma', valore: ATTIVA, livello: 2 },
     'security.downloads.trustedSites': { nome: 'siti fidati per i programmi', elenco: true, livello: 2 },
-    'security.pagineDelicate.enabled': { nome: 'pagine delicate tenute lontane dai modelli', valore: sino('sì', 'no'), livello: 2 },
-    'security.pagineDelicate.siti': { nome: 'siti delicati aggiunti da te', elenco: true, livello: 2 },
+    'security.pagineDelicate.siti': { nome: 'siti dove Filo chiede sempre', elenco: true, livello: 2 },
     'security.pagineDelicate.nonDelicati': { nome: 'siti non delicati per te, anche col campo password', elenco: true, livello: 2 },
+    'security.privacy.livello': { nome: 'livello di privacy', valori: LIVELLI_PRIVACY, livello: 2 },
+    'security.privacy.incognito': { nome: 'livello di privacy in incognito', valori: LIVELLI_PRIVACY, livello: 2 },
+    'security.privacy.chiedi': { nome: 'categorie su cui Filo chiede', elenco: true, leggibile: nomeCategoria, livello: 2 },
+    'security.privacy.sitiAnticipo': { nome: 'siti dove Filo manda in anticipo', elenco: true, livello: 2 },
     'security.autoFeedback': { nome: 'segnalazione automatica dei problemi', valore: ATTIVA, livello: 2 },
     'proxy.datacenter': { nome: 'indirizzo del proxy economico', segreto: true },
     'proxy.residential': { nome: 'indirizzo del proxy residenziale', segreto: true },
@@ -195,6 +202,7 @@
     'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
     'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
     'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
+    'security.privacy.righeScartate': 'le righe scartate dai siti in anticipo sono un avviso sulla casella, non una scelta',
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',
@@ -421,7 +429,8 @@
       const parti = [];
       // Gli elenchi sono di siti: münchen.de, non la forma «xn--» con cui si salva.
       const N = global.SN_NOMI_SITO;
-      const leggibili = (l) => elencoDi(N && N.leggibile ? l.map((x) => N.leggibile(x)) : l);
+      const leggi = v.leggibile || (N && N.leggibile ? (x) => N.leggibile(x) : null);
+      const leggibili = (l) => elencoDi(leggi ? l.map(leggi) : l);
       if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${leggibili(piu)}`);
       if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${leggibili(meno)}`);
       return `${nome}: ${parti.join(', ') || 'riordinati'}`;

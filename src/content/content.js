@@ -1194,7 +1194,8 @@
     const wantCorrection = !!SpellCheck && SpellCheck.erroriAttivi();
     let updateCorrection = null;
     const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
-    if (tutti) items.unshift(tutti, { type: 'separator' });
+    const controlla = campoDiFilo ? voceControlla(campoDiFilo) : null;
+    if (tutti || controlla) items.unshift(...[controlla, tutti].filter(Boolean), { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
@@ -1819,6 +1820,12 @@
     return { type: 'item', label: I18n.t('spell_correggi_tutti', n), onClick: () => SpellCheck.correggiTutti(editableEl) };
   }
 
+  // Dove il livello di privacy chiede prima (#1589) il correttore non manda niente da solo: «Controlla» lo fa partire.
+  function voceControlla(editableEl) {
+    if (!SpellCheck?.chiedePrima?.(editableEl)) return null;
+    return { type: 'item', label: I18n.t('spell_controlla'), onClick: () => SpellCheck.controllaOra(editableEl) };
+  }
+
   // Una correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
   function contaUsoDelCorrettore(action) {
     try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
@@ -1830,7 +1837,8 @@
     if (errore) sopra.push(...vociErrore(editableEl, errore));
     if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
     const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
-    if (tutti) sopra.push(tutti, { type: 'separator' });
+    const controlla = voceControlla(editableEl);
+    if (tutti || controlla) sopra.push(...[controlla, tutti].filter(Boolean), { type: 'separator' });
     items.unshift(...sopra);
     conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });

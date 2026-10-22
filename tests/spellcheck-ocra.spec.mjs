@@ -223,12 +223,17 @@ test('aspetto: i puntini accanto all\'onda degli errori, anche sulla stessa paro
   await page.screenshot({ path: 'tests/.shots/1115-ocra-scuro.png', clip: { x: 0, y: 0, width: 820, height: 320 } }).catch(() => {});
 });
 
-test('su una pagina delicata il testo della pagina non parte: niente contraddizioni, le date restano', async ({ app, openTab, testServer }) => {
+// #1589 — dove il livello di privacy chiede prima, il correttore non parte da solo: aspetta «Controlla» dal tasto destro.
+test('su una pagina dove Filo chiede prima il controllo aspetta «Controlla», e il testo della pagina non parte: niente contraddizioni, le date restano', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { enabled: true, siti: ['sito-pubblico.test'] } } }));
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { siti: ['sito-pubblico.test'] } } }));
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'));
   await page.locator('#ta').click();
   await page.keyboard.type('sì ci vediamo mercoledì e poi giovedì 9 ottobre 2026');
+  await page.waitForTimeout(4500);
+  expect(await chiamate(app), 'mentre si scrive non parte niente').toBe(0);
+  await page.locator('#ta').click({ button: 'right' });
+  await menuDi(page).voce('Controlla').click();
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(1);
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).not.toContain('porto io i biglietti');

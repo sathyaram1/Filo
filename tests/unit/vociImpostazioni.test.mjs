@@ -49,7 +49,7 @@ function foglie(o, base = '', out = []) {
 }
 const CAMPIONI = ['scuro', 'grande', 'sì', 'no', '12', '0,5', '1', 'privacy', 'automatico', 'off', 'openrouter',
   'sk-or-v1-abcdefgh1234', '20 euro', 'più vivaci', 'delicata', 'media', 'powershell', 'Rispondi breve.', 'automatica',
-  'aggiungi esempio.it', 'nessuno', 'Chat con Filo: deepseek'];
+  'aggiungi esempio.it', 'nessuno', 'Chat con Filo: deepseek', 'tutto', 'sanità'];
 function percorsiScrittiDa(setter) {
   const out = new Set();
   for (const v of CAMPIONI) {
@@ -189,6 +189,7 @@ const FUORI_DALLA_CHAT = {
   'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
   'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
   'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
+  'security.privacy.righeScartate': 'le righe scartate dai siti in anticipo sono un avviso sulla casella, non una scelta',
   'proxy.': 'il proxy si usa dalla chat con le sue azioni (PROXY_TAB, REGOLA_PROXY_DOMINIO); indirizzi con le credenziali e paese vengono dalla configurazione e dalla scheda',
 };
 function foglieDiSerie(o, base = '', out = []) {

@@ -669,6 +669,139 @@
     return rigore[nuovo] < prima;
   }
 
+  // ── I livelli di privacy (#1589) ─────────────────────────────────────────────
+  // Abbassare quanto esce parte; alzarlo (un livello più largo, una categoria che smette di chiedere, un sito in anticipo
+  // in più) vuole «conferma» a ogni livello: lo dice `alza` della regola, da qualunque strada arrivi.
+  function livelliPrivacy() {
+    if (!global.SN_LIVELLI_PRIVACY && typeof require === 'function') require('./livelliPrivacy.js');
+    return global.SN_LIVELLI_PRIVACY;
+  }
+  // Senza le impostazioni di adesso vale la più stretta: ogni cambio conta come alzare.
+  function privacyAttuale(at) {
+    const L = livelliPrivacy();
+    if (!at) return { livello: 'sempre', incognito: 'sempre', chiedi: L.CATEGORIE.slice(), sitiAnticipo: [] };
+    const r = L.regola(at);
+    return { livello: r.livello, incognito: r.incognito, chiedi: r.chiedi, sitiAnticipo: r.sitiAnticipo };
+  }
+  const PAROLE_LIVELLO = {
+    anticipo: /^(?:anticipo|tutto in anticipo|in anticipo|largo|massimo|aperto)$/,
+    delicate: /^(?:delicate|delicata|delicati|chiedi sulle delicate|sulle delicate|chiedi solo sulle delicate|medio|normale)$/,
+    sempre: /^(?:sempre|chiedi sempre|stretto|minimo|niente|chiuso|massima privacy)$/,
+  };
+  function livelloDetto(v) {
+    const t = String(v == null ? '' : v).trim().toLowerCase().replace(/[«»"'.!]/g, '').replace(/\s+/g, ' ');
+    for (const [id, re] of Object.entries(PAROLE_LIVELLO)) if (re.test(t)) return id;
+    return null;
+  }
+  const PAROLE_CATEGORIA = [
+    ['posta', /^(?:posta|mail|email|e-mail|gmail)$/],
+    ['banche', /^(?:banca|banche|conto|conti|bank|pagamenti)$/],
+    ['sanita', /^(?:sanita|sanità|salute|medico|medici|referti|health)$/],
+    ['pa', /^(?:pa|enti pubblici|ente pubblico|pubblica amministrazione|inps|fisco)$/],
+    ['campi', /^(?:password|campi|carte|carta|pagine con password|pagine con una password)$/],
+  ];
+  function categoriaDetta(p) {
+    const t = String(p || '').trim().toLowerCase();
+    const c = PAROLE_CATEGORIA.find(([, re]) => re.test(t));
+    return c ? c[0] : null;
+  }
+  function privacySetters() {
+    const L = livelliPrivacy();
+    const nome = (id) => L.nomeLivello(id);
+    const alza = (r, at) => L.alza(privacyAttuale(at), r.partial.security.privacy);
+    return [
+      {
+        // «tutto» e «di serie» riscrivono anche le categorie: chi le possiede, e le mostra in lettura, è privacy_categorie.
+        scrive: ['security.privacy.livello'],
+        aiuto: '"anticipo" (Tutto in anticipo) | "delicate" (Chiedi sulle delicate) | "sempre" (Chiedi sempre) | "meno" (un passo più '
+          + 'stretto) | "più" (un passo più largo) | "tutto" (in anticipo anche la sanità e ogni categoria) | "di serie": quanto Filo '
+          + 'manda ai modelli dalle pagine senza che l\'utente lo chieda (spiegazioni e descrizioni del tasto destro, correttore, '
+          + 'screenshot, riassunto e pulizia delle schede). Password, carte e codici non escono a nessun livello',
+        keys: ['livello_privacy', 'livello di privacy', 'privacy', 'quanto manda ai modelli', 'cosa manda ai modelli',
+          'manda ai modelli', 'pagine delicate', 'pagine_delicate'],
+        costo: 2,
+        allenta: alza,
+        risk: 'Decide quanto Filo manda ai modelli dalle pagine senza che tu lo chieda: spiegazioni e descrizioni del tasto '
+          + 'destro, controlli del correttore, screenshot, riassunto e pulizia delle schede. Un livello più largo fa partire da '
+          + 'sole anche posta, banca e sanità; password, carte e codici restano comunque sul computer.',
+        build(v, at) {
+          const t = String(v == null ? '' : v).trim().toLowerCase().replace(/[«»"'.!]/g, '');
+          const ordine = L.ORDINE;
+          const ora = privacyAttuale(at).livello;
+          let livello = livelloDetto(t);
+          let chiedi;
+          if (/^(?:tutto|manda tutto|tutto quanto)$/.test(t)) { livello = 'anticipo'; chiedi = []; }
+          else if (/^(?:di serie|predefinito|default|come prima)$/.test(t)) { livello = L.PREDEFINITA.livello; chiedi = L.PREDEFINITA.chiedi.slice(); }
+          else if (/^(?:meno|stringi|abbassa|più stretto|piu stretto|più privacy|piu privacy)$/.test(t)) livello = ordine[Math.min(ordine.length - 1, ordine.indexOf(ora) + 1)];
+          else if (/^(?:più|piu|di più|di piu|allarga|alza|più largo|piu largo)$/.test(t)) livello = ordine[Math.max(0, ordine.indexOf(ora) - 1)];
+          if (!livello) return null;
+          const privacy = { livello, ...(chiedi ? { chiedi } : {}) };
+          const altro = chiedi && !chiedi.length ? ' (nessuna categoria chiede)' : '';
+          return { partial: { security: { privacy } }, label: `Livello di privacy → ${nome(livello)}${altro}` };
+        },
+      },
+      {
+        scrive: ['security.privacy.incognito'],
+        aiuto: '"anticipo" | "delicate" | "sempre": il livello di privacy nelle finestre in incognito (di serie «sempre»: niente parte da solo)',
+        keys: ['privacy_incognito', 'livello di privacy in incognito', 'privacy in incognito', 'incognito privacy'],
+        costo: 2,
+        allenta: alza,
+        risk: 'Decide quanto Filo manda ai modelli dalle pagine aperte in incognito senza che tu lo chieda. Un livello più '
+          + 'largo fa partire da sole spiegazioni, descrizioni e controlli anche lì.',
+        build(v) {
+          const livello = livelloDetto(v);
+          if (!livello) return null;
+          return { partial: { security: { privacy: { incognito: livello } } }, label: `Livello di privacy in incognito → ${nome(livello)}` };
+        },
+      },
+      {
+        scrive: ['security.privacy.chiedi'],
+        aiuto: '"aggiungi <categorie>" | "togli <categorie>" | "solo <categorie>" | "nessuna": le categorie su cui Filo chiede prima '
+          + 'anche a «Tutto in anticipo». Categorie: posta, banca, sanità, enti pubblici, password (pagine con un campo password o carta); di serie la sanità',
+        keys: ['privacy_categorie', 'categorie che chiedono', 'chiedi su', 'chiedi prima su', 'categorie delicate'],
+        costo: 2,
+        allenta: alza,
+        risk: 'Decide su quali pagine delicate Filo chiede prima anche a «Tutto in anticipo»: posta, banca, sanità, enti '
+          + 'pubblici, pagine con una password. Una categoria tolta fa partire da sole le sue pagine.',
+        build(v, at) {
+          const s = String(v == null ? '' : v).trim();
+          if (!s) return null;
+          if (SVUOTA.test(s) || /^nessuna$/i.test(s)) return { partial: { security: { privacy: { chiedi: [] } } }, label: 'Categorie che chiedono → nessuna' };
+          let op = 'aggiungi';
+          let resto = s;
+          for (const [n, re] of OP_ELENCO) {
+            const m = s.match(re);
+            if (m) { op = n; resto = s.slice(m[0].length); break; }
+          }
+          const pezzi = resto.split(/\s*(?:,|;|\be\b|\bed\b)\s*/i).map((x) => x.trim()).filter(Boolean);
+          const voci = [];
+          for (const p of pezzi) {
+            const c = categoriaDetta(p);
+            if (!c) return { rifiuto: `«${p.slice(0, 40)}» non è una categoria: posta, banca, sanità, enti pubblici o password` };
+            if (!voci.includes(c)) voci.push(c);
+          }
+          if (!voci.length) return null;
+          const prima = privacyAttuale(at).chiedi;
+          const chiedi = op === 'togli' ? prima.filter((c) => !voci.includes(c))
+            : op === 'sostituisci' ? voci : [...new Set([...prima, ...voci])];
+          const ordinate = L.CATEGORIE.filter((c) => chiedi.includes(c));
+          const lista = ordinate.length ? ordinate.map(L.nomeCategoria).join(', ') : 'nessuna';
+          return { partial: { security: { privacy: { chiedi: ordinate } } }, label: `Categorie che chiedono → ${lista}` };
+        },
+      },
+      elenco({
+        keys: ['siti_anticipo', 'siti in anticipo', 'manda tutto su', 'siti dove manda tutto'],
+        percorso: 'security.privacy.sitiAnticipo',
+        allentaSe: 'aggiungi',
+        nome: 'Siti dove Filo manda in anticipo',
+        aiuto: 'siti dove spiegazioni, descrizioni e controlli partono da soli a ogni livello di privacy, anche se delicati (fuori dall\'incognito). '
+          + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
+        risk: 'Fa partire da sole verso i modelli spiegazioni, descrizioni e controlli del testo delle pagine di questi siti, '
+          + 'anche quando il livello di privacy direbbe di chiedere. Password, carte e codici restano comunque sul computer.',
+      }),
+    ];
+  }
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }; `partial` si fonde nelle impostazioni.
   // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat; `allenta(r, attuali)` dice se il
   // valore abbassa una difesa (vuole «conferma» a ogni livello); `elencoFisso` la mette nell'elenco fisso.
@@ -1967,33 +2100,17 @@
         return { partial: { security: { riquadriRotti: { modello: b } } }, label: `Contenuti incorporati rotti guardati da un modello → ${b ? 'sì' : 'no'}` };
       },
     },
-    interruttore({
-      keys: ['pagine_delicate', 'pagine delicate', 'non mandare ai modelli le pagine delicate', 'proteggi le pagine delicate',
-        'pagine riservate'],
-      percorso: 'security.pagineDelicate.enabled',
-      nome: 'Pagine delicate tenute lontane dai modelli',
-      stati: ['sì', 'no'],
-      aiuto: 'true | false (posta, banche, sanità, pubblica amministrazione, pagine con un campo password o carta e i siti delicati '
-        + 'scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli, la chat ne vede '
-        + 'solo il nome del sito, screenshot e immagini copiate da lì non vanno al modello delle immagini neanche incollati '
-        + 'altrove, la spiegazione parte solo dal tasto destro; il correttore resta acceso e manda quello che l\'utente scrive, '
-        + 'non la pagina; acceso di serie)',
-      risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
-        + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
-        + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '
-        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, e la '
-        + 'spiegazione si prepara anche lì appena selezioni un testo.',
-    }),
+    ...privacySetters(),
     elenco({
       keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
       percorso: 'security.pagineDelicate.siti',
       allentaSe: 'togli',
       nome: 'Siti delicati aggiunti da te',
-      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche, sanità e pubblica amministrazione: niente di loro va ai modelli nei lavori automatici. '
+      aiuto: 'siti dove Filo chiede sempre prima di mandare qualcosa ai modelli, a ogni livello di privacy: niente di loro parte da solo. '
         + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
-      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine le funzioni che partono '
-        + 'da sole (riassunto e pulizia delle schede, screenshot, spiegazione preparata) non mandano niente ai modelli. Un '
-        + 'sito tolto torna a mandarlo.',
+      risk: 'Cambia i siti dove Filo chiede sempre prima di mandare: delle loro pagine le funzioni che partono da sole '
+        + '(riassunto e pulizia delle schede, screenshot, spiegazioni, descrizioni e controlli del testo) non mandano niente ai '
+        + 'modelli finché non lo chiedi. Un sito tolto torna a seguire il livello di privacy.',
     }),
     elenco({
       keys: ['siti_non_delicati', 'siti non delicati', 'sito non delicato', 'non delicati'],
@@ -2121,7 +2238,7 @@
       };
     }
     const setter = r.setter;
-    const b = setter.build(rawVal);
+    const b = setter.build(rawVal, attuali);
     if (b && b.rifiuto) return b.perModello ? { rifiuto: b.rifiuto, perModello: b.perModello } : { rifiuto: b.rifiuto };
     if (!b) return null;
     let allenta = false;

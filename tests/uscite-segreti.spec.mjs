@@ -25,6 +25,10 @@ const RACCOLTA = 'raccolta.example';
 const CHIAVE = 'FINTA-chiave-opzioni-7f3a9c2e5b8d10464e2a';
 const TAVILY = 'FINTA-ricerca-0123456789abcdefABCDEF';
 
+// Il pavimento della privacy (#1589) toglie il codice prima che arrivi al modello: le prove che chiedono al modello di
+// averlo davanti misurano il freno delle uscite da solo, per i codici che il pavimento non riconosce.
+const senzaPavimento = (app) => app.evaluate(() => { globalThis.SN_PAVIMENTO.oscuraTutto = (v) => v; });
+
 const apertoVerso = (app, host) => app.windows().some((w) => {
   try { return w.url().includes(host); } catch (_) { return false; }
 });
@@ -451,6 +455,7 @@ async function riapriEPortaFuori(app, openTab, page, { testo, frase, fonte }) {
 
 test('riaperta dopo un riavvio, la chat non porta fuori il codice che Filo aveva letto e ripetuto', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
+  await senzaPavimento(app);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
   await preparaModelli(app);
@@ -473,6 +478,7 @@ test('riaperta dopo un riavvio, la chat non porta fuori il codice che Filo aveva
 
 test('riaperta dalla Cronologia, la chat non porta fuori il codice uscito da un comando lanciato a mano', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
+  await senzaPavimento(app);
   const casa = cartellaInCasa('filo-uscite-riaperta-');
   const file = join(casa, 'notifica.txt');
   writeFileSync(file, `Il tuo codice monouso è ${CODICE}\n`, 'utf8');
@@ -899,6 +905,7 @@ for (const [nome, suggerimento] of [
 ]) {
   test(`il testo di un suggerimento ${nome} della home non conta come parole dell’utente`, async ({ app, shell, openTab }) => {
     test.setTimeout(90_000);
+    await senzaPavimento(app);
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
     const page = await newtab(app);
     await leggiIlCodice(app, page, { home: homeDi([LEGGERE, { icon: 'link', importance: 5, ...suggerimento }]) });

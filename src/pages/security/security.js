@@ -13,6 +13,7 @@
   const Sito = window.SN_STESSO_SITO;
   const Eseguibili = window.SN_ESEGUIBILI;
   const Google = window.SN_DOMINI_GOOGLE;
+  const Privacy = window.SN_LIVELLI_PRIVACY;
 
   function $(id) { return document.getElementById(id); }
 
@@ -48,8 +49,16 @@
     $('sec-dl-exe-label').textContent = I18n.t('options_security_downloads');
     $('sec-dl-exe-desc').textContent = I18n.t('options_security_downloads_desc');
     $('sec-dl-trusted-label').textContent = I18n.t('options_security_downloads_trusted_label');
-    $('sec-delicate-label').textContent = I18n.t('options_security_delicate');
-    $('sec-delicate-desc').textContent = I18n.t('options_security_delicate_desc');
+    $('sec-privacy-title').textContent = I18n.t('options_privacy_title');
+    for (const l of Privacy.LIVELLI) {
+      $(`privacy-livello-${l.id}-label`).textContent = l.nome;
+      $(`privacy-livello-${l.id}-desc`).textContent = Privacy.frase(l.id);
+      $(`privacy-incognito-${l.id}`).textContent = l.nome;
+    }
+    $('privacy-chiedi-label').textContent = I18n.t('options_privacy_chiedi');
+    $('privacy-incognito-label').textContent = I18n.t('options_privacy_incognito');
+    $('privacy-siti-anticipo-label').textContent = I18n.t('options_privacy_siti_anticipo_label');
+    $('privacy-pavimento').textContent = I18n.t('options_privacy_pavimento');
     $('sec-delicate-sites-label').textContent = I18n.t('options_security_delicate_sites_label');
     $('sec-delicate-campi-title').textContent = I18n.t('options_security_delicate_campi_title');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
@@ -906,10 +915,9 @@
     setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
     const del = sec.pagineDelicate || {};
-    $('sec-delicate').checked = del.enabled !== false;
     $('sec-delicate-sites').value = righe(del.siti, del.righeScartate);
     setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
-    syncDelicateEnabled();
+    mostraPrivacy(settings);
     loadDelicateCampi();
     caricaSitiScaricati();
     const sb = sec.safeBrowse || {};
@@ -1254,12 +1262,126 @@
     $('sec-dl-trusted').disabled = !on;
   }
 
-  // Spenta la protezione, l'elenco resta lì ma non vale: si vede attenuato, come quello dei siti fidati.
-  function syncDelicateEnabled() {
-    const on = !!$('sec-delicate').checked;
-    const sub = $('sec-delicate-sub');
-    if (sub) sub.style.opacity = on ? '1' : '0.45';
-    $('sec-delicate-sites').disabled = !on;
+  // ─── livelli di privacy (#1589) ───────────────────────────────────────────
+  // Le categorie si scelgono solo con «Tutto in anticipo»: agli altri livelli chiedono già tutte, e la riga si attenua.
+  function categorieScelte() {
+    return [...$('privacy-chiedi').querySelectorAll('input[type="checkbox"]')].filter((c) => c.checked).map((c) => c.value);
+  }
+  function livelloScelto() {
+    const r = document.querySelector('input[name="privacy-livello"]:checked');
+    return r ? r.value : Privacy.PREDEFINITA.livello;
+  }
+  function renderCategorie(chiedi) {
+    const box = $('privacy-chiedi');
+    box.textContent = '';
+    for (const c of Privacy.CATEGORIE) {
+      const l = document.createElement('label');
+      l.className = 'sn-privacy-categoria';
+      const i = document.createElement('input');
+      i.type = 'checkbox';
+      i.value = c;
+      i.checked = chiedi.includes(c);
+      i.addEventListener('change', () => cambiaPrivacy({ chiedi: categorieScelte() }));
+      const t = document.createElement('span');
+      t.textContent = Privacy.nomeCategoria(c);
+      l.append(i, t);
+      box.appendChild(l);
+    }
+  }
+  function syncPrivacy() {
+    const anticipo = livelloScelto() === 'anticipo';
+    const riga = $('privacy-chiedi-riga');
+    riga.style.opacity = anticipo ? '1' : '0.45';
+    for (const c of riga.querySelectorAll('input')) c.disabled = !anticipo;
+    $('privacy-livello-anticipo-desc').textContent = Privacy.frase('anticipo', categorieScelte());
+  }
+  function mostraPrivacy(settings) {
+    const r = Privacy.regola(settings);
+    const radio = document.querySelector(`input[name="privacy-livello"][value="${r.livello}"]`);
+    if (radio) radio.checked = true;
+    $('privacy-incognito').value = r.incognito;
+    renderCategorie(r.chiedi);
+    const p = (settings.security || {}).privacy || {};
+    $('privacy-siti-anticipo').value = righe(p.sitiAnticipo, p.righeScartate);
+    setAnticipoError(parseBlacklist($('privacy-siti-anticipo').value).invalid);
+    syncPrivacy();
+  }
+  // Alzare quanto esce (un livello più largo, una categoria che smette di chiedere) vuole «conferma» scritta, come
+  // dalla chat; abbassarlo parte subito. Detto no, i controlli tornano a quello salvato.
+  let privacyInCorso = false;
+  async function cambiaPrivacy(dopo) {
+    if (privacyInCorso) return;
+    const prima = (mostrata && mostrata.privacy) || {};
+    if (Privacy.alza(prima, dopo)) {
+      privacyInCorso = true;
+      let ok = false;
+      try {
+        const Ui = window.SN_CONFIRM_UI;
+        ok = Ui ? await Ui.confirmTyped(Privacy.confermaAlzata(dopo)) : false;
+      } finally { privacyInCorso = false; }
+      if (!ok) {
+        mostraPrivacy({ security: { privacy: prima } });
+        return;
+      }
+    }
+    syncPrivacy();
+    save();
+  }
+  // L'uscita dalla casella dei siti in anticipo: un sito in più vuole «conferma»; detto no, la casella torna com'era.
+  async function cambiaSitiAnticipo() {
+    const prima = (mostrata && mostrata.privacy) || {};
+    const siti = parseBlacklist($('privacy-siti-anticipo').value).valid;
+    if (!Privacy.alza(prima, { sitiAnticipo: siti })) { save(); return; }
+    if (privacyInCorso) return;
+    privacyInCorso = true;
+    let ok = false;
+    try {
+      const Ui = window.SN_CONFIRM_UI;
+      ok = Ui ? await Ui.confirmTyped(Privacy.confermaAlzata({ sitiAnticipo: siti }, prima)) : false;
+    } finally { privacyInCorso = false; }
+    if (!ok) {
+      $('privacy-siti-anticipo').value = righe(prima.sitiAnticipo, prima.righeScartate);
+      setAnticipoError(parseBlacklist($('privacy-siti-anticipo').value).invalid);
+      save();
+      return;
+    }
+    save({ anticipoConfermato: true });
+  }
+
+  // Un sito tolto da quelli dove Filo chiede sempre alza quanto esce: «conferma» all'uscita dalla casella, come dalla
+  // chat. Detto no, i siti tolti tornano nella casella; quelli aggiunti restano.
+  const sitiTolti = (prima, dopo) => (Array.isArray(prima) ? prima : []).filter((s) => !dopo.includes(s));
+  async function cambiaSitiChiedi() {
+    const primaDel = (mostrata && mostrata.pagineDelicate) || {};
+    const dopo = parseBlacklist($('sec-delicate-sites').value).valid;
+    const tolti = sitiTolti(primaDel.siti, dopo);
+    if (!tolti.length) { save(); return; }
+    if (privacyInCorso) return;
+    privacyInCorso = true;
+    let ok = false;
+    try {
+      const Ui = window.SN_CONFIRM_UI;
+      ok = Ui ? await Ui.confirmTyped(Privacy.confermaSitiTolti(tolti.map(leggibile))) : false;
+    } finally { privacyInCorso = false; }
+    if (!ok) {
+      $('sec-delicate-sites').value = righe([...primaDel.siti, ...dopo.filter((s) => !primaDel.siti.includes(s))], primaDel.righeScartate);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+      save();
+      return;
+    }
+    save({ chiediConfermato: true });
+  }
+
+  function setAnticipoError(invalidRows) {
+    const el = $('privacy-siti-anticipo-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_delicate_sites_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
   }
 
   // I siti che Filo ha segnato da solo per un campo password o carta: tutti visibili, e ognuno si toglie e si rimette.
@@ -1298,6 +1420,15 @@
       btn.textContent = I18n.t(it.tolto ? 'options_security_delicate_campi_rimetti' : 'options_security_delicate_campi_togli');
       btn.addEventListener('click', async () => {
         btn.disabled = true;
+        // Toglierlo dai segnati alza quanto esce: vuole «conferma», come dalla chat.
+        if (!it.tolto) {
+          let ok = false;
+          try {
+            const Ui = window.SN_CONFIRM_UI;
+            ok = Ui ? await Ui.confirmTyped(Privacy.confermaSitiTolti([leggibile(it.sito)], { campi: true })) : false;
+          } catch (_) { ok = false; }
+          if (!ok) { btn.disabled = false; return; }
+        }
         // L'elenco ha già tutti i tolti: è da lì che si scrive quello nuovo.
         const tolti = delicateCampi.filter((x) => x.tolto && x.sito !== it.sito).map((x) => x.sito);
         if (!it.tolto) tolti.push(it.sito);
@@ -1385,6 +1516,7 @@
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
       setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
       setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+      setAnticipoError(parseBlacklist($('privacy-siti-anticipo').value).invalid);
       if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
     },
     spegni: () => $('savedHint').classList.remove('sn-show'),
@@ -1402,6 +1534,7 @@
     const blocco = parseBlacklist($('sec-siteblock-blacklist').value);
     const fidati = parseFidati($('sec-dl-trusted').value);
     const delicati = parseBlacklist($('sec-delicate-sites').value);
+    const anticipo = parseBlacklist($('privacy-siti-anticipo').value);
     return {
       protectIpLeak: !!$('sec-protect-ip').checked,
       blockPopups: !!$('sec-block-popups').checked,
@@ -1425,11 +1558,18 @@
         trustedSites: fidati.valid,
         righeScartate: fidati.scartate,
       },
-      // #1004 — le pagine delicate e i siti che l'utente aggiunge all'elenco di serie.
+      // #1004 — i siti che l'utente aggiunge all'elenco di serie: lì Filo chiede sempre.
       pagineDelicate: {
-        enabled: !!$('sec-delicate').checked,
         siti: delicati.valid,
         righeScartate: delicati.scartate,
+      },
+      // #1589 — i livelli di privacy e i siti dove parte tutto in anticipo.
+      privacy: {
+        livello: livelloScelto(),
+        incognito: $('privacy-incognito').value,
+        chiedi: categorieScelte(),
+        sitiAnticipo: anticipo.valid,
+        righeScartate: anticipo.scartate,
       },
       // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
       autoFeedback: !!$('sec-auto-feedback').checked,
@@ -1463,8 +1603,22 @@
       setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
       setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+      setAnticipoError(parseBlacklist($('privacy-siti-anticipo').value).invalid);
     }
     const ora = leggiSicurezza();
+    // Un sito in più fra quelli in anticipo alza quanto esce (#1589): resta nella casella e parte solo dopo «conferma»,
+    // che si chiede all'uscita dalla casella. Mentre si scrive, o da un altro salvataggio, non parte.
+    const primaPrivacy = (mostrata && mostrata.privacy) || {};
+    if (!(opts && opts.anticipoConfermato) && Privacy.alza(primaPrivacy, { sitiAnticipo: ora.privacy.sitiAnticipo })) {
+      ora.privacy.sitiAnticipo = primaPrivacy.sitiAnticipo || [];
+      ora.privacy.righeScartate = primaPrivacy.righeScartate || [];
+    }
+    // Così un sito tolto da quelli dove Filo chiede sempre: gli aggiunti partono subito, i tolti dopo «conferma».
+    const primaDel = (mostrata && mostrata.pagineDelicate) || {};
+    if (!(opts && opts.chiediConfermato) && sitiTolti(primaDel.siti, ora.pagineDelicate.siti).length) {
+      ora.pagineDelicate.siti = [...primaDel.siti, ...ora.pagineDelicate.siti.filter((s) => !primaDel.siti.includes(s))];
+      ora.pagineDelicate.righeScartate = primaDel.righeScartate || [];
+    }
     const cambi = soloCambiati(ora, mostrata);
     mostrata = ora;
     if (Object.keys(cambi).length) {
@@ -1503,12 +1657,14 @@
     // Le righe scartate sono la metà non valida della stessa casella.
     const inSospeso = new Set(pendenti.map((p) => p.replace(/^siteBlock\.righeScartate$/, 'siteBlock.blacklist')
       .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')
-      .replace(/^pagineDelicate\.righeScartate$/, 'pagineDelicate.siti')));
+      .replace(/^pagineDelicate\.righeScartate$/, 'pagineDelicate.siti')
+      .replace(/^privacy\.righeScartate$/, 'privacy.sitiAnticipo')));
     const sec = settings.security || {};
     const scartate = {
       'sec-siteblock-blacklist': (sec.siteBlock || {}).righeScartate,
       'sec-dl-trusted': (sec.downloads || {}).righeScartate,
       'sec-delicate-sites': (sec.pagineDelicate || {}).righeScartate,
+      'privacy-siti-anticipo': (sec.privacy || {}).righeScartate,
     };
     const toccati = Voci.riallineaPagina('security', settings, {
       // La casella dei siti fidati serve ad aggiungerne uno: l'elenco vero è sotto, e si riallinea qui dopo.
@@ -1528,9 +1684,15 @@
     if (toccati.includes('sec-siteblock-blacklist')) setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     if (toccati.includes('sec-dl-trusted')) setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
     if (toccati.includes('sec-delicate-sites')) setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+    if (toccati.includes('privacy-siti-anticipo')) setAnticipoError(parseBlacklist($('privacy-siti-anticipo').value).invalid);
+    // Le categorie non sono un campo della pagina: si rimettono qui, se nessuna è in sospeso.
+    if (!inSospeso.has('privacy.chiedi') && !privacyInCorso) {
+      const chiedi = Privacy.regola(settings).chiedi;
+      if (chiedi.join() !== categorieScelte().join()) renderCategorie(chiedi);
+    }
     syncSiteBlockEnabled();
     syncDownloadsEnabled();
-    syncDelicateEnabled();
+    syncPrivacy();
     syncSafebrowseEnabled();
     syncCookieMode();
     const ora = leggiSicurezza();
@@ -1603,8 +1765,13 @@
     $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
     $('sec-dl-trusted').addEventListener('change', save);
     $('sec-dl-trusted').addEventListener('input', (e) => { setTrustedError([]); caselle.cambiato('liste', e); });
-    $('sec-delicate').addEventListener('change', () => { syncDelicateEnabled(); save(); });
-    $('sec-delicate-sites').addEventListener('change', save);
+    for (const r of document.querySelectorAll('input[name="privacy-livello"]')) {
+      r.addEventListener('change', () => cambiaPrivacy({ livello: r.value }));
+    }
+    $('privacy-incognito').addEventListener('change', () => cambiaPrivacy({ incognito: $('privacy-incognito').value }));
+    $('privacy-siti-anticipo').addEventListener('change', cambiaSitiAnticipo);
+    $('privacy-siti-anticipo').addEventListener('input', (e) => { setAnticipoError([]); caselle.cambiato('liste', e); });
+    $('sec-delicate-sites').addEventListener('change', cambiaSitiChiedi);
     $('sec-delicate-sites').addEventListener('input', (e) => { setDelicateError([]); caselle.cambiato('liste', e); });
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);

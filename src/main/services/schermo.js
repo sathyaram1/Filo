@@ -161,7 +161,7 @@ function sistemaVero() {
     },
     delicata: async (url) => {
       if (!/^https?:/i.test(String(url || ''))) return '';
-      try { return String((await globalThis.SN_DELICATE.filtro())(url) || ''); } catch (_) { return 'delicata'; }
+      try { return String((await globalThis.SN_DELICATE.filtro(null, { tipo: 'immagine' }))(url) || ''); } catch (_) { return 'delicata'; }
     },
   };
 }

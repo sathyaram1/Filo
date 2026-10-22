@@ -181,6 +181,28 @@
   color: var(--sn-fg);
 }
 
+/* Dove il livello di privacy chiede prima (#1589) la risposta aspetta un clic: il tasto prende il posto del testo,
+   con l'accento del menu al passaggio come le voci. */
+.sn-menu-inline-chiedi-tasto {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--sn-fg);
+  cursor: pointer;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-menu-inline-chiedi-tasto:hover,
+.sn-menu-inline-chiedi-tasto:focus-visible {
+  background: rgba(var(--sn-accent-rgb), 0.35);
+  border-color: rgba(var(--sn-accent-rgb), 0.6);
+}
+
 /* Riga d'origine dell'immagine: sta in cima al riquadro e non deve prendere
    il corsivo dell'attesa né il rosso dell'errore di chi le sta sotto. */
 .sn-menu-origine {

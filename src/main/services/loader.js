@@ -46,7 +46,8 @@ require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e get
 require(path.join(SHARED, 'stessoSito.js')); // #876 — «stesso sito» e Public Suffix List: prima di eseguibili e preferences
 require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google sono un accesso solo (dopo stessoSito)
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
-require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
+require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — cosa una pagina è: posta, banca, sanità, con un campo password
+require(path.join(SHARED, 'livelliPrivacy.js')); // #1589 — quanto parte da solo verso i modelli, la regola unica
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
 require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
@@ -90,6 +91,7 @@ require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normali
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: il main li cerca anche nei riquadri
 require(path.join(SHARED, 'urlExfil.js'));
+require(path.join(SHARED, 'pavimento.js')); // #1589 — cosa non esce mai verso un modello, a nessun livello (dopo guardianoStatico)
 require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat

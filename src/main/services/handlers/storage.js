@@ -105,6 +105,12 @@ module.exports = function register(on, ctx) {
     // Tornare al predefinito non alza l'autonomia di Filo: alzarla vuole «conferma» (#530).
     const A = globalThis.SN_AUTONOMIA;
     if (A && current) defaults.autonomia = A.unisciPiuStretta(current.autonomia, defaults.autonomia);
+    // Né manda di più ai modelli (#1589): alzarlo vuole «conferma».
+    const LP = globalThis.SN_LIVELLI_PRIVACY;
+    if (LP && current && current.security) {
+      defaults.security.privacy = LP.piuStretta(current.security.privacy, defaults.security.privacy);
+      defaults.security.pagineDelicate = LP.delicateStrette(current.security.pagineDelicate, defaults.security.pagineDelicate);
+    }
     await Storage.setSettings(defaults);
     const merged = await applySettingsUpdate({});
     return { ok: true, settings: merged };
@@ -324,6 +330,14 @@ module.exports = function register(on, ctx) {
       const A = globalThis.SN_AUTONOMIA;
       if (A && settings && typeof settings === 'object') {
         settings.autonomia = A.unisciPiuStretta((current[SETTINGS_KEY] || {}).autonomia, ((pending.data || {})[SETTINGS_KEY] || {}).autonomia);
+      }
+      // Né il livello di privacy (#1589): un backup più largo non fa mandare di più ai modelli senza «conferma».
+      const LP = globalThis.SN_LIVELLI_PRIVACY;
+      if (LP && settings && typeof settings === 'object' && settings.security && typeof settings.security === 'object') {
+        const qui = ((current[SETTINGS_KEY] || {}).security || {}).privacy;
+        const dalBackup = ((((pending.data || {})[SETTINGS_KEY] || {}).security) || {}).privacy;
+        settings.security.privacy = LP.piuStretta(qui, dalBackup || settings.security.privacy);
+        settings.security.pagineDelicate = LP.delicateStrette(((current[SETTINGS_KEY] || {}).security || {}).pagineDelicate, settings.security.pagineDelicate);
       }
       // Il tetto di spesa del backup, più largo di quello di qui, entra solo col bottone che lo offre (#1050).
       if (msg.tettoDelBackup === true && stats.tettoSpesa && settings && typeof settings === 'object') {

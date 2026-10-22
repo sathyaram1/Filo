@@ -831,6 +831,32 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page .sn-cookie-mode-label { font-weight: 600; display: block; }
 .sn-page .sn-cookie-mode-desc { display: block; margin-top: 3px; line-height: 1.5; }
 
+/* I livelli di privacy (#1589): sotto i tre livelli, una riga per le categorie e una per l'incognito. Le categorie sono
+   pastiglie come le scelte dell'intervista: la spunta resta, il bordo d'accento dice quelle che chiedono. */
+.sn-page .sn-privacy-riga {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.sn-page .sn-privacy-categorie { display: flex; flex-wrap: wrap; gap: 6px; }
+.sn-page .sn-privacy-riga > select { width: auto; min-width: 220px; }
+.sn-page .sn-privacy-categoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-page .sn-privacy-categoria:hover { background: var(--sn-hover); }
+.sn-page .sn-privacy-categoria:has(input:checked) { border-color: var(--sn-accent); }
+.sn-page .sn-privacy-categoria:has(input:disabled) { cursor: default; }
+.sn-page .sn-privacy-categoria > input { margin: 0; }
+
 .sn-page .sn-cookie-wl-add > input { flex: 1; }
 .sn-page #cookie-wl-list li,
 .sn-page #cookie-banners-list li,

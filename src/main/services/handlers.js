@@ -223,7 +223,8 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     })();
     const [llmsRes, pathsRes] = await Promise.all([
       domain ? LlmsTxt.get(domain, { sender }).catch(() => null) : Promise.resolve(null),
-      domain ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
+      // Dove il livello di privacy chiede prima (#1589) il nome del sito non va al server a cercare i percorsi noti.
+      domain && payload.percorsiNoti !== false ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
     ]);
     const siteKnowledge = (llmsRes && llmsRes.present && llmsRes.text) ? llmsRes.text : '';
     const knownPaths = formatKnownPathsForPrompt(pathsRes || []);
@@ -2195,13 +2196,13 @@ async function eseguiAzioneFilo(action, {
       if (accoglienza && !confirmed && !assistente && setter && setter.scrive.includes('agentStyle')
         && !testoDiAltriNelleAzioni(contesto)) action._accoglienza = true;
     } catch (_) {}
-    // «Questo sito», «scheda: <titolo>» fra i siti delicati e quelli col menu proprio (#975): la chat vede i titoli
+    // «Questo sito», «scheda: <titolo>» fra i siti delicati, quelli in anticipo (#1589) e quelli col menu proprio (#975): la chat vede i titoli
     // delle schede, non gli indirizzi (#1004).
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
       if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti')
-        || setter.scrive.includes('blocklist'))) {
+        || setter.scrive.includes('security.privacy.sitiAnticipo') || setter.scrive.includes('blocklist'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
         const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
@@ -2752,19 +2753,24 @@ async function eseguiAzioneFilo(action, {
         // Finché è a schermo senza risposta la voce non si spunta e l'intervista non si chiude, anche da un'altra
         // azione dello stesso turno: chiusa, la scelta sparirebbe con la chat. La regola sta nello stato dell'intervista.
         const sceltaAutonomia = truthy(action.autonomia);
+        // #1589 — la scelta del livello di privacy segue la stessa regola: si mostra, la fa l'utente.
+        const sceltaPrivacy = truthy(action.privacy);
         // #1461 — la scelta dei contatori anonimi segue la stessa regola: si mostra, la fa l'utente, poi si spunta.
-        const sceltaContatori = !sceltaAutonomia && truthy(action.contatori);
+        const sceltaContatori = !sceltaAutonomia && !sceltaPrivacy && truthy(action.contatori);
         const autonomiaSospesa = sceltaAutonomia || Onboarding.autonomiaInSospeso(state);
+        const privacySospesa = sceltaPrivacy || Onboarding.privacyInSospeso(state);
         const contatoriSospesi = sceltaContatori || Onboarding.contatoriInSospeso(state);
-        const inSospeso = autonomiaSospesa || contatoriSospesi;
+        const inSospeso = autonomiaSospesa || privacySospesa || contatoriSospesi;
         const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
           .filter((x) => {
             const id = String(x || '').trim().toLowerCase();
-            return !(autonomiaSospesa && id === 'autonomia') && !(contatoriSospesi && id === 'contatori');
+            return !(autonomiaSospesa && id === 'autonomia') && !(privacySospesa && id === 'privacy')
+              && !(contatoriSospesi && id === 'contatori');
           });
         const spuntato = Onboarding.tick(state, ids).state;
-        const ticked = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato)
-          : (sceltaContatori ? Onboarding.mostraSceltaContatori(spuntato) : spuntato);
+        const conAutonomia = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato) : spuntato;
+        const conPrivacy = sceltaPrivacy ? Onboarding.mostraSceltaPrivacy(conAutonomia) : conAutonomia;
+        const ticked = sceltaContatori ? Onboarding.mostraSceltaContatori(conPrivacy) : conPrivacy;
         // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
         // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
         // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
@@ -2778,10 +2784,22 @@ async function eseguiAzioneFilo(action, {
           try { attivi = !(((await Storage.getSettings()) || {}).contatori?.attivi === false); } catch (_) {}
           return { executed: true, kept: true, output: { sceltaContatori: true, attivi } };
         }
-        if (!sceltaAutonomia) return { executed: true, kept: false };
+        if (!sceltaAutonomia && !sceltaPrivacy) return { executed: true, kept: false };
         let livello = '';
-        try { livello = globalThis.SN_AUTONOMIA.livelloAttivo(((await Storage.getSettings()) || {}).autonomia?.livello); } catch (_) {}
-        return { executed: true, kept: true, output: { sceltaAutonomia: true, livello } };
+        let livelloPrivacy = '';
+        try {
+          const impostazioni = (await Storage.getSettings()) || {};
+          livello = globalThis.SN_AUTONOMIA.livelloAttivo(impostazioni.autonomia?.livello);
+          livelloPrivacy = globalThis.SN_LIVELLI_PRIVACY.regola(impostazioni).livello;
+        } catch (_) {}
+        return {
+          executed: true,
+          kept: true,
+          output: {
+            ...(sceltaAutonomia ? { sceltaAutonomia: true, livello } : {}),
+            ...(sceltaPrivacy ? { sceltaPrivacy: true, livelloPrivacy } : {}),
+          },
+        };
       }
       case 'SALVA_LEZIONE': {
         // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
@@ -3517,7 +3535,8 @@ async function eseguiAzioneFilo(action, {
       }
       case 'ANNULLA_CAMBIO': {
         // «Rimetti come prima»: vale per i cambi chiesti in chat e per quelli fatti dalle pagine.
-        const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
+        // Il cancello ha già chiesto la parola scritta: un annullo che alza quanto esce ha il livello di una difesa.
+        const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat', confermato: true });
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
@@ -4870,11 +4889,21 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Sotto la tua risposta l'utente vede Sì e No dei contatori anonimi (adesso sono ${res.output.attivi ? 'accesi' : 'spenti'}) `
       + `e sceglie lui con un clic: la scelta ti arriva come suo messaggio. Non dire di averli cambiati tu.${doveStaIlTesto(giro)}`;
   }
-  if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
-    const A = globalThis.SN_AUTONOMIA;
-    const ora = A ? A.infoLivello(res.output.livello).nome : '';
-    return `Sotto la tua risposta l'utente vede i livelli di autonomia${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
-      + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
+  if (type === 'ONBOARDING' && res.executed && res.output && (res.output.sceltaAutonomia || res.output.sceltaPrivacy)) {
+    const righe = [];
+    if (res.output.sceltaAutonomia) {
+      const A = globalThis.SN_AUTONOMIA;
+      const ora = A ? A.infoLivello(res.output.livello).nome : '';
+      righe.push(`Sotto la tua risposta l'utente vede i livelli di autonomia${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
+        + 'la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.');
+    }
+    if (res.output.sceltaPrivacy) {
+      const L = globalThis.SN_LIVELLI_PRIVACY;
+      const ora = L ? L.nomeLivello(res.output.livelloPrivacy) : '';
+      righe.push(`Sotto la tua risposta l'utente vede i livelli di privacy${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
+        + 'la scelta ti arriva come suo messaggio.');
+    }
+    return `${righe.join(' ')}${doveStaIlTesto(giro)}`;
   }
   if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
   if (type === 'APRI_FILE' && res.output && res.output.rete) {
@@ -6064,6 +6093,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}),
         ...(renderedActions.some((x) => x && x._output && x._output.sceltaAutonomia) ? { autonomia: true } : {}),
         ...(renderedActions.some((x) => x && x._output && x._output.sceltaContatori) ? { contatori: true } : {}),
+        ...(renderedActions.some((x) => x && x._output && x._output.sceltaPrivacy) ? { privacy: true } : {}),
       });
     }
     const tetto = !after.done && Onboarding.shouldForceClose(after);
@@ -6701,7 +6731,7 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
     // Di una pagina della rete di casa al modello arrivano solo i segnali di Filo: titolo, indirizzo e testo restano qui (#591).
     const casa = isHomeNetworkUrl(t.url);
     // Di una pagina delicata solo il tipo, che lo scrive Filo: basta a tenere aperta la posta (#1004).
-    const delicata = casa ? null : (fuori.attivo !== false && t.delicata) || fuori(t.url);
+    const delicata = casa ? null : t.delicata || fuori(t.url);
     const parts = casa
       ? [`#${i}`, '[pagina della rete di casa]']
       : delicata

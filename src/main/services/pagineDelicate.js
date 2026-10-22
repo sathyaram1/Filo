@@ -1,11 +1,12 @@
 // Le pagine delicate lato main (#1004): ricorda i siti che hanno mostrato un campo password o carta, e dà ai lavori
-// automatici una domanda sola, «questa pagina è delicata?», con impostazioni ed elenco remoto di adesso.
+// automatici una domanda sola, «da qui parte qualcosa da solo?», coi livelli di privacy e l'elenco remoto di adesso.
 // La regola sta in src/shared/pagineDelicate.js; dall'incognito non si scrive niente su disco.
 
 const { getDomainInfo } = require('./safebrowse/psl');
 const { ElencoSiti } = require('../../shared/stessoSito');
 
 const PD = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
+const LP = globalThis.SN_LIVELLI_PRIVACY || require('../../shared/livelliPrivacy.js');
 
 // Per dominio registrabile: chi entra da accesso.banca.it e poi legge i movimenti su online.banca.it resta sullo stesso sito.
 // Un ricordo salvato su gov.it quando contava come un sito solo copre ancora i siti sotto di lui (stessoSito.js).
@@ -72,33 +73,56 @@ function elencoRemoto() {
   try { return require('./defaultsStore').get().sitiDelicati; } catch (_) { return null; }
 }
 
-// Un predicato sincrono (url → motivo | null) con le impostazioni di adesso: chi controlla molte pagine lo chiede una volta.
-async function filtro(settingsIn) {
+// Le schede che mostrano adesso un campo password o carta, con l'indirizzo dove l'hanno mostrato: il pavimento delle
+// immagini guarda la pagina, non il sito (da Gmail l'immagine parte anche dopo un accesso a Google).
+const campiInVista = new WeakMap();
+function mostraCampi(wc, url) {
+  if (wc && typeof wc === 'object' && url) campiInVista.set(wc, String(url));
+}
+const campiOra = (wc) => (url) => Boolean(wc && campiInVista.get(wc) === String(url || ''));
+
+// Un predicato sincrono (url → motivo | null) con le impostazioni di adesso: il motivo per cui da quella pagina non parte
+// niente da solo, secondo i livelli di privacy (#1589). `incognito` e `tipo` ('testo' | 'immagine') dicono chi chiede;
+// per le immagini `wc` è la scheda, e senza vale il ricordo del sito che ha mostrato il campo. Chi controlla molte
+// pagine lo chiede una volta.
+async function filtro(settingsIn, { incognito = false, tipo = 'testo', wc = null } = {}) {
   await carica();
   let settings = settingsIn;
   if (!settings) {
     try { settings = await globalThis.SN_STORAGE.getSettings(); } catch (_) { settings = null; }
   }
+  const regola = LP.regola(settings);
   const opzioni = {
-    attivo: PD.attivo(settings),
     sitiUtente: PD.sitiUtente(settings),
     elenco: PD.elenco(elencoRemoto()),
     campi: haCampi,
     nonDelicati: PD.nonDelicati(settings),
   };
-  const f = (url) => PD.classifica(url, opzioni);
-  f.attivo = opzioni.attivo;
-  // Una scheda archiviata porta il motivo di quando si è chiusa; un sito tolto dopo dai segnati per il campo ne è fuori.
-  const tolto = (url) => {
+  const tolto = (h) => Boolean(h) && opzioni.nonDelicati.some((d) => h === d || h.endsWith(`.${d}`));
+  const inVista = wc ? campiOra(wc) : null;
+  const decidi = (url, motivo) => {
     const h = PD.host(url);
-    return Boolean(h) && opzioni.nonDelicati.some((d) => h === d || h.endsWith(`.${d}`));
+    if (!h) return null;
+    const campi = tipo === 'immagine' && (inVista ? inVista(url) : haCampi(h) && !tolto(h));
+    return LP.chiede(regola, { host: h, motivo: motivo || PD.classifica(url, opzioni), campi, incognito, tipo });
   };
+  const f = (url) => decidi(url);
+  f.regola = regola;
+  // Una scheda archiviata porta ciò che la pagina era quando si è chiusa; si decide coi livelli di adesso. Un sito tolto
+  // dopo dai segnati per il campo ne è fuori.
   f.voce = (it) => {
-    const m = opzioni.attivo && it && it.delicata;
-    if (m && !(m === 'campi' && tolto(it.url))) return m;
-    return f(it && it.url);
+    const salvato = it && PD.CLASSI.includes(it.delicata) ? it.delicata : null;
+    const valido = salvato && !(salvato === 'campi' && tolto(PD.host(it.url)));
+    return decidi(it && it.url, valido ? salvato : null);
   };
   return f;
+}
+
+// La domanda di chi sta per mandare una cosa sola: da questa pagina parte da sola? Il motivo per cui chiede, o null. Solo
+// pagine web; senza la regola non si sa, e nel dubbio chiede.
+async function chiede(url, { incognito = false, tipo = 'testo', wc = null } = {}) {
+  if (!/^https?:/i.test(String(url || ''))) return null;
+  try { return (await filtro(null, { incognito, tipo, wc }))(url) || null; } catch (_) { return 'campi'; }
 }
 
 // I siti segnati per un campo password o carta che restano anche dopo un riavvio: quelli che l'utente vede in Sicurezza.
@@ -114,6 +138,6 @@ function rileggi() {
   return carica();
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, rileggi, dimentica, elencoCampi };
+globalThis.SN_DELICATE = { segnaCampi, haCampi, mostraCampi, filtro, chiede, carica, rileggi, dimentica, elencoCampi };
 
 module.exports = globalThis.SN_DELICATE;

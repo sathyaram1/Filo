@@ -209,6 +209,23 @@ async function annullaOra(id, prov = {}) {
   if (K().annullati(lista).has(trovato.id)) return { ok: false, motivo: 'già annullato', id: trovato.id };
   const e = daRimettere(trovato, lista);
   if (!K().annullabile(e)) return { ok: false, motivo: 'il valore di prima non è conservato (è un segreto)', id: e.id };
+  // Rimettere com'era un cambio che stringeva quanto esce verso i modelli lo riallarga: vuole «conferma» (#1589). La
+  // chat ci arriva dopo il suo riquadro con la parola scritta, le pagine la chiedono e ritornano con `confermato`.
+  if (e.tipo === 'impostazioni' && prov.confermato !== true) {
+    const LP = globalThis.SN_LIVELLI_PRIVACY;
+    const correnti = await globalThis.SN_STORAGE.getSettings();
+    const parziale = K().annulloImpostazioni(e, correnti, globalThis.SN_STORAGE.REPLACE_KEYS);
+    const sec = (s) => (s && s.security && typeof s.security === 'object' ? s.security : {});
+    const dopo = {
+      security: {
+        privacy: { ...(sec(correnti).privacy || {}), ...(sec(parziale).privacy || {}) },
+        pagineDelicate: { ...(sec(correnti).pagineDelicate || {}), ...(sec(parziale).pagineDelicate || {}) },
+      },
+    };
+    if (LP && parziale && parziale.security && LP.alzaTutto(correnti, dopo)) {
+      return { ok: false, motivo: 'conferma', id: e.id, conferma: LP.confermaAnnullo(K().frase(e)) };
+    }
+  }
   const raccolti = [];
   let saltati = [];
   let riuscito = true;

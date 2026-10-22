@@ -114,7 +114,7 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
-    sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
+    sceltaAutonomia: (a) => Accoglienza.scelteDi(a._output),
     sceltaContatori: (a) => Accoglienza.sceltaContatori(!(a._output && a._output.attivi === false)),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
@@ -2037,6 +2037,9 @@
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
       if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
+      if (msg.settings && msg.settings.security && msg.settings.security.privacy) {
+        Accoglienza.aggiornaSceltaPrivacy(msg.settings.security.privacy.livello);
+      }
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);

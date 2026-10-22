@@ -340,6 +340,14 @@ function registerIpcHandlers() {
     // cache AI e conteggio dei costi devono restare effimeri.
     const work = async () => {
       try {
+        // La spiegazione di un link aperta dal tasto destro parte da sola: i livelli di privacy decidono se aspetta il clic (#1589).
+        if (payload && payload.anticipata === true) {
+          const info = senderInfo(event);
+          const url = String(info.tab?.url || info.url || '');
+          const motivo = await globalThis.SN_DELICATE.chiede(url, { incognito, tipo: 'testo', wc: event.sender }).catch(() => 'campi');
+          if (motivo) throw Object.assign(new Error('La pagina aspetta che la spiegazione la chieda tu'), { code: 'CHIEDI_PRIMA', motivo });
+        }
+        if (payload && typeof payload === 'object') delete payload.anticipata;
         const meta = {};
         // Chi legge lo stream (il riquadro di «spiega») scrive da sé la riga del ripiego (#662).
         const K = globalThis.SN_WALLET_MAIN;
@@ -355,7 +363,7 @@ function registerIpcHandlers() {
         }));
         send('done', { ...result });
       } catch (err) {
-        console.warn('[Filo IPC] stream error', requestId, err);
+        if (!err || err.code !== 'CHIEDI_PRIMA') console.warn('[Filo IPC] stream error', requestId, err);
         // Lo stream dice quello che dice la risposta di `filo:message`: senza
         // status, fornitore e frase già scritta chi mostra l'errore non può
         // ricomporlo e finisce per stampare la riga grezza del servizio (#663).
@@ -367,6 +375,7 @@ function registerIpcHandlers() {
           userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
           keyRefused: rifiutoDellaChiave(err),
           ...dettagliDelTetto(err),
+          ...(err && err.motivo ? { motivo: String(err.motivo) } : {}),
         });
       } finally {
         inFlightStreams.delete(requestId);

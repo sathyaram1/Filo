@@ -76,31 +76,45 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // Da una pagina delicata non parte niente di automatico (#1004): né la descrizione di uno screenshot o di un'immagine
-  // copiata, né la spiegazione preparata alla selezione (#1274). Un'immagine nata lì resta fuori anche incollata su un
-  // altro sito: conta la pagina da cui viene. Senza la regola non si sa: nel dubbio vale delicata.
-  async function automaticaDaDelicata(msg, sender) {
+  // I livelli di privacy (#1589) decidono cosa parte da solo verso un modello da una pagina web; quello che l'utente
+  // chiede parte sempre. Da soli partono: la descrizione di uno screenshot o di un'immagine copiata, la spiegazione
+  // preparata alla selezione (#1274), le sezioni che il tasto destro apre (`anticipata`: immagine, selezione, link), i
+  // controlli del correttore mentre scrivi (#1446). Il tipo decide il pavimento delle immagini.
+  const DEL_CORRETTORE = new Set([SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC, SN_CONST.ACTIONS.SPELLCHECK_CONTEXT]);
+  function partenzaDaSola(msg) {
     const A = SN_CONST.ACTIONS;
-    const immagine = Boolean(msg && msg.action === A.DESCRIBE_IMAGE && msg.payload && msg.payload.automatica);
-    const preparata = Boolean(msg && msg.action === A.EXPLAIN && msg.suRichiesta !== true);
-    if (!immagine && !preparata) return false;
-    const url = String(sender?.tab?.url || sender?.url || '');
-    let delicata = null;
-    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { return true; }
-    const daQui = /^https?:/i.test(url) && Boolean(delicata(url));
-    if (!immagine) return daQui;
+    if (!msg) return null;
+    const immagine = msg.action === A.DESCRIBE_IMAGE;
+    if (immagine && msg.payload && msg.payload.automatica) return 'immagine';
+    if (msg.anticipata === true) return immagine ? 'immagine' : 'testo';
+    if ((msg.action === A.EXPLAIN || DEL_CORRETTORE.has(msg.action)) && msg.suRichiesta !== true) return 'testo';
+    return null;
+  }
+  const incognitoDi = (sender) => Boolean(winOf && winOf(sender)?._filoTabs?.incognito);
+  const paginaDi = (sender) => String(sender?.tab?.url || sender?.url || '');
+  // Il motivo per cui questa richiesta aspetta che l'utente la chieda, o null. Senza la regola non si sa: nel dubbio chiede.
+  async function chiedePrima(msg, sender, tipo = partenzaDaSola(msg)) {
+    if (!tipo) return null;
+    try {
+      return await globalThis.SN_DELICATE.chiede(paginaDi(sender), { incognito: incognitoDi(sender), tipo, wc: sender && sender.wc });
+    } catch (_) { return 'campi'; }
+  }
+  // Un'immagine nata dove Filo chiede resta fuori anche incollata su un altro sito: conta la pagina da cui viene. Il solo
+  // «Chiedi sempre» non la segna: lì è il livello a fermarla, e scelto un livello più largo torna a partire.
+  async function immagineFerma(msg, sender, motivo) {
     const Immagini = require('../immaginiDelicate').perFilo();
     const dataUrl = msg.payload.dataUrl;
-    if (daQui) {
-      const incognito = Boolean(winOf && winOf(sender)?._filoTabs?.incognito);
-      await Immagini.segna(dataUrl, { incognito }).catch(() => {});
-      // Al modello va la copia coi campi segreti coperti (#810.7): incollata altrove, l'utente ha la foto vera.
-      const originale = msg.payload.originale;
-      if (typeof originale === 'string' && originale !== dataUrl) await Immagini.segna(originale, { incognito }).catch(() => {});
-      return true;
+    if (motivo) {
+      if (motivo !== 'sempre') {
+        const incognito = incognitoDi(sender);
+        await Immagini.segna(dataUrl, { incognito }).catch(() => {});
+        // Al modello va la copia coi campi segreti coperti (#810.7): incollata altrove, l'utente ha la foto vera.
+        const originale = msg.payload.originale;
+        if (typeof originale === 'string' && originale !== dataUrl) await Immagini.segna(originale, { incognito }).catch(() => {});
+      }
+      return motivo;
     }
-    if (delicata.attivo === false) return false;
-    try { return await Immagini.daDelicata(dataUrl); } catch (_) { return true; }
+    try { return (await Immagini.daDelicata(dataUrl)) ? 'campi' : null; } catch (_) { return 'campi'; }
   }
 
   // Spenta in Preferenze (#1274), la descrizione di screenshot e immagini copiate non parte: il file prende data e ora.
@@ -111,19 +125,14 @@ module.exports = function register(on, ctx) {
     return Boolean(s && s.descriviImmagini && s.descriviImmagini.enabled === false);
   }
 
-  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: i due controlli del
-  // correttore (#1446) partono col solo testo di chi scrive e il nome del sito, e lo dicono alla pagina, che allora non
-  // ha citazioni da confrontare.
-  const DEL_CORRETTORE = new Set([SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC, SN_CONST.ACTIONS.SPELLCHECK_CONTEXT]);
+  // Chiesto dove Filo chiede, il controllo del correttore parte col solo testo di chi scrive e il nome del sito (#1446),
+  // e lo dice alla pagina, che allora non ha citazioni da confrontare.
   const sitoDi = (url) => {
     try { const u = new URL(url); return u.protocol === 'filo:' ? 'Filo' : (u.hostname || ''); } catch (_) { return ''; }
   };
   async function senzaPaginaDelicata(msg, sender) {
     if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
-    const url = String(sender?.tab?.url || sender?.url || '');
-    if (!/^https?:/i.test(url)) return false;
-    let delicata = true;
-    try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
+    const delicata = Boolean(await chiedePrima(msg, sender, 'testo'));
     if (delicata) {
       const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
       msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
@@ -148,7 +157,10 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
-    if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
+    const tipo = partenzaDaSola(msg);
+    let motivo = await chiedePrima(msg, sender, tipo);
+    if (tipo === 'immagine' && msg.payload && msg.payload.automatica) motivo = await immagineFerma(msg, sender, motivo);
+    if (motivo) return { ok: false, code: 'CHIEDI_PRIMA', motivo };
     if (await descrizioneSpenta(msg)) return { ok: false, code: 'DESCRIZIONE_SPENTA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
@@ -165,10 +177,12 @@ module.exports = function register(on, ctx) {
       const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
       if (d) esterno.documenti = d; else delete esterno.documenti;
     }
-    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta.
+    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta. Così i percorsi noti
+    // dal server: dove il livello di privacy chiede prima (#1589) il nome del sito non esce.
     if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
       msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
       msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+      msg.payload.percorsiNoti = !(await chiedePrima(msg, sender, 'testo'));
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
@@ -917,6 +931,7 @@ module.exports = function register(on, ctx) {
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      if (r && r.pavimento) return { ok: false, blocked: 'segreto', frase: r.reason, results: [] };
       segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       return { ok: true, ...r };
     } catch (e) {

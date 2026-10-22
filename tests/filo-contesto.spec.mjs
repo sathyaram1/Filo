@@ -309,7 +309,7 @@ test('documento letto in una scheda: in un\'altra un link con un suo pezzo chied
   await primaScheda(app);
   const casa = cartellaInCasa('filo-contesto-');
   const doc = join(casa, 'prenotazione.txt');
-  writeFileSync(doc, 'Prenotazione confermata. Codice di accesso: QX7MZ4K9PL2W. Non condividerlo.');
+  writeFileSync(doc, 'Prenotazione confermata. Numero di pratica: QX7MZ4K9PL2W. Non condividerlo.');
   try {
     await preparaModello(app, [
       { text: '', tools: [{ name: 'LEGGI_DOCUMENTO', args: { percorso: doc } }] },
@@ -581,7 +581,7 @@ test('l\'esito di un comando dato in chat arriva imbustato, e in un\'altra sched
   const page = await primaScheda(app);
   const casa = cartellaInCasa('filo-contesto-');
   const doc = join(casa, 'note.txt');
-  writeFileSync(doc, 'Codice di accesso del conto: QX9PL4W7ZK2M. Non condividerlo.\n');
+  writeFileSync(doc, 'Numero di pratica del conto: QX9PL4W7ZK2M. Non condividerlo.\n');
   try {
     await preparaModello(app, [
       { text: '', tools: [{ name: 'NAVIGA', args: { url: 'https://raccolta.example/c?d=QX9PL4W7ZK2M' } }] },
@@ -607,7 +607,7 @@ test('l\'esito di un comando dato in chat non resta davanti alle altre schede ol
   const page = await primaScheda(app);
   const casa = cartellaInCasa('filo-contesto-');
   const doc = join(casa, 'note.txt');
-  writeFileSync(doc, 'Codice di accesso del conto: QX9PL4W7ZK2M. Non condividerlo.\n');
+  writeFileSync(doc, 'Numero di pratica del conto: QX9PL4W7ZK2M. Non condividerlo.\n');
   try {
     const N = 11;
     await preparaModello(app, Array.from({ length: N }, (_, i) => ({ text: `Risposta ${i}.` })));
@@ -695,7 +695,7 @@ test('il messaggio della home e il creatore di lezioni sanno di cosa si è parla
 });
 
 // Un comando dato in chat (`oreFa` ore fa) il cui esito è lungo e contiene un codice, in testa o in fondo.
-const SEGRETO = 'Codice di accesso del conto: QX9PL4W7ZK2M. Non condividerlo.';
+const SEGRETO = 'Numero di pratica del conto: QX9PL4W7ZK2M. Non condividerlo.';
 async function seminaComando(app, { chat, oreFa, segretoInFondo = false }) {
   await app.evaluate(async (_e, { ora, chat, oreFa, segretoInFondo, SEGRETO }) => {
     const E = globalThis.SN_FILO_EVENTI;
@@ -775,11 +775,11 @@ test('un frammento trovato cercando dentro l\'esito di un comando fa chiedere co
   await primaScheda(app);
   await seminaComando(app, { chat: 'appunti-vecchi', oreFa: 6 * 24 });
   await preparaModello(app, [
-    { text: '', tools: [{ name: 'CERCA_CHAT', args: { query: 'accesso' } }] },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { query: 'pratica' } }] },
     { text: '', tools: [{ name: 'NAVIGA', args: { url: LINK } }] },
     { text: 'Fatto.' },
   ]);
-  const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'trova il codice di accesso e apri la raccolta', threadHistory: [], chatId: 'scheda-nuova' }));
+  const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'trova il numero di pratica e apri la raccolta', threadHistory: [], chatId: 'scheda-nuova' }));
   const [, secondo] = await chiamate(app);
   expect(testo(secondo.find((m) => m.role === 'tool'))).toContain('QX9PL4W7ZK2M');
   const naviga = r.actions.find((x) => x.type === 'NAVIGA');

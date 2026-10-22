@@ -2373,7 +2373,7 @@
         + `- Ma un «no grazie», «magari dopo», «non ora» che risponde a una tua PROPOSTA (l'accesso Google, il tema scuro, un approfondimento) rifiuta QUELLA proposta, non l'accoglienza: prendine atto in mezza riga, spunta la voce e vai avanti con quelle che restano. NON chiudere.\n`
         + `- Quando l'elenco è finito, chiudi con ONBOARDING {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
         + `- Scambi usati finora: ${Number(onboardingTurns) || 0} su ${Number(onboardingMax) || 7}. All'ultimo chiudi, a meno che sia l'utente a voler continuare.\n`
-        + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true o quella dei contatori con contatori: true, e/o chiude l'intervista con fine: true).\n\n`
+        + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true, quella della privacy con privacy: true o quella dei contatori con contatori: true, e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
 
     filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
@@ -2847,14 +2847,23 @@
         trustedSites: [],
         righeScartate: [],
       },
-      // #1004 — le pagine delicate (posta, banche, sanità, pubblica amministrazione, quelle con un campo password o carta,
-      // e `siti` scritti dall'utente) non mandano niente ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
+      // #1004 — le pagine delicate (posta, banche, sanità, pubblica amministrazione, quelle con un campo password o carta);
+      // `siti` sono quelli che l'utente aggiunge, dove Filo chiede a ogni livello. Cosa parte da solo: `privacy` qui sotto.
       pagineDelicate: {
-        enabled: true,
         siti: [],
         righeScartate: [],
         // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
         nonDelicati: [],
+      },
+      // #1589 — i livelli di privacy: quanto Filo manda ai modelli dalle pagine senza che tu lo chieda. 'anticipo' |
+      // 'delicate' | 'sempre', uno a parte per l'incognito, le categorie che chiedono anche a «Tutto in anticipo» e i
+      // siti dove parte tutto. Regola e valori di serie: src/shared/livelliPrivacy.js (decisione D-72).
+      privacy: {
+        livello: 'anticipo',
+        incognito: 'sempre',
+        chiedi: ['sanita'],
+        sitiAnticipo: [],
+        righeScartate: [],
       },
       // #1084 — un riquadro di terzi che sembra rotto dai cookie e che le regole non riconoscono lo guarda un modello
       // (foto del solo riquadro). Spento, restano le regole e il tasto destro sul riquadro. Regola: riquadriRotti.js.
