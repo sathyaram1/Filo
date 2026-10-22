@@ -17,7 +17,7 @@
         'Incollare un testo lungo nell\'Editor non blocca più la pagina: anche mille righe entrano in un attimo.',
         'Se una risposta arriva da un fornitore che Filo esclude, te lo dice un avviso sulla pagina, anche senza «Solo modelli a pesi aperti», e «Segnala» apre il feedback già scritto. Nella Cronologia AI quella richiesta resta segnata e la trovi cercando il nome del fornitore.',
         'Su Windows e Mac i file che scarichi con Filo, anche con «Salva immagine come», risultano arrivati da Internet, come da qualunque browser. Se apri un programma fuori da Filo il sistema ti avvisa prima, e Office apre i documenti in Visualizzazione protetta. «Salva immagine come» ti propone anche il nome vero del file, lo stesso che poi trovi fra i download.',
-        'Filo salta le pubblicità dei video anche quando il video suona in una scheda che non stai guardando o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.',
+        'Le pubblicità dei video che si possono saltare Filo le salta anche quando il video suona in una scheda che non stai guardando, o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.',
       ],
     },
     {
