@@ -116,6 +116,8 @@ function messaggiDi(chats) {
     }
     (c.messages || []).forEach((m, i) => {
       if (!m) return;
+      // Già risolta, anche per un archivio di prima del campo: chi rilegge non ha più le fonti della chat (#1508).
+      const classe = FC().classeDelMessaggio(m, c.fonti);
       out.push({
         chat: c.id,
         titolo: c.title || '',
