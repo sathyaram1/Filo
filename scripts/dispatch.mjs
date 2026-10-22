@@ -1885,6 +1885,8 @@ export function tornaAllaLineaPrincipale() {
   if (process.env.FILO_ROUTINE !== '1') {
     return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
   }
+  const vivo = lavoroVivo(ROOT);
+  if (vivo.vivo) return { ok: false, vivo: true, message: testoLavoroVivo(vivo, `riportato la cartella su ${MAIN_BRANCH}`) };
   clearExpectation(ROOT);
   tryGit(['fetch', 'origin', MAIN_BRANCH]);
   const rif = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok ? `origin/${MAIN_BRANCH}` : MAIN_BRANCH;
