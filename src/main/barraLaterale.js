@@ -80,6 +80,7 @@ class BarraLaterale {
     this.ultimaSonda = 0;
     this.etichettePagina = null;
     this.ultimaPagina = '';
+    this.comandoInAttesa = null;
     this.strisciaPx = STRISCIA;
     this.vuoto = new VuotoDellaVista({
       vista: () => (this.vista && !this.vista.webContents.isDestroyed() ? this.vista : null),
