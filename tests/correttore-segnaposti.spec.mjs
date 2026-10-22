@@ -236,7 +236,7 @@ for (const [come, riga] of [['con altre parole', '[di soli xx][][Google P/E rati
         const t = String(a.messages[a.messages.length - 1].content);
         // Le fonti di Alphabet non dicono il p/e di Apple.
         if (t.includes('Chi scrive ha messo delle x') && t.includes('Apple P/E')) return { text: '[][][][nessuno]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
-        if (!t.includes('proponi SUGGERIMENTI') || !t.includes('davvero basso')) return prima(a);
+        if (!String(a.messages[0].content).includes('proponi SUGGERIMENTI') || !t.includes('davvero basso')) return prima(a);
         globalThis.__riletture++;
         return { text: t.includes('Apple ha') ? riga.replace('Google', 'Apple') : riga, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       };
