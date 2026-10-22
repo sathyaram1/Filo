@@ -1082,14 +1082,24 @@
 
   // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
   // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
+  // Anche il testo: una chat che svuota la casella da script all'invio non manda input, e lo strato terrebbe il vecchio.
+  const SEGUI_TESTO_DOPO_TASTO_MS = 10000;
   let seguendo = false;
   function seguiIlCampo() {
     if (seguendo) return;
     seguendo = true;
     const giro = () => {
       const state = activeEl && monitored.get(activeEl);
-      if (!state || !state.overlay || !state.el.isConnected || !state.inVista.length) {
+      const specchioPieno = !!(state && state.overlay && state.overlay.textContent)
+        && Date.now() - state.ultimoTasto < SEGUI_TESTO_DOPO_TASTO_MS;
+      if (!state || !state.overlay || !state.el.isConnected || (!state.inVista.length && !specchioPieno)) {
         seguendo = false;
+        return;
+      }
+      if (getEditableText(state.el) !== state.testo) {
+        seguiIlTesto(state);
+        aggiornaCodice(state);
+        requestAnimationFrame(giro);
         return;
       }
       const r = state.el.getBoundingClientRect();
