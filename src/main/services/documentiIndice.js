@@ -495,7 +495,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
       punteggio: Math.round(o.punteggio * 100) / 100,
     });
   }
-  return { risultati, indice: riassuntoIndice(rs, sotto), fermata, cartellaMancante };
+  return { risultati, indice: riassuntoIndice(rs, sotto), fermata, cartellaMancante, cartellaDiRete: '', cartellaFuori: '' };
 }
 
 /**
