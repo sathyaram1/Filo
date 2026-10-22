@@ -204,6 +204,13 @@ test('eventoNelRiquadro(): il vero si ferma e al campo va una copia nostra non c
     UI.eventoNelRiquadro(fuori);
     assert.notEqual(fuori.fermato, true, 'fuori dai riquadri non si tocca niente');
 
+    // La selezione trascinata fuori dalla casella: il sito non la legge, e il trascinamento resta del browser.
+    const trascinata = evento({ type: 'dragstart', isTrusted: true });
+    UI.eventoNelRiquadro(trascinata);
+    assert.equal(trascinata.fermato, true);
+    assert.equal(arrivate.length, 2, 'dragstart si ferma senza copia');
+    assert.notEqual(trascinata.annullato, true);
+
     const esc = evento({ type: 'keyup', isTrusted: true, key: 'Escape' });
     UI.eventoNelRiquadro(esc);
     assert.notEqual(esc.fermato, true, 'l\'Esc resta di tutti');

@@ -180,7 +180,7 @@
 
   // Un evento nato in un riquadro chiuso esce dallo shadow verso la finestra del sito: un tasto per lui non sta in una
   // casella e le sue scorciatoie si prenderebbero quello che l'utente scrive (#1071); inserimenti, composizione, incolla
-  // e rilascio gli portano il testo e i file (#1509). Lo ferma il primo ascolto della pagina (il ponte in page-preload, a
+  // e trascinamento gli portano il testo e i file (#1509). Lo ferma il primo ascolto della pagina (il ponte in page-preload, a
   // document_start), che ascolta questi tipi; al campo arriva una copia nostra che non esce dallo shadow. Fermare la
   // propagazione non toglie l'azione predefinita: il testo entra lo stesso. L'Esc resta di tutti (#514).
   const modificatori = (e) => ({ ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey });
@@ -198,6 +198,10 @@
       dataTransfer: e.dataTransfer || null, targetRanges,
     });
   };
+  const trascinamento = (e) => new DragEvent(e.type, {
+    ...base(e), ...modificatori(e), dataTransfer: e.dataTransfer,
+    clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY, button: e.button, buttons: e.buttons,
+  });
   const COPIE = {
     keydown: tasto,
     keypress: tasto,
@@ -208,13 +212,11 @@
     compositionupdate: (e) => new CompositionEvent(e.type, { ...base(e), data: e.data }),
     compositionend: (e) => new CompositionEvent(e.type, { ...base(e), data: e.data }),
     paste: (e) => new ClipboardEvent(e.type, { ...base(e), clipboardData: e.clipboardData }),
-    drop: (e) => new DragEvent(e.type, {
-      ...base(e), ...modificatori(e), dataTransfer: e.dataTransfer,
-      clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY, button: e.button, buttons: e.buttons,
-    }),
+    drop: trascinamento,
   };
-  // textInput porta il testo come beforeinput, ma nessuno di Filo lo ascolta: si ferma e basta.
-  const EVENTI_DEL_RIQUADRO = Object.freeze([...Object.keys(COPIE), 'textInput']);
+  // textInput porta il testo come beforeinput, dragstart la selezione trascinata; nessuno di Filo li ascolta in un
+  // riquadro: si fermano e basta. Una copia di dragstart, che divide coi dati l'originale, annullava il trascinamento.
+  const EVENTI_DEL_RIQUADRO = Object.freeze([...Object.keys(COPIE), 'textInput', 'dragstart']);
   // La copia nasce solo da un gesto vero (o nostro): uno fabbricato dal sito sull'host si ferma, e Chromium manda
   // compositionend non fidato col testo composto.
   function eventoNelRiquadro(e) {
