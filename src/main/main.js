@@ -285,6 +285,7 @@ app.whenReady().then(async () => {
   // #322 — le scadenze si controllano nel main: altrimenti una sveglia scatta
   // solo se la newtab è aperta.
   try { require('./services/alarmWatcher').start(); } catch (_) {}
+  try { require('./services/correttoreSpinte').avvia(); } catch (_) {}
 
   // Controlla le GitHub Releases e scarica in sottofondo; quando installare lo dice updater.js (no-op in dev/test).
   initAutoUpdater(impostazioniAvvio);

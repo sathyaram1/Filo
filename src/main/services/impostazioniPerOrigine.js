@@ -63,6 +63,8 @@ const SPINTE_WEB = Object.freeze(new Set([
   'form_recheck',
   'form_sent',
   'icon_layout_changed',
+  // Dizionario, correzioni e parole da non correggere del correttore (#1447): correttoreSpinte.js.
+  'correttore_memorie',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno

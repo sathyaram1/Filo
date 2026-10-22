@@ -153,16 +153,8 @@
   // anche se la scheda si chiude prima.
   const campoAlVolo = window.SN_CASELLE.alVolo();
 
-  // Una correzione si aggiunge anche dal tasto destro su una parola: se l'elenco
-  // cambia da fuori ci si riallinea, ma non mentre il cursore è in una riga,
-  // dove ridisegnare butterebbe via quello che si sta scrivendo.
-  chrome.storage.onChanged.addListener((changes) => {
-    const c = changes && changes[STORAGE_KEYS.AUTOCORRECT];
-    if (!c) return;
-    const a = document.activeElement;
-    if (a && a.closest && a.closest('.sn-spell-row')) return;
-    renderAutocorrect(c.newValue || {});
-  });
+  // Una correzione arriva anche dal tasto destro, o imparata scrivendo: la spinta del main (in fondo) ridisegna
+  // l'elenco, ma non mentre il cursore è in una riga, dove butterebbe via quello che si sta scrivendo.
 
   function renderAutocorrect(map) {
     mappaMostrata = { ...(map || {}) };
@@ -455,18 +447,10 @@
       rileggi().catch(() => {});
     });
 
-    // Quello che Filo ha imparato scrivendo in un'altra scheda compare tornando qui.
+    // Quello che Filo impara scrivendo in un'altra scheda arriva spinto dal main (#1447), e si rilegge tornando qui.
     document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggi().catch(() => {}); });
-
-    // Aggiornamento live se cambia da un altro tab, o se Filo impara una parola mentre la pagina è aperta.
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') return;
-      if (changes[STORAGE_KEYS.PERSONAL_DICT] && !siScriveIn('dictList')) {
-        renderDict(changes[STORAGE_KEYS.PERSONAL_DICT].newValue || []);
-      }
-      if (changes[STORAGE_KEYS.CORRETTORE_IMPARATO] && !siScriveIn('rifiutateList')) {
-        renderRifiutate(changes[STORAGE_KEYS.CORRETTORE_IMPARATO].newValue);
-      }
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === window.SN_MSG.MSG.CORRETTORE_MEMORIE) rileggi().catch(() => {});
     });
   });
 })();

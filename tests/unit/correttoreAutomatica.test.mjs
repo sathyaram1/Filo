@@ -214,3 +214,12 @@ test('i colori di riserva del lampo sono i predefiniti dei suoi token', () => {
   assert.ok(css.includes(`var(--sn-spell-lampo-durata, ${TT.defaultValue('correttore.lampo.durata', 'light')})`));
   assert.ok(TT.validate('correttore.lampo.durata', '600ms') && !TT.validate('correttore.lampo.durata', '1s; color:red'));
 });
+
+test('alle schede va solo quello che il content script usa: i conti a metà restano nel magazzino', () => {
+  const S = require('../../src/main/services/correttoreSpinte.js');
+  assert.deepEqual(S.ritaglia({ sn_correttore_imparato: { oldValue: { rifiutate: [] }, newValue: { rifiutate: ['marco'], annullate: { x: 1 } } } }), { rifiutate: ['marco'] });
+  assert.equal(S.ritaglia({ sn_correttore_imparato: { oldValue: { rifiutate: ['a'] }, newValue: { rifiutate: ['a'], riscritte: { x: { n: 1 } } } } }), null, 'un conto che cresce non si spinge');
+  assert.deepEqual(S.ritaglia({ sn_personal_dict: { newValue: ['ciuruglio'] }, settings: { newValue: {} } }), { sn_personal_dict: ['ciuruglio'] });
+  assert.deepEqual(S.ritaglia({ sn_autocorrect: { newValue: undefined } }), { sn_autocorrect: {} }, 'tolte tutte, la mappa vuota');
+  assert.equal(S.ritaglia({ settings: { newValue: {} } }), null);
+});

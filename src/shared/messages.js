@@ -426,6 +426,7 @@
     ICON_LAYOUT_GET: 'icon_layout_get',             // → { ok, layout }
     ICON_LAYOUT_DROP: 'icon_layout_drop',           // { id, target, beforeId } → { ok, layout }
     ICON_LAYOUT_CHANGED: 'icon_layout_changed',     // spinta → { layout }
+    CORRETTORE_MEMORIE: 'correttore_memorie',       // spinta → { memorie: { sn_personal_dict?, sn_autocorrect?, rifiutate? } } (#1447)
     BARRA_TRASCINA: 'barra_trascina',               // { fase: inizio|sopra|posa|fine, id, x, y } → { ok, larghezza }
     BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
     BARRA_ETICHETTE_CHIEDI: 'barra_etichette_chiedi', // spinta alla scheda davanti → { ids }: come si chiamano adesso le sue azioni nella barra

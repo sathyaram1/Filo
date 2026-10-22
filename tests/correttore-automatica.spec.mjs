@@ -315,3 +315,23 @@ test('l\'interruttore sta in Opzioni → Altro e in Preferenze, insieme a quante
   await pref.locator('#correttoreAutomatica').check();
   await expect(altro.locator('#spellcheckAutomatica')).toBeChecked();
 });
+
+test('nella pagina del correttore una parola imparata si cambia scrivendoci, e una già presente non si duplica', async ({ app, openTab }) => {
+  await app.evaluate(async () => { await globalThis.chrome.storage.local.set({ sn_personal_dict: ['ciuruglio', 'zanzotera'] }); });
+  const pagina = await openTab(URL_CORRETTORE);
+  const parole = pagina.locator('#dictList .sn-spell-word');
+  await expect(parole).toHaveCount(2, { timeout: 8000 });
+  await parole.nth(1).fill('Zanzottera');
+  await parole.nth(1).press('Enter');
+  await expect.poll(() => magazzino(app, 'sn_personal_dict')).toEqual(['ciuruglio', 'Zanzottera']);
+  await parole.nth(0).fill('zanzottera');
+  await parole.nth(0).press('Enter');
+  await expect(pagina.locator('#dictConflict')).toContainText('zanzottera');
+  await expect(parole.nth(0)).toHaveValue('ciuruglio');
+  expect(await magazzino(app, 'sn_personal_dict')).toEqual(['ciuruglio', 'Zanzottera']);
+  // A mano anche le parole da non correggere da sé.
+  await pagina.locator('#newRifiutata').fill('Marco');
+  await pagina.locator('#addRifiutata').click();
+  await expect(pagina.locator('#rifiutateList .sn-spell-word')).toHaveValue('marco');
+  await expect.poll(async () => (await imparato(app))?.rifiutate).toEqual(['marco']);
+});

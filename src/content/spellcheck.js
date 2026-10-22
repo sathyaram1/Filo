@@ -101,6 +101,14 @@
     document.addEventListener('visibilitychange', riprendiRimandati);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggiMemorie(); });
 
+    // Le memorie cambiate altrove (la pagina del correttore, un'altra scheda) arrivano spinte dal main (#1447).
+    try {
+      chrome.runtime.onMessage.addListener((m) => {
+        if (m?.type !== MSG.CORRETTORE_MEMORIE || !m.memorie || typeof m.memorie !== 'object') return;
+        usaMemorie(m.memorie);
+      });
+    } catch (_) {}
+
     try {
       chrome.runtime.onMessage.addListener((m) => {
         if (m?.type !== '_spell:native') return;
@@ -112,24 +120,6 @@
         // Per i test: la parola di cui sono arrivati i suggerimenti nativi, invece di un'attesa fissa.
         try { document.documentElement.dataset.filoNativeWord = lastNative.word; } catch (_) {}
         for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
-      });
-    } catch (_) {}
-
-    // La pagina del correttore cambia dizionario e correzioni automatiche: qui valgono subito.
-    try {
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area !== 'local') return;
-        if (changes[STORAGE_KEYS.PERSONAL_DICT]) {
-          usaDizionario(changes[STORAGE_KEYS.PERSONAL_DICT].newValue);
-          const state = activeEl && monitored.get(activeEl);
-          if (state) aggiornaCodice(state);
-        }
-        if (changes[STORAGE_KEYS.AUTOCORRECT]) {
-          autocorrectMap = changes[STORAGE_KEYS.AUTOCORRECT].newValue || {};
-        }
-        if (changes[STORAGE_KEYS.CORRETTORE_IMPARATO] && A()) {
-          imparato = A().memoria(changes[STORAGE_KEYS.CORRETTORE_IMPARATO].newValue);
-        }
       });
     } catch (_) {}
   }
@@ -638,14 +628,22 @@
     rileggiMemorie();
   }
 
-  // Dizionario, correzioni e quello che Filo ha imparato si rileggono quando si torna a scrivere: un cambio fatto nella
-  // pagina del correttore o imparato in un'altra scheda vale qui, e ai content script nessuno lo spinge (#1447).
+  // Dizionario, correzioni e quello che Filo ha imparato si rileggono anche tornando a scrivere: una spinta persa (la
+  // scheda nata dopo il cambio, un riquadro) non lascia la pagina indietro.
   let rilettaAlle = 0;
   async function rileggiMemorie() {
     const ora = Date.now();
     if (ora - rilettaAlle < 500) return;
     rilettaAlle = ora;
     await Promise.all([loadDictionary(), loadAutocorrect(), caricaImparato()]);
+    const state = activeEl && monitored.get(activeEl);
+    if (state && state.attivo) aggiornaCodice(state);
+  }
+
+  function usaMemorie(m) {
+    if (Array.isArray(m.sn_personal_dict)) usaDizionario(m.sn_personal_dict);
+    if (m.sn_autocorrect && typeof m.sn_autocorrect === 'object' && !Array.isArray(m.sn_autocorrect)) autocorrectMap = m.sn_autocorrect;
+    if (Array.isArray(m.rifiutate) && A()) imparato = { ...(imparato || A().memoria(null)), rifiutate: m.rifiutate.map(String) };
     const state = activeEl && monitored.get(activeEl);
     if (state && state.attivo) aggiornaCodice(state);
   }
