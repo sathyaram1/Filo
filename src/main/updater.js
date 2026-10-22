@@ -396,6 +396,7 @@ function soloTagDiRilascio(au) {
       if (!R.fileDiRilascio({ versione: info.version, urls, owner: opz.owner, repo: opz.repo, host: opz.host || 'github.com' })) {
         throw rifiutoDelCancello(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`, info);
       }
+      await controllaAncora(vero, info);
     }
     return r;
   };
