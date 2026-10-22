@@ -81,8 +81,12 @@ test('finish: un unit rosso già corretto su main arriva a chiedere la fusione s
     verificato(r, [['claude/vecchio', vecchio], ['claude/rompe', rompe]]);
 
     r.git('checkout', '-q', 'claude/vecchio');
+    const base = r.git('merge-base', 'claude/vecchio', 'main').slice(0, 8);
+    const mainOra = r.git('rev-parse', 'main').slice(0, 8);
     const v = finish(r);
     assert.match(v.out, /Controlli di logica rossi sul ramo da solo, ma sul risultato della fusione con main [0-9a-f]{8}, che è ciò che arriva su main, sono verdi: non sono del ramo, proseguo\./, v.out);
+    assert.ok(v.out.includes(`Il ramo parte da main ${base}, più vecchio`), `la base del ramo, dove il rosso c'è ancora, si nomina:\n${v.out}`);
+    assert.ok(v.out.includes(`su main da solo si usa ${mainOra}, non la base del ramo`), v.out);
     assert.doesNotMatch(v.out, /non pubblico/, v.out);
     assert.match(v.out, /Chiedo al server di fondere/, 'arriva alla richiesta di fusione');
     assert.equal(v.out.match(/▸ Unit sul risultato della fusione con main/g).length, 1, 'la prova sulla fusione gira una volta sola, non di nuovo prima della richiesta');
