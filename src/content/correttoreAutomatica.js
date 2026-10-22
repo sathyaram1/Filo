@@ -368,7 +368,7 @@
 
   global.SN_CORRETTORE_AUTO = {
     NOMI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome,
-    soloMaiuscole, correzioneAFineParola, dentroCodice, stileDi, scriveMinuscolo, scriveMinuscoloQui, distanza, imparabile, memoria, accettata, annullata,
+    soloMaiuscole, correzioneAFineParola, dentroCodice, stileDi, scriveMinuscolo, scriveMinuscoloQui, STILE_MAX, sommaStile, distanza, imparabile, memoria, accettata, annullata,
     riscritta, corretta, dimentica, inizioDiFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
