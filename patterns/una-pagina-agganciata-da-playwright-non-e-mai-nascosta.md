@@ -20,8 +20,8 @@ animazioni non partono. Il «Salta» compariva, la pubblicità suonava per inter
 content script non lo sapeva.
 
 La prova era verde perché Playwright, per ogni pagina che aggancia, chiede a Chromium
-di emulare il fuoco (`Emulation.setFocusEmulationEnabled`), e Chromium tiene sveglia
-come visibile una pagina con il fuoco emulato. Con la vista grande zero, nascosta con
+di emulare il fuoco (`Emulation.setFocusEmulationEnabled`), e Chromium tratta come
+visibile una pagina con il fuoco emulato. Con la vista grande zero, nascosta con
 `setVisible(false)`, e anche con la finestra nascosta, la pagina sotto Playwright
 risponde `visibilityState === 'visible'` e disegna a 60 fotogrammi al secondo. Lo
 stesso Electron senza Playwright, con la vista nascosta, risponde `hidden` e i
