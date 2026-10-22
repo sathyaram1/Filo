@@ -268,6 +268,15 @@
       css: '--sn-spell-dubbio',
       default: '0.4',
     },
+    // Il tetto di ogni scheda nella fila in alto, attiva compresa (#1493): lo legge shell.js, nessuna variabile CSS.
+    // Il minimo è la larghezza minima della scheda attiva (MIN_ATTIVA in shell.js).
+    'tab.larghezza': {
+      label: 'Larghezza massima delle schede',
+      type: 'pixel',
+      min: 110,
+      max: 1000,
+      default: '240px',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
