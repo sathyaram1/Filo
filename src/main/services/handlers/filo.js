@@ -458,9 +458,11 @@ module.exports = function register(on, ctx) {
     // Una finestra guardata dopo l'OK (#778): ne resta il nome, che toStoredMessage accorcia.
     const guardate = role === 'filo' && actions.some((a) => a.type === 'VEDI_SCHERMO')
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
+    // Una riga di Filo scritta dalla pagina non è passata dal giudizio dei collegamenti (#1505): riaperta, non ne ha.
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
       ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
+      ...(role === 'filo' ? { senzaVerdetto: true } : {}),
     });
     return { ok: true };
   });
