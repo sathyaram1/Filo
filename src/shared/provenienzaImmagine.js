@@ -1291,17 +1291,19 @@
           ? `${cosa} secondo credenziali firmate da ${chi}. Firma valida, firmatario non verificato.`
           : `${cosa} secondo credenziali firmate. Firma valida, firmatario non verificato.`;
       }
-      if (res.firmatario !== 'riconosciuto') {
+      if (res.firmatario !== 'riconosciuto' && res.firmatario !== 'provvisorio') {
         return chi
           ? `${cosa} secondo credenziali firmate da ${chi}, che non è nell’elenco ufficiale dei firmatari riconosciuti.`
           : `${cosa} secondo credenziali firmate da qualcuno che non è nell’elenco ufficiale dei firmatari riconosciuti.`;
       }
+      // Il riconoscimento dell'elenco provvisorio pesa meno di quello ufficiale, e lo si dice.
+      const dove = res.firmatario === 'provvisorio' ? ' Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.' : '';
       const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
-      if (!chi) return `${cosa} secondo credenziali firmate da un firmatario riconosciuto${debole ? ', ma incomplete' : ''}.`;
-      if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.`;
-      if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.`;
-      if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
-      return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.`;
+      if (!chi) return `${cosa} secondo credenziali firmate da un firmatario riconosciuto${debole ? ', ma incomplete' : ''}.${dove}`;
+      if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.${dove}`;
+      if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.${dove}`;
+      if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.${dove}`;
+      return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.${dove}`;
     }
     if (res.prova === 'marchio') return chi ? `${cosa}: porta il marchio invisibile che ${chi} mette nelle sue immagini.` : '';
     return chi
