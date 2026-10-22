@@ -1721,6 +1721,9 @@
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
+        gemella._durata = durata;
+        // Rinnovata mentre aspettava dietro il «+N»: è la notizia più fresca, torna in vista in fondo.
+        if (gemella.dataset.attesa === '1') { hostEl().appendChild(gemella); disponi(); }
         avviaTempo(gemella, durata);
         return gemella;
       }
@@ -1728,6 +1731,7 @@
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
+      card._durata = durata;
       card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
