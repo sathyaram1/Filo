@@ -419,7 +419,8 @@
   }
 
   // Gli editor di testo ricco (ProseMirror, Lexical) tengono un loro annulla e la scorciatoia non arriva al browser:
-  // subito dopo una correzione automatica la prende Filo, prima della pagina, e riporta la parola com'era.
+  // subito dopo una correzione automatica la prende Filo, prima della pagina. Prima l'annulla del browser, che toglie
+  // proprio la correzione (e quello dopo toglie quel che si era scritto); se non la riporta, la riscrive Filo.
   function annullaColTasto(e) {
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key || '').toLowerCase() !== 'z') return;
     const el = editabileDellEvento(e);
@@ -429,7 +430,13 @@
     if (!u || getEditableText(el) !== u.testo) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    annullaAutomatica(el, u.voce);
+    state.annullando = u;
+    try { document.execCommand('undo'); } catch (_) {}
+    const ora = getEditableText(el);
+    if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
+    state.annullando = null;
+    if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
+    if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
   }
 
   // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
