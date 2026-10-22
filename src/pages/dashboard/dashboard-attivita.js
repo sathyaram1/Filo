@@ -1555,11 +1555,7 @@
   // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
   // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
   const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
-  // Un percorso sul disco (assoluto, con ~ o con la lettera del disco), non un indirizzo web.
-  const percorsoLocale = (p) => {
-    const s = String(p || '').trim();
-    return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && (/^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s));
-  };
+  const percorsoLocale = (p) => !!window.SN_NOMI_FILE && window.SN_NOMI_FILE.percorsoLocale(p);
   // Se il bottone non porta il «dove» coi nomi di Filo (una chat riaperta): le ultime due cartelle; il percorso intero sta
   // nel suggerimento.
   function cartellaBreve(p) {
