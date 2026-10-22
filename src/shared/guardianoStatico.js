@@ -62,7 +62,7 @@
     /\bAKIA[A-Z0-9]{12,}/,
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
     // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
-    new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n){20,}`),
+    new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n(?=[A-Za-z0-9+/])){20,}`),
   ];
 
   // Il pezzo che ogni chiave dello stesso tipo ha uguale: dice di che tipo è, non quale. Di un JWT lo sono intestazione e
