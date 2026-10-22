@@ -558,7 +558,7 @@
     // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
     let piatto = alnumMinuscolo(t);
     for (const c of chiavi) {
-      for (const cerca of [c.norm, c.rov]) {
+      for (const cerca of [c.norm, c.rov, c.nucleo].filter(Boolean)) {
         let guardia = 0;
         while (piatto.includes(cerca) && guardia++ < 1000) {
           const pos = [];
