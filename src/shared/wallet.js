@@ -272,6 +272,12 @@
     // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
     inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
     network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
+    // I rifiuti della nuova chiave (#1503): una richiesta alla volta, una ogni dieci minuti, mai su crediti sospesi o finiti.
+    busy: 'Una chiave nuova per questi crediti è già in preparazione: riprova fra un paio di minuti.',
+    too_soon: 'Una chiave nuova per questi crediti è stata chiesta da pochi minuti: se ne può avere una ogni dieci minuti, riprova più tardi.',
+    suspended: 'I tuoi crediti sono sospesi, quindi non posso darti una chiave nuova. Se ti sembra un errore, mandaci un feedback.',
+    empty: 'I tuoi crediti sono finiti e una chiave nuova non avrebbe niente da spendere: riprova quando ne arrivano altri, oppure metti in questa pagina una tua chiave OpenRouter.',
+    conflict: 'Questa richiesta si è incrociata con un’altra per gli stessi crediti: riprova fra qualche minuto.',
   });
 
   // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
