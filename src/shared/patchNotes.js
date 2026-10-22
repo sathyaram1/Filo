@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.249', date: '2026-10-23',
+      features: [
+        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.248', date: '2026-10-23',
       features: [
         'Ctrl+Tab porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima scheda si riparte dalla prima. Su Mac si premono col tasto Control.',
@@ -45,9 +52,7 @@
     },
     {
       version: '0.2.246', date: '2026-10-22',
-      features: [
-        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
-      ],
+      features: [],
       fixes: [
         'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
         'Se arrivano più di cinque avvisi insieme in basso a destra, quelli in più non spariscono più. Aspettano dietro un «+3» in cima alla pila: un clic li mostra tutti, e da lì li chiudi anche tutti insieme. Quando gli altri se ne vanno, entrano da soli.',
