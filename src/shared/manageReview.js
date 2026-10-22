@@ -644,6 +644,28 @@
   }
 
   /**
+   * Cosa dice il giudizio a chi sta per leggerne il testo (#1514). PURA. `leggibile`: panel completo, o giudici saltati
+   * su un fidato; `mai_giudicato` è tutto il resto (filtro all'ingresso, panel parziale o degradato, nessun giudizio),
+   * che dai segni d'attacco da solo non si distingue da un pulito. Un completo con attacco fuori dai Ricevuti l'ha
+   * spostato l'owner: la decisione è sua.
+   */
+  function giudizioPerLettura(fb) {
+    const segnalato = segnalatoComeAttacco(fb);
+    if (segnalato) return { esito: 'segnalato', motivo: segnalato };
+    if (judgesSkippedText(fb) || panelComplete(fb)) return { esito: 'leggibile', motivo: '' };
+    const p = fb && fb.pipeline;
+    const mai = (motivo) => ({ esito: 'mai_giudicato', motivo });
+    if (p === undefined || p === null || p === '') return mai('nessun giudizio registrato');
+    if (typeof p !== 'object') return mai('il giudizio non si decifra');
+    const verdetti = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class).length : 0;
+    if (p.skipped && !verdetti) return mai('giudici saltati su una pratica non fidata');
+    if (!verdetti && (p.l1Category || p.action)) return mai('fermato dal filtro all’ingresso, nessun giudice');
+    if (p.l2Unfiltered === true || p.l2Degraded === true) return mai('panel dei giudici degradato');
+    if (verdetti) return mai(`panel parziale, ${verdetti} giudic${verdetti === 1 ? 'e' : 'i'} su ${panelSize(p)}`);
+    return mai('nessun verdetto dei giudici');
+  }
+
+  /**
    * Il segno «solo in locale» si può mettere (`valore` true) o togliere su questa pratica? PURA.
    * Ritorna { ok: true } o { ok: false, motivo, utente } — `utente` vuol dire che il feedback
    * è di un utente: in locale si lavora solo col sì dell'owner (#913), e se servisse torna nei Ricevuti.
