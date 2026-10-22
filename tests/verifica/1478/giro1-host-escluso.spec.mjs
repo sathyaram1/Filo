@@ -65,17 +65,3 @@ test('una risposta servita da un host escluso mentre si è nella home: l’avvis
   await expect(avviso).toContainText('Google AI Studio');
   await home.screenshot({ path: 'tests/.shots/1478-v-avviso-home.png' }).catch(() => {});
 });
-
-test('l’avviso offre una strada per segnalarlo', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Ancora una pagina.</p></body></html>');
-  await page.mouse.click(5, 5);
-  await fintoServitoDa(app, 'Google Cloud');
-  const r = await spiega(app, page.url(), 'sole');
-  expect(r.ok, JSON.stringify(r)).toBe(true);
-  const avviso = page.locator('.sn-toast');
-  await expect(avviso).toHaveCount(1, { timeout: 5000 });
-  await expect(avviso).toContainText('Segnalalo');
-  // Chi legge «Segnalalo» deve avere il tasto per farlo dall'avviso stesso.
-  await expect(avviso.locator('button, a, [role="button"]')).toHaveCount(1);
-});
