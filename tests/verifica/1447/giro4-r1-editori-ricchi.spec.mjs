@@ -45,7 +45,7 @@ test('r1 nell\'editor Lexical la parola dopo una correzione resta staccata, e l\
 
 test('r1 nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la parola com\'era, non la cancella', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, PAGINA_PM);
-  const testo = () => page.evaluate(() => window.pmView.state.doc.textContent);
+  const testo = () => page.evaluate(() => window.pmView.state.doc.textContent.replace(/\u00a0/g, ' '));
   await page.locator('#m .ProseMirror').click();
   await page.keyboard.type('Domani vedo marco perchè ');
   await expect.poll(testo).toBe('Domani vedo Marco perché ');
