@@ -317,6 +317,22 @@ test('il testo messo da uno script resta com\'è, e con la correzione automatica
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
 
+test('dopo l\'apostrofo d\'elisione il nome prende la maiuscola, l\'apostrofo al posto dell\'accento si corregge, e quello che chiude una virgoletta resta', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  const scritto = async (testo) => { await svuota(page); await page.keyboard.type(testo); return valore(page); };
+  expect(await scritto("Mi piace l'italia ")).toBe("Mi piace l'Italia ");
+  expect(await scritto("Il sud dell'europa e l'iphone ")).toBe("Il sud dell'Europa e l'iPhone ");
+  expect(await scritto("Ok perche' no, ci vediamo piu' tardi e va bene cosi' ")).toBe('Ok perché no, ci vediamo più tardi e va bene così ');
+  expect(await scritto("Ok c'e' tempo ")).toBe("Ok c'è tempo ");
+  expect(await scritto("Aspetta un po' e di' la verità ")).toBe("Aspetta un po' e di' la verità ");
+  expect(await scritto("La congiunzione 'e' si scrive senza accento ")).toBe("La congiunzione 'e' si scrive senza accento ");
+  expect(await scritto("Chiedi a 'marco' ")).toBe("Chiedi a 'Marco' ");
+  // L'annullo del nome dopo l'apostrofo riporta solo il nome.
+  await scritto("Mi piace l'italia ");
+  await page.keyboard.press('Control+z');
+  expect(await valore(page)).toBe("Mi piace l'italia ");
+});
+
 // Il campo che ha il cursore prima che il correttore parta non ha più un focusin da dare: si scrive subito, senza clic.
 test('nella chat di casa e in una pagina in autofocus, scritto subito senza clic, «perchè » diventa «perché»', async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {

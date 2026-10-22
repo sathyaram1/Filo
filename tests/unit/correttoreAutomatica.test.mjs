@@ -308,3 +308,39 @@ test('come si scrive in un sito si somma, si dimezza oltre il tetto e resta nel 
     Object.assign(globalThis, prima);
   }
 });
+
+test('il nome dopo un apostrofo d\'elisione prende la maiuscola, e l\'annullo vale per il nome', () => {
+  assert.deepEqual(battuto("Mi piace l'italia "), { prima: 'italia', dopo: 'Italia', fonte: 'nome' });
+  assert.deepEqual(battuto("Il sud dell'europa,"), { prima: 'europa', dopo: 'Europa', fonte: 'nome' });
+  assert.deepEqual(battuto("Ho l'iphone "), { prima: 'iphone', dopo: 'iPhone', fonte: 'nome' });
+  assert.equal(battuto("Mi piace l'italia ", { rifiutate: new Set(['italia']) }), null);
+  assert.equal(battuto("Ok c'era "), null);
+});
+
+test('l\'apostrofo al posto dell\'accento si corregge con la forma che il dizionario conosce; i troncamenti giusti restano', () => {
+  const giuste = new Set(['perché', 'più', 'così', 'sarà', "c'è", 'né', 'dì', 'caffè']);
+  const accento = (p) => giuste.has(p);
+  assert.deepEqual(battuto("Ok perche' ", { accento }), { prima: "perche'", dopo: 'perché', fonte: 'fisso' });
+  assert.deepEqual(battuto("Ci vediamo piu' ", { accento }), { prima: "piu'", dopo: 'più', fonte: 'fisso' });
+  assert.deepEqual(battuto("Va bene COSI' ", { accento }), { prima: "COSI'", dopo: 'COSÌ', fonte: 'fisso' });
+  assert.deepEqual(battuto("Ok c'e' ", { accento }), { prima: "c'e'", dopo: "c'è", fonte: 'fisso' });
+  assert.deepEqual(battuto("Ok ne' ", { accento }), { prima: "ne'", dopo: 'né', fonte: 'fisso' });
+  assert.deepEqual(battuto("Ok qual'e' ", { accento: (p) => p === "qual'è" }), { prima: "qual'e'", dopo: 'qual è', fonte: 'fisso' });
+  for (const t of ["Aspetta un po' ", "Di' ", "Fa' ", "I de' "]) assert.equal(battuto(t, { accento }), null, t);
+  // Senza dizionario carico niente si indovina.
+  assert.equal(battuto("Ok perche' ", { accento: () => false }), null);
+  assert.equal(battuto("Ok perche' "), null);
+});
+
+test('l\'apice che chiude una virgoletta semplice non è un accento', () => {
+  const accento = (p) => ['più', 'è'].includes(p);
+  assert.equal(battuto("La congiunzione 'e' ", { accento }), null);
+  assert.equal(battuto("La congiunzione ‘e’ ", { accento }), null);
+  assert.equal(battuto("Disse 'vengo anche io e' ", { accento }), null);
+  assert.equal(battuto("Ha scritto 'piu' ", { accento }), null);
+  assert.deepEqual(battuto("Chiedi a 'marco' "), { prima: 'marco', dopo: 'Marco', fonte: 'nome' });
+  // Chiusa la virgoletta, l'apostrofo dopo torna un accento.
+  assert.deepEqual(battuto("Ha detto 'ciao' e' ", { accento }), { prima: "e'", dopo: 'è', fonte: 'fisso' });
+  assert.deepEqual(battuto("L'ho visto e' ", { accento }), { prima: "e'", dopo: 'è', fonte: 'fisso' });
+  assert.equal(R.erroriFissi("Disse 'vengo perche'").length, 0);
+});
