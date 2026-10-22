@@ -92,6 +92,7 @@
     segnaRadice();
     loadDictionary();
     loadAutocorrect();
+    caricaImparato();
     // In cattura, per i campi dentro i componenti (per quanto possibile).
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
