@@ -781,20 +781,19 @@
 
   // L'elenco scaricato è un PEM con righe di commento in mezzo: vale ogni
   // certificato che si legge, gli altri blocchi si saltano.
-  function ancoreDaPem(testo) {
+  function certificatiDaPem(testo) {
     const crypto = nodeMod('node:crypto');
     if (!crypto || !crypto.X509Certificate) return [];
     const out = [];
     const re = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
     let m;
     while ((m = re.exec(String(testo || '')))) {
-      try {
-        const c = new crypto.X509Certificate(m[0]);
-        if (c.ca) out.push(c);
-      } catch (_) {}
+      try { out.push(new crypto.X509Certificate(m[0])); } catch (_) {}
     }
     return out;
   }
+  function ancoreDaPem(testo) { return certificatiDaPem(testo).filter((c) => c.ca); }
+  function ammessiDaPem(testo) { return certificatiDaPem(testo).filter((c) => !c.ca); }
 
   // ───────────────────────── marca temporale (RFC 3161) ─────────────────────────
   // Un certificato scaduto oggi non dice niente su una firma fatta quando valeva: lo
