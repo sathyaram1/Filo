@@ -84,7 +84,10 @@
     }
     seguiti.clear();
     if (timer) { clearTimeout(timer); timer = null; }
+    if (veglia) { clearTimeout(veglia); veglia = null; }
   }
+
+  const nascosta = () => document.visibilityState === 'hidden';
 
   function premibile(el) {
     if (!el || !el.isConnected || el.disabled) return false;
