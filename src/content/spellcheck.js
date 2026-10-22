@@ -352,6 +352,7 @@
         personali: autocorrectMap,
         rifiutate: new Set(imparato ? imparato.rifiutate : []),
         nomeDi,
+        accento: giustaPerIlBrowser,
         minuscolo: () => minuscoloQui(state, A().parolaPrima(testo, fine)?.start ?? fine),
       });
       if (c && correggiDaSe(state, c)) return;
