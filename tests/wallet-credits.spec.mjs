@@ -20,6 +20,8 @@ let identityDown = false;
 let soloIngresso = false;
 let saldoIgnoto = false;
 let statoGiu = false;
+// #1503: il prossimo /walletReissue risponde con questo rifiuto, poi torna a dare la chiave.
+let reissueRifiuto = null;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
