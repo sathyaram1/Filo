@@ -119,13 +119,15 @@
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
         if (changes[STORAGE_KEYS.PERSONAL_DICT]) {
-          const words = changes[STORAGE_KEYS.PERSONAL_DICT].newValue || [];
-          personalDict = new Set(words.map((w) => String(w).toLowerCase()));
+          usaDizionario(changes[STORAGE_KEYS.PERSONAL_DICT].newValue);
           const state = activeEl && monitored.get(activeEl);
           if (state) aggiornaCodice(state);
         }
         if (changes[STORAGE_KEYS.AUTOCORRECT]) {
           autocorrectMap = changes[STORAGE_KEYS.AUTOCORRECT].newValue || {};
+        }
+        if (changes[STORAGE_KEYS.CORRETTORE_IMPARATO] && A()) {
+          imparato = A().memoria(changes[STORAGE_KEYS.CORRETTORE_IMPARATO].newValue);
         }
       });
     } catch (_) {}
