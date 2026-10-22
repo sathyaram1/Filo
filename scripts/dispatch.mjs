@@ -1938,7 +1938,7 @@ function positionOnBranch(bucket) {
   // ripristino (D) confronteranno. I punti fermi di un'altra storia (un altro ramo, o questo prima di una
   // riscrittura) se ne vanno: la pulizia dopo un «pass» li consulterebbe ancora (#1486).
   const base = { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch };
-  if (!stessoRamo || res.rewritten) base.checkpoints = [];
+  if (prev?.branch !== branch || res.rewritten) base.checkpoints = [];
   const state = withCheckpoint(base, res.head, `${bucket.role}:checkout`);
   writeState(state);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
