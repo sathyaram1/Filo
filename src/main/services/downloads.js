@@ -1182,6 +1182,8 @@ module.exports = {
   // nativo, così la rinomina finale è istantanea invece di una copia fra volumi.
   downloadsDir,
   uniquePath,
+  safeName,
+  marcaOrigine,
   list,
   clearCompleted,
   remove,
