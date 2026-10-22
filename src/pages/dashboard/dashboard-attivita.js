@@ -955,7 +955,7 @@
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',
-    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
+    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita', APRI_FILE: 'File non mostrato',
     CERCA_SALVATE: 'Ricerca fra le pagine salvate non riuscita',
     APRI_SALVATA: 'Pagina salvata non aperta',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
