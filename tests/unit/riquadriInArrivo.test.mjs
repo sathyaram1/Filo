@@ -258,6 +258,8 @@ test('lato main: chi esegue codice in un riquadro chiede prima se è arrivato', 
 });
 
 test('lato main: i campi segreti nei riquadri non toccano un riquadro in arrivo, e coprono quelli arrivati', async () => {
+  require('../../src/shared/guardianoStatico.js');
+  require('../../src/shared/campiSegreti.js');
   const { campiSegretiNeiRiquadri } = require('../../src/main/services/campiNeiRiquadri.js');
   const toccati = [];
   const CAMPO = { left: 5, top: 5, width: 10, height: 10 };
