@@ -2126,6 +2126,18 @@ function segnaLetturaAiuto(sender, action) {
   fontiPerAiuto.set(wc, fonti);
 }
 
+// La classe peggiore che il compito ha letto quando Filo risponde: la risposta la porta nell'archivio, e chi la rilegge
+// da un'altra conversazione la eredita (#1508). Gli spostamenti scelti dall'utente valgono come per lo stato.
+async function classeLettaDelCompito(sender, { contesto = null, fontiLette = null } = {}) {
+  try {
+    const A = globalThis.SN_AUTONOMIA;
+    let aut = {};
+    try { aut = (await Storage.getSettings()).autonomia || {}; } catch (_) {}
+    const fonti = fontiDelCompito(sender, contesto, fontiLette);
+    return A.stato({ fonti, livello: A.livelloAttivo(aut.livello), spostamenti: aut.fonti, manopole: aut.manopole }).classe;
+  } catch (_) { return null; }
+}
+
 // Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
 function fileScaricato(p) {
   if (!p) return false;
