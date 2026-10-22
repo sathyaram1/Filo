@@ -634,7 +634,7 @@ function avviaInSottofondo() {
 }
 
 module.exports = {
-  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
+  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, cartellaChiesta, nomeDellaVoce, cartelleMancanti,
   cartellaDiSerie, elimina, dimentica, occasionaliFra, comeDarePermesso, doveSta, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
