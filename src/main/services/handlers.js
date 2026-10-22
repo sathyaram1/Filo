@@ -3716,8 +3716,8 @@ async function eseguiAzioneFilo(action, {
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
         // Chi è già nella home non ci si porta: ricaricarla butterebbe via il
-        // lavoro e la risposta prima che l'utente li legga (il bottone per
-        // svuotare la conversazione lo mette la chat).
+        // lavoro e la risposta prima che l'utente li legga (il bottone che
+        // chiude la conversazione lo mette la chat).
         if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
           return { executed: true, kept: true, output: { window: 'home', already: true } };
         }
@@ -4875,11 +4875,13 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
-  // La home chiesta da chi è già nella home: non è stato ricaricato niente, e
-  // il modello non deve dire di averlo portato da qualche parte.
+  // La home chiesta da chi è già nella home: non è stato ricaricato niente, e il modello non deve dire di averlo portato
+  // da qualche parte né promettere che il bottone svuoti la home (chiude la conversazione, lo scambio resta: #869).
   if (type === 'COMANDO_FINESTRA' && res.output && res.output.already) {
     return 'La home È la pagina da cui l\'utente ti sta scrivendo: non ho ricaricato niente, perché ricaricarla '
-      + 'cancellerebbe questa conversazione. Diglielo in una riga; sotto la tua risposta trova un bottone per svuotarla lui.';
+      + 'interromperebbe questa risposta. Diglielo in una riga. Sotto la tua risposta l\'utente ha il bottone «Chiudi la '
+      + 'conversazione»: lo scambio resta nella home e il suo messaggio dopo ne comincia una nuova. Non promettergli che la '
+      + 'home si svuota o si ricarica.';
   }
   if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
     const A = globalThis.SN_AUTONOMIA;

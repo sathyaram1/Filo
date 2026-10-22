@@ -376,6 +376,14 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
   expect(await page.evaluate(() => window.__segnoVivo)).toBe('io c\'ero');
   await expect(page.locator('.dash-bubble-user', { hasText: 'portami alla home' })).toHaveCount(1);
 
+  // Quello che il modello legge è quello che poi racconta: il bottone chiude la conversazione e lo scambio resta, la
+  // home non si svuota (prima gli si diceva di un bottone «per svuotarla», e l'utente lo premeva per niente).
+  const letto = await app.evaluate(() => (globalThis.__fakeF_calls[1] || [])
+    .filter((m) => m.role === 'tool' && m.tool_call_id === 'f1').map((m) => m.content).join('\n'));
+  expect(letto).toContain('Chiudi la conversazione');
+  expect(letto).toContain('lo scambio resta nella home');
+  expect(letto).not.toMatch(/svuotarla|cancellerebbe/i);
+
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
   await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
