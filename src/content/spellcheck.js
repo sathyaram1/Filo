@@ -99,6 +99,7 @@
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
     document.addEventListener('visibilitychange', riprendiRimandati);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggiMemorie(); });
 
     try {
       chrome.runtime.onMessage.addListener((m) => {
@@ -323,14 +324,13 @@
     if (state) aggiornaCodice(state);
   }
 
-  // Come scrive chi scrive, qui: il campo prima della parola (senza le correzioni di Filo) e i testi già mandati dalla
-  // pagina.
-  function stileQui(state, finoA) {
+  // Si scrive tutto minuscolo apposta, qui? Il campo prima della parola (senza le correzioni di Filo) e i testi già
+  // mandati dalla pagina.
+  function minuscoloQui(state, finoA) {
     const testo = getEditableText(state.el);
     const da = Math.max(0, finoA - 3000);
     const esclusi = state.automatiche.map((x) => ({ start: x.start - da, end: x.end - da }));
-    const s = A().stileDi(testo.slice(da, finoA), null, esclusi);
-    return { minuscoli: s.minuscoli + stilePagina.minuscoli, maiuscoli: s.maiuscoli + stilePagina.maiuscoli };
+    return A().scriveMinuscoloQui(A().stileDi(testo.slice(da, finoA), null, esclusi), stilePagina);
   }
   function ricordaStile(state, testo) {
     const esclusi = state.automatiche;
@@ -350,8 +350,11 @@
     const tipo = evento && evento.inputType;
     if (tipo !== 'insertText' && tipo !== 'insertLineBreak' && tipo !== 'insertParagraph') return;
     const G = global.SN_GESTO;
-    if (!G || !G.prendi('automatica', G.CHIUDE, G.dentro(state.el))) return;
     const el = state.el;
+    // Dentro un riquadro chiuso di Filo il tasto si vede cadere sul suo host.
+    const riquadro = radiceDi(el);
+    const qui = G && G.dentro(el);
+    if (!G || !G.prendi('automatica', G.CHIUDE, (l) => qui(l) || (!!riquadro && l.el === riquadro.host))) return;
     const testo = getEditableText(el);
     const pos = cursoreNelCampo(el);
     const fine = A().fineDellaParola(testo, pos);
@@ -362,7 +365,7 @@
         personali: autocorrectMap,
         rifiutate: new Set(imparato ? imparato.rifiutate : []),
         nomeDi,
-        minuscolo: () => A().scriveMinuscolo(stileQui(state, A().parolaPrima(testo, fine)?.start ?? fine)),
+        minuscolo: () => minuscoloQui(state, A().parolaPrima(testo, fine)?.start ?? fine),
       });
       if (c && correggiDaSe(state, c)) return;
     }
@@ -632,6 +635,19 @@
     const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
+    rileggiMemorie();
+  }
+
+  // Dizionario, correzioni e quello che Filo ha imparato si rileggono quando si torna a scrivere: un cambio fatto nella
+  // pagina del correttore o imparato in un'altra scheda vale qui, e ai content script nessuno lo spinge (#1447).
+  let rilettaAlle = 0;
+  async function rileggiMemorie() {
+    const ora = Date.now();
+    if (ora - rilettaAlle < 500) return;
+    rilettaAlle = ora;
+    await Promise.all([loadDictionary(), loadAutocorrect(), caricaImparato()]);
+    const state = activeEl && monitored.get(activeEl);
+    if (state && state.attivo) aggiornaCodice(state);
   }
 
   function onFocusOut(e) {

@@ -33,7 +33,8 @@ async function apri(app, openTab, testServer, opz = {}) {
       models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       featureFlags: { spellcheck: true, spellcheckContext: opz.suggerimenti !== undefined },
-      correttore: { modelloErrori: true, ripetizioni: true, ...(opz.correttore || {}) },
+      // La correzione automatica (#1447) cambierebbe gli errori fissi battuti qui: la prova sta in correttore-automatica.spec.mjs.
+      correttore: { modelloErrori: true, ripetizioni: true, automatica: false, ...(opz.correttore || {}) },
     });
     Object.assign(globalThis, {
       __rapide: [], __ragionate: [], __errori: opz.errori || {},

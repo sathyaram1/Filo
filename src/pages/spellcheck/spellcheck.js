@@ -20,11 +20,12 @@
     await rileggi();
   }
 
+  // Una lista dove si sta scrivendo non si ridisegna.
   async function rileggi() {
     const data = await chrome.storage.local.get([STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT, STORAGE_KEYS.CORRETTORE_IMPARATO]);
-    renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
-    renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
-    renderRifiutate(data[STORAGE_KEYS.CORRETTORE_IMPARATO]);
+    if (!siScriveIn('autocorrectList')) renderAutocorrect(data[STORAGE_KEYS.AUTOCORRECT] || {});
+    if (!siScriveIn('dictList')) renderDict(data[STORAGE_KEYS.PERSONAL_DICT] || []);
+    if (!siScriveIn('rifiutateList')) renderRifiutate(data[STORAGE_KEYS.CORRETTORE_IMPARATO]);
   }
 
   function fillStaticText() {
@@ -453,6 +454,9 @@
       if (!msg || msg.type !== window.SN_MSG.MSG.DATI_IMPORTATI) return;
       rileggi().catch(() => {});
     });
+
+    // Quello che Filo ha imparato scrivendo in un'altra scheda compare tornando qui.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggi().catch(() => {}); });
 
     // Aggiornamento live se cambia da un altro tab, o se Filo impara una parola mentre la pagina è aperta.
     chrome.storage.onChanged.addListener((changes, area) => {

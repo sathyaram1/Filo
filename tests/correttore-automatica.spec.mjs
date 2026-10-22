@@ -57,7 +57,17 @@ async function apri(app, openTab, testServer, { errori = null, correttore = {} }
 const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
 const valore = (page) => page.locator('#ta').inputValue();
 const cursore = (page) => page.evaluate(() => document.getElementById('ta').selectionStart);
-const imparato = (app) => app.evaluate(async () => (await globalThis.SN_STORAGE.get('sn_correttore_imparato')) || null);
+const magazzino = (app, chiave) => app.evaluate(async (_e, k) => (await globalThis.chrome.storage.local.get(k))[k] ?? null, chiave);
+const imparato = (app) => magazzino(app, 'sn_correttore_imparato');
+
+// Si torna alla scheda come l'utente, dalla barra delle schede.
+async function attiva(shell, indirizzo) {
+  await shell.evaluate(async (u) => {
+    const s = await window.filoShell.tabs.snapshot();
+    const t = s.tabs.find((x) => x.url === u);
+    if (t) await window.filoShell.tabs.activate(t.id);
+  }, indirizzo);
+}
 
 async function svuota(page, sel = '#ta') {
   await page.locator(sel).click();
@@ -138,7 +148,7 @@ test('«marco» prende la maiuscola dove chi scrive usa le maiuscole, e non dove
   expect(await valore(page)).toBe('Apri google.com e marco.txt ');
 });
 
-test('una correzione annullata due volte non torna; la pagina del correttore la mostra e da lì si toglie', async ({ app, openTab, testServer }) => {
+test('una correzione annullata due volte non torna; la pagina del correttore la mostra e da lì si toglie', async ({ app, shell, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   // La prima volta con l'annulla, subito dopo.
   await page.locator('#ce').click();
@@ -169,11 +179,11 @@ test('una correzione annullata due volte non torna; la pagina del correttore la 
   const riga = pagina.locator('#rifiutateList .sn-spell-word');
   await expect(riga).toHaveCount(1, { timeout: 8000 });
   await expect(riga).toHaveValue('marco');
-  await pagina.locator('#rifiutateList .sn-spell-row', { has: riga }).getByRole('button').click();
+  await pagina.locator('#rifiutateList .sn-spell-row button').click();
   await expect(riga).toHaveCount(0);
   await expect(pagina.locator('#rifiutateEmpty')).toBeVisible();
 
-  await page.bringToFront();
+  await attiva(shell, page.url());
   await svuota(page, '#ce');
   await page.keyboard.type('Domani vedo marco ');
   await expect(page.locator('#ce')).toHaveText('Domani vedo Marco ');
@@ -194,7 +204,7 @@ test('l\'annulla della barra dei menu del Mac riporta indietro la correzione com
   expect(await cursore(page)).toBe(10);
 });
 
-test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole imparate, da dove si toglie; «qual\'è» no', async ({ app, openTab, testServer }) => {
+test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole imparate, da dove si toglie; «qual\'è» no', async ({ app, shell, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   for (let i = 0; i < 3; i++) {
     await svuota(page);
@@ -206,10 +216,14 @@ test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole 
     await svuota(page);
     await page.keyboard.type('qual\'è ');
     expect(await valore(page), `«qual'è» scritto ${i + 1} volte`).toBe('qual è ');
+  }
+  // Annullata due volte non torna da sé, ma resta un errore: non si impara mai.
+  for (let i = 0; i < 2; i++) {
+    await svuota(page);
+    await page.keyboard.type('qual\'è ');
     await page.keyboard.press('Control+z');
     expect(await valore(page)).toBe('qual\'è ');
   }
-  // Annullata tre volte non torna da sé, ma resta un errore: non si impara mai.
   await svuota(page);
   await page.keyboard.type('qual\'è ');
   expect(await valore(page)).toBe('qual\'è ');
@@ -219,10 +233,10 @@ test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole 
   const parole = pagina.locator('#dictList .sn-spell-word');
   await expect(parole).toHaveCount(1, { timeout: 8000 });
   await expect(parole).toHaveValue('ciuruglio');
-  await pagina.locator('#dictList .sn-spell-row', { has: parole }).getByRole('button').click();
+  await pagina.locator('#dictList .sn-spell-row button').click();
   await expect(parole).toHaveCount(0);
 
-  await page.bringToFront();
+  await attiva(shell, page.url());
   await svuota(page);
   await page.keyboard.type('che ciuruglio ');
   await expect(errore(page, 'ciuruglio')).toHaveCount(1, { timeout: 4000 });
@@ -232,15 +246,15 @@ test('«Ignora» su una parola fuori dizionario la impara; su un refuso di una p
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
   await page.keyboard.type('che ciuruglio e propio ');
-  for (const [parola, impara] of [['ciuruglio', true], ['propio', false]]) {
+  for (const parola of ['ciuruglio', 'propio']) {
     const segno = errore(page, parola);
     await expect(segno).toHaveCount(1, { timeout: 4000 });
     const b = await riquadroDelSegno(segno);
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
     await menuDi(page).voce('Ignora').click();
     await expect(segno).toHaveCount(0);
-    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.get('sn_personal_dict')) || []))
-      .toEqual(impara ? ['ciuruglio'] : ['ciuruglio']);
+    // «propio» è a un tasto da «proprio»: resta fuori dalle parole imparate.
+    await expect.poll(() => magazzino(app, 'sn_personal_dict')).toEqual(['ciuruglio']);
   }
   await svuota(page);
   await page.keyboard.type('che ciuruglio e propio ');
@@ -263,13 +277,13 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
     await prima.click();
     await expect.poll(() => valore(page)).toBe('è proprio bello ');
   }
-  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.get('sn_autocorrect')) || {})).toEqual({ propio: 'proprio' });
+  await expect.poll(() => magazzino(app, 'sn_autocorrect')).toEqual({ propio: 'proprio' });
   await svuota(page);
   await page.keyboard.type('è propio ');
   expect(await valore(page)).toBe('è proprio ');
 });
 
-test('il testo messo da uno script non si corregge, e con la correzione automatica spenta niente cambia da solo', async ({ app, openTab, testServer }) => {
+test('il testo messo da uno script resta com\'è, e con la correzione automatica spenta niente cambia da solo', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
   await page.waitForTimeout(1700);
@@ -285,7 +299,7 @@ test('il testo messo da uno script non si corregge, e con la correzione automati
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
 
-test('l\'interruttore sta in Opzioni → Altro e in Preferenze, e si cambia anche a parole', async ({ app, openTab }) => {
+test('l\'interruttore sta in Opzioni → Altro e in Preferenze, insieme a quante volte serve per imparare', async ({ app, openTab }) => {
   const altro = await openTab('filo://options/altro.html');
   const sw = altro.locator('#spellcheckAutomatica');
   await expect(sw).toBeChecked({ timeout: 8000 });
@@ -298,9 +312,6 @@ test('l\'interruttore sta in Opzioni → Altro e in Preferenze, e si cambia anch
   await pref.locator('#correttoreAnnulli').fill('4');
   await pref.locator('#correttoreAnnulli').blur();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).correttore.annulliPerImparare)).toBe(4);
-  const P = await app.evaluate(() => {
-    const r = globalThis.SN_PREFERENCES?.risolvi?.('correzione automatica', 'true');
-    return r || null;
-  });
-  void P;
+  await pref.locator('#correttoreAutomatica').check();
+  await expect(altro.locator('#spellcheckAutomatica')).toBeChecked();
 });

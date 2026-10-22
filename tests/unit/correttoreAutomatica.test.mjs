@@ -5,8 +5,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
+globalThis.self = globalThis;
+for (const m of ['tabColor', 'constants', 'contenutoEsterno', 'preferences', 'themeTokens']) require(`../../src/shared/${m}.js`);
 require('../../src/content/correttoreRegole.js');
 require('../../src/content/correttoreAutomatica.js');
 const A = globalThis.SN_CORRETTORE_AUTO;
@@ -95,6 +98,11 @@ test('chi scrive tutto minuscolo apposta non riceve maiuscole, ma gli errori fis
   assert.equal(A.scriveMinuscolo(A.stileDi(t, null, [{ start: 5, end: 10 }])), true);
   assert.equal(A.scriveMinuscolo(A.stileDi(t)), false);
   assert.deepEqual(A.stileDi('ok OK. va bene'), { minuscoli: 2, maiuscoli: 0 }, 'le sigle non dicono niente');
+  // Il testo che si scrive decide; i testi già mandati dalla pagina contano solo se lui dice poco.
+  assert.equal(A.scriveMinuscoloQui({ minuscoli: 3, maiuscoli: 0 }, { minuscoli: 0, maiuscoli: 5 }), true);
+  assert.equal(A.scriveMinuscoloQui({ minuscoli: 0, maiuscoli: 1 }, { minuscoli: 9, maiuscoli: 0 }), false);
+  assert.equal(A.scriveMinuscoloQui({ minuscoli: 1, maiuscoli: 0 }, { minuscoli: 2, maiuscoli: 0 }), true, 'un messaggio corto in una chat tutta minuscola');
+  assert.equal(A.scriveMinuscoloQui({ minuscoli: 0, maiuscoli: 0 }, { minuscoli: 0, maiuscoli: 0 }), false, 'senza niente da leggere si corregge');
 });
 
 test('si impara solo una parola che non è il refuso di una parola vera', () => {
@@ -185,4 +193,24 @@ test('il modello non segna come errore una minuscola che vuole la maiuscola', ()
   assert.deepEqual(R.segniDaRisposta('[oggi è][Oggi è][Maiuscola.][errore]', 'oggi è bello').segni, []);
   const [s] = R.segniDaRisposta('[Lunedi][lunedì][Accento.][errore]', 'ci vediamo Lunedi').segni;
   assert.equal(s.correzioni[0], 'lunedì', 'una correzione che cambia altro resta');
+});
+
+test('si accende, si spegne e si regola anche a parole, dentro i limiti; accesa di serie', () => {
+  const P = globalThis.SN_PREF;
+  const C = globalThis.SN_CONST;
+  assert.equal(C.DEFAULT_SETTINGS.correttore.automatica, true);
+  assert.deepEqual(P.buildPreferencePartial('correzione automatica', 'no').partial, { correttore: { automatica: false } });
+  assert.deepEqual(P.buildPreferencePartial('autocorrezione', 'sì').partial, { correttore: { automatica: true } });
+  assert.deepEqual(P.buildPreferencePartial('quante volte annullare', '4').partial, { correttore: { annulliPerImparare: 4 } });
+  assert.match(P.buildPreferencePartial('correzioni accettate', '500').rifiuto, /fuori dai limiti/);
+  assert.deepEqual(C.soglieCorrettore({ correttore: { riscrittePerImparare: '' } }), { accettiPerImparare: 3, annulliPerImparare: 2, riscrittePerImparare: 3 });
+});
+
+test('i colori di riserva del lampo sono i predefiniti dei suoi token', () => {
+  const TT = globalThis.SN_THEME_TOKENS;
+  const css = readFileSync(new URL('../../src/styles/spellcheck.css', import.meta.url), 'utf8');
+  assert.ok(css.includes(`var(--sn-spell-lampo, ${TT.defaultValue('correttore.lampo.color', 'light')})`));
+  assert.ok(css.includes(`var(--sn-spell-lampo, ${TT.defaultValue('correttore.lampo.color', 'dark')})`));
+  assert.ok(css.includes(`var(--sn-spell-lampo-durata, ${TT.defaultValue('correttore.lampo.durata', 'light')})`));
+  assert.ok(TT.validate('correttore.lampo.durata', '600ms') && !TT.validate('correttore.lampo.durata', '1s; color:red'));
 });

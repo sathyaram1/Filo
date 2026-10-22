@@ -199,6 +199,13 @@
   function scriveMinuscolo({ minuscoli = 0, maiuscoli = 0 } = {}) {
     return maiuscoli === 0 ? minuscoli >= 2 : minuscoli >= 4 * maiuscoli;
   }
+  // Il testo che si sta scrivendo dice più della pagina: una sua maiuscola o due suoi inizi di frase minuscoli decidono;
+  // se dice poco, contano anche i testi già mandati da lì.
+  function scriveMinuscoloQui(campo = {}, pagina = {}) {
+    if ((campo.maiuscoli || 0) > 0) return false;
+    if ((campo.minuscoli || 0) >= 2) return true;
+    return scriveMinuscolo({ minuscoli: (campo.minuscoli || 0) + (pagina.minuscoli || 0), maiuscoli: pagina.maiuscoli || 0 });
+  }
 
   // ── Cosa Filo impara ────────────────────────────────────────────────────────
   // Distanza fra due parole contando anche lo scambio di due lettere vicine; si ferma oltre `tetto`.
@@ -335,7 +342,7 @@
 
   global.SN_CORRETTORE_AUTO = {
     NOMI, SOGLIE, LIMITE_CONTI, chiave, conMaiuscole, fineDellaParola, parolaPrima, chiavePersonale, formaDelNome,
-    soloMaiuscole, correzioneAFineParola, stileDi, scriveMinuscolo, distanza, imparabile, memoria, accettata, annullata,
+    soloMaiuscole, correzioneAFineParola, stileDi, scriveMinuscolo, scriveMinuscoloQui, distanza, imparabile, memoria, accettata, annullata,
     riscritta, corretta, dimentica, inizioDiFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
