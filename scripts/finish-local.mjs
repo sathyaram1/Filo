@@ -661,8 +661,11 @@ async function main() {
     process.exit(1);
   }
 
-  if (!git(['diff', '--quiet']).ok || !git(['diff', '--cached', '--quiet']).ok) {
-    console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
+  // I controlli provano un commit (#1480): anche un file nuovo nato da una shell ne resterebbe fuori in silenzio.
+  const fuori = [...new Set([git(['diff', '--name-only', 'HEAD']), git(['ls-files', '--others', '--exclude-standard'])]
+    .flatMap((r) => (r.ok ? r.out.split('\n') : ['(stato della cartella illeggibile)'])).filter(Boolean))];
+  if (fuori.length) {
+    console.error(testoFuoriDaiCommit(fuori));
     process.exit(1);
   }
   // Anche con --check, che la prova sulla fusione la fa solo per giudicare unit rossi: i resti di una prova interrotta non aspettano la prossima.
