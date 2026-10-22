@@ -188,9 +188,13 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
   try {
     if (!dbg.isAttached()) { dbg.attach('1.3'); mio = true; }
     const base = { x: msg.x, y: msg.y };
-    await dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mouseMoved', button: 'none' });
-    await dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mousePressed', button: 'left', buttons: 1, clickCount: 1 });
-    await dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mouseReleased', button: 'left', buttons: 0, clickCount: 1 });
+    // Lo spostamento la pagina lo legge al fotogramma dopo, che una scheda nascosta non disegna: la sua risposta non
+    // arriverebbe mai. Non lo si aspetta; la pressione, che parte subito, se lo porta dietro nell'ordine giusto.
+    dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mouseMoved', button: 'none' }).catch(() => {});
+    await entro(Promise.all([
+      dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mousePressed', button: 'left', buttons: 1, clickCount: 1 }),
+      dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mouseReleased', button: 'left', buttons: 0, clickCount: 1 }),
+    ]), TETTO_CLIC_MS);
   } catch (_) {
     return { ok: false, code: 'scheda' };
   } finally {
