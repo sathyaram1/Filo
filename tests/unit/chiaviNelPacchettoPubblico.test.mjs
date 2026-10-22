@@ -93,11 +93,34 @@ function controllaPacchetto(generato, { ammesse = AMMESSE, uscite = USCITE, nonC
 const VALIDO = { apiKeys: { tavily: 'tav' }, safeBrowsingKey: 'gsb', bakedAt: '2026-10-22T10:00:00.000Z' };
 const con = (modifica) => modifica(structuredClone(VALIDO));
 
-// Ogni fonte che il bake nomina, più quelle delle chiavi uscite: una chiave nuova arriva con una fonte nuova, e spenta la prova non la vedrebbe.
+// Le variabili di comando del bake, non fonti di chiavi: accese, lo manderebbero al server vero o fuori dalla cartella usa e getta.
+const VARIABILI_DI_COMANDO = new Set(['FILO_BAKE_OUT', 'FILO_ROUTINE_API', 'FILO_BUILD_PASSPHRASE']);
+
+// Gira prima del bake: registra ogni variabile d'ambiente assente che il codice nella cartella del bake chiede, col nome che ha a runtime.
+// Conta solo il chiamante diretto: una lettura interna di Node partita da una chiamata del bake non è una fonte di chiavi.
+const REGISTRA_LETTURE = `
+const { writeFileSync } = require('node:fs');
+const { pathToFileURL } = require('node:url');
+const reale = process.env;
+const uscita = reale.FILO_SENTINELLA_LETTE;
+const cartella = reale.FILO_SENTINELLA_CARTELLA;
+const dentro = [cartella, pathToFileURL(cartella).href + '/'];
+const lette = new Set();
+process.env = new Proxy(reale, {
+  get(t, k, r) {
+    if (typeof k === 'string' && !(k in t)) {
+      const chiamante = (new Error().stack || '').split('\\n')[2] || '';
+      if (dentro.some((d) => chiamante.includes(d))) lette.add(k);
+    }
+    return Reflect.get(t, k, r);
+  },
+});
+process.on('exit', () => { try { writeFileSync(uscita, JSON.stringify([...lette])); } catch (_) {} });
+`;
+
+// Le fonti dal server sono quelle che il bake nomina, più quelle delle chiavi uscite; quelle del job le accende il bake stesso, chiedendole (bakeColJob).
 function fontiDelBake(sorgente) {
-  const variabili = new Set(sorgente.match(/FILO_DEFAULT_[A-Z0-9_]+/g) || []);
-  variabili.add('FILO_DEFAULT_OPENROUTER_KEY');
-  variabili.add('FILO_DEFAULT_GEMINI_KEY');
+  const variabili = new Set(['FILO_DEFAULT_OPENROUTER_KEY', 'FILO_DEFAULT_GEMINI_KEY']);
   const job = Object.fromEntries([...variabili].map((n) => [n, `job-${n.toLowerCase()}`]));
   const server = { ok: true, apiKeys: { tavily: 'srv-tavily', openrouter: 'srv-openrouter', gemini: 'srv-gemini' }, safeBrowsingKey: 'srv-safebrowsing' };
   for (const [, campo] of sorgente.matchAll(/config\/secrets\.([\w.]+)/g)) {
