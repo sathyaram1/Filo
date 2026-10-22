@@ -2496,6 +2496,11 @@ if (isMainModule) {
       // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       giroDelBiglietto = true;
+      // Prima di ogni marcatore: biglietto, battito e ruolo di chi lavora ancora qui restano i suoi (#1480).
+      if (ticket) {
+        const vivo = lavoroVivo(ROOT, { mio: ticket });
+        if (vivo.vivo) process.exit(emitHalt('transient', testoLavoroVivo(vivo, 'preso la cartella per il tuo lavoro'), { vivo: true }).exit);
+      }
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
