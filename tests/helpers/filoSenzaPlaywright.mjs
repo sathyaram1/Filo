@@ -1,14 +1,13 @@
 // Filo guidato dall'ispettore del main, senza Playwright sulle pagine: Playwright emula il fuoco su ogni pagina che
 // aggancia e Chromium la tiene visibile anche dietro un'altra scheda. Per ciò che cambia a pagina nascosta.
-// Regole: patterns/una-pagina-agganciata-da-playwright-non-e-mai-nascosta.md
+// Regole: patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md (la pagina nascosta, #1494).
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './scala.mjs';
-import { cartellaTemporanea } from './percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ELETTRONE = createRequire(import.meta.url)('electron');
@@ -107,7 +106,7 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
     try { sock.close(); } catch (_) {}
     await Promise.race([morto, new Promise((ok) => setTimeout(ok, 5000).unref?.())]);
     ammazza();
-    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+    togliCartella(userData);
   }
 
   // Un `require('electron')` chiesto mentre il main di Filo parte ancora gli ha rotto l'avvio («BrowserWindow is not a

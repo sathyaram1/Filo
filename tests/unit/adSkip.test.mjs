@@ -1,11 +1,12 @@
 // #737 — il «Salta» delle pubblicità dei video: chi può avere il clic vero, dove cade, quanto spesso, e chi lo spegne.
 // Il clic vero è un gesto dell'utente per la pagina: fuori da YouTube un sito si farebbe un pulsante finto per averlo.
 
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { inAttesa, svuota, scorri } from '../helpers/orologio.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -150,8 +151,6 @@ test('il clic dal riquadro parte solo se ogni frame sopra conferma il punto, dal
 });
 
 // #1494 — in una scheda nascosta i frame rispondono al passo dei timer, un secondo: il tentativo dopo arriva prima.
-const entroPoco = (p) => Promise.race([p, new Promise((ok) => setTimeout(() => ok({ code: 'appeso' }), 200))]);
-
 test('mentre un clic al riquadro aspetta le risposte, un altro sulla stessa scheda non parte', async () => {
   const s = annidati('https://www.youtube.com/embed/x');
   const eventi = [];
@@ -159,11 +158,13 @@ test('mentre un clic al riquadro aspetta le risposte, un altro sulla stessa sche
     debugger: { isAttached: () => false, attach() {}, detach() {}, sendCommand: async (c, p) => { eventi.push(p.type); } } });
   let rispondi = null;
   const lento = () => new Promise((ok) => { rispondi = ok; });
-  const primo = A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 });
-  const secondo = await entroPoco(A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 + 5000 }));
-  assert.equal(secondo.code, 'presto');
+  const primo = inAttesa(A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 }));
+  const secondo = inAttesa(A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 + 5000 }));
+  await svuota();
+  assert.equal(secondo.fatto && secondo.valore.code, 'presto');
   rispondi({ x: 5, y: 5, tag: 'bb' });
-  assert.deepEqual(await primo, { ok: true });
+  await svuota();
+  assert.deepEqual(primo.valore, { ok: true });
   assert.deepEqual(eventi, ['mouseMoved', 'mousePressed', 'mouseReleased'], 'un clic solo, non due intrecciati');
   const dopo = await A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista },
     { chiedi: async () => ({ x: 5, y: 5, tag: 'bb' }), ora: 3e7 + 10_000 });
@@ -171,19 +172,30 @@ test('mentre un clic al riquadro aspetta le risposte, un altro sulla stessa sche
 });
 
 test('una risposta del protocollo che non arriva non ferma il clic né lascia attaccato il debugger', async () => {
-  const wc = finta();
-  let staccato = 0;
-  const comandi = [];
-  // Lo spostamento in una pagina nascosta non risponde mai; pressione e rilascio sì.
-  wc.debugger = { isAttached: () => false, attach() {}, detach() { staccato++; },
-    sendCommand: (c, p) => { comandi.push(p.type); return p.type === 'mouseMoved' ? new Promise(() => {}) : Promise.resolve(); } };
-  assert.deepEqual(await entroPoco(A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 4e7 })), { ok: true });
-  assert.deepEqual(comandi, ['mouseMoved', 'mousePressed', 'mouseReleased']);
-  assert.equal(staccato, 1);
-  // Nemmeno la pressione risponde: dopo il tetto il clic si dà per fallito e il debugger si stacca.
-  wc.debugger.sendCommand = () => new Promise(() => {});
-  assert.deepEqual(await entroPoco(A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 5e7, tetto: 20 })), { ok: false, code: 'scheda' });
-  assert.equal(staccato, 2);
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const wc = finta();
+    let staccato = 0;
+    const comandi = [];
+    // Lo spostamento in una pagina nascosta non risponde mai; pressione e rilascio sì.
+    wc.debugger = { isAttached: () => false, attach() {}, detach() { staccato++; },
+      sendCommand: (c, p) => { comandi.push(p.type); return p.type === 'mouseMoved' ? new Promise(() => {}) : Promise.resolve(); } };
+    const r = inAttesa(A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 4e7 }));
+    await svuota();
+    assert.deepEqual(r.valore, { ok: true });
+    assert.deepEqual(comandi, ['mouseMoved', 'mousePressed', 'mouseReleased']);
+    assert.equal(staccato, 1);
+    // Nemmeno la pressione risponde: passato il tetto il clic si dà per fallito e il debugger si stacca.
+    wc.debugger.sendCommand = () => new Promise(() => {});
+    const appeso = inAttesa(A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 5e7 }));
+    await scorri(A.TETTO_CLIC_MS - 1);
+    assert.equal(appeso.fatto, false);
+    await scorri(1);
+    assert.deepEqual(appeso.valore, { ok: false, code: 'scheda' });
+    assert.equal(staccato, 2);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('alla domanda del main risponde solo il frame interrogato', () => {

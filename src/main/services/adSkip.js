@@ -244,5 +244,5 @@ async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora 
 
 module.exports = {
   attivo, configureFromSettings, hostConClicVero, hostIncorporato, modoClicVero, mittenteConClicVero, catena,
-  rispostaDalFrame, clicDalRiquadro, puntoNellaVista, clicVero, clicNelRiquadro, INTERVALLO_MS,
+  rispostaDalFrame, clicDalRiquadro, puntoNellaVista, clicVero, clicNelRiquadro, INTERVALLO_MS, TETTO_CLIC_MS,
 };
