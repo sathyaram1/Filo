@@ -558,6 +558,7 @@ module.exports = function register(on, ctx) {
     let soggetto = msg.soggetto;
     let dove = '';
     let recinto = 'filo';
+    let daPagina = false;
     if (isFilo(origin) || sender?.isShell) {
       const d = String(msg.dove || '');
       if (/^(?:filo|https?):\/\//i.test(d)) dove = d;
