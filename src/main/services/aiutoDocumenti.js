@@ -107,11 +107,11 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
   const q = unaRiga(cosa, COSA_MAX);
   if (!q) return { ok: false, errore: 'vuota' };
   const c = String(cartella == null ? '' : cartella).trim().slice(0, CARTELLA_MAX);
-  let ch = { percorso: '', serie: false, rete: false };
-  if (c) { try { ch = await deps.cartellaChiesta(c); } catch (_) {} }
+  let ch = null;
+  if (c) { try { ch = await deps.cartellaChiesta(c); } catch (_) { ch = null; } }
   const s = statoDi(wc);
   // Una cartella su un altro computer non si cerca (#1499): lo si dice senza chiedere un sì che non porterebbe a niente.
-  if (ch.rete) {
+  if (ch && ch.rete) {
     s.dati = { cercato: q, risultati: [], indice: indicePerLaPagina(null), fermata: false, cartellaMancante: '', cartellaDiRete: c };
     return { ok: true, cercato: q, candidati: [], indice: s.dati.indice, fermata: false, cartellaMancante: '', cartellaDiRete: unaRiga(c, 200) };
   }
