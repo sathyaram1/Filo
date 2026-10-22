@@ -75,6 +75,16 @@ test('a interruttore aggiunge hybrid in una copia, solo dove manca', async () =>
   assert.ok(logs.some((l) => l.includes('esito get ok tipo=public-key attacco=cross-platform')));
 });
 
+test('la funzione avvolta si presenta come l\'originale', () => {
+  const { ctx } = pagina({ hybrid: true, esito: () => Promise.resolve(null) });
+  const get = ctx.navigator.credentials.get;
+  assert.equal(get.name, 'get');
+  assert.equal(get.length, 1, 'stessa arità della finta originale');
+  assert.ok(String(get).includes('ricevute.push'), 'toString mostra il testo dell\'originale');
+  assert.ok(!String(get).includes('riassunto'));
+  assert.ok(!String(ctx.Function.prototype.toString).includes('originali'), 'anche toString si maschera');
+});
+
 test('senza publicKey (password, federated) non registra e non tocca', async () => {
   const { ctx, logs, ricevute } = pagina({ hybrid: true, esito: () => Promise.resolve(null) });
   const opts = { password: true };
