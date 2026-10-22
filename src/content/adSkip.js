@@ -301,5 +301,5 @@
 
   carica();
 
-  global.SN_AD_SKIP = { SALTA, _stato: () => ({ attivo, clicVero, seguiti: seguiti.size }) };
+  global.SN_AD_SKIP = { SALTA, _stato: () => ({ attivo, clicVero, seguiti: seguiti.size, veglia: !!veglia }) };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
