@@ -593,6 +593,7 @@
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
     APRI_SALVATA: 'non ho aperto la pagina salvata',
+    CERCA_DOCUMENTI: 'non ho cercato fra i documenti',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
