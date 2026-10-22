@@ -13,6 +13,7 @@ class SchedeInAlto {
     this.tabs = tabs;
     this.visibili = false;
     this.premuto = false;
+    this.premutoPagina = false;
     this.timer = { spinta: null, uscita: null };
     const shell = win && win.webContents;
     if (shell && typeof shell.on === 'function') shell.on('input-event', (_e, input) => this._dallaShell(input));
@@ -44,9 +45,15 @@ class SchedeInAlto {
       return;
     }
     if (this.visibili) {
-      // Tornato sulla pagina: le schede se ne vanno dopo l'attesa d'uscita; un clic sulla pagina le chiude subito.
-      if (t === 'mouseDown') this.nascondi();
-      else if (t === 'mouseMove') this._programmaUscita();
+      // Tornato sulla pagina: le schede se ne vanno dopo l'attesa d'uscita; un clic sulla pagina le chiude al
+      // rilascio, mai alla pressione: la pagina che risale sotto un tasto premuto manda il rilascio altrove (#1343 r3).
+      if (t === 'mouseDown') { this.premutoPagina = true; this._ferma('uscita'); }
+      else if (t === 'mouseUp') { if (this.premutoPagina) this.nascondi(); }
+      else if (t === 'mouseMove') {
+        if (tastoPremuto(input)) this._ferma('uscita');
+        else if (this.premutoPagina) this.nascondi(); // il rilascio è andato perso: il tasto non c'è più
+        else this._programmaUscita();
+      }
       return;
     }
     if (t !== 'mouseMove') {
@@ -75,8 +82,29 @@ class SchedeInAlto {
     if (this.timer.uscita || this.premuto) return;
     this.timer.uscita = setTimeout(() => {
       this.timer.uscita = null;
-      if (this.visibili) this.nascondi();
+      if (!this.visibili) return;
+      if (this._trattenute()) this._programmaUscita();
+      else this.nascondi();
     }, Number(this._opzioni().uscitaMs) || 400);
+  }
+
+  // Un menu di Filo aperto su questa finestra tiene le schede finché si chiude, come la barra laterale; il puntatore
+  // sopra una finestrella figlia (la carta d'anteprima) è ancora sulla fila (#1343 r1).
+  _trattenute() {
+    const win = this.win;
+    if (!win || (typeof win.isDestroyed === 'function' && win.isDestroyed())) return false;
+    try { if (require('./popup-menu').menuAperto(win)) return true; } catch (_) {}
+    if (typeof win.getChildWindows !== 'function') return false;
+    let p = null;
+    try { p = require('electron').screen.getCursorScreenPoint(); } catch (_) { return false; }
+    // Chiuso il menu, il puntatore fermo sulla fila ci è rimasto: la fila non sente niente finché non si muove.
+    const f = win.getContentBounds();
+    if (p.x >= f.x && p.x < f.x + f.width && p.y >= f.y && p.y < f.y + (Number(this.tabs.tabRowHeight) || 0)) return true;
+    return win.getChildWindows().some((c) => {
+      if (!c || c.isDestroyed() || !c.isVisible()) return false;
+      const b = c.getBounds();
+      return p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+    });
   }
 
   mostra() {
@@ -89,6 +117,7 @@ class SchedeInAlto {
   nascondi() {
     this._ferma('uscita');
     this.premuto = false;
+    this.premutoPagina = false;
     if (!this.visibili) return;
     this.visibili = false;
     this.tabs.layout();
@@ -100,6 +129,7 @@ class SchedeInAlto {
     this._ferma('uscita');
     this.visibili = false;
     this.premuto = false;
+    this.premutoPagina = false;
   }
 
   _ferma(nome) {

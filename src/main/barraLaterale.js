@@ -628,7 +628,7 @@ class BarraLaterale {
       this.chiudi();
       this._restituisciTastiera();
       const conColore = d.contagocce && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? { colore: testo(colore) } : {};
-      this.comandoInAttesa = { tabId: attiva.id, iconId: id, ...conColore, scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+      this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...conColore, scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
       this._consegnaInAttesa();
       return;
     }
@@ -660,7 +660,7 @@ class BarraLaterale {
     const c = this.comandoInAttesa;
     if (!c) return;
     const t = this._attiva();
-    if (!t || t.id !== c.tabId || Date.now() > c.scade) { this.comandoInAttesa = null; return; }
+    if (!t || t.id !== c.tabId || (t.url || '') !== c.url || Date.now() > c.scade) { this.comandoInAttesa = null; return; }
     if (!t.aiuto) return;
     this.comandoInAttesa = null;
     const nav = this._nav();
