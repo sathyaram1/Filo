@@ -987,7 +987,7 @@
       }
     }
     const store = perEtichetta(manifesto.figli, 'c2pa.assertions');
-    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, hashBmff: null, ingredienti: [] };
+    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, hashBmff: null, ingredienti: [], tuttiIngredienti: 0, azioni: [] };
     if (!store) return out;
     for (const box of store.figli) {
       if (box.tipo !== 'jumb' || !box.etichetta) continue;
