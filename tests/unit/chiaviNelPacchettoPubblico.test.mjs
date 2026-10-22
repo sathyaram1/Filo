@@ -36,13 +36,18 @@ const NON_CHIAVI = [
 
 const RIFERIMENTO_REVOCA = /^(#\d+(\.\d+)?|D-\d+)$/;
 
+// Un nome con punti o parentesi va fra virgolette: `{"apiKeys.tavily": …}` in cima non deve passare per la voce ammessa.
+function passo(percorso, k, lista) {
+  if (lista) return `${percorso}[${k}]`;
+  if (!/^[A-Za-z_$][\w$]*$/.test(k)) return `${percorso}[${JSON.stringify(k)}]`;
+  return percorso ? `${percorso}.${k}` : k;
+}
+
 function stringhePiene(valore, percorso = '', acc = []) {
   if (typeof valore === 'string') {
     if (valore.trim()) acc.push([percorso, valore]);
   } else if (valore && typeof valore === 'object') {
-    for (const [k, v] of Object.entries(valore)) {
-      stringhePiene(v, Array.isArray(valore) ? `${percorso}[${k}]` : (percorso ? `${percorso}.${k}` : k), acc);
-    }
+    for (const [k, v] of Object.entries(valore)) stringhePiene(v, passo(percorso, k, Array.isArray(valore)), acc);
   }
   return acc;
 }
