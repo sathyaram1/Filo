@@ -215,8 +215,8 @@ function impronteDellAncora(doc) {
 }
 
 // `ancora`: { letta: false } se Firestore non ha risposto; { letta: true, impronte, altre } se sì, con `impronte` null
-// quando questa release non ha documento e `altre` vero se ne esiste almeno uno. Nessuna àncora in tutta la raccolta
-// vuol dire che il server non ancora ancora niente: il controllo si accende da solo alla prima, e non si spegne più.
+// quando questa release non ha documento e `altre` vero se ne esiste almeno uno. Raccolta vuota: il server non ha
+// ancorato ancora niente. Il controllo si accende da solo alla prima àncora, e il server non ne cancella.
 // `file`: [{ nome, sha512 }], tutti quelli che il feed elenca. Esiti: coincide, spenta, manca, diversa, illeggibile.
 function esitoAncora({ file, ancora } = {}) {
   if (!ancora || ancora.letta !== true) return { esito: 'illeggibile' };
