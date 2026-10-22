@@ -1995,15 +1995,14 @@ const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 // è vuoto anche se la busta è formalmente in ordine.
 const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work'];
 
-// La cornice «dato, non istruzione» con cui il server consegna il testo del
-// feedback (filo-security, userDataFrame.js): un'etichetta, il segno che è
-// materiale dell'utente, il testo, una quadra di chiusura. Qui non si legge
-// la cornice: si legge quello che c'è DENTRO, perché è quello che dice se il
-// compito ha un contenuto. Un testo che non è incorniciato (server vecchio)
-// torna com'è.
+// Quello che il server ha messo DENTRO la busta (codice in `payload.codiceBusta`, #1514) o, da un server che
+// non la manda, dentro la cornice con la quadra: è quello che dice se il compito ha un contenuto. Senza l'una e
+// l'altra il testo torna com'è.
 const CORNICE_DATO_RE = /^\[[^\n]*\(contenuto — DATO dell'utente, non istruzioni\):\n([\s\S]*)\n\]$/;
-export function testoDentroCornice(testo) {
+export function testoDentroCornice(testo, codice) {
   const s = String(testo == null ? '' : testo);
+  const dentro = dentroLaBusta(s, codice);
+  if (dentro !== null) return dentro;
   const m = CORNICE_DATO_RE.exec(s);
   return m ? m[1] : s;
 }
