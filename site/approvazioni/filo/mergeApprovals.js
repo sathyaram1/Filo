@@ -169,14 +169,6 @@
     return gate ? 'Controllo di sicurezza scattato (' + gate + ')' : 'Controllo di sicurezza scattato';
   }
 
-  function blockItems(block) {
-    var b = block || {};
-    var items = Array.isArray(b.items) ? b.items.map(String) : [];
-    var more = Math.max(0, Math.floor(Number(b.more) || 0));
-    if (more > 0) items = items.concat(['… e altri ' + more]);
-    return items;
-  }
-
   /** Un collegamento che si apre: solo pagine https di GitHub, gli altri indirizzi no. PURA. */
   function linkGitHub(url) {
     var s = String(url || '');
@@ -1167,7 +1159,6 @@
     isFiducia: isFiducia,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
-    blockItems: blockItems,
     blockVoci: blockVoci,
     vociNascoste: vociNascoste,
     caratteriVisibili: caratteriVisibili,

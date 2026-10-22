@@ -177,12 +177,6 @@ describe('i motivi del blocco', () => {
     assert.match(UI.blockLabel({}), /Controllo di sicurezza/);
   });
 
-  test('i file toccati si vedono, e il troncamento si dichiara', () => {
-    assert.deepEqual(UI.blockItems({ items: ['a.js', 'b.js'] }), ['a.js', 'b.js']);
-    assert.deepEqual(UI.blockItems({ items: ['a.js'], more: 4 }), ['a.js', '… e altri 4']);
-    assert.deepEqual(UI.blockItems({}), []);
-  });
-
   // #1404: ogni riga dice dove sta, e i blocchi si leggono divisi per tipo.
   test('dove sta una voce: file e riga, o il solo file', () => {
     assert.equal(UI.doveVoce({ file: 'src/a.js', riga: 12 }), 'src/a.js:12');
