@@ -18,9 +18,14 @@ const HOST = 'https://utente:segreto@cdn.esempio.it/file/setup.exe?v=2#token=abc
 const PAGINA = 'https://chiave@blog.esempio.it/articolo#commenti';
 
 test('la marca dice zona Internet, chi ha servito i byte e la pagina, senza credenziali', () => {
-  const t = DL._testoZoneIdentifier({ hostUrl: HOST, referrerUrl: PAGINA });
-  assert.equal(t, '[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=https://blog.esempio.it/articolo\r\nHostUrl=https://cdn.esempio.it/file/setup.exe?v=2\r\n');
+  const t = DL._testoZoneIdentifier({ hostUrl: 'https://utente:segreto@blog.esempio.it/file/setup.exe?v=2#token=abc', referrerUrl: PAGINA });
+  assert.equal(t, '[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=https://blog.esempio.it/articolo\r\nHostUrl=https://blog.esempio.it/file/setup.exe?v=2\r\n');
   assert.ok(!/segreto|utente|chiave|token/.test(t), t);
+});
+
+test('un file servito da un altro sito si porta dietro solo l’origine della pagina, come il Referer', () => {
+  const t = DL._testoZoneIdentifier({ hostUrl: HOST, referrerUrl: 'https://blog.esempio.it/cerca?q=fattura+mario' });
+  assert.equal(t, '[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=https://blog.esempio.it/\r\nHostUrl=https://cdn.esempio.it/file/setup.exe?v=2\r\n');
 });
 
 test('in incognito la marca arma gli avvisi ma non porta indirizzi', () => {
