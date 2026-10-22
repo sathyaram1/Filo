@@ -99,6 +99,19 @@ Vicini: [La shell non disegna sopra la pagina](la-shell-non-disegna-sopra-la-pag
 all'utente](un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md) (quello
 che resta nel documento del sito, e il suo limite: il sito può coprirlo).
 
+## Un avviso di Filo che non riguarda la pagina
+
+Lo stesso vale, in piccolo, per gli avvisi che il main manda e che con la pagina
+davanti non c'entrano (allegati del feedback non saliti, chiave rifiutata,
+crediti finiti, fornitore escluso): mandati alle schede come `SHOW_TOAST`, la
+scheda in primo piano li scriveva nel suo documento e il sito li leggeva
+(#1509). Vanno nella barra della cornice con `avvisoDiFilo`
+(`src/main/services/avvisoFinestra.js`), e dicono il meno possibile (quanti
+allegati, non i loro nomi). `SHOW_TOAST` verso una pagina web resta per
+l'avviso che riguarda quella pagina, a quella scheda sola. Sentinella:
+`tests/unit/avvisiDiFiloNellaBarra.test.mjs`; prova:
+`tests/avvisi-di-filo-nella-barra.spec.mjs`.
+
 ## Provarlo
 
 `tests/safebrowse.spec.mjs`. I locator e la tastiera di Playwright vanno
