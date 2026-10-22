@@ -428,10 +428,14 @@
     const out = raccolta();
     const fine = () => Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
     if (!s.trim()) return fine();
+    let oltre = false;
     for (const re of FORME_CHIAVE) {
       const g = new RegExp(re.source, 'g');
       let m;
-      while ((m = g.exec(s)) && !out.saturo) out.push({ valore: m[0], regola: 'chiave' });
+      while ((m = g.exec(s)) && !out.saturo) {
+        if (m[1]) oltre = true;
+        out.push({ valore: m[1] ? m[0].slice(0, -m[1].length) : m[0], regola: 'chiave' });
+      }
     }
     codiciVicini(s, out);
     for (const m of s.match(IBAN_RE) || []) {
