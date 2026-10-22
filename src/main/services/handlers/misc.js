@@ -4,7 +4,7 @@
 const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { perContoDellaScheda } = require('../perContoDellaScheda');
-const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { avvisoNellaFinestra, avvisoDiFilo } = require('../avvisoFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
@@ -236,7 +236,7 @@ async function immagineNegliAppunti() {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
+  const { MSG, winOf, modelGate, controllaUscita, apriDaFilo } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo

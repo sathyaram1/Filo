@@ -585,13 +585,7 @@ function noteServedProvider(settings, action, result) {
     );
   }
   if (violation && settings.openWeightsOnly === true) {
-    try {
-      broadcastToTabs({
-        type: MSG.SHOW_TOAST,
-        text: I18n.t('toast_open_weights_violated', servedBy),
-        duration: 8000,
-      });
-    } catch (_) {}
+    try { require('./avvisoFinestra').avvisoDiFilo(I18n.t('toast_open_weights_violated', servedBy), { durataSec: 8 }); } catch (_) {}
   }
   return { servedBy, violation };
 }
