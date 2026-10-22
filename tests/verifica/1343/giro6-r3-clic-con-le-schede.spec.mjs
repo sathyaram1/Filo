@@ -11,6 +11,13 @@ const cima = (app) => app.evaluate(({ BrowserWindow }) => {
   return { y: tm.tabs.find((x) => x.id === tm.activeId).view.getBounds().y, fila: tm.tabRowHeight };
 });
 
+// Il tasto come arriva dal sistema, nelle coordinate della vista: il rilascio dove sta il puntatore in quel momento.
+const allaPagina = (app, ev) => app.evaluate(({ BrowserWindow }, e) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  const tm = w._filoTabs;
+  tm.tabs.find((x) => x.id === tm.activeId).view.webContents.sendInputEvent({ ...e, x: Math.round(e.x), y: Math.round(e.y) });
+}, ev);
+
 test('r3 con le schede scoperte a schermo intero un clic su un collegamento della pagina lo segue', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif;height:1400px">
     <div style="height:100px"></div><a id="link" href="#arrivato" style="display:inline-block;height:20px;margin-left:200px">vai al capitolo</a>
@@ -28,13 +35,9 @@ test('r3 con le schede scoperte a schermo intero un clic su un collegamento dell
   const y = box.y + 10;
   await page.mouse.move(x, y);
   const prima = (await cima(app)).y;
-  await page.mouse.down();
+  await allaPagina(app, { type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
   await pausa(80);
   const salita = prima - (await cima(app)).y;
-  await page.mouse.up();
-  await page.mouse.move(x, y + salita);
-  await page.mouse.down();
-  await page.mouse.up();
-  void salita;
+  await allaPagina(app, { type: 'mouseUp', x, y: y + salita, button: 'left', clickCount: 1 });
   await expect.poll(() => page.evaluate(() => location.hash), { timeout: 3000 }).toBe('#arrivato');
 });
