@@ -92,8 +92,11 @@
           suggestions: Array.isArray(m.suggestions) ? m.suggestions : [],
           ts: Date.now(),
         };
-        // Per i test: la parola di cui sono arrivati i suggerimenti nativi, invece di un'attesa fissa.
-        try { document.documentElement.dataset.filoNativeWord = lastNative.word; } catch (_) {}
+        // Solo per gli spec, che lo chiedono col segnale del main: sul documento del sito è la parola sbagliata che
+        // l'utente ha scritto, e da un riquadro di Filo il sito non la deve leggere (#1509).
+        if (m.segnoPerLeProve === true && !global.SN_FILO_UI?.eRiquadro?.(document.activeElement)) {
+          try { document.documentElement.dataset.filoNativeWord = lastNative.word; } catch (_) {}
+        }
         for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
       });
     } catch (_) {}
