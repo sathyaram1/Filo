@@ -8,8 +8,10 @@ import vm from 'node:vm';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
+import { createRequire } from 'node:module';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const require = createRequire(import.meta.url);
 const SORGENTE = readFileSync(join(ROOT, 'src', 'shared', 'riquadriInArrivo.js'), 'utf8');
 
 // Un modulo nuovo per ogni prova: il conto dei load è di chi l'ha acceso.
@@ -209,4 +211,88 @@ test('sentinella: nessuno tocca un riquadro senza passare dalla regola dei riqua
     });
   }
   assert.deepEqual(fuori, [], 'passa da SN_RIQUADRI_IN_ARRIVO (finestra, documento, riquadroDi) o chiedi inArrivo sulla stessa riga');
+});
+
+// #1429: la stessa regola nel corpo che Filo mette nella pagina e nel main.
+test('nella pagina: un ospite inserito di nuovo, anche solo spostato, torna in volo; moveBefore no', () => {
+  const s = readFileSync(join(ROOT, 'src/preload/riquadri-vuoti.js'), 'utf8');
+  assert.match(s, /nodi: function[\s\S]*?ripartono\(a\[i\]\)/, 'senza, un riquadro spostato si tocca prima del suo load');
+  assert.match(s, /gamma: function[\s\S]*?ripartono\(a\[0\]\)/);
+  assert.match(s, /m === 'moveBefore' \? SE\.sposta : SE\.nodi/, 'moveBefore tiene il documento: in volo non arriverebbe più');
+  assert.doesNotMatch(s.match(/sposta: function[^\n]*/)[0], /ripartono/);
+});
+
+test('lato main: un riquadro senza ancora un documento suo ha url vuoto, e non si esegue', () => {
+  const { riquadroArrivato } = require('../../src/main/services/riquadroArrivato.js');
+  const top = { url: 'https://esempio.test/', detached: false };
+  top.top = top;
+  const figlio = (url, extra = {}) => ({ url, top, detached: false, ...extra });
+  assert.equal(riquadroArrivato(top), true);
+  assert.equal(riquadroArrivato(figlio('')), false, 'prima del primo commit');
+  assert.equal(riquadroArrivato(figlio('about:blank')), true, 'il vuoto scritto dalla pagina si legge');
+  assert.equal(riquadroArrivato(figlio('https://esempio.test/dentro')), true);
+  assert.equal(riquadroArrivato(figlio('https://esempio.test/dentro', { detached: true })), false);
+  assert.equal(riquadroArrivato(null), false);
+  assert.equal(riquadroArrivato({ get url() { throw new Error('distrutto'); }, top }), false);
+});
+
+test('lato main: chi esegue codice in un riquadro chiede prima se è arrivato', () => {
+  // Il riquadro che il blocco ha fermato non arriverà mai: il segnale gli va dato prima, e il preload lì non serve.
+  const ECCEZIONI = new Set(['src/main/services/adblock.js']);
+  const file = [];
+  const giro = (dir) => {
+    for (const d of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const p = `${dir}/${d.name}`;
+      if (d.isDirectory()) giro(p);
+      else if (d.name.endsWith('.js')) file.push(p);
+    }
+  };
+  giro('src/main');
+  // Un riquadro si riconosce da chi non è una pagina, qualunque nome abbia (`genitore`, `figlio`…).
+  const PAGINA = new Set(['wc', 'pwc', 'webContents', 'contents']);
+  const eseguono = file.filter((f) => !ECCEZIONI.has(f)
+    && [...readFileSync(join(ROOT, f), 'utf8').matchAll(/\b([A-Za-z_$][\w$]*)\.executeJavaScript(?:InIsolatedWorld)?\(/g)]
+      .some((m) => !PAGINA.has(m[1])));
+  assert.ok(eseguono.length >= 4, `la ricerca non trova più chi esegue nei riquadri: ${eseguono.join(', ')}`);
+  for (const f of eseguono) assert.match(readFileSync(join(ROOT, f), 'utf8'), /riquadroArrivato/, `${f} esegue in un riquadro forse ancora in arrivo`);
+});
+
+test('lato main: i campi segreti nei riquadri non toccano un riquadro in arrivo, e coprono quelli arrivati', async () => {
+  require('../../src/shared/guardianoStatico.js');
+  require('../../src/shared/campiSegreti.js');
+  const { campiSegretiNeiRiquadri } = require('../../src/main/services/campiNeiRiquadri.js');
+  const toccati = [];
+  const CAMPO = { left: 5, top: 5, width: 10, height: 10 };
+  const frame = (nome, url, parent) => {
+    const f = { nome, url, parent, detached: false, top: parent ? parent.top : null };
+    f.executeJavaScript = async (codice) => {
+      toccati.push(nome);
+      if (codice === '0') return 0;
+      if (codice.startsWith('new Promise')) return { left: 100, top: 200, width: 300, height: 300 };
+      if (codice.startsWith('parent.postMessage')) return undefined;
+      return [CAMPO];
+    };
+    if (!parent) f.top = f;
+    return f;
+  };
+  const pagina = (...riquadri) => {
+    const mainFrame = riquadri[0].top;
+    mainFrame.framesInSubtree = [mainFrame, ...riquadri];
+    return { mainFrame };
+  };
+
+  const top = frame('pagina', 'https://esempio.test/', null);
+  const carta = frame('carta', 'https://carta.test/', top);
+  const inArrivo = frame('in arrivo', '', top);
+  const r1 = await campiSegretiNeiRiquadri(pagina(carta, inArrivo));
+  assert.ok(!toccati.includes('in arrivo'), 'il riquadro senza documento non si esegue');
+  assert.equal(r1.nonCoperti, false);
+  assert.deepEqual(r1.campi.map((c) => [c.left, c.top]), [[105, 205]], 'il campo del riquadro arrivato resta coperto');
+
+  toccati.length = 0;
+  const genitore = frame('genitore in arrivo', '', top);
+  const nipote = frame('nipote', 'https://carta.test/', genitore);
+  const r2 = await campiSegretiNeiRiquadri(pagina(genitore, nipote));
+  assert.ok(!toccati.includes('genitore in arrivo'), 'il genitore senza documento non si esegue');
+  assert.equal(r2.nonCoperti, true, 'senza la misura del genitore la foto non parte');
 });

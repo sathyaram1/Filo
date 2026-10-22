@@ -580,3 +580,12 @@ test('rifatta o ripresa, l’intervista porta il segno che la lega alle pagine c
   assert.equal(O.dimentica(rifatta).rifatta, true, 'dimenticata a metà resta della sua pagina');
   assert.equal(O.normalize({ rifatta: 'si' }).rifatta, undefined);
 });
+
+test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto né nomina la Bacheca', () => {
+  // La Bacheca è in pausa per chi non è owner: l'intervista non può promettere una cosa che il nuovo utente non vede.
+  for (const i of O.ITEMS) {
+    const testo = `${i.label} ${i.detail || ''} ${i.applica || ''}`;
+    assert.doesNotMatch(testo, /\bvot|bacheca|ancora rotto/i, `la voce «${i.id}» nomina il voto o la Bacheca`);
+  }
+  assert.match(O.ITEMS.find((i) => i.id === 'crediti').detail, /L’accesso Google serve per dare inviti ad altri/);
+});

@@ -56,7 +56,7 @@
     '/feedback': (text, chat) => {
       if (!isOwner) {
         // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
-        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu, in Bacheca. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
         send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
         return;
       }

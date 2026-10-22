@@ -12,6 +12,7 @@ const Mittente = require('../feedbackMittente');
 // segnalazione col testo che voleva. Il voto e la riapertura sono gesti che si
 // fanno in bacheca, che è una pagina di Filo.
 const { soloFilo } = require('./origine');
+const InPausa = require('../inPausa');
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
@@ -80,7 +81,15 @@ module.exports = function register(on, ctx) {
     return MR.listBoardTab([card], { releasedVersion: versioneRilasciata() }).length > 0;
   }
 
+  // La Bacheca in pausa (#1592): voti e «Ancora rotto?» non partono per chi non la vede, nemmeno da una pagina vecchia.
+  const bachecaChiusa = async () => {
+    if ((await InPausa.cancello('bacheca').assicura()).visible) return null;
+    return { ok: false, code: 'paused', error: InPausa.FRASI_PAUSA.bacheca };
+  };
+
   on(MSG.BOARD_CAST_VOTE, soloFilo(async (msg) => {
+    const chiusa = await bachecaChiusa();
+    if (chiusa) return chiusa;
     const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
@@ -122,6 +131,8 @@ module.exports = function register(on, ctx) {
   // ORDINE DELIBERATO, guard PRIMA del feedback: le due scritture non sono atomiche, e col
   // feedback per primo una caduta di rete lasciava duplicati gratis. Crediti resi se fallisce.
   on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
+    const chiusa = await bachecaChiusa();
+    if (chiusa) return chiusa;
     const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {
@@ -225,6 +236,8 @@ module.exports = function register(on, ctx) {
   on(MSG.SEGNALAZIONI_MIE_TOGLI, soloFilo(async (msg) => ({ ok: true, voci: await Mie().togli(msg?.id) })));
 
   on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
+    const chiusa = await bachecaChiusa();
+    if (chiusa) return chiusa;
     const id = String(msg?.id || '').trim();
     try {
       if (!auth.isSignedIn()) {

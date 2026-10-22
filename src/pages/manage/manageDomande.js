@@ -30,6 +30,9 @@
     + 'Ogni pulsante fa solo quello che c’è scritto sopra.';
   const TASTO_MANDA = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : '';
   const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
+  // Lo scudo in elenco è la fiducia della domanda, non del feedback da cui nasce.
+  const SCUDO_FIDATA = 'Fidata. L’ha scritta una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
+  const SCUDO_NON_FIDATA = 'Non fidata. Chi l’ha scritta ha letto testo che non viene da te, e le sue parole possono essere manipolate.';
 
   // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
   // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
@@ -55,7 +58,7 @@
   const inCorso = new Set();
   let conferma = null;
   const ascoltatori = [];
-  const dip = { apriFeedback: null, apriScheda: null };
+  const dip = { apriFeedback: null, apriScheda: null, soloNonFidate: null, impostaSoloNonFidate: null };
   let firmaLista = '';
   let firmaDettaglio = '';
 
@@ -150,7 +153,10 @@
   function idDi(d) { return d.id || (Number.isInteger(d.numero) ? D.idDi(d.numero) : ''); }
   function chiaveDi(b) { return `${b.priorita}|${String(b.gruppo || '').toLocaleLowerCase('it')}`; }
 
-  function diScheda(tab) { return stato.domande.filter((d) => MR.schedaDomanda(d) === tab); }
+  // «Solo non fidate» è della pagina (#1575): lo stesso filtro dei feedback, chiesto a chi lo possiede.
+  function soloNonFidate() { return !!(dip.soloNonFidate && dip.soloNonFidate()); }
+  function tutteDiScheda(tab) { return stato.domande.filter((d) => MR.schedaDomanda(d) === tab); }
+  function diScheda(tab) { return MR.filtraFiducia(tutteDiScheda(tab), soloNonFidate()); }
 
   // Le schede che aspettano seguono §3.7 (priorità, gruppo, età); l'archivio va dal più recente.
   function blocchi(tab) {
@@ -182,8 +188,25 @@
     return c;
   }
 
+  // Lo scudo della fiducia, come sulle righe dei feedback: pieno se fidata, vuoto se no; il bordo destro ne ripete il colore.
+  function scudo(d) {
+    const s = MR.segnoFiducia(d);
+    const span = el('span', `mg-fiducia-segno mg-fiducia-segno--${s.classe}`);
+    span.title = s.classe === 'fidata' ? SCUDO_FIDATA : SCUDO_NON_FIDATA;
+    span.setAttribute('aria-label', s.parola);
+    span.setAttribute('role', 'img');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', MR.FORME_SVG.scudo);
+    svg.appendChild(path);
+    span.appendChild(svg);
+    return span;
+  }
+
   function riga(d, tab, nelGruppo) {
-    const li = el('li', 'mg-domanda');
+    const li = el('li', `mg-domanda mg-fiducia--${MR.segnoFiducia(d).classe}`);
     li.dataset.id = idDi(d);
     li.dataset.priorita = String(d.priorita || '');
     li.tabIndex = 0;
@@ -195,6 +218,7 @@
     if (tab === 'domande-archivio') li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
     const data = quando(tab === 'domande-archivio' ? (d.modificataIl || d.creataIl) : d.creataIl);
     if (data) li.appendChild(el('span', 'mg-domanda-data', data));
+    li.appendChild(scudo(d));
     return li;
   }
 
@@ -203,7 +227,7 @@
     if (!lista) return;
     const bl = blocchi(scheda);
     const firma = JSON.stringify([scheda, aperta && aperta.ids, [...scelte],
-      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile])])]);
+      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile, d.fiducia])])]);
     if (firma === firmaLista && !lista.hidden) return;
     firmaLista = firma;
     lista.replaceChildren();
@@ -247,6 +271,15 @@
       btn.hidden = !scelte.size;
       btn.textContent = `Applica il consiglio (${scelte.size})`;
       btn.disabled = !!(conferma && conferma.inviando);
+    }
+    // Il numero dice quante ne resterebbero col filtro acceso, come quello della lista dei feedback.
+    const filtro = $('mgDomandeFiduciaFiltro');
+    if (filtro) {
+      filtro.hidden = !stato.lette;
+      filtro.setAttribute('aria-pressed', soloNonFidate() ? 'true' : 'false');
+      filtro.title = soloNonFidate() ? 'Mostra anche le domande fidate' : 'Mostra solo le domande non fidate';
+      const c = filtro.querySelector('.mg-livello-count');
+      if (c) c.textContent = stato.lette ? ` (${MR.contaNonFidate(tutteDiScheda(scheda))}${stato.altre && scheda === 'domande-archivio' ? '+' : ''})` : '';
     }
   }
 
@@ -849,7 +882,8 @@
     }
     scegliSeServe();
     const n = inOrdine(scheda).length;
-    const vuoto = n ? '' : (VUOTO[scheda] || '');
+    const nascoste = !n && soloNonFidate() && tutteDiScheda(scheda).length > 0;
+    const vuoto = n ? '' : (nascoste ? 'Qui sono tutte fidate.' : (VUOTO[scheda] || ''));
     if (stato.aggiornamento) {
       el0.textContent = `Non riesco ad aggiornare le domande: ${stato.aggiornamento}. Restano quelle dell’ultima lettura.${vuoto ? ` ${vuoto}` : ''}`;
       if (riprova) riprova.hidden = false;
@@ -1031,6 +1065,8 @@
       }
     }
     if (!d) return false;
+    // Aprire una domanda precisa la deve far vedere anche col filtro della fiducia acceso.
+    if (soloNonFidate() && MR.isFidato(d) && dip.impostaSoloNonFidate) dip.impostaSoloNonFidate(false);
     // Prima di cambiare scheda: la scheda nuova apre da sé la prima, se quella aperta non è fra le sue.
     apri([d.id]);
     const tab = MR.schedaDomanda(d) || 'domande';
@@ -1048,6 +1084,8 @@
       disegna();
     },
     alCambio(fn) { if (typeof fn === 'function') ascoltatori.push(fn); },
+    // Un filtro della pagina è cambiato: lista, testa e numeri si rifanno.
+    ridisegna() { cambia(); },
     // Quello che la pagina possiede: aprire un feedback nella sua scheda, accendere una scheda di Domande.
     collega(d) { Object.assign(dip, d || {}); },
     // Solo per le prove: domande finte (o un guasto finto) al posto del main, che da lì non le rimpiazza più.

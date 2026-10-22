@@ -186,6 +186,38 @@ test('l\'incognito non vede l\'archivio e non ci scrive', async () => {
   assert.deepEqual(trovaSuDisco('incognito-825.test'), []);
 });
 
+// #1525 — indirizzi e titolo li sceglie il sito: tagliati alla misura, col segno, e una voce tagliata non si riapre intera.
+test('indirizzi e titolo lunghissimi escono tagliati e segnati, anche fra le schede aperte insieme', async () => {
+  const lungo = (n) => `https://lungo-1525.test/?q=${n}` + 'x'.repeat(100_000);
+  const t = await A.archive({ url: lungo(0), title: 'T'.repeat(5000), coOpenUrls: ['https://corta.test/', lungo(1), lungo(2)] });
+  const riletta = (await A.list()).find((x) => x.id === t.id);
+  assert.equal(riletta.url.length, 8192);
+  assert.equal(riletta.urlTagliato, true);
+  assert.equal(riletta.title.length, 1024);
+  assert.equal(riletta.titleTagliato, true);
+  assert.deepEqual(riletta.coOpenUrls.map((u) => u.length), ['https://corta.test/'.length, 8192, 8192]);
+  assert.deepEqual(riletta.coOpenUrlsTagliati, [1, 2]);
+  // Tolta la scheda corta, i segni seguono le voci che restano.
+  const corta = await A.archive({ url: 'https://corta.test/', title: 'Corta' });
+  await A.remove(corta.id);
+  assert.deepEqual((await A.list()).find((x) => x.id === t.id).coOpenUrlsTagliati, [0, 1]);
+  const normale = await A.archive({ url: 'https://normale-1525.test/', title: 'Normale', coOpenUrls: ['https://a.test/'] });
+  assert.equal(normale.urlTagliato, undefined);
+  assert.equal(normale.coOpenUrlsTagliati, undefined);
+  await A.removeMany([t.id, normale.id]);
+});
+
+// #1525 giro 1 — anche l'icona la sceglie il sito: un data: lungo un mega non entra a ogni chiusura, una normale sì.
+test('l’icona di un sito oltre la misura non entra nell’archivio, quella normale resta', async () => {
+  const icona = 'data:image/svg+xml,' + 'a'.repeat(1_000_000);
+  const lunga = await A.archive({ url: 'https://icona-1525.test/', title: 'Icona', favicon: icona });
+  const breve = await A.archive({ url: 'https://icona-breve-1525.test/', title: 'Breve', favicon: 'https://icona-breve-1525.test/favicon.ico' });
+  const lista = await A.list();
+  assert.equal(lista.find((x) => x.id === lunga.id).favicon, '');
+  assert.equal(lista.find((x) => x.id === breve.id).favicon, 'https://icona-breve-1525.test/favicon.ico');
+  await A.removeMany([lunga.id, breve.id]);
+});
+
 test('«cancella tutti i dati» svuota anche l\'archivio, dal disco', async () => {
   await globalThis.chrome.storage.local.clear();
   assert.deepEqual(await A.list(), []);

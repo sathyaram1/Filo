@@ -50,7 +50,8 @@
     if (r.k === 'pagina') {
       corpo.append(el('span', 'dash-cerca-titolo', r.titolo || global.SN_FILO_CODA.sito(r.url)));
       corpo.append(el('span', 'dash-cerca-sotto', r.estratto || global.SN_FILO_CODA.sito(r.url)));
-      b.title = r.url;
+      const dove = global.SN_FILO_CODA.daAprire(r);
+      b.title = dove && dove.sito ? `${dove.url} · indirizzo troppo lungo, si apre il sito` : r.url;
     } else if (r.k === 'nascosta') {
       ic.innerHTML = icona('eyeOff', 13);
       corpo.append(el('span', 'dash-cerca-titolo', r.titolo || r.testo));
@@ -71,10 +72,11 @@
     if (r.k === 'significato') return significato(r);
     if (r.k === 'nascosta') return rimetti(r);
     if (r.k === 'pagina') {
-      if (!/^https?:\/\//i.test(String(r.url || ''))) return;
+      const dove = global.SN_FILO_CODA.daAprire(r);
+      if (!dove) return;
       // Una scheda chiusa si riapre com'era (scroll, paese); se la sua voce non c'è più, come una pagina qualunque.
-      const riaperta = r.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
-      if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: r.url });
+      const riaperta = r.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
+      if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
       return;
     }
     chiudi();
@@ -128,7 +130,7 @@
       .filter((t) => t && /^https?:\/\//i.test(String(t.url || '')) && !gia.has(t.url));
     const i = voci.indexOf(b);
     if (i >= 0) voci.splice(i, 1);
-    const dopo = nuove.map((t) => voce({ k: 'pagina', url: t.url, titolo: t.title || '', ts: t.closedAt || t.openedAt || '', estratto: t.summary || t.snippet || '', ...(t.id ? { archivio: t.id } : {}) }));
+    const dopo = nuove.map((t) => voce({ k: 'pagina', url: t.url, titolo: t.title || '', ts: t.closedAt || t.openedAt || '', estratto: t.summary || t.snippet || '', ...(t.id ? { archivio: t.id } : {}), ...(t.urlTagliato ? { urlTagliato: true } : {}) }));
     if (dopo.length) {
       b.replaceWith(...dopo);
       voci.splice(i >= 0 ? i : voci.length, 0, ...dopo);
@@ -229,9 +231,10 @@
       ];
     }
     if (r.k === 'pagina') {
+      const dove = global.SN_FILO_CODA.daAprire(r);
       return [
-        { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => { apri(r).catch(() => {}); } },
-        { type: 'item', icon: icona('copy', 16), label: 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(r.url).catch(() => {}); } },
+        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { apri(r).catch(() => {}); } },
+        { type: 'item', icon: icona('copy', 16), label: dove && dove.sito ? 'Copia l’indirizzo del sito' : 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(dove && dove.sito ? dove.url : r.url).catch(() => {}); } },
         { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togli(r).catch(() => {}); } },
       ];
     }

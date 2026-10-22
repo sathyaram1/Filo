@@ -41,9 +41,11 @@ test('la barra mostra le sezioni e ogni scheda si apre dalla sua', async ({ open
     .toEqual(['Domande', 'Feedback', 'Routine', 'Utenti', 'Impostazioni predefinite']);
   // Si parte da Feedback: le sue schede si vedono, quelle delle altre sezioni no.
   await expect(page.locator('.mg-sezione[data-sezione="feedback"]')).toHaveClass(/mg-sezione--active/);
-  for (const t of ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats']) {
+  for (const t of ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeVisible();
   }
+  // I lavori server stanno nella scheda del loro stato (#1575): la loro scheda non c'è più.
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveCount(0);
   for (const t of ['automation', 'log', 'domande', 'domande-lavoro', 'domande-archivio', 'utenti', 'predefiniti']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeHidden();
   }

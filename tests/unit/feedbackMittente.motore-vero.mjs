@@ -1,4 +1,4 @@
-// La prova del mittente (#595), la fiducia (#1148) e l'interruttore del Red Team (#896) contro il
+// La prova del mittente (#595), la fiducia (#1148) e gli interruttori (#896, #1592) contro il
 // MOTORE VERO delle regole. Non è un unit test (nome senza `.test.mjs`): serve
 // l'emulatore Firestore e Java. Si lancia come pathsRegole.motore-vero.mjs,
 // accanto (stessa cartella usa-e-getta), con questo file al posto di quello:
@@ -90,6 +90,18 @@ await prova('config/redteam: openToAll è un booleano', () =>
   assertFails(setDoc(doc(admin, 'config/redteam'), { openToAll: 'sì' })));
 await prova('config/redteam: l’admin lo cancella (= in pausa)', () =>
   assertSucceeds(deleteDoc(doc(admin, 'config/redteam'))));
+
+// #1592 — Bacheca e Deck builder: lo stesso interruttore, un documento ciascuno.
+for (const nome of ['config/bacheca', 'config/mazzi']) {
+  await prova(`${nome}: lo legge chiunque`, () => assertSucceeds(getDoc(doc(anon, nome))));
+  await prova(`${nome}: un loggato qualunque non lo scrive`, () => assertFails(setDoc(doc(loggato, nome), { openToAll: true })));
+  await prova(`${nome}: l’admin lo scrive`, () => assertSucceeds(setDoc(doc(admin, nome), { openToAll: true, updatedAt: Timestamp.now() })));
+  await prova(`${nome}: niente campi fuori da openToAll e updatedAt`, () => assertFails(setDoc(doc(admin, nome), { openToAll: true, altro: 1 })));
+  await prova(`${nome}: openToAll è un booleano`, () => assertFails(setDoc(doc(admin, nome), { openToAll: 'sì' })));
+  await prova(`${nome}: l’admin lo cancella (= in pausa)`, () => assertSucceeds(deleteDoc(doc(admin, nome))));
+}
+// Gli altri documenti di config non diventano leggibili con loro.
+await prova('config/secrets: resta chiuso a chi non è admin', () => assertFails(getDoc(doc(anon, 'config/secrets'))));
 
 console.log(`\n${ok} ok, ${ko} falliti`);
 await env.cleanup();

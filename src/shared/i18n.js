@@ -652,7 +652,7 @@
       'Quando chiudi queste schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a ' +
       'nessun modello. La chat ne vede solo il nome del sito, i loro screenshot e le immagini copiate da lì non ' +
       'vanno al modello delle immagini, nemmeno incollati altrove, e la spiegazione di quello che selezioni parte ' +
-      'solo dal tasto destro.',
+      'solo dal tasto destro. Il correttore resta acceso: manda al modello quello che scrivi, non la pagina.',
     options_security_delicate_sites_label:
       'Altri siti delicati, uno per riga',
     options_security_delicate_sites_invalid:

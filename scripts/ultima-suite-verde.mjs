@@ -127,6 +127,7 @@ export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, c
   righe.push(
     '',
     'Cosa fare: apri le corse rosse qui sopra, capisci quali rossi si ripetono e correggili finché un commit di main non torna verde; se un rosso è d\'ambiente del contenitore senza schermo, va in tests/rossi-noti.json (contenitore.specs) col titolo esatto. Ogni suite rossa su main ha già aperto il suo feedback, anche quando il rosso sono gli unit test su Windows: parti da quelli.',
+    'Dalla cloud registro e allegati di una corsa non si scaricano: i suoi rossi stanno nelle annotazioni del lavoro, che si leggono con l\'API (gh api repos/<repo>/actions/runs/<corsa>/jobs, poi gh api repos/<repo>/check-runs/<id del lavoro>/annotations).',
   );
   if (esecuzione) righe.push('', `Registro di questa esecuzione: ${esecuzione}`);
   return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: nessun commit di main con la suite verde`, testo: righe.join('\n') };

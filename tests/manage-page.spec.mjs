@@ -44,10 +44,10 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 16 schede: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni
-  // (#1110); più le tre della sezione Domande (#1150), «Aspettano» (#903), «Crediti» fra le Routine (#1356), e le pagine
-  // dell'owner entrate in Gestione, «Inviti e utenti» e «Modelli predefiniti» (#1414).
-  await expect(page.locator('.mg-tab')).toHaveCount(16);
+  // «Statistiche feedback» (#496) in più, «Modelli di supporto» dentro Automazioni (#1110), i lavori server nella
+  // scheda del loro stato (#1575); più le tre della sezione Domande (#1150), «Aspettano» (#903), «Crediti» fra le
+  // Routine (#1356), e le pagine dell'owner entrate in Gestione, «Inviti e utenti» e «Modelli predefiniti» (#1414).
+  await expect(page.locator('.mg-tab')).toHaveCount(15);
   // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -55,12 +55,12 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await page.evaluate(() => window.__mgTest.setData([]));
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
-  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori server (0)');
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveCount(0);
   await expect(page.locator('.mg-tab[data-tab="waiting"]')).toHaveText('Aspettano (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
-  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Red Team');
+  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('In pausa');
   // I Modelli di supporto stanno dentro Automazioni (#1110).
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveCount(0);
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
@@ -1947,7 +1947,8 @@ test('#1034 — Ricevuti: anche «Segna fidato» sta sulla riga degli altri tast
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
   await stubFeedbackUpdate(page);
-  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-in', status: 'new', reviewDecision: undefined };
+  // La riga più lunga dei Ricevuti: il rombo azzurro, che ha anche «💻 Lavoro server» (#1575).
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-in', status: 'design', statusReason: 'locale', reviewDecision: undefined };
   await page.evaluate((f) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([f]);

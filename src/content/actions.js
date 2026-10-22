@@ -739,16 +739,23 @@
     return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
   }
 
+  // Il Referer che la pagina concede (<meta name="referrer">, l'attributo dell'elemento) vale anche per i byte che il
+  // main scarica per lei; la politica dell'intestazione HTTP la vede il main da sé.
+  function politicheReferrer(el) {
+    const meta = Array.from(document.querySelectorAll('meta[name="referrer" i]'), (m) => m.getAttribute('content') || '');
+    return [meta.join(','), String((el && el.referrerPolicy) || '')].filter(Boolean);
+  }
+
   // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
   // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
   // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
-  async function scaricaImmagine(src) {
+  async function scaricaImmagine(src, el) {
     try {
       const r = await fetch(src);
       if (r.ok) return await blobToDataUrl(await r.blob());
     } catch (_) {}
     if (!/^https?:/i.test(String(src || ''))) throw new Error('immagine non leggibile');
-    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src });
+    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src, politiche: politicheReferrer(el) });
     if (!res || !res.ok || !res.dataUrl) throw new Error((res && res.error) || 'immagine non leggibile');
     return res.dataUrl;
   }
@@ -796,7 +803,7 @@
         (async () => {
           let dataUrl;
           try {
-            dataUrl = await scaricaImmagine(src);
+            dataUrl = await scaricaImmagine(src, imgEl);
           } catch (_) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -1120,7 +1127,7 @@
 
   async function copyImage(imgEl) {
     try {
-      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src, imgEl);
       const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
       if (blob.type !== 'image/png') {
@@ -1160,7 +1167,7 @@
     // Sulle immagini http(s) cross-origin Chromium ignora l'attributo download e la scheda
     // NAVIGAVA sull'immagine (#274): scarica il main, che risponde a download concluso.
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src });
+      const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src, politiche: politicheReferrer(imgEl) });
       if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
       else if (!res?.cancelled) Popup.showToast(I18n.t('toast_image_save_failed'));
     } catch (_) {
@@ -1393,6 +1400,7 @@
         type: MSG.DOWNLOAD_MEDIA,
         url: src,
         kind: audio ? 'audio' : 'video',
+        politiche: politicheReferrer(el),
       });
       if (res?.ok) Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved'));
       else if (!res?.cancelled) Popup.showToast(I18n.t(failToast));

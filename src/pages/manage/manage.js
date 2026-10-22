@@ -147,7 +147,6 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
-  const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgAtteseToggle = document.getElementById('mgAtteseToggle');
   const mgAttese       = document.getElementById('mgAttese');
   const mgAtteseLista  = document.getElementById('mgAtteseLista');
@@ -195,17 +194,16 @@
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox:    'Nessun feedback ricevuto.',
     queue:    'Nessun feedback in coda.',
-    local:    'Nessun lavoro server.',
     waiting:  'Nessun feedback aspetta un altro.',
     resolved: 'Nessun feedback risolto.',
     archived: 'Nessun feedback archiviato.',
   };
-  const LIST_TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
+  const LIST_TABS = ['inbox', 'queue', 'waiting', 'resolved', 'archived'];
   // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
   // sezione, perché nessuna sezione è stata scelta.
   const SENZA_SEZIONI_LABEL = 'Segnalazioni';
@@ -235,6 +233,10 @@
   }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
+  // «Solo non fidate» (#1575) vale per le schede dei feedback e per le Domande; non si ricorda, per lo stesso motivo.
+  let soloNonFidate = false;
+  const mgFiduciaFiltro = document.getElementById('mgFiduciaFiltro');
+  const mgDomandeFiduciaFiltro = document.getElementById('mgDomandeFiduciaFiltro');
   const DOMANDE_TABS = (MR.SEZIONI.find((s) => s.id === 'domande') || { schede: [] }).schede;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
@@ -544,7 +546,7 @@
         // giudizio, quindi i feedback già in attesa restano dove sono. Senza
         // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
         // attesa hanno il loro pulsante, due righe più in là.
-        const pending = r.enabled ? alignedFeedbacks().length : 0;
+        const pending = r.enabled ? alignedFeedbacks(true).length : 0;
         setAutoModeMsg(
           pending
             ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
@@ -1838,6 +1840,8 @@
     DOMANDE.collega({
       apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
       apriScheda: (tab) => selectTab(tab),
+      soloNonFidate: () => soloNonFidate,
+      impostaSoloNonFidate: (v) => impostaSoloNonFidate(v),
     });
   }
 
@@ -1922,10 +1926,37 @@
     });
   }
 
-  // Aprire una pratica precisa (avviso, statistiche, ricerca) la deve far vedere anche col filtro acceso.
+  // Aprire una pratica precisa (avviso, statistiche, ricerca, una domanda) la deve far vedere anche coi filtri accesi.
   function mostraNelFiltro(fb) {
-    if (!fb || !livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!fb) return;
+    if (soloNonFidate && MR.isFidato(fb)) impostaSoloNonFidate(false);
+    if (!livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
     if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
+  }
+
+  // ── «Solo non fidate» (#1575): un tasto nella testa della lista e uno in quella delle Domande, uno stato ─────
+  function impostaSoloNonFidate(valore) {
+    const v = !!valore;
+    if (v === soloNonFidate) return;
+    soloNonFidate = v;
+    renderList();
+    if (DOMANDE && typeof DOMANDE.ridisegna === 'function') DOMANDE.ridisegna();
+  }
+  for (const b of [mgFiduciaFiltro, mgDomandeFiduciaFiltro]) {
+    if (!b) continue;
+    b.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${MR.FORME_SVG.scudo}"/></svg>`);
+    b.addEventListener('click', () => impostaSoloNonFidate(!soloNonFidate));
+  }
+  // `base` è la lista che la scheda mostrerebbe a filtro spento: il numero dice quante ne resterebbero accendendolo.
+  function aggiornaFiltroFiducia(base) {
+    if (!mgFiduciaFiltro) return;
+    const show = !searchMode && sezioniAttendibili() && LIST_TABS.includes(currentTab);
+    mgFiduciaFiltro.hidden = !show;
+    if (!show) return;
+    mgFiduciaFiltro.setAttribute('aria-pressed', soloNonFidate ? 'true' : 'false');
+    mgFiduciaFiltro.title = soloNonFidate ? 'Mostra anche le pratiche fidate' : 'Mostra solo le pratiche non fidate';
+    const c = mgFiduciaFiltro.querySelector('.mg-livello-count');
+    if (c) c.textContent = dataLoaded && Array.isArray(base) ? ` ${countText(MR.contaNonFidate(base))}` : '';
   }
 
   function updateLivelliFiltro() {
@@ -1933,7 +1964,7 @@
     const show = currentTab === 'inbox' && !searchMode && sezioniAttendibili();
     mgLivelliFiltro.hidden = !show;
     if (!show) return;
-    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni }) : null;
+    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni, soloNonFidate }) : null;
     mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
       const l = b.dataset.livello;
       b.setAttribute('aria-pressed', livelliScelti.includes(l) ? 'true' : 'false');
@@ -2118,7 +2149,7 @@
   // Priorità (1-3 pallini), solo per l'owner e solo dove serve agire: più pallini pieni = le
   // routine la affrontano prima.
   function priorityHasDots() {
-    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting' || currentTab === 'inbox';
+    return currentTab === 'queue' || currentTab === 'waiting' || currentTab === 'inbox';
   }
   function priorityDotsHtml(fb) {
     if (!priorityHasDots()) return '';
@@ -2244,12 +2275,7 @@
   }
   // Lo stesso menu per le schede che vivono in un file loro (manageRedteam.js).
   window.SN_MANAGE_MENU = { apri: apriMenu };
-  // L'esito si legge nel dettaglio: dal menu la pratica si apre, così il messaggio ha dove stare.
-  function segnoDalMenu(fb, valore) {
-    if (selectedId !== fb._id) openDetail(fb._id);
-    setLocalSign(fb._id, valore);
-  }
-  // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta.
+  // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta: l'esito si legge lì.
   function approvaDalMenu(fb, azione) {
     if (selectedId !== fb._id) openDetail(fb._id);
     applyAction(azione, null);
@@ -2267,21 +2293,6 @@
     if (domandaId) {
       voci.push({ testo: `Rispondi alla domanda ${domandaId}`, titolo: 'Si risponde in un posto solo: la domanda, con le sue opzioni.', azione: () => apriDomandaDelFeedback(domandaId, fb._id) });
     }
-    const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
-    if (isAdmin && MR.isLocalOnly(fb)) {
-      const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });
-      voci.push({
-        testo: chiusa ? '💻 Non era un lavoro server' : '💻 Non è un lavoro server',
-        titolo: chiusa ? `${localSignText(fb)} ${titoloTogliChiusa(fb)}` : localSignText(fb),
-        azione: () => segnoDalMenu(fb, false),
-      });
-    } else if (segnabile.ok) {
-      voci.push({
-        testo: segnabile.chiusa ? '💻 Era un lavoro server' : '💻 Lavoro server',
-        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.',
-        azione: () => segnoDalMenu(fb, true),
-      });
-    }
     if (isAdmin && ATT) {
       if (!MR.praticaChiusa(fb, opzSezioni())) {
         voci.push({ testo: '⏳ Aspetta un altro feedback…', titolo: 'Nessuna routine lo prende finché quello non è fuso.', azione: () => apriCasellaAttese(fb._id) });
@@ -2293,9 +2304,10 @@
         });
       }
     }
+    // Solo sul rombo azzurro, come nel dettaglio: lì è l'unica uscita (#1575).
     const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
     if (lavoroLocale) {
-      voci.push({ testo: '💻 Approva come lavoro server', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
+      voci.push({ testo: lavoroLocale.label, titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
     if (isAdmin && MR.fiduciaCheck(fb).ok) {
       voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); impostaFiducia(fb._id, true); } });
@@ -2403,7 +2415,7 @@
     updateLivelliFiltro();
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti }))
+      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti, soloNonFidate }))
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
@@ -2443,6 +2455,8 @@
     const bd = scrivi('domande', nd ? `(${nd.domande})` : '',
       nd ? `${nd.domande} da rispondere${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
     if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
+    // Le schede contano quello che mostrano, col filtro della fiducia; la sezione, come Feedback, a filtro spento.
+    const nt = nd && soloNonFidate ? MR.contaDomande(MR.filtraFiducia(d.domande, true)) : nd;
     for (const tab of DOMANDE_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
@@ -2451,7 +2465,7 @@
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
       // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
-      badge.textContent = `(${nd[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
+      badge.textContent = `(${nt[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
@@ -2479,6 +2493,7 @@
     const sezioni = mostraSezioni();
     if (!sezioni) {
       if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+      aggiornaFiltroFiducia(null);
       currentList = applySortMode(allFeedbacks.slice().sort((a, b) =>
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
       mgListEmpty.textContent = TAB_EMPTY.inbox;
@@ -2493,10 +2508,15 @@
     const isArchived = currentTab === 'archived';
     if (mgArchiveFilter) mgArchiveFilter.hidden = !isArchived;
 
+    // Sottoinsieme della tab corrente, ordinato (logica pura condivisa). La fiducia si filtra dopo con la stessa
+    // funzione che conta le schede: la lista di prima serve al numero sul suo tasto.
+    let base;
     if (isArchived) {
-      // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐, di ogni stato. La stessa
-      // funzione conta la scheda, così numero e lista non divergono.
-      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
+      // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
+      // Il filtro "Bloccati confermati" (solo attacchi/spam confermati) è dentro
+      // listArchiveTab: la stessa funzione conta la scheda, così il numero non
+      // può discostarsi dalla lista.
+      base = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
       mgListEmpty.textContent = confirmedOnly
         ? 'Nessun attacco o spam confermato.'
         : starredOnly
@@ -2507,11 +2527,14 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
+      base = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
       if (currentTab === 'inbox' && livelliScelti.length) {
         mgListEmpty.textContent = `Nessun feedback fermo a ${livelliScelti.slice().sort().map((l) => l.toUpperCase()).join(' o ')}.`;
       }
     }
+    currentList = MR.filtraFiducia(base, soloNonFidate);
+    if (soloNonFidate && base.length && !currentList.length) mgListEmpty.textContent = 'Qui sono tutte fidate.';
+    aggiornaFiltroFiducia(base);
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
@@ -2604,13 +2627,14 @@
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
+      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
         + alignedCls
         + (progress ? ' mg-item--staged' : '')
-        + (progress && progress.active ? ' mg-item--active-work' : '');
+        + (progress && progress.active ? ' mg-item--active-work' : '')
+        + ` mg-fiducia--${MR.segnoFiducia(fb).classe}`;
       item.dataset.id = fb._id;
       // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa, così si riconosce
       // scorrendo la lista.
@@ -2645,6 +2669,7 @@
         ${attesaBadgeHtml(fb)}
         ${leggibile ? domandaBadgeHtml(fb) : ''}
         ${priorityDotsHtml(fb)}
+        ${fiduciaSegnoHtml(fb)}
       `;
       item.innerHTML = progress
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
@@ -2697,11 +2722,16 @@
     return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
   }
 
-  // Nei Lavori locali il segno lo dice la sezione; altrove (una pratica che aspetta
-  // l'owner nei Ricevuti, una chiusa) la scheda lo porta, o sembrerebbe una delle routine.
+  // Il segno non sposta di scheda (#1575): l'etichetta lo dice in ogni scheda, o sembrerebbe un lavoro delle routine.
   function localBadgeHtml(fb) {
-    if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
+    if (!MR.isLocalOnly(fb)) return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
+  }
+  // Lo scudo della fiducia (#1575): pieno se fidata, vuoto e tratteggiato se no; il colore lo ripete il bordo destro.
+  function fiduciaSegnoHtml(x) {
+    const s = MR.segnoFiducia(x);
+    return `<span class="mg-fiducia-segno mg-fiducia-segno--${s.classe}" title="${esc(s.testo)}" aria-label="${esc(s.parola)}" role="img">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG.scudo}"/></svg></span>`;
   }
   // Le attese che segue il server: gli unit sulla fusione (#1207); per un lavoro server la suite di filo-security, il PC (#1159).
   const ATTESE_SERVER = Object.freeze({
@@ -2717,7 +2747,7 @@
       : MR.isPrivateLocalWork(fb) ? 'Era un lavoro server: per questo non sta nella bacheca pubblica.'
         : 'Era un lavoro server: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
-    const si = a ? ` Approvato come lavoro server da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno l'approvazione resta, e il segno si rimette con un clic.` : '';
+    const si = a ? ` Approvato come lavoro server da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}.` : '';
     return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.${si}`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
@@ -2787,8 +2817,9 @@
     const cl = MR.classifyBlock(fb);
     return !!(cl && cl.reason === 'unfiltered');
   }
+  // Le due barre agiscono solo su quello che si vede: col filtro della fiducia acceso, sulle non fidate.
   function unfilteredFeedbacks() {
-    return allFeedbacks.filter(isUnfiltered);
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate).filter(isUnfiltered);
   }
   function setReevalMsg(text, kind) {
     if (!mgReevalMsg) return;
@@ -2811,13 +2842,17 @@
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
   }
 
-  // Approvare È scrivere `todo`: l'automatica non sposta più nulla nelle liste, quindi i blu si
-  // mettono in coda da qui (o uno a uno dal dettaglio).
-  function alignedFeedbacks() {
-    // Stesso motivo dei bianchi: «allineato» è una lettura dello status, e approvare in
-    // blocco quello che non si è potuto leggere è la scrittura più pesante della pagina.
+  // ── Approvazione in blocco degli allineati (macchina a stati) ─────────────
+  // L'approvazione È scrivere `todo`: la modalità automatica di oggi non sposta
+  // più nulla nelle liste, quindi i blu si mettono in coda da qui (o uno a uno
+  // dal dettaglio).
+  // `tutti`: anche quelli che il filtro della fiducia nasconde, per chi li conta fuori dalla lista (Automazioni).
+  function alignedFeedbacks(tutti) {
+    // Stesso motivo dei bianchi: "allineato" è una lettura dello status, e
+    // approvare in blocco quello che non si è potuto leggere è la scrittura
+    // più pesante della pagina.
     if (!sezioniAttendibili()) return [];
-    return allFeedbacks.filter((f) => statoLeggibile(f) && MR.isAligned(f));
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
@@ -2825,10 +2860,7 @@
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && blues.length > 0;
     mgAlignedBar.hidden = !show;
     if (!show || !mgAlignedBtn) return;
-    // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
-    const locali = blues.filter((f) => MR.isLocalOnly(f)).length;
-    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori server' : 'In coda e Lavori server');
-    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → ${dove}`;
+    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → In coda`;
   }
   async function approveAllAligned() {
     const blues = alignedFeedbacks();
@@ -2963,6 +2995,8 @@
   function hideTabBars() {
     if (mgArchiveFilter) mgArchiveFilter.hidden = true;
     if (mgLivelliFiltro) mgLivelliFiltro.hidden = true;
+    // La ricerca cerca fra tutte: il filtro della fiducia non la tocca, quindi non si offre.
+    if (mgFiduciaFiltro) mgFiduciaFiltro.hidden = true;
     if (mgReevalBar)     mgReevalBar.hidden = true;
     if (mgAlignedBar)    mgAlignedBar.hidden = true;
   }
@@ -3094,6 +3128,7 @@
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
+        ${fiduciaSegnoHtml(fb)}
       `;
       item.addEventListener('click', () => openDetail(fb._id));
       resultCards.set(fb._id, item);
@@ -3105,6 +3140,12 @@
       || (Number.isFinite(p) ? `pertinenza ${Math.round(p * 100)}%` : '');
     item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
     item.classList.toggle('mg-item--selected', fb._id === selectedId);
+    // La card resta, la fiducia può cambiare mentre la si guarda: il segno si riscrive al suo posto.
+    const classe = MR.segnoFiducia(fb).classe;
+    item.classList.toggle('mg-fiducia--fidata', classe === 'fidata');
+    item.classList.toggle('mg-fiducia--nonfidata', classe !== 'fidata');
+    const scudo = item.querySelector('.mg-fiducia-segno');
+    if (scudo && !scudo.classList.contains(`mg-fiducia-segno--${classe}`)) scudo.outerHTML = fiduciaSegnoHtml(fb);
     return item;
   }
 
@@ -3495,48 +3536,17 @@
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-    reflectLocal(fb);
     reflectAttese(fb);
     reflectFiducia(fb);
   }
 
-  // ── «Solo in locale» (#908) ───────────────────────────────────────────────
-  // Il tasto c'è dove il segno si può mettere (feedback fidato; su una pratica chiusa
-  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti solo col sì dell'owner (#913).
-  function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || MR.isFidato(fb) || MR.isLocalApproved(fb);
-  }
-  // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
-  // Stesso avviso di «Segna fidato»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
+  // ── «💻 Lavoro server» sul rombo azzurro (#913, #1575) ────────────────────
+  // Il segno a mano non c'è più: lo mette il server quando chi lavora lo chiede (#1358). Resta l'uscita dei rombi
+  // azzurri nati prima, dove il sì dell'owner vale anche alla fusione: un segnalato si guarda prima.
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server e torna In coda. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
     return c.segnalato ? `${TITOLO_LAVORO_LOCALE} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_LAVORO_LOCALE;
-  }
-  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro server: la segna così, e la sua scheda esce dalla bacheca pubblica.';
-  // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
-  const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
-  // Il feedback di un utente approvato la scheda la tiene (#913): è da lì che chi l'ha mandato vede la risoluzione.
-  function titoloLocaleChiusa(fb) {
-    return MR.isLocalApproved(fb) ? 'Era un lavoro server: la segna così, e la sua scheda resta nella bacheca pubblica.' : TITOLO_LOCALE_CHIUSA;
-  }
-  function titoloTogliChiusa(fb) {
-    return MR.isPrivateLocalWork(fb) ? TITOLO_TOGLI_CHIUSA : 'Un clic toglie il segno.';
-  }
-  function reflectLocal(fb) {
-    if (!mgLocalBtn) return;
-    const on = MR.isLocalOnly(fb);
-    mgLocalBtn.hidden = !isAdmin || !localToggleOffered(fb);
-    mgLocalBtn.disabled = false;
-    mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    mgLocalBtn.textContent = on ? '💻 Lavoro server' : '💻 Server';
-    const perche = on ? null : MR.localSignCheck(fb, true);
-    const chiusa = on && MR.praticaChiusa(fb, { releasedVersion, fusioni });
-    mgLocalBtn.title = on
-      ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la toglie dai lavori server.'}`
-      : (perche.ok
-        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.')
-        : `Adesso non si può: ${perche.motivo}.`);
   }
 
   // ── «Segna fidato» (#1148) ────────────────────────────────────────────────
@@ -3582,7 +3592,7 @@
       renderList();
       updateTabCounts();
       setManageMsg(valore
-        ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito fra i lavori server.` : `Da ora${chi} è fidato.`)
+        ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito In coda come lavoro server.` : `Da ora${chi} è fidato.`)
         : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
       setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
@@ -3593,40 +3603,6 @@
   if (mgFiduciaBtn) {
     mgFiduciaBtn.addEventListener('click', () => {
       if (selectedId) impostaFiducia(selectedId, mgFiduciaBtn.getAttribute('aria-pressed') !== 'true');
-    });
-  }
-
-  async function setLocalSign(id, valore) {
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb) return;
-    const check = MR.localSignCheck(fb, valore);
-    const num = FB.formatNum(fb.seq, fb.subSeq);
-    const chi = num ? ` (#${num})` : '';
-    if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
-    if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
-    setManageMsg(valore ? 'Segno la pratica come lavoro server…' : (check.chiusa ? 'Tolgo il segno…' : 'La tolgo dai lavori server…'), '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
-      if (selectedId === id) reflectLocal(fb);
-      renderList();
-      const dove = MR.manageTabFor(fb, opzSezioni());
-      const fatto = !valore
-        ? (check.chiusa ? `Da ora${chi} non è più un lavoro server${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} è un lavoro come gli altri.`)
-        : check.chiusa ? `Segnata${chi} come lavoro server${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
-          : `Da ora${chi} è un lavoro server${dove === 'local' ? ': la trovi nei Lavori server' : ''}.`;
-      setManageMsg(fatto, 'ok');
-    } catch (e) {
-      setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
-    } finally {
-      if (mgLocalBtn) mgLocalBtn.disabled = false;
-    }
-  }
-  if (mgLocalBtn) {
-    mgLocalBtn.addEventListener('click', () => {
-      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
-      if (fb) setLocalSign(fb._id, !MR.isLocalOnly(fb));
     });
   }
 
@@ -3869,7 +3845,7 @@
   };
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
-    accept_local: 'Lo passo nei Lavori server…',
+    accept_local: 'Lo passo ai lavori server…',
     confirm_attack: 'Conferma in corso…',
     confirm_spam: 'Conferma in corso…',
     archive: 'Archivio…',
@@ -3990,8 +3966,9 @@
     if (action.kind === 'archive') { payload.archiveOverride = 'archived'; locale.archiveOverride = 'archived'; }
     if (action.kind === 'restore') { payload.archiveOverride = 'keep_open'; locale.archiveOverride = 'keep_open'; }
     if (extra && typeof extra.notes === 'string') { payload.notes = extra.notes; locale.notes = extra.notes; }
-    // #913: il segno e il sì dell'owner nella stessa scrittura dell'approvazione. Il CHI lo mette il main.
-    if (action.locale) { payload.localOnly = true; payload.localApproval = true; }
+    // #913: il segno, e il sì dell'owner a chi ne ha bisogno, nella stessa scrittura dell'approvazione. Il CHI lo
+    // mette il main.
+    if (action.locale) { payload.localOnly = true; if (action.approva) payload.localApproval = true; }
 
     setActionsBusy(true);
     setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
@@ -4000,7 +3977,8 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (action.locale) {
         const segno = { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() };
-        Object.assign(locale, { localOnly: segno, localApproval: { ...segno } });
+        locale.localOnly = segno;
+        if (action.approva) locale.localApproval = { ...segno };
       }
       Object.assign(fb, locale);
       updateTabCounts();
@@ -4013,7 +3991,7 @@
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
           if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
-        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori server.${fiducia}`, fiducia ? 'err' : 'ok');
+        toast(`${num ? `#${num}` : 'Il feedback'} è In coda come lavoro server.${fiducia}`, fiducia ? 'err' : 'ok');
       }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
@@ -5238,7 +5216,7 @@
   };
   function titoloStrada(fb, key) {
     if (key !== 'accept') return ACTION_TITLE[key] || '';
-    return MR.isLocalOnly(fb) ? 'Torna nei Lavori server e il lavoro si rifà' : 'Torna in coda e le routine rifanno il lavoro';
+    return MR.isLocalOnly(fb) ? 'Torna In coda come lavoro server e il lavoro si rifà' : 'Torna in coda e le routine rifanno il lavoro';
   }
   function pannelloStradeFusione(fb, liv) {
     if (!isAdmin) return null;
@@ -5448,10 +5426,11 @@
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const color = cl ? cl.color : 'var(--sn-border)';
       listHtml += `
-        <div class="mg-sender-item" data-id="${esc(fb._id)}" style="border-left-color:${color}">
+        <div class="mg-sender-item mg-fiducia--${MR.segnoFiducia(fb).classe}" data-id="${esc(fb._id)}" style="border-left-color:${color}">
           ${num ? `<span class="mg-sender-item-num">#${esc(num)}</span>` : ''}
           ${statoLeggibile(fb) ? segnoFermataHtml(fb) : ''}
           <span class="mg-sender-item-title">${esc(title)}</span>
+          ${fiduciaSegnoHtml(fb)}
         </div>
       `;
     }
@@ -5916,6 +5895,11 @@
     livelliFiltro(livelli) {
       if (Array.isArray(livelli)) { livelliScelti = livelli.filter((l) => MR.LIVELLI_RICEVUTI.includes(l)); renderList(); }
       return livelliScelti.slice();
+    },
+    // «Solo non fidate»: con un booleano lo imposta, sempre ritorna com'è.
+    fiduciaFiltro(v) {
+      if (typeof v === 'boolean') impostaSoloNonFidate(v);
+      return soloNonFidate;
     },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
     setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },

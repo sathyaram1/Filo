@@ -26,3 +26,13 @@ test('gli annunci di importanza stanno accanto a «Enfasi vuota», con almeno tr
   assert.ok(esempi.filter((e) => riga.includes(`"${e}"`)).length >= 3, riga);
   assert.match(riga, /Tagliala, o scrivi in cosa consiste la differenza/);
 });
+
+// #1567: la descrizione della skill si richiama solo se la sessione lo decide; CLAUDE.md, caricato sempre, deve dire
+// anche lui che unslop vale per ogni risposta in chat.
+test('CLAUDE.md lega unslop anche alle risposte in chat, e «cosa tenere» viene prima dei pattern', () => {
+  const md = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
+  const paragrafi = md.split(/\n\s*\n/).filter((p) => p.includes('skills/unslop/SKILL.md'));
+  assert.ok(paragrafi.some((p) => /ogni risposta in chat/.test(p)), paragrafi.join('\n---\n'));
+  const tenere = SKILL.indexOf('## Prima di tutto: cosa tenere');
+  assert.ok(tenere > 0 && tenere < SKILL.indexOf('## Pattern da individuare'), 'manca la sezione «cosa tenere» prima dei pattern');
+});

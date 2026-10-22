@@ -329,3 +329,21 @@ test('motionFactor legge --sn-motion dal documento, con 1 se manca e un tetto', 
   }
   assert.equal(TT.motionFactor(null), 1);
 });
+
+test('#1493 — tab.larghezza: pixel interi fra 110 e 1000, scritti anche senza unità, rifiutati col numero', () => {
+  assert.equal(TT.get('tab.larghezza').type, 'pixel');
+  assert.equal(TT.defaultValue('tab.larghezza', 'dark'), '240px');
+  for (const [dato, salvato] of [['300px', '300px'], ['300', '300px'], [' 300 PX ', '300px'], [300, '300px'], ['110px', '110px'], ['1000', '1000px'], ['0240', '240px']]) {
+    assert.ok(TT.validate('tab.larghezza', dato), String(dato));
+    assert.equal(TT.normalize('tab.larghezza', dato), salvato);
+  }
+  for (const no of ['109px', '1001px', '20em', '50%', '300.5px', '300,5', '-300px', '1e3', 'calc(300px)', '300px;}', '', ' ', 300.5, NaN, null, true]) {
+    assert.ok(!TT.validate('tab.larghezza', no), String(no));
+  }
+  assert.match(TT.errorMessage('tab.larghezza'), /fra 110 e 1000/);
+  assert.equal(TT.effectiveValue('tab.larghezza', { 'tab.larghezza': '320' }, 'light'), '320px');
+  assert.equal(TT.effectiveValue('tab.larghezza', { 'tab.larghezza': '20' }, 'light'), '240px');
+  // Lo legge la barra in JS: nessuna variabile CSS esce sulle pagine né sulla shell.
+  assert.equal(TT.pageCss({ 'tab.larghezza': '320px' }), '');
+  assert.equal(TT.shellCss({ 'tab.larghezza': '320px' }), '');
+});

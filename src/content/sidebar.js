@@ -1381,7 +1381,7 @@
       try {
         let lettura = origineLetta.get(src);
         if (!lettura) {
-          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src)))();
+          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src, im)))();
           lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
           if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
           origineLetta.set(src, lettura);

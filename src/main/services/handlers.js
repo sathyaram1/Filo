@@ -5,6 +5,7 @@ const { BrowserWindow } = require('electron');
 const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const PageRead = require('./pageRead');
+const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
@@ -186,7 +187,8 @@ function testoDelTurnoAutomatico(payload) {
   });
 }
 
-async function buildMessages(action, payload) {
+// `sender`: la scheda per conto della quale si legge quello che serve al prompt (l'llms.txt dell'Aiuto).
+async function buildMessages(action, payload, { sender = null } = {}) {
   if (payload && Array.isArray(payload.messages) && payload.messages.length) {
     return payload.messages;
   }
@@ -212,7 +214,7 @@ async function buildMessages(action, payload) {
       catch (_) { return ''; }
     })();
     const [llmsRes, pathsRes] = await Promise.all([
-      domain ? LlmsTxt.get(domain).catch(() => null) : Promise.resolve(null),
+      domain ? LlmsTxt.get(domain, { sender }).catch(() => null) : Promise.resolve(null),
       domain ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
     ]);
     const siteKnowledge = (llmsRes && llmsRes.present && llmsRes.text) ? llmsRes.text : '';
@@ -249,13 +251,21 @@ async function buildMessages(action, payload) {
     ] }];
   }
 
-  // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti.
+  // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti. Le regole
+  // nel messaggio di sistema, che va in cache (#1580); il testo che cambia in quello dell'utente.
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
-    return [{ role: 'user', content: PROMPTS.spellcheckErrori(payload || {}) }];
+    return [
+      { role: 'system', content: PROMPTS.spellcheckErroriSistema() },
+      { role: 'user', content: PROMPTS.spellcheckErrori(payload || {}) },
+    ];
   }
   if (action === ACTIONS.SPELLCHECK_CONTEXT) {
+    const p = payload || {};
     // La data la dà l'orologio di qui, non la pagina.
-    return [{ role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...(payload || {}), oggi: new Date() }) }];
+    return [
+      { role: 'system', content: PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: p.ripetizioni !== false }) },
+      { role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...p, oggi: new Date() }) },
+    ];
   }
   if (action === ACTIONS.EDIT_TEXT) {
     return [{ role: 'user', content: PROMPTS.editText({ original: payload.original, instruction: payload.instruction }) }];
@@ -713,7 +723,7 @@ async function handleAIRequest({ intera = false, ...opts }) {
   return r;
 }
 
-async function chiamaIlModello({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
+async function chiamaIlModello({ action, payload, origin, sender = null, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE payload.modelOverride: il modello di una funzione viene SOLO dalla configurazione
@@ -728,7 +738,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
   } catch (e) {
     if (e && e.code === 'NO_MODEL_FOR_ACTION') throw e;
   }
-  let messages = await buildMessages(action, { ...payload, modelName });
+  let messages = await buildMessages(action, { ...payload, modelName }, { sender });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
   // `noCache` salta la LETTURA, non la scrittura: serve ai ritentativi sul JSON illeggibile,
@@ -1413,7 +1423,7 @@ async function testoDellaPagina(sender) {
   try { riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || []; } catch (_) {}
   for (const f of riquadri) {
     if (letture.length > MAX_RIQUADRI) break;
-    if (f === wc.mainFrame || f.detached) continue;
+    if (f === wc.mainFrame || !riquadroArrivato(f)) continue;
     letture.push(leggi(() => f.executeJavaScript(LEGGI_PAGINA_JS)));
   }
   const testo = (await Promise.all(letture)).map((t) => String(t || '')).filter((t) => t.trim()).join('\n\n');
@@ -3522,8 +3532,12 @@ async function eseguiAzioneFilo(action, {
             if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender });
           }
         }
+        // Il Deck builder in pausa (#1592) non ha una carta da rimettere o spostare: per chi chiede non esiste.
+        if (CH.risolvi(action.carta) === 'mazzi' && !require('./inPausa').aperti().mazzi) {
+          return { executed: false, kept: false, output: { error: 'carta sconosciuta', ...descriviCarte(await require('./carteHome').leggi()) } };
+        }
         const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
-        const dove = CH.descrivi(esito.layout);
+        const dove = descriviCarte(esito.layout);
         if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
         return { executed: true, kept: true, output: dove };
@@ -3630,9 +3644,13 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
     });
 }
 
-// Le capacità che l'agente conosce dipendono da chi usa Filo: il Red Team in pausa solo a chi lo vede (#896).
+// Le capacità che l'agente conosce dipendono da chi usa Filo: Red Team (#896), Bacheca e Mazzi (#1592) in pausa
+// solo a chi li vede.
 function cancelliAperti() {
-  try { return { redteam: require('./redteamGate').visibile() }; } catch (_) { return {}; }
+  const aperti = {};
+  try { aperti.redteam = require('./redteamGate').visibile(); } catch (_) {}
+  try { Object.assign(aperti, require('./inPausa').aperti()); } catch (_) {}
+  return aperti;
 }
 
 function broadcastLiveUpdate() {
@@ -3868,9 +3886,14 @@ async function paginePerChat(query) {
     const delicata = fuori(p.url) || (p.chiusa && restaQui(p._voce || {}, fuori));
     let sito = '';
     try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: al modello va il sito, detto come tale.
+    const tagliata = !!(p._voce && p._voce.urlTagliato);
+    let origine = '';
+    try { origine = new URL(p.url).origin; } catch (_) {}
     out.push(delicata
       ? { url: sito ? `https://${sito}/` : '', title: sito || 'sito', date: p.date, chiusa: !!p.chiusa, delicata: true }
-      : { url: p.url, title: p.title, date: p.date, chiusa: !!p.chiusa, ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
+      : { url: tagliata ? (origine ? `${origine}/` : '') : p.url, title: p.title, date: p.date, chiusa: !!p.chiusa,
+        ...(tagliata ? { tagliata: true } : {}), ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
   }
   return out.filter((p) => p.url);
 }
@@ -4046,7 +4069,7 @@ function chatSearchesForPrompt(actions) {
       const righe = pagine.map((pg) => {
         const when = pg.date ? new Date(pg.date).toLocaleString('it-IT') : '';
         const stato = pg.chiusa ? 'scheda chiusa' : 'visitata';
-        return `- ${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
+        return `- ${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}${pg.tagliata ? ' · indirizzo troppo lungo: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
       });
       blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Per riaprirne una usa NAVIGA col suo indirizzo.]\n`
         + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
@@ -6008,6 +6031,15 @@ async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {
   return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
 }
 
+// Dove stanno le carte di destra per il modello, senza quella di una funzione in pausa (#1592).
+function descriviCarte(layout) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const dove = CH.descrivi(layout);
+  if (require('./inPausa').aperti().mazzi) return dove;
+  const mazzi = CH.carta('mazzi').titolo;
+  return { destra: dove.destra.filter((t) => t !== mazzi), altro: dove.altro.filter((t) => t !== mazzi) };
+}
+
 // null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
 async function rimettiSinistraDaChat({ action, sender, chatId }) {
   const CH = globalThis.SN_CARTE_HOME;
@@ -6031,7 +6063,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   const CH = globalThis.SN_CARTE_HOME;
   const Carte = require('./carteHome');
   const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
-  const destra = CH.descrivi(await Carte.leggi());
+  const destra = descriviCarte(await Carte.leggi());
   const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...destra } });
   const voci = trovate.voci;
   if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
@@ -6358,6 +6390,7 @@ require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'a
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);
+require('./handlers/inPausa')(on, handlerCtx); // #1592 — Bacheca e Mazzi in pausa per chi non è owner
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 

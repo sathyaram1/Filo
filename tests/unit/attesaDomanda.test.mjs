@@ -35,9 +35,9 @@ test('design con la domanda: In coda, nessun segno dei Ricevuti, nessuna casella
   }
 });
 
-test('un lavoro server fermo su un passo dell’owner aspetta fra i Lavori server, col segno; la scheda pubblica resta', () => {
+test('un lavoro server fermo su un passo dell’owner aspetta In coda, col segno; la scheda pubblica resta', () => {
   const f = fb('design', 'locale', { domandaId: 'D-6', localOnly: { by: 'routine', at: 1 } });
-  assert.equal(MR.manageTabFor(f), 'local');
+  assert.equal(MR.manageTabFor(f), 'queue');
   assert.deepEqual(MR.ownerActions(f).map((a) => a.key), ['archive']);
   assert.equal(MR.isPrivateLocalWork({ localOnly: { by: 'routine', at: 1 } }), false, 'passato ai lavori server da una routine: la scheda di chi l’ha mandato resta');
   assert.equal(MR.isPrivateLocalWork({ localOnly: { by: 'owner', at: 1 } }), true);

@@ -2378,6 +2378,10 @@
     });
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener(onChatChangedElsewhere);
+      // Rimesso in pausa dall'owner (#1592) mentre la pagina è aperta: si ricarica, e il main serve la pausa.
+      chrome.runtime.onMessage.addListener((msg) => {
+        if (msg && msg.type === MSG.IN_PAUSA_CAMBIATO && msg.nome === 'mazzi' && msg.visible === false) location.reload();
+      });
     }
     // Tasto destro sulla riga del commander (§ "il tasto destro è centrale"):
     // quando un commander è impostato, offre di rimuoverlo direttamente da lì

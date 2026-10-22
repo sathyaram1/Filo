@@ -135,6 +135,16 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     assert.match(rossiDellePartiMancanti([2], 4)[0].titolo, /tetto del passo/, 'una parte senza esito può essere stata fermata dal tetto: si dice');
   });
 
+  // #1429: dalla cloud registro e allegati non si scaricano, e chi risolve «pubblicazione ferma» non vedeva i rossi.
+  test('i rossi nuovi restano leggibili con l\'API, come annotazioni, anche su un ramo', () => {
+    const passo = elencoVerdetto.find((p) => /annotazioni-github\.mjs/.test(p.corpo));
+    assert.ok(passo, 'senza annotazioni i rossi di una corsa li legge solo chi apre GitHub da un browser');
+    assert.match(passo.corpo, /annotazioni-github\.mjs rossi-nuovi\.txt/);
+    assert.match(passo.corpo, /if:\s*always\(\) && steps\.verdetto\.outcome == 'failure'\s*$/m);
+    assert.match(passo.corpo, /continue-on-error:\s*true/, 'un\'annotazione non scritta non dice niente del commit');
+    assert.ok(elencoVerdetto.indexOf(passo) > elencoVerdetto.findIndex((p) => p.id === 'verdetto'));
+  });
+
   test('esito, verdetto e tracce restano allegati per sette giorni, anche a suite rossa', () => {
     const finale = elencoVerdetto.find((p) => /upload-artifact/.test(p.corpo));
     const tracce = elenco.find((p) => /upload-artifact/.test(p.corpo) && /test-results\//.test(p.corpo));
@@ -276,6 +286,17 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
     assert.ok(ramo);
     assert.match(ramo.corpo, /steps\.unit\.outcome == 'failure' \|\| failure\(\)/);
     assert.match(ramo.corpo, /exit 1/);
+  });
+
+  test('gli unit rossi restano leggibili con l\'API, come annotazioni, anche su un ramo', () => {
+    const passo = elenco.find((p) => /annotazioni-github\.mjs/.test(p.corpo));
+    assert.ok(passo);
+    assert.match(passo.corpo, /if:\s*always\(\) && steps\.unit\.outcome == 'failure'\s*$/m);
+    assert.match(passo.corpo, /continue-on-error:\s*true/);
+    assert.ok(elenco.indexOf(passo) > elenco.indexOf(unit));
+    // Una corsa caduta prima del riepilogo non ha casi «not ok»: senza la coda del registro dalla cloud non si legge niente.
+    assert.match(passo.corpo, /if \[ -s unit-rossi\.txt \]/);
+    assert.match(passo.corpo, /tail -n \d+ unit\.log > (\S+)[\s\S]*annotazioni-github\.mjs \1/);
   });
 
   test('la scelta del verde chiede alle corse se questo lavoro è passato', () => {

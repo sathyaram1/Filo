@@ -6,6 +6,8 @@
 
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { perRiga } = require('./leggiARighe');
+const { MISURA, taglia } = require('./misurePagine');
 
 const E = () => globalThis.SN_FILO_EVENTI;
 const FILE_EVENTI = 'eventi.jsonl';
@@ -14,6 +16,28 @@ const FILE_DISPOSITIVO = 'dispositivo';
 const FILE_SCHEDE_ENTRATE = 'schede-chiuse-entrate';
 // Una visita già nel filo per la stessa scheda chiusa: stesso indirizzo, aperta fra l'apertura e la chiusura (più un margine).
 const MARGINE_SCHEDA_MS = 2 * 60 * 1000;
+// Oltre questa misura il file si fa notare una volta per avvio, con la strada per alleggerirlo (#1525): non è un tetto.
+const SOGLIA_AVVISO = 256 * 1024 * 1024;
+// Il filo che non si legge lo dice; ogni richiesta riprova, ma l'avviso non torna a ogni pagina aperta.
+const RIPETI_ILLEGGIBILE_MS = 10 * 60 * 1000;
+const CANCELLA_PAGINE_URL = 'filo://security/security.html#cancella-pagine';
+
+function avvisoDiFinestra(testo, opts) {
+  try { require('./avvisoFinestra').avvisoQuandoPronta(testo, opts); } catch (_) {}
+}
+
+// La causa come la capisce chi usa Filo: il codice di sistema resta nel log.
+function causaDi(e) {
+  const c = e && e.code;
+  if (c === 'EACCES' || c === 'EPERM') return 'il sistema non dà il permesso di leggerle';
+  if (c === 'EBUSY') return 'un altro programma tiene occupato il file';
+  if (c === 'EIO') return 'il disco ha dato un errore di lettura';
+  if (c === 'EMFILE' || c === 'ENFILE') return 'il sistema ha troppi file aperti in questo momento';
+  if (c === 'EISDIR') return 'al posto del file c’è una cartella';
+  if (c === 'ENOMEM' || e instanceof RangeError) return 'non c’è abbastanza memoria per leggerle';
+  const m = String((e && e.message) || '').trim();
+  return m ? `c’è stato un errore («${m.slice(0, 200)}»)` : 'c’è stato un errore sconosciuto';
+}
 
 function disco() {
   try { return require('../shim/storage'); } catch (_) { return null; }
@@ -30,11 +54,13 @@ function cartellaDati() {
 }
 
 // Un'istanza per profilo: il profilo segreto ne aprirà una sua con un'altra cartella, senza vedere questa.
-function creaFilo({ cartella } = {}) {
+// `avvisa(testo, { chiave, azioni })`: il toast nella cornice della finestra (le prove lo raccolgono).
+function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   const dir = () => cartella || path.join(cartellaDati(), 'filo');
   const fileEventi = () => path.join(dir(), FILE_EVENTI);
 
   const normale = { stato: E().nuovoStato(), caricato: false, caricando: null, dispositivo: '' };
+  const avvisi = { illeggibile: 0, peso: false };
   // L'incognito ha un filo suo in memoria: si vede solo da lì e sparisce con l'ultima finestra incognito.
   let incognito = { stato: E().nuovoStato(), eventi: [] };
 
@@ -80,44 +106,78 @@ function creaFilo({ cartella } = {}) {
   }
 
   // Le uniche righe che si tolgono dal file sono quelle coperte da una cancellazione; le altre restano byte per byte.
+  // Due letture a righe, mai il file intero in memoria: la prima decide quali righe restano, la seconda le copia.
   async function compattaFile() {
-    let testo = '';
-    try { testo = await fsp.readFile(fileEventi(), 'utf8'); } catch (e) { if (e.code === 'ENOENT') return 0; throw e; }
-    const coppie = [];
-    for (const r of testo.split('\n')) {
-      if (!r.trim()) continue;
-      let ev = null;
-      try { ev = JSON.parse(r); } catch (_) { continue; }
-      if (!ev || typeof ev !== 'object') continue;
-      coppie.push({ r, ev });
-    }
-    const validi = coppie.filter((c) => E().valido(c.ev)).map((c) => c.ev);
-    const tenuti = new Set(E().compatta(validi));
+    const lette = [];
+    // Di un evento servono solo i campi che decidono cosa copre una cancellazione, non il testo dei messaggi.
+    const sottile = (ev) => ({ id: ev.id, tipo: ev.tipo, ts: ev.ts, chat: ev.chat, url: ev.url, visita: ev.visita, pagine: ev.pagine });
+    try {
+      await perRiga(fileEventi(), (r, i) => {
+        if (!r.trim()) return;
+        let ev = null;
+        try { ev = JSON.parse(r); } catch (_) { return; }
+        if (!ev || typeof ev !== 'object') return;
+        lette.push({ i, ev: E().valido(ev) ? sottile(ev) : null });
+      });
+    } catch (e) { if (e.code === 'ENOENT') return 0; throw e; }
+    const tenuti = new Set(E().compatta(lette.filter((x) => x.ev).map((x) => x.ev)));
     // Una riga che questa versione non capisce (una versione più nuova del formato) resta dov'è.
-    const restano = coppie.filter((c) => !E().valido(c.ev) || tenuti.has(c.ev));
+    const restano = new Set(lette.filter((x) => !x.ev || tenuti.has(x.ev)).map((x) => x.i));
     const tmp = fileEventi() + '.tmp';
     const fh = await fsp.open(tmp, 'w');
     try {
-      await fh.writeFile(restano.map((c) => c.r + '\n').join(''), 'utf8');
+      let blocco = '';
+      await perRiga(fileEventi(), (r, i) => {
+        if (!restano.has(i)) return undefined;
+        blocco += r + '\n';
+        if (blocco.length < (1 << 20)) return undefined;
+        const b = blocco;
+        blocco = '';
+        return fh.write(b, null, 'utf8');
+      });
+      if (blocco) await fh.write(blocco, null, 'utf8');
       await fh.datasync().catch(() => {});
     } finally { await fh.close(); }
     await rinomina(tmp, fileEventi());
-    return coppie.length - restano.length;
+    return lette.length - restano.size;
   }
 
   async function caricaDaDisco() {
     const stato = E().nuovoStato();
-    let testo = '';
-    try { testo = await fsp.readFile(fileEventi(), 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-    const { eventi, scartate } = E().analizza(testo);
-    if (scartate) console.warn(`[Filo] filo: ${scartate} righe illeggibili saltate`);
+    let scartate = 0;
     let daCompattare = false;
-    for (const ev of eventi) if (E().applica(stato, ev).tolti) daCompattare = true;
+    let aCapo = true;
+    try {
+      ({ aCapo } = await perRiga(fileEventi(), (r) => {
+        const ev = E().analizzaRiga(r);
+        if (ev === null) scartate++;
+        else if (ev && E().applica(stato, ev).tolti) daCompattare = true;
+      }));
+    } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    if (scartate) console.warn(`[Filo] filo: ${scartate} righe illeggibili saltate`);
     // Una riga lasciata a metà da un guasto non deve incollarsi all'evento che arriva dopo.
-    if (testo && !testo.endsWith('\n')) await scriviInCoda('\n');
+    if (!aCapo) await scriviInCoda('\n');
     // Una cancellazione scritta ma non ancora tolta dal file (l'app è morta in mezzo) si finisce adesso.
     if (daCompattare) await compattaFile();
     return stato;
+  }
+
+  function avvisaIlleggibile(e) {
+    const ora = Date.now();
+    if (ora - avvisi.illeggibile < RIPETI_ILLEGGIBILE_MS) return;
+    avvisi.illeggibile = ora;
+    avvisa(`Filo non riesce a leggere le chat e le pagine visitate, perché ${causaDi(e)}. Finché non ci riesce non salva niente di nuovo, e riprova a ogni richiesta.`,
+      { chiave: 'filo-illeggibile' });
+  }
+
+  async function avvisaSePesa() {
+    if (avvisi.peso) return;
+    let byte = 0;
+    try { byte = (await fsp.stat(fileEventi())).size; } catch (_) { return; }
+    if (byte <= SOGLIA_AVVISO) return;
+    avvisi.peso = true;
+    avvisa(`Le chat e le pagine visitate occupano ${Math.round(byte / (1024 * 1024))} MB sul disco. Cancellare le pagine di un periodo le alleggerisce.`,
+      { chiave: 'filo-pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
   }
 
   // Le chat salvate prima del filo (#525) diventano segmenti: una chat già nel filo non si riscrive, così la
@@ -162,6 +222,8 @@ function creaFilo({ cartella } = {}) {
     if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
   }
 
+  // Rifiuta se il file non si legge: chi scrive non deve lavorare su un filo vuoto (le sue righe finirebbero in coda a
+  // un file che nessuno ha riletto). La richiesta dopo riprova da capo.
   function carica() {
     if (normale.caricato) return Promise.resolve();
     if (!normale.caricando) {
@@ -173,13 +235,23 @@ function creaFilo({ cartella } = {}) {
           // Senza leggere il filo non si migra né si compatta: una migrazione su un elenco vuoto farebbe doppioni.
           console.warn('[Filo] filo non leggibile, riprovo alla prossima richiesta:', e?.message || e);
           normale.caricando = null;
-          return;
+          avvisaIlleggibile(e);
+          const err = new Error(`il filo non si legge: ${e?.message || e}`);
+          err.code = 'FILO_ILLEGGIBILE';
+          err.cause = e;
+          throw err;
         }
         try { await migraDaStorage(); } catch (e) { console.warn('[Filo] migrazione delle chat:', e?.message || e); }
         normale.caricato = true;
+        avvisaSePesa().catch(() => {});
       })();
     }
     return normale.caricando;
+  }
+
+  // Chi legge soltanto vede il filo vuoto (l'avviso dice perché); chi scrive passa da `transazione`, che rifiuta.
+  async function caricaPerLeggere() {
+    try { await carica(); } catch (_) {}
   }
 
   function evento(tipo, campi, { autore, ts, id } = {}) {
@@ -221,7 +293,8 @@ function creaFilo({ cartella } = {}) {
   function transazione(fn, opts) {
     const incog = inIncognito(opts);
     return inCoda(async () => {
-      await carica();
+      // L'incognito ha il filo in memoria: un file che non si legge non lo tocca.
+      if (incog) await caricaPerLeggere(); else await carica();
       const v = incog ? incognito : normale;
       return fn({
         incognito: incog,
@@ -235,7 +308,7 @@ function creaFilo({ cartella } = {}) {
 
   async function vista(opts) {
     const incog = inIncognito(opts);
-    await carica();
+    await caricaPerLeggere();
     return incog ? incognito : normale;
   }
 
@@ -288,11 +361,15 @@ function creaFilo({ cartella } = {}) {
   }
 
   // Ogni pagina aperta in una scheda: dalla finestra incognito resta nel filo in memoria, mai su disco.
+  // Indirizzo e titolo li sceglie il sito: oltre la misura si tagliano, e la visita lo segna.
   function registraVisita({ url, titolo, scheda, ts } = {}, opts) {
     if (!url) return Promise.resolve(null);
+    const u = taglia(url, MISURA.url);
+    const tt = taglia(titolo || '', MISURA.titolo);
     return transazione(async (t) => {
       const ev = t.evento(E().TIPI.NAVIGAZIONE, {
-        url: String(url), titolo: String(titolo || ''), scheda: scheda == null ? undefined : scheda,
+        url: u.testo, titolo: tt.testo, scheda: scheda == null ? undefined : scheda,
+        urlTagliato: u.tagliato || undefined, titoloTagliato: tt.tagliato || undefined,
       }, { autore: 'utente', ts });
       await t.scrivi([ev]);
       return ev;
@@ -300,10 +377,11 @@ function creaFilo({ cartella } = {}) {
   }
 
   // Il titolo che la pagina si dà dopo (un'app web, «Caricamento…» che diventa il nome vero) è un evento in coda.
-  function aggiornaTitolo({ visita, titolo } = {}, opts) {
-    if (!visita || typeof titolo !== 'string' || !titolo) return Promise.resolve(null);
+  function aggiornaTitolo({ visita, titolo: intero } = {}, opts) {
+    if (!visita || typeof intero !== 'string' || !intero) return Promise.resolve(null);
+    const { testo: titolo, tagliato } = taglia(intero, MISURA.titolo);
     return transazione(async (t) => {
-      const ev = t.evento(E().TIPI.TITOLO_PAGINA, { visita: String(visita), titolo }, { autore: 'utente' });
+      const ev = t.evento(E().TIPI.TITOLO_PAGINA, { visita: String(visita), titolo, titoloTagliato: tagliato || undefined }, { autore: 'utente' });
       const { scritti } = await t.scrivi([ev]);
       return scritti.length ? ev : null;
     }, opts);
@@ -349,7 +427,7 @@ function creaFilo({ cartella } = {}) {
   async function esporta(opts) {
     const incog = inIncognito(opts);
     return inCoda(async () => {
-      await carica();
+      await caricaPerLeggere();
       if (incog) return Buffer.from(incognito.eventi.map(E().riga).join(''), 'utf8');
       try { return await fsp.readFile(fileEventi()); } catch (e) { if (e.code === 'ENOENT') return Buffer.alloc(0); throw e; }
     });
@@ -401,10 +479,13 @@ function creaFilo({ cartella } = {}) {
       for (const { s, t: inizio } of ordinate) {
         if (legate.has(s.id)) continue;
         const fine = Date.parse(s.closedAt) || inizio;
-        const viste = perUrl.get(s.url) || [];
+        const u = taglia(s.url, MISURA.url);
+        const tt = taglia(s.title && s.title !== s.url ? s.title : '', MISURA.titolo);
+        const viste = perUrl.get(u.testo) || [];
         if (viste.some((x) => x >= inizio - MARGINE_SCHEDA_MS && x <= fine + MARGINE_SCHEDA_MS)) continue;
         eventi.push(t.evento(E().TIPI.NAVIGAZIONE, {
-          url: s.url, titolo: String(s.title && s.title !== s.url ? s.title : ''), archivio: s.id,
+          url: u.testo, titolo: tt.testo, archivio: s.id,
+          urlTagliato: (u.tagliato || s.urlTagliato === true) || undefined, titoloTagliato: (tt.tagliato || s.titleTagliato === true) || undefined,
         }, { autore: 'utente', ts: new Date(inizio).toISOString() }));
       }
       const { scritti } = eventi.length ? await t.scrivi(eventi) : { scritti: [] };
@@ -421,7 +502,8 @@ function creaFilo({ cartella } = {}) {
   }
 
   async function dispositivo() {
-    await carica();
+    await caricaPerLeggere();
+    if (!normale.dispositivo) normale.dispositivo = await leggiDispositivo();
     return normale.dispositivo;
   }
 

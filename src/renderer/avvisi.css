@@ -87,3 +87,31 @@ html.vassoio #pila {
   padding: 12px 16px 16px 16px;
 }
 html.vassoio .shell-notif { max-width: 360px; }
+
+/* In cima alla pila: «+N» per gli avvisi oltre il tetto, e aperta Riduci e Chiudi tutti (#1477).
+   Pillole piccole e quiete: dicono che c'è dell'altro senza fare concorrenza alle carte. */
+.avvisi-testa {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity calc(0.2s * var(--sn-motion, 1)) ease;
+}
+.avvisi-testa.show { opacity: 1; }
+.avvisi-testa[hidden], .avvisi-testa button[hidden] { display: none; }
+.avvisi-testa button {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--tab-active);
+  color: var(--fg-soft, var(--fg));
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, calc(0.12 * var(--sn-ombra, 1)));
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
+}
+.avvisi-testa button:hover { background: var(--border); color: var(--fg); }
+.avvisi-testa button:disabled { opacity: 0.45; cursor: default; pointer-events: none; }

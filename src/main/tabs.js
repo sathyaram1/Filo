@@ -56,8 +56,28 @@ const HOVER_INPUT_TYPES = new Set([
   'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
 ]);
 
-// #514 — quanto si aspetta la pagina prima di uscire dallo schermo intero da soli. Due
-// tempi: larga per chi risponde (non è ritardo), corta per chi non risponderà mai.
+// Per le pagine visitate (#1525) vale come gesto un input vero sulla scheda o una navigazione chiesta a Filo.
+const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
+
+// #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
+// conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
+// dire "quell'Esc me lo sono preso io".
+//
+// Due tempi, perché i due casi sono diversi e mescolarli è già costato.
+//  · Una pagina che RISPONDE (ha i pezzi di Filo dentro, si è presentata da
+//    sola appena montata) risponde in entrambi i casi: se il tasto era suo lo
+//    rivendica, se non lo era chiede lei l'uscita. Quindi qui l'attesa non è un
+//    ritardo — l'uscita arriva quando arriva la sua risposta — ed è solo la
+//    rete di sicurezza per il caso in cui quella risposta non arrivi MAI
+//    (renderer morto, script che gira all'infinito). Larga: una pagina
+//    impegnata mezzo secondo quando l'utente preme Esc rispondeva fuori tempo
+//    massimo, e usciva dallo schermo intero chiudendo insieme il riquadro che
+//    stava sopra — il danno di #514 da un'altra porta.
+//  · Una pagina che NON risponde (il visore PDF, una pagina d'errore, una
+//    scheda ancora vuota) non dirà niente per definizione: lì l'attesa è tutta
+//    ritardo, e resta corta.
+// In tutti e due i casi l'errore possibile è un'uscita in ritardo, mai restare
+// chiusi dentro.
 const ESC_ATTESA_MS = 400;
 const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 
@@ -894,6 +914,8 @@ class TabManager {
       muted: false,
       isInternal,
       openedAt: new Date().toISOString(),
+      // Aperta da Filo, non dalla pagina che l'ha chiesta con window.open: per il filo è un gesto (#1525).
+      _gestoFiloAt: adotta ? 0 : Date.now(),
       // Da quando c'è la pagina in vista: dopo un collegamento seguito nella stessa scheda non è più l'apertura (#826).
       paginaDal: null,
       _paginaUrl: senzaAncora(url),
@@ -994,6 +1016,7 @@ class TabManager {
   _caricaRinviata(tab) {
     if (!tab || !tab._rinviata || !this.tabs.includes(tab)) return false;
     tab._rinviata = false;
+    tab._gestoFiloAt = Date.now();
     let wc;
     try { wc = tab.view.webContents; if (wc.isDestroyed()) return false; } catch (_) { return false; }
     const url = tab.url;
@@ -1296,7 +1319,7 @@ class TabManager {
     } catch (e) {
       return { ok: false, error: 'proxy_failed' };
     }
-    ProxyTab.setPartitionAuth(partition, ses, resolved.auth);
+    await ProxyTab.registraRete(partition, ses, resolved);
     tab.proxy = { country: code, tier: resolved.tier };
     // La ricreazione applica anche l'anti-leak WebRTC. Vale pure per il cambio
     // paese: stessa partizione, proxy aggiornato, ricarica dal nuovo endpoint.
@@ -1838,6 +1861,7 @@ class TabManager {
   navigate(id, url) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     const target = normalizeUrl(url);
     // SICUREZZA (#248) — come openTab: un loadURL programmatico non emette will-navigate, e qui
     // convergono TUTTI gli handler IPC che rinavigano una scheda. mailto/tel/sms vanno all'OS.
@@ -1939,6 +1963,7 @@ class TabManager {
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     if (!canGoBack(tab.view.webContents)) { this._vaiFuori(tab, 'indietro', 0); return; }
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
@@ -2061,6 +2086,7 @@ class TabManager {
     const h = tab && tab.view.webContents.navigationHistory;
     const i = Math.round(Number(indice));
     if (!h || !Number.isFinite(i) || i === h.getActiveIndex()) return;
+    tab._gestoFiloAt = Date.now();
     const f = Storia.fuori(i, h.length());
     if (f) { this._vaiFuori(tab, f.verso, f.k); return; }
     tab._passoStoria = true;
@@ -2120,6 +2146,7 @@ class TabManager {
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     if (!canGoFwd(tab.view.webContents)) { this._vaiFuori(tab, 'avanti', 0); return; }
     const meta = this._vocePassoStoria(tab, 1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
@@ -2134,6 +2161,7 @@ class TabManager {
   reload(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     // Una scheda ancora in coda non ha niente da ricaricare: chi lo chiede la vuole adesso.
     if (tab._rinviata) {
       if (!this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
@@ -2658,7 +2686,7 @@ class TabManager {
         return;
       }
       this._assestaEsito(tab);
-      this.visite.navigata(wc, tab.id, url);
+      this.visite.navigata(wc, tab.id, url, { gesto: gestoPerIlFilo(tab), chiave: tab });
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -2726,7 +2754,7 @@ class TabManager {
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this._misuraStoria(tab, wc);
       update({ url: userUrl(url), canBack: this.puoTornare(tab, 'indietro', wc), canFwd: this.puoTornare(tab, 'avanti', wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
-      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
+      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true, gesto: gestoPerIlFilo(tab), chiave: tab });
       if (isMainFrame === true) this._accessoDopoCarico(tab);
       if (isMainFrame === true) segnaPagina(tab, url);
     });

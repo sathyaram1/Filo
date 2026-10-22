@@ -2,6 +2,8 @@
 // (la carta di un servizio di pagamento) e dentro i componenti chiusi, che raggiunge solo il protocollo d'ispezione.
 // Coordinate della finestra della pagina principale; le regole dei campi stanno in src/shared/campiSegreti.js.
 
+const { riquadroArrivato } = require('./riquadroArrivato');
+
 const ATTESA_MS = 1000;
 const ATTESA_COMPONENTI_MS = 2500;
 
@@ -39,7 +41,8 @@ function misuraRiquadro(el) {
 // un messaggio, e il messaggio porta solo un segnale usa e getta.
 async function boxNelGenitore(figlio) {
   const genitore = figlio.parent;
-  if (!genitore) return null;
+  // Un genitore ancora in arrivo perderebbe Filo per uno script: meglio la foto ferma che un riquadro muto.
+  if (!riquadroArrivato(genitore)) return null;
   const segnale = `filo-riquadro-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   const risposta = genitore.executeJavaScript(`new Promise((ok) => {
     const misura = ${misuraRiquadro};
@@ -99,7 +102,8 @@ function nellaPagina(campi, posa) {
 // pagina, e l'immagine non deve partire.
 async function campiSegretiNeiRiquadri(webContents) {
   let riquadri = [];
-  try { riquadri = webContents.mainFrame.framesInSubtree.filter((f) => f !== webContents.mainFrame); } catch (_) {}
+  // Un riquadro in arrivo non ha ancora campi da coprire.
+  try { riquadri = webContents.mainFrame.framesInSubtree.filter((f) => f !== webContents.mainFrame && riquadroArrivato(f)); } catch (_) {}
   if (!riquadri.length) return { campi: [], nonCoperti: false };
   const codice = codiceMisura();
   const campi = [];

@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { mezzanotte, oggiFa } from './helpers/istanti.mjs';
 
 const SHOTS = 'tests/.shots';
 mkdirSync(SHOTS, { recursive: true });
@@ -394,7 +395,8 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   test.setTimeout(60_000);
   const tolta = 'https://www.youtube.com/watch?v=orche';
   const cancellata = 'https://www.youtube.com/watch?v=delfini';
-  await semina(app, { pagine: [{ url: tolta, titolo: 'YouTube: orche', ts: alle(0, 0, 30) }, { url: cancellata, titolo: 'YouTube: delfini', ts: new Date(Date.now() - 600_000).toISOString() }] });
+  // Visite di poco fa e cancellazione dell'ultima ora: un'ora del giorno fissa, o «oggi», cambiano esito dopo mezzanotte (#1599).
+  await semina(app, { pagine: [{ url: tolta, titolo: 'YouTube: orche', ts: new Date(Date.now() - 1_200_000).toISOString() }, { url: cancellata, titolo: 'YouTube: delfini', ts: new Date(Date.now() - 600_000).toISOString() }] });
   await app.evaluate(async (_e, urls) => {
     for (const [url, title, closedAt, openedAt] of urls) await globalThis.SN_ARCHIVED_TABS.archive({ url, title, closedAt: closedAt || new Date().toISOString(), openedAt });
   }, [[tolta, 'YouTube: orche'], [cancellata, 'YouTube: delfini'], ['https://esempio.it/ieri', 'ieri', alle(1, 12), alle(1, 11)]]);
@@ -408,7 +410,7 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   const cerca = page.locator('#cercaInput');
   await cerca.fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
-  const r = await page.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'oggi' }));
+  const r = await page.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'ultima_ora' }));
   expect(r.ok).toBe(true);
   await cerca.fill('');
   await cerca.fill('delfini');
@@ -419,9 +421,10 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
 
 test('il timer che suona ore dopo il saluto, con pagine visitate in mezzo, è un messaggio nuovo in fondo al filo', async ({ app, openTab }) => {
   test.setTimeout(90_000);
-  const inizio = new Date();
-  inizio.setHours(0, 5, 0, 0);
-  const passo = Math.max(60_000, Math.floor((Date.now() - inizio.getTime()) / 5));
+  // Saluto e pagine sempre fra la mezzanotte e adesso: alle 00:03 un saluto «alle 00:05» sarebbe dopo il timer.
+  const adesso = Date.now();
+  const inizio = new Date(Math.min(mezzanotte(adesso) + 5 * 60_000, (mezzanotte(adesso) + adesso) / 2));
+  const passo = (adesso - inizio.getTime()) / 5;
   await app.evaluate(async (_e, d) => {
     const E = globalThis.SN_FILO_EVENTI;
     const qui = await globalThis.SN_IL_FILO.dispositivo();
@@ -486,7 +489,8 @@ test('una pagina tolta dal filo mentre la sua scheda è aperta non torna nella r
 test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue visite e le schede chiuse', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const url = 'https://www.youtube.com/watch?v=orche';
-  await semina(app, { pagine: [{ url, titolo: 'YouTube: orche', ts: new Date(Date.now() - 900_000).toISOString() }, { url, titolo: 'YouTube: orche', ts: new Date(Date.now() - 600_000).toISOString() }] });
+  // Le due visite stanno nella stessa giornata anche subito dopo mezzanotte: un giorno in mezzo le metterebbe in due righe.
+  await semina(app, { pagine: [{ url, titolo: 'YouTube: orche', ts: oggiFa(0.25, 1000) }, { url, titolo: 'YouTube: orche', ts: oggiFa(1 / 6, 2000) }] });
   await app.evaluate((_e, u) => globalThis.SN_ARCHIVED_TABS.archive({ url: u, title: 'YouTube: orche', closedAt: new Date().toISOString() }), url);
   const page = await openTab('filo://newtab/');
   await expect(page.locator('.dash-pagine-testo').last()).toHaveText('2 pagine, fra cui YouTube: orche');
@@ -645,3 +649,27 @@ for (const tema of ['light', 'dark']) {
   });
 }
 
+
+// #1525 — un indirizzo tagliato alla misura porterebbe altrove: dalla home si apre il suo sito, detto come tale.
+test('una pagina con l’indirizzo tagliato alla misura si apre dal suo sito, non da un indirizzo a metà', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await home(app);
+  const base = testServer.html('<title>Lunga</title><p>lunga</p>');
+  const origine = new URL(base).origin;
+  await app.evaluate(async (_e, u) => {
+    await globalThis.SN_IL_FILO.registraVisita({ url: u, titolo: 'Pagina lunghissima' });
+  }, `${base}?q=${'x'.repeat(10_000)}`);
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').last();
+  await riga.locator('.dash-pagine-testa').click();
+  const pagina = riga.locator('.dash-pagina', { hasText: 'Pagina lunghissima' });
+  await expect(pagina).toHaveAttribute('href', `${origine}/`);
+  await pagina.click({ button: 'right' });
+  const menu = menuDi(page).locator('.sn-menu');
+  await expect(menu.getByText('Apri il sito', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Riapri la pagina', { exact: true })).toHaveCount(0);
+  await menu.getByText('Apri il sito', { exact: true }).click();
+  const schede = async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.map((t) => String(t.url));
+  await expect.poll(async () => (await schede()).some((u) => u.replace(/^https?:\/\//, '').replace(/\/$/, '') === new URL(origine).host)).toBe(true);
+  expect((await schede()).some((u) => u.includes('xxxx'))).toBe(false);
+});

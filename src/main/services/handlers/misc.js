@@ -1,9 +1,9 @@
 // Handler di dominio: cattura schermo, salvataggio immagini su disco, box
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
-const { safeFetch } = require('../safe-fetch');
 const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
+const { perContoDellaScheda } = require('../perContoDellaScheda');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
@@ -14,110 +14,75 @@ const identitaInvio = require('../../auth/identita-invio');
 // Serve ownerize(), per marcare gli invii dell'owner. Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
 
-// Referer e cookie della session: i download di Electron perdono sempre il Referer e
-// net.request viene bloccato dal webRequest. I byte vanno diretti su disco, mai in RAM.
-async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, onProgress, shouldStop }) {
-  const MAX_REDIRECTS = 5;
-  let target = url;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    // eslint-disable-next-line no-await-in-loop
-    const servito = target;
-    const conIndirizzo = onHeaders && ((h) => onHeaders({ ...h, servito }));
-    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders: conIndirizzo, onProgress, shouldStop });
-    if (res.redirect) {
-      try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
-      if (!/^https?:/i.test(target)) throw new Error('redirect non http');
-      continue;
-    }
-    return res;
-  }
-  throw new Error('troppi redirect');
-}
+// ── "Salva immagine/video/audio come…" (#274, #400): byte scaricati nel main ─
 
-// Una GET sola: su 3xx risolve { redirect, location }, altrimenti scrive il body nel file
-// di onHeaders() e risolve a scrittura conclusa.
-async function httpGetToFile(target, referrer, session, kind, hooks) {
-  const isMedia = kind === 'video' || kind === 'audio';
-  let u;
-  try { u = new URL(target); } catch (_) { throw new Error('URL non valido'); }
-  const mod = u.protocol === 'https:' ? require('node:https') : require('node:http');
+// Scarica i byte di un'immagine o di un filmato per conto della scheda: dalla sua sessione (proxy, cache, cookie),
+// col Referer che le presenterebbe la pagina ridotto all'origine (#1272). Un download di Electron il Referer lo perde
+// sempre, e senza i siti con la protezione dai collegamenti esterni rispondono 403.
+// #436: i byte vanno su disco mentre arrivano, mai tutti in memoria; i ricevuti diventano l'avanzamento.
+// Risolve { partPath, filename, totalBytes, receivedBytes } o rigetta con un errore leggibile.
+const INATTIVITA_MS = 30000;
+
+async function fetchToFile({ sender, url, politiche, kind = 'image', onHeaders, onProgress, shouldStop }) {
   const fs = require('node:fs');
-  const { pipeline } = require('node:stream');
-
-  // Cookie della session per QUESTO host (immagini dietro login), come un browser.
-  let cookieHeader = '';
+  const { Readable, Transform } = require('node:stream');
+  const { pipeline } = require('node:stream/promises');
+  const isMedia = kind === 'video' || kind === 'audio';
+  // Un file da un'ora è legittimo, mezzo minuto di silenzio assoluto no.
+  const ac = new AbortController();
+  let fermo = null;
+  const riarma = () => { clearTimeout(fermo); fermo = setTimeout(() => ac.abort(), INATTIVITA_MS); };
+  riarma();
   try {
-    const cookies = await session.cookies.get({ url: target });
-    cookieHeader = (cookies || []).map((c) => `${c.name}=${c.value}`).join('; ');
-  } catch (_) {}
-
-  const headers = {
-    'User-Agent': 'Mozilla/5.0',
-    // Un Accept di sole immagini fa rispondere 406 su un filmato: per i media si chiede il tipo
-    // giusto.
-    Accept: isMedia ? `${kind}/*,*/*;q=0.8` : 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-  };
-  if (/^https?:/i.test(referrer)) headers.Referer = referrer;
-  if (cookieHeader) headers.Cookie = cookieHeader;
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (fn, arg) => { if (settled) return; settled = true; fn(arg); };
-
-    const req = mod.get(target, { headers }, (res) => {
-      const status = res.statusCode || 0;
-      if (status >= 300 && status < 400 && res.headers.location) {
-        res.resume(); // scarta il body del redirect
-        finish(resolve, { redirect: true, location: res.headers.location });
-        return;
-      }
-      if (status >= 400) { res.resume(); finish(reject, new Error('HTTP ' + status)); return; }
-
-      // Il Content-Length è ciò che rende l'avanzamento una percentuale: manca sui trasferimenti
-      // chunked, e lì la barra resta indeterminata come nei download nativi.
-      const expected = parseInt(res.headers['content-length'], 10);
-      const total = Number.isFinite(expected) && expected > 0 ? expected : 0;
-      const filename = filenameFromHeaders(res.headers, target);
-
-      // Nome e dimensione si sanno solo ora: servono ad aprire la voce nella barra e a scegliere
-      // dove far crescere il file parziale.
-      let partPath;
-      try {
-        partPath = hooks.onHeaders({ filename, totalBytes: total, contentType: String(res.headers['content-type'] || '') });
-      } catch (e) {
-        res.resume();
-        try { req.destroy(); } catch (_) {}
-        finish(reject, e instanceof Error ? e : new Error('destinazione non disponibile'));
-        return;
-      }
-
-      let received = 0;
-      res.on('data', (chunk) => {
+    let res;
+    try {
+      res = await perContoDellaScheda(sender, url, {
+        credenziali: 'include', conReferer: true, politiche, lanSeLaPaginaCiSta: true, signal: ac.signal,
+        // Un Accept che dichiara solo immagini fa rispondere 406 ad alcuni server quando l'URL è un filmato.
+        accetta: isMedia ? `${kind}/*,*/*;q=0.8` : 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      });
+    } catch (e) {
+      throw new Error(ac.signal.aborted ? 'timeout' : (e && e.message) || 'richiesta fallita');
+    }
+    if (!res.ok) {
+      try { await res.body?.cancel?.(); } catch (_) {}
+      throw new Error('HTTP ' + res.status);
+    }
+    // Content-Length rende l'avanzamento una percentuale; senza (chunked) la barra resta indeterminata.
+    const expected = parseInt(res.headers.get('content-length'), 10);
+    const total = Number.isFinite(expected) && expected > 0 ? expected : 0;
+    const filename = filenameFromHeaders({ 'content-disposition': res.headers.get('content-disposition') || '' }, res.url || url);
+    let partPath;
+    try {
+      partPath = onHeaders({ filename, totalBytes: total, contentType: res.headers.get('content-type') || '', servito: res.url || url });
+    } catch (e) {
+      try { await res.body?.cancel?.(); } catch (_) {}
+      throw e instanceof Error ? e : new Error('destinazione non disponibile');
+    }
+    if (!res.body) throw new Error('file vuoto');
+    let received = 0;
+    const conta = new Transform({
+      transform(chunk, _enc, cb) {
+        riarma();
         received += chunk.length;
-        try { hooks.onProgress && hooks.onProgress(received, total); } catch (_) {}
-        // Annullato dalla barra: si chiude la connessione invece di consumare rete e disco.
-        if (hooks.shouldStop && hooks.shouldStop()) {
-          try { req.destroy(new Error('annullato')); } catch (_) {}
-        }
-      });
-
-      const out = fs.createWriteStream(partPath);
-      pipeline(res, out, (err) => {
-        if (err) { finish(reject, err instanceof Error ? err : new Error('download interrotto')); return; }
-        // Body interrotto o Content-Length non raggiunto: risposta troncata, quindi un errore e non
-        // un file valido.
-        if (!res.complete || (total && received < total)) {
-          finish(reject, new Error('download interrotto'));
-          return;
-        }
-        if (!received) { finish(reject, new Error('file vuoto')); return; }
-        finish(resolve, { partPath, filename, totalBytes: total || received, receivedBytes: received });
-      });
+        try { if (onProgress) onProgress(received, total); } catch (_) {}
+        // "Annulla" nella barra: si chiude la connessione invece di continuare a consumare rete e disco.
+        if (shouldStop && shouldStop()) { cb(new Error('annullato')); return; }
+        cb(null, chunk);
+      },
     });
-    req.on('error', (e) => finish(reject, e || new Error('richiesta fallita')));
-    // Timeout di INATTIVITÀ: un file da un'ora è legittimo, mezzo minuto di silenzio no.
-    req.setTimeout(30000, () => { try { req.destroy(new Error('timeout')); } catch (_) {} });
-  });
+    try {
+      await pipeline(Readable.fromWeb(res.body), conta, fs.createWriteStream(partPath));
+    } catch (e) {
+      throw new Error(ac.signal.aborted ? 'timeout' : (e && e.message === 'annullato' ? 'annullato' : 'download interrotto'));
+    }
+    // Un Content-Length dichiarato e non raggiunto è una risposta troncata, non un file valido.
+    if (total && received < total) throw new Error('download interrotto');
+    if (!received) throw new Error('file vuoto');
+    return { partPath, filename, totalBytes: total || received, receivedBytes: received };
+  } finally {
+    clearTimeout(fermo);
+  }
 }
 
 // Stesso volume: rinomina istantanea. Altro disco: copia a blocchi, mai passando dalla
@@ -175,7 +140,7 @@ const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
 function tipoImmagine(b) {
   const fourcc = (i) => b.toString('latin1', i, i + 4);
   if (b.length < 4) return '';
-  if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
+  if (b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG') return 'image/png';
   if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
   if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
   if (fourcc(0) === 'GIF8') return 'image/gif';
@@ -206,9 +171,15 @@ function eSvg(b) {
   return /^<svg[\s>]/i.test(t);
 }
 
+// Le politiche del Referer che il content script ha letto nella pagina: possono solo stringerlo.
+function politicheDi(msg) {
+  const p = msg && msg.politiche;
+  return (Array.isArray(p) ? p : []).filter((x) => typeof x === 'string').map((x) => x.slice(0, 200)).slice(0, 4);
+}
+
 // I byte di un'immagine che la pagina mostra ma che il suo script non può leggere
 // (altra origine): stessa strada di «Salva immagine come…», in un file temporaneo.
-async function byteImmagineRemota({ url, referrer, session }) {
+async function byteImmagineRemota({ sender, url, politiche }) {
   const fs = require('node:fs');
   const path = require('node:path');
   const { app } = require('electron');
@@ -217,7 +188,7 @@ async function byteImmagineRemota({ url, referrer, session }) {
   let troppo = false;
   try {
     await fetchToFile({
-      url, referrer, session, kind: 'image',
+      sender, url, politiche, kind: 'image',
       onHeaders: ({ totalBytes, contentType }) => {
         if (totalBytes > MAX_BYTE_PROVENIENZA) { troppo = true; throw new Error('troppo grande'); }
         tipo = contentType;
@@ -318,8 +289,9 @@ module.exports = function register(on, ctx) {
     return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
   });
 
-  // I byte si scaricano nel main: un <a download> vale solo same-origin, e molti CDN con
-  // protezione hotlink rifiutano senza Referer, che a un download di Electron non si può dare.
+  // "Salva immagine/video/audio come…" (#274, #400): i byte li scarica il main per conto della scheda (fetchToFile),
+  // perché Chromium ignora `download` su un'altra origine e un download di Electron perde il Referer. Il trasferimento
+  // sta nella barra degli scaricamenti come gli altri (#436) e l'utente sceglie dove salvare col dialogo nativo.
   const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
@@ -330,8 +302,6 @@ module.exports = function register(on, ctx) {
     const fs = require('node:fs');
     const { dialog, app, BrowserWindow } = require('electron');
     const downloads = require('../downloads');
-    const ses = wc.session;
-    const referrer = String(sender?.tab?.url || sender?.url || '');
     const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
 
     // In test si salva diretto: il dialogo nativo non è automatizzabile. Non rigetta MAI,
@@ -376,9 +346,9 @@ module.exports = function register(on, ctx) {
     let downloadError = null;
     try {
       result = await fetchToFile({
+        sender,
         url,
-        referrer,
-        session: ses,
+        politiche: politicheDi(msg),
         kind,
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
@@ -489,7 +459,7 @@ module.exports = function register(on, ctx) {
     if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
-    return byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
+    return byteImmagineRemota({ sender, url, politiche: politicheDi(msg) });
   });
 
   // "Salva file" su un link a un file (#410.2). A differenza di
@@ -775,28 +745,32 @@ module.exports = function register(on, ctx) {
       // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
       const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
+      // Il tempo copre anche il corpo: un sito che lo manda a gocce non tiene aperto il menu in attesa.
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
-      // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando
-      // ogni redirect. Evita che una pagina usi questa fetch del main per
-      // sondare/leggere servizi locali o interni (SSRF).
-      const r = await safeFetch(url, { signal: controller.signal, redirectAmmesso: (_da, prossimo) => !(rinvio = anteprimaFerma(prossimo.href)) });
-      clearTimeout(t);
       let html = '';
-      const reader = r.body?.getReader?.();
-      if (reader) {
-        const dec = new TextDecoder('utf-8', { fatal: false });
-        let total = 0;
-        while (total < 65536) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          total += value.byteLength;
-          html += dec.decode(value, { stream: true });
-          if (html.includes('</head>')) break;
+      try {
+        // Esce come uscirebbe dalla scheda (proxy compreso) e mai verso la rete interna; senza cookie né Referer:
+        // chi passa sopra un link non l'ha ancora aperto.
+        const r = await perContoDellaScheda(sender, String(url), {
+          signal: controller.signal, accetta: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+          redirectAmmesso: (_da, prossimo) => !(rinvio = anteprimaFerma(prossimo.href)),
+        });
+        const reader = r.body?.getReader?.();
+        if (reader) {
+          const dec = new TextDecoder('utf-8', { fatal: false });
+          let total = 0;
+          while (total < 65536) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            html += dec.decode(value, { stream: true });
+            if (html.includes('</head>')) break;
+          }
+          try { reader.cancel(); } catch (_) {}
         }
-        try { reader.cancel(); } catch (_) {}
-      } else {
-        html = await r.text();
+      } finally {
+        clearTimeout(t);
       }
       const pick = (re) => { const m = html.match(re); return m ? m[1].trim() : ''; };
       const ogTitle = pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||

@@ -9,11 +9,29 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.246', date: '2026-10-22',
+      features: [],
+      fixes: [
+        'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
+        'Se arrivano più di cinque avvisi insieme in basso a destra, quelli in più non spariscono più. Aspettano dietro un «+3» in cima alla pila: un clic li mostra tutti, e da lì li chiudi anche tutti insieme. Quando gli altri se ne vanno, entrano da soli.',
+        'Una scheda non si allarga più fino a prendere mezza barra in alto, nemmeno quella aperta accanto a schede dal titolo lungo. Arriva al massimo a 240 pixel, e il titolo intero lo leggi passandoci sopra col mouse. Il massimo lo cambi in Preferenze, nelle impostazioni avanzate, o chiedendo a Filo «schede più larghe».',
+      ],
+    },
+    {
+      version: '0.2.245', date: '2026-10-22',
+      features: [],
+      fixes: [
+        'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
+        'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',
+      ],
+    },
+    {
       version: '0.2.244', date: '2026-10-21',
       features: [
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
       ],
       fixes: [
+        'Se in chat qualcuno ti chiede la password del wifi o un pin e tu rispondi, il correttore non manda più al modello la password o il pin. Il resto del messaggio lo controlla come sempre.',
         'L\'assistente di pagina e la spiegazione del tasto destro non leggono più la password, il numero della carta e i codici che scrivi in un modulo, nemmeno nel riquadro del servizio di pagamento. L\'assistente sa a cosa serve ogni campo, ma al posto di quello che hai scritto vede i puntini.',
         'Nell\'Editor, con la finestra piccola o quando la domanda accanto a microfono e invio non si leggerebbe tutta, la casella della chat prende tutta la riga e i due tasti vanno sotto. Prima poteva restare larga due o tre parole. Mentre scrivi resta in vista la fine dell\'ultima risposta di Filo. In una chat molto bassa una domanda lunga scorre dentro la casella, e per leggerla tutta basta allargare il riquadro della chat.',
         'Nella home il microfono e il tasto per inviare stanno al centro del campo dove scrivi, alla stessa distanza dal bordo sopra, sotto e a destra. Quando vai a capo restano sull\'ultima riga.',
@@ -22,6 +40,7 @@
         'Nei riquadri incorporati dello stesso sito, come un blocco commenti, Alt+E e il tasto destro di Filo funzionano sempre. Prima, se il riquadro finiva di caricare dopo la pagina o ci passavi sopra col puntatore mentre caricava, lì dentro Filo non rispondeva più.',
         'La Cronologia AI resta svelta anche con migliaia di voci. Mentre scrivi nella ricerca la pagina non si blocca più, e scorrendo verso le voci vecchie non scatta.',
         'Il tasto destro su un link non visita più i siti che Filo ti segnala come sospetti né quelli della tua lista dei siti bloccati. Per un sito in lista il menu ti dice che è bloccato. Le zone cliccabili di un\'immagine e i link dentro un disegno ora hanno le voci del link e l\'avviso giusto quando imitano un sito noto.',
+        'Nei siti divisi in frame la rotella premuta su un frame apre sempre lo zoom, anche se il frame finisce di caricare dopo la pagina o ci muovi sopra il mouse mentre carica. Prima a volte lì dentro non succedeva niente.',
       ],
     },
     {

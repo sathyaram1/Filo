@@ -176,8 +176,56 @@
     return items;
   }
 
-  // Come si riottiene una richiesta decaduta dipende da CHI l'aveva chiesta: il lavoro locale
-  // si ripropone da questo computer, quello di un'automazione torna in attesa. PURA.
+  /** Un collegamento che si apre: solo pagine https di GitHub, gli altri indirizzi no. PURA. */
+  function linkGitHub(url) {
+    var s = String(url || '');
+    return /^https:\/\/github\.com\/[^\s"'<>\\]+$/.test(s) ? s : '';
+  }
+
+  /** Dove sta una voce: «file:riga», «file» o ''. PURA. */
+  function doveVoce(voce) {
+    var v = voce || {};
+    var file = String(v.file || '');
+    var riga = Math.floor(Number(v.riga) || 0);
+    if (!file) return '';
+    return riga > 0 ? file + ':' + riga : file;
+  }
+
+  /** Le voci di un blocco (file, riga, testo, intorno): [] per i blocchi di un server di prima, che hanno solo righe. PURA. */
+  function blockVoci(block) {
+    var b = block || {};
+    return Array.isArray(b.voci) ? b.voci.filter(function (v) { return v && (v.file || v.testo); }) : [];
+  }
+
+  // Le guardie toccate, le capacità nuove e ciò che il controllo non ha potuto leggere si guardano con occhi diversi:
+  // stanno separati (#1404). Il gruppo lo decide il server; un gruppo che questo client non conosce si mostra lo stesso.
+  var GRUPPI = [['guardie', 'Guardie toccate'], ['capacita', 'Capacità nuove'], ['contenuto', 'Diff da guardare a mano']];
+
+  /** I blocchi divisi per gruppo, in ordine fisso. Senza gruppi (server di prima): un gruppo solo, senza titolo. PURA. */
+  function gruppiDiBlocchi(blocks) {
+    var list = (Array.isArray(blocks) ? blocks : []).filter(Boolean);
+    if (!list.length) return [];
+    if (!list.some(function (b) { return b.gruppo; })) return [{ gruppo: '', titolo: '', blocchi: list }];
+    var noti = GRUPPI.map(function (g) { return g[0]; });
+    var out = [];
+    GRUPPI.forEach(function (g) {
+      var qui = list.filter(function (b) { return (b.gruppo || 'capacita') === g[0]; });
+      if (qui.length) out.push({ gruppo: g[0], titolo: g[1], blocchi: qui });
+    });
+    var altri = list.filter(function (b) { return b.gruppo && noti.indexOf(b.gruppo) < 0; });
+    if (altri.length) out.push({ gruppo: 'altro', titolo: 'Altri controlli', blocchi: altri });
+    return out;
+  }
+
+  /**
+   * Come si riottiene una richiesta che è decaduta. PURA.
+   *
+   * Dipende da CHI aveva chiesto la fusione, e sbagliarlo manda l'owner a
+   * lanciare un comando che non c'entra niente: il lavoro locale si ripropone
+   * da questo computer, quello di un'automazione no — lì la segnalazione torna
+   * in attesa di una sua decisione.
+   */
+  /** La prima lettera minuscola, per incastrare una frase dentro un'altra. PURA. */
   function lowerFirst(text) {
     var s = String(text || '');
     return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
@@ -322,6 +370,89 @@
     return n;
   }
 
+  /** Un collegamento a GitHub che si apre in una scheda; un indirizzo che non lo è resta testo. */
+  function linkEsterno(cls, testo, url, titolo) {
+    var u = linkGitHub(url);
+    if (!u) return el('span', cls, testo);
+    var a = el('a', cls, testo);
+    a.href = u;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    if (titolo) a.title = titolo;
+    return a;
+  }
+
+  /**
+   * Una voce di un blocco: dove sta (che apre la riga nel diff su GitHub) e la riga. Con l'intorno la riga si apre
+   * sulle tre righe prima e dopo, coi segni del diff: l'owner vede cosa fa senza uscire da Gestione.
+   */
+  function buildVoce(voce) {
+    var v = voce || {};
+    var li = el('li', 'sn-mac-voce');
+    var testa = el('span', 'sn-mac-voce-testa');
+    var dove = doveVoce(v);
+    if (dove) testa.appendChild(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub'));
+    if (v.testo) testa.appendChild(el('code', 'sn-mac-voce-testo', v.testo));
+    var prima = Array.isArray(v.prima) ? v.prima.map(String) : [];
+    var dopo = Array.isArray(v.dopo) ? v.dopo.map(String) : [];
+    if (!v.testo || (!prima.length && !dopo.length)) {
+      li.appendChild(testa);
+      return li;
+    }
+    var det = el('details', 'sn-mac-voce-intorno');
+    var sum = el('summary', 'sn-mac-voce-sum');
+    sum.title = 'Le righe intorno';
+    sum.appendChild(testa);
+    det.appendChild(sum);
+    var pre = el('pre', 'sn-mac-intorno');
+    var riga = function (testo, scattata) {
+      var r = el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo);
+      r.dataset.segno = testo.charAt(0) === '+' ? 'piu' : testo.charAt(0) === '-' ? 'meno' : 'uguale';
+      return r;
+    };
+    prima.forEach(function (t) { pre.appendChild(riga(t, false)); });
+    pre.appendChild(riga('+' + v.testo, true));
+    dopo.forEach(function (t) { pre.appendChild(riga(t, false)); });
+    det.appendChild(pre);
+    li.appendChild(det);
+    return li;
+  }
+
+  /**
+   * I blocchi di una richiesta: divisi in guardie toccate, capacità nuove e diff da guardare, ognuno con l'elenco
+   * intero delle sue voci (#1404). Un blocco di un server di prima, senza voci, mostra le sue righe come allora.
+   */
+  function buildBlocchi(blocks) {
+    var box = el('div', 'sn-mac-gruppi');
+    var gruppi = gruppiDiBlocchi(blocks);
+    for (var g = 0; g < gruppi.length; g++) {
+      var sez = el('section', 'sn-mac-gruppo');
+      if (gruppi[g].gruppo) sez.dataset.gruppo = gruppi[g].gruppo;
+      if (gruppi[g].titolo) sez.appendChild(el('p', 'sn-mac-gruppo-title', gruppi[g].titolo));
+      var ul = el('ul', 'sn-mac-blocks');
+      for (var i = 0; i < gruppi[g].blocchi.length; i++) {
+        var b = gruppi[g].blocchi[i];
+        var li = el('li', 'sn-mac-block');
+        li.dataset.gate = String(b.gate || '');
+        li.appendChild(el('span', 'sn-mac-block-label', blockLabel(b)));
+        var voci = blockVoci(b);
+        var lista = el('ul', 'sn-mac-block-list');
+        if (voci.length) {
+          voci.forEach(function (v) { lista.appendChild(buildVoce(v)); });
+          var more = Math.max(0, Math.floor(Number(b.more) || 0));
+          if (more > 0) lista.appendChild(el('li', 'sn-mac-block-items', '… e altre ' + more + ' che non entrano nell’elenco: sono nel diff su GitHub'));
+        } else {
+          blockItems(b).forEach(function (t) { lista.appendChild(el('li', 'sn-mac-block-items', t)); });
+        }
+        if (lista.childNodes.length) li.appendChild(lista);
+        ul.appendChild(li);
+      }
+      sez.appendChild(ul);
+      box.appendChild(sez);
+    }
+    return box;
+  }
+
   // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
   // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
   var LIBERA = 'sn-mac-libera';
@@ -419,8 +550,8 @@
     }
     head.appendChild(origin);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
-    var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
-    sha.title = 'Il commit esaminato: ' + String(req.sha || '');
+    var sha = linkEsterno('sn-mac-sha', shortSha(req.sha), req.diffUrl);
+    sha.title = 'Il commit esaminato: ' + String(req.sha || '') + (linkGitHub(req.diffUrl) ? '\nApri il diff su GitHub' : '');
     head.appendChild(sha);
     // Senza chi ha chiesto, la separazione fra chi chiede e chi approva resta a metà.
     var who = el('span', 'sn-mac-who', requestedBy(req.who, req));
@@ -453,15 +584,7 @@
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
     if (blocks.length) {
       card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
-      var ul = el('ul', 'sn-mac-blocks');
-      for (var i = 0; i < blocks.length; i++) {
-        var li = el('li', 'sn-mac-block');
-        li.appendChild(el('span', 'sn-mac-block-label', blockLabel(blocks[i])));
-        var items = blockItems(blocks[i]);
-        if (items.length) li.appendChild(el('span', 'sn-mac-block-items', items.join(' · ')));
-        ul.appendChild(li);
-      }
-      card.appendChild(ul);
+      card.appendChild(buildBlocchi(blocks));
     }
 
     var status = el('p', 'sn-mac-status');
@@ -908,8 +1031,9 @@
         head.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       }
       head.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
-      var sha = el('span', 'sn-mac-sha', shortSha(r.mergeSha || r.sha));
-      sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
+      var sha = linkEsterno('sn-mac-sha', shortSha(r.mergeSha || r.sha), r.diffUrl);
+      sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '')
+        + (linkGitHub(r.diffUrl) ? '\nApri il diff su GitHub' : '');
       head.appendChild(sha);
       var who = el('span', 'sn-mac-recent-who', isFiducia(r) ? 'lavoro fidato: controllo registrato'
         : isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
@@ -922,21 +1046,7 @@
       li.appendChild(head);
       var blocks = Array.isArray(r.blocks) ? r.blocks : [];
       if (blocks.length) {
-        var bl = el('ul', 'sn-mac-blocks');
-        for (var j = 0; j < blocks.length; j++) {
-          var b = el('li', 'sn-mac-block');
-          b.appendChild(el('span', 'sn-mac-block-label', blockLabel(blocks[j])));
-          var items = blockItems(blocks[j]);
-          if (items.length) {
-            // Ogni voce sulla sua riga: qui l'elenco è la cosa da leggere, e cinquanta percorsi in
-            // una riga sola non si leggono.
-            var il = el('ul', 'sn-mac-block-list');
-            for (var k = 0; k < items.length; k++) il.appendChild(el('li', 'sn-mac-block-items', items[k]));
-            b.appendChild(il);
-          }
-          bl.appendChild(b);
-        }
-        li.appendChild(bl);
+        li.appendChild(buildBlocchi(blocks));
       } else {
         li.appendChild(el('p', 'sn-mac-status', 'Nessun dettaglio registrato su cosa era stato segnalato.'));
       }
@@ -970,6 +1080,10 @@
     howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,
+    blockVoci: blockVoci,
+    doveVoce: doveVoce,
+    linkGitHub: linkGitHub,
+    gruppiDiBlocchi: gruppiDiBlocchi,
     outcomeMessage: outcomeMessage,
     render: render,
     occupata: occupata,

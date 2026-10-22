@@ -50,6 +50,7 @@
     'link.font': 'solo i link; finché non lo tocchi seguono `font`',
     motion: 'un moltiplicatore di TUTTE le animazioni: "togli le animazioni" = "0", "rimetti le animazioni" = "predefinito", "più lente" = "2", "più veloci" = "0.5"',
     shadow: 'l\'alfa dell\'ombra di menu e popup, le altre ombre seguono: "ombre più leggere" = più basso di 0.18, "togli le ombre" = "0"',
+    'tab.larghezza': 'il tetto di ogni scheda nella barra in alto, attiva compresa: è QUESTO per "schede più strette/più larghe" o "si vede tutto il titolo della scheda"; fino al tetto la scheda è larga quanto il suo titolo',
   };
   // Nel main i moduli sono già caricati dal loader; negli unit test che caricano solo questo, li porta require.
   function modulo(nome, file) {
@@ -479,7 +480,7 @@
         + 'Con valore "predefinito" il token torna al suo valore di serie. Token disponibili:\n' + righeToken(),
       properties: {
         token: S('Il token, dall\'elenco.'),
-        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per una durata i millisecondi ("450ms"); per la durata delle animazioni un moltiplicatore 0-3 ("0" le toglie, "1" normali, "2" due volte più lente); per il font una lista di famiglie ("Georgia, serif"); per lo stile di una linea uno fra dotted, dashed, wavy, solid, double.'),
+        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per una durata i millisecondi ("450ms"); per la durata delle animazioni un moltiplicatore 0-3 ("0" le toglie, "1" normali, "2" due volte più lente); per la larghezza delle schede i pixel ("320px"); per il font una lista di famiglie ("Georgia, serif"); per lo stile di una linea uno fra dotted, dashed, wavy, solid, double.'),
       },
       required: ['token', 'valore'],
     },
@@ -631,10 +632,10 @@
       risultato: true,
     },
     CARTA_HOME: {
-      description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei mazzi", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
+      description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei suggerimenti", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
       properties: {
         operazione: S('togli, rimetti, sposta, oppure ripristina (tutte le carte al loro posto di partenza, e tornano anche quelle di sinistra che erano state solo nascoste, come uno scaricamento finito o la carta dei Crediti).', { enum: ['togli', 'rimetti', 'sposta', 'ripristina'] }),
-        carta: S('A destra: editor = Editor (documenti recenti), mazzi = Mazzi del deck builder, suggerimenti = «Filo ti suggerisce», rapide = Impostazioni rapide. A sinistra: le parole con cui l\'utente la indica (il nome del timer, del file scaricato, un pezzo del testo dell\'avviso, oppure solo il tipo, come "gli avvisi") o la chiave che un esito precedente ti ha dato. Serve a tutte le operazioni tranne ripristina.'),
+        carta: S('A destra: editor = Editor (documenti recenti), suggerimenti = «Filo ti suggerisce», rapide = Impostazioni rapide, oppure il nome con cui l\'utente indica la carta. A sinistra: le parole con cui l\'utente la indica (il nome del timer, del file scaricato, un pezzo del testo dell\'avviso, oppure solo il tipo, come "gli avvisi") o la chiave che un esito precedente ti ha dato. Serve a tutte le operazioni tranne ripristina.'),
         verso: S('Dove metterla, per sposta (e cima per rimetti): su o giu di un posto, cima, fondo.', { enum: ['su', 'giu', 'cima', 'fondo'] }),
         prima_di: S('In alternativa a verso: la carta davanti a cui metterla, della stessa colonna.'),
       },

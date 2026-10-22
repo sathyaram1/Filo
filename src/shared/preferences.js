@@ -1069,7 +1069,7 @@
     },
     {
       scrive: ['correttore.modelloErrori'],
-      aiuto: 'true | false (un modello controlla gli errori del correttore; spento restano solo quelli che Filo trova da sé, sbiaditi, e non si spende)',
+      aiuto: 'true | false (un modello controlla gli errori del correttore; spento restano solo quelli che Filo trova da sé, sbiaditi i dubbi, e non si spende)',
       costo: 1,
       keys: ['modello errori', 'controllo rapido', 'correttore col modello', 'correttore senza modello', 'correttore senza ai', 'modello del correttore'],
       build(v) {
@@ -1953,7 +1953,8 @@
       aiuto: 'true | false (posta, banche, sanità, pubblica amministrazione, pagine con un campo password o carta e i siti delicati '
         + 'scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli, la chat ne vede '
         + 'solo il nome del sito, screenshot e immagini copiate da lì non vanno al modello delle immagini neanche incollati '
-        + 'altrove, la spiegazione parte solo dal tasto destro; acceso di serie)',
+        + 'altrove, la spiegazione parte solo dal tasto destro; il correttore resta acceso e manda quello che l\'utente scrive, '
+        + 'non la pagina; acceso di serie)',
       risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
         + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
         + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '

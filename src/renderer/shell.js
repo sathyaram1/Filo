@@ -62,8 +62,10 @@
   // #146.1 — i token estetici dell'utente valgono anche qui, e si riapplicano
   // dal vivo a ogni cambio: la barra non può restare indietro sulle pagine.
   const ThemeTokens = window.SN_THEME_TOKENS;
+  let tokenShell = {};
   function applyShellTokens(tokens) {
-    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
+    tokenShell = tokens && typeof tokens === 'object' ? tokens : {};
+    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokenShell, { shell: true });
   }
   // Parametri "Colore identità delle tab" per il fondo delle schede non attive.
   const TabColor = window.SN_TAB_COLOR;
@@ -251,15 +253,20 @@
   // Gestione è l'ingresso unico delle pagine dell'owner (#1414): Modelli
   // predefiniti e Inviti e utenti stanno lì, non in altri menu. Chi vuole MANDARE
   // un feedback non passa di qui: passa dal menu del tasto destro.
+  // Bacheca e Deck builder in pausa (#1592): li vede l'owner, o tutti se l'owner li ha aperti. Con la Bacheca in
+  // pausa le segnalazioni mandate restano raggiungibili: la voce porta alla sola parte che è dell'utente.
+  let inPausaVisibili = { bacheca: false, mazzi: false };
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
-      { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+      ...(inPausaVisibili.mazzi ? [{ label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' }] : []),
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
       { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
       { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
-      { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
+      inPausaVisibili.bacheca
+        ? { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' }
+        : { label: 'Le tue segnalazioni', icon: 'feedback', url: 'filo://board/board.html#segnalazioni' },
     ];
     if (isAdmin) {
       entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
@@ -304,7 +311,24 @@
   }
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
-  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, buildApps()));
+  // Lo stato di adesso; una copia scaduta il main la rilegge in sottofondo e annuncia il cambio.
+  function rifletteInPausa(r) {
+    if (!r || !r.ok) return;
+    inPausaVisibili = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
+  }
+  function refreshInPausa(attendi = false) {
+    if (!MSG_FILO.IN_PAUSA_STATO) return Promise.resolve();
+    return api.message({ type: MSG_FILO.IN_PAUSA_STATO, attendi }).then(rifletteInPausa).catch(() => {});
+  }
+  refreshInPausa(true);
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(inPausaVisibili, m.nome)) {
+        inPausaVisibili = { ...inPausaVisibili, [m.nome]: m.visible === true };
+      } else if (m?.type === MSG_FILO.AUTH_CHANGED) refreshInPausa(true);
+    });
+  }
+  appsBtn.addEventListener('click', () => { showNativeMenu(appsBtn, buildApps()); refreshInPausa(); });
 
   // Registrata a parte perché deve funzionare anche senza il bottone account.
   if (api.onMenuAction) {
@@ -1030,18 +1054,24 @@
   // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
   // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
   // stacca di STACCO dalla scheda tipica dietro solo con lo spazio che avanza: un vuoto suo non taglia un nome altrui.
+  // Nessuna scheda, attiva e stacco compresi, supera la larghezza massima del token `tab.larghezza` (#1493).
   const STACCO = 1.25;
   const STACCO_MAX = 1.8;
   const MIN_ATTIVA = 110;
   const MIN_SCHEDA = 40;
   let larghezzeInVigore = null; // { chiave, w: number[] }
+  function larghezzaMassima() {
+    const v = ThemeTokens ? parseInt(ThemeTokens.effectiveValue('tab.larghezza', tokenShell), 10) : NaN;
+    return Number.isFinite(v) ? Math.max(MIN_ATTIVA, v) : Infinity;
+  }
   function spazioDellaStriscia() {
     const spazio = tabRowEl.querySelector('.tab-drag-spacer');
     const sp = spazio ? spazio.getBoundingClientRect().width - (parseFloat(getComputedStyle(spazio).minWidth) || 0) : 0;
     const cs = getComputedStyle(tabsEl);
     return tabsEl.getBoundingClientRect().width + Math.max(0, sp) - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
   }
-  function larghezzeDistribuite(naturali, ia, posto) {
+  function larghezzeDistribuite(piene, ia, posto, massimo) {
+    const naturali = piene.map((w) => Math.min(w, massimo));
     const dietro = naturali.filter((_, i) => i !== ia);
     const ordinate = [...dietro].sort((a, b) => a - b);
     const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
@@ -1058,7 +1088,7 @@
     const attiva = attivaCon(tetto);
     const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
     const avanzo = Math.floor(posto - totale(tetto));
-    const conStacco = attiva + Math.max(0, Math.min(stacco, avanzo));
+    const conStacco = Math.min(massimo, attiva + Math.max(0, Math.min(stacco, avanzo)));
     return naturali.map((w, i) => (i === ia ? conStacco : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
   }
   function misuraLarghezzeChieste() {
@@ -1070,7 +1100,7 @@
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
     const naturali = schede.map((el) => Math.ceil(el.getBoundingClientRect().width));
     const ia = schede.findIndex((el) => el.classList.contains('active'));
-    const misurate = larghezzeDistribuite(naturali, ia, posto);
+    const misurate = larghezzeDistribuite(naturali, ia, posto, larghezzaMassima());
     const chiave = schede.map((el) => el.dataset.id).join(',') + '|' + ia;
     const tieni = puntatoreSullaFila && larghezzeInVigore && larghezzeInVigore.chiave === chiave;
     passoTrattenuto = Boolean(tieni) && misurate.some((w, i) => w !== larghezzeInVigore.w[i]);
@@ -1492,9 +1522,11 @@
   // la si chiude. È la base su cui passano tutti gli avvisi della shell.
   const NOTIFS = (() => {
     let host = null;
-    // Senza tetto una raffica di eventi (una tempesta di popup bloccati) spinge
-    // le più vecchie fuori schermo, dove non si possono più chiudere.
+    // Tetto alle carte a schermo: una raffica non spinge le più vecchie fuori dalla finestra. Quelle oltre il tetto
+    // non si buttano (#1477): aspettano dietro un «+N» che le mostra. Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
     const MAX_STACK = 5;
+    // «+N» aperto: tutte a schermo finché sono più del tetto.
+    let aperta = false;
     // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
     const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
@@ -1509,7 +1541,7 @@
         }
         new MutationObserver(rispecchia).observe(host, {
           childList: true, subtree: true, characterData: true,
-          attributes: true, attributeFilter: ['class', 'data-closing'],
+          attributes: true, attributeFilter: ['class', 'data-closing', 'data-attesa'],
         });
       }
       return host;
@@ -1519,16 +1551,18 @@
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
-      const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
+      const tutte = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const carte = tutte.filter((c) => c.dataset.attesa !== '1').map((c) => ({
         id: c.dataset.nid || '',
         testo: c.querySelector('.shell-notif-msg')?.textContent || '',
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
       }));
+      const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
       const vars = {};
       for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
-      try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
+      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
       if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
@@ -1541,19 +1575,34 @@
           : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
         if (btn) btn.click();
       });
+      if (api.avvisi.onPila) api.avvisi.onPila((dati) => comandoPila(dati && dati.azione));
       try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
     }
-    // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
-    // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
-    function enforceCap() {
-      const h = hostEl();
-      const live = Array.from(h.children).filter((c) => c.dataset.closing !== '1');
-      const over = live.length - MAX_STACK;
-      for (let i = 0; i < over; i++) {
-        const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._tempo) c._tempo.annulla();
-        uscita(c);
-        try { c.remove(); } catch (_) {}
+    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
+    // Oltre il tetto aspettano le più vecchie: fuori vista e col tempo fermo, che parte intero quando tocca a loro.
+    function disponi() {
+      const live = vive();
+      if (live.length <= MAX_STACK) aperta = false;
+      const nascoste = aperta ? 0 : live.length - MAX_STACK;
+      live.forEach((c, i) => {
+        const attesa = i < nascoste;
+        if (attesa === (c.dataset.attesa === '1')) return;
+        if (attesa) {
+          c.dataset.attesa = '1';
+          if (c._tempo) c._tempo.annulla();
+          c._tempo = null;
+        } else {
+          delete c.dataset.attesa;
+          avviaTempo(c, c._durata);
+        }
+      });
+    }
+    function comandoPila(azione) {
+      if (azione === 'apri' || azione === 'riduci') {
+        aperta = azione === 'apri';
+        disponi();
+      } else if (azione === 'chiudi-tutti') {
+        for (const c of vive()) dismiss(c);
       }
     }
     function uscita(card) {
@@ -1572,8 +1621,9 @@
       card._tempo = null;
       uscita(card);
       card.classList.remove('show');
+      disponi();
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
-      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
+      if (!vive().length) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} }, ThemeTokens ? ThemeTokens.motionMs(220) : 220);
     }
@@ -1603,7 +1653,7 @@
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
     // actions: [{ label, onClick }], unica, alChiudere }. Senza opts usa la config delle Preferenze.
-    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, tetto).
+    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, «Chiudi tutti»).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
     function show(text, opts) {
@@ -1622,6 +1672,9 @@
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
+        gemella._durata = durata;
+        // Rinnovata mentre aspettava dietro il «+N»: è la notizia più fresca, torna in vista in fondo.
+        if (gemella.dataset.attesa === '1') { hostEl().appendChild(gemella); disponi(); }
         avviaTempo(gemella, durata);
         return gemella;
       }
@@ -1629,6 +1682,7 @@
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
+      card._durata = durata;
       card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
@@ -1650,7 +1704,7 @@
       azioni(card, opts.actions);
 
       hostEl().appendChild(card);
-      enforceCap();
+      disponi();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;

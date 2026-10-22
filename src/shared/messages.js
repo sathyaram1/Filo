@@ -1138,6 +1138,17 @@
     //   GET { } → { ok, openToAll, letto } · SET { openToAll } → { ok, openToAll } | { ok:false, error }.
     REDTEAM_OPEN_GET: 'redteam_open_get',
     REDTEAM_OPEN_SET: 'redteam_open_set',
+
+    // Bacheca e Deck builder dei Mazzi in pausa per chi non è owner (#1592), `nome` 'bacheca' | 'mazzi'.
+    // IN_PAUSA_STATO (solo da Filo): { attendi? } → { ok, bacheca: stato, mazzi: stato },
+    //   stato = { visible, owner, openToAll, letto }. `attendi` aspetta la prima lettura dell'interruttore.
+    IN_PAUSA_STATO: 'in_pausa_stato',
+    // Broadcast main → shell e pagine di Filo: { nome, visible } quando cambia chi la vede.
+    IN_PAUSA_CAMBIATO: 'in_pausa_cambiato',
+    // Gli interruttori di Gestione (SOLO owner, solo da Filo).
+    //   GET { nome } → { ok, openToAll, letto } · SET { nome, openToAll } → { ok, openToAll } | { ok:false, error }.
+    IN_PAUSA_GET: 'in_pausa_get',
+    IN_PAUSA_SET: 'in_pausa_set',
   };
 
   // Port-based streaming

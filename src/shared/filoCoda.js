@@ -101,7 +101,10 @@
     function aggiungiPagina(p) {
       const t = ms(p.ts);
       if (gruppo && giornoDi(ms(gruppo.ts)) !== giornoDi(t)) chiudi();
-      const pagina = { id: p.id, ts: p.ts, url: String(p.url || ''), titolo: String(p.titolo || ''), ...(p.archivio ? { archivio: p.archivio } : {}) };
+      const pagina = {
+        id: p.id, ts: p.ts, url: String(p.url || ''), titolo: String(p.titolo || ''),
+        ...(p.archivio ? { archivio: p.archivio } : {}), ...(p.urlTagliato ? { urlTagliato: true } : {}),
+      };
       if (qui && p.dispositivo && p.dispositivo !== qui) pagina.altrove = true;
       if (!gruppo) gruppo = { k: 'pagine', key: `p:${p.id}`, ts: p.ts, fine: p.ts, pagine: [] };
       gruppo.pagine.push(pagina);
@@ -122,6 +125,15 @@
 
   function sito(url) {
     try { return new URL(String(url)).hostname.replace(/^www\./, ''); } catch (_) { return String(url || ''); }
+  }
+
+  // Cosa apre una pagina del filo: solo una pagina web, e un indirizzo tagliato alla misura (#1525) non come intero
+  // (porterebbe altrove), ma il suo sito. Null se non c'è niente da aprire.
+  function daAprire(p) {
+    const url = String((p && p.url) || '');
+    if (!/^https?:\/\//i.test(url)) return null;
+    if (!p.urlTagliato) return { url, sito: false };
+    try { return { url: new URL(url).origin + '/', sito: true }; } catch (_) { return null; }
   }
 
   // Un pezzo della coda: gli ultimi `quanti` prima di `prima` (esclusa), o da poco prima di `fino` in poi, o tutto ciò
@@ -246,7 +258,12 @@
     for (const p of Array.isArray(pagine) ? pagine : []) {
       if (!p || !p.url || !contiene(`${p.titolo || ''} ${p.url}`, ts, largo)) continue;
       const prima = perUrl.get(p.url);
-      if (!prima || ms(p.ts) > ms(prima.ts)) perUrl.set(p.url, { k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts, ...(p.archivio ? { archivio: p.archivio } : {}) });
+      if (!prima || ms(p.ts) > ms(prima.ts)) {
+        perUrl.set(p.url, {
+          k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts,
+          ...(p.archivio ? { archivio: p.archivio } : {}), ...(p.urlTagliato ? { urlTagliato: true } : {}),
+        });
+      }
     }
     for (const s of Array.isArray(schede) ? schede : []) {
       if (!s || !s.url) continue;
@@ -260,6 +277,7 @@
         ...(prima && prima.id ? { id: prima.id } : {}),
         // La scheda chiusa si riapre com'era (scroll, paese): la voce d'archivio la conosce il main (#872).
         ...(s.id ? { archivio: s.id } : {}),
+        ...(s.urlTagliato || (prima && prima.urlTagliato) ? { urlTagliato: true } : {}),
         ...(nelContenuto ? { estratto: estratto(dentro, ts, 70, largo) } : {}),
       };
       if (!prima || nelContenuto) perUrl.set(s.url, voce);
@@ -271,7 +289,7 @@
   }
 
   global.SN_FILO_CODA = {
-    PAUSA_MS, PEZZO, ORA_GIORNATA, FUSIONE_MS, elementi, nomeDelGruppo, sito, pezzo, chatCorrente, siFonde, serveGiornata,
+    PAUSA_MS, PEZZO, ORA_GIORNATA, FUSIONE_MS, elementi, nomeDelGruppo, sito, daAprire, pezzo, chatCorrente, siFonde, serveGiornata,
     termini, cerca,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

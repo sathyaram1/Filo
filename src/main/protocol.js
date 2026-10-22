@@ -46,16 +46,26 @@ function registerProtocolSchemes() {
 // parser normalizza i `..` NON codificati, ma i `..` percent-encoded (%2e%2e)
 // sopravvivono e ridiventano `..` solo dopo decodeURIComponent — finendo in
 // path.join. Esportato per i test.
-// Il Red Team in pausa (#896): a chi non lo vede, ogni indirizzo della sua cartella risponde con la sola frase.
-// Si decide dalla cartella, non dal nome: Windows porta allo stesso file anche con altri nomi (`::$DATA`, nome corto).
-const REDTEAM_DIR = path.join(SRC, 'pages', 'redteam') + path.sep;
-const REDTEAM_PAUSA = path.join(SRC, 'pages', 'redteam', 'pausa.html');
+// Le pagine in pausa, Red Team (#896) e Deck builder (#1592): a chi non le vede, ogni indirizzo della loro cartella
+// risponde con la sola frase. Si decide dalla cartella, non dal nome: Windows porta allo stesso file anche con altri
+// nomi (`::$DATA`, nome corto). La Bacheca no: in pausa resta la parte con le segnalazioni dell'utente.
+const CARTELLE_IN_PAUSA = [
+  ['redteam', () => require('./services/redteamGate')],
+  ['decks', () => require('./services/inPausa').cancello('mazzi')],
+].map(([cartella, cancello]) => ({
+  dir: path.join(SRC, 'pages', cartella) + path.sep,
+  pausa: path.join(SRC, 'pages', cartella, 'pausa.html'),
+  cancello,
+}));
 
-async function paginaRedteamChiusa(resolved) {
+/** La pagina della pausa da servire al posto di `resolved`, o null. */
+async function paginaInPausa(resolved) {
   const p = resolved.toLowerCase();
-  if (!(p + path.sep).startsWith(REDTEAM_DIR.toLowerCase()) || p === REDTEAM_PAUSA.toLowerCase()) return false;
-  const Gate = require('./services/redteamGate');
-  return !(await Gate.assicura()).visible;
+  for (const c of CARTELLE_IN_PAUSA) {
+    if (!(p + path.sep).startsWith(c.dir.toLowerCase()) || p === c.pausa.toLowerCase()) continue;
+    return (await c.cancello().assicura()).visible ? null : c.pausa;
+  }
+  return null;
 }
 
 function relIsUnsafe(rel) {
@@ -115,7 +125,7 @@ async function filoHandler(request) {
       return new Response('Forbidden', { status: 403 });
     }
 
-    const servito = (await paginaRedteamChiusa(resolved)) ? REDTEAM_PAUSA : resolved;
+    const servito = (await paginaInPausa(resolved)) || resolved;
     const res = await net.fetch(pathToFileURL(servito).href);
     // CSP solo per i documenti HTML (le pagine privilegiate filo://): rete di
     // sicurezza contro un eventuale XSS futuro su una pagina che ha accesso a

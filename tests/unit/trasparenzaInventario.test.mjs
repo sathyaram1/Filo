@@ -98,6 +98,8 @@ const COLLEZIONI = {
   '/config/automation': CONFIGURAZIONE,
   '/config/routines': CONFIGURAZIONE,
   '/config/redteam': CONFIGURAZIONE,
+  '/config/bacheca': CONFIGURAZIONE,
+  '/config/mazzi': CONFIGURAZIONE,
   '/config/supportModels': CONFIGURAZIONE,
   '/config/credits': CONFIGURAZIONE,
   '/admins/{email}': { perche: 'gli indirizzi di chi amministra il server' },

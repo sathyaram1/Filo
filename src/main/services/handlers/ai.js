@@ -178,9 +178,11 @@ module.exports = function register(on, ctx) {
     // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
     const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
     const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    // Il correttore ripete una volta la domanda la cui risposta era illeggibile (#1580): la cache la ridarebbe uguale.
+    const noCache = Boolean(msg && msg.riprova === true && DEL_CORRETTORE.has(msg.action));
     const chiedi = daSola
-      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
-      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
