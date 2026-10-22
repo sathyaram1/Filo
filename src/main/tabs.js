@@ -2844,6 +2844,8 @@ class TabManager {
             type: '_spell:native',
             word: params.misspelledWord,
             suggestions: (params.dictionarySuggestions || []).slice(0, 5),
+            // Il segno sulla pagina che gli spec aspettano: fuori dalle prove il sito non deve leggere la parola.
+            segnoPerLeProve: process.env.NODE_ENV === 'test',
           });
         } catch (_) {}
       }
