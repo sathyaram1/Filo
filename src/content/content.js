@@ -2433,7 +2433,7 @@
   function valutaDalRiquadro() {
     let el = document.activeElement;
     try {
-      while (el && /^(IFRAME|FRAME)$/.test(el.tagName)) el = el.contentDocument ? el.contentDocument.activeElement : null;
+      while (el && /^(IFRAME|FRAME)$/.test(el.tagName)) el = self.SN_RIQUADRI_IN_ARRIVO?.documento(el)?.activeElement || null;
     } catch (_) { el = null; }
     const campo = el && el.ownerDocument !== document ? campoDaValutare(el) : null;
     if (campo) Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
