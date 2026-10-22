@@ -2143,9 +2143,8 @@
     if (righe.length < INCOLLA_A_RIGHE) document.execCommand('insertText', false, text);
     else incollaLungo(righe);
   });
-  // insertText spende una pausa per ogni a capo, e mille righe fermavano la pagina per minuti (#1475): oltre la soglia la
-  // prima riga entra da insertText, il resto in un colpo come paragrafi. insertHTML in un blocco vuoto è lento uguale,
-  // per questo l'ultimo carattere della prima riga si rimette insieme al resto, nel tag del suo blocco.
+  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475); insertHTML è lento uguale in un
+  // blocco vuoto, per questo la prima riga entra da insertText e il suo ultimo carattere torna col resto, nel suo tag.
   const INCOLLA_A_RIGHE = 50;
   const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
   function incollaLungo(righe) {
