@@ -317,6 +317,40 @@ test('il testo messo da uno script resta com\'è, e con la correzione automatica
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
 
+// Il campo che ha il cursore prima che il correttore parta non ha più un focusin da dare: si scrive subito, senza clic.
+test('un campo che ha già il cursore all\'apertura si corregge subito: la chat di casa e una pagina in autofocus', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: true },
+    });
+  });
+  const casa = await openTab('filo://dashboard/dashboard.html');
+  await expect.poll(() => casa.evaluate(() => document.activeElement && document.activeElement.id), { timeout: 8000 }).toBe('input');
+  await casa.waitForTimeout(1500);
+  await casa.keyboard.type('Domani vedo marco perchè ');
+  await expect.poll(() => casa.locator('#input').inputValue(), { timeout: 4000 }).toBe('Domani vedo Marco perché ');
+
+  const page = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body>
+    <textarea id="ta" lang="it" autofocus style="width:600px;height:100px"></textarea></body>`, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ta');
+  await page.keyboard.type('Ciao marco perchè ');
+  await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché ');
+
+  // Acceso mentre il cursore è già nel campo, vale da subito.
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { featureFlags: { spellcheck: false } } },
+    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+  await page.waitForTimeout(500);
+  await page.keyboard.type('poi ');
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { featureFlags: { spellcheck: true } } },
+    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+  await page.waitForTimeout(500);
+  await page.keyboard.type('perchè ');
+  await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché poi perché ');
+});
+
 test('l\'interruttore sta in Opzioni → Altro e in Preferenze, insieme a quante volte serve per imparare', async ({ app, openTab }) => {
   const altro = await openTab('filo://options/altro.html');
   const sw = altro.locator('#spellcheckAutomatica');
