@@ -171,7 +171,7 @@ after(() => { if (CASA) togliCartella(CASA); });
 test('l\'indice rifiuta una cartella di rete prima di guardarla: nella ricerca, nell\'elenco delle Preferenze e prima di aggiungerla', async () => {
   const spia = spiaDelDisco();
   try {
-    for (const cartella of ['//nas/condivisa', '«//nas/condivisa', '/net/nas/condivisa']) {
+    for (const cartella of ['//nas/condivisa', '«//nas/condivisa', RETE_DEL_SISTEMA, `"${RETE_DEL_SISTEMA}"`]) {
       const r = await Indice.cerca('bolletta', { cartella });
       assert.equal(r.cartellaDiRete, cartella);
       assert.deepEqual(r.risultati, []);
