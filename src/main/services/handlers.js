@@ -5597,7 +5597,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const giaScritta = unisciTesti(risposta);
     if (!chatId || (!successe.length && !giaScritta)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, classeLetta, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
