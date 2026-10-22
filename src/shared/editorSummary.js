@@ -169,6 +169,7 @@
     MAX_SUMMARY,
     TESTO_AL_MODELLO_MAX,
     testoAlModello,
+    rilettoDopoRifiuto,
     notaTaglio,
     avvisoTaglio,
     plainText,
