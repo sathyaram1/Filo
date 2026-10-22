@@ -2,6 +2,8 @@
 // (la carta di un servizio di pagamento) e dentro i componenti chiusi, che raggiunge solo il protocollo d'ispezione.
 // Coordinate della finestra della pagina principale; le regole dei campi stanno in src/shared/campiSegreti.js.
 
+const { riquadroArrivato } = require('./riquadroArrivato');
+
 const ATTESA_MS = 1000;
 const ATTESA_COMPONENTI_MS = 2500;
 
