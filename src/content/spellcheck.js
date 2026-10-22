@@ -93,6 +93,7 @@
     // In cattura, per i campi dentro i componenti (per quanto possibile).
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
+    window.addEventListener('keydown', annullaColTasto, true);
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
     document.addEventListener('visibilitychange', riprendiRimandati);
