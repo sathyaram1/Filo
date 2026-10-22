@@ -620,7 +620,8 @@
       },
       describe: (a) => {
         const q = String((a && (a.cosa ?? a.query ?? a.testo)) || '').trim();
-        const c = String((a && a.cartella) || '').trim();
+        // La cartella che si leggerà davvero, se il main l'ha risolta: «"/etc» del modello è /etc.
+        const c = String((a && (a._cartella || a.cartella)) || '').trim();
         const perche = cartellaDocumentiFuori(a);
         // Richiesta e cartella le scrive il modello: intere, nel loro riquadro, come nell'Aiuto.
         return ['Cercare fra i tuoi documenti', ...(q ? [' ', cit(q)] : []), ...(c ? [' nella cartella ', cit(c, true)] : []),
