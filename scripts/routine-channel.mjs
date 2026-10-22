@@ -1346,6 +1346,7 @@ if (isMain) {
     console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);
   } else if (cmd === 'probe') {
     const r = await probe(args[0]);
+    if (r.outcome !== 'fault') scriviAccensione(args[0], r.accensione || '');
     if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
