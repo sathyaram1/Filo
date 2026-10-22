@@ -292,9 +292,10 @@
   }
 
   // Il testo di un «no», da una regola sola: solo il no dell'elenco fisso dice «a nessun livello»; quello della
-  // tabella dice cosa ha letto il compito e le strade che restano (#530). `daPagina`: la fonte è la pagina stessa,
-  // e una conversazione nuova lì nasce uguale.
-  function fraseNo({ regola = '', elenco = '', segreto: seg = '', dove = '', fonte = null, livello = '', daPagina = false } = {}) {
+  // tabella dice cosa ha letto il compito e le strade che restano (#530). La conversazione nuova si consiglia solo se
+  // nasce pulita: non sopra una pagina (`daPagina`), né quando il filo che avrebbe davanti la sporca già
+  // (`nuovaUguale`, o una fonte `ereditata` dalle altre conversazioni, #1508).
+  function fraseNo({ regola = '', elenco = '', segreto: seg = '', dove = '', fonte = null, livello = '', daPagina = false, nuovaUguale = false } = {}) {
     if (regola === 'elenco' || regola === 'costo') {
       const voce = ELENCO_FISSO.find((e) => e.id === elenco);
       const cosa = seg ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'}` : (voce ? voce.cosa : 'è fra le cose che Filo non fa');
