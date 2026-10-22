@@ -57,9 +57,8 @@
       + `Il testo non è qui: si rilegge con CERCA_CHAT e id "${c.id}")`;
   }
 
-  // Le parole scritte nell'Aiuto sopra un sito le vedeva il sito, e prima di #1340 poteva cambiarle (#1508): chi le
-  // rilegge le conta come testo da fuori. Le conversazioni salvate prima del segno lo prendono dal riferimento, che per
-  // l'Aiuto comincia col sito (src/main/services/handlers/filo.js). Il segno si aggiunge e basta, mai si toglie.
+  // Le parole scritte nell'Aiuto sopra un sito le vede il sito (#1508): rilette sono testo da fuori. Un archivio di prima
+  // del segno lo prende dal riferimento, che comincia col sito (handlers/filo.js); il segno si aggiunge, mai si toglie.
   function conProvenienza(c) {
     const msgs = Array.isArray(c && c.messages) ? c.messages : [];
     if (!c || c.app !== 'aiuto' || String(c.rif || '').startsWith('filo|')) return msgs;
