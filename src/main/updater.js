@@ -32,6 +32,7 @@ const dip = {
   chiudi: () => electronApp().quit(),
   riapri: (execPath) => electronApp().relaunch({ execPath, args: [] }),
   avviso: mandaAvviso,
+  leggiAncora: (tag) => leggiAncora(tag),
 };
 
 // La chat (scrivere e leggere la preferenza) chiede qui se la scelta apertura/chiusura vale sul sistema di Filo.
