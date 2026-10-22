@@ -75,8 +75,7 @@ test('il costo di CERCA_DOCUMENTI misura la cartella che l\'indice leggerà: un 
         const risolta = Indice.voceCartella(cartella, { path: ctx.path, casa: ctx.casa });
         // Una voce che non è un percorso assoluto di quel sistema non porta la ricerca da nessuna parte.
         if (!risolta) continue;
-        const fuori = !ctx.path.relative(ctx.casa, risolta).split(/[\\/]/).every((x) => x && x !== '..')
-          || DR.percorsoDiRete(risolta, { win: ctx.perimetro.win, reti: () => [] });
+        const fuori = !dentroCasa(ctx, risolta) || DR.percorsoDiRete(risolta, { win: ctx.perimetro.win, reti: () => [] });
         assert.ok(fuori, `${ctx.nome} ${cartella} → ${risolta} sta fuori casa o in rete`);
         const a = { type: 'CERCA_DOCUMENTI', cosa: 'fattura', cartella, _cartella: risolta, _perimetro: ctx.perimetro };
         assert.equal(AL.costoFor(a), 2, `${ctx.nome} ${cartella} → ${risolta}`);
