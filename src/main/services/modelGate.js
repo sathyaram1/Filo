@@ -441,5 +441,5 @@
     return { complete, stream, text, call, decideAll, ensureUnderLimit, supports, hasProvider, keyInfo, hostVerdict };
   }
 
-  global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, hostVerdict, limitError, PAID };
+  global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, hostVerdict, limitError, PAID, CAMPI_TESTO };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
