@@ -89,7 +89,9 @@ test('#545.5: Ctrl+Shift+T, W, L e R sono di Filo come senza Shift, su ogni sist
       assert.ok(r.cosa, 'il rifiuto dice cosa fa quel tasto');
     }
   }
-  assert.match(T.chiLaPrende('Ctrl+Shift+T', 'win32'), /scheda nuova/);
+  // #1476: con Shift riapre l'ultima scheda chiusa, come nei browser.
+  assert.match(T.chiLaPrende('Ctrl+Shift+T', 'win32'), /riapre l'ultima scheda chiusa/);
+  assert.match(T.chiLaPrende('Cmd+Shift+T', 'darwin'), /riapre l'ultima scheda chiusa/);
 });
 
 const rifiuto = (id, scritta, sistema = 'win32') => {

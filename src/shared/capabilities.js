@@ -56,6 +56,12 @@
       doesNot: 'Le finestre in incognito e le pagine interne di Filo non vengono archiviate.',
     },
     {
+      id: 'reopen-closed-tab', title: 'Riapri l’ultima scheda chiusa', category: 'navigation',
+      desc: 'Riapre la scheda chiusa più di recente com’era: nello stesso posto della fila, con Indietro e Avanti, lo scorrimento, lo zoom e il paese da cui passava. Ripetendo riapre quella chiusa prima, e così via; finite quelle chiuse da quando hai aperto Filo continua con l’archivio delle schede chiuse, dalla più recente. Vale anche per le pagine di Filo e in incognito.',
+      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; oppure tasto destro su una scheda → "Riapri scheda chiusa"; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa".',
+      doesNot: 'Non riapre una scheda che hai cancellato dall’archivio o dalle pagine visitate. In incognito riapre solo le schede chiuse in quella finestra, finché resta aperta. Una home vuota non conta come scheda chiusa.',
+    },
+    {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda. Sui pulsanti della barra laterale il tasto destro elenca le pagine della scheda, dalla più vicina, e ci salta con un clic.',
       invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore; su Mac anche Cmd+\u2190 e Cmd+\u2192, ma solo quando non stai scrivendo in un campo di testo, dove portano il cursore a inizio o fine riga), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: i pulsanti "Indietro" e "Avanti" in cima alla barra laterale, spenti quando non c\u2019\u00e8 dove andare, e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',

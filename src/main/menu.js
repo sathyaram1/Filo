@@ -86,6 +86,11 @@ function nuovaScheda() {
   try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 }
 
+function riapriSchedaChiusa() {
+  const win = finestra();
+  try { win && win._filoTabs.riapriChiusa().catch(() => {}); } catch (_) {}
+}
+
 function chiudiScheda() {
   const c = schedaAttiva();
   try { c && c.tabs.closeTab(c.tab.id); } catch (_) {}
@@ -210,6 +215,7 @@ function template(piattaforma) {
     label: 'Schede',
     submenu: [
       { label: 'Nuova scheda', accelerator: 'CommandOrControl+T', click: nuovaScheda, ...SOLO_SCRITTA },
+      { label: 'Riapri scheda chiusa', accelerator: 'CommandOrControl+Shift+T', click: riapriSchedaChiusa, ...SOLO_SCRITTA },
       { label: 'Nuova finestra in incognito', click: finestraIncognito },
       { type: 'separator' },
       { label: 'Indietro', accelerator: tasto('Alt+\u2190'), click: indietro, ...SOLO_SCRITTA },

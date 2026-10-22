@@ -62,6 +62,11 @@ const ICON_PATHS = {
     '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +
     '<circle cx="12" cy="12" r="2.8"/>',
 
+  // Freccia che torna: COPIA di `undo` in src/shared/icons.js. Voce «Riapri scheda chiusa» del menu della scheda.
+  undo:
+    '<path d="M4 10h11a5 5 0 0 1 0 10h-4"/>' +
+    '<path d="M8 6l-4 4 4 4"/>',
+
   duplicate:
     '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
     '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',

@@ -818,7 +818,7 @@ test('su Mac l\'avviso nomina la combinazione che hai scritto', async ({ openTab
 });
 
 // #842: i tasti di Spiega, Traduci, Salva e Aiuto li sceglie l'utente. Cambiata Traduci, la combinazione vecchia
-// torna libera per un modulo e la nuova è presa; #545.5: Ctrl+Shift+T è della shell come Ctrl+T.
+// torna libera per un modulo e la nuova è presa; #545.5: Ctrl+Shift+T è della shell (#1476: riapre la scheda chiusa).
 test('una scorciatoia di modulo segue i tasti scelti per le azioni di Filo', async ({ app, openTab }) => {
   const page = await openTab(EDITOR);
   await page.waitForLoadState('domcontentloaded');
@@ -832,7 +832,7 @@ test('una scorciatoia di modulo segue i tasti scelti per le azioni di Filo', asy
   await page.locator('.ed-module[data-type="word-count"]').click();
   for (const [scritto, atteso] of [
     ['Ctrl+Shift+Y', /«Traduci»/],
-    ['Ctrl+Shift+T', /già di Filo \(apre una scheda nuova\)/],
+    ['Ctrl+Shift+T', /già di Filo \(riapre l'ultima scheda chiusa\)/],
     ['Ctrl+Shift+R', /ricarica la pagina/],
   ]) {
     await page.fill('#cfgShortcut', scritto);
