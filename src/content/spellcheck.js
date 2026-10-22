@@ -163,14 +163,11 @@
     if (personalDict.has(wLower)) return;
     personalDict.add(wLower);
     formeDizionario.set(wLower, w);
+    // Lo scrive la fila del main, la stessa della pagina del correttore (#1447): la parola resta come l'ha scritta
+    // l'utente («iPhone»), il confronto è senza maiuscole.
     try {
-      // Lo storage tiene la parola come l'ha scritta l'utente («iPhone»); il confronto è senza maiuscole.
-      const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-      const existing = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
-      if (!existing.some((x) => String(x).toLowerCase() === wLower)) {
-        existing.push(w);
-        await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
-      }
+      const r = await chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, passo: 'aggiungiParola', parola: w });
+      if (r && r.ok && Array.isArray(r.parole)) usaDizionario(r.parole);
     } catch (_) {}
   }
 
@@ -255,11 +252,12 @@
   // ============================================================================
   // La correzione automatica a fine parola (#1447)
   // ============================================================================
+  // Dalla memoria alla scheda arrivano solo le parole da non correggere: i conti a metà restano nel main.
   async function caricaImparato() {
     if (!A()) return;
     try {
-      const d = await chrome.storage.local.get(STORAGE_KEYS.CORRETTORE_IMPARATO);
-      imparato = A().memoria(d?.[STORAGE_KEYS.CORRETTORE_IMPARATO]);
+      const r = await chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, passo: 'leggi' });
+      imparato = A().memoria({ rifiutate: r && r.ok ? r.rifiutate : [] });
     } catch (_) { imparato = A().memoria(null); }
   }
 
@@ -345,7 +343,7 @@
       if (c && correggiDaSe(state, c)) return;
     }
     const w = A().parolaPrima(testo, fine);
-    if (w && erroriAttivi()) contaRiscritta(state, w, testo);
+    if (w && erroriAttivi() && !A().dentroCodice(testo, fine)) contaRiscritta(state, w, testo);
   }
 
   function correggiDaSe(state, c) {
@@ -461,9 +459,10 @@
     });
   }
 
-  // Una correzione scelta dall'utente (menu, «Correggi tutti»): alla soglia diventa una sua correzione automatica.
+  // Una correzione scelta dall'utente (menu, «Correggi tutti»): alla soglia diventa una sua correzione automatica. Solo
+  // per una parola che il dizionario non conosce: «a» → «ha» è giusta lì, e da sé cambierebbe ogni «a» (#1447).
   function accettata(parola, correzione) {
-    if (!A()) return;
+    if (!A() || !sbagliataPerIlBrowser(String(parola || '').replace(/’/g, "'"))) return;
     impara({ passo: 'accettata', parola, correzione }, (r) => {
       if (r && r.impara) return setAutocorrect(r.impara.parola, r.impara.correzione);
       return null;
@@ -517,7 +516,7 @@
     let fatto = 0;
     for (let n = w.nextNode(); n && fatto < 2; n = w.nextNode()) {
       const len = n.nodeValue.length;
-      if (!fatto && start <= tot + len) { range.setStart(n, start - tot); fatto = 1; }
+      if (!fatto && start < tot + len) { range.setStart(n, start - tot); fatto = 1; }
       if (fatto === 1 && end <= tot + len) { range.setEnd(n, end - tot); fatto = 2; }
       tot += len;
     }
@@ -1759,10 +1758,11 @@
     return ignorato(state, { segno: 'errore', segment: w, start: 0, end: w.length }, w);
   }
 
+  // A inizio frase la maiuscola non dice niente: la parola si aggiunge minuscola, se no Filo la metterebbe ovunque.
   async function aggiungiAlDizionario(el, segno) {
     if (!segno) return;
     esitoSegno(el, segno, 'rifiutata');
-    await addToDictionary(segno.segment);
+    await addToDictionary(A() ? formaDaImparare(segno.segment, A().inizioDiFrase(getEditableText(el), segno.start)) : segno.segment);
     const state = el && monitored.get(el);
     if (state) aggiornaCodice(state);
   }
@@ -2281,7 +2281,9 @@
       let cur = 0, startNode = null, startOff = 0, endNode = null, endOff = 0, n;
       while ((n = walker.nextNode())) {
         const len = n.nodeValue.length;
-        if (!startNode && cur + len >= range.start) {
+        // Un pezzo che comincia dove finisce un nodo comincia nel nodo dopo: preso dalla fine di quello prima, la
+        // selezione si porterebbe dietro l'a capo fra i due e la battuta lo cancellerebbe (#1447).
+        if (!startNode && cur + len > range.start) {
           startNode = n; startOff = range.start - cur;
         }
         if (!endNode && cur + len >= range.end) {

@@ -85,6 +85,13 @@ test('le correzioni dell\'utente, anche su più parole, vincono sul resto; le pa
   assert.equal(battuto('Ke ', { personali, rifiutate }), null);
 });
 
+test('dentro il codice, in blocco aperto o in linea non ancora chiuso, niente cambia', () => {
+  assert.equal(battuto('```\nsudo apt install firefox '), null);
+  assert.equal(battuto('`brew install firefox '), null);
+  assert.deepEqual(battuto('```\nx\n```\nuso firefox '), { prima: 'firefox', dopo: 'Firefox', fonte: 'nome' });
+  assert.deepEqual(battuto('il `codice` e firefox '), { prima: 'firefox', dopo: 'Firefox', fonte: 'nome' });
+});
+
 test('chi scrive tutto minuscolo apposta non riceve maiuscole, ma gli errori fissi sì', () => {
   const minuscolo = A.scriveMinuscolo(A.stileDi('ciao come stai. tutto bene, '));
   assert.equal(minuscolo, true);
@@ -113,6 +120,9 @@ test('si impara solo una parola che non è il refuso di una parola vera', () => 
   assert.equal(A.imparabile("qual'è", []), false);
   assert.equal(A.imparabile('perchè', []), false);
   assert.equal(A.imparabile('cmq', ['cm', 'mq']), true, 'le parole cortissime hanno sempre una parola vera vicina');
+  assert.equal(A.imparabile('nn', ['non', 'in']), true);
+  assert.equal(A.imparabile('teh', ['the', 'ten']), false, 'due lettere scambiate restano un refuso anche corto');
+  assert.equal(A.imparabile('metereologia', ['meteorologia']), false, 'una parola lunga sbaglia anche di due');
   assert.equal(A.imparabile('Claude', ['Claude', 'Claudette']), true, 'la stessa parola con la maiuscola non è un refuso');
 });
 
@@ -236,11 +246,27 @@ test('quello che si impara passa da una fila sola nel main: tre schede insieme n
     const I = require('../../src/main/services/correttoreImpara.js');
     const esiti = await Promise.all([1, 2, 3].map(() => I.passo({ passo: 'riscritta', parola: 'ciuruglio' })));
     assert.deepEqual(esiti.map((e) => e.impara), [null, null, 'ciuruglio']);
-    await I.passo({ passo: 'rifiuta', parola: 'Marco' });
-    assert.equal((await I.passo({ passo: 'rifiuta', parola: 'marco' })).gia, true);
-    assert.equal((await I.passo({ passo: 'rinominaRifiutata', parola: 'marco', nuova: 'luca' })).ok, true);
-    assert.deepEqual((await I.passo({ passo: 'togliRifiutata', parola: 'luca' })).rifiutate, []);
-    for (const q of [{ passo: 'cancella', parola: 'x' }, { passo: 'annullata', parola: '' }, { passo: 'annullata', parola: 'a'.repeat(500) },
+    const daFilo = { daFilo: true };
+    await I.passo({ passo: 'rifiuta', parola: 'Marco' }, daFilo);
+    assert.equal((await I.passo({ passo: 'rifiuta', parola: 'marco' }, daFilo)).gia, true);
+    assert.equal((await I.passo({ passo: 'rinominaRifiutata', parola: 'marco', nuova: 'luca' }, daFilo)).ok, true);
+    assert.deepEqual((await I.passo({ passo: 'leggi' })).rifiutate, ['luca'], 'alle schede vanno solo le parole da non correggere');
+    assert.deepEqual(Object.keys(await I.passo({ passo: 'leggi' })).sort(), ['ok', 'rifiutate']);
+    // Da un sito si impara scrivendo, ma non si cambia né si toglie niente a mano.
+    for (const passo of ['rifiuta', 'togliRifiutata', 'rinominaRifiutata', 'togliParola', 'rinominaParola']) {
+      assert.equal((await I.passo({ passo, parola: 'luca', nuova: 'x' })).code, 'forbidden', passo);
+    }
+    assert.deepEqual((await I.passo({ passo: 'togliRifiutata', parola: 'luca' }, daFilo)).rifiutate, []);
+    // Il dizionario personale passa dalla stessa fila: niente doppioni, e chi cambia una parola la fa ricominciare.
+    await Promise.all(['ciuruglio', 'Zanzotera', 'CIURUGLIO'].map((parola) => I.passo({ passo: 'aggiungiParola', parola })));
+    assert.deepEqual(mem.sn_personal_dict, ['ciuruglio', 'Zanzotera']);
+    await I.passo({ passo: 'riscritta', parola: 'zanzottera' });
+    assert.equal((await I.passo({ passo: 'rinominaParola', parola: 'zanzotera', nuova: 'ciuruglio' }, daFilo)).gia, true);
+    await I.passo({ passo: 'rinominaParola', parola: 'zanzotera', nuova: 'Zanzottera' }, daFilo);
+    assert.deepEqual(mem.sn_personal_dict, ['ciuruglio', 'Zanzottera']);
+    assert.equal(mem.sn_correttore_imparato.riscritte.zanzottera, undefined);
+    assert.deepEqual((await I.passo({ passo: 'togliParola', parola: 'CIURUGLIO' }, daFilo)).parole, ['Zanzottera']);
+    for (const q of [{ passo: 'cancella', parola: 'x' }, { passo: 'annullata', parola: '' }, { passo: 'annullata', parola: 'a'.repeat(5000) },
       { passo: 'accettata', parola: 'propio' }, { passo: '__proto__', parola: 'x' }, null]) {
       assert.equal((await I.passo(q)).ok, false, JSON.stringify(q));
     }

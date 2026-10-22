@@ -89,9 +89,6 @@
   // ----------------------------------------------------------------------
   // Si scrive dalla fila del main, la stessa delle schede che imparano (src/main/services/correttoreImpara.js).
   const passo = (q) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CORRETTORE_IMPARA, ...q });
-  async function dimenticaParole(...parole) {
-    for (const p of parole) if (p) await passo({ passo: 'dimentica', parola: p });
-  }
 
   // Una riga con una parola sola, che si cambia scrivendoci e si toglie con «Rimuovi». `rinomina(vecchia, nuova)` dice
   // se il cambio è valido; uno scartato rimette la parola com'era.
@@ -297,31 +294,20 @@
     }
   }
 
+  // Tolta o cambiata una parola, Filo ricomincia da zero su di lei (lo fa la fila del main).
   async function removeDictWord(word) {
-    const key = String(word || '').toLowerCase();
-    const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-    const arr = (data[STORAGE_KEYS.PERSONAL_DICT] || []).filter(
-      (w) => String(w).toLowerCase() !== key
-    );
-    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: arr });
-    renderDict(arr);
-    await dimenticaParole(word);
+    const r = await passo({ passo: 'togliParola', parola: word });
+    if (r && r.ok) renderDict(r.parole);
   }
 
   // La forma nuova prende il posto della vecchia; se la parola c'è già in un'altra riga il cambio non vale.
   async function renameDictWord(vecchia, nuova) {
-    const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-    const arr = (data[STORAGE_KEYS.PERSONAL_DICT] || []).map(String);
-    const da = vecchia.toLowerCase();
-    const a = nuova.toLowerCase();
-    if (da !== a && arr.some((w) => w.toLowerCase() === a)) {
+    const r = await passo({ passo: 'rinominaParola', parola: vecchia, nuova });
+    if (!r || !r.ok) return false;
+    if (r.gia) {
       showDictConflictMessage(nuova);
       return false;
     }
-    const out = arr.filter((w) => w.toLowerCase() !== da);
-    out.push(nuova);
-    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: out });
-    await dimenticaParole(vecchia, nuova);
     return true;
   }
 
@@ -380,16 +366,14 @@
     // un token e resterebbe inerte, quindi si spezza in voci separate.
     const words = raw.split(/\s+/).filter(Boolean);
     if (!words.length) return;
-    const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-    const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
-    const present = new Set(existing.map((x) => String(x).toLowerCase()));
+    // Una alla volta dalla fila del main, che non aggiunge le già presenti (anche con le maiuscole diverse).
     const added = [];
+    let parole = null;
     for (const w of words) {
-      const key = w.toLowerCase();
-      if (present.has(key)) continue;
-      present.add(key);
-      existing.push(w); // preserva il casing originale
-      added.push(w);
+      const r = await passo({ passo: 'aggiungiParola', parola: w });
+      if (!r || !r.ok) continue;
+      parole = r.parole;
+      if (!r.gia) added.push(w);
     }
     if (!added.length) {
       // Tutte già presenti: avvisa invece di ingoiare l'input. Il campo non si svuota, così si
@@ -398,8 +382,7 @@
       $('newDictWord').select();
       return;
     }
-    await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
-    renderDict(existing);
+    renderDict(parole);
     $('newDictWord').value = '';
     $('newDictWord').focus();
   }

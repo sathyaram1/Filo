@@ -138,6 +138,12 @@ test('nel campo modificabile il cursore resta dopo lo spazio, e la punteggiatura
   await expect(page.locator('#ce')).toHaveText('un po\' di tempo, perché? ');
   await page.keyboard.type('fine');
   await expect(page.locator('#ce')).toHaveText('un po\' di tempo, perché? fine');
+  // La parola a inizio riga resta sulla sua riga: la correzione non si porta via l'a capo prima.
+  await svuota(page, '#ce');
+  await page.keyboard.type('Ciao,');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('marco ');
+  await expect.poll(() => page.locator('#ce').innerText()).toMatch(/^Ciao,\n+Marco\s$/);
 });
 
 test('«marco» prende la maiuscola dove chi scrive usa le maiuscole, e non dove scrive tutto minuscolo apposta', async ({ app, openTab, testServer }) => {

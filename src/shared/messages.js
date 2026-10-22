@@ -409,8 +409,8 @@
     OPEN_HISTORY: 'open_history',
     OPEN_OPTIONS: 'open_options',
     OPEN_SPELLCHECK_PAGE: 'open_spellcheck_page',
-    // #1447 — un passo di quello che il correttore impara (src/main/services/correttoreImpara.js). Aperto anche ai
-    // content script dei siti, che sono quelli che vedono scrivere: tocca solo i conti e le parole da non correggere.
+    // #1447 — un passo di quello che il correttore impara, o del dizionario personale (src/main/services/correttoreImpara.js).
+    // Dai content script dei siti, che sono quelli che vedono scrivere, solo i passi che imparano; gli altri da filo://.
     CORRETTORE_IMPARA: 'correttore_impara',
     CLOSE_TAB: 'close_tab',
     CLOSE_ALL_TABS: 'close_all_tabs',               // chiude tutte le tab → 1 newtab

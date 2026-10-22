@@ -7,7 +7,8 @@ require('../../content/correttoreAutomatica.js');
 
 const CHIAVE = 'sn_correttore_imparato';
 const DIZIONARIO = 'sn_personal_dict';
-const PAROLA_MAX = 120;
+// Largo: una parola del dizionario può essere un codice o un indirizzo incollato.
+const PAROLA_MAX = 1000;
 const A = () => globalThis.SN_CORRETTORE_AUTO;
 
 const testo = (v) => (typeof v === 'string' && v.trim() && v.length <= PAROLA_MAX ? v.trim() : '');

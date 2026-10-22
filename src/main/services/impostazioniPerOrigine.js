@@ -77,13 +77,11 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'settings',
   'sn_personal_dict',
   'sn_autocorrect',
-  'sn_correttore_imparato',
   'sn_icon_layout',
   'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',
 ]);
-// Quello che il correttore impara si legge ma si scrive solo dalla fila del main (correttoreImpara.js, #1447).
-const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings' && k !== 'sn_correttore_imparato'));
+const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
 
 // Le bozze dei riquadri (feedback, attacco red-team) scritte in un sito restano a quel sito (#1071): ognuno legge e
 // scrive solo le chiavi che portano la SUA origine, quella del riquadro che chiede e non della scheda (un riquadro
