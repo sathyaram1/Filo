@@ -344,6 +344,8 @@
     .mg-dq-opzione-testa { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-weight: 600; }
     .mg-dq-opzione-n { color: var(--sn-muted); font-variant-numeric: tabular-nums; }
     .mg-dq-opzione-testo { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+    /* Ogni testo di chi chiede è un paragrafo di direzione a sé: uno scritto da destra non rigira i vicini (#1502). */
+    .mg-domanda-titolo, .mg-dq-titolo, .mg-dq-opzione-testo, .mg-dq-md { unicode-bidi: isolate; }
     .mg-dq-badge {
       font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px;
       color: var(--sn-accent); border: 1px solid var(--sn-accent);

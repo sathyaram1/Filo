@@ -23,9 +23,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ATTRIBUTI = join(ROOT, '.gitattributes');
@@ -45,6 +46,21 @@ const TESTO = ['.mjs', '.js', '.cjs', '.md', '.json', '.html', '.css', '.yml',
   '.yaml', '.txt', '.sh', '.rules', '.gitignore', '.gitattributes', '.firebaserc'];
 
 const diTesto = (f) => TESTO.some((e) => f.endsWith(e)) || f.split('/').pop().startsWith('.git');
+
+// Il NUL si cerca per cartella, non per estensione: un `.dat` con un NUL sotto src/ è opaco nei diff quanto un `.js`.
+// Dei dizionari sono binari solo i `.bdic`; le sorgenti GPL sono testo, anche se Latin-1 e CRLF.
+const CARTELLE_SENZA_NUL = ['src/', 'scripts/', '.github/'];
+const daControllarePerNul = (f) => diTesto(f)
+  || CARTELLE_SENZA_NUL.some((c) => f.startsWith(c))
+  || (f.startsWith('assets/dizionari/') && !f.endsWith('.bdic'));
+
+function conNul(root, files) {
+  return files.filter((f) => {
+    if (!daControllarePerNul(f)) return false;
+    const p = join(root, f);
+    return existsSync(p) && readFileSync(p).includes(0x00);
+  });
+}
 
 // La cura per una copia di lavoro che è GIÀ storta.
 //
@@ -124,15 +140,33 @@ describe('fine riga: LF in ogni copia di lavoro', () => {
     // quindi si tiene i suoi CRLF mentre tutto il resto è a posto. È l'unica
     // via d'uscita dalla regola generale, ed è capitata davvero (uno spec
     // scriveva il carattere invece dell'escape `\u0000`).
-    const colpevoli = [];
-    for (const f of fileTracciati()) {
-      if (!diTesto(f)) continue;
-      const p = join(ROOT, f);
-      if (!existsSync(p)) continue;
-      if (readFileSync(p).includes(0x00)) colpevoli.push(f);
-    }
+    const colpevoli = conNul(ROOT, fileTracciati());
     assert.equal(colpevoli.length, 0,
       `sorgenti con un NUL vero dentro: ${elenco(colpevoli)}. Scrivilo come escape `
       + '(`\\u0000`), altrimenti git li tratta da binari e la regola di fine riga non li tocca');
+  });
+
+  test('il NUL si cerca in ogni file sotto src/, scripts/ e .github/ e nelle sorgenti dei dizionari', () => {
+    const dir = cartellaTemporanea('nul-');
+    try {
+      const file = {
+        'src/dati/tabella.dat': Buffer.from([0x61, 0x00, 0x62]),
+        'scripts/lib/senza-estensione': Buffer.from([0x00]),
+        '.github/workflows/x.bin': Buffer.from([0x00]),
+        'assets/dizionari/sorgenti/it_IT.dic': Buffer.from([0x63, 0x00]),
+        'assets/dizionari/it-IT-3-0.bdic': Buffer.from([0x00]),
+        'assets/icone/logo.png': Buffer.from([0x00]),
+        'src/pulito.dat': Buffer.from('niente'),
+      };
+      for (const [f, b] of Object.entries(file)) {
+        mkdirSync(dirname(join(dir, f)), { recursive: true });
+        writeFileSync(join(dir, f), b);
+      }
+      assert.deepEqual(conNul(dir, Object.keys(file)).sort(), [
+        '.github/workflows/x.bin', 'assets/dizionari/sorgenti/it_IT.dic', 'scripts/lib/senza-estensione', 'src/dati/tabella.dat',
+      ]);
+    } finally {
+      togliCartella(dir);
+    }
   });
 });

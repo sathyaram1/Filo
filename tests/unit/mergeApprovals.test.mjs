@@ -482,3 +482,24 @@ describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
     assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
 });
+
+describe('voci che si vedono davvero (#1502)', () => {
+  test('i caratteri di controllo e di formato si scrivono per esteso, tabulazione e a capo restano', () => {
+    assert.equal(UI.caratteriVisibili('if (ok)‮ { evil() }⁦'), 'if (ok)⟨U+202E⟩ { evil() }⟨U+2066⟩');
+    assert.equal(UI.caratteriVisibili('a\u0000b​c­d'), 'a⟨U+0000⟩b⟨U+200B⟩c⟨U+00AD⟩d');
+    assert.equal(UI.caratteriVisibili('tag\u{E0041}'), 'tag⟨U+E0041⟩');
+    assert.equal(UI.caratteriVisibili('\triga\nseconda\r'), '\triga\nseconda\r');
+    assert.equal(UI.caratteriVisibili('שלום ok'), 'שלום ok', 'le lettere da destra a sinistra sono testo, non invisibili');
+    assert.equal(UI.caratteriVisibili(null), '');
+    assert.equal(UI.doveVoce({ file: 'src/‮sj.txt', riga: 3 }), 'src/⟨U+202E⟩sj.txt:3');
+  });
+
+  test('si contano le voci oltre le prime dodici e quelle che il server non ha mandato', () => {
+    const voci = (n) => Array.from({ length: n }, (_, i) => ({ file: `f${i}.js`, testo: 'x' }));
+    assert.equal(UI.vociNascoste({ voci: voci(12) }), 0);
+    assert.equal(UI.vociNascoste({ voci: voci(14) }), 2);
+    assert.equal(UI.vociNascoste({ voci: voci(12), more: 5 }), 5);
+    assert.equal(UI.vociNascoste({ items: Array.from({ length: 13 }, String) }), 1, 'anche le righe di un server di prima');
+    assert.equal(UI.vociNascoste(null), 0);
+  });
+});

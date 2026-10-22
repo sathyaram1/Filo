@@ -809,7 +809,11 @@ function conImmagini(ctx) {
 
 // Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
 // Con un diff del server da giudicare non dice «nessuna modifica»: farebbe passare il server senza leggerlo (#1418).
-function testoDiffVuoto({ commitPropri = null } = {}, diffServer = '') {
+function testoDiffVuoto({ commitPropri = null, soloMedia = 0 } = {}, diffServer = '') {
+  if (soloMedia > 0) {
+    const media = `Il diff di testo è vuoto: il ramo cambia solo ${soloMedia === 1 ? 'un file multimediale' : `${soloMedia} file multimediali`}, binari davvero, elencati in diffMedia.`;
+    return diffServer ? `${media} Il diff del server (diffServerFile) resta da giudicare intero, come dice il paragrafo «Lavoro server».` : media;
+  }
   const perche = commitPropri === 0
     ? 'il ramo non ha commit propri rispetto a main'
     : `il ramo ${commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : ''}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda)`;
@@ -830,8 +834,10 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num,
         ...(ctx.diffBase && ctx.diffBase.sha ? {
           diffBase: ctx.diffBase,
-          ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
+          ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: ctx.diffComando || `git diff --text --no-textconv ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
+        ...(Array.isArray(ctx.diffMedia) ? { diffMedia: ctx.diffMedia } : {}),
+        ...(Array.isArray(ctx.diffBinari) ? { diffBinari: ctx.diffBinari } : {}),
         ...server,
         ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto, server.diffServer) } : {}),
       };
@@ -904,7 +910,11 @@ function tryGit(args) {
  * Il diff del ramo contro il main di GitHub, con la base e la punta su cui è calcolato: chi lo ricalcola usa
  * quelle. Un diff che git non sa calcolare esce con `ok: false` e il motivo, mai come diff vuoto (#740); uno vuoto
  * esce solo se il contenuto del ramo è davvero quello della base comune, e lo dichiara in `vuoto`.
- * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, vuoto?:{commitPropri:number|null}}
+ * È testo anche dove un attributo lo renderebbe opaco (#1502): fuori restano solo i media binari davvero (`media`),
+ * e ogni altro file con un NUL dentro è elencato in `binari`.
+ * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, comando:string,
+ *   media:Array<{file:string, stato:string, byte:number}>, binari:Array<{file:string, stato:string, byte:number}>,
+ *   vuoto?:{commitPropri:number|null, soloMedia?:number}}
  *   | {ok:false, motivo:string, diff:'', base:object|null, head:string}}
  */
 export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi } = {}) {
@@ -942,16 +952,80 @@ export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi }
   if (storia.errore) return guasto(storia.errore, base, head);
   const comune = git(['merge-base', base.sha, head]);
   if (!comune.ok) return guasto(`ramo e origin/${main} non hanno una base comune`, base, head);
+  // Quali file cambiano e cosa c'è dentro si chiede ai blob, non agli attributi: quelli li scrive il ramo stesso.
+  const elenco = git(['diff', '--raw', '-z', '--no-renames', '--no-abbrev', `${base.sha}...${head}`], { grezzo: true });
+  if (!elenco.ok) return guasto(`l'elenco dei file cambiati non si calcola (${primaRiga(elenco.out)})`, base, head);
+  const voci = vociRaw(elenco.out);
+  const blob = blobConNul(root, voci.map((v) => v.sha));
+  if (!blob.ok) return guasto(`i file cambiati non si leggono (${blob.motivo})`, base, head);
+  const scheda = (v) => ({ file: v.file, stato: v.stato, byte: blob.byte.get(v.sha) || 0 });
+  const media = voci.filter((v) => MEDIA_RE.test(v.file) && blob.nul.has(v.sha));
+  const binari = voci.filter((v) => !MEDIA_RE.test(v.file) && blob.nul.has(v.sha)).map(scheda);
+  const fuori = media.map((v) => `:(exclude,literal)${v.file}`);
+  const args = ['diff', '--text', '--no-textconv', `${base.sha}...${head}`, ...(fuori.length ? ['--', '.', ...fuori] : [])];
+  const fatto = { base, head, comando: comandoGit(args), media: media.map(scheda), binari };
   // Fra gli sha, non fra i nomi: il diff è esattamente quello del comando che il payload dichiara.
-  const r = git(['diff', `${base.sha}...${head}`], { grezzo: true });
+  const r = git(args, { grezzo: true });
   if (!r.ok) return guasto(`git diff non riesce (${primaRiga(r.out)})`, base, head);
-  if (r.out) return { ok: true, diff: r.out, base, head };
+  if (r.out) return { ok: true, diff: r.out, ...fatto };
+  const propri = () => { const n = git(['rev-list', '--count', `${base.sha}..${head}`]); return n.ok ? Number(n.out) : null; };
+  const vuotoMa = 'il diff è uscito vuoto ma il ramo cambia dei file rispetto alla base comune con main';
+  if (voci.length > media.length) return guasto(vuotoMa, base, head);
+  if (media.length) return { ok: true, diff: '', ...fatto, vuoto: { commitPropri: propri(), soloMedia: media.length } };
   // Vuoto vale solo se l'albero del ramo è quello della base comune: è la prova che non passa dal testo del diff.
   const albero = (sha) => git(['rev-parse', '--verify', '--quiet', `${sha}^{tree}`]);
   const [a, b] = [albero(comune.out.split('\n')[0]), albero(head)];
-  if (!a.ok || !b.ok || a.out !== b.out) return guasto('il diff è uscito vuoto ma il ramo cambia dei file rispetto alla base comune con main', base, head);
-  const propri = git(['rev-list', '--count', `${base.sha}..${head}`]);
-  return { ok: true, diff: '', base, head, vuoto: { commitPropri: propri.ok ? Number(propri.out) : null } };
+  if (!a.ok || !b.ok || a.out !== b.out) return guasto(vuotoMa, base, head);
+  return { ok: true, diff: '', ...fatto, vuoto: { commitPropri: propri() } };
+}
+
+// I media che restano fuori dal diff di testo, se hanno un NUL dentro: lì `--text` darebbe solo byte illeggibili.
+// Un «media» senza NUL è testo, e nel diff ci resta.
+const MEDIA_RE = /\.(png|jpe?g|webp|gif|ico|icns|pdf|avif|heic|bdic|woff2?|ttf|otf|mp3|wav|ogg|mp4|webm)$/i;
+
+/** Le voci di `git diff --raw -z --no-renames --no-abbrev`: il file, lo stato e il blob da guardare (il vecchio se tolto). PURA. */
+export function vociRaw(out) {
+  const parti = String(out || '').split('\0');
+  const voci = [];
+  for (let i = 0; i + 1 < parti.length; i += 2) {
+    const m = /^:(\d+) (\d+) ([0-9a-f]+) ([0-9a-f]+) ([A-Z])/.exec(parti[i]);
+    if (!m || !parti[i + 1]) continue;
+    // Un sottomodulo punta a un commit, non a un blob: nel diff di testo è già la riga «Subproject commit».
+    const gitlink = m[1] === '160000' || m[2] === '160000';
+    voci.push({ file: parti[i + 1], stato: m[5], sha: gitlink ? '' : m[5] === 'D' ? m[3] : m[4] });
+  }
+  return voci;
+}
+
+// I blob con un NUL dentro e la loro taglia, letti in un solo `cat-file --batch`.
+function blobConNul(root, shas) {
+  const unici = [...new Set(shas.filter((s) => s && !/^0+$/.test(s)))];
+  const nul = new Set();
+  const byte = new Map();
+  if (!unici.length) return { ok: true, nul, byte };
+  let out;
+  try {
+    out = execFileSync('git', ['cat-file', '--batch'], { cwd: root, input: `${unici.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 30, timeout: TETTO_STORIA_MS });
+  } catch (e) {
+    return { ok: false, motivo: String((e.stderr && String(e.stderr).trim()) || e.message || e).split('\n')[0] };
+  }
+  let i = 0;
+  while (i < out.length) {
+    const a = out.indexOf(0x0a, i);
+    if (a < 0) break;
+    const [sha, tipo, taglia] = out.toString('utf8', i, a).split(' ');
+    if (tipo !== 'blob') return { ok: false, motivo: `${sha} non è un blob leggibile (${tipo || 'niente'})` };
+    const n = Number(taglia);
+    byte.set(sha, n);
+    if (out.subarray(a + 1, a + 1 + n).includes(0)) nul.add(sha);
+    i = a + 1 + n + 1;
+  }
+  return { ok: true, nul, byte };
+}
+
+// Il comando come lo si riscrive in una shell: gli argomenti con caratteri speciali fra apici.
+function comandoGit(args) {
+  return ['git', ...args].map((a) => (/^[\w@%+=:,./^-]+$/.test(a) ? a : `'${a.replace(/'/g, `'\\''`)}'`)).join(' ');
 }
 
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
@@ -2043,7 +2117,13 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // Un lavoro server porta anche il diff del server: lo scarica il server, perché qui il clone non c'è (#1159 fase 2).
     const server = payload && payload.diffServer && typeof payload.diffServer === 'object' ? { diffServer: payload.diffServer } : {};
     if (diff && typeof diff === 'object') {
-      return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '', ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}), ...server };
+      return {
+        diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '',
+        ...(diff.comando ? { diffComando: diff.comando } : {}),
+        ...(Array.isArray(diff.media) ? { diffMedia: diff.media } : {}),
+        ...(Array.isArray(diff.binari) ? { diffBinari: diff.binari } : {}),
+        ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}), ...server,
+      };
     }
     return { diff, ...server };
   }
