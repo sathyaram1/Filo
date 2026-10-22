@@ -649,6 +649,12 @@
     return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
   }
 
+  // /bin/sh su Debian e Ubuntu è dash, che non conosce `$'…'`: lì `\'` chiude la stringa e il resto diventa
+  // altri argomenti. Dove sh può essere dash si misurano tutte e due le letture (#1511).
+  function forseDash(c) {
+    return shellPosix(c) && !c.win && c.shell !== 'bash';
+  }
+
   const ESCAPE_ANSI = { a: 7, b: 8, e: 27, E: 27, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '\'': 39, '"': 34, '?': 63 };
   const UTF8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
 
