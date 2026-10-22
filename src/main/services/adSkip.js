@@ -255,8 +255,9 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now(), tetto = T
 const inCorso = new WeakSet();
 
 /**
- * Il lettore incorporato chiede il clic nel suo punto: ogni frame sopra di lui, dal più vicino alla pagina della
- * scheda, ritrova il riquadro figlio, vede che sopra non c'è altro e dà il punto nella sua vista.
+ * Il lettore incorporato chiede il clic nel suo punto. Con la scheda davanti ogni frame sopra di lui, dal più vicino
+ * alla pagina della scheda, ritrova il riquadro figlio e vede che sopra non c'è altro e che nessuno ci sta scrivendo.
+ * Una pagina nascosta nessuno la guarda né ci scrive: lì il clic va al lettore senza domande.
  */
 async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now() } = {}) {
   const wc = sender.wc;
@@ -267,14 +268,17 @@ async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora 
   if (typeof msg.tag !== 'string' || !msg.tag || msg.tag.length > 64) return { ok: false, code: 'punto' };
   inCorso.add(wc);
   try {
-    let p = { x: msg.x, y: msg.y, tag: msg.tag };
-    for (const a of anelli) {
-      const r = await chiedi(wc, a.frame, { tag: p.tag, origine: a.origineFiglio, x: p.x, y: p.y });
-      if (!r) return { ok: false, code: 'tempo' };
-      if (r.no) return { ok: false, code: r.no };
-      p = r;
+    if (dove && dove.davanti) {
+      let p = { x: msg.x, y: msg.y, tag: msg.tag };
+      for (const a of anelli) {
+        const r = await chiedi(wc, a.frame, { tag: p.tag, origine: a.origineFiglio, x: p.x, y: p.y });
+        if (!r) return { ok: false, code: 'tempo' };
+        if (r.no === 'nascosta') break;
+        if (r.no) return { ok: false, code: r.no };
+        p = r;
+      }
     }
-    return await clicNelRiquadro(wc, p, { ...dove, ora });
+    return await clicNelRiquadro(wc, { x: msg.x, y: msg.y, url: urlDelFrame(sender) }, { ...dove, ora });
   } finally {
     inCorso.delete(wc);
   }
