@@ -1753,8 +1753,7 @@
       azioni(card, opts.actions);
 
       hostEl().appendChild(card);
-      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
-      enforceCap();
+      disponi();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
