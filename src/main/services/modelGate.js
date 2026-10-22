@@ -305,10 +305,12 @@
       if (!P || typeof P[method] !== 'function') {
         throw codeError(`Il fornitore ${a.provider || '—'} non sa fare questa chiamata (${method})`, 'PROVIDER_METHOD_MISSING');
       }
-      const conMessaggi = args && Array.isArray(args.messages) ? { messages: await senzaSegreti(args.messages) } : {};
+      const testi = {};
+      for (const k of CAMPI_TESTO) if (args && args[k] != null) testi[k] = args[k];
+      const oscurati = Object.keys(testi).length ? await senzaSegreti(testi) : {};
       const input = {
         ...(args || {}),
-        ...conMessaggi,
+        ...oscurati,
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),
