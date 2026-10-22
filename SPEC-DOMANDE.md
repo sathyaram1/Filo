@@ -112,6 +112,35 @@ sessione si può riprendere senza nascere sporca. Quelli fermi da più di 30
 giorni, o di sessioni morte senza l'hook di fine, li chiude l'avvio di una
 sessione successiva.
 
+**L'accensione.** In cloud un biglietto nasce anche dentro un'accensione: la
+sessione che il pacemaker accende, con tutto quello che il suo contenitore ha
+già lavorato. Fra un worker e l'altro il contenitore non torna pulito (file
+ignorati, configurazione e ganci di git, gli strumenti fissati), quindi un
+lavoro non fidato può lasciare stato sotto quelli che vengono dopo, verifica e
+controllo di sicurezza compresi.
+
+- Il sondaggio di partenza apre l'accensione, legata alla parola d'ordine, e ne
+  dà l'identificativo. Il canale lo ricorda e lo manda con ogni richiesta di
+  biglietto; se non l'ha, fa il sondaggio da sé. Senza un identificativo
+  valido il biglietto nasce non fidato.
+- Quando nell'accensione nasce un biglietto non fidato, o uno dei suoi si
+  sporca, l'accensione diventa sporca e non torna pulita. Da lì ogni biglietto
+  nasce non fidato, col motivo «accensione sporcata da un lavoro precedente»,
+  anche su un feedback fidato col ramo pulito: il suo commit lascia il ramo non
+  pulito, e la fusione chiede il sì dell'owner. Un lavoro server non nasce in
+  un'accensione sporca: resta per l'accensione dopo.
+- Il contenitore sporco conosce parola d'ordine e identificativo. Un secondo
+  sondaggio con la stessa parola, mentre l'ultima accensione di quella parola è
+  sporca e non è finita, eredita lo sporco. Quando un'accensione è finita lo
+  decide il server, mai il contenitore: nel dubbio è viva, e sporca.
+- Dopo un biglietto non fidato la sessione non si chiude: i successivi nascono
+  non fidati. Costa solo più richieste di sì all'owner, nessuna riaccensione.
+- Niente difese dentro il contenitore (impronte degli strumenti, pulizie più
+  profonde): contro un worker deciso non reggono (#1182). Conta che uno stato
+  contaminato non produca più lavoro fidato.
+- L'identificativo è anche l'identità dell'orchestratore (§ 12.2): la stessa
+  regola vale per i worker in parallelo.
+
 ### 1.3 Unire senza sporcare: la delega
 
 Chi riordina la coda legge testo di utenti, quindi è sporco. Se scrivesse lui il
