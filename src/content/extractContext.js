@@ -1161,7 +1161,8 @@
     const campo = CAMPO_CON_VALORE.test(el.tagName);
     const nome = el.getAttribute?.('aria-label') || el.getAttribute?.('alt') || etichettaCollegata(el)
       || el.getAttribute?.('placeholder') || (campo ? etichettaVicina(el) : '') || '';
-    const valore = campo && !campoSegreto(el) ? el.value : '';
+    // Un segreto che l'utente scrive (#810.8) non parte: al modello basta sapere che il campo è compilato.
+    const valore = !campo || campoSegreto(el) ? '' : (global.SN_CAMPO_TESTO?.segretoDellUtente?.(el) ? '(compilato)' : el.value);
     const testo = nome || valore || (el.tagName === 'INPUT' ? '' : (el.innerText || el.textContent || ''));
     return String(testo).replace(/\s+/g, ' ').trim();
   }

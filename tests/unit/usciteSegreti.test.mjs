@@ -1320,3 +1320,39 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
     assert.ok(!/catch \(_\) \{ return ''; \}/.test(campo), 'un errore della porta lascia scrivere il campo');
   });
 });
+
+// #810.8 — un valore che l'utente ha messo in un campo non è letto da fuori dove una pagina lo ripete, in qualunque
+// ordine arrivino le due cose; un comando che lo stampa invece resta letto.
+test('i valori dell’utente nei campi non restano fra i segreti letti da una pagina', () => {
+  SL.usaDeposito(null);
+  const carte = () => SL.tutti().filter((x) => x.valore === '5555555555554444').map((x) => x.fonte);
+  SL.ricorda('Numero della carta 5555 5555 5555 4444', 'da una pagina');
+  SL.immessoDallUtente('1:1-1:1', '5555 5555 55');
+  assert.deepEqual(carte(), ['da una pagina'], 'un pezzo del numero non copre il numero intero');
+  SL.immessoDallUtente('1:1-1:1', '5555 5555 5555 4444');
+  assert.deepEqual(carte(), []);
+  SL.ricorda('Anteprima 5555 5555 5555 4444', 'dalla pagina negozio.example');
+  assert.deepEqual(carte(), []);
+  SL.ricorda('Carta 5555-5555-5555-4444', "dall'output di un comando");
+  assert.deepEqual(carte(), ["dall'output di un comando"]);
+  // Una proposta dell'assistente conta riga per riga, e una riga lunga non copre niente.
+  SL.ricorda('Codice di recupero: 731954', 'dalla pagina banca.example');
+  SL.valoriDellUtente(`${'0123456789'.repeat(60)}731954`, { maxRiga: 500 });
+  assert.ok(SL.tutti().some((x) => x.valore === '731954'), 'una proposta lunga ha coperto un codice letto');
+  SL.valoriDellUtente('Codice di recupero: 731954', { maxRiga: 500 });
+  assert.ok(!SL.tutti().some((x) => x.valore === '731954'));
+  SL.usaDeposito(null);
+});
+
+// #810.8 giro 3 — il valore vero di un campo è dell'utente se è fatto dei caratteri che lui ci ha messo: una maschera
+// o una correzione in mezzo li riordinano, un sito che ci aggiunge del suo no.
+test('il valore di un campo è dell’utente solo se è fatto dei suoi caratteri', () => {
+  const { fattoDiCaratteri, MAX_INCOLLA } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  const conti = (s) => { const m = new Map(); for (const c of s.toLowerCase()) if (/[\p{L}\p{N}]/u.test(c)) m.set(c, (m.get(c) || 0) + 1); return m; };
+  assert.ok(fattoDiCaratteri('4111 1111 1111 1111', conti('4111111111111111')), 'la maschera aggiunge solo spazi');
+  assert.ok(fattoDiCaratteri('4111 1111 1131 1111', conti('41111111112111111' + '3')), 'correzione in mezzo');
+  assert.ok(!fattoDiCaratteri('4111 1111 1111 1111', conti('411111111111111')), 'una cifra in più è del sito');
+  assert.ok(!fattoDiCaratteri('a'.repeat(5) + '731942', conti('aaaaa')), 'il testo del sito non diventa dell’utente');
+  assert.ok(!fattoDiCaratteri('', conti('abc')));
+  assert.ok(MAX_INCOLLA >= 256 && MAX_INCOLLA <= 10000, 'un incolla lungo coprirebbe migliaia di codici');
+});

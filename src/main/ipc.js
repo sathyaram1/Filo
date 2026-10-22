@@ -215,6 +215,15 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  // #810.8 — il testo che l'utente ha immesso in un elemento della pagina: lo manda il preload da eventi veri.
+  ipcMain.on('filo:immesso-utente', (event, n, testo) => {
+    try {
+      const f = event.senderFrame;
+      const chiave = `${event.sender.id}:${f ? `${f.processId}-${f.routingId}` : '?'}:${String(n).slice(0, 40)}`;
+      require('./services/segretiLetti').immessoDallUtente(chiave, testo);
+    } catch (_) {}
+  });
+
   // Sincroni: devono arrivare prima della finestra che la pagina chiede nello stesso clic (#737.1 giri 6 e 7).
   ipcMain.on('filo:gesto-pagina', (event, tasto) => {
     const vero = require('./services/permessiPagine').gestoDellaPagina(event.sender, event.senderFrame, tasto);
