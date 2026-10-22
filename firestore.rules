@@ -402,8 +402,9 @@ service cloud.firestore {
         && request.resource.data.get('walletPseudonym', '') is string
         && (request.resource.data.get('walletPseudonym', '') == ''
             || request.resource.data.walletPseudonym.size() == 16)
-        // S1.F2.1: se presente, statusPublic deve essere un valore valido.
-        && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
+        // #1516: chi non è admin crea solo feedback aperti. Uno nato 'closed' accendeva la
+        // redazione del server (una chiamata al modello senza tetto) alla prima scrittura.
+        && request.resource.data.get('statusPublic', 'open') == 'open'
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000
         && request.resource.data.get('url', '') is string
