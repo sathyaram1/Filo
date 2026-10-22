@@ -310,6 +310,8 @@ module.exports = function register(on, ctx) {
   const avvisaLeSuperficiDiFilo = (m) => {
     if (typeof ctx.broadcastToFiloPages === 'function') ctx.broadcastToFiloPages(m);
     else ctx.broadcastToTabs(m);
+    // L'owner entrato o uscito cambia chi vede Bacheca e Mazzi senza che l'interruttore si muova (#1592).
+    try { require('../inPausa').accessoCambiato(); } catch (_) {}
   };
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico

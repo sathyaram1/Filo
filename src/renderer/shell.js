@@ -257,15 +257,20 @@
   // Gestione è l'ingresso unico delle pagine dell'owner (#1414): Modelli
   // predefiniti e Inviti e utenti stanno lì, non in altri menu. Chi vuole MANDARE
   // un feedback non passa di qui: passa dal menu del tasto destro.
+  // Bacheca e Deck builder in pausa (#1592): li vede l'owner, o tutti se l'owner li ha aperti. Con la Bacheca in
+  // pausa le segnalazioni mandate restano raggiungibili: la voce porta alla sola parte che è dell'utente.
+  let inPausaVisibili = { bacheca: false, mazzi: false };
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
-      { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+      ...(inPausaVisibili.mazzi ? [{ label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' }] : []),
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
       { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
       { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
-      { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
+      inPausaVisibili.bacheca
+        ? { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' }
+        : { label: 'Le tue segnalazioni', icon: 'feedback', url: 'filo://board/board.html#segnalazioni' },
     ];
     if (isAdmin) {
       entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
@@ -311,7 +316,24 @@
   }
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
-  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, buildApps()));
+  // Lo stato di adesso; una copia scaduta il main la rilegge in sottofondo e annuncia il cambio.
+  function rifletteInPausa(r) {
+    if (!r || !r.ok) return;
+    inPausaVisibili = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
+  }
+  function refreshInPausa(attendi = false) {
+    if (!MSG_FILO.IN_PAUSA_STATO) return Promise.resolve();
+    return api.message({ type: MSG_FILO.IN_PAUSA_STATO, attendi }).then(rifletteInPausa).catch(() => {});
+  }
+  refreshInPausa(true);
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(inPausaVisibili, m.nome)) {
+        inPausaVisibili = { ...inPausaVisibili, [m.nome]: m.visible === true };
+      } else if (m?.type === MSG_FILO.AUTH_CHANGED) refreshInPausa(true);
+    });
+  }
+  appsBtn.addEventListener('click', () => { showNativeMenu(appsBtn, buildApps()); refreshInPausa(); });
 
   // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
   // non più nel menu Impostazioni → apre la finestra incognito nel main.

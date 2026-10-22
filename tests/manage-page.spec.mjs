@@ -60,7 +60,7 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
-  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Red Team');
+  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('In pausa');
   // I Modelli di supporto stanno dentro Automazioni (#1110).
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveCount(0);
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');

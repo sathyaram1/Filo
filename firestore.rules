@@ -48,6 +48,16 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
 
+    // Un interruttore «aperto a tutti» dell'owner (config/redteam, config/bacheca,
+    // config/mazzi): solo `openToAll` booleano e la data in cui è cambiato.
+    function interruttoreValido(d) {
+      return d.keys().hasOnly(['openToAll', 'updatedAt'])
+        && d.get('openToAll', false) is bool
+        && (!('updatedAt' in d)
+            || d.updatedAt is timestamp
+            || (d.updatedAt is string && d.updatedAt.size() <= 40));
+    }
+
     // Un richiedente è una routine se è loggato con email verificata ed esiste
     // un documento `routines/<sua-email>`. Ruolo deliberatamente debole.
     function isRoutine() {
@@ -303,13 +313,21 @@ service cloud.firestore {
     // basta, e la pagina del Red Team deve poter dire «in pausa» a chiunque.
     match /config/redteam {
       allow read: if true;
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['openToAll', 'updatedAt'])
-        && request.resource.data.get('openToAll', false) is bool
-        && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp
-            || (request.resource.data.updatedAt is string
-                && request.resource.data.updatedAt.size() <= 40));
+      allow create, update: if isAdmin() && interruttoreValido(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // config/bacheca e config/mazzi (#1592) → `openToAll`, come config/redteam:
+    // la Bacheca e il Deck builder sono aperti a chi non è admin? Spento, assente o
+    // illeggibile = in pausa. Lettura pubblica: dentro c'è un interruttore e basta.
+    match /config/bacheca {
+      allow read: if true;
+      allow create, update: if isAdmin() && interruttoreValido(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    match /config/mazzi {
+      allow read: if true;
+      allow create, update: if isAdmin() && interruttoreValido(request.resource.data);
       allow delete: if isAdmin();
     }
 

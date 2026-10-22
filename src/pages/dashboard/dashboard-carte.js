@@ -23,6 +23,8 @@
     editor: null,
     mazzi: null,
     impostazioni: null,
+    // Bacheca e Deck builder in pausa (#1592): finché il main non risponde, in pausa come per chi non li vede.
+    aperte: { bacheca: false, mazzi: false },
   };
 
   const VOCI_IN_CARTA = 5;
@@ -503,8 +505,14 @@
 
   const COSTRUTTORI = { editor: cartaEditor, mazzi: cartaMazzi, suggerimenti: cartaSuggerimenti, rapide: cartaRapide };
 
+  // La carta di una funzione in pausa non c'è, né a destra né fra le tolte: la disposizione salvata resta com'è.
+  const inPausa = (id) => id === 'mazzi' && !dati.aperte.mazzi;
+  // Con la Bacheca in pausa l'app porta alle sole segnalazioni dell'utente, che restano sue. Il nome corto sta nella cella.
+  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
+  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? SEGNALAZIONI : a));
+
   function carteDestra() {
-    return ((layout && layout.destra) || []).map((id) => {
+    return ((layout && layout.destra) || []).filter((id) => !inPausa(id)).map((id) => {
       const def = C.carta(id);
       const corpo = COSTRUTTORI[id]();
       return {
@@ -665,12 +673,12 @@
   const ICONA_SINISTRA = { crediti: 'credits', download: 'download', lavoro: 'sparkles', timer: 'timer', sveglia: 'alarm', avviso: 'bell' };
   let formaAltro = '';
   function disegnaAltro() {
-    const tolte = ((layout && layout.tolte) || []).map((id) => ({ ...C.carta(id), tolta: true }));
+    const tolte = ((layout && layout.tolte) || []).filter((id) => !inPausa(id)).map((id) => ({ ...C.carta(id), tolta: true }));
     const sinistre = C.nascosteSinistra(datiSinistra(), layout).map((v) => ({
       id: v.chiave, titolo: v.tipo === 'crediti' ? 'Crediti' : v.titolo, icona: ICONA_SINISTRA[v.tipo] || 'bell',
       url: v.tipo === 'crediti' ? URL_CREDITI : null, tolta: true, sinistra: true,
     }));
-    const voci = [...sinistre, ...tolte, ...C.APP];
+    const voci = [...sinistre, ...tolte, ...appVisibili()];
     const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}:${v.titolo}`).join(',');
     if (f === formaAltro && altroEl.childElementCount) return;
     formaAltro = f;
@@ -982,6 +990,12 @@
     dati.lavori = r && r.ok && Array.isArray(r.lavori) ? r.lavori : [];
     disegna();
   }
+  async function caricaAperte(attendi = false) {
+    const r = await d.send({ type: MSG.IN_PAUSA_STATO, attendi });
+    if (!r || !r.ok) return;
+    dati.aperte = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
+    disegna();
+  }
   async function caricaImpostazioni() {
     try { dati.impostazioni = await global.SN_STORAGE.getSettings(); } catch (_) { dati.impostazioni = {}; }
     disegna();
@@ -1010,18 +1024,25 @@
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
       else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
+      else if (msg.type === MSG.IN_PAUSA_CAMBIATO && Object.prototype.hasOwnProperty.call(dati.aperte, msg.nome)) {
+        dati.aperte = { ...dati.aperte, [msg.nome]: msg.visible === true };
+        disegna();
+      } else if (msg.type === MSG.AUTH_CHANGED) caricaAperte(true).catch(() => {});
       else if (msg.type === MSG.TAB_IN_VISTA && msg.inVista) {
         caricaEditor().catch(() => {});
         caricaMazzi().catch(() => {});
         caricaDownloads().catch(() => {});
         caricaLavori().catch(() => {});
+        caricaAperte().catch(() => {});
       }
     });
-    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori()]).catch(() => {});
+    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori(),
+      caricaAperte(true)]).catch(() => {});
   }
 
   global.SN_DASH_CARTE = {
     init,
+    aperta: (nome) => dati.aperte[nome] === true,
     setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];

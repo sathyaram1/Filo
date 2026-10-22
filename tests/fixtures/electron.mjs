@@ -110,8 +110,11 @@ export const test = base.extend({
   argomentiInPiu: [[], { option: true }],
   // Nomi in più portati al loopback, per le prove che vogliono un sito col suo nome (example.org, #823).
   hostInPiu: [[], { option: true }],
+  // Bacheca e Deck builder (#1592) sono in pausa per chi non è owner: le loro prove li trovano aperti a tutti.
+  // Chi prova la pausa e l'interruttore passa `test.use({ inPausaAperte: false })`.
+  inPausaAperte: [true, { option: true }],
 
-  app: async ({ accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu }, use, testInfo) => {
+  app: async ({ accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -146,6 +149,7 @@ export const test = base.extend({
         FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
         ...(riservaNuovaScheda ? { FILO_RISERVA_NUOVA_SCHEDA: '1' } : {}),
         FILO_STRATO_MENU: stratoDelMenu ? '1' : '0',
+        FILO_TEST_IN_PAUSA_APERTE: inPausaAperte ? '1' : '0',
         // I download ("Salva immagine come…") finiscono qui SENZA dialogo
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.

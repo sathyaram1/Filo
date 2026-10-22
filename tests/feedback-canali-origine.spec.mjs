@@ -59,6 +59,9 @@ const PORTE_784 = {
   redteamRevocaCodice: ['REDTEAM_REVOKE_CODE', { code: 'ABCD-EFGH' }],
   redteamApertoLettura: ['REDTEAM_OPEN_GET', {}],
   redteamApertoScrittura: ['REDTEAM_OPEN_SET', { openToAll: true }],
+  // #1592 — gli interruttori di Bacheca e Deck builder: aprirli da un sito li mostrerebbe a tutti.
+  inPausaLettura: ['IN_PAUSA_GET', { nome: 'bacheca' }],
+  inPausaScrittura: ['IN_PAUSA_SET', { nome: 'mazzi', openToAll: true }],
   provaModelloScelto: ['TEST_DEFAULT_MODEL', { provider: 'openrouter', model: 'qualsiasi/modello' }],
   catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
   elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],

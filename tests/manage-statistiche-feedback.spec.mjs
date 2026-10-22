@@ -91,7 +91,8 @@ test('#496 — la scheda «Statistiche feedback» sta accanto a quella del Red T
   const nuova = page.locator('.mg-tab[data-tab="fbstats"]');
   const redteam = page.locator('.mg-tab[data-tab="stats"]');
   await expect(nuova).toHaveText('Statistiche feedback');
-  await expect(redteam).toHaveText('Red Team');
+  // #1592 — la scheda del Red Team tiene anche Bacheca e Deck builder: si chiama «In pausa».
+  await expect(redteam).toHaveText('In pausa');
   // Una accanto all'altra, nell'ordine: prima i feedback, poi il red team.
   const xNuova = (await nuova.boundingBox()).x;
   const xRed = (await redteam.boundingBox()).x;

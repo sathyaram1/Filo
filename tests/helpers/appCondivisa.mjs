@@ -12,12 +12,12 @@ import { primaFinestra } from './primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export const OPZIONI_FIXTURE = Object.freeze({ accoglienzaFatta: true, riservaNuovaScheda: false, stratoDelMenu: false, argomentiInPiu: [], hostInPiu: [] });
+export const OPZIONI_FIXTURE = Object.freeze({ accoglienzaFatta: true, riservaNuovaScheda: false, stratoDelMenu: false, argomentiInPiu: [], hostInPiu: [], inPausaAperte: true });
 // Le stesse della fixture, nello stesso ordine: la sentinella le confronta col suo sorgente.
 export const REGOLE_HOST = Object.freeze(['MAP blocked.test 127.0.0.1', 'MAP 192.168.1.1 127.0.0.1:9', 'MAP sito-pubblico.test 127.0.0.1']);
 
 /** Argomenti e ambiente del lancio, gli stessi della fixture `app`. PURA. */
-export function lancio(userData, { accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu } = OPZIONI_FIXTURE, env = process.env) {
+export function lancio(userData, { accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte } = OPZIONI_FIXTURE, env = process.env) {
   const regole = [...REGOLE_HOST, ...hostInPiu.map((h) => `MAP ${h} 127.0.0.1`)].join(', ');
   return {
     args: [...argomentiScala, ...argomentiInPiu, `--host-resolver-rules=${regole}`, '.'],
@@ -28,6 +28,7 @@ export function lancio(userData, { accoglienzaFatta, riservaNuovaScheda, stratoD
       FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
       ...(riservaNuovaScheda ? { FILO_RISERVA_NUOVA_SCHEDA: '1' } : {}),
       FILO_STRATO_MENU: stratoDelMenu ? '1' : '0',
+      FILO_TEST_IN_PAUSA_APERTE: inPausaAperte ? '1' : '0',
       FILO_DOWNLOAD_DIR: join(userData, 'downloads'),
       NODE_ENV: 'test',
     },

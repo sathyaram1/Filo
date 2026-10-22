@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  let sezione, conto, lista, vuoto, altre, titoloMigliorie;
+  let sezione, conto, lista, vuoto, altre, titoloMigliorie, titoloSezione;
 
   // Chiusa, la sezione mostra le più recenti: in cima alla bacheca non deve spingere giù i miglioramenti.
   const RECENTI = 3;
@@ -18,6 +18,8 @@
   };
 
   let tutte = location.hash === '#segnalazioni';
+  // Con la Bacheca in pausa (#1592) la pagina è solo questa: tutte le righe, sempre, col titolo della pagina.
+  const soloLoro = () => document.body.dataset.bachecaPausa === '1';
   let voci = [];
   let precedenti = false;
   const righe = new Map();
@@ -231,7 +233,7 @@
 
   function disegna() {
     const tutteLe = ordinate();
-    const visibili = tutte ? tutteLe : tutteLe.slice(0, RECENTI);
+    const visibili = tutte || soloLoro() ? tutteLe : tutteLe.slice(0, RECENTI);
     const vivi = new Set(tutteLe.map((v) => v.id));
     for (const [id, r] of righe) if (!vivi.has(id)) { r.el.remove(); righe.delete(id); }
     const mostrati = new Set(visibili.map((v) => v.id));
@@ -250,15 +252,16 @@
     const n = tutteLe.length;
     conto.textContent = n ? String(n) : '';
     // Chi ha segnalazioni di prima la trova anche aprendo la Bacheca dal menu, con la frase che spiega il vuoto.
-    const mostra = n > 0 || precedenti || location.hash === '#segnalazioni';
+    const mostra = n > 0 || precedenti || location.hash === '#segnalazioni' || soloLoro();
     sezione.hidden = !mostra;
+    titoloSezione.classList.toggle('bd-h2-pagina', soloLoro());
     if (titoloMigliorie) titoloMigliorie.hidden = !mostra;
     vuoto.hidden = n > 0;
     // Chi ha mandato segnalazioni prima che l'elenco esistesse non deve leggere che non ne ha mai mandate.
     vuoto.textContent = precedenti
       ? 'Quelle che hai mandato prima di questa versione compaiono qui quando vengono risolte.'
       : 'Da questo computer non hai ancora mandato segnalazioni.';
-    altre.hidden = n <= RECENTI;
+    altre.hidden = n <= RECENTI || soloLoro();
     altre.textContent = tutte ? 'Solo le ultime' : `Tutte e ${n}`;
     altre.setAttribute('aria-expanded', String(tutte));
   }
@@ -269,7 +272,16 @@
     try { r = await send({ type: 'segnalazioni_mie_list' }); } catch (_) { r = null; }
     if (mio !== giro) return;
     // L'incognito non vede l'elenco: la sezione non compare, come se non ci fosse.
-    if (!r || !r.ok || r.incognito) { sezione.hidden = true; if (titoloMigliorie) titoloMigliorie.hidden = true; return; }
+    if (!r || !r.ok || r.incognito) {
+      if (!soloLoro()) { sezione.hidden = true; if (titoloMigliorie) titoloMigliorie.hidden = true; return; }
+      // Senza la Bacheca intorno, una pagina vuota non direbbe niente: si dice perché l'elenco non c'è.
+      voci = [];
+      disegna();
+      vuoto.textContent = r && r.incognito
+        ? 'In una finestra in incognito l’elenco delle tue segnalazioni non si vede.'
+        : 'Non riesco a leggere l’elenco delle tue segnalazioni: riprova fra poco.';
+      return;
+    }
     voci = Array.isArray(r.voci) ? r.voci : [];
     precedenti = !!r.precedenti;
     disegna();
@@ -286,6 +298,7 @@
     vuoto = document.getElementById('bdMieVuoto');
     altre = document.getElementById('bdMieAltre');
     titoloMigliorie = document.getElementById('bdMiglioramentiTitolo');
+    titoloSezione = document.getElementById('bdMieTitolo');
     if (!sezione || !lista) return;
 
     altre.addEventListener('click', () => { tutte = !tutte; disegna(); });
@@ -306,5 +319,5 @@
     carica();
   }
 
-  window.SN_BOARD_SEGNALAZIONI = { init };
+  window.SN_BOARD_SEGNALAZIONI = { init, rinfresca: () => { if (sezione) carica(); } };
 })();

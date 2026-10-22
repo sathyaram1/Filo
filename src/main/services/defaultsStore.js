@@ -51,8 +51,9 @@ const ROUTINES_DOC = 'config/routines';
 // Le manopole dei crediti (#652). Il documento lo legge il server dei crediti a
 // ogni riscatto, quota e premio; da qui lo scrive l'owner dalla sua pagina.
 const CREDITS_DOC = 'config/credits';
-// L'interruttore del Red Team (#896): lettura pubblica, scrittura dell'owner.
-const REDTEAM_DOC = 'config/redteam';
+// Gli interruttori delle funzioni in pausa per chi non è owner (#896 Red Team, #1592 Bacheca e Mazzi):
+// un documento ciascuno, lettura pubblica, scrittura dell'owner.
+const DOC_IN_PAUSA = Object.freeze({ redteam: 'config/redteam', bacheca: 'config/bacheca', mazzi: 'config/mazzi' });
 
 // Cache degli override remoti dall'ultimo refresh.
 // Campi del doc modelli lasciati dal fornitore ritirato: il salvataggio li toglie.
@@ -815,23 +816,33 @@ async function setRoutineRoleModel(patch, idToken) {
 }
 
 
-// ── Red Team aperto a tutti (#896) ───────────────────────────────────────────
+// ── Aperto a tutti: Red Team (#896), Bacheca e Mazzi (#1592) ────────────────
 // `aperto` è vero solo per un `openToAll: true` scritto: documento assente o
 // illeggibile vale «in pausa», come sul server. `risposto` distingue la rete giù
 // dal no del server, perché chi tiene una copia in memoria possa riprovare.
-async function getRedteamOpen() {
-  const r = await leggiDoc(REDTEAM_DOC, null);
+function docInPausa(nome) {
+  const doc = Object.prototype.hasOwnProperty.call(DOC_IN_PAUSA, nome) ? DOC_IN_PAUSA[nome] : null;
+  if (!doc) throw new Error(`Interruttore sconosciuto: ${nome}`);
+  return doc;
+}
+
+async function getApertoATutti(nome) {
+  const r = await leggiDoc(docInPausa(nome), null);
   return { risposto: r.risposto, aperto: !!(r.doc && r.doc.openToAll === true) };
 }
 
-async function setRedteamOpen(on, idToken) {
-  if (!idToken) throw new Error('Serve un ID token admin per aprire o mettere in pausa il Red Team.');
-  await patchDoc(REDTEAM_DOC, {
+async function setApertoATutti(nome, on, idToken) {
+  const doc = docInPausa(nome);
+  if (!idToken) throw new Error('Serve un ID token admin per aprire o mettere in pausa una funzione.');
+  await patchDoc(doc, {
     openToAll: toFsValue(Boolean(on)),
     updatedAt: { timestampValue: new Date(adesso()).toISOString() },
   }, ['openToAll', 'updatedAt'], idToken);
   return Boolean(on);
 }
+
+const getRedteamOpen = () => getApertoATutti('redteam');
+const setRedteamOpen = (on, idToken) => setApertoATutti('redteam', on, idToken);
 
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
 // Le impostazioni di `config/credits` che l'owner cambia dalla sua
@@ -939,5 +950,7 @@ module.exports = {
   setCreditsKnobs,
   getRedteamOpen,
   setRedteamOpen,
+  getApertoATutti,
+  setApertoATutti,
   getWorkerLog,
 };

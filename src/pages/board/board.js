@@ -1004,9 +1004,32 @@
     });
   }
 
+  // La Bacheca in pausa (#1592): la pagina parte con le sole segnalazioni dell'utente e mostra il resto a chi la vede
+  // (l'owner, o tutti se l'ha aperta). Niente voti, niente «Ancora rotto?», niente letture dei miglioramenti.
+  const MSG_PAUSA = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  async function bachecaAperta() {
+    try {
+      const r = await sendToMain({ type: MSG_PAUSA.IN_PAUSA_STATO || 'in_pausa_stato', attendi: true });
+      return !!(r && r.ok && r.bacheca && r.bacheca.visible);
+    } catch (_) { return false; }
+  }
+  let aperta = false;
+  if (window.chrome?.runtime?.onMessage?.addListener) {
+    // Aperta o rimessa in pausa mentre la pagina è aperta: si rifà da capo, come all'apertura.
+    window.chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === (MSG_PAUSA.IN_PAUSA_CAMBIATO || 'in_pausa_cambiato') && msg.nome === 'bacheca'
+        && (msg.visible === true) !== aperta) location.reload();
+    });
+  }
+
   async function init() {
     // «Le tue segnalazioni» (#986) vive in board-segnalazioni.js e non aspetta la rete dei miglioramenti.
     try { window.SN_BOARD_SEGNALAZIONI?.init(); } catch (e) { console.warn('[bacheca] segnalazioni:', e); }
+    aperta = await bachecaAperta();
+    if (!aperta) return;
+    delete document.body.dataset.bachecaPausa;
+    document.title = 'Filo — Bacheca';
+    try { window.SN_BOARD_SEGNALAZIONI?.rinfresca(); } catch (_) {}
     await refreshAuth();
     await loadData();
   }

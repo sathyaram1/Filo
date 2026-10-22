@@ -14,6 +14,8 @@
   const GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
   const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
   const VAI = Object.freeze({ editor: "Apri nell'Editor", mazzi: 'Apri nei Mazzi', aiuto: 'Apri la pagina' });
+  // Il Deck builder in pausa (#1592) non si apre da qui: la conversazione resta, la strada per l'app no.
+  const vai = (app) => (app === 'mazzi' && !(global.SN_DASH_CARTE && global.SN_DASH_CARTE.aperta('mazzi')) ? '' : VAI[app] || '');
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;
@@ -120,14 +122,14 @@
     }
     const parti = (chat.messages || []).filter((m) => m && String(m.text || '').trim()).map(messaggio);
     const v = r.vista;
-    if (v.dove && VAI[v.app]) {
-      const vai = document.createElement('button');
-      vai.type = 'button';
-      vai.className = 'dash-riga-app-vai';
-      vai.textContent = VAI[v.app];
-      vai.title = v.app === 'aiuto' ? v.dove : VAI[v.app];
-      vai.addEventListener('click', (e) => { e.stopPropagation(); apri(r); });
-      parti.push(vai);
+    if (v.dove && vai(v.app)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-riga-app-vai';
+      b.textContent = vai(v.app);
+      b.title = v.app === 'aiuto' ? v.dove : vai(v.app);
+      b.addEventListener('click', (e) => { e.stopPropagation(); apri(r); });
+      parti.push(b);
     }
     r.corpo.replaceChildren(...parti);
   }
@@ -188,7 +190,7 @@
     const voci = [
       { type: 'item', icon: icona('caretDown', 16), label: r.aperta ? 'Chiudi lo scambio' : 'Mostra lo scambio', onClick: () => alterna(r).catch(() => {}) },
     ];
-    if (r.vista.dove && VAI[r.vista.app]) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: VAI[r.vista.app], onClick: () => apri(r) });
+    if (r.vista.dove && vai(r.vista.app)) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: vai(r.vista.app), onClick: () => apri(r) });
     voci.push({ type: 'item', icon: icona('copy', 16), label: 'Copia lo scambio', onClick: () => copia(r).catch(() => {}) });
     // #1295 — come una conversazione della home: nascosta si rimette, «Togli dal filo» la cancella.
     if (global.SN_DASH_CODA && global.SN_DASH_CODA.nascondi) {

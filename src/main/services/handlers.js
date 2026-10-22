@@ -3684,8 +3684,12 @@ async function eseguiAzioneFilo(action, {
             if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender });
           }
         }
+        // Il Deck builder in pausa (#1592) non ha una carta da rimettere o spostare: per chi chiede non esiste.
+        if (CH.risolvi(action.carta) === 'mazzi' && !require('./inPausa').aperti().mazzi) {
+          return { executed: false, kept: false, output: { error: 'carta sconosciuta', ...descriviCarte(await require('./carteHome').leggi()) } };
+        }
         const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
-        const dove = CH.descrivi(esito.layout);
+        const dove = descriviCarte(esito.layout);
         if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
         return { executed: true, kept: true, output: dove };
@@ -3808,9 +3812,13 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
     });
 }
 
-// Le capacità che l'agente conosce dipendono da chi usa Filo: il Red Team in pausa solo a chi lo vede (#896).
+// Le capacità che l'agente conosce dipendono da chi usa Filo: Red Team (#896), Bacheca e Mazzi (#1592) in pausa
+// solo a chi li vede.
 function cancelliAperti() {
-  try { return { redteam: require('./redteamGate').visibile() }; } catch (_) { return {}; }
+  const aperti = {};
+  try { aperti.redteam = require('./redteamGate').visibile(); } catch (_) {}
+  try { Object.assign(aperti, require('./inPausa').aperti()); } catch (_) {}
+  return aperti;
 }
 
 function broadcastLiveUpdate() {
@@ -6244,6 +6252,15 @@ async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {
   return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
 }
 
+// Dove stanno le carte di destra per il modello, senza quella di una funzione in pausa (#1592).
+function descriviCarte(layout) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const dove = CH.descrivi(layout);
+  if (require('./inPausa').aperti().mazzi) return dove;
+  const mazzi = CH.carta('mazzi').titolo;
+  return { destra: dove.destra.filter((t) => t !== mazzi), altro: dove.altro.filter((t) => t !== mazzi) };
+}
+
 // null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
 async function rimettiSinistraDaChat({ action, sender, chatId }) {
   const CH = globalThis.SN_CARTE_HOME;
@@ -6267,7 +6284,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   const CH = globalThis.SN_CARTE_HOME;
   const Carte = require('./carteHome');
   const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
-  const destra = CH.descrivi(await Carte.leggi());
+  const destra = descriviCarte(await Carte.leggi());
   const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...destra } });
   const voci = trovate.voci;
   if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
@@ -6598,6 +6615,7 @@ require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'a
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);
+require('./handlers/inPausa')(on, handlerCtx); // #1592 — Bacheca e Mazzi in pausa per chi non è owner
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
