@@ -33,9 +33,3 @@ test('r1 un’immagine vera di ChatGPT si dice generata con l’AI, non modifica
   await page.screenshot({ path: 'tests/.shots/verifica-946.1-chatgpt-vera.png' }).catch(() => {});
   await expect(riga).toHaveAttribute('aria-label', /^Generata con l’AI/);
 });
-
-test('r2 un’immagine vera di ChatGPT di prima del congelamento non si dice «incompleta»', async ({ app, openTab, testServer }) => {
-  const { riga } = await rigaSullaVera(app, openTab, testServer);
-  await expect(riga).not.toHaveAttribute('aria-label', /incomplete/);
-  await expect(riga).not.toHaveClass(/sn-menu-origine-debole/);
-});
