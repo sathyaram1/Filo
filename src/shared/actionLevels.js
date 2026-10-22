@@ -505,6 +505,10 @@
     APRI_SALVATA: {
       costo: 1,
       campo: 'web',
+      // Il titolo che torna l'ha scritto il sito, come in CERCA_SALVATE.
+      fonte: (a, out) => (out.aperta
+        ? { classe: 3, campo: 'web', chiave: 'salvate:titoli', motivo: 'ho letto il titolo di una pagina che hai salvato per dopo, scritto dal sito' }
+        : null),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         const quale = t ? cit(t) : 'una pagina salvata per dopo';
