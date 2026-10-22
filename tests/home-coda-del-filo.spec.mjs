@@ -409,7 +409,7 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   const cerca = page.locator('#cercaInput');
   await cerca.fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
-  const r = await page.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'oggi' }));
+  const r = await page.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'ultima_ora' }));
   expect(r.ok).toBe(true);
   await cerca.fill('');
   await cerca.fill('delfini');
