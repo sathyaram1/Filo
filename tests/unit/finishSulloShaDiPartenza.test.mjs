@@ -13,6 +13,7 @@ import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
 import { apriProvaSulCommit, pulisciResti, gitIn, togliCollegamento } from '../../scripts/lib/unit-sulla-fusione.mjs';
+import { testoFuoriDaiCommit } from '../../scripts/finish-local.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // node_modules vero, ovunque giri questo file: anche dalla cartella staccata di finish, che ce l'ha un livello sopra.
