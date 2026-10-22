@@ -1135,12 +1135,16 @@ test.describe('spellcheck-segni-restano', () => {
       globalThis.__scan = 0;
       const finto = async ({ messages }) => {
         const t = JSON.stringify(messages);
-        if (t.includes('Sei il controllo rapido di un correttore')) {
+        if (t.includes('Sei il controllo rapido')) {
           globalThis.__scan += 1;
           const parole = [...new Set(t.match(/xq[a-z]+\d+/g) || [])];
+          // Come un modello vero conferma i refusi fra i candidati (ciiao, staii): uno taciuto sarebbe giusto (#1580).
+          const candidati = [...String(messages[messages.length - 1].content).matchAll(/^\[([^\]\n]+)\]/gm)]
+            .map((m) => m[1]).filter((w) => !parole.includes(w));
           // `__trattieni`: la risposta aspetta che la prova la lasci andare, come un modello lento.
           if (globalThis.__trattieni) await new Promise((ok) => globalThis.__rilascia.push(ok));
-          return { text: parole.map((w) => `[${w}][y][x][errore]`).join('\n') || '[][][][nessuno]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+          const righe = [...parole.map((w) => `[${w}][y][x][errore]`), ...candidati.map((w) => `[${w}][${w.replace(/(.)\1/g, '$1')}][refuso][errore]`)];
+          return { text: righe.join('\n') || 'NIENTE', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
         }
         // «Correggi» nel riquadro Modifica, sulla prima riga della prova del rosso.
         if (t.includes('Correggi eventuali errori')) return { text: 'ciao amico mio', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };

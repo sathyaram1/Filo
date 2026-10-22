@@ -15,9 +15,15 @@
 
   // Le parole come le conta il dizionario: lettere, con apostrofi e trattini dentro («l'America», «e-mail», «po'»).
   const PAROLA = /[\p{L}\p{M}]+(?:['’-][\p{L}\p{M}]+)*['’]?/gu;
-  // Il pezzo da giudicare in una volta: un documento incollato si giudica a tratti, uno per controllo.
+  // Il pezzo che il controllo rapido giudica in una volta: un documento incollato si giudica a tratti, uno per controllo.
   const REGIONE_MAX = 6000;
+  // Il controllo ragionato rilegge il campo intero fino a qui; oltre, l'ultima parte (#1580, D3).
+  const TESTO_INTERO_MAX = 12000;
   const MOTIVO_MAX = 160;
+  // Il segno sbiadito subito solo su una parola minuscola in alfabeto latino: maiuscole e altri alfabeti sono quasi
+  // sempre nomi, sigle o lingue che il dizionario non ha, e aspettano il modello (#1580, D6).
+  const LATINA_MINUSCOLA = /^[\p{Script=Latin}\p{M}'’-]+$/u;
+  const minuscolaLatina = (p) => p === p.toLowerCase() && LATINA_MINUSCOLA.test(p);
 
   // Le stesse parole a meno di spazi e punteggiatura: il giudizio sarebbe lo stesso (#1097.5). Apostrofo e trattino
   // invece cambiano le parole («un amico» / «un'amico», «e-mail»).
@@ -63,7 +69,8 @@
   }
 
   // `sbagliata(parola)`: il dizionario del browser; `nota(parola)`: le parole che Filo sa giuste (dizionario personale,
-  // scarti del modello). Una parola attaccata a cifre («2m», «x86») non si chiede.
+  // scarti del modello). Una parola attaccata a cifre («2m», «x86») non si chiede. `attende`: il candidato parte verso il
+  // modello ma non si disegna finché il modello non lo conferma.
   function candidatiDizionario(testo, { sbagliata, nota = () => false } = {}) {
     if (typeof sbagliata !== 'function') return [];
     const fuori = zoneEscluse(testo);
@@ -73,10 +80,14 @@
       if (diParola(testo[start - 1]) || diParola(testo[end])) continue;
       if (fuori.some(([a, b]) => start < b && end > a)) continue;
       if (nota(parola) || !sbagliata(parola.replace(/’/g, "'"))) continue;
-      out.push(segno(testo, start, end, { fonte: 'dizionario', tipo: 'ortografia' }));
+      out.push(segno(testo, start, end, { fonte: 'dizionario', tipo: 'ortografia', ...(minuscolaLatina(parola) ? {} : { attende: true }) }));
     }
     return out;
   }
+
+  // Ripetizioni, errori fissi e date impossibili sono sbagliati comunque: segno pieno subito, nessun giudizio da
+  // aspettare né da chiedere (#1580, D5).
+  const CERTO = { dubbio: false, certo: true };
 
   // Le parole grammaticali, che ripetute di fila sono un refuso. Le parole piene no («piano piano», «quasi quasi»), né
   // quelle che ripetute possono essere giuste: «se se ne va», «si si», «that that», «had had», gli articoli tedeschi.
@@ -100,7 +111,7 @@
       if (!uguali(p, q) || !vicine(p, q) || !GRAMMATICALI.has(q.parola.toLowerCase())) continue;
       if ((uguali(ps[i - 2], p) && vicine(ps[i - 2], p)) || (uguali(q, ps[i + 1]) && vicine(q, ps[i + 1]))) continue;
       out.push(segno(testo, p.end, q.end, {
-        fonte: 'ripetizione', tipo: 'ripetizione', correzioni: [''], motivo: t('spell_ripetuta', q.parola),
+        ...CERTO, fonte: 'ripetizione', tipo: 'ripetizione', correzioni: [''], motivo: t('spell_ripetuta', q.parola),
       }));
     }
     return out;
@@ -125,7 +136,7 @@
       if (fuori.some(([a, b]) => start < b && end > a)) continue;
       const correzione = comeScritto(parola, giusta);
       out.push(segno(testo, start, end, {
-        fonte: 'fisso', tipo: 'fisso', correzioni: [correzione], motivo: t('spell_fisso', correzione),
+        ...CERTO, fonte: 'fisso', tipo: 'fisso', correzioni: [correzione], motivo: t('spell_fisso', correzione),
       }));
     }
     return out;
@@ -225,16 +236,23 @@
     return a;
   }
 
-  // Come daGiudicare, a frasi intere. `finoA`: oltre non si giudica (la frase ancora aperta), torna al giro dopo.
-  function frasiDaGiudicare(base, adesso, { finoA = null, max = REGIONE_MAX } = {}) {
+  // Il controllo ragionato rilegge il campo intero, se qualcosa è cambiato: oltre `max` caratteri l'ultima parte, o la
+  // parte che comincia con la frase cambiata se il cambio sta tutto prima. `finoA`: la frase aperta resta al giro dopo.
+  // `nuovo`: quello che è cambiato davvero, dove si cerca un pezzo che la risposta cita più volte.
+  function testoDaRileggere(base, adesso, { finoA = null, max = TESTO_INTERO_MAX } = {}) {
     adesso = String(adesso ?? '');
     const r = regioneNuova(base, adesso);
     if (!r) return null;
-    const f = aFrasiIntere(adesso, r.start, r.end);
-    const limite = typeof finoA === 'number' ? Math.min(f.end, finoA) : f.end;
-    return daGiudicare(base, adesso, {
-      max, regione: { start: f.start, end: f.end }, inScrittura: limite < f.end ? { start: limite, end: f.end } : null,
+    const fine = typeof finoA === 'number' ? Math.max(0, Math.min(adesso.length, finoA)) : adesso.length;
+    if (r.start >= fine) return null;
+    let start = Math.max(0, fine - max);
+    if (r.end <= start) start = aFrasiIntere(adesso, r.start, r.end).start;
+    while (start > 0 && start < adesso.length && diParola(adesso[start - 1]) && diParola(adesso[start])) start++;
+    const g = daGiudicare(base, adesso, {
+      max, regione: { start, end: Math.min(adesso.length, start + max) },
+      inScrittura: fine < adesso.length ? { start: fine, end: adesso.length } : null,
     });
+    return g && { ...g, nuovo: { start: Math.max(g.start, r.start), end: Math.min(g.end, r.end) } };
   }
 
   // ── La risposta del modello ───────────────────────────────────────────────
@@ -245,13 +263,19 @@
   }
 
   // Una riga per segno: [pezzo][correzione][motivo][tipo], più [citazione] per una contraddizione; il resto si ignora.
+  // Una riga a tre campi ha perso il tipo (`tipo: ''`, lo decide chi legge), o il motivo se il terzo è un tipo (#1580, D8).
+  const TIPI = new Set(['errore', 'suggerimento', 'contraddizione', 'giusto', 'nessuno']);
   function leggiRighe(raw) {
     const out = [];
     for (const riga of String(raw == null ? '' : raw).split(/\r?\n/)) {
       const r = riga.trim().replace(/^[-*•]\s*/, '');
       if (!r.startsWith('[') || !r.endsWith(']')) continue;
       const campi = r.slice(1, -1).split(/\]\s*\[/);
-      if (campi.length < 4 || campi.length > 5) continue;
+      if (campi.length < 3 || campi.length > 5) continue;
+      if (campi.length === 3) {
+        if (TIPI.has(campi[2].trim().toLowerCase())) campi.splice(2, 0, '');
+        else campi.push('');
+      }
       const [pezzo, correzione, motivo, tipo, citazione = ''] = campi;
       out.push({ pezzo, correzione, motivo: motivo.trim(), tipo: tipo.trim().toLowerCase(), citazione: citazione.trim() });
       if (out.length >= 60) break;
@@ -259,20 +283,57 @@
     return out;
   }
 
-  // Il pezzo nel testo di adesso, se ci sta esattamente una volta. Apici e virgolette tipografiche valgono quelle dritte
-  // (stessa lunghezza: le posizioni restano quelle del testo).
-  const dritte = (s) => s.replace(/[‘’‚‛]/g, '\'').replace(/[“”„]/g, '"');
-  function trovaUnaVolta(testo, pezzo) {
-    testo = String(testo ?? '');
-    pezzo = String(pezzo ?? '');
-    if (!pezzo.trim()) return null;
-    for (const [dove, cosa] of [[testo, pezzo], [dritte(testo), dritte(pezzo)]]) {
-      const i = dove.indexOf(cosa);
-      if (i < 0) continue;
-      if (dove.indexOf(cosa, i + 1) >= 0) return null;
-      return { start: i, end: i + cosa.length };
+  // Una risposta senza nessuna riga leggibile che non dice nemmeno «nessuno» o «NIENTE»: la chiamata si ripete una volta.
+  const senzaRighe = (raw) => !leggiRighe(raw).length && !/nessun|niente/i.test(String(raw ?? ''));
+
+  // Il pezzo nel testo di adesso. Le file di spazi valgono uno spazio e apici e virgolette tipografiche quelli dritti
+  // (#1580, D8). Se compare più volte vale l'unica occorrenza che tocca `nuovo`, il testo nuovo di quella chiamata; se no
+  // si scarta. Prima le occorrenze a parole intere: «sono» non si cerca dentro «persono».
+  const APICI = /['‘’‚‛]/;
+  const VIRGOLETTE = /["“”„]/;
+  const esc = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function formaDelPezzo(pezzo) {
+    let out = '';
+    for (const pezzetto of pezzo.split(/(\s+)/)) {
+      if (!pezzetto) continue;
+      if (/^\s+$/.test(pezzetto)) { out += '\\s+'; continue; }
+      for (const c of pezzetto) out += APICI.test(c) ? '[\'‘’‚‛]' : VIRGOLETTE.test(c) ? '["“”„]' : esc(c);
     }
-    return null;
+    return new RegExp(out, 'gu');
+  }
+  function trovaPezzo(testo, pezzo, nuovo = null) {
+    testo = String(testo ?? '');
+    pezzo = String(pezzo ?? '').trim();
+    if (!pezzo) return null;
+    const tutte = [...testo.matchAll(formaDelPezzo(pezzo))].map((m) => ({ start: m.index, end: m.index + m[0].length }));
+    const intere = tutte.filter((o) => !(diParola(pezzo[0]) && diParola(testo[o.start - 1]))
+      && !(diParola(pezzo[pezzo.length - 1]) && diParola(testo[o.end])));
+    const lista = intere.length ? intere : tutte;
+    if (lista.length === 1) return lista[0];
+    const vicine = nuovo ? lista.filter((o) => o.start < nuovo.end && o.end > nuovo.start) : [];
+    return vicine.length === 1 ? vicine[0] : null;
+  }
+
+  // Dove cade nel testo una posizione del pezzo citato, quando le file di spazi hanno lunghezze diverse.
+  function posizioniNelTesto(pezzo, visto) {
+    const out = new Array(pezzo.length + 1);
+    let i = 0;
+    let j = 0;
+    while (i < pezzo.length) {
+      if (/\s/.test(pezzo[i])) {
+        let fi = i;
+        while (fi < pezzo.length && /\s/.test(pezzo[fi])) fi++;
+        let fj = j;
+        while (fj < visto.length && /\s/.test(visto[fj])) fj++;
+        for (let k = i; k < fi; k++) out[k] = j;
+        i = fi;
+        j = fj;
+      } else {
+        out[i++] = j++;
+      }
+    }
+    out[pezzo.length] = visto.length;
+    return out;
   }
 
   // Il segno sta su quello che la correzione cambia, a parole intere: «oggi sonno andato» → «oggi sono andato» segna
@@ -291,27 +352,31 @@
     return { da: p, a: pezzo.length - s, sostituto: correzione.slice(p, correzione.length - s) };
   }
 
-  // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `citata(c)`: la prova di
-  // una contraddizione, che deve stare nella pagina; `inScrittura`: la parola che non si segna.
-  function segniDaRisposta(raw, testo, { tipi = ['errore'], citata = () => false, inScrittura = null, fonte = 'rapido' } = {}) {
+  // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `senzaTipo`: quello di una
+  // riga che l'ha perso; `citata(c)`: la prova di una contraddizione, che deve stare nella pagina; `inScrittura`: la
+  // parola che non si segna; `nuovo`: il testo nuovo della chiamata, per un pezzo citato che compare più volte.
+  function segniDaRisposta(raw, testo, { tipi = ['errore'], senzaTipo = 'errore', citata = () => false, inScrittura = null, fonte = 'rapido', nuovo = null } = {}) {
     const ammessi = new Set(tipi);
     const segni = [];
     const giusti = [];
     for (const r of leggiRighe(raw)) {
-      if (!ammessi.has(r.tipo) && r.tipo !== 'giusto') continue;
-      const dove = trovaUnaVolta(testo, r.pezzo);
+      const tipo = r.tipo || senzaTipo;
+      if (!ammessi.has(tipo) && tipo !== 'giusto') continue;
+      const pezzo = r.pezzo.trim();
+      const dove = trovaPezzo(testo, pezzo, nuovo);
       if (!dove) continue;
-      if (r.tipo === 'giusto') { giusti.push(dove); continue; }
-      if (r.tipo === 'contraddizione' && !citata(r.citazione)) continue;
-      const errore = r.tipo === 'errore';
+      if (tipo === 'giusto') { giusti.push(dove); continue; }
+      if (tipo === 'contraddizione' && !citata(r.citazione)) continue;
+      const errore = tipo === 'errore';
       let start = dove.start;
       let end = dove.end;
       let correzioni = [];
       if (r.correzione.trim() || errore) {
-        const stretto = restringi(r.pezzo, r.correzione.trim() ? r.correzione : '');
+        const stretto = restringi(pezzo, r.correzione.trim() ? r.correzione : '');
         if (stretto) {
-          start = dove.start + stretto.da;
-          end = dove.start + stretto.a;
+          const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
+          start = dove.start + pos[stretto.da];
+          end = dove.start + pos[stretto.a];
           correzioni = [stretto.sostituto];
         } else if (errore) continue;
       }
@@ -319,8 +384,8 @@
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
       segni.push({
         start, end, segment: testo.slice(start, end), segno: errore ? 'errore' : 'suggerimento', dubbio: false, fonte,
-        tipo: r.tipo, motivo: corta(r.motivo, MOTIVO_MAX), correzioni,
-        citazione: r.tipo === 'contraddizione' ? corta(r.citazione, 240) : '',
+        tipo, motivo: corta(r.motivo, MOTIVO_MAX), correzioni,
+        citazione: tipo === 'contraddizione' ? corta(r.citazione, 240) : '',
       });
     }
     const perSegno = (k) => senzaSovrapposti(segni.filter((x) => x.segno === k));
@@ -332,8 +397,8 @@
   const chiaveVerdetto = (it) => `${it.fonte}\u0001${String(it.segment || '').replace(/’/g, "'").toLowerCase()}`;
 
   global.SN_CORRETTORE = {
-    REGIONE_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
-    senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, frasiDaGiudicare,
-    leggiRighe, trovaUnaVolta, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI,
+    REGIONE_MAX, TESTO_INTERO_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
+    senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
+    leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

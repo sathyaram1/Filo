@@ -1,6 +1,6 @@
 // Per test:shoot (#1446): un modello finto per i due controlli del correttore e una pagina con un campo, servita su
-// http://127.0.0.1:47811/. Il controllo rapido conferma «quseta» e lascia in dubbio «Zanzottera»; il ragionato segna
-// «alle 18». Uso: main-file:tests/agent/scenari/correttore-tre-segni.js; tab:http://127.0.0.1:47811/ (/scuro: pagina scura)
+// http://127.0.0.1:47811/. Il controllo rapido conferma «quseta» e non giudica «Zanzottera», che resta senza segno
+// (#1580); «qual'è» è pieno da sé; il ragionato segna «alle 18». Uso: main-file:tests/agent/scenari/correttore-tre-segni.js; tab:http://127.0.0.1:47811/ (/scuro: pagina scura)
 const C = globalThis.SN_CONST;
 await globalThis.SN_STORAGE.updateSettings({
   useDefaultModels: false,
@@ -11,8 +11,9 @@ await globalThis.SN_STORAGE.updateSettings({
 });
 const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
 const finto = async ({ messages }) => {
-  const t = String(messages[messages.length - 1].content);
-  if (t.includes('Sei il controllo rapido di un correttore')) return fine('[quseta][questa][Refuso: si scrive «questa».][errore]');
+  // Le regole stanno nel system (#1580).
+  const t = String(messages[0].content);
+  if (t.includes('Sei il controllo rapido')) return fine('[quseta][questa][Refuso: si scrive «questa».][errore]');
   if (t.includes('proponi SUGGERIMENTI')) return fine('[alle 18][][Alle 18 di quale giorno? Nella chat si parla di martedì.][suggerimento]');
   return fine('');
 };
