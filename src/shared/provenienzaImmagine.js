@@ -1017,6 +1017,7 @@
         const elenco = az && Array.isArray(az.actions) ? az.actions : [];
         for (const a of elenco) {
           if (!a || typeof a !== 'object') continue;
+          out.azioni.push(String(a.action || ''));
           const c = codiceSorgente(a.digitalSourceType);
           if (c === 'ai') out.origine = 'ai';
           else if (c && out.origine !== 'ai') out.origine = c;
