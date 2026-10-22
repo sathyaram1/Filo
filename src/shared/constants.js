@@ -67,6 +67,8 @@
     // #1447 — quello che il correttore impara dai rifiuti: conti di correzioni accettate, annullate e parole riscritte,
     // e le parole da non correggere più da sé (src/content/correttoreAutomatica.js).
     CORRETTORE_IMPARATO: 'sn_correttore_imparato',
+    // Come si scrive in ogni sito, per non mettere le maiuscole dove si scrive tutto minuscolo (correttoreImpara.js).
+    CORRETTORE_STILI: 'sn_correttore_stili',
     ICON_LAYOUT: 'sn_icon_layout',
     // Tab aperti e indice dell'attivo, per riaprirli alla riapertura di Filo.
     OPEN_TABS: 'sn_open_tabs',

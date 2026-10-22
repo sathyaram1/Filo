@@ -7,6 +7,10 @@ require('../../content/correttoreAutomatica.js');
 
 const CHIAVE = 'sn_correttore_imparato';
 const DIZIONARIO = 'sn_personal_dict';
+// Come si scrive in ogni sito (tutto minuscolo apposta o no): resta sul computer, e oltre il tetto esce il sito usato
+// meno di recente.
+const STILI = 'sn_correttore_stili';
+const STILI_MAX = 500;
 // Largo: una parola del dizionario può essere un codice o un indirizzo incollato.
 const PAROLA_MAX = 1000;
 const A = () => globalThis.SN_CORRETTORE_AUTO;
@@ -50,12 +54,38 @@ const PASSI_DIZIONARIO = {
 // Da un sito si impara scrivendo; cambiare o togliere a mano si fa solo dalla pagina del correttore.
 const SOLO_DA_FILO = new Set(['rifiuta', 'togliRifiutata', 'rinominaRifiutata', 'togliParola', 'rinominaParola']);
 
-async function esegui(q, { daFilo = false } = {}) {
+// Il sito lo dice il main da chi manda, mai la richiesta: una pagina scrive e legge solo il suo.
+function sitoDi(origine) {
+  try {
+    const u = new URL(String(origine || ''));
+    return /^(https?|filo|file):$/.test(u.protocol) ? `${u.protocol}//${u.host}` : '';
+  } catch (_) { return ''; }
+}
+
+async function stile(nome, q, origine) {
+  const sito = sitoDi(origine);
+  if (!sito) return { ok: false, error: 'richiesta non valida' };
+  const local = globalThis.chrome.storage.local;
+  const salvati = (await local.get(STILI))[STILI];
+  const stili = salvati && typeof salvati === 'object' && !Array.isArray(salvati) ? { ...salvati } : {};
+  const qui = Object.prototype.hasOwnProperty.call(stili, sito) ? stili[sito] : null;
+  if (nome === 'leggiStile') return { ok: true, stile: A().sommaStile(qui, null) };
+  const nuovo = A().sommaStile(qui, { minuscoli: q.minuscoli, maiuscoli: q.maiuscoli });
+  delete stili[sito];
+  stili[sito] = nuovo;
+  const siti = Object.keys(stili);
+  for (let i = 0; i < siti.length - STILI_MAX; i++) delete stili[siti[i]];
+  await local.set({ [STILI]: stili });
+  return { ok: true, stile: nuovo };
+}
+
+async function esegui(q, { daFilo = false, origine = '' } = {}) {
   const nome = q && typeof q.passo === 'string' ? q.passo : '';
   const local = globalThis.chrome.storage.local;
   const memoria = async () => A().memoria((await local.get(CHIAVE))[CHIAVE]);
   // Alle schede basta sapere quali parole non correggere: i conti a metà restano qui.
   if (nome === 'leggi') return { ok: true, rifiutate: (await memoria()).rifiutate };
+  if (nome === 'stile' || nome === 'leggiStile') return stile(nome, q, origine);
   const passoMemoria = Object.prototype.hasOwnProperty.call(PASSI, nome) ? PASSI[nome] : null;
   const passoDizionario = Object.prototype.hasOwnProperty.call(PASSI_DIZIONARIO, nome) ? PASSI_DIZIONARIO[nome] : null;
   const parola = testo(q && q.parola);
@@ -89,4 +119,4 @@ function passo(q, opz = {}) {
   return giro;
 }
 
-module.exports = { passo, CHIAVE, PASSI, PASSI_DIZIONARIO, SOLO_DA_FILO };
+module.exports = { passo, CHIAVE, STILI, STILI_MAX, sitoDi, PASSI, PASSI_DIZIONARIO, SOLO_DA_FILO };
