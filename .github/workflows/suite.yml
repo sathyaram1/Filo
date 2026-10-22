@@ -32,7 +32,7 @@ jobs:
       matrix:
         parte: [1, 2, 3, 4]
     steps:
-      - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
+      - name: Checkout del commit da provare (con la storia)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
