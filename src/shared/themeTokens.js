@@ -338,6 +338,10 @@
         return ms >= 0 && ms <= 10000;
       }
       case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
+      case 'pixel': {
+        const m = v.match(/^(\d{1,4})px$/);
+        return Boolean(m) && Number(m[1]) >= t.min && Number(m[1]) <= t.max;
+      }
       default: return false;
     }
   }
