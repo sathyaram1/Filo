@@ -1702,8 +1702,8 @@ async function linkCheChiedonoOk(testo, { sender = null, contesto = null, proven
   });
 }
 
-// `proposta`: il collegamento l'ha mostrato un modello in una pagina che riceve i verdetti (chat e home di Filo): se
-// non ne ha uno, perché la risposta si è interrotta o il controllo non è arrivato, chiede l'OK (#1505).
+// `proposta`: il collegamento sta in una frase di Filo che riceve i verdetti (la chat della home): se non ne ha uno,
+// perché la risposta si è interrotta o il controllo non è arrivato, chiede l'OK (#1505).
 async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false, proposta = false } = {}) {
   const indirizzo = String(url || '').trim();
   let pagina = '';
