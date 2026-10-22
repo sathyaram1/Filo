@@ -94,6 +94,26 @@ test('blog letto a metà del video incorporato (il «Salta» sopra il bordo), po
   });
 });
 
+test('il sito copre il video incorporato con un suo elemento mentre la scheda è dietro: quell\'elemento non riceve il clic vero', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'finestra vera');
+  test.setTimeout(120_000);
+  await conFilo(async ({ nel, quando, apri }) => {
+    const dentro = suYouTube(testServer.html(lettore('Video')));
+    const blog = testServer.html(`<!doctype html><title>Blog</title><style>body{margin:0}</style><iframe src="${dentro}" width="720" height="420" style="border:0;display:block"></iframe>`
+      + '<div id="velo" style="position:absolute;left:0;top:0;width:720px;height:420px;display:none;background:rgba(0,0,0,0.01)"></div>'
+      + `${GESTI}<script>document.addEventListener('visibilitychange',()=>{document.getElementById('velo').style.display=document.hidden?'block':'none';});</script>`, { pubblico: true });
+    await apri(blog);
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', 'il video non si vede');
+    await apri(testServer.html('<title>Altra</title><p>altra</p>'));
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'hidden', 'il video non è dietro');
+    await quando(async () => (await nel(blog, 'document.getElementById("velo").style.display')) === 'block', 'velo');
+    await nel(dentro, 'window.__mostra()');
+    await new Promise((ok) => setTimeout(ok, 6000));
+    expect(await nel(blog, 'window.__gesti'), 'il sito ha ricevuto il clic di Filo').toEqual([]);
+    expect(await nel(dentro, 'window.__saltate')).toBe(1);
+  });
+});
+
 test('blog ingrandito col video incorporato, lasciato dietro: la pubblicità si salta', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'finestra vera');
   test.setTimeout(120_000);
