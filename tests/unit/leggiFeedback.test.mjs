@@ -17,7 +17,68 @@ function rete(campi) {
 
 test('segnalati come attacco o file sospetto, e stato illeggibile: niente testo', () => {
   for (const s of ['attack', 'attack_confirmed', 'suspicious_file', 'FENC1:abc', '']) assert.ok(mod.vietatoLeggere(s), s);
-  for (const s of ['todo', 'working', 'design', 'unlabeled', 'done', 'spam']) assert.equal(mod.vietatoLeggere(s), '', s);
+  // Fuori dai Ricevuti l'ha spostato l'owner: si legge anche senza giudizio, con l'avviso in prima riga (sotto).
+  for (const s of ['todo', 'working', 'done']) assert.equal(mod.vietatoLeggere(s), '', s);
+});
+
+// #1514: nei Ricevuti un feedback mai giudicato (fermo al filtro, panel parziale o degradato, senza giudizio) non si
+// distingue da uno pulito guardando i soli segni d'attacco, e chi manda ci arriva riempiendo le raffiche.
+const PANEL_PULITO = { l2Class: 'aligned', verdicts: [1, 2, 3, 4].map(() => ({ class: 'aligned' })) };
+test('nei Ricevuti un mai giudicato non si legge; un panel completo pulito e un fidato coi giudici saltati sì', () => {
+  const mai = [
+    ['unlabeled', { l1Category: 'spam', action: 'human_review' }, /filtro all’ingresso/],
+    ['unlabeled', { verdicts: [{ class: 'aligned' }] }, /panel parziale, 1 giudice su 4/],
+    ['unlabeled', { l2Degraded: true, verdicts: PANEL_PULITO.verdicts }, /degradato/],
+    ['unlabeled', undefined, /nessun giudizio/],
+    ['design', undefined, /nessun giudizio/],
+    ['spam', { l1Category: 'spam', action: 'block_spam' }, /filtro all’ingresso/],
+    // Il segno dei giudici saltati vale solo con la fiducia.
+    ['aligned', { skipped: 'fidato' }, /saltati su una pratica non fidata/],
+    ['aligned', { skipped: 'fidato' }, /saltati/, 'non_fidato'],
+  ];
+  for (const [status, pipeline, motivo, fiducia] of mai) {
+    const v = mod.vietatoLeggere(status, pipeline, fiducia);
+    assert.match(v, /mai passato dai giudici/, `${status} ${JSON.stringify(pipeline)}`);
+    assert.match(v, motivo);
+    assert.match(v, /--anche-mai-giudicato/);
+    assert.equal(mod.vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato: true }), '', 'l’opzione esplicita lo lascia leggere');
+  }
+  assert.match(mod.vietatoLeggere('unlabeled', undefined), /Ri-valuta i non filtrati/);
+  assert.doesNotMatch(mod.vietatoLeggere('spam', undefined), /Ri-valuta/, 'il tasto ri-valuta solo i non filtrati');
+  assert.equal(mod.vietatoLeggere('aligned', { skipped: 'fidato' }, 'fidato'), '');
+  assert.equal(mod.vietatoLeggere('unlabeled', PANEL_PULITO), '');
+  assert.equal(mod.vietatoLeggere('spam', { l2Class: 'spam', verdicts: [1, 2, 3, 4].map(() => ({ class: 'spam' })) }), '');
+  // L'opzione non apre un segnalato.
+  assert.ok(mod.vietatoLeggere('attack', PANEL_PULITO, 'fidato', { ancheMaiGiudicato: true }));
+  assert.ok(mod.vietatoLeggere('unlabeled', { verdicts: [{ class: 'attack' }] }, '', { ancheMaiGiudicato: true }));
+});
+
+test('un mai giudicato si stampa con l’avviso in prima riga: fuori dai Ricevuti da sé, nei Ricevuti solo con l’opzione', async () => {
+  const decifra = async (g) => ({ ...g });
+  const doc = (status, pipeline) => rete({ status, ...(pipeline ? { pipeline: JSON.stringify(pipeline) } : {}), text: 'ciao', clientId: 'c-utente' });
+  const chiesti = [];
+  const conta = async (g) => { chiesti.push(Object.keys(g).filter((k) => k !== '_id')); return { ...g }; };
+  const no = await mod.leggi('x', { bearer: 't', decifra: conta, fetchImpl: doc('unlabeled', { l1Category: 'spam', action: 'human_review' }) });
+  assert.equal(no.codice, 3);
+  assert.match(no.errore, /mai passato dai giudici.*Non ho decifrato il testo/);
+  assert.deepEqual(chiesti, [['status', 'pipeline']], 'il testo non si decifra');
+
+  const si = await mod.leggi('x', { bearer: 't', decifra, segno: 'abc', ancheMaiGiudicato: true, fetchImpl: doc('unlabeled', { l1Category: 'spam', action: 'human_review' }) });
+  assert.equal(si.codice, 0);
+  assert.match(si.testo.split('\n')[0], /^MAI PASSATO DAI GIUDICI \(fermato dal filtro all’ingresso, nessun giudice\)/);
+  const fuori = await mod.leggi('x', { bearer: 't', decifra, segno: 'abc', fetchImpl: doc('todo') });
+  assert.equal(fuori.codice, 0);
+  assert.match(fuori.testo.split('\n')[0], /^MAI PASSATO DAI GIUDICI \(nessun giudizio registrato\)/);
+  assert.match(fuori.testo, /Inizio abc\]\nciao\n\[Fine abc\]/);
+  const giudicato = await mod.leggi('x', { bearer: 't', decifra, segno: 'abc', fetchImpl: doc('aligned', PANEL_PULITO) });
+  assert.equal(giudicato.codice, 0);
+  assert.doesNotMatch(giudicato.testo, /MAI PASSATO/);
+});
+
+test('gli argomenti della lettura: un riferimento, e l’opzione per il mai giudicato', () => {
+  assert.deepEqual(mod.argomentiLettura(['1514']), { rif: '1514', ancheMaiGiudicato: false });
+  assert.deepEqual(mod.argomentiLettura(['--anche-mai-giudicato', '#1514']), { rif: '#1514', ancheMaiGiudicato: true });
+  for (const no of [[], ['1', '2'], ['1514', '--tutto'], ['--anche-mai-giudicato']]) assert.equal(mod.argomentiLettura(no), null, no.join(' '));
 });
 
 test('su un attacco lo stato si decifra, il testo mai', async () => {
@@ -68,7 +129,7 @@ test('nei Ricevuti col giudizio d’attacco (mittente fidato: il server lo lasci
   const ok = await mod.leggi('x', { bearer: 't', decifra, segno: 'abc',
     fetchImpl: rete({ status: 'todo', pipeline: JSON.stringify(giudizio), text: 'ciao', clientId: 'routine:residuo', senderProof: 'server' }) });
   assert.equal(ok.codice, 0);
-  assert.equal(mod.vietatoLeggere('unlabeled', { verdicts: [{ class: 'aligned' }] }), '');
+  assert.equal(mod.vietatoLeggere('unlabeled', PANEL_PULITO), '');
   assert.ok(mod.vietatoLeggere('aligned', { verdicts: [{ class: 'attack' }] }));
 });
 
