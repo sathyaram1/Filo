@@ -101,11 +101,8 @@ function classificatore() {
   return globalThis.SN_CMD_CLASSIFY || (require('../../shared/cmdClassify.js'), globalThis.SN_CMD_CLASSIFY);
 }
 
-/**
- * Il percorso porta a un altro computer della rete (#1499): anche un solo stat fa presentare Windows a quel computer
- * con l'identità dell'utente, quindi chi tocca il disco lo chiede PRIMA. Regola del perimetro (cmdClassify) più le
- * lettere d'unità che puntano alla rete (shell.unitaDiRete). Si chiede per il percorso scritto e per quello risolto.
- */
+// Il percorso porta a un altro computer della rete: anche un solo stat fa presentare Windows a quel computer con
+// l'identità dell'utente, quindi chi tocca il disco lo chiede PRIMA, per il percorso scritto e per quello risolto (#1499).
 function percorsoDiRete(percorso, { win = process.platform === 'win32', reti = null } = {}) {
   const C = classificatore();
   const p = C.pulisciPercorso(percorso);
