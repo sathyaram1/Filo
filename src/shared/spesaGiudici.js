@@ -27,6 +27,11 @@
     }
     return null;
   }
+  // «40.000» scritto all'italiana è quarantamila, non quaranta.
+  function intero(v) {
+    if (typeof v === 'string' && /^\s*\d{1,3}([.\s]\d{3})+\s*$/.test(v)) return Number(v.replace(/[.\s]/g, ''));
+    return numero(v);
+  }
   const centesimi = (n) => Math.round(n * 100) / 100;
 
   /** Le impostazioni come le legge il server: un campo assente o storto vale il numero di fabbrica. */
