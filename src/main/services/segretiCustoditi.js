@@ -1,9 +1,10 @@
 // I segreti che Filo custodisce (#810): chiavi dei servizi, accesso, identità della copia,
-// portafoglio. Servono solo a fermare un'uscita che li contiene e a oscurarli nei messaggi verso
+// portafoglio, chiave dei feedback. Servono solo a fermare un'uscita che li contiene e a oscurarli nei messaggi verso
 // i modelli: mai a un prompt. Regole: src/shared/urlExfil.js (valutaUscita).
 
 // `impostazioni`: le salvate e le effettive (queste aggiungono la chiave di fabbrica e la personale).
-function custoditi({ impostazioni = [] } = {}) {
+// `chiaveFeedback`: la privata dei feedback cifrati, se questo computer ce l'ha (chiaveFeedback.js).
+function custoditi({ impostazioni = [], chiaveFeedback = null } = {}) {
   const min = (globalThis.SN_GUARDIANO_STATICO && globalThis.SN_GUARDIANO_STATICO.SEGRETO_MIN) || 12;
   const out = [];
   const visti = new Set();
