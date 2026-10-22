@@ -125,7 +125,7 @@
     segnaRadice();
     if (!attivo()) { detachAll(); return; }
     const state = activeEl && monitored.get(activeEl);
-    if (!state) return;
+    if (!state) { adottaIlFuoco(); return; }
     // Ogni parte si spegne da sola, e le altre restano.
     if (!modelloErrori()) fermaTimer(state, ['timerRapido', 'timerFine']);
     if (!suggerimentiAttivi()) fermaTimer(state, ['timerRagionato']);
