@@ -553,11 +553,11 @@ describe('una pagina piena di codici finti nascosti non nasconde quello vero', (
 // chi la chiamava lo prendeva per via libera. Regex provate in Node, non nel processo di Electron.
 describe('un token lunghissimo nella pagina dà un verdetto, e in fretta', () => {
   const LUNGO = `sk-${'a'.repeat(8000000)}`;
-  test('la porta risponde su un token di otto milioni di caratteri, senza lanciare', () => {
-    const t = Date.now();
-    const v = X.valutaUscita({ type: 'NAVIGA', url: 'https://raccolta.example/?k=482913' }, { pagina: { testo: LUNGO, host: 'riquadro.example' }, daPagina: true });
+  test('la porta risponde su un token di otto milioni di caratteri, senza lanciare e in fretta', () => {
+    let v;
+    const c = costoInUnita(() => { v = X.valutaUscita({ type: 'NAVIGA', url: 'https://raccolta.example/?k=482913' }, { pagina: { testo: LUNGO, host: 'riquadro.example' }, daPagina: true }); }, { tetto: 100 });
+    assert.ok(c.entro, c.come);
     assert.equal(v.blocca, false);
-    assert.ok(Date.now() - t < 3000, `verdetto in ${Date.now() - t} ms`);
   });
   for (const testa of ['sk-', 'ghp_', 'AIza', 'AKIA', 'xoxb-', 'github_pat_', 'sk_live_']) {
     test(`${testa}… oltre il tetto: il testo è saturo, e la chiave vera accanto si trova`, () => {
