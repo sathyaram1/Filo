@@ -78,8 +78,7 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
     sock.send(JSON.stringify({ id, method, params }));
   });
 
-  async function evaluate(fn, arg) {
-    const expression = `(async () => (${fn.toString()})(process.mainModule.require('electron'), ${JSON.stringify(arg ?? null)}))()`;
+  async function grezzo(expression) {
     const r = await manda('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) {
       const d = r.exceptionDetails;
@@ -87,6 +86,8 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
     }
     return r.result.value;
   }
+
+  const evaluate = (fn, arg) => grezzo(`(async () => (${fn.toString()})(process.mainModule.require('electron'), ${JSON.stringify(arg ?? null)}))()`);
 
   // Il frame si cerca a ogni chiamata: una scheda ricreata (proxy, crash) ha frame nuovi.
   function nelFrame(url, codice) {

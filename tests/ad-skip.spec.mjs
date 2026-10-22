@@ -150,8 +150,8 @@ async function conFiloSenzaPlaywright(opzioni, corpo) {
   try { await corpo(h); } finally { await filo.chiudi(); }
 }
 
-test('con la scheda dietro o Filo nascosto il «Salta» si preme lo stesso, su YouTube e negli altri lettori', async ({ testServer, suYouTube }) => {
-  await conFiloSenzaPlaywright({}, async ({ filo, nel, quando, apri, arrivato, nascosta, saltata, clic }) => {
+test('con la scheda dietro il «Salta» si preme lo stesso, su YouTube e negli altri lettori', async ({ testServer, suYouTube }) => {
+  await conFiloSenzaPlaywright({}, async ({ filo, nel, apri, arrivato, nascosta, saltata, clic }) => {
     // La canzone che Filo mette dalla home nasce dietro, e l'utente resta dov'era.
     const yt = suYouTube(testServer.html(lettore({ dopoMs: -1, titolo: 'Canzone' })));
     const r = await filo.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Canzone', background: true }), yt);
@@ -160,7 +160,8 @@ test('con la scheda dietro o Filo nascosto il «Salta» si preme lo stesso, su Y
     const ima = testServer.html(lettore({ classe: 'videoAdUiSkipButton', soloVeri: false, dopoMs: -1, titolo: 'IMA' }), { pubblico: true });
     await apri(testServer.html(`<!doctype html><title>Ospite</title><p>articolo</p><iframe src="${ima}" width="720" height="420"></iframe>`), true);
     await arrivato(ima);
-    await apri(testServer.html('<title>Altra</title><p>altra scheda</p>'), true);
+    const altra = testServer.html('<title>Altra</title><p>altra scheda</p>');
+    await apri(altra, true);
     await arrivato(yt);
     for (const u of [yt, ima]) await nascosta(u);
 
@@ -175,43 +176,52 @@ test('con la scheda dietro o Filo nascosto il «Salta» si preme lo stesso, su Y
     expect((await clic(ima)).length).toBe(1);
     // Ogni tanto la scheda dietro riprende la sua misura per un attimo: conta il clic arrivato quando era grande zero.
     expect(await filo.evaluate(() => globalThis.__larghezzeAlClic)).toContain(0);
-    expect(await nel(yt, 'document.visibilityState'), 'la scheda è rimasta dietro').toBe('hidden');
-
-    // Filo ridotto a icona, con la canzone davanti.
-    await filo.evaluate(({ BrowserWindow }, u) => {
+    expect(await filo.evaluate(({ BrowserWindow }) => {
       const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-      tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
-    }, yt);
-    await filo.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).hide());
-    await nascosta(yt);
-    await nel(yt, 'window.__saltata = false; window.__mostra()');
-    await saltata(yt);
-    expect((await clic(yt)).filter((c) => c.vero).length).toBe(2);
+      return tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL();
+    }), 'l\'utente è rimasto dov\'era').toBe(altra);
   });
 });
 
-// La finestra parcheggiata fuori schermo dei test perde il clic instradato al riquadro di una scheda nascosta, quella vera no:
-// qui serve la finestra vera, e solo su Linux lo schermo è virtuale e non la vede nessuno.
-test('il video di YouTube incorporato in una scheda dietro salta la pubblicità, e il gesto resta al lettore', async ({ testServer, suYouTube }) => {
+// La finestra dei test, parcheggiata fuori schermo, tiene nascoste anche le schede davanti: per vedere la differenza fra
+// davanti e dietro serve la finestra vera, e solo su Linux lo schermo è virtuale e non la vede nessuno.
+test('a finestra vera: con Filo ridotto a icona salta, e il video incorporato in una scheda dietro aspetta senza dare il gesto al sito', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'la finestra vera comparirebbe sullo schermo di chi prova');
-  await conFiloSenzaPlaywright({ env: { FILO_HIDE_WINDOW: '0' } }, async ({ filo, nel, apri, arrivato, nascosta, saltata, clic }) => {
+  await conFiloSenzaPlaywright({ env: { FILO_HIDE_WINDOW: '0' } }, async ({ filo, nel, quando, apri, arrivato, nascosta, saltata, clic }) => {
+    const visibile = (url, perche) => quando(async () => (await nel(url, 'document.visibilityState')) === 'visible', perche);
+    const finestra = (azione) => filo.evaluate(({ BrowserWindow }, a) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs)[a](); }, azione);
+    const attiva = (url) => filo.evaluate(({ BrowserWindow }, u) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
+    }, url);
+
+    const yt = suYouTube(testServer.html(lettore({ dopoMs: -1, titolo: 'Canzone' })));
+    await apri(yt, true);
+    await arrivato(yt);
+    await visibile(yt, 'la canzone davanti non si vede: la finestra non è quella vera');
+    await finestra('hide');
+    await nascosta(yt);
+    await nel(yt, 'window.__mostra()');
+    await saltata(yt);
+    expect((await clic(yt)).every((c) => c.vero)).toBe(true);
+    await finestra('show');
+
     for (const [host, pubblico] of [['www.youtube.com', false], ['www.youtube-nocookie.com', true]]) {
       const pagina = testServer.html(lettore({ dopoMs: -1 }));
       const dentro = host === 'www.youtube.com' ? suYouTube(pagina) : pagina.replace('127.0.0.1', host);
       const ospitante = testServer.html(ospite(dentro), { pubblico });
       await apri(ospitante, true);
       await arrivato(dentro);
+      await visibile(dentro, `${host}: il lettore davanti non si vede`);
       await apri(testServer.html('<title>Altra</title><p>altra scheda</p>'), true);
       await nascosta(dentro);
-      await filo.evaluate((_e, p) => {
-        const A = process.mainModule.require(p);
-        globalThis.__diag = [];
-        if (!A.__orig) A.__orig = A.clicDalRiquadro;
-        A.clicDalRiquadro = async (s, m, d, o) => { globalThis.__diag.push(['in', Date.now(), m]); const r = await A.__orig(s, m, d, o); globalThis.__diag.push(['out', Date.now(), r]); return r; };
-      }, join(APP_ROOT, 'src', 'main', 'services', 'adSkip.js'));
       await nel(dentro, 'window.__mostra()');
-      await new Promise((ok) => setTimeout(ok, 5000));
-      console.log('EMB', host, JSON.stringify(await filo.evaluate(() => globalThis.__diag)), JSON.stringify(await nel(dentro, '({c: window.__clic, v: document.visibilityState})')), JSON.stringify(await nel(ospitante, '({g: window.__gesti, v: document.visibilityState})')));
+      await new Promise((ok) => setTimeout(ok, 3000));
+      expect(await nel(ospitante, 'window.__gesti'), `${host}: il sito ha ricevuto il clic di Filo`).toEqual([]);
+      expect((await clic(dentro)).some((c) => c.vero), host).toBe(false);
+      // Tornati sulla scheda, il «Salta» si preme subito, e il gesto resta al lettore.
+      await attiva(ospitante);
+      await visibile(dentro, `${host}: la scheda non è tornata davanti`);
       await saltata(dentro);
       expect((await clic(dentro)).every((c) => c.vero), host).toBe(true);
       expect(await nel(ospitante, 'window.__gesti'), host).toEqual([]);
