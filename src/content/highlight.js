@@ -220,6 +220,8 @@
           // Il sì al passo lo dà l'utente: il bottone sta nel documento del sito, che lo preme da codice (#592.6).
           if (!activeTarget || !gestoVero(e)) return;
           fillElement(activeTarget, fillValue);
+          // Accettato, il testo è dell'utente anche quando poi lo ritocca (#810.8).
+          try { global.SN_IMMESSI?.accettato?.(activeTarget, fillValue); } catch (_) {}
           const cb = onAction;
           // Disattiva subito per evitare doppi trigger su doppio click.
           if (onTargetClick === cb) onTargetClick = null;
