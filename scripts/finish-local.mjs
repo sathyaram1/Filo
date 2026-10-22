@@ -135,6 +135,13 @@ export function pushArgs(branch) {
   return ['push', 'origin', `refs/heads/${branch}:refs/heads/${branch}`];
 }
 
+/** Il rifiuto per una cartella non a un commit, coi file che i controlli salterebbero. PURA. */
+export function testoFuoriDaiCommit(file, mostrati = 10) {
+  const altri = file.length > mostrati ? ` (e altri ${file.length - mostrati})` : '';
+  return `Ci sono modifiche fuori dai commit, che i controlli non proverebbero: ${file.slice(0, mostrati).join(', ')}${altri}.\n`
+    + 'Falle salvare (un Edit qualsiasi le committa) o toglile, poi rilancia.';
+}
+
 function git(args, opts = {}) {
   try {
     // stderr CATTURATO, non a schermo: quando una lettura fallisce l'esito lo
