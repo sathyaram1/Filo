@@ -104,7 +104,9 @@
   }
 
   // Il clic vero sposterebbe il fuoco da un campo in cui si scrive, o romperebbe un trascinamento: si aspetta.
+  // In una pagina nascosta nessuno scrive né trascina, e il fuoco rimasto in un campo non ferma il «Salta».
   function utenteOccupato() {
+    if (nascosta()) return false;
     if (premuto) return true;
     const ct = global.SN_CAMPO_TESTO;
     try { return !!(ct && ct.scriveQui(document) !== false); } catch (_) { return false; }
