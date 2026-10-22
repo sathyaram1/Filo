@@ -525,8 +525,16 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // raggiungibile; altrimenti lo stato remoto del branch (che È la consegna).
   // NB: senza punto fermo NON si torna a main — su un branch di revisione il
   // contenuto consegnato è tutto ciò che abbiamo.
+  const remoteTip = hasRemote ? g(['rev-parse', `origin/${branch}`]).out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  if (!target) target = hasRemote ? g(['rev-parse', `origin/${branch}`]).out : headSha(root);
+  // Un punto fermo fuori dalla linea della punta pubblicata è di una storia riscritta altrove (un riallineamento):
+  // vince la punta. Antenato della punta resta il caso dell'interruzione (#507), discendente è lavoro non spedito (#1486).
+  let rewritten = null;
+  if (target && remoteTip && !sullaStessaLinea(g, target, remoteTip)) {
+    rewritten = target;
+    target = remoteTip;
+  }
+  if (!target) target = remoteTip || headSha(root);
   if (!target) return { ok: false, kind: 'transient', message: `impossibile risolvere il contenuto atteso di ${branch}` };
 
   const before = headSha(root);
