@@ -14,7 +14,7 @@ const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur:
 const finto = async ({ messages }) => {
   const t = String(messages[messages.length - 1].content);
   if (t.includes('Chi scrive ha messo delle x')) return fine('[27][Rapporto prezzo/utili di Alphabet][1][20 ottobre 2026]');
-  if (t.includes('proponi SUGGERIMENTI')) {
+  if (String(messages[0].content).includes('proponi SUGGERIMENTI')) {
     return fine([
       '[nel 14xx][nel 1492][Cristoforo Colombo sbarcò in America il 12 ottobre 1492][segnaposto]',
       '[di soli xx][][Alphabet P/E ratio][cerca][web]',
