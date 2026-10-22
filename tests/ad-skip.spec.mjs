@@ -175,8 +175,20 @@ test('una canzone che Filo apre in secondo piano dalla home salta la pubblicità
 test('ESPERIMENTO dietro nascosta', async ({ app, openTab, testServer, suYouTube }) => {
   const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1 }))));
   await apri(openTab, testServer.html('<title>Altra</title><p>altra scheda</p>'));
-  const diag = () => page.evaluate(() => ({ w: innerWidth, h: innerHeight, vis: document.visibilityState, clic: window.__clic }));
-  for (let i = 0; i < 6; i++) { console.log('T', i, JSON.stringify(await diag())); await page.waitForTimeout(1000); }
+  const diag = async () => ({
+    pg: await page.evaluate(() => new Promise((ok) => { let n = 0; const f = () => { n++; requestAnimationFrame(f); }; requestAnimationFrame(f);
+      setTimeout(() => ok({ w: innerWidth, h: innerHeight, vis: document.visibilityState, raf: n, clic: window.__clic }), 1000); })),
+    mn: await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().includes('www.youtube.com'));
+      return { vis: t.view.getVisible?.(), b: t.view.getBounds(), bt: t.view.webContents.getBackgroundThrottling?.(), min: w.isMinimized(), wv: w.isVisible() };
+    }),
+  });
+  for (let i = 0; i < 3; i++) { console.log('T', i, JSON.stringify(await diag())); }
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.minimize(); });
+  for (let i = 0; i < 3; i++) { console.log('MIN', i, JSON.stringify(await diag())); }
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.restore(); w.hide(); });
+  for (let i = 0; i < 3; i++) { console.log('HIDE', i, JSON.stringify(await diag())); }
   await page.evaluate(() => window.__mostra());
   await page.waitForTimeout(5000);
   console.log('DOPO', JSON.stringify(await diag()));
