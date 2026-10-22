@@ -526,10 +526,9 @@ async function cartelleMancanti(elenco) {
     const voce = voceCartella(v);
     if (voce && DI_SERIE[voce]) continue;
     let ok = false;
-    if (voce && diRete(v, voce)) {
-      if (!rs) rs = await radici();
-      ok = (await cartellaChiesta(v, rs)).rete === false;
-    } else if (voce) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
+    if (voce && diRete(v, voce) && !rs) rs = await radici();
+    const altrove = !!rs && (await cartellaChiesta(v, rs)).rete;
+    if (voce && !altrove) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
     if (!ok) out.push(String(v));
   }
   return out;
