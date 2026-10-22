@@ -1662,35 +1662,10 @@ async function ricercaNelSito(action, { provenienza, contesto = null, parole = '
 const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
 
 // #868.6 — un collegamento che un modello scrive, cliccato, chiede lo stesso OK che chiederebbe se lo aprisse lui. Il
-// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova qui.
-const LINK_DA_CONFERMARE = new Map(); // chiave del link → motivo
-const MAX_LINK_DA_CONFERMARE = 5000;
-const chiaveLinkUscita = (url) => {
-  const raw = String(url || '').trim();
-  try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
-};
-function indirizzoWebAperto(grezzo) {
-  try {
-    const u = new URL(String(typeof grezzo === 'string' ? grezzo : '').trim());
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
-  } catch (_) { return ''; }
-}
-function segnaLinkDaConfermare(url, motivo) {
-  const k = chiaveLinkUscita(url);
-  LINK_DA_CONFERMARE.delete(k);
-  LINK_DA_CONFERMARE.set(k, String(motivo || ''));
-  while (LINK_DA_CONFERMARE.size > MAX_LINK_DA_CONFERMARE) LINK_DA_CONFERMARE.delete(LINK_DA_CONFERMARE.keys().next().value);
-}
-// Un sito con un collegamento in attesa di OK: la sua icona non si chiede alla rete, il dato può stare nel nome (#848).
-function sitoDaConfermare(url) {
-  let host = '';
-  try { host = new URL(String(url || '')).host.toLowerCase(); } catch (_) { return false; }
-  if (!host) return false;
-  for (const k of LINK_DA_CONFERMARE.keys()) {
-    try { if (new URL(k).host.toLowerCase() === host) return true; } catch (_) {}
-  }
-  return false;
-}
+// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova
+// nel registro di verdettiUscite.js, che vale anche per icona e anteprima (#1505).
+const sitoDaConfermare = (url) => VerdettiUscite.sitoDaConfermare(url);
+const contattabilePrimaDelClic = (url, opzioni) => VerdettiUscite.contattabile(url, opzioni);
 // Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
 const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
 
@@ -1710,55 +1685,39 @@ function indirizziCliccabili(testo) {
 }
 // I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
 // `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
+// Il giudizio sta in verdettiUscite.js (giudica): una porta guasta o un collegamento oltre il tetto chiedono l'OK.
 async function linkCheChiedonoOk(testo, { sender = null, contesto = null, provenienza = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
-  const out = [];
-  const visti = new Set();
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
-  for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
-    // Si giudica l'indirizzo che il browser aprirà: «https:sito/…» o con le barre rovesciate è lo stesso indirizzo web.
-    const url = indirizzoWebAperto(grezzo);
-    if (!url) continue;
-    const k = chiaveLinkUscita(url);
-    if (visti.has(k) || visti.size >= 200) continue;
-    visti.add(k);
-    let u = null;
-    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }); } catch (_) { u = null; }
-    if (!u || u.blocca || (!u.exfil && !u.nonCompare)) continue;
-    if (u.nonCompare) u = { ...u, reason: u.datiReason || 'ha scritto Filo e che non compare da nessuna parte' };
-    let chiede = sempre;
-    if (!chiede && Levels) {
+  return VerdettiUscite.giudica([...indirizzi, ...indirizziCliccabili(testo)], {
+    porta: (url) => controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }),
+    chiede: async (url, u) => {
+      if (sempre || !Levels) return true;
       if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
       const verdetto = u.nonCompare ? { _nonCompare: true } : { _exfil: true };
       const ing = Levels.ingressi({ type: 'NAVIGA', url, ...verdetto, _exfilReason: u.reason }, { richiesta, impostazioni });
-      chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
-    }
-    if (!chiede) continue;
-    segnaLinkDaConfermare(url, u.reason);
-    out.push({ url, motivo: u.reason });
-  }
-  return out;
+      return !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+    },
+  });
 }
 
-async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false } = {}) {
+// `proposta`: il collegamento l'ha mostrato un modello in una pagina che riceve i verdetti (chat e home di Filo): se
+// non ne ha uno, perché la risposta si è interrotta o il controllo non è arrivato, chiede l'OK (#1505).
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false, proposta = false } = {}) {
   const indirizzo = String(url || '').trim();
   let pagina = '';
   try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
-  let u = { blocca: false };
-  try {
-    u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
-  } catch (e) {
-    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
-  }
+  const u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
   if (u.blocca) {
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
   // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente nel link chiede l'OK come per NAVIGA.
   const daSito = /^https?:/i.test(pagina);
-  const k = chiaveLinkUscita(indirizzo);
-  const motivo = LINK_DA_CONFERMARE.get(k) ?? (chiedi ? String(chiedi) : '') ?? '';
-  let daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi);
+  const k = VerdettiUscite.chiave(indirizzo);
+  const v = /^https?:/i.test(indirizzo) ? VerdettiUscite.alClic(indirizzo, { chiedi, proposta }) : { daChiedere: false, motivo: '' };
+  const motivo = v.motivo;
+  let daChiedere = v.daChiedere;
   if (!daChiedere && daSito && u.exfil && /^https?:/i.test(indirizzo)) {
     const Levels = globalThis.SN_ACTION_LEVELS;
     let impostazioni = {};
