@@ -17,6 +17,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
