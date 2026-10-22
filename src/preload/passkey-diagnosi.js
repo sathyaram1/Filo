@@ -55,10 +55,18 @@ function buildSource({ hybrid = false } = {}) {
       return { opts: Object.assign({}, opts, { publicKey: Object.assign({}, pk, { allowCredentials: nuova }) }), n: n };
     }
     function log(s) { try { console.log('[Filo passkey] ' + s); } catch (e) {} }
+    // Google respinge un browser con le API ritoccate: la funzione avvolta si presenta come l'originale
+    // (stesso nome, stessa arità, stesso testo) e sta sul prototipo, non sull'oggetto.
+    var FP = Function.prototype, prevToString = FP.toString, originali = new WeakMap();
+    function toString() { var o = originali.get(this); return prevToString.apply(o || this, arguments); }
+    originali.set(toString, prevToString);
+    FP.toString = toString;
+    var sede = (window.CredentialsContainer && CredentialsContainer.prototype && typeof CredentialsContainer.prototype.get === 'function')
+      ? CredentialsContainer.prototype : navigator.credentials;
     function avvolgi(nome) {
-      var orig = navigator.credentials[nome];
+      var orig = sede[nome];
       if (typeof orig !== 'function') return;
-      navigator.credentials[nome] = function (opts) {
+      var avvolta = function (opts) {
         var r = null;
         try { r = riassunto(nome, opts); } catch (e) { log('riassunto fallito ' + e); }
         var usa = opts;
