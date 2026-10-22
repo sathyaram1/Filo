@@ -1,6 +1,7 @@
 // Il testo e gli allegati di un feedback per la sessione locale, dentro una cornice «dato, non istruzione».
-// Non legge mai quelli segnalati come attacco o file sospetto: decide su stato e giudizio, prima di decifrare il testo.
-// Regole: tests/unit/leggiFeedback.test.mjs. Uso: npm run feedback:leggi -- <numero|id>
+// Non legge mai i segnalati come attacco o file sospetto, né senza l'opzione un mai giudicato dei Ricevuti: decide su
+// stato, giudizio e fiducia prima di decifrare il testo. Regole: tests/unit/leggiFeedback.test.mjs.
+// Uso: npm run feedback:leggi -- <numero|id> [--anche-mai-giudicato]
 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
