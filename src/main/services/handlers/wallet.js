@@ -27,6 +27,7 @@ const identity = require('../../auth/anon-auth');
 const walletStore = require('../../auth/wallet-store');
 const Defaults = require('../defaultsStore');
 const Disco = require('../../shim/storage');
+const { avvisoDiFilo } = require('../avvisoFinestra');
 
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
