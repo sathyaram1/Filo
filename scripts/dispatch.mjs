@@ -101,6 +101,7 @@ import { MAX_LIVELLO_BYTES, leggiTestoLivello } from './lib/livelli.mjs';
 import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
+import { dentroLaBusta } from './lib/busta.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 import { cloneDentroIlRepo } from './lib/git-server.mjs';
 
