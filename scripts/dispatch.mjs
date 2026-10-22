@@ -91,7 +91,7 @@ import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
-  leggiBigliettoAMano,
+  leggiBigliettoAMano, leggiMarcatoreBiglietto, bigliettoFinito,
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
@@ -1917,7 +1917,8 @@ function positionOnBranch(bucket) {
   // giro passato ignorando quello assegnato dal server (#507, seconda porta).
   const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
-  const vivo = lavoroVivo(ROOT, { mio: readRoutineTicket(ROOT) });
+  // Il resto l'ha guardato il giro prima di scrivere i marcatori; qui resta un battito acceso nel frattempo da un altro.
+  const vivo = lavoroVivo(ROOT, { mio: readRoutineTicket(ROOT), cosa: ['battito'] });
   if (vivo.vivo) return { ok: false, kind: 'transient', vivo: true, message: testoLavoroVivo(vivo, `posizionato la cartella su ${branch}`) };
 
   // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
@@ -2499,7 +2500,10 @@ if (isMainModule) {
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       giroDelBiglietto = true;
       // Prima di ogni marcatore: biglietto, battito e ruolo di chi lavora ancora qui restano i suoi (#1480).
-      if (ticket) {
+      // Chi rilancia dispatch col biglietto che la cartella ha già è lo stesso worker: i processi lì sono i suoi.
+      const marcatore = ticket ? leggiMarcatoreBiglietto(ROOT) : null;
+      const giaSua = !!(marcatore && String(marcatore.ticket || '') === ticket && !bigliettoFinito(marcatore));
+      if (ticket && !giaSua) {
         const vivo = lavoroVivo(ROOT, { mio: ticket });
         if (vivo.vivo) process.exit(emitHalt('transient', testoLavoroVivo(vivo, 'preso la cartella per il tuo lavoro'), { vivo: true }).exit);
       }

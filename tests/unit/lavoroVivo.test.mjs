@@ -221,6 +221,22 @@ test('un worker nuovo con un altro vivo nella cartella: halt col guasto, e bigli
   }
 });
 
+test('lo stesso worker che rilancia dispatch col suo biglietto non si ferma sui propri processi', { skip: !LINUX && 'i processi si leggono da /proc' }, () => {
+  const { casa, clone } = cartellaSulRamo();
+  const suo = processoVivo(clone);
+  try {
+    writeFileSync(ticketFile(clone), JSON.stringify({ ticket: T2, since: new Date().toISOString() }));
+    const r = spawnSync(process.execPath, [DISPATCH, '--ticket', T2], {
+      encoding: 'utf8', env: ambiente(clone, { FILO_ROUTINE_API: 'http://127.0.0.1:9' }),
+    });
+    assert.notEqual(r.status, USCITA_LAVORO_VIVO, r.stderr);
+    assert.doesNotMatch(r.stderr, /LAVORO VIVO/);
+  } finally {
+    ferma(suo);
+    togliCartella(casa);
+  }
+});
+
 // ─── Il rilascio ──────────────────────────────────────────────────────────────
 
 async function canaleFinto() {
