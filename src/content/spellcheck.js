@@ -64,11 +64,16 @@
   function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
   function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
   function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
+  function automaticaAttiva() { return !spentoQui() && !!A() && settings.correttore?.automatica !== false; }
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
   }
-  const attivo = () => erroriAttivi() || suggerimentiAttivi();
+  function soglia(k) {
+    const C = global.SN_CONST;
+    return C.soglieCorrettore ? C.soglieCorrettore(settings)[k] : A().SOGLIE[k];
+  }
+  const attivo = () => erroriAttivi() || suggerimentiAttivi() || automaticaAttiva();
 
   // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
   // caselle di una riga. Sul sito dove Filo è spento il browser fa da sé.
