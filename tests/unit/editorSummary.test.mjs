@@ -23,6 +23,7 @@ require(join(SHARED, 'editorVersions.js'));
 require(join(SHARED, 'editorNotes.js'));
 require(join(SHARED, 'editorSummary.js'));
 require(join(SHARED, 'constants.js'));
+require(join(SHARED, 'filoContesto.js'));
 
 const STORE = globalThis.SN_EDITOR_STORE;
 const SUM = globalThis.SN_EDITOR_SUMMARY;
@@ -226,4 +227,28 @@ test('vuoto o soli spazi: niente da mandare', () => {
     assert.equal(r.testo, '');
     assert.equal(r.tagliato, false);
   }
+});
+
+// Un modello dalla finestra stretta rifiuta il documento intero: si rimanda più corto, dentro la finestra che il
+// rifiuto dice, e il taglio si dice come oltre il tetto.
+test('dopo un rifiuto per finestra il documento si rilegge dentro la finestra detta', () => {
+  const testo = 'parola '.repeat(30000);
+  const letto = SUM.testoAlModello(testo);
+  const caratteri = letto.letti + 3000;
+  const rifiuto = { ok: false, error: "OpenRouter 400: {\"error\":{\"message\":\"This endpoint's maximum context length is 32768 tokens. However, you requested about 61000 tokens (60000 of text input, 1000 in the output).\"}}" };
+  const corto = SUM.rilettoDopoRifiuto(testo, letto, rifiuto, caratteri);
+  assert.ok(corto && corto.tagliato);
+  assert.ok(corto.letti < letto.letti * (32768 / 61000), `letti ${corto.letti}`);
+  assert.ok(corto.letti > letto.letti * 0.3, `letti ${corto.letti}`);
+  assert.equal(corto.totale, letto.totale);
+  assert.match(SUM.notaTaglio(corto), /ho letto i primi/);
+});
+
+test('un altro errore, o un documento già minimo, non si rilegge', () => {
+  const testo = 'parola '.repeat(30000);
+  const letto = SUM.testoAlModello(testo);
+  assert.equal(SUM.rilettoDopoRifiuto(testo, letto, { ok: false, error: 'OpenRouter 402: insufficient credits' }, letto.letti), null);
+  const corto = SUM.testoAlModello('ciao '.repeat(300));
+  const rifiuto = { ok: false, error: 'maximum context length is 1000 tokens. However, you requested about 5000 tokens' };
+  assert.equal(SUM.rilettoDopoRifiuto('ciao '.repeat(300), corto, rifiuto, corto.letti + 20000), null);
 });
