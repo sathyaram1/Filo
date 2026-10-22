@@ -197,7 +197,7 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       file: process.env.ComSpec || 'cmd.exe',
       // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
       args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
+      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...ambiente.env, [VALORI_CMD]: fileValori } },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
       wrap: (command) => {
         let { testo, file } = comandoPerCmd(command);
