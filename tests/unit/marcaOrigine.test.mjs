@@ -77,7 +77,7 @@ test('su Windows lo stream Zone.Identifier sta davvero sul file', { skip: proces
   const marca = readFileSync(`${file}:Zone.Identifier`, 'utf8');
   assert.match(marca, /ZoneId=3/);
   assert.match(marca, /HostUrl=https:\/\/cdn\.esempio\.it\/file\/setup\.exe\?v=2/);
-  assert.match(marca, /ReferrerUrl=https:\/\/blog\.esempio\.it\/articolo/);
+  assert.match(marca, /ReferrerUrl=https:\/\/blog\.esempio\.it\/\r\n/);
   assert.equal(readFileSync(file, 'utf8'), 'MZ');
 
   const privato = join(dir, 'privato.exe');
