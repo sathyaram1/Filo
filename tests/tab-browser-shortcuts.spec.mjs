@@ -270,6 +270,29 @@ test('Ctrl+L da una pagina porta alla home col cursore nel campo dove si scrive'
   await expect(home.locator('#input')).toHaveValue('esempio.it');
 });
 
+test('Ctrl+L con del testo scritto nella pagina apre la home accanto e la pagina tiene il testo', async ({ app, openTab, testServer }) => {
+  const url = testServer.html('<title>Modulo</title><textarea id="t"></textarea>');
+  const page = await openTab(url);
+  await page.locator('#t').fill('una lettera lunga scritta a mano');
+  const prima = await info(app);
+  // Il segnale del testo scritto arriva dalla pagina: si aspetta che sia arrivato, come quando l'utente scrive e poi preme.
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
+    return !!tm.tabs.find((t) => t.id === tm.activeId).formDirty;
+  }), { timeout: 10_000 }).toBe(true);
+
+  await premi(app, 'L', ['control']);
+
+  await expect.poll(() => info(app).then((i) => i.count), { timeout: 10_000 }).toBe(prima.count + 1);
+  const dopo = await info(app);
+  expect(String(dopo.activeUrl)).toContain('filo://newtab/');
+  let home = null;
+  await expect.poll(async () => Boolean(home = await paginaDellaScheda(app, dopo.activeId, (p) => p.url().startsWith('filo://newtab/'))), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => home.evaluate(() => document.activeElement && document.activeElement.id), { timeout: 10_000 }).toBe('input');
+  expect(dopo.urls).toContain(url);
+  await expect(page.locator('#t')).toHaveValue('una lettera lunga scritta a mano');
+});
+
 test('Ctrl+L sulla home non la ricarica: dà il fuoco al campo e tiene quello che c\'era scritto', async ({ app, shell }) => {
   await shell.waitForLoadState('domcontentloaded');
   let id = null;
