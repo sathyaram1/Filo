@@ -652,6 +652,25 @@ class BarraLaterale {
     if (daTastiera) this.chiudi();
   }
 
+  // Un'azione premuta su una pagina che sta ancora arrivando aspetta che Filo ci sia dentro (#1343 r2): mandata
+  // prima, nessuno l'ascolterebbe. Vale per la scheda su cui si è premuto, finché resta davanti.
+  _consegnaInAttesa() {
+    const c = this.comandoInAttesa;
+    if (!c) return;
+    const t = this._attiva();
+    if (!t || t.id !== c.tabId || Date.now() > c.scade) { this.comandoInAttesa = null; return; }
+    if (!t.aiuto) return;
+    this.comandoInAttesa = null;
+    const nav = this._nav();
+    if (!nav.pagina || nav.spento) return;
+    // Il clic è nella barra, non nella pagina: vale come un gesto dato a Filo su quella scheda (i suoi appunti), mai
+    // come un gesto della pagina, che non apre finestre né permessi.
+    try { require('./services/permessiPagine').gestoDiFilo(t.view.webContents); } catch (_) {}
+    const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
+    const colore = c.colore ? { colore: c.colore } : {};
+    try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: c.iconId, daBarra: true, ...colore }); } catch (_) {}
+  }
+
   // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
   // la consegna aspetta i suoi pezzi di Filo se si sta ancora caricando.
   _passoAiuto(attiva) {
