@@ -45,6 +45,20 @@
     return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
   }
 
+  // La voce di `files[]` come la ammettono le regole (documentoAllegato in firestore.rules): solo url, nome e tipo,
+  // nei tetti. Un nome oltre il tetto perde la parte centrale, non l'estensione; un tipo oltre il tetto non è un tipo.
+  const VOCE_DOCUMENTO = Object.freeze({ NOME_MAX: 500, TIPO_MAX: 255 });
+  function voceDocumento(url, name, type) {
+    let nome = Array.from(String(name || 'allegato'));
+    if (nome.length > VOCE_DOCUMENTO.NOME_MAX) {
+      const punto = nome.lastIndexOf('.');
+      const ext = punto > 0 && nome.length - punto <= 20 ? nome.slice(punto) : [];
+      nome = nome.slice(0, VOCE_DOCUMENTO.NOME_MAX - ext.length - 1).concat('…', ext);
+    }
+    const tipo = String(type || '');
+    return { url: String(url), name: nome.join(''), type: tipo.length <= VOCE_DOCUMENTO.TIPO_MAX ? tipo : '' };
+  }
+
   // Host → inizi ammessi, NOME DEL DEPOSITO compreso: REST di Firebase e diretto di Storage.
   // I nomi del deposito sono due: senza quello storico un allegato vecchio non si apre più.
   const DEPOSITI = [BUCKET, `${PROJECT_ID}.appspot.com`];
