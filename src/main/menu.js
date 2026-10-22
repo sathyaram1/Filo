@@ -121,7 +121,7 @@ function avanti() {
 
 function vaiAScrivereUnIndirizzo() {
   const c = schedaAttiva();
-  if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
+  if (c) { try { c.tabs.vaiAScrivereUnIndirizzo(c.tab.id).catch(() => {}); } catch (_) {} return; }
   nuovaScheda();
 }
 

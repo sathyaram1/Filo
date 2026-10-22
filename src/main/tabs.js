@@ -1303,7 +1303,7 @@ class TabManager {
   }
 
   // Riapre una scheda chiusa com'era: indirizzo, scroll, zoom e paese; dalla pila anche posto e cronologia.
-  // Una porta sola per la scorciatoia, il menu della scheda e la ricerca del filo (REOPEN_ARCHIVED_TAB).
+  // Una porta sola per la scorciatoia, la barra dei menu e la ricerca del filo (REOPEN_ARCHIVED_TAB).
   async riapri(voce) {
     const url = voce && typeof voce.url === 'string' ? voce.url : '';
     if (!url) return null;
@@ -1351,14 +1351,27 @@ class TabManager {
     try { return this._pilaChiuse().dallArchivio(await A.listMeta()); } catch (_) { return null; }
   }
 
-  // Il menu della scheda mostra «Riapri scheda chiusa» solo se c'è qualcosa da riaprire.
-  async ciSonoChiuse() {
-    return this._pilaChiuse().quante > 0 || !!(await this._chiusaDallArchivio());
-  }
-
   // Una scheda d'archivio riaperta da un'altra porta non torna anche con la scorciatoia.
   segnaRiaperta(idArchivio) {
     if (!this.incognito) this._pilaChiuse().segnaRiaperta(idArchivio);
+  }
+
+  // Ctrl/Cmd+L: l'indirizzo si scrive nel campo della home, la barra degli indirizzi non c'è. Già sulla home non la
+  // ricarica, che butterebbe via quello che c'è scritto: dà il fuoco al campo col testo selezionato, come un browser.
+  async vaiAScrivereUnIndirizzo(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) { this.openTab('filo://newtab/'); return; }
+    let sullaHome = false;
+    if (/^filo:\/\/newtab\//.test(String(tab.url || '')) && !tab.loading) {
+      try {
+        tab.view.webContents.focus();
+        sullaHome = await tab.view.webContents.executeJavaScript(
+          "(()=>{const i=document.getElementById('input');if(!i||i.disabled||!i.offsetParent)return false;i.focus();i.select();return true;})()",
+          false,
+        ) === true;
+      } catch (_) {}
+    }
+    if (!sullaHome) this.navigate(tab.id, 'filo://newtab/');
   }
 
   // Lo stato vive sulla SCHEDA, non sul WebContents: deve sopravvivere a una
@@ -2157,12 +2170,11 @@ class TabManager {
     // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
     if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
       const k = String(input.key || '').toLowerCase();
-      // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476).
-      if (k === 't') { if (input.shift) this.riapriChiusa().catch(() => {}); else this.openTab('filo://newtab/'); return true; }
+      // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476); tenuto premuto non svuota l'archivio.
+      if (k === 't' && input.shift) { if (!input.isAutoRepeat) this.riapriChiusa().catch(() => {}); return true; }
+      if (k === 't') { this.openTab('filo://newtab/'); return true; }
       if (k === 'w') { this.closeTab(tab.id); return true; }
-      // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
-      // Ctrl+L apre la home di Filo, esattamente come nella shell.
-      if (k === 'l') { this.navigate(tab.id, 'filo://newtab/'); return true; }
+      if (k === 'l') { this.vaiAScrivereUnIndirizzo(tab.id).catch(() => {}); return true; }
       if (k === 'r') { this.reload(tab.id); return true; }
     }
     return false;
