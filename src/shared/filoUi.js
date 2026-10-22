@@ -270,6 +270,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
+    ombra, ombraDi, eRiquadro: (el) => ombre.has(el), bersaglio, EVENTI_DEL_RIQUADRO, eventoNelRiquadro, chiaveDiBozza, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
