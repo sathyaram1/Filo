@@ -169,18 +169,29 @@
         return { start: p.start, end: fine, originale, corretta, fonte: 'personale' };
       }
     }
-    const w = parolaPrima(testo, fine);
+    let w = parolaPrima(testo, fine);
     if (!w) return null;
+    // L'apice che chiude una virgoletta non è della parola: «'e'» resta «'e'», «'marco'» diventa «'Marco'».
+    if (/['’]$/.test(w.parola) && R().chiudeVirgolette(testo, w.start)) {
+      if (w.parola.length < 2) return null;
+      w = { start: w.start, end: w.end - 1, parola: w.parola.slice(0, -1) };
+    }
     const k = chiave(w.parola);
     if (rifiutate.has(k)) return null;
-    const giusta = R().FISSI.get(k);
+    const accentata = R().FISSI.has(k) ? '' : formaAccentata(w.parola, accento);
+    const giusta = R().FISSI.get(chiave(accentata || w.parola)) || accentata;
     if (giusta) {
       const corretta = R().comeScritto(w.parola, giusta);
-      return corretta !== w.parola ? { start: w.start, end: fine, originale: w.parola, corretta, fonte: 'fisso' } : null;
+      return corretta !== w.parola ? { start: w.start, end: w.end, originale: w.parola, corretta, fonte: 'fisso' } : null;
+    }
+    const el = ELISIONE.exec(w.parola);
+    if (el) {
+      w = { start: w.start + el[0].length, end: w.end, parola: w.parola.slice(el[0].length) };
+      if (rifiutate.has(chiave(w.parola))) return null;
     }
     if (!tuttaMinuscola(w.parola) || qui()) return null;
     const forma = nomeDi(w.parola);
-    return forma && forma !== w.parola ? { start: w.start, end: fine, originale: w.parola, corretta: forma, fonte: 'nome' } : null;
+    return forma && forma !== w.parola ? { start: w.start, end: w.end, originale: w.parola, corretta: forma, fonte: 'nome' } : null;
   }
 
   // ── Come scrive chi scrive, in quel posto ──────────────────────────────────
