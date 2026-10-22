@@ -17,6 +17,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
@@ -120,6 +121,71 @@ test('"Salva immagine come…" funziona anche su siti con protezione hotlink (ri
 
     // …la scheda non è navigata e l'utente riceve la conferma.
     expect(page.url()).toBe(pageUrl);
+    await expect(page.locator('.sn-toast')).toContainText('Immagine salvata');
+  } finally {
+    try { imgServer.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => imgServer.close(r));
+  }
+});
+
+// #1510 — un nome col carattere che capovolge la lettura (U+202E) si mostra con l'estensione sbagliata: nel dialogo,
+// nel file parziale e nella barra deve arrivare il nome vero. E il file salvato porta la marca d'origine del sistema.
+test('«Salva immagine come» salva col nome vero, senza caratteri che capovolgono la lettura, e marca il file come arrivato da Internet', async ({ app, shell, openTab, testServer }) => {
+  const imgServer = createServer((req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Content-Length': PNG.length,
+      'Content-Disposition': "inline; filename*=UTF-8''ricordo%E2%80%AEgpj.png",
+    });
+    res.end(PNG);
+  });
+  await new Promise((r) => imgServer.listen(0, '127.0.0.1', r));
+  const imgUrl = `http://127.0.0.1:${imgServer.address().port}/foto`;
+
+  try {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
+      <h1>Galleria</h1>
+      <img id="pic" src="${imgUrl}" width="64" height="64">
+    </body></html>`);
+    const pageUrl = page.url();
+    await page.waitForFunction(() => {
+      const i = document.getElementById('pic');
+      return i && i.complete && i.naturalWidth > 0;
+    });
+
+    await page.locator('#pic').click({ button: 'right' });
+    const item = menuDi(page).locator('.sn-menu button', { hasText: 'Salva immagine come' });
+    await expect(item).toBeVisible();
+    await item.click();
+
+    // In test il nome proposto al dialogo è il nome del file salvato.
+    const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
+    await expect
+      .poll(() => (existsSync(dir) ? readdirSync(dir) : []), { timeout: 15000 })
+      .toContain('ricordogpj.png');
+    const file = join(dir, 'ricordogpj.png');
+    expect(readFileSync(file).equals(PNG)).toBe(true);
+    expect(readdirSync(dir).filter((n) => /[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/.test(n))).toEqual([]);
+
+    // La voce nella barra dice lo stesso nome del file su disco.
+    await expect.poll(async () => {
+      const r = await shell.evaluate(() => window.filoShell.downloads.list());
+      const v = ((r && r.items) || []).find((it) => it.url === imgUrl);
+      return v && v.state === 'completed' ? { filename: v.filename, savePath: v.savePath } : null;
+    }, { timeout: 10000 }).toEqual({ filename: 'ricordogpj.png', savePath: file });
+
+    if (process.platform === 'win32') {
+      const marca = readFileSync(`${file}:Zone.Identifier`, 'utf8');
+      expect(marca).toContain('ZoneId=3');
+      expect(marca).toContain(`HostUrl=${imgUrl}`);
+      // L'immagine sta su un'altra origine: della pagina resta l'origine, come nel Referer.
+      expect(marca).toContain(`ReferrerUrl=${new URL(pageUrl).origin}/\r\n`);
+    } else if (process.platform === 'darwin') {
+      expect(execFileSync('/usr/bin/xattr', ['-p', 'com.apple.quarantine', file], { encoding: 'utf8' })).toMatch(/^0081;[0-9a-f]+;Filo;/);
+    } else {
+      // Linux non ha una marca di sistema: accanto al file non deve nascere niente.
+      expect(readdirSync(dir).filter((n) => n.includes('Zone.Identifier'))).toEqual([]);
+    }
     await expect(page.locator('.sn-toast')).toContainText('Immagine salvata');
   } finally {
     try { imgServer.closeAllConnections?.(); } catch (_) {}

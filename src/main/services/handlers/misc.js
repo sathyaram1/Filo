@@ -122,15 +122,6 @@ function filenameFromUrl(url) {
   } catch (_) { return ''; }
 }
 
-// Il nome dal server è dato ostile: separatori, caratteri di controllo e traversal vanno
-// neutralizzati, o il file esce dalla cartella scelta.
-function safeImageFilename(name) {
-  let n = require('node:path').basename(String(name || ''));
-  n = n.replace(/[\x00-\x1f<>:"/\\|?*]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
-  if (!n) n = 'immagine';
-  return n.slice(0, 200);
-}
-
 // #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
 // da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
 const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
@@ -353,9 +344,9 @@ module.exports = function register(on, ctx) {
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
         onHeaders: ({ filename, totalBytes, servito }) => {
-          // Nome file sicuro: preferisci il Content-Disposition del server, poi
-          // il path dell'URL; neutralizza separatori e tentativi di traversal.
-          const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
+          // Il nome dal server è dato ostile: la regola è quella dei download da link, e dialogo, file
+          // parziale e voce nella barra mostrano lo stesso nome (#1510).
+          const name = downloads.safeName(filename || filenameFromUrl(url) || fallbackName, fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
           entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito, webContents: wc });
@@ -411,7 +402,7 @@ module.exports = function register(on, ctx) {
       entry.fail(); await dropPart();
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
-    entry.done(dest.filePath);
+    await entry.done(dest.filePath);
     return { ok: true, path: dest.filePath, filename: path.basename(dest.filePath) };
   };
 
