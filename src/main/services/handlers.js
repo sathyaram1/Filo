@@ -5557,7 +5557,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const giaScritta = unisciTesti(risposta);
     if (!chatId || (!successe.length && !giaScritta)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
@@ -5858,12 +5859,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
   // I collegamenti della risposta che il modello non avrebbe potuto aprire senza un OK lo chiedono anche al clic (#868.6).
   let linkDaConfermare = [];
+  // Senza giudizio i collegamenti della frase restano senza verdetto anche riaperta: al clic chiedono l'OK (#1505).
+  let senzaVerdetto = false;
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
       sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
       indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
     });
-  } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
+  } catch (e) {
+    senzaVerdetto = true;
+    console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e);
+  }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
@@ -5878,6 +5884,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         role: 'filo', text: textReply, actions: successe,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
+        ...(senzaVerdetto ? { senzaVerdetto } : {}),
         ...(cambi.length ? { cambi } : {}),
       },
       { onboarding: onbActive },

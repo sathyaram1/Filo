@@ -469,12 +469,16 @@
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;
-      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora.
+      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora. Tutti quelli che il
+      // registro tiene: oltre il tetto del giudizio sono quelli che chiedono l'OK senza essere stati guardati (#1505).
       const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
         .filter((x) => x && typeof x.url === 'string' && x.url)
-        .slice(0, 200)
+        .slice(0, 5000)
         .map((x) => ({ url: x.url, motivo: String(x.motivo || '').slice(0, 200) }));
       if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
+      // Mai passata dal giudizio dei collegamenti (risposta interrotta, riga scritta dalla pagina): riaperta, i suoi
+      // collegamenti restano senza verdetto.
+      if (turn.senzaVerdetto === true) out.senzaVerdetto = true;
     }
     return out;
   }
