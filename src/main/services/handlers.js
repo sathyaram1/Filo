@@ -3299,14 +3299,14 @@ async function eseguiAzioneFilo(action, {
             kind: c.kind || null,
             snippet: ChatArchive.snippetFor(c, termini.join(' ')),
           }));
-          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat) resta quella lettura.
+          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat, le parole scritte nell'Aiuto
+          // sopra un sito) resta quella lettura; uno preso da una risposta di Filo porta la classe che lei aveva letto (#1508).
           const daFuori = [];
+          let classeLetta = 1;
           found.forEach((c, i) => {
-            const pezzo = String(results[i].snippet || '').replace(/^…|…$/g, '').trim();
-            if (!pezzo) return;
-            for (const x of globalThis.SN_FILO_CONTESTO.daFuoriDi(c.messages)) {
-              if (x.testo.replace(/\s+/g, ' ').includes(pezzo)) { daFuori.push({ testo: pezzo, fonte: x.fonte }); break; }
-            }
+            const p = globalThis.SN_FILO_CONTESTO.provenienzaDelFrammento(c, results[i].snippet);
+            daFuori.push(...p.daFuori);
+            classeLetta = Math.max(classeLetta, p.classeLetta);
           });
           return {
             executed: true,
