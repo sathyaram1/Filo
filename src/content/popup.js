@@ -1256,6 +1256,24 @@
       azioni = [{ label: pagina.label, fn: () => { apriRimedio(pagina); close(); } }];
       if (durata) durata = Math.max(durata, DURATA_CON_RIMEDIO_MS);
     }
+    // `segnala`: la segnalazione già scritta da Filo (#1478). Un avviso che dice «Segnalalo» porta il tasto per farlo.
+    const segnala = typeof opts.segnala === 'string' && opts.segnala.trim() && global.SN_FEEDBACK_UI ? opts.segnala : '';
+    if (segnala) {
+      const apri = () => { try { global.SN_FEEDBACK_UI?.open({ testo: segnala }); } catch (_) {} close(); };
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-msg-rimedio';
+      btn.textContent = I18n.t('toast_segnala');
+      btn.addEventListener('click', (e) => {
+        const vero = global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted;
+        if (!vero) return;
+        e.stopPropagation();
+        apri();
+      });
+      t.appendChild(btn);
+      azioni = [...(azioni || []), { label: I18n.t('toast_segnala'), fn: apri }];
+      if (durata) durata = Math.max(durata, DURATA_CON_RIMEDIO_MS);
+    }
     global.SN_AVVISI.chiudibile(t, close, azioni);
     tempo = tempoAvviso(durata, close);
     return { close, el: t };
