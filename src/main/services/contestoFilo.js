@@ -258,6 +258,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     messaggi: f.messaggi,
     visti: f.visti,
     azioni: f.azioni,
+    perUnaNuova: senzaTolti(f.perUnaNuova),
     vecchi: f.vecchi,
     coda: codaGrezza.map((m) => {
       const azioni = Array.isArray(m.actions) ? senzaTolti(m.actions) : m.actions;
