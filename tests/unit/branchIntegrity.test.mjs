@@ -361,7 +361,7 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     // Il lavoro: commit + push (l'hook di salvataggio pusha sempre).
     const consegna = commit(work, 'lavoro.txt', 'fatto\n');
     git(work, ['push', '-q', 'origin', branch]);
-    return { work, id, branch, base, consegna };
+    return { work, origin, id, branch, base, consegna };
   }
 
   test('senza sigillo il posizionamento successivo SCARTA la consegna (il guasto)', () => {
