@@ -935,5 +935,6 @@ export function testoLavoroVivo(esito, azione) {
   });
   const c = esito && esito.commit;
   const commit = c ? ` Ultimo commit della cartella: ${c.sha} (${c.quando}) «${c.titolo}»${c.ramo ? ` sul ramo ${c.ramo}` : ''}.` : '';
-  return `lavoro ancora vivo nella cartella: non ho ${azione}. ${righe.join('; ')}.${commit}`;
+  // Il testo finisce anche dentro un `--guasto "…"` copiato a mano: niente virgolette doppie, apici inversi, dollari.
+  return `lavoro ancora vivo nella cartella: non ho ${azione}. ${righe.join('; ')}.${commit}`.replace(/\\/g, '/').replace(/["`$]/g, "'");
 }
