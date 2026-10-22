@@ -422,7 +422,8 @@
   }
 
   // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
-  // testo ne aveva più del tetto, e chi controlla un'uscita lì guarda la presenza dei suoi pezzi (urlExfil.js).
+  // testo ne aveva più del tetto, o una chiave più lunga di MAX_TOKEN, e chi controlla un'uscita lì guarda la presenza
+  // dei suoi pezzi (urlExfil.js).
   function segretiNelTesto(testoLetto) {
     const s = testo(testoLetto);
     const out = raccolta();
