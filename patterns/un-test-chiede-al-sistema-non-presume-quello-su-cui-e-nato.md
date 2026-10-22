@@ -43,6 +43,24 @@ Tre unit test rossi solo su Windows.
 Riferimenti: `tests/unit/documentRead.test.mjs` (nomi ambigui, maiuscole),
 `tests/unit/terminaleCodifica.test.mjs` (preludio per shell, esito dei comandi).
 
+## Lo stesso percorso vuol dire due cose (#1610)
+
+Il percorso che una prova scrive ha il significato del sistema su cui gira, e il
+codice lo legge con il `path` e il `process.platform` di quel sistema. Il caso:
+`/net/nas/condivisa` è un altro computer sul Mac e su Linux, ma su Windows è la
+cartella `\net\nas\condivisa` dell'unità corrente. La prova aspettava un rifiuto
+che su Windows sarebbe stato un errore. Su Windows lo stesso rifiuto si prova con
+`\\nas\condivisa`. Il resto della prova resta uguale sui due lati.
+
+Lì vicino: su Windows un percorso che parte da `\` prende l'unità della cartella
+corrente, e il runner di GitHub lavora su `D:` mentre la casa finta sta su `C:`.
+Fra due unità `path.win32.relative` non dà un `..`: dà il percorso di arrivo, che è
+assoluto. «Dentro la casa» quindi vuol dire relativo, senza `..` in testa e non
+assoluto. Una prova che dipende dall'unità prova anche il caso `D:` in modo
+esplicito, così lo vede pure il Linux delle routine.
+
+Riferimento: `tests/unit/percorsiDiRete.test.mjs`.
+
 ## Il contenitore senza gestore di finestre (#465.1)
 
 Sotto xvfb (le routine, la suite in GitHub) nessuno esegue `minimize()`: la richiesta
