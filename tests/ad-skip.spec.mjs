@@ -172,6 +172,17 @@ test('una canzone che Filo apre in secondo piano dalla home salta la pubblicità
   expect((await stato(page)).saltata).toBe(true);
 });
 
+test('ESPERIMENTO dietro nascosta', async ({ app, openTab, testServer, suYouTube }) => {
+  const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1 }))));
+  await apri(openTab, testServer.html('<title>Altra</title><p>altra scheda</p>'));
+  const diag = () => page.evaluate(() => ({ w: innerWidth, h: innerHeight, vis: document.visibilityState, clic: window.__clic }));
+  for (let i = 0; i < 6; i++) { console.log('T', i, JSON.stringify(await diag())); await page.waitForTimeout(1000); }
+  await page.evaluate(() => window.__mostra());
+  await page.waitForTimeout(5000);
+  console.log('DOPO', JSON.stringify(await diag()));
+  expect((await stato(page)).saltata).toBe(true);
+});
+
 test('mentre si scrive in un campo della pagina aspetta, poi salta', async ({ openTab, testServer, suYouTube }) => {
   const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1, campo: true }))));
   await page.locator('#cerca').click();
