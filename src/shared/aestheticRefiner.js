@@ -4,7 +4,7 @@
 // verdi"), applica SUBITO un valore ragionevole; poi la bolla mostra un bottone
 // che apre QUESTO box in sovrimpressione per scegliere il valore esatto, con
 // anteprima LIVE. Il tipo di controllo deriva dal tipo del token nel registro
-// (themeTokens.js): colore → color picker, opacità, raggio, durata e
+// (themeTokens.js): colore → color picker, opacità, raggio, larghezza, durata e
 // moltiplicatore → slider, font → menu di famiglie.
 //
 // È un modulo condiviso (IIFE su globalThis) ma puramente DOM: lo usa la
@@ -34,7 +34,7 @@
   function controlTypeFor(name, Tokens) {
     const t = Tokens && Tokens.get && Tokens.get(name);
     const type = t && t.type;
-    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor' || type === 'linea') return type;
+    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor' || type === 'linea' || type === 'pixel') return type;
     return 'color';
   }
 
@@ -47,6 +47,7 @@
     time: 'Regola la durata',
     factor: 'Regola col cursore',
     linea: 'Cambia lo stile della linea',
+    pixel: 'Regola la larghezza',
     color: 'Scegli il colore esatto',
   };
   const NOMI_LINEA = { dotted: 'Puntini', dashed: 'Trattini', wavy: 'Onda', solid: 'Linea', double: 'Doppia' };
@@ -207,7 +208,7 @@
         lbl.className = 'sn-refine-sample-text';
         lbl.textContent = eff;
         sample.appendChild(lbl);
-      } else if (type === 'time') {
+      } else if (type === 'time' || type === 'pixel') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
         txt.textContent = eff;
@@ -279,6 +280,14 @@
       control.value = String(parseInt(startEff, 10) || 0);
       control.setAttribute('aria-label', t.label || name);
       control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}px`));
+    } else if (type === 'pixel') {
+      control = doc.createElement('input');
+      control.type = 'range';
+      control.className = 'sn-refine-input sn-refine-range';
+      control.min = String(t.min); control.max = String(t.max); control.step = '10';
+      control.value = String(parseInt(startEff, 10) || t.min);
+      control.setAttribute('aria-label', t.label || name);
+      control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || t.min}px`));
     } else if (type === 'time') {
       control = doc.createElement('input');
       control.type = 'range';

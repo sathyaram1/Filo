@@ -65,8 +65,10 @@
   // della shell (--accent, --fg, …) al boot e live a ogni cambio impostazioni
   // (stesso canale SETTINGS_UPDATED usato dalle pagine).
   const ThemeTokens = window.SN_THEME_TOKENS;
+  let tokenShell = {};
   function applyShellTokens(tokens) {
-    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
+    tokenShell = tokens && typeof tokens === 'object' ? tokens : {};
+    if (ThemeTokens) ThemeTokens.applyToDocument(document, tokenShell, { shell: true });
   }
   // Parametri "Colore identità delle tab" per il fondo delle schede non attive.
   const TabColor = window.SN_TAB_COLOR;
@@ -1089,18 +1091,24 @@
   // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
   // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
   // stacca di STACCO dalla scheda tipica dietro solo con lo spazio che avanza: un vuoto suo non taglia un nome altrui.
+  // Nessuna scheda, attiva e stacco compresi, supera la larghezza massima del token `tab.larghezza` (#1493).
   const STACCO = 1.25;
   const STACCO_MAX = 1.8;
   const MIN_ATTIVA = 110;
   const MIN_SCHEDA = 40;
   let larghezzeInVigore = null; // { chiave, w: number[] }
+  function larghezzaMassima() {
+    const v = ThemeTokens ? parseInt(ThemeTokens.effectiveValue('tab.larghezza', tokenShell), 10) : NaN;
+    return Number.isFinite(v) ? Math.max(MIN_ATTIVA, v) : Infinity;
+  }
   function spazioDellaStriscia() {
     const spazio = tabRowEl.querySelector('.tab-drag-spacer');
     const sp = spazio ? spazio.getBoundingClientRect().width - (parseFloat(getComputedStyle(spazio).minWidth) || 0) : 0;
     const cs = getComputedStyle(tabsEl);
     return tabsEl.getBoundingClientRect().width + Math.max(0, sp) - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
   }
-  function larghezzeDistribuite(naturali, ia, posto) {
+  function larghezzeDistribuite(piene, ia, posto, massimo) {
+    const naturali = piene.map((w) => Math.min(w, massimo));
     const dietro = naturali.filter((_, i) => i !== ia);
     const ordinate = [...dietro].sort((a, b) => a - b);
     const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
@@ -1117,7 +1125,7 @@
     const attiva = attivaCon(tetto);
     const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
     const avanzo = Math.floor(posto - totale(tetto));
-    const conStacco = attiva + Math.max(0, Math.min(stacco, avanzo));
+    const conStacco = Math.min(massimo, attiva + Math.max(0, Math.min(stacco, avanzo)));
     return naturali.map((w, i) => (i === ia ? conStacco : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
   }
   function misuraLarghezzeChieste() {
@@ -1129,7 +1137,7 @@
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
     const naturali = schede.map((el) => Math.ceil(el.getBoundingClientRect().width));
     const ia = schede.findIndex((el) => el.classList.contains('active'));
-    const misurate = larghezzeDistribuite(naturali, ia, posto);
+    const misurate = larghezzeDistribuite(naturali, ia, posto, larghezzaMassima());
     const chiave = schede.map((el) => el.dataset.id).join(',') + '|' + ia;
     const tieni = puntatoreSullaFila && larghezzeInVigore && larghezzeInVigore.chiave === chiave;
     passoTrattenuto = Boolean(tieni) && misurate.some((w, i) => w !== larghezzeInVigore.w[i]);

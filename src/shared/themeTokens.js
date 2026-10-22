@@ -268,6 +268,15 @@
       css: '--sn-spell-dubbio',
       default: '0.4',
     },
+    // Il tetto di ogni scheda nella fila in alto, attiva compresa (#1493): lo legge shell.js, nessuna variabile CSS.
+    // Il minimo è quello della scheda attiva (tests/unit/tabLarghezzaMassima.test.mjs).
+    'tab.larghezza': {
+      label: 'Larghezza massima delle schede',
+      type: 'pixel',
+      min: 110,
+      max: 1000,
+      default: '240px',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
@@ -294,6 +303,12 @@
   const NUMERICI = new Set(['opacity', 'factor']);
   function normalize(name, value) {
     const t = TOKENS[name];
+    // «300», «300 px» o il numero della chat: la forma salvata è «300px».
+    if (t && t.type === 'pixel') {
+      const s = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim().toLowerCase() : value;
+      const m = typeof s === 'string' && s.match(/^(\d{1,4})\s*(?:px)?$/);
+      return m ? `${Number(m[1])}px` : s;
+    }
     if (t && NUMERICI.has(t.type)) {
       if (typeof value === 'number') return Number.isFinite(value) ? String(value) : value;
       if (typeof value === 'string') return value.trim().replace(/^(\d*),(\d+)$/, '$1.$2');
@@ -323,6 +338,10 @@
         return ms >= 0 && ms <= 10000;
       }
       case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
+      case 'pixel': {
+        const m = v.match(/^(\d{1,4})px$/);
+        return Boolean(m) && Number(m[1]) >= t.min && Number(m[1]) <= t.max;
+      }
       default: return false;
     }
   }
@@ -338,6 +357,7 @@
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
       case 'linea': return 'Stile non valido: dotted, dashed, wavy, solid o double.';
       case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX}, es. 0 (nessuna animazione), 1 (normale) o 1,5.`;
+      case 'pixel': return `Misura non valida: pixel interi fra ${t.min} e ${t.max}, es. ${t.default}.`;
       default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
     }
   }
