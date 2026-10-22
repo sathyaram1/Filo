@@ -99,6 +99,13 @@ test('il testo del rifiuto dice chi è vivo, senza codici lunghi e copiabile den
     assert.ok(testo.includes(atteso), `${atteso} in: ${testo}`);
   }
   assert.doesNotMatch(testo, /["`$]/);
+  // Una suite che gira sono decine di processi: i primi comandi veri, le shell dopo, e il numero del resto.
+  const tanti = [{ tipo: 'processo', pid: 1, cmd: '/bin/bash -c source snap.sh && npm run finish:check', cwd: '/r' },
+    ...Array.from({ length: 9 }, (_, i) => ({ tipo: 'processo', pid: 10 + i, cmd: `node --test f${i}.mjs`, cwd: '/r' }))];
+  const lungo = testoLavoroVivo({ segni: tanti, commit: null }, 'provato');
+  assert.match(lungo, /^lavoro ancora vivo nella cartella: non ho provato\. processo 10 /);
+  assert.match(lungo, /e altri 4 processi\.$/);
+  assert.doesNotMatch(lungo, /snap\.sh/);
   assert.ok(sottoCartella('/a/b/c', '/a/b') && !sottoCartella('/a/bc', '/a/b') && sottoCartella('/a/b', '/a/b'));
 });
 

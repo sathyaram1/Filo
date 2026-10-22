@@ -926,13 +926,21 @@ export function lavoroVivo(root, {
   return { vivo: segni.length > 0, segni, processiVisti: processi !== null, commit: segni.length ? ultimoCommit(radice) : null };
 }
 
+const MOSTRATI = 6;
+
 /** Il rifiuto, con chi lavora ancora e cosa fare: `azione` è ciò che non si è fatto. PURA. */
 export function testoLavoroVivo(esito, azione) {
-  const righe = (esito && esito.segni || []).map((s) => {
+  const segni = (esito && esito.segni) || [];
+  // Prima i comandi veri, poi le shell che li avvolgono.
+  const shell = (s) => /^(\S*\/)?(ba|z)?sh -c /.test(s.cmd) ? 1 : 0;
+  const processi = segni.filter((s) => s.tipo === 'processo').sort((a, b) => shell(a) - shell(b));
+  // Una suite di test sono decine di processi: i primi bastano a dire chi è, il numero dice il resto.
+  const righe = [...segni.filter((s) => s.tipo !== 'processo'), ...processi.slice(0, MOSTRATI)].map((s) => {
     if (s.tipo === 'battito') return `battito vivo del biglietto ${s.biglietto}… (pid ${s.pid})`;
     if (s.tipo === 'timbro') return `il gancio di salvataggio del biglietto ${s.biglietto}… ha salvato ${Math.round(s.etaMs / 60000)} minuti fa`;
     return `processo ${s.pid} «${s.cmd}» in ${s.cwd}`;
   });
+  if (processi.length > MOSTRATI) righe.push(`e altri ${processi.length - MOSTRATI} processi`);
   const c = esito && esito.commit;
   const commit = c ? ` Ultimo commit della cartella: ${c.sha} (${c.quando}) «${c.titolo}»${c.ramo ? ` sul ramo ${c.ramo}` : ''}.` : '';
   // Il testo finisce anche dentro un `--guasto "…"` copiato a mano: niente virgolette doppie, apici inversi, dollari.
