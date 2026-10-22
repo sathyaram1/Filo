@@ -11,6 +11,7 @@ import { webcrypto } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -813,14 +814,14 @@ describe('la chiave privata dei feedback è custodita come le altre (#1507)', ()
       assert.equal(T.ambienteComandi().FILO_SIS_PROVA, 'sis-ok');
       assert.equal(T.ambienteComandi({ FILO_DEFAULT_OPENROUTER_KEY: 'x', FILO_GOOGLE_CLIENT_SECRET: 'y', PATH: 'p' }).PATH, 'p');
       assert.deepEqual(Object.keys(T.ambienteComandi({ FILO_DEFAULT_OPENROUTER_KEY: 'x', FILO_GOOGLE_CLIENT_SECRET: 'y' })), []);
-      const assistente = await T.runCommand(STAMPA, { timeoutMs: 20000 });
+      const assistente = await T.runCommand(STAMPA, { timeoutMs: TETTO_ATTESA_MS });
       assert.equal(assistente.stdout.trim(), '[][sis-ok]', assistente.stderr);
-      const sistema = await T.runCommand(STAMPA, { env: { ...process.env, LC_ALL: 'C.UTF-8' }, timeoutMs: 20000 });
+      const sistema = await T.runCommand(STAMPA, { env: { ...process.env, LC_ALL: 'C.UTF-8' }, timeoutMs: TETTO_ATTESA_MS });
       assert.equal(sistema.stdout.trim(), '[][sis-ok]', sistema.stderr);
       const terminale = await new Promise((resolve, reject) => {
         const sessione = SH.createSession({});
         let testo = '';
-        const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale non ha risposto')); }, 20000);
+        const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale non ha risposto')); }, TETTO_ATTESA_MS);
         sessione.exec(STAMPA, {
           onData: ({ chunk, stream }) => { if (stream !== 'stderr') testo += chunk; },
           onExit: () => { clearTimeout(scade); sessione.kill(); resolve(testo); },

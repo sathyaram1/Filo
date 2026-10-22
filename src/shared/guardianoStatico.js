@@ -449,7 +449,7 @@
   const STAMPABILE = /^[\x09\x0a\x0d\x20-\x7e]*$/;
 
   // Un pezzo della parte variabile lungo così ricostruisce la chiave, anche senza il prefisso o con qualche carattere in
-  // meno (#1507). È la misura di ciò che si confronta con quello che l'agente ha letto (urlExfil.js, FINESTRA).
+  // meno (#1507). È la stessa misura con cui urlExfil.js confronta un'uscita con quello che l'agente ha letto.
   const FINESTRA = 20;
 
   // `norm` è il segreto in sola forma alfanumerica minuscola; `nucleo` la stessa senza i pezzi fissi del suo tipo, se è
