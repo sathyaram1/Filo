@@ -317,7 +317,7 @@ test('il testo messo da uno script resta com\'è, e con la correzione automatica
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
 
-test('dopo l\'apostrofo d\'elisione il nome prende la maiuscola, l\'apostrofo al posto dell\'accento si corregge, e quello che chiude una virgoletta resta', async ({ app, openTab, testServer }) => {
+test('dopo l\'apostrofo d\'elisione il nome prende la maiuscola, «perche\'» diventa «perché», e l\'apice che chiude una virgoletta resta', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   const scritto = async (testo) => { await svuota(page); await page.keyboard.type(testo); return valore(page); };
   expect(await scritto("Mi piace l'italia ")).toBe("Mi piace l'Italia ");

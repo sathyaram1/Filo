@@ -317,7 +317,7 @@ test('il nome dopo un apostrofo d\'elisione prende la maiuscola, e l\'annullo va
   assert.equal(battuto("Ok c'era "), null);
 });
 
-test('l\'apostrofo al posto dell\'accento si corregge con la forma che il dizionario conosce; i troncamenti giusti restano', () => {
+test('l\'apostrofo al posto dell\'accento diventa la forma accentata che il dizionario conosce; i troncamenti giusti restano', () => {
   const giuste = new Set(['perché', 'più', 'così', 'sarà', "c'è", 'né', 'dì', 'caffè']);
   const accento = (p) => giuste.has(p);
   assert.deepEqual(battuto("Ok perche' ", { accento }), { prima: "perche'", dopo: 'perché', fonte: 'fisso' });
