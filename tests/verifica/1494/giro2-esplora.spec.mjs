@@ -114,6 +114,43 @@ test('il sito copre il video incorporato con un suo elemento mentre la scheda è
   });
 });
 
+test('due pubblicità di fila nel video incorporato dietro: si saltano tutte e due', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'finestra vera');
+  test.setTimeout(120_000);
+  await conFilo(async ({ nel, quando, apri }) => {
+    const dentro = suYouTube(testServer.html(lettore('Video')));
+    const blog = testServer.html(`<!doctype html><title>Blog</title><p>articolo</p><iframe src="${dentro}" width="720" height="420"></iframe>${GESTI}`, { pubblico: true });
+    await apri(blog);
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', 'il video non si vede');
+    await apri(testServer.html('<title>Altra</title><p>altra</p>'));
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'hidden', 'il video non è dietro');
+    await nel(dentro, 'window.__mostra()');
+    await quando(async () => (await nel(dentro, 'window.__saltate')) === 1, 'prima non saltata', 10_000);
+    await new Promise((ok) => setTimeout(ok, 1500));
+    await nel(dentro, 'window.__mostra()');
+    await quando(async () => (await nel(dentro, 'window.__saltate')) === 2, 'seconda non saltata', 15_000);
+    expect(await nel(blog, 'window.__gesti')).toEqual([]);
+  });
+});
+
+test('Filo ridotto a icona col video incorporato davanti: la pubblicità si salta', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'finestra vera');
+  test.setTimeout(120_000);
+  await conFilo(async ({ filo, nel, quando, apri }) => {
+    const dentro = suYouTube(testServer.html(lettore('Video')));
+    const blog = testServer.html(`<!doctype html><title>Blog</title><p>articolo</p><iframe src="${dentro}" width="720" height="420"></iframe>${GESTI}`, { pubblico: true });
+    await apri(blog);
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', 'il video non si vede');
+    await filo.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs).minimize(); });
+    await new Promise((ok) => setTimeout(ok, 1500));
+    const stato = await filo.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); return { min: w.isMinimized(), vis: w.isVisible() }; });
+    console.log('finestra', JSON.stringify(stato), await nel(dentro, 'document.visibilityState'));
+    await nel(dentro, 'window.__mostra()');
+    await quando(async () => (await nel(dentro, 'window.__saltate')) === 1, 'pubblicità non saltata', 10_000);
+    expect(await nel(blog, 'window.__gesti')).toEqual([]);
+  });
+});
+
 test('blog ingrandito col video incorporato, lasciato dietro: la pubblicità si salta', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'finestra vera');
   test.setTimeout(120_000);
