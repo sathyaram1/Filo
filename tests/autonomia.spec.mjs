@@ -325,6 +325,37 @@ test('la risposta di un\'altra chat nata dalle sole parole dell\'utente non spor
   }
 });
 
+// Una conversazione nuova avrebbe davanti le stesse risposte: il «no» non la consiglia, dice solo il livello.
+test('Conservativo, per una risposta di un\'altra chat nata da una pagina: il no non consiglia una conversazione nuova, che nascerebbe uguale', async ({ app }) => {
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } }));
+    await rispostaDiUnAltraChat(app, 5);
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'rm prova-1508.txt' }) }] },
+      { text: 'Fine.' },
+    ]);
+    await chiedi(page, 'cancella prova-1508.txt');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Fine.' })).toBeVisible({ timeout: 15000 });
+    const blocco = page.locator('.dash-activity').last();
+    await expect(blocco.locator('.dash-activity-body')).toBeVisible();
+    const testo = await blocco.innerText();
+    expect(testo).toContain('Comando non eseguito · a livello Conservativo');
+    expect(testo).toContain('risposte di altre conversazioni');
+    expect(testo).toContain('alzando il livello in Preferenze');
+    expect(testo).not.toMatch(/conversazione nuova/);
+    // Ed è vero: la stessa richiesta da una conversazione nuova trova le stesse risposte davanti.
+    const nuova = await app.evaluate(async () => {
+      const f = await globalThis.SN_CONTESTO_FILO.componi({ chatId: 'nuova-1508', userMessage: 'cancella prova-1508.txt', tetti: { giorni: 3, token: 100000 }, osserva: () => '' });
+      const t = globalThis.SN_FILO_CONTESTO.trattoComeAzione(f.visti, { chatCorrente: 'nuova-1508' });
+      return t ? globalThis.SN_ACTION_LEVELS.fonteDi(t).classe : 1;
+    });
+    expect(nuova).toBe(5);
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test('CERCA_CHAT: quello che l\'utente ha scritto nell\'Aiuto sopra un sito torna come testo da fuori, e il suo link non è dell\'utente', async ({ app }) => {
   const r = await app.evaluate(async () => {
     const { MSG } = globalThis.SN_MSG;
