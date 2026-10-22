@@ -4927,6 +4927,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
       + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
   }
   if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
+  if (type === 'APRI_FILE' && res.output && res.output.rete) {
+    return 'Bottone NON mostrato: il file sta su un altro computer della rete, e Filo mostra e apre solo i file di questo '
+      + 'computer. Dillo all\'utente in una riga; non riprovare con un altro percorso di rete.';
+  }
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
     return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
   }
