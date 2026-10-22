@@ -172,6 +172,14 @@ function clicVero(wc, msg, { win, view, ora = Date.now() } = {}) {
   return { ok: true };
 }
 
+// Una risposta del protocollo che non arriva non deve tenere il debugger attaccato né fermare i clic dopo.
+const TETTO_CLIC_MS = 3000;
+function entro(p, ms) {
+  let t = null;
+  const scade = new Promise((_, ko) => { t = setTimeout(() => ko(new Error('tempo')), ms); });
+  return Promise.race([p, scade]).finally(() => clearTimeout(t));
+}
+
 // Un lettore incorporato da un altro sito vive in un processo suo: sendInputEvent arriva solo al frame principale, che
 // riceverebbe lui il gesto. Il protocollo di debug instrada il clic come quello del mouse, fino al riquadro sotto il punto.
 async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
