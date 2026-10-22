@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { mezzanotte, oggiFa } from './helpers/istanti.mjs';
 
 const SHOTS = 'tests/.shots';
 mkdirSync(SHOTS, { recursive: true });
