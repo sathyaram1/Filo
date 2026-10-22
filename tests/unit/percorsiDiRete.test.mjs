@@ -162,7 +162,7 @@ before(() => {
   writeFileSync(join(DOC, 'nota.txt'), 'Bolletta energia elettrica marzo');
   // Una cartella di rete cercata prima che la rete si rifiutasse resta fra quelle cercate per l'occasione.
   mkdirSync(join(DATI, 'documenti'), { recursive: true });
-  writeFileSync(join(DATI, 'documenti', 'indice.jsonl'), `${JSON.stringify({ o: '//nas/condivisa', q: 1 })}\n${JSON.stringify({ o: '/net/nas/archivio', q: 2 })}\n`);
+  writeFileSync(join(DATI, 'documenti', 'indice.jsonl'), `${JSON.stringify({ o: '//nas/condivisa', q: 1 })}\n${JSON.stringify({ o: ARCHIVIO_DI_RETE, q: 2 })}\n`);
   Indice._azzera();
   Indice.configura({ impostazioni: async () => ({ documenti: { cartelle: [DOC] } }), cartellaDati: () => DATI, estrai: (p) => Testo.estrai(p) });
 });
