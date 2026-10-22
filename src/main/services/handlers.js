@@ -561,10 +561,8 @@ function openWeightsBlockReason(settings, entry) {
 // registrarlo, l'esclusione è solo una speranza. Viola la politica un host
 // escluso e, per un modello da comprare solo dal produttore, un host che non è
 // suo (#904): Claude servito da Amazon Bedrock o da Azure.
-// Ritorna { servedBy, violation }. Con l'interruttore "solo pesi aperti" acceso
-// il caso non resta nei log: chi l'ha acceso ha chiesto una garanzia, e una
-// garanzia caduta in silenzio è peggio dell'interruttore assente — quindi lo
-// vede anche a schermo, e la voce di cronologia resta marchiata.
+// Ritorna { servedBy, violation }. Il caso non resta nei log: la voce di cronologia
+// resta marchiata e chi usa Filo lo vede in un avviso (#1478).
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
   const model = (result && result.model) || '';
@@ -584,16 +582,27 @@ function noteServedProvider(settings, action, result) {
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
   }
-  if (violation && settings.openWeightsOnly === true) {
-    try {
-      broadcastToTabs({
-        type: MSG.SHOW_TOAST,
-        text: I18n.t('toast_open_weights_violated', servedBy),
-        duration: 8000,
-      });
-    } catch (_) {}
-  }
+  if (violation) avvisaFuoriPolitica(settings, why, servedBy, model, action);
   return { servedBy, violation };
+}
+
+// Un avviso per host e motivo ogni dieci minuti: una pagina tradotta a pezzi dallo stesso host non ne impila cinquanta.
+const AVVISO_FUORI_POLITICA_MS = 10 * 60 * 1000;
+const avvisatiFuoriPolitica = new Map();
+function avvisaFuoriPolitica(settings, why, servedBy, model, action) {
+  const chiave = `${why}|${SN_CONST.normalizeProviderName(servedBy)}`;
+  const ora = Date.now();
+  if (ora - (avvisatiFuoriPolitica.get(chiave) || 0) < AVVISO_FUORI_POLITICA_MS) return;
+  avvisatiFuoriPolitica.set(chiave, ora);
+  let text;
+  if (why === 'not-producer') {
+    const regola = SN_CONST.producerOnlyRule(model);
+    text = I18n.t('toast_served_not_producer', servedBy, (regola && regola.nome) || 'il suo produttore');
+  } else {
+    text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
+  }
+  const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
+  try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000, segnala }); } catch (_) {}
 }
 
 // ─── Dettatura ───────────────────────────────────────────────────────────────

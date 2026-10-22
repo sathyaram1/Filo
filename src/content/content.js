@@ -2413,7 +2413,9 @@
       try {
         if (document.visibilityState === 'visible' && document.hasFocus()) {
           // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
-          Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null });
+          Popup?.showToast?.(String(msg.text || ''), {
+            duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
+          });
         }
       } catch (_) {}
       return;

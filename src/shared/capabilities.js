@@ -363,7 +363,7 @@
     },
     {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',
-      desc: 'L’elenco di tutte le richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), senza un limite che tolga le più vecchie, filtrabile e ricercabile, con il costo di ogni richiesta e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata; puoi rimuovere una singola voce oppure svuotarla del tutto.',
+      desc: 'L’elenco di tutte le richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), senza un limite che tolga le più vecchie, filtrabile e ricercabile, con il costo di ogni richiesta, chi l’ha servita e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata. Una risposta arrivata da un fornitore che Filo esclude è segnata sulla sua voce, e te lo dice subito anche un avviso sulla pagina, col tasto «Segnala» che apre «Invia feedback» già scritto; cercando il nome di chi l’ha servita trovi le sue voci. Puoi rimuovere una singola voce oppure svuotarla del tutto.',
       invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',
     },
     {
