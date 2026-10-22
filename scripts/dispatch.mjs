@@ -2026,7 +2026,7 @@ export function checkEnvelope(w) {
   if (RUOLI_CON_FEEDBACK.includes(role)) {
     // Il testo arriva dentro la cornice del server: una cornice attorno a
     // niente è ancora niente.
-    const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text).trim();
+    const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text, w && w.payload && w.payload.codiceBusta).trim();
     if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
   }
   return null;
