@@ -626,7 +626,7 @@
         // S1.2: cifra anche gli allegati non-immagine.
         const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
-        uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
+        uploadedFiles.push(voceDocumento(u.url, fname, f.type || rawBlob.type || ''));
       } catch (e) {
         if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
