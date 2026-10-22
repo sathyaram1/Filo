@@ -76,8 +76,13 @@ test('mai entrato, Mazzi tolti prima: niente in «altro»; aperti dall\'owner la
   docs['config/mazzi'] = { openToAll: false };
   expect(await rileggi(app)).toEqual({ bacheca: false, mazzi: false });
   const o = await openTab('filo://options/options.html');
-  await o.waitForSelector('#modelUsageList', { timeout: 8000 });
+  await o.waitForSelector('#useDefaultModels', { timeout: 8000 });
   await o.waitForTimeout(1500);
-  const testo = await o.locator('#modelUsageList').innerText();
-  console.log('MODELLI-MAZZI', /Mazzi/.test(testo), (testo.match(/Mazzi[^\n]*/g) || []).join(' | '));
+  const prima = await o.evaluate(() => document.body.innerText);
+  console.log('MODELLI-MAZZI-PRIMA', (prima.match(/[^\n]*Mazzi[^\n]*/g) || []).join(' | '));
+  await o.uncheck('#useDefaultModels');
+  await o.waitForTimeout(1500);
+  const testo = await o.evaluate(() => document.body.innerText);
+  console.log('MODELLI-MAZZI', (testo.match(/[^\n]*Mazzi[^\n]*/g) || []).join(' | '));
+  await o.screenshot({ path: 'tests/.shots/v1592-modelli.png', fullPage: true });
 });
