@@ -151,6 +151,24 @@ test('Filo ridotto a icona col video incorporato davanti: la pubblicità si salt
   });
 });
 
+test('blog davanti letto più giù del video incorporato a lungo, poi si risale: la pubblicità si salta', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'finestra vera');
+  test.setTimeout(240_000);
+  await conFilo(async ({ nel, quando, apri }) => {
+    const dentro = suYouTube(testServer.html(lettore('Video')));
+    const blog = testServer.html(`<!doctype html><title>Blog</title><p>articolo</p><iframe src="${dentro}" width="720" height="420"></iframe>`
+      + `<div style="height:4000px">resto dell'articolo</div>${GESTI}`, { pubblico: true });
+    await apri(blog);
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', 'il video non si vede');
+    await nel(blog, 'scrollTo(0, 2000); scrollY');
+    await nel(dentro, 'window.__mostra()');
+    await new Promise((ok) => setTimeout(ok, 90_000));
+    expect(await nel(dentro, 'window.__saltate')).toBe(0);
+    await nel(blog, 'scrollTo(0, 0); scrollY');
+    await quando(async () => (await nel(dentro, 'window.__saltate')) === 1, 'risaliti sul video, la pubblicità non si salta', 15_000);
+  });
+});
+
 test('blog ingrandito col video incorporato, lasciato dietro: la pubblicità si salta', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'finestra vera');
   test.setTimeout(120_000);
