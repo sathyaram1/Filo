@@ -307,12 +307,13 @@
     }
     const nome = infoLivello(livello).nome;
     const letto = fonte && fonte.motivo ? String(fonte.motivo) : 'ho letto cose scritte da altri';
-    const strade = daPagina
+    const soloLivello = daPagina || nuovaUguale || !!(fonte && fonte.ereditata);
+    const strade = soloLivello
       ? 'alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»'
       : 'chiederlo in una conversazione nuova, che non ha ancora letto niente, oppure alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»';
     return {
       breve: `a livello ${nome} non lo faccio da solo, perché in questo compito ${letto}. `
-        + (daPagina ? 'Si può alzando il livello in Preferenze' : 'Si può in una conversazione nuova, o alzando il livello in Preferenze'),
+        + (soloLivello ? 'Si può alzando il livello in Preferenze' : 'Si può in una conversazione nuova, o alzando il livello in Preferenze'),
       perModello: `a livello di autonomia ${nome}, dopo che in questo compito ${letto}, Filo non fa da solo ciò che non si disfa. `
         + `Non è vietato a ogni livello: dillo all'utente in una riga, con le strade che ha (${strade}). Non riprovare in questa conversazione`,
     };
