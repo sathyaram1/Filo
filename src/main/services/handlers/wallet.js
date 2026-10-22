@@ -153,7 +153,7 @@ module.exports = function register(on, ctx) {
     const now = Date.now();
     if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
     ultimoAvvisoRipiego = now;
-    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+    try { avvisoDiFilo(W.ownKeyFallbackLine(status), { durataSec: 8 }); } catch (_) {}
   }
   function ripiegoMostrato() {
     ultimoAvvisoRipiego = Date.now();
