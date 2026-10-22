@@ -1001,10 +1001,13 @@
   }
 
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
-  function gitPerimetro(trimmed, c) {
-    const sub = subcommandOf(trimmed);
+  function gitPerimetro(raw, c) {
+    const sub = subcommandOf(dequote(raw));
     if (sub === 'grep') return due(MOTIVI.ricorsivo);
-    const args = gitArgsAfterSub(trimmed);
+    // I percorsi come li legge la shell, come per gli altri lettori.
+    const testi = argomenti(raw, c).slice(1).map((a) => a.testo).filter(Boolean);
+    const k = testi.findIndex((x) => !x.startsWith('-'));
+    const args = k < 0 ? [] : testi.slice(k + 1);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
     // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
