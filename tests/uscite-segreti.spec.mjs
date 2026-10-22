@@ -238,7 +238,8 @@ test('la password che l’utente scrive in un modulo non arriva al modello e non
   await expect(page.locator('.sn-sidebar-log', { hasText: "non ho aperto l'indirizzo" })).toBeVisible({ timeout: 20_000 });
   expect(apertoVerso(app, RACCOLTA), 'la password scritta dall’utente è uscita').toBe(false);
   const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
-  expect(visti, 'il modello sa che il campo è compilato').toContain('input \\"(compilato)\\" :: #p');
+  // Il campo col nome si chiama col nome, come vuole #810.7: il valore non parte.
+  expect(visti, 'il modello sa quale campo è').toContain('input \\"Password:\\" :: #p');
   expect(visti, 'la password è arrivata al modello').not.toContain(PASSWORD_UTENTE);
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('731954');
   expect(await lettiSalvati(app)).not.toContain(PASSWORD_UTENTE);
@@ -479,8 +480,9 @@ test('l’assistente vede l’indirizzo che l’utente ha scritto in un campo, n
   await scriviAllAiuto(page, 'ho scritto giusto la mia email?');
   await expect(page.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
   const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
-  expect(visti, 'il modello non ha l’email scritta').toContain('input \\"mario.rossi@gmial.com\\"');
-  expect(visti, 'il modello sa che il campo della carta è compilato').toContain('input \\"(compilato)\\" :: #c');
+  // Un campo col nome si chiama col nome (#810.7): l'email scritta il modello la legge nella foto, che copre solo i segreti.
+  expect(visti, 'il modello sa quale campo è').toContain('input \\"Email\\" :: #e');
+  expect(visti, 'il modello sa quale campo è la carta').toContain('input \\"Numero della carta\\" :: #c');
   expect(visti, 'la carta è arrivata al modello').not.toContain(CARTA_UTENTE);
 });
 
