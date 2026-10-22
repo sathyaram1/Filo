@@ -167,7 +167,7 @@ function randSid() {
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
-  const ambiente = env ? { env } : {};
+  const ambiente = { env: ambienteComandi(env || process.env) };
   // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
   // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
   // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
