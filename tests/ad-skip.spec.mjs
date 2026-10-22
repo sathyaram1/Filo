@@ -184,7 +184,10 @@ test('ESPERIMENTO dietro nascosta', async ({ app, openTab, testServer, suYouTube
       return { vis: t.view.getVisible?.(), b: t.view.getBounds(), bt: t.view.webContents.getBackgroundThrottling?.(), min: w.isMinimized(), wv: w.isVisible() };
     }),
   });
-  for (let i = 0; i < 3; i++) { console.log('T', i, JSON.stringify(await diag())); }
+  for (let i = 0; i < 2; i++) { console.log('T', i, JSON.stringify(await diag())); }
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
+  for (let i = 0; i < 2; i++) { console.log('NOFOCUSEMU', i, JSON.stringify(await diag())); }
   await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.minimize(); });
   for (let i = 0; i < 3; i++) { console.log('MIN', i, JSON.stringify(await diag())); }
   await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.restore(); w.hide(); });
