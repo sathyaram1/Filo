@@ -43,6 +43,7 @@ export const PASSI = {
   istruzioni: 'il caricamento del foglietto del primo avvio',
   controllo: 'il controllo che i file siano davvero nella release',
   impronte: 'la scrittura delle impronte SHA-256 dei file nella sezione «Verifica» della pagina della versione',
+  ancora: "la richiesta al server di ancorare le impronte dei file (#1501): senza, Filo con l'àncora accesa non installa questa versione",
 };
 
 const numeri = (tag) => {
