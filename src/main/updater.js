@@ -72,6 +72,7 @@ function nuovoStato() {
     scaricamento: null,   // { versione, percento } finché scarica
     pronta: null,         // la versione scaricata
     agganciata: false,    // electron-updater la installerà alla chiusura (vedi regola)
+    ancora: null,         // { versione, impronte } ancorate dal server per l'ultima versione passata dal cancello
     errore: null,
     annuncia: () => {},
   };
