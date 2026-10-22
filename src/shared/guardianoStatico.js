@@ -40,6 +40,16 @@
   // Quanto lontano dalla parola si cerca la forma: una riga scarsa.
   const RAGGIO = 60;
 
+  // L'inizio fisso di una chiave privata pkcs8 in base64 senza intestazione (EC P-256 con e senza la pubblica, P-384,
+  // RSA, Ed25519): così la salvano le librerie, e così è la chiave dei feedback (#1507).
+  const INIZI_PKCS8 = [
+    'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg',
+    'MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCA',
+    'MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDA',
+    'MII[A-Za-z0-9+/]{3}IBADANBgkqhkiG9w0BAQEFAASC[A-Za-z0-9+/]{3}wgg[A-Za-z0-9+/]{2}AgEAAoI',
+    'MC4CAQAwBQYDK2VwBCIEI',
+  ];
+
   // Le chiavi si riconoscono dal prefisso che il loro emittente ci mette
   // apposta: cercare «stringa lunga e casuale» prenderebbe mezzo web.
   const FORME_CHIAVE = [
@@ -51,7 +61,17 @@
     /\bAIza[A-Za-z0-9_-]{20,}/,
     /\bAKIA[A-Z0-9]{12,}/,
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+    // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
+    new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n){20,}`),
   ];
+
+  // Il pezzo che ogni chiave dello stesso tipo ha uguale: dice di che tipo è, non quale. Di un JWT lo sono intestazione e
+  // dichiarazioni (l'emittente e la chiave di firma sono quelli di tutti): il segreto è la firma.
+  const PREFISSO_FISSO = new RegExp(`^(?:-----BEGIN [A-Z ]*PRIVATE KEY-----\\s*)?(?:${[
+    'sk-(?:or-v1-|ant-api\\d\\d-|proj-)?', '(?:sk|pk|rk)_(?:live|test)_', 'gh[pousr]_', 'github_pat_', 'xox[baprs]-', 'AIza', 'AKIA',
+    ...INIZI_PKCS8, 'eyJ[\\w-]*\\.eyJ[\\w-]*\\.',
+  ].join('|')})?`);
+  const CODA_FISSA = /\s*-----END [A-Z ]*PRIVATE KEY-----\s*$/;
 
   const IBAN_RE = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}[ ]?[A-Z0-9]{1,4}\b/g;
   const CARTA_RE = /\b(?:\d[ -]?){13,19}\b/g;
