@@ -314,8 +314,10 @@ test('un avviso di sistema non arriva a nessun sito, né davanti né sullo sfond
   await nelContentScript(app, davanti, spia);
 
   await app.evaluate(() => globalThis.SN_WALLET_MAIN.outOfCreditsNotice({ keySource: 'own' }));
-  const notifica = (await avvisi()).locator('.shell-notif', { hasText: /credit/i });
+  const vista = await avvisi();
+  const notifica = vista.locator('.shell-notif', { hasText: /credit/i });
   await expect(notifica).toBeVisible({ timeout: 8000 });
+  await vista.screenshot({ path: 'tests/.shots/1509-avviso-crediti.png' }).catch(() => {});
   expect(await nelContentScript(app, davanti, 'globalThis.__spia589t'), 'l\'avviso è arrivato al sito davanti').toEqual([]);
   expect(await nelContentScript(app, testServer.origin, 'globalThis.__spia589t'), 'l\'avviso è arrivato al sito sullo sfondo').toEqual([]);
   expect(await pagina.evaluate(() => document.documentElement.outerHTML)).not.toMatch(/credit/i);
