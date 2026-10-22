@@ -1495,7 +1495,10 @@ class TabManager {
         ) === true;
       } catch (_) {}
     }
-    if (!sullaHome) this.navigate(tab.id, 'filo://newtab/');
+    if (sullaHome) return;
+    // Il testo scritto e non inviato vive solo in quella pagina, e Indietro non lo rimette: la home si apre accanto.
+    if (this._testoNonInviato(tab)) this.openTab('filo://newtab/');
+    else this.navigate(tab.id, 'filo://newtab/');
   }
 
   // Lo stato vive sulla SCHEDA, non sul WebContents: deve sopravvivere a una
