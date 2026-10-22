@@ -451,7 +451,9 @@
     img.alt = '';
     img.onerror = () => { img.remove(); generica(); };
     ico.appendChild(img);
-    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
+    // Il suggerimento l'ha scritto un modello che ha letto testo di altri: l'icona si prende solo dalle copie, mai dal
+    // sito, che saprebbe dell'indirizzo prima di ogni clic (#1505).
+    d.iconaDelSito(s.action.url, { soloCopie: true }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 
