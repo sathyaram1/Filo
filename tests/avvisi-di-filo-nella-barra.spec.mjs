@@ -34,6 +34,7 @@ test('un allegato del feedback che non sale: l\'avviso compare nella barra di Fi
   const notifica = vista.locator('.shell-notif', { hasText: 'Feedback inviato, ma non sono riuscito a caricare 2 allegati' });
   await expect(notifica).toBeVisible({ timeout: 10_000 });
   await expect(notifica).not.toContainText('estratto-conto');
+  await vista.screenshot({ path: 'tests/.shots/1509-avviso-allegati.png' }).catch(() => {});
 
   const nellaPagina = await page.evaluate(() => document.documentElement.outerHTML + window.__visti.join(' '));
   expect(nellaPagina).not.toContain('non sono riuscito a caricare');
