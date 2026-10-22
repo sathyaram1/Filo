@@ -21,6 +21,7 @@ test('aspetto chiaro e scuro, chiuso e aperto', async ({ app, shell, avvisi, ope
   const prefs = await openTab('filo://preferences/preferences.html');
   await prefs.evaluate(() => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }));
   await vista.waitForTimeout(1200);
+  console.log('shell dopo scuro', await shell.evaluate(() => [document.documentElement.outerHTML.slice(0, 200), getComputedStyle(document.documentElement).getPropertyValue('--bg')].join(' | ')));
   await vista.screenshot({ path: SHOTS + '1477-scuro-aperto.png' });
   await vista.locator('.avvisi-testa [data-pila="riduci"]').click();
   await vista.waitForTimeout(600);
