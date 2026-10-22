@@ -152,3 +152,38 @@ test('una risposta servita da un fornitore escluso: avviso sulla pagina e segno 
   await expect(segno('parola1478 esclusa')).toBeVisible({ timeout: 10_000 });
   await storia.screenshot({ path: `${SHOTS}/1478-cronologia-scuro.png` }).catch(() => {});
 });
+
+test('«Segnala» nell’avviso apre «Invia feedback» già scritto, e in Cronologia l’host si trova cercandolo', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await home(app);
+  await routerFinto(app);
+  await configura(app);
+  await app.evaluate(async () => { try { await globalThis.SN_HISTORY.clear(); } catch (_) {} });
+  await servitaDa(app, 'Google Vertex');
+
+  await scrivi(chat, 'domanda1478 segnala');
+  const avviso = chat.locator('.sn-toast', { hasText: '«Google Vertex»' });
+  await expect(avviso).toBeVisible({ timeout: 15_000 });
+  const tasto = avviso.locator('.sn-msg-rimedio');
+  await expect(tasto).toHaveText('Segnala');
+  await chat.waitForTimeout(400);
+  await chat.screenshot({ path: `${SHOTS}/1478-avviso-segnala.png` }).catch(() => {});
+  await tasto.click();
+  const testo = chat.locator('.sn-fb-overlay .sn-fb-text');
+  await expect(testo).toBeVisible({ timeout: 5_000 });
+  await expect(testo).toHaveValue(/«Google Vertex»/);
+  await expect(testo).toHaveValue(/deepseek/);
+  await expect(avviso).toHaveCount(0, { timeout: 5_000 });
+  await chat.screenshot({ path: `${SHOTS}/1478-segnala-feedback.png` }).catch(() => {});
+  await chat.locator('.sn-fb-overlay .sn-fb-cancel').click();
+
+  const storia = await openTab('filo://history/history.html');
+  await expect(storia.locator('.sn-history-item', { hasText: 'domanda1478 segnala' })).toBeVisible({ timeout: 10_000 });
+  for (const q of ['Vertex', 'non ammesso']) {
+    await storia.locator('#search').fill(q);
+    await expect(storia.locator('.sn-history-item', { hasText: 'domanda1478 segnala' }), `cercando «${q}»`).toBeVisible({ timeout: 3_000 });
+  }
+  await storia.locator('#search').fill('DeepInfra');
+  await expect(storia.locator('.sn-history-item')).toHaveCount(0, { timeout: 3_000 });
+});
