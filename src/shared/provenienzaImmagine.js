@@ -724,6 +724,34 @@
     }
     return 'sconosciuto';
   }
+
+  // L'elenco provvisorio del C2PA (anchors.pem + allowed.pem del verificatore di riferimento) è congelato da questa data:
+  // vale solo per chi l'elenco ufficiale non riconosce, e solo per le firme fatte prima, con la sua frase (#946.1).
+  const CONGELAMENTO_PROVVISORIO = Date.UTC(2026, 0, 1);
+  // L'ora della firma la dice una marca che regge; senza, il certificato deve almeno essere nato prima del congelamento.
+  function primaDelCongelamento(firma, ancoreTsa) {
+    const foglia = firma && firma.certificati && firma.certificati[0];
+    if (!foglia) return false;
+    if (firma.marca && marcaValida(firma.marca, foglia, ancoreTsa)) return firma.marca.ora < CONGELAMENTO_PROVVISORIO;
+    const da = Date.parse(foglia.validFrom);
+    return Number.isFinite(da) && da < CONGELAMENTO_PROVVISORIO;
+  }
+  // Nell'elenco provvisorio ci sono anche certificati di singoli firmatari, ammessi senza catena: vale l'impronta esatta.
+  function ammessoProvvisorio(certs, ammessi) {
+    const foglia = certs && certs[0];
+    if (!foglia || foglia.ca || !Array.isArray(ammessi)) return false;
+    return ammessi.some((c) => c && c.fingerprint256 === foglia.fingerprint256);
+  }
+  // Torna lo stato del firmatario e le autorità di marcatura che valgono per lui.
+  function fiducia(firma, ancore, ancoreTsa, provvisorio) {
+    const stato = statoFirmatario(firma.certificati, ancore);
+    if (stato !== 'sconosciuto' || !provvisorio) return { stato, ancoreTsa };
+    const tsa = (ancoreTsa || []).concat(provvisorio.ancore || []);
+    const dentro = statoFirmatario(firma.certificati, provvisorio.ancore || []) === 'riconosciuto'
+      || ammessoProvvisorio(firma.certificati, provvisorio.ammessi);
+    if (!dentro || !primaDelCongelamento(firma, tsa)) return { stato, ancoreTsa };
+    return { stato: 'provvisorio', ancoreTsa: tsa };
+  }
   // Il motore crittografico di Electron non decodifica le chiavi RSA dichiarate «solo per PSS» (id-RSASSA-PSS),
   // che Node legge: i byte della chiave sono quelli di una RSA qualunque, quindi si rileggono con l'identificativo generico.
   const OID_RSA_PSS = '1.2.840.113549.1.1.10';
