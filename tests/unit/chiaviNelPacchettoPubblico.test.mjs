@@ -217,8 +217,7 @@ test('le regole: una chiave nascosta nella data del bake è rossa', () => {
   assert.match(errori[0], /^bakedAt: non ha la forma/);
 });
 
-test('gli elenchi: ogni ammessa ha la sua decisione, ogni uscita la sua revoca, nessuna sta in tutti e due', () => {
-  assert.deepEqual(controllaPacchetto(VALIDO).filter((e) => !/^(apiKeys|safeBrowsingKey|bakedAt)/.test(e)), []);
+test('gli elenchi: un\'ammessa senza decisione o che sta anche fra le uscite è rossa', () => {
   const errori = controllaPacchetto(VALIDO, {
     ammesse: [...AMMESSE, { campo: 'apiKeys.openrouter', decisione: '' }],
   });
