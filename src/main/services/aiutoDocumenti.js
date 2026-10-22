@@ -115,7 +115,8 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
     s.dati = { cercato: q, risultati: [], indice: indicePerLaPagina(null), fermata: false, cartellaMancante: '', cartellaDiRete: c };
     return { ok: true, cercato: q, candidati: [], indice: s.dati.indice, fermata: false, cartellaMancante: '', cartellaDiRete: unaRiga(c, 200) };
   }
-  const perche = fuoriPerimetro(c, ch.serie ? '' : ch.percorso);
+  // Senza la cartella risolta vale la regola sul nome scritto.
+  const perche = fuoriPerimetro(c, ch ? (ch.serie ? '' : ch.percorso) : undefined);
   const sito = !daFilo(origine);
   if (sito || perche) {
     // Una domanda alla volta per scheda: chi ne chiede altre mentre una aspetta non accoda popup all'utente.
