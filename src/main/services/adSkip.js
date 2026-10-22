@@ -110,7 +110,7 @@ function rispostaDalFrame(sender, msg) {
   try { if (sender.frame.frameTreeNodeId !== d.ftn) return false; } catch (_) { return false; }
   const ok = numero(msg.x) && numero(msg.y) && msg.x >= 0 && msg.y >= 0
     && typeof msg.tag === 'string' && msg.tag.length > 0 && msg.tag.length <= 64;
-  d.fine(ok ? { x: msg.x, y: msg.y, tag: msg.tag } : { no: msg.code === 'ignoto' ? 'ignoto' : 'coperto' });
+  d.fine(ok ? { x: msg.x, y: msg.y, tag: msg.tag } : { no: msg.code === 'ignoto' || msg.code === 'nascosta' ? msg.code : 'coperto' });
   return true;
 }
 
@@ -285,6 +285,6 @@ async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora 
 }
 
 module.exports = {
-  attivo, configureFromSettings, hostConClicVero, hostIncorporato, modoClicVero, mittenteConClicVero, catena,
+  SALTA_YOUTUBE, attivo, configureFromSettings, hostConClicVero, hostIncorporato, modoClicVero, mittenteConClicVero, catena,
   rispostaDalFrame, clicDalRiquadro, puntoNellaVista, clicVero, clicNelRiquadro, INTERVALLO_MS, TETTO_CLIC_MS,
 };
