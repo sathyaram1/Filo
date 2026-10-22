@@ -128,17 +128,48 @@
   // Rifiuti del main che non passano: qui il clic vero non arriverà, si torna al clic dello script.
   const RIFIUTI_FERMI = new Set(['forbidden', 'off']);
 
+  // Una pagina nascosta col «Salta» fuori dalla vista (si leggevano i commenti) nessuno la guarda: la si porta sul
+  // pulsante per il clic vero e la si rimette com'era appena il clic è arrivato (#1494). Torna la funzione che rimette.
+  const RIMETTI_MS = 10000;
+  function portaInVista(el) {
+    const posti = [];
+    for (let n = el.parentElement; n; n = n.parentElement) posti.push([n, n.scrollLeft, n.scrollTop]);
+    const se = document.scrollingElement;
+    if (se && !posti.some((p) => p[0] === se)) posti.push([se, se.scrollLeft, se.scrollTop]);
+    try { el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); } catch (_) { return null; }
+    let fatto = false;
+    let timer = null;
+    const rimetti = () => {
+      if (fatto) return;
+      fatto = true;
+      clearTimeout(timer);
+      window.removeEventListener('click', suClic, true);
+      for (const [n, l, t] of posti) {
+        if (n.scrollLeft !== l || n.scrollTop !== t) { try { n.scrollTo({ left: l, top: t, behavior: 'instant' }); } catch (_) {} }
+      }
+    };
+    // Rimessa prima che il clic arrivi, la pagina lo riceverebbe in un altro punto: si aspetta il clic, o a lungo.
+    function suClic(e) { if (e.isTrusted && e.target instanceof Node && el.contains(e.target)) setTimeout(rimetti, 0); }
+    window.addEventListener('click', suClic, true);
+    timer = setTimeout(rimetti, RIMETTI_MS);
+    return rimetti;
+  }
+
   // false = per ora non si preme: il tentativo non si conta e si riguarda al giro dopo.
   // Un «Salta» coperto o fuori dalla vista (si sta leggendo più giù) prende un clic dello script, poi si aspetta di vederlo.
   function premi(el, s) {
     if (clicVero && !s.finto) {
-      // In una pagina nascosta il clic vero instradato al riquadro a volte non gli arriva e lo riceve la pagina che lo
-      // ospita (#1494): il lettore incorporato aspetta di tornare a schermo.
-      if (!inCima && nascosta()) return false;
       if (utenteOccupato()) return false;
-      const p = centro(el);
+      let p = centro(el);
+      let rimetti = null;
+      if (!p && nascosta()) {
+        rimetti = portaInVista(el);
+        p = rimetti && centro(el);
+        if (!p && rimetti) { rimetti(); rimetti = null; }
+      }
       if (p) {
         send({ type: T_CLICK, x: p.x, y: p.y, tag: mioTag }, (r) => {
+          if (rimetti && !(r && r.ok)) rimetti();
           if (!r || (!r.ok && RIFIUTI_FERMI.has(r.code))) s.finto = true;
           else if (r.code === 'ignoto') presentati();
         });
