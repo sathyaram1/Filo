@@ -97,6 +97,8 @@ export function writeTicket(root, ticket) {
   if (!t) return null;
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
+    // Il timbro del gancio di salvataggio è del biglietto di prima: col nuovo varrebbe come suo lavoro vivo (#1480).
+    if (String((readMarkerFrom(root) || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
     const marker = { ticket: t, since: new Date().toISOString() };
     writeFileSync(ticketFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;

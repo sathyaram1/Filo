@@ -787,3 +787,153 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
 export function escalationNote(count = IDENTITY_REJECT_LIMIT) {
   return `La lavorazione automatica si è disallineata ${count} volte di seguito: chi doveva registrare l'esito stava guardando una versione del codice diversa da quella in lavorazione, quindi il risultato non sarebbe attendibile. Ho sospeso i tentativi automatici invece di insistere; serve una tua decisione su come procedere.`;
 }
+
+// ─── Lavoro vivo nella cartella (#1480) ──────────────────────────────────────
+// Un worker che l'orchestratore crede finito può lavorare ancora qui: chi sposta la cartella o rilascia il suo
+// biglietto glielo toglie (D-90, D-91). Una guardia sola per tutte le porte; regole: tests/unit/lavoroVivo.test.mjs.
+
+export const USCITA_LAVORO_VIVO = 5;
+// Il gancio rinnova il timbro al più ogni 5 minuti: 10 coprono un salvataggio e il successivo.
+export const TIMBRO_VIVO_MS = 10 * 60 * 1000;
+export const SEGNI_TUTTI = Object.freeze(['battito', 'timbro', 'processi']);
+// Il battito si conta dal suo marcatore: i battiti singoli del gancio e il ciclo di un biglietto non sono lavoro.
+const COMANDO_BATTITO = /routine-channel\.mjs["']?\s+heartbeat\b/;
+
+export function timbroFile(root) {
+  return resolve(root, '.claude', 'routine-beat-hook.stamp');
+}
+
+/** `p` è `cartella` o ci sta dentro? PURA. */
+export function sottoCartella(p, cartella, platform = process.platform) {
+  const n = (x) => { const r = resolve(String(x || '')); return platform === 'win32' ? r.toLowerCase() : r; };
+  const a = n(p);
+  const b = n(cartella);
+  return !!String(p || '') && !!String(cartella || '') && (a === b || a.startsWith(b.endsWith(sep) ? b : b + sep));
+}
+
+/** Un comando da mostrare: una riga, accorciato, senza codici lunghi (un biglietto, una parola d'ordine). PURA. */
+export function comandoLeggibile(cmd) {
+  const s = String(cmd || '').replace(/\s+/g, ' ').trim().replace(/[A-Za-z0-9_-]{32,}/g, (m) => `${m.slice(0, 6)}…`);
+  return s.length > 160 ? `${s.slice(0, 159)}…` : s;
+}
+
+/**
+ * I segni di lavoro vivo, da dati già letti. PURA.
+ * `mio`: il biglietto di chi chiede (il suo battito e il suo timbro non contano). `cosa`: quali segni guardare.
+ * `processi`: null = non visti (fuori da Linux); ognuno { pid, sid, stato, cwd, cmd }.
+ */
+export function segniDiLavoroVivo({
+  mio = '', battito = null, battitoVivo = false, biglietto = null, timbroMs = null, processi = [], cartelle = [],
+  esclusi = new Set(), sessione = 0, adesso = Date.now(), cosa = SEGNI_TUTTI, platform = process.platform,
+} = {}) {
+  const segni = [];
+  const corto = (t) => String(t || '').slice(0, 8);
+  if (cosa.includes('battito') && battito && battitoVivo && String(battito.ticket || '') !== String(mio || '')) {
+    segni.push({ tipo: 'battito', biglietto: corto(battito.ticket), pid: Number(battito.pid) || 0 });
+  }
+  if (cosa.includes('timbro') && biglietto && biglietto.ticket && String(biglietto.ticket) !== String(mio || '')
+      && Number.isFinite(timbroMs) && adesso - timbroMs < TIMBRO_VIVO_MS && adesso - timbroMs > -60 * 1000) {
+    // Un timbro di prima della fine del biglietto è il suo ultimo salvataggio; uno dopo è un worker che lavora ancora.
+    const fine = bigliettoFinito(biglietto) ? Date.parse(biglietto.morto.ora) : NaN;
+    if (!(fine >= timbroMs)) segni.push({ tipo: 'timbro', biglietto: corto(biglietto.ticket), etaMs: Math.max(0, adesso - timbroMs) });
+  }
+  if (cosa.includes('processi') && Array.isArray(processi)) {
+    for (const p of processi) {
+      if (!p || esclusi.has(p.pid) || (sessione > 0 && p.sid === sessione) || p.stato === 'Z' || !p.cmd) continue;
+      if (COMANDO_BATTITO.test(p.cmd)) continue;
+      const cartella = cartelle.find((c) => sottoCartella(p.cwd, c, platform));
+      if (cartella) segni.push({ tipo: 'processo', pid: p.pid, cmd: comandoLeggibile(p.cmd), cwd: p.cwd });
+    }
+  }
+  return segni;
+}
+
+/** I processi della macchina, con cartella di lavoro e sessione. null dove non si sanno leggere. */
+export function processiDiSistema({ platform = process.platform, proc = '/proc' } = {}) {
+  if (platform === 'linux') {
+    let voci;
+    try { voci = readdirSync(proc).filter((n) => /^\d+$/.test(n)); } catch (_) { return null; }
+    const out = [];
+    for (const n of voci) {
+      try {
+        const stat = readFileSync(`${proc}/${n}/stat`, 'utf8');
+        const campi = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+        let cwd = '';
+        try { cwd = readlinkSync(`${proc}/${n}/cwd`).replace(/ \(deleted\)$/, ''); } catch (_) { /* di un altro utente, o già uscito */ }
+        let cmd = '';
+        try { cmd = readFileSync(`${proc}/${n}/cmdline`, 'utf8').split('\u0000').join(' ').trim(); } catch (_) { /* già uscito */ }
+        out.push({ pid: Number(n), stato: campi[0], ppid: Number(campi[1]), sid: Number(campi[3]), cwd, cmd });
+      } catch (_) { /* uscito mentre lo leggevo */ }
+    }
+    return out;
+  } else {
+    // Mac e Windows non hanno /proc: le routine girano su Linux, e qui restano battito e timbro.
+    return null;
+  }
+}
+
+/** Chi chiede e i suoi antenati, e la sessione da escludere se l'ha aperta uno di loro (la shell del comando). PURA. */
+export function questoProcesso(processi, pid = process.pid) {
+  const perPid = new Map((processi || []).map((p) => [p.pid, p]));
+  const esclusi = new Set();
+  for (let p = pid; p > 0 && !esclusi.has(p);) {
+    esclusi.add(p);
+    const v = perPid.get(p);
+    if (!v) break;
+    p = v.ppid;
+  }
+  const mia = perPid.get(pid);
+  const sessione = mia && mia.sid > 0 && esclusi.has(mia.sid) ? mia.sid : 0;
+  return { esclusi, sessione };
+}
+
+function worktreeEstranei(root) {
+  const l = gitIn(root)(['worktree', 'list', '--porcelain']);
+  if (!l.ok) return [];
+  const qui = percorsoVero(root);
+  return l.out.split(/\r?\n/).filter((r) => r.startsWith('worktree ')).map((r) => r.slice(9).trim())
+    .filter((d) => d && existsSync(d) && percorsoVero(d) !== qui).map(percorsoVero);
+}
+
+function ultimoCommit(root) {
+  const r = gitIn(root)(['log', '-1', '--format=%h%x00%cr%x00%s']);
+  if (!r.ok || !r.out) return null;
+  const [sha, quando, titolo] = r.out.split('\u0000');
+  return { ramo: currentBranch(root), sha, quando, titolo: String(titolo || '').slice(0, 80) };
+}
+
+/**
+ * C'è lavoro vivo in `root`? Battito di un altro biglietto, timbro fresco del gancio di salvataggio, processi con la
+ * cartella di lavoro qui o in un worktree estraneo dello stesso deposito. Esclusi chi chiede, i suoi antenati e la sua
+ * shell. @returns {{ vivo: boolean, segni: object[], processiVisti: boolean, commit: object|null }}
+ */
+export function lavoroVivo(root, {
+  mio = '', cosa = SEGNI_TUTTI, adesso = Date.now(), leggiProcessi = processiDiSistema, alive = pidAlive, pid = process.pid,
+} = {}) {
+  const radice = percorsoVero(resolve(root));
+  const battito = readBeat(radice);
+  const diQui = battito && (!battito.root || stessaCartella(battito.root, radice));
+  const battitoVivo = !!(diQui && beatIsLive(battito, battito.ticket, { now: adesso, alive }));
+  let timbroMs = null;
+  try { timbroMs = statSync(timbroFile(radice)).mtimeMs; } catch (_) { /* nessun salvataggio in questo giro */ }
+  const processi = cosa.includes('processi') ? leggiProcessi() : [];
+  const { esclusi, sessione } = questoProcesso(processi || [], pid);
+  const segni = segniDiLavoroVivo({
+    mio, battito: diQui ? battito : null, battitoVivo, biglietto: leggiMarcatoreBiglietto(radice), timbroMs,
+    processi, cartelle: processi && processi.length ? [radice, ...worktreeEstranei(radice)] : [radice],
+    esclusi, sessione, adesso, cosa,
+  });
+  return { vivo: segni.length > 0, segni, processiVisti: processi !== null, commit: segni.length ? ultimoCommit(radice) : null };
+}
+
+/** Il rifiuto, con chi lavora ancora e cosa fare: `azione` è ciò che non si è fatto. PURA. */
+export function testoLavoroVivo(esito, azione) {
+  const righe = (esito && esito.segni || []).map((s) => {
+    if (s.tipo === 'battito') return `battito vivo del biglietto ${s.biglietto}… (pid ${s.pid})`;
+    if (s.tipo === 'timbro') return `il gancio di salvataggio del biglietto ${s.biglietto}… ha salvato ${Math.round(s.etaMs / 60000)} minuti fa`;
+    return `processo ${s.pid} «${s.cmd}» in ${s.cwd}`;
+  });
+  const c = esito && esito.commit;
+  const commit = c ? ` Ultimo commit della cartella: ${c.sha} (${c.quando}) «${c.titolo}»${c.ramo ? ` sul ramo ${c.ramo}` : ''}.` : '';
+  return `lavoro ancora vivo nella cartella: non ho ${azione}. ${righe.join('; ')}.${commit}`;
+}
