@@ -319,6 +319,16 @@ test('generata con l’AI e poi ritagliata con le credenziali: la riga lo dice a
   await expect(riga).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
 });
 
+// #946.1: un file vero di ChatGPT del 2025, con la radice Truepic dell'elenco provvisorio vero: generata, non modificata.
+test('un’immagine vera di ChatGPT si dice generata con l’AI da OpenAI, riconosciuta dall’elenco provvisorio', async ({ app, openTab, testServer }) => {
+  const url = testServer.asset(elencoPem(RADICE), 'text/plain');
+  const urlProvvisorio = testServer.asset(fixture('elenco-provvisorio-truepic.pem'), 'text/plain');
+  const esito = await app.evaluate((_e, a) => globalThis.__filoFirmatariC2pa.aggiorna({ forza: true, ...a }), { url, urlProvvisorio });
+  expect(esito.ok).toBe(true);
+  const { riga } = await rigaSu(testServer, openTab, fixture('chatgpt-2025-vera.png'), 'image/png');
+  await expect(riga).toHaveAttribute('aria-label', /^Generata con l’AI secondo OpenAI.*elenco provvisorio del C2PA\.$/, { timeout: 15000 });
+});
+
 // La prova di #946: la STESSA immagine firmata, ricompressa come fa un salvataggio
 // qualsiasi, perde le credenziali — e allora il menu non dice niente sull'origine.
 test('la stessa immagine firmata, ricompressa senza metadati, non fa comparire nessuna frase sull’origine', async ({ app, openTab, testServer }) => {
