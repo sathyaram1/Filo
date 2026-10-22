@@ -178,7 +178,7 @@
     host.style.cssText = 'all:initial!important;display:contents!important;';
     const radice = UI?.ombra ? UI.ombra(host) : host.attachShadow({ mode: 'closed' });
     try { radice.adoptedStyleSheets = fogliDelRiquadro(); } catch (_) {}
-    // I tasti scritti qui dentro il sito non li vede: SN_FILO_UI.tastoNelRiquadro.
+    // Tasti, inserimenti, incolla e rilasci fatti qui dentro il sito non li vede: SN_FILO_UI.eventoNelRiquadro.
     UI?.soloGestiVeri(contenuto);
     radice.appendChild(contenuto);
     return host;
