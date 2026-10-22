@@ -43,11 +43,11 @@ function passo(percorso, k, lista) {
   return percorso ? `${percorso}.${k}` : k;
 }
 
-function stringhePiene(valore, percorso = '', acc = []) {
+function stringhe(valore, percorso = '', acc = []) {
   if (typeof valore === 'string') {
-    if (valore.trim()) acc.push([percorso, valore]);
+    acc.push([percorso, valore]);
   } else if (valore && typeof valore === 'object') {
-    for (const [k, v] of Object.entries(valore)) stringhePiene(v, passo(percorso, k, Array.isArray(valore)), acc);
+    for (const [k, v] of Object.entries(valore)) stringhe(v, passo(percorso, k, Array.isArray(valore)), acc);
   }
   return acc;
 }
@@ -69,8 +69,11 @@ function controllaPacchetto(generato, { ammesse = AMMESSE, uscite = USCITE, nonC
     }
   }
 
-  const scritte = new Map(stringhePiene(generato));
-  for (const [campo, valore] of scritte) {
+  // Un campo fuori elenco è rosso anche vuoto: vuoto vuol dire solo che la prova non ha acceso la sua fonte.
+  const tutte = stringhe(generato);
+  const scritte = new Map(tutte.filter(([, v]) => v.trim()));
+  for (const [campo, valore] of tutte) {
+    if (!valore.trim() && (usc.has(campo) || amm.has(campo))) continue;
     if (usc.has(campo)) {
       errori.push(`${campo}: chiave uscita con ${usc.get(campo).revoca} e tornata nel file generato, che chiunque scarichi l'installer legge. Per rimetterla serve una decisione dell'owner, e la voce torna fra le ammesse.`);
     } else if (non.has(campo)) {
@@ -90,8 +93,23 @@ function controllaPacchetto(generato, { ammesse = AMMESSE, uscite = USCITE, nonC
 const VALIDO = { apiKeys: { tavily: 'tav' }, safeBrowsingKey: 'gsb', bakedAt: '2026-10-22T10:00:00.000Z' };
 const con = (modifica) => modifica(structuredClone(VALIDO));
 
+// Ogni fonte che il bake nomina, più quelle delle chiavi uscite: una chiave nuova arriva con una fonte nuova, e spenta la prova non la vedrebbe.
+function fontiDelBake(sorgente) {
+  const variabili = new Set(sorgente.match(/FILO_DEFAULT_[A-Z0-9_]+/g) || []);
+  variabili.add('FILO_DEFAULT_OPENROUTER_KEY');
+  variabili.add('FILO_DEFAULT_GEMINI_KEY');
+  const job = Object.fromEntries([...variabili].map((n) => [n, `job-${n.toLowerCase()}`]));
+  const server = { ok: true, apiKeys: { tavily: 'srv-tavily', openrouter: 'srv-openrouter', gemini: 'srv-gemini' }, safeBrowsingKey: 'srv-safebrowsing' };
+  for (const [, campo] of sorgente.matchAll(/config\/secrets\.([\w.]+)/g)) {
+    const [testa, coda] = campo.split('.');
+    if (coda && testa === 'apiKeys') server.apiKeys[coda] = `srv-${coda}`;
+    else if (!coda) server[testa] = `srv-${testa}`;
+  }
+  return { job, server };
+}
+
 // Il bake in un ambiente pulito più le sorgenti date, con l'uscita in una cartella usa e getta.
-async function bake(sorgenti) {
+async function bake(sorgenti, percorsoBake = BAKE) {
   const cartella = cartellaTemporanea('filo-bake-pubblico-');
   const out = join(cartella, 'generato.json');
   const env = { ...process.env, FILO_BAKE_OUT: out, NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' };
@@ -99,7 +117,7 @@ async function bake(sorgenti) {
   Object.assign(env, sorgenti);
   try {
     let uscita = 0;
-    try { await esegui(process.execPath, [BAKE], { env }); } catch (e) { uscita = typeof e.code === 'number' ? e.code : 1; }
+    try { await esegui(process.execPath, [percorsoBake], { env }); } catch (e) { uscita = typeof e.code === 'number' ? e.code : 1; }
     return { uscita, generato: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : null };
   } finally {
     togliCartella(cartella);
@@ -122,31 +140,78 @@ async function conServer(risposta, fn) {
   }
 }
 
+// Le stesse prove sul bake vero e su una sua copia ritoccata: `percorsoBake` dice quale.
+async function bakeColJob(percorsoBake = BAKE) {
+  const { job } = fontiDelBake(readFileSync(percorsoBake, 'utf8'));
+  return bake(job, percorsoBake);
+}
+
+async function bakeColServer(percorsoBake = BAKE) {
+  const { job, server } = fontiDelBake(readFileSync(percorsoBake, 'utf8'));
+  const soloUscite = { FILO_DEFAULT_OPENROUTER_KEY: job.FILO_DEFAULT_OPENROUTER_KEY, FILO_DEFAULT_GEMINI_KEY: job.FILO_DEFAULT_GEMINI_KEY };
+  return conServer(server, (canale) => bake({ ...soloUscite, FILO_ROUTINE_API: canale, FILO_BUILD_PASSPHRASE: 'parola-di-prova' }, percorsoBake));
+}
+
+// Copia del bake con i moduli che importa, ritoccata come la ritoccherebbe un lavoro futuro.
+async function conBakeRitoccato(ritocco, fn) {
+  const cartella = cartellaTemporanea('filo-bake-ritoccato-');
+  try {
+    const scripts = join(cartella, 'scripts');
+    mkdirSync(join(scripts, 'lib'), { recursive: true });
+    for (const f of ['build-alarm.mjs', join('lib', 'rete.mjs')]) copyFileSync(join(RADICE, 'scripts', f), join(scripts, f));
+    const prima = readFileSync(BAKE, 'utf8');
+    const dopo = ritocco(prima);
+    assert.notEqual(dopo, prima, 'il ritocco non ha trovato il punto del bake da cambiare');
+    const copia = join(scripts, 'bake-default-config.mjs');
+    writeFileSync(copia, dopo, 'utf8');
+    return await fn(copia);
+  } finally {
+    togliCartella(cartella);
+  }
+}
+
 test('il bake, con le chiavi uscite fra i segreti del job, scrive tutte le ammesse e nient\'altro', async () => {
-  const r = await bake({
-    FILO_DEFAULT_TAVILY_KEY: 'tav-del-job',
-    FILO_DEFAULT_SAFEBROWSING_KEY: 'gsb-del-job',
-    FILO_DEFAULT_OPENROUTER_KEY: 'or-del-job',
-    FILO_DEFAULT_GEMINI_KEY: 'gem-del-job',
-  });
+  const r = await bakeColJob();
   assert.equal(r.uscita, 0);
   assert.deepEqual(controllaPacchetto(r.generato), []);
 });
 
 test('il bake, con le chiavi uscite anche nella risposta del server, scrive tutte le ammesse e nient\'altro', async () => {
-  const r = await conServer({
-    ok: true,
-    apiKeys: { tavily: 'tav-dal-server', openrouter: 'or-dal-server', gemini: 'gem-dal-server' },
-    safeBrowsingKey: 'gsb-dal-server',
-  }, (canale) => bake({
-    FILO_ROUTINE_API: canale,
-    FILO_BUILD_PASSPHRASE: 'parola-di-prova',
-    FILO_DEFAULT_OPENROUTER_KEY: 'or-del-job',
-    FILO_DEFAULT_GEMINI_KEY: 'gem-del-job',
-  }));
+  const r = await bakeColServer();
   assert.equal(r.uscita, 0);
   assert.deepEqual(controllaPacchetto(r.generato), []);
-  assert.equal(r.generato.apiKeys.tavily, 'tav-dal-server', 'la prova deve passare davvero dal server');
+  assert.equal(r.generato.apiKeys.tavily, 'srv-tavily', 'la prova deve passare davvero dal server');
+});
+
+const CHIAVE_NUOVA_NEL_PACCHETTO = (s) => s.replace(
+  "{ nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },",
+  "$&\n  { nome: 'anthropic', env: 'FILO_DEFAULT_ANTHROPIC_KEY', server: 'config/secrets.apiKeys.anthropic' },",
+);
+const CHIAVE_NUOVA_FUORI_MAPPA = (s) => s.replace(
+  'JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt',
+  "JSON.stringify({ apiKeys, safeBrowsingKey, mapsKey: envKey('FILO_DEFAULT_MAPS_KEY'), bakedAt",
+);
+const CHIAVE_NUOVA_SE_PRESENTE = (s) => s.replace(
+  'JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt',
+  "JSON.stringify({ apiKeys, safeBrowsingKey, ...(envKey('FILO_DEFAULT_MAPS_KEY') ? { mapsKey: envKey('FILO_DEFAULT_MAPS_KEY') } : {}), bakedAt",
+);
+
+test('una chiave nuova aggiunta al bake con la sua fonte è rossa, dal job e dal server, e nomina la chiave', async () => {
+  for (const [ritocco, campo] of [
+    [CHIAVE_NUOVA_NEL_PACCHETTO, 'apiKeys.anthropic'],
+    [CHIAVE_NUOVA_FUORI_MAPPA, 'mapsKey'],
+    [CHIAVE_NUOVA_SE_PRESENTE, 'mapsKey'],
+  ]) {
+    await conBakeRitoccato(ritocco, async (copia) => {
+      for (const corsa of [bakeColJob, bakeColServer]) {
+        if (ritocco !== CHIAVE_NUOVA_NEL_PACCHETTO && corsa === bakeColServer) continue;
+        const r = await corsa(copia);
+        assert.equal(r.uscita, 0);
+        const errori = controllaPacchetto(r.generato);
+        assert.ok(errori.some((e) => e.startsWith(`${campo}: campo fuori elenco`)), `${corsa.name}, ${campo}: ${JSON.stringify(errori)}`);
+      }
+    });
+  }
 });
 
 test('un file generato che porta solo chiavi uscite non dà niente all\'applicazione', async () => {
