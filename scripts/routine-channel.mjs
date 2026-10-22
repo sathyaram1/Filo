@@ -265,13 +265,16 @@ export async function accensioneDelGiro(passphrase, opts = {}) {
  * terrebbe un feedback fermo per tutta l'installazione e scadrebbe prima che
  * qualcuno inizi a lavorarci.
  *
- * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string }}
+ * Il server ci apre anche l'accensione del contenitore e ne dà l'identificativo in `accensione` (#1498).
+ *
+ * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string, accensione?: string }}
  */
 export async function probe(passphrase, opts) {
   const { status, body } = await call('routineTicket', { passphrase, probe: true, ...creditiDi(opts) }, opts);
   const b = body || {};
-  if (status === 200 && b.ok && b.work === true) return { outcome: 'work' };
-  if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
+  const conAccensione = accensioneDa(b) ? { accensione: accensioneDa(b) } : {};
+  if (status === 200 && b.ok && b.work === true) return { outcome: 'work', ...conAccensione };
+  if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || ''), ...conAccensione };
   return { outcome: 'fault', reason: String(b.reason || `http_${status}`) };
 }
 
