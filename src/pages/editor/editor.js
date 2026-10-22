@@ -1166,9 +1166,11 @@
         type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_SUMMARY || 'editor_summary', payload: { messages },
       });
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) return false;
-      return applyGeneratedSummary(id, rawText);
+      const ok = rawText != null && applyGeneratedSummary(id, rawText);
+      if (manuale) showEditorToast(ok ? notaTaglio(letto, 'per il riassunto') || 'Riassunto aggiornato.' : 'Non sono riuscito a generare il riassunto.');
+      return ok;
     } catch (_) {
+      if (manuale) showEditorToast('Non sono riuscito a generare il riassunto.');
       return false;
     }
   }
