@@ -3476,11 +3476,7 @@ async function eseguiAzioneFilo(action, {
         // l'identità dell'utente, e il nome lo sceglie il modello (#1499). Ogni campo dove il bottone può trovarlo.
         const DR = require('./documentRead');
         if ([action.percorso, action.path].some((v) => DR.percorsoDelFile(v) === null)) {
-          return {
-            executed: false,
-            kept: true,
-            output: { error: 'il file sta su un altro computer della rete', detail: 'Filo mostra solo i file di questo computer: dillo all\'utente' },
-          };
+          return { executed: false, kept: false, output: { rete: true, error: 'il file sta su un altro computer della rete' } };
         }
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
         const p = String(action.percorso ?? action.path ?? '').trim();
