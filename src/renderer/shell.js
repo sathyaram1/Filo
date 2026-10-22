@@ -1571,13 +1571,11 @@
   // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
   const NOTIFS = (() => {
     let host = null;
-    // Tetto al numero di card impilate insieme. Senza limite una raffica di
-    // eventi (es. tempesta di popup bloccati, o ripristino con molte schede su
-    // siti in blacklist) fa crescere lo stack oltre l'altezza della finestra e
-    // spinge le più vecchie fuori schermo, dove non si possono più chiudere.
-    // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
-    // vengono rimosse subito, senza attendere il timeout.
+    // Tetto alle carte a schermo: una raffica non spinge le più vecchie fuori dalla finestra. Quelle oltre il tetto
+    // non si buttano (#1477): aspettano dietro un «+N» che le mostra. Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
     const MAX_STACK = 5;
+    // «+N» aperto: tutte a schermo finché sono più del tetto.
+    let aperta = false;
     // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
     const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
@@ -1592,7 +1590,7 @@
         }
         new MutationObserver(rispecchia).observe(host, {
           childList: true, subtree: true, characterData: true,
-          attributes: true, attributeFilter: ['class', 'data-closing'],
+          attributes: true, attributeFilter: ['class', 'data-closing', 'data-attesa'],
         });
       }
       return host;
@@ -1602,16 +1600,18 @@
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
-      const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
+      const tutte = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const carte = tutte.filter((c) => c.dataset.attesa !== '1').map((c) => ({
         id: c.dataset.nid || '',
         testo: c.querySelector('.shell-notif-msg')?.textContent || '',
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
       }));
+      const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
       const vars = {};
       for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
-      try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
+      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
       if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
@@ -1624,19 +1624,34 @@
           : card.querySelectorAll('.shell-notif-action')[Number(dati.azione)];
         if (btn) btn.click();
       });
+      if (api.avvisi.onPila) api.avvisi.onPila((dati) => comandoPila(dati && dati.azione));
       try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchia); } catch (_) {}
     }
-    // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
-    // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
-    function enforceCap() {
-      const h = hostEl();
-      const live = Array.from(h.children).filter((c) => c.dataset.closing !== '1');
-      const over = live.length - MAX_STACK;
-      for (let i = 0; i < over; i++) {
-        const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._tempo) c._tempo.annulla();
-        uscita(c);
-        try { c.remove(); } catch (_) {}
+    const vive = () => Array.from(hostEl().children).filter((c) => c.dataset.closing !== '1');
+    // Oltre il tetto aspettano le più vecchie: fuori vista e col tempo fermo, che parte intero quando tocca a loro.
+    function disponi() {
+      const live = vive();
+      if (live.length <= MAX_STACK) aperta = false;
+      const nascoste = aperta ? 0 : live.length - MAX_STACK;
+      live.forEach((c, i) => {
+        const attesa = i < nascoste;
+        if (attesa === (c.dataset.attesa === '1')) return;
+        if (attesa) {
+          c.dataset.attesa = '1';
+          if (c._tempo) c._tempo.annulla();
+          c._tempo = null;
+        } else {
+          delete c.dataset.attesa;
+          avviaTempo(c, c._durata);
+        }
+      });
+    }
+    function comandoPila(azione) {
+      if (azione === 'apri' || azione === 'riduci') {
+        aperta = azione === 'apri';
+        disponi();
+      } else if (azione === 'chiudi-tutti') {
+        for (const c of vive()) dismiss(c);
       }
     }
     function uscita(card) {
@@ -1655,8 +1670,9 @@
       card._tempo = null;
       uscita(card);
       card.classList.remove('show');
+      disponi();
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
-      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
+      if (!vive().length) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} }, ThemeTokens ? ThemeTokens.motionMs(220) : 220);
     }
@@ -1686,7 +1702,7 @@
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
     // actions: [{ label, onClick }], unica, alChiudere }. Senza opts usa la config delle Preferenze.
-    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, tetto).
+    // `alChiudere`: chiamata una volta quando l'avviso esce di scena, in qualunque modo (X, tempo, azione, «Chiudi tutti»).
     // `unica`: finché una notifica con la stessa chiave è a schermo non ne nasce un'altra;
     // quella riparte da capo con le azioni nuove. Chiusa, la prossima ricompare subito.
     function show(text, opts) {
@@ -1705,6 +1721,9 @@
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
+        gemella._durata = durata;
+        // Rinnovata mentre aspettava dietro il «+N»: è la notizia più fresca, torna in vista in fondo.
+        if (gemella.dataset.attesa === '1') { hostEl().appendChild(gemella); disponi(); }
         avviaTempo(gemella, durata);
         return gemella;
       }
@@ -1712,6 +1731,7 @@
       const card = document.createElement('div');
       card.className = 'shell-notif';
       card.dataset.nid = String(++seq);
+      card._durata = durata;
       card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
@@ -1733,8 +1753,7 @@
       azioni(card, opts.actions);
 
       hostEl().appendChild(card);
-      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
-      enforceCap();
+      disponi();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
