@@ -1137,24 +1137,14 @@
     if (!doc || !doc.meta) return false;
     syncActiveIntoCollection();
     const id = doc.id;
-    const letto = docPerIlModello();
-    if (!letto.testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
-    const chat = editorChatMessages();
-    const memory = await filoMemoryText();
-    const parts = [bloccoDocumento(letto)];
-    if (chat.length) {
-      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
-        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
-    }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
-    const messages = [
+    if (!docPerIlModello().testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
+    const contesto = contestoDelDocumento(editorChatMessages(), await filoMemoryText());
+    const conDocumento = (letto) => [
       { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
-      { role: 'user', content: parts.join('\n\n') },
+      { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
-      const r = await sendMessage({
-        type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_SUMMARY || 'editor_summary', payload: { messages },
-      });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       const ok = rawText != null && applyGeneratedSummary(id, rawText);
       if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
