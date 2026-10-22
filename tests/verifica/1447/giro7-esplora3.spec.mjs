@@ -50,6 +50,10 @@ test('propio tre volte', async ({ app, openTab, testServer }) => {
   await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
   await page.locator('#ta').click();
   for (let i = 0; i < 4; i++) { await page.keyboard.type('Era propio lui '); await page.keyboard.press('Enter'); }
+  for (const m of ['ok ci vediamo', 'si va bene', 'zanzibarro arriva', 'zanzibarro torna', 'zanzibarro parte']) {
+    await page.keyboard.type(m + ' ');
+    await page.keyboard.press('Enter');
+  }
   await page.keyboard.type('Era propio lui ');
   await page.waitForTimeout(1200);
   console.log('PROPIO VAL', JSON.stringify(await page.locator('#ta').inputValue()));
