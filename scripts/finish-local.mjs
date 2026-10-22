@@ -63,7 +63,7 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState, registraNelRegistro } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
@@ -71,7 +71,7 @@ import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
-import { chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
+import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
@@ -152,9 +152,11 @@ function defaultBranch() {
   return r.ok ? r.out : '';
 }
 
-function run(cmd, args, label, env = undefined) {
+// `cwd`: la cartella staccata della prova (apriProvaSulCommit). Senza shell: lì si lancia node per percorso intero.
+function run(cmd, args, label, env = undefined, cwd = ROOT) {
   process.stdout.write(`\n▸ ${label}\n`);
-  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
+  const shell = process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx');
+  const r = spawnSync(cmd, args, { cwd, stdio: 'inherit', shell, ...(env ? { env } : {}) });
   return r.status === 0;
 }
 
@@ -473,14 +475,17 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
 export { lottiPerRigaDiComando };
 
-/** Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. */
-function runSpecsALotti(specs, label) {
+/**
+ * Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. Nella cartella della
+ * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
+ */
+function runSpecsALotti(specs, label, albero) {
   const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    const l = preparaLancioElectron('npx', ['playwright', 'test', ...lotto]);
-    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env)) ok = false;
+    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env, albero.dir)) ok = false;
   });
   return ok;
 }
@@ -662,6 +667,15 @@ async function main() {
   // Anche con --check, che la prova sulla fusione la fa solo per giudicare unit rossi: i resti di una prova interrotta non aspettano la prossima.
   pulisciResti({ git: gitIn(ROOT) });
 
+  // Lo sha si fissa adesso e i controlli girano in una cartella staccata su di lui: se intanto questa cartella cambia
+  // ramo (un altro worker, un checkout), l'esito resta di questo commit (#1480, D-91).
+  const shaProvato = git(['rev-parse', 'HEAD']).out;
+  const albero = apriProvaSulCommit({ root: ROOT, sha: shaProvato });
+  if (albero.errore) { console.error(`\n✗ ${albero.errore}`); process.exit(1); }
+  if (!albero.moduli) { albero.chiudi(); console.error('\n✗ node_modules manca: lancia npm install prima dei controlli.'); process.exit(1); }
+  process.on('exit', () => { const c = albero.chiudi(); if (!c.ok) console.error(`[finish] ${c.motivo}: la cartella di prova resta, la toglie il prossimo giro`); });
+  console.log(`\n▸ Controlli su ${branch} ${shaProvato.slice(0, 8)}, in una cartella staccata (${albero.dir})`);
+
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
   // la base del diff per gli spec mirati e la guardia sul ramo rimasto indietro.
@@ -671,9 +685,9 @@ async function main() {
   if (note) console.log(`\n${note}`);
 
   {
-    const behind = Number(git(['rev-list', '--count', `HEAD..${base}`]).out);
-    const prova = !checkOnly && behind > 0 ? provaFusione(base) : null;
-    const stop = behindMainStop(behind, { checkOnly, prova });
+    const behind = Number(git(['rev-list', '--count', `${shaProvato}..${base}`]).out);
+    const fusione = !checkOnly && behind > 0 ? provaFusione(base, albero.dir) : null;
+    const stop = behindMainStop(behind, { checkOnly, prova: fusione });
     if (stop) { console.error(`\n${stop}`); process.exit(1); }
     const nota = behindMainNota(behind, { checkOnly });
     if (nota) console.log(`\n${nota}`);
@@ -691,24 +705,24 @@ async function main() {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
     // adesso e non dopo gli unit test.
     if (!spec.rilancia) console.log(`\n${spec.nota}`);
-    const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT) }) : { changed: [], nota: '' };
+    const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
-    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
+    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
     const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
-    const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
+    const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
       if (schermo.nota) console.log(`\n${schermo.nota}`);
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
-    if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
+    if (!run(process.execPath, [join(albero.dir, 'scripts', 'run-unit-tests.mjs')], 'Controlli di logica', undefined, albero.dir)) {
       console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
-      const puntaProvata = git(['rev-parse', 'HEAD']).out;
+      const puntaProvata = shaProvato;
       const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
       provaDelRamo = { prova, punta: puntaProvata };
       const esito = esitoUnitDelRamo({ checkOnly, prova });
@@ -719,7 +733,7 @@ async function main() {
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     if (blocking.length) {
-      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
+      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
@@ -728,7 +742,7 @@ async function main() {
     if (informative.length) {
       // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
       // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`);
+      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero);
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
@@ -775,7 +789,14 @@ async function main() {
     console.error('\n✗ Controlli di logica rossi, più sopra: sistema e rilancia.');
     process.exit(1);
   }
-  if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
+  const ora = git(['rev-parse', 'HEAD']).out;
+  const mossa = ora !== shaProvato ? `la cartella si è mossa durante i controlli (adesso ${git(['rev-parse', '--abbrev-ref', 'HEAD']).out || 'staccata'} ${ora.slice(0, 8)})` : '';
+  if (checkOnly) {
+    console.log(`\n✓ Controlli passati su ${branch} ${shaProvato.slice(0, 8)} (--check: non chiedo la fusione).${mossa ? ` Valgono per quel commit: ${mossa}.` : ''}`);
+    return;
+  }
+  // Si spedisce e si chiede di fondere solo il commit provato.
+  if (mossa) { console.error(`\n✗ ${mossa}: i controlli valgono per ${shaProvato.slice(0, 8)}, non per quello che c'è adesso. Rilancia.`); process.exit(1); }
 
   // 4. Il ramo dev'essere SU ORIGIN: il server fonde ciò che vede lui, non ciò
   //    che c'è su questo disco. L'hook di salvataggio di solito l'ha già
