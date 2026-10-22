@@ -654,6 +654,8 @@
   function forseDash(c) {
     return shellPosix(c) && !c.win && c.shell !== 'bash';
   }
+  // Senza un `\'` le due letture hanno gli stessi confini, e quella di dash è un nome con `$` e backslash letterali.
+  const APICE_CHE_DASH_CHIUDE = /\$'(?:[^'\\]|\\[^'])*\\'/;
 
   const ESCAPE_ANSI = { a: 7, b: 8, e: 27, E: 27, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '\'': 39, '"': 34, '?': 63 };
   const UTF8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
