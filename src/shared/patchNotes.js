@@ -21,6 +21,7 @@
       version: '0.2.246', date: '2026-10-22',
       features: [],
       fixes: [
+        'Se una risposta arriva da un fornitore che Filo esclude, te lo dice un avviso sulla pagina, anche senza «Solo modelli a pesi aperti». Nella Cronologia AI quella richiesta resta segnata.',
         'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
         'Se arrivano più di cinque avvisi insieme in basso a destra, quelli in più non spariscono più. Aspettano dietro un «+3» in cima alla pila: un clic li mostra tutti, e da lì li chiudi anche tutti insieme. Quando gli altri se ne vanno, entrano da soli.',
         'Una scheda non si allarga più fino a prendere mezza barra in alto, nemmeno quella aperta accanto a schede dal titolo lungo. Arriva al massimo a 240 pixel, e il titolo intero lo leggi passandoci sopra col mouse. Il massimo lo cambi in Preferenze, nelle impostazioni avanzate, o chiedendo a Filo «schede più larghe».',
