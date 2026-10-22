@@ -202,7 +202,7 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now(), tetto = T
     await entro(Promise.all([
       dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mousePressed', button: 'left', buttons: 1, clickCount: 1 }),
       dbg.sendCommand('Input.dispatchMouseEvent', { ...base, type: 'mouseReleased', button: 'left', buttons: 0, clickCount: 1 }),
-    ]), TETTO_CLIC_MS);
+    ]), tetto);
   } catch (_) {
     return { ok: false, code: 'scheda' };
   } finally {
