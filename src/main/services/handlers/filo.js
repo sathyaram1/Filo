@@ -392,6 +392,8 @@ module.exports = function register(on, ctx) {
     const chat = await FiloChats.get(msg.id);
     // Riaperta (anche dopo un riavvio), la chat torna a dire cosa aveva letto da fuori prima di ogni clic (#810).
     try { ricordaLettoInChat([], (chat && chat.messages) || []); } catch (_) {}
+    // …e i verdetti dei suoi collegamenti (#1505): chi chiedeva l'OK lo chiede ancora, i giudicati si aprono.
+    try { ricordaVerdettiArchiviati((chat && chat.messages) || []); } catch (_) {}
     let conFoto = chat;
     try { conFoto = global.SN_CONTESTO_FILO ? global.SN_CONTESTO_FILO.conFotoInMemoria(chat) : chat; } catch (_) {}
     return { ok: true, chat: conFoto };
