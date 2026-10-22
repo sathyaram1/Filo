@@ -875,6 +875,8 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     exe: marca(() => ESE().eEseguibile(nome), false),
     site: marca(() => ESE().sito(indirizzo), ''),
     servedBy: marca(() => ESE().servitoDa(indirizzo, servedFrom), ''),
+    _servito: String(servedFrom || indirizzo),
+    _pagina: paginaDi(webContents),
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
