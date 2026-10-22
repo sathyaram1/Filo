@@ -1149,7 +1149,7 @@
     return meglio;
   }
 
-  function daC2pa(boxes, byteFile, ancore, ancoreTsa) {
+  function daC2pa(boxes, byteFile, ancore, ancoreTsa, provvisorio) {
     const store = boxes.find((x) => x.tipo === 'jumb') || boxes[0];
     if (!store || !store.figli) return null;
     // L'ultimo manifesto è quello attivo: i precedenti sono la storia del file.
