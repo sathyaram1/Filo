@@ -189,13 +189,14 @@ test('la finestra dice quali esiti avrebbe davanti una conversazione nuova: gli 
   const ora = Date.parse('2026-10-21T12:00:00Z');
   const msg = (chat, i, role) => ({ chat, role, text: `${role} ${i}`, ts: new Date(ora - (100 - i) * 60000).toISOString(), actions: [] });
   const lista = [];
-  for (let i = 0; i < 40; i++) lista.push(msg(i < 2 ? 'vecchia' : 'questa', i, i % 2 ? 'filo' : 'user'));
-  const esito = (m) => (m.role === 'filo' ? { azioni: [{ type: 'CERCA_WEB', _output: { results: [{ url: `https://x.example/${m.text}` }] }, _da: m.text }] } : null);
+  // La chat di adesso parla per prima, poi un'altra scheda scrive trenta messaggi.
+  for (let i = 0; i < 40; i++) lista.push(msg(i < 10 ? 'questa' : 'altra', i, i % 2 ? 'filo' : 'user'));
+  const esito = (m) => (m.role === 'filo' ? { azioni: [{ type: 'CERCA_WEB', _output: { results: [{ url: `https://x.example/${m.text.replace(' ', '-')}` }] }, _da: m.text }] } : null);
   const f = FC.finestra(lista, { ora, giorni: 3, token: 1e6, chatCorrente: 'questa', esiti: esito, osserva: () => '' });
   const da = (azioni) => azioni.map((a) => a._da);
-  assert.ok(da(f.azioni).includes('filo 21'), 'la chat di adesso ha davanti i suoi esiti fino a venti messaggi');
+  assert.ok(da(f.azioni).includes('filo 9'), 'la chat di adesso ha davanti i suoi ultimi venti messaggi');
+  assert.ok(!da(f.perUnaNuova).includes('filo 9'), 'una conversazione nuova no: sono fuori dagli ultimi venti del filo');
   assert.ok(da(f.perUnaNuova).includes('filo 39'), 'gli ultimi del filo li avrebbe davanti anche una conversazione nuova');
-  assert.ok(!da(f.perUnaNuova).includes('filo 1'), 'quelli più vecchi degli ultimi venti messaggi del filo no');
   assert.ok(da(f.perUnaNuova).every((x) => da(f.azioni).includes(x)));
 });
 
