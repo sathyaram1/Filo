@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   segniDiLavoroVivo, questoProcesso, comandoLeggibile, testoLavoroVivo, lavoroVivo, sottoCartella, timbroFile,
-  TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch,
+  TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation,
 } from '../../scripts/lib/branch-integrity.mjs';
 import { beatFile } from '../../scripts/lib/routine-beat.mjs';
 import { ticketFile } from '../../scripts/lib/routine-ticket.mjs';
@@ -79,7 +79,7 @@ test('chi chiede: lui, i suoi antenati e la shell che li ha aperti; una sessione
     { pid: 970, ppid: 204, sid: 970 },
   ];
   const q = questoProcesso(processi, 951);
-  assert.deepEqual([...q.esclusi].sort((a, b) => a - b), [0, 1, 148, 204, 950, 951]);
+  assert.deepEqual([...q.esclusi].sort((a, b) => a - b), [1, 148, 204, 950, 951]);
   assert.equal(q.sessione, 950, 'il resto della riga di comando (una pipe) è della stessa shell');
   assert.equal(questoProcesso([{ pid: 5, ppid: 204, sid: 0 }, { pid: 204, ppid: 1, sid: 0 }], 5).sessione, 0);
 });
@@ -125,6 +125,8 @@ function cartellaSulRamo() {
   git(clone, 'config', 'user.name', 't');
   const r = prepareBranch({ root: clone, branch: 'worker/vivo', mainBranch: 'main' });
   assert.equal(r.ok, true, r.message);
+  mkdirSync(join(clone, '.claude'), { recursive: true });
+  writeExpectation(clone, { branch: 'worker/vivo', id: 'fb1' });
   // Il worker vivo ha una modifica a metà, non ancora salvata.
   writeFileSync(join(clone, 'codice.txt'), 'a metà\n');
   return { casa, clone };

@@ -1503,6 +1503,13 @@ if (isMain) {
         sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
+    // Un biglietto che il server dice morto non ha più niente da tenere vivo: il battito si spegne e la fine si segna,
+    // o il suo battito ancora acceso varrebbe come lavoro vivo per chi viene dopo (#1480).
+    if (!r.ok && BATTITO_FINITO.has(r.reason)) {
+      const { stopBeat } = await import('./lib/routine-beat.mjs');
+      stopBeat(ROOT, { ticket: args[0] });
+      segnaBigliettoFinito(ROOT, args[0], r.reason);
+    }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
