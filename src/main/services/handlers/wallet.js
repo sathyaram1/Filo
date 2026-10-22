@@ -939,7 +939,12 @@ module.exports = function register(on, ctx) {
     if (now - lastNoticeAt < 10 * 60 * 1000) return;
     lastNoticeAt = now;
     // L'avviso nomina la pagina Crediti: porta il tasto per andarci, come ogni frase sui crediti (#663).
-    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000, rimedio: { keyRefused: true } }); } catch (_) {}
+    try {
+      const pagina = globalThis.SN_CHAT_ERRORS?.rimedioPagina?.({ keyRefused: true });
+      avvisoDiFilo(text.charAt(0).toUpperCase() + text.slice(1), {
+        durataSec: 15, azioni: pagina ? [{ label: pagina.label, openUrl: pagina.url }] : [],
+      });
+    } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
