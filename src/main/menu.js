@@ -141,7 +141,7 @@ const avanti = contata('navigate-back-forward', () => {
 
 const vaiAScrivereUnIndirizzo = contata('address-bar', () => {
   const c = schedaAttiva();
-  if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
+  if (c) { try { c.tabs.vaiAScrivereUnIndirizzo(c.tab.id).catch(() => {}); } catch (_) {} return; }
   const win = finestra();
   try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 });

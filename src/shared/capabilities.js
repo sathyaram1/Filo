@@ -58,7 +58,7 @@
     {
       id: 'reopen-closed-tab', title: 'Riapri l’ultima scheda chiusa', category: 'navigation',
       desc: 'Riapre la scheda chiusa più di recente com’era: nello stesso posto della fila, con Indietro e Avanti, lo scorrimento, lo zoom e il paese da cui passava. Ripetendo riapre quella chiusa prima, e così via; finite quelle chiuse da quando hai aperto Filo continua con l’archivio delle schede chiuse, dalla più recente. Vale anche per le pagine di Filo e in incognito.',
-      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; oppure tasto destro su una scheda → "Riapri scheda chiusa"; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa".',
+      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa". Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
       doesNot: 'Non riapre una scheda che hai cancellato dall’archivio o dalle pagine visitate. In incognito riapre solo le schede chiuse in quella finestra, finché resta aperta. Una home vuota non conta come scheda chiusa.',
     },
     {
@@ -92,7 +92,7 @@
     {
       id: 'address-bar', title: 'Apri un indirizzo', category: 'navigation',
       desc: 'Scrivi un indirizzo per navigare, o un termine per cercare sul web. Funziona anche con gli indirizzi locali: un server di sviluppo (localhost:3000), un IP (127.0.0.1:8080), il router di casa (192.168.1.1) e i nomi dei dispositivi della tua rete (nas.lan, raspberrypi.local, fritz.box). Se un indirizzo non risulta esistere te lo dice, e puoi aprirlo lo stesso.',
-      invoke: 'In una nuova scheda scrivi "/" seguito dall\'indirizzo nel campo "Chiedi qualsiasi cosa" (per esempio /example.com o /localhost:3000). Da un sito, Ctrl+L (Cmd+L su Mac) apre la home dove digitare il nuovo indirizzo.',
+      invoke: 'In una nuova scheda scrivi "/" seguito dall\'indirizzo nel campo "Chiedi qualsiasi cosa" (per esempio /example.com o /localhost:3000). Da un sito, Ctrl+L (Cmd+L su Mac) apre la home col cursore nel campo dove digitare il nuovo indirizzo; se sei già sulla home non la ricarica: porta il cursore nel campo e seleziona quello che avevi scritto.',
     },
     {
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
