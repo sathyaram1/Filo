@@ -6168,11 +6168,13 @@ function ordinaCome(sx, layout) {
   }, layout);
 }
 
+// `daSalvate`: l'indirizzo l'ha salvato l'utente, non l'ha scritto un modello: la carta può chiedere l'icona al sito.
 function savedSuggestions(saved) {
   return saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
+    daSalvate: true,
   }));
 }
 

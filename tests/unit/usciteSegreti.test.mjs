@@ -1288,7 +1288,10 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
     const genera = corpo(handlers, 'async function generateDashboardFromInputs(');
     assert.match(genera, /controllaUscita\(suggestions\[i\]\.action, casa\)/);
     assert.match(genera, /linkCheChiedonoOk\('', \{ \.\.\.casa, sempre: true/);
-    assert.match(src('pages', 'dashboard', 'dashboard-carte.js'), /iconaDelSito\(s\.action\.url, \{ soloCopie: true \}\)/);
+    assert.match(src('pages', 'dashboard', 'dashboard-carte.js'), /iconaDelSito\(s\.action\.url, \{ soloCopie: s\.daSalvate !== true \}\)/);
+    // Il segno delle pagine salvate lo mette solo il main: i suggerimenti del modello tengono i soli campi noti.
+    assert.match(corpo(handlers, 'function savedSuggestions('), /daSalvate: true/);
+    assert.ok(!/daSalvate/.test(corpo(handlers, 'async function generateDashboardFromInputs(')), 'un suggerimento del modello può dirsi salvato');
   });
 
   test('icona e anteprima chiedono alla stessa regola se un indirizzo si può contattare prima del clic', () => {
