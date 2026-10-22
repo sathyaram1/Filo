@@ -367,7 +367,7 @@
     const cursorePrima = cursoreNelCampo(el);
     suppressAutocorrect = true;
     try {
-      applyFix(el, { start: c.start, end: c.end }, c.corretta, { cursor: 'preserve', expectedSegment: c.originale, automatica: true });
+      sostituisciParola(el, c.start, c.end, c.originale, c.corretta);
     } finally {
       // Dopo il flush degli eventi sincroni e dell'input riemesso da setRangeText.
       setTimeout(() => { suppressAutocorrect = false; }, 0);
