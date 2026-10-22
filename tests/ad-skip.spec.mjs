@@ -156,6 +156,21 @@ test('in una scheda in secondo piano salta lo stesso, col clic vero', async ({ a
   expect(await app.evaluate(() => globalThis.__larghezzeAlClic)).toContain(0);
 });
 
+test('una canzone che Filo apre in secondo piano dalla home salta la pubblicità senza che la si guardi', async ({ app, openTab, testServer, suYouTube }) => {
+  await openTab('filo://newtab/');
+  const url = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
+  const r = await app.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Canzone', background: true }), url);
+  expect(r.output && r.output.background).toBe(true);
+  const page = await paginaDellaScheda(app, r.output.tabId, (w) => w.url().startsWith('https://www.youtube.com'));
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
+  const diag = () => page.evaluate(() => ({ w: innerWidth, h: innerHeight, vis: document.visibilityState, st: globalThis.SN_AD_SKIP?._stato?.(), clic: window.__clic }));
+  console.log('PRIMA', JSON.stringify(await diag()));
+  await page.evaluate(() => window.__mostra());
+  await page.waitForTimeout(4000);
+  console.log('DOPO', JSON.stringify(await diag()));
+  expect((await stato(page)).saltata).toBe(true);
+});
+
 test('mentre si scrive in un campo della pagina aspetta, poi salta', async ({ openTab, testServer, suYouTube }) => {
   const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1, campo: true }))));
   await page.locator('#cerca').click();
