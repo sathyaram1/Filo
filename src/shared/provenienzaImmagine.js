@@ -1064,9 +1064,13 @@
 
   // `opzioni.ancore`: i certificati dell'elenco ufficiale dei firmatari
   // (`ancoreDaPem`); assente se Filo non l'ha mai scaricato.
+  // `opzioni.provvisorio`: { ancore, ammessi } dell'elenco provvisorio, o assente.
   function analizza(byte, opzioni) {
     const ancore = opzioni && Array.isArray(opzioni.ancore) ? opzioni.ancore : null;
     const ancoreTsa = opzioni && Array.isArray(opzioni.ancoreTsa) ? opzioni.ancoreTsa : null;
+    const p = opzioni && opzioni.provvisorio;
+    const provvisorio = p && (Array.isArray(p.ancore) || Array.isArray(p.ammessi))
+      ? { ancore: Array.isArray(p.ancore) ? p.ancore : [], ammessi: Array.isArray(p.ammessi) ? p.ammessi : [] } : null;
     const b = u8(byte);
     const vuoto = { trovato: false, origine: null, prova: '', dichiarante: '', firmatario: '', avvisi: [], fonte: '' };
     if (b.length < 12) return vuoto;
