@@ -309,13 +309,19 @@
   }
   function ricordaStile(state, testo) {
     const esclusi = state.automatiche;
-    const s = A().stileDi(testo.slice(-3000), null, testo.length > 3000 ? [] : esclusi);
-    stilePagina.minuscoli += s.minuscoli;
-    stilePagina.maiuscoli += s.maiuscoli;
-    if (stilePagina.minuscoli + stilePagina.maiuscoli > STILE_PAGINA_MAX) {
-      stilePagina.minuscoli = Math.round(stilePagina.minuscoli / 2);
-      stilePagina.maiuscoli = Math.round(stilePagina.maiuscoli / 2);
-    }
+    aggiungiStile(A().stileDi(testo.slice(-3000), null, testo.length > 3000 ? [] : esclusi));
+  }
+  function aggiungiStile(s) {
+    if (!s || (!s.minuscoli && !s.maiuscoli)) return;
+    Object.assign(stilePagina, A().sommaStile(stilePagina, s));
+    impara({ passo: 'stile', minuscoli: s.minuscoli || 0, maiuscoli: s.maiuscoli || 0 });
+  }
+  async function caricaStile() {
+    if (!A()) return;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, passo: 'leggiStile' });
+      if (r && r.ok && r.stile) Object.assign(stilePagina, A().sommaStile(stilePagina, r.stile));
+    } catch (_) {}
   }
 
   // Una parola chiusa da un tasto vero in questa casella: si corregge da sé, o si conta per quello che Filo impara. Mai
