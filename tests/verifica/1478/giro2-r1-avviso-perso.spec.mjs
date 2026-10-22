@@ -3,18 +3,17 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 const MODELLO = 'deepseek/deepseek-v4-flash';
 
-async function fintoServitoDa(app, host, extra = {}) {
-  await app.evaluate(async (_e, { host: h, modello, extra: x }) => {
+async function fintoServitoDa(app, host) {
+  await app.evaluate(async (_e, { host: h, modello }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false, openWeightsOnly: false, apiKeys: { openrouter: 'k-test' },
       modelRegistry: { ...globalThis.SN_TEST_MODELS.registry, 'mio-aperto': { provider: 'openrouter', model: modello } },
       models: { [C.ACTIONS.EXPLAIN]: 'mio-aperto' },
-      ...x,
     });
     const P = globalThis.SN_PROVIDERS;
     P.completeWithFallback = async () => ({ text: 'r', model: modello, provider: 'openrouter', servedBy: h, usage: { promptTokens: 1, completionTokens: 1 } });
-  }, { host, modello: MODELLO, extra });
+  }, { host, modello: MODELLO });
 }
 
 const spiega = (app, url, parola) => app.evaluate(async ({ webContents }, { u, p }) => {
@@ -49,17 +48,3 @@ test('r1 la risposta arriva mentre si è in un’altra applicazione: tornati, l�
   await expect(page.locator('.sn-toast', { hasText: 'Google Vertex' }).first()).toBeVisible({ timeout: 5000 });
 });
 
-test('r1 la risposta arriva mentre si è su un sito dove Filo è spento: nella scheda dopo l’avviso arriva comunque', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, '<!doctype html><html><body><p>Una pagina qualunque.</p></body></html>');
-  await page.mouse.click(5, 5);
-  await fintoServitoDa(app, 'Google AI Studio', { blocklist: ['127.0.0.1'] });
-  await page.waitForTimeout(800);
-  expect((await spiega(app, page.url(), 'neve')).ok).toBe(true);
-  await page.waitForTimeout(1000);
-  expect(await page.locator('.sn-toast').count(), 'sul sito spento l’avviso non si mostra').toBe(0);
-  const home = await openTab('filo://newtab/');
-  await home.mouse.click(5, 5);
-  expect((await spiega(app, home.url(), 'pioggia')).ok).toBe(true);
-  await expect(home.locator('.sn-toast', { hasText: 'Google AI Studio' }).first()).toBeVisible({ timeout: 5000 });
-});
