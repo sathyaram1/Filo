@@ -208,7 +208,7 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
 // arriverebbe con la domanda di prima ancora aperta, e due clic intrecciati non ne fanno nessuno.
 const inCorso = new WeakSet();
 
-async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now(), adesso = Date.now } = {}) {
+async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now() } = {}) {
   const wc = sender.wc;
   if (inCorso.has(wc) || ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };
   const anelli = catena(sender);
