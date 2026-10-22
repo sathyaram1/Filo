@@ -424,13 +424,14 @@
       if (!m || !m.chat || m.riga) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
-        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
+        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], classeLetta: 1, titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
         aperti.set(m.chat, t);
         out.push(t);
       }
       const testo = String(m.text || '').replace(/\s+/g, ' ').trim();
       if (testo) t.righe.push(`${m.role === 'user' ? 'Utente' : 'Filo'}: ${testo}`);
       t.daFuori.push(...daFuoriDi([m]));
+      t.classeLetta = Math.max(t.classeLetta, classeDelMessaggio(m));
       t.fine = m.ts;
     }
     return out.filter((t) => t.righe.length).map((t) => ({ ...t, testo: t.righe.join('\n') }));
