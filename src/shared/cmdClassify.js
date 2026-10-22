@@ -667,7 +667,7 @@
     for (; i < s.length; i++) {
       const ch = s[i];
       if (ch === '\'') break;
-      if (ch !== '\\') { byteUtf8(ch.codePointAt(0), b); if (ch.codePointAt(0) > 0xffff) i += 1; continue; }
+      if (ch !== '\\') { const cp = s.codePointAt(i); byteUtf8(cp, b); if (cp > 0xffff) i += 1; continue; }
       const e = s[i + 1];
       if (e === undefined) { ignoto = true; break; }
       i += 1;
