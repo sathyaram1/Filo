@@ -2160,6 +2160,12 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     elenco: ing.elenco, difesa: ing.difesa, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);
+  let nuovaUguale = false;
+  const diUnaNuova = d.risposta === 'no' && Array.isArray(contesto) ? LETTURE_DI_UNA_NUOVA.get(contesto) : null;
+  if (diUnaNuova) {
+    const stNuova = A.stato({ fonti: fontiDelCompito(null, diUnaNuova), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+    nuovaUguale = A.decide({ ...ingressi, stato: stNuova.stato }) === 'no';
+  }
   let perche = '';
   if (d.risposta !== 'si' && d.risposta !== 'no') {
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
