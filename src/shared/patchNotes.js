@@ -9,7 +9,7 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.245', date: '2026-10-22',
+      version: '0.2.246', date: '2026-10-22',
       features: [
         'Traduci, Screenshot, Condividi, Salva per dopo, il QR della pagina e Nuova scheda non stanno più in cima al menu del tasto destro: li trovi nella barra laterale, sotto Indietro e Ricarica, e agiscono sulla pagina che hai davanti. Le icone che usi meno vanno sotto la piega «Altro…» in fondo alla barra: le sposti trascinandole, o col tasto destro sull\'icona.',
         'A schermo intero ritrovi le schede portando il mouse contro il bordo in alto per un attimo. Quando torni sulla pagina spariscono. Se non lo vuoi, lo spegni in Preferenze, alla voce «Barra laterale».',
