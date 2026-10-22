@@ -387,6 +387,32 @@ test('un ingrediente la cui impronta non è quella firmata non racconta la stori
   assert.notEqual(r.origine, 'ai');
 });
 
+// #946.1: un file vero di ChatGPT (2025) mette l'immagine generata come unico componente del passo finale, firmato
+// dallo stesso certificato. È generata, non modificata; con l'elenco provvisorio OpenAI è riconosciuta.
+test('un’immagine vera di ChatGPT è generata con l’AI, e con l’elenco provvisorio la dichiara OpenAI', () => {
+  const byte = ufficiale('chatgpt-2025-vera.png');
+  const provvisorio = { ancore: P.ancoreDaPem(ufficiale('elenco-provvisorio-truepic.pem').toString('utf8')), ammessi: [] };
+  const r = P.analizza(byte, { ancore: ANCORE, provvisorio });
+  assert.equal(r.origine, 'ai');
+  assert.equal(r.dichiarante, 'OpenAI');
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.match(P.frase(r), /^Generata con l’AI secondo OpenAI/);
+  assert.equal(conElenco(byte).origine, 'ai', 'anche senza elenco provvisorio');
+});
+
+test('un componente resta «modificata» se non è tutta l’immagine', () => {
+  const { pezzoUnico } = P._interni;
+  const firma = (fp) => ({ certificati: [{ fingerprint256: fp }] });
+  const genitore = (tuttiIngredienti, azioni = [], fp = 'A') => ({ firma: firma(fp), letto: { tuttiIngredienti, azioni } });
+  assert.equal(pezzoUnico(genitore(1), firma('A')), true, 'come ChatGPT: un solo componente, stesso certificato');
+  assert.equal(pezzoUnico(genitore(1, ['c2pa.converted']), firma('A')), true);
+  assert.equal(pezzoUnico(genitore(2), firma('A')), false, 'un secondo ingrediente è un montaggio');
+  assert.equal(pezzoUnico(genitore(1, ['c2pa.placed']), firma('A')), false, 'una lavorazione dichiarata');
+  assert.equal(pezzoUnico(genitore(1, ['c2pa.edited']), firma('A')), false);
+  assert.equal(pezzoUnico(genitore(1), firma('B')), false, 'un altro firmatario');
+  assert.equal(pezzoUnico(null, firma('A')), false);
+});
+
 // ── Certificato scaduto dopo la firma: decide la marca temporale (#946) ──────────
 // Chi firma con certificati di breve durata (le fotocamere dei telefoni) conta
 // sulla marca: dice che la firma è stata fatta quando il certificato valeva.

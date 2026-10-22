@@ -1123,7 +1123,8 @@
   // Un'immagine generata e poi solo ritagliata porta l'origine nel manifesto del
   // passo prima: vale se la sua impronta è quella che il passo dopo ha firmato e
   // se la sua firma regge. Torna { origine, firma } o null.
-  function daIngredienti(store, ingredienti, profondita, visti) {
+  // `genitore`: { firma, letto } del manifesto che elenca questi ingredienti.
+  function daIngredienti(store, ingredienti, profondita, visti, genitore) {
     if (profondita > 16) return null;
     let meglio = null;
     for (const ing of ingredienti) {
@@ -1138,17 +1139,30 @@
       visti.add(etichetta);
       const dentro = leggiManifesto(box, letto.claim);
       let esito = dentro.origine ? { origine: dentro.origine, firma: letto.firma, generatore: dentro.generatore } : null;
-      const sotto = daIngredienti(store, dentro.ingredienti, profondita + 1, visti);
+      const sotto = daIngredienti(store, dentro.ingredienti, profondita + 1, visti, { firma: letto.firma, letto: dentro });
       if (sotto && (!esito || PESO_ORIGINE[sotto.origine] > PESO_ORIGINE[esito.origine])) esito = sotto;
       if (!esito) continue;
       // Un pezzo incollato dentro l'immagine non la rende scattata né generata: la rende modificata.
-      if (ing.relazione === 'componentOf') {
+      // Non quando il pezzo è l'immagine intera (ChatGPT firma così ogni sua immagine, #946.1).
+      if (ing.relazione === 'componentOf' && !pezzoUnico(genitore, letto.firma)) {
         if (esito.origine === 'fotocamera') continue;
         esito = { ...esito, origine: 'ai-modificata' };
       }
       if (!meglio || PESO_ORIGINE[esito.origine] > PESO_ORIGINE[meglio.origine]) meglio = esito;
     }
     return meglio;
+  }
+
+  // Azioni che passano l'immagine com'è, senza aggiungerle niente.
+  const SOLO_TRASPORTO = new Set(['c2pa.converted', 'c2pa.transcoded', 'c2pa.repackaged', 'c2pa.published']);
+  // Il componente è tutta l'immagine se è il suo solo ingrediente, lo firma lo stesso certificato, e il passo che lo
+  // incorpora non dichiara nessun'altra lavorazione: un firmatario diverso o un secondo ingrediente è un montaggio.
+  function pezzoUnico(genitore, firmaPezzo) {
+    if (!genitore || !genitore.letto || genitore.letto.tuttiIngredienti !== 1) return false;
+    if (!genitore.letto.azioni.every((a) => SOLO_TRASPORTO.has(a))) return false;
+    const a = genitore.firma && genitore.firma.certificati && genitore.firma.certificati[0];
+    const b = firmaPezzo && firmaPezzo.certificati && firmaPezzo.certificati[0];
+    return !!(a && b && a.fingerprint256 && a.fingerprint256 === b.fingerprint256);
   }
 
   function daC2pa(boxes, byteFile, ancore, ancoreTsa, provvisorio) {
@@ -1184,7 +1198,7 @@
     // un'immagine generata e poi ritagliata, il generatore e non il programma del ritaglio.
     let origine = letto.origine;
     let chi = { firma, generatore: letto.generatore };
-    const storia = daIngredienti(store, letto.ingredienti, 0, new Set([manifesto.etichetta]));
+    const storia = daIngredienti(store, letto.ingredienti, 0, new Set([manifesto.etichetta]), { firma, letto });
     if (storia && (!origine || PESO_ORIGINE[storia.origine] > PESO_ORIGINE[origine])) {
       origine = storia.origine;
       chi = { firma: storia.firma, generatore: storia.generatore };
@@ -1359,6 +1373,6 @@
 
   global.SN_PROVENIENZA = {
     analizza, frase, notaPerModello, ancoreDaPem, ammessiDaPem, esitoDaMarchio, CONGELAMENTO_PROVVISORIO,
-    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario, fiducia },
+    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario, fiducia, pezzoUnico },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
