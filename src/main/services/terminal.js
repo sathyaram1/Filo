@@ -316,8 +316,9 @@ function extractCwdMark(rawStdout, mark) {
 
 // Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
 // esito da mostrare.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false } = {}) {
   const cmd = String(command || '').trim();
+  const env = ambienteComandi(chiesto || process.env);
   const startedAt = Date.now();
   const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
