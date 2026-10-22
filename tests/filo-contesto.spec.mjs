@@ -505,6 +505,7 @@ test('il suggerimento della home che porta fuori un numero scritto in chat chied
       return { ...base, text: JSON.stringify({ message: 'Ciao', suggestions: [
         { icon: 'link', text: 'Offerte per te', action: { type: 'NAVIGA', url: LINK } },
         { icon: 'link', text: 'Meteo', action: { type: 'NAVIGA', url: 'https://meteo.example/oggi' } },
+        { icon: 'link', text: 'Video', action: { type: 'NAVIGA', url: 'https://www.youtube.com/' } },
       ] }) };
     };
   }, LINK);
@@ -516,8 +517,11 @@ test('il suggerimento della home che porta fuori un numero scritto in chat chied
   const sugg = (home && home.suggestions) || [];
   const offerte = sugg.find((s) => s.text === 'Offerte per te');
   const meteo = sugg.find((s) => s.text === 'Meteo');
+  const video = sugg.find((s) => s.text === 'Video');
   expect(offerte && offerte.chiedeOk).toContain('dato che hai scritto in chat');
-  expect(meteo && meteo.chiedeOk).toBeFalsy();
+  // La home legge testo di altri (#1505): un indirizzo scritto dal modello chiede l'OK; la home di un sito comune no.
+  expect(meteo && meteo.chiedeOk).toContain('non compare da nessuna parte');
+  expect(video && video.chiedeOk).toBeFalsy();
   const r = await app.evaluate((_e, LINK) => globalThis.__filoHandlers.handleMessage(
     { type: globalThis.SN_MSG.MSG.FILO_APRI_PROPOSTA, url: LINK, parole: [] },
     { url: 'filo://newtab/' },
