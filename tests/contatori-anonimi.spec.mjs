@@ -447,7 +447,8 @@ test('un’impostazione cambiata conta il valore solo se è di un elenco chiuso,
   await home.bringToFront();
   await home.locator('#input').fill('metti il tema scuro');
   await home.locator('#sendBtn').click();
-  await expect(home.locator('.dash-bubble-filo', { hasText: 'Fatto, ora è scuro.' })).toBeVisible({ timeout: 15_000 });
+  // La frase è anche un comando rapido, che Filo fa senza modello: il cambio è chiesto in chat per l'una o l'altra via.
+  await expect.poll(async () => (await impostazioni(app)).theme, { timeout: 15_000 }).toBe('dark');
   await expect.poll(async () => (await oggi(app))?.impostazioni?.theme || null, { timeout: 8_000 }).toEqual({ 'dark|chat': 1 });
 });
 
@@ -539,7 +540,8 @@ test('«Cerca nel filo» conta l’apertura del pannello e la chiusura senza sce
 
 test('il correttore conta le proposte mostrate, accettate e ignorate, per tipo e modello, mai la parola', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  // Il controllo rapido finto segna come errore ogni pezzo di ERRORI che trova nel testo nuovo (come tests/correttore.spec.mjs).
+  // Il controllo rapido finto segna come errore ogni pezzo di ERRORI che trova nel testo nuovo (come tests/correttore.spec.mjs):
+  // pezzi di più parole, che cambiano in testa e in coda, così il segno resta una frase.
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -556,7 +558,7 @@ test('il correttore conta le proposte mostrate, accettate e ignorate, per tipo e
       const a = t.indexOf(M.inizio, i) + M.inizio.length + 1;
       return t.slice(a, t.indexOf(M.fine, a) - 1);
     };
-    const ERRORI = { 'ho andato': 'sono andato', 'le ragazzo': 'il ragazzo' };
+    const ERRORI = { 'ho andato al': 'sono andata alla', 'le ragazzo': 'i ragazzi' };
     const finto = async ({ messages }) => {
       const t = String(messages[messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto/correttore', provider: 'openrouter', costEur: 0, usage: {} });
@@ -574,30 +576,30 @@ test('il correttore conta le proposte mostrate, accettate e ignorate, per tipo e
   await page.locator('#ta').click();
   await page.keyboard.type('oggi ho andato al mare con le ragazzo e basta ');
   const segno = (testo) => page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)', { hasText: testo });
-  await expect(segno('ho andato')).toHaveCount(1, { timeout: 8000 });
+  await expect(segno('ho andato al')).toHaveCount(1, { timeout: 8000 });
   await expect(segno('le ragazzo')).toHaveCount(1, { timeout: 8000 });
   const frase = async () => Object.entries((await oggi(app))?.correttore?.frase || {});
   await expect.poll(async () => (await frase()).map(([m, c]) => [m, c[0]]), { timeout: 5000 }).toEqual([['finto/correttore', 2]]);
 
   // La prima si accetta dal tasto destro: la correzione in cima.
-  const box = await riquadroDelSegno(segno('ho andato'));
+  const box = await riquadroDelSegno(segno('ho andato al'));
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
-  const riga = menuDi(page).locator('.sn-menu-correction-main', { hasText: 'sono andato' });
+  const riga = menuDi(page).locator('.sn-menu-correction-main', { hasText: 'sono andata alla' });
   await expect(riga).toBeVisible({ timeout: 8000 });
   await riga.click();
-  await expect(page.locator('#ta')).toHaveValue(/sono andato/);
+  await expect(page.locator('#ta')).toHaveValue(/sono andata alla/);
   await expect.poll(async () => (await frase())[0]?.[1]?.[1] || 0, { timeout: 5000 }).toBe(1);
   // Disfatta subito con la tastiera: un annullo della correzione.
   await page.locator('#ta').focus();
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(async () => (await oggi(app))?.annullati?.correzione || 0, { timeout: 5000 }).toBe(1);
   // La seconda la sistema chi scrive, e sparisce senza una scelta: è ignorata.
-  await page.evaluate(() => { const ta = document.getElementById('ta'); ta.value = ta.value.replace('le ragazzo', 'il ragazzo'); ta.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.evaluate(() => { const ta = document.getElementById('ta'); ta.value = ta.value.replace('le ragazzo', 'i ragazzi'); ta.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.keyboard.type(' ');
   await expect.poll(async () => (await frase())[0]?.[1]?.[3] || 0, { timeout: 8000 }).toBeGreaterThanOrEqual(1);
   const tutto = JSON.stringify(await statoContatori(app));
-  expect(tutto).not.toContain('andato');
-  expect(tutto).not.toContain('ragazzo');
+  expect(tutto).not.toContain('andat');
+  expect(tutto).not.toContain('ragazz');
 });
 
 test('la barra laterale e il box del tasto destro contano l’apertura, la scelta con la sua posizione e la chiusura senza scelta', async ({ app, openTab, testServer }) => {

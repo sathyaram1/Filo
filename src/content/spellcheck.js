@@ -719,11 +719,12 @@
     return true;
   }
   function esitoSegno(el, segno, esito) { return !!segno && esitoProposta(el, tipoDelSegno(segno), chiaveSegno(segno), esito); }
-  // I segni in vista adesso: i nuovi sono mostrati, quelli spariti senza una scelta ignorati.
+  // I segni in vista adesso: i nuovi sono mostrati, quelli spariti senza una scelta ignorati. Uno nascosto solo perché
+  // il cursore sta sulla sua parola (un tasto destro appena dopo aver scritto) c'è ancora.
   function allineaProposte(state) {
-    if (!state || !state.el) return;
+    if (!state || !state.el || !R()) return;
     const vive = new Map();
-    for (const s of state.inVista || []) {
+    for (const s of segniInVista(state, { ignoraScrittura: true })) {
       if (!propostaVera(s)) continue;
       const tipo = tipoDelSegno(s);
       vive.set(`${tipo}|${chiaveSegno(s)}`, { tipo, modello: modelloDelSegno(state, s), segno: true });
