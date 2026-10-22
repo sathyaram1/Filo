@@ -3613,16 +3613,13 @@
       const thinking = { role: 'assistant', content: '…' };
       m.data.messages.push(thinking);
       renderLog();
-      const letto = docPerIlModello();
-      const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
-      const messages = [
-        { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + (avviso ? `${avviso}\n\n` : '') + letto.testo },
-        ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
-      ];
+      const turni = m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content }));
+      const conDocumento = (letto) => {
+        const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
+        return [{ role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + (avviso ? `${avviso}\n\n` : '') + letto.testo }, ...turni];
+      };
       try {
-        const r = await sendMessage({
-          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages }, diceRipiego: true,
-        });
+        const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_CHAT || 'editor_chat', conDocumento, { diceRipiego: true });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
           thinking.content = erroreInChat(r, 'nessuna risposta');
