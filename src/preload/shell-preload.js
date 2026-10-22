@@ -137,6 +137,12 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:sopra', wrapped);
       return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
     },
+    // I comandi della pila intera («+N», Riduci, Chiudi tutti).
+    onPila: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:pila', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:pila', wrapped);
+    },
   },
   // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
   barra: {
