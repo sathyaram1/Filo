@@ -643,8 +643,9 @@
   }
 
   // sh e bash (anche su Windows) tolgono i backslash e decodificano `$'…'`; PowerShell e cmd no.
-  // Fuori da Windows una shell non indicata è POSIX: lì non ce ne sono altre.
+  // Fuori da Windows una shell non indicata è POSIX: lì non ce ne sono altre. Senza contesto il sistema non si sa.
   function shellPosix(c) {
+    if (c.ignoto) return false;
     return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
   }
 
