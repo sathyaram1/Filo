@@ -691,7 +691,7 @@
       if (e === 'c') {
         let x = s[i + 1];
         if (x === '\\') { i += 1; x = s[i + 1]; }
-        if (x === undefined || x === '\'' && s[i] !== '\\' || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
+        if (x === undefined || (x === '\'' && s[i] !== '\\') || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
         i += 1;
         b.push(x === '?' ? 0x7f : x.toUpperCase().charCodeAt(0) & 0x1f);
         continue;
