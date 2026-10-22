@@ -552,18 +552,21 @@ test('il correttore conta le proposte mostrate, accettate e ignorate, per tipo e
       correttore: { modelloErrori: true },
     });
     const M = globalThis.SN_ESTERNO.marcature('TESTO_IN_PAGINA');
-    const busta = (t, dopo) => {
-      const i = t.indexOf(dopo);
-      if (i < 0) return '';
-      const a = t.indexOf(M.inizio, i) + M.inizio.length + 1;
-      return t.slice(a, t.indexOf(M.fine, a) - 1);
+    // Le regole stanno nel system, il testo nuovo imbustato dentro <testo_nuovo> del messaggio dell'utente (#1580).
+    const tag = (t, nome) => {
+      const a = t.indexOf(`<${nome}>\n`);
+      const b = t.indexOf(`</${nome}>`, a);
+      if (a < 0 || b < 0) return '';
+      const dentro = t.slice(a, b);
+      const i = dentro.indexOf(M.inizio);
+      return i < 0 ? '' : dentro.slice(i + M.inizio.length + 1, dentro.indexOf(M.fine) - 1);
     };
     const ERRORI = { 'ho andato al': 'sono andata alla', 'le ragazzo': 'i ragazzi' };
     const finto = async ({ messages }) => {
       const t = String(messages[messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto/correttore', provider: 'openrouter', costEur: 0, usage: {} });
-      if (!t.includes('Sei il controllo rapido di un correttore')) return fine('[][][][nessuno]');
-      const nuovo = busta(t, 'TESTO NUOVO:\n');
+      if (!String(messages[0].content).includes('Sei il controllo rapido')) return fine('[][][][nessuno]');
+      const nuovo = tag(t, 'testo_nuovo');
       const righe = Object.entries(ERRORI).filter(([p]) => nuovo.includes(p)).map(([p, c]) => `[${p}][${c}][x][errore]`);
       return fine(righe.join('\n') || '[][][][nessuno]');
     };
