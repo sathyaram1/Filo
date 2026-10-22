@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Il bottone di un file che Filo ti trova in chat porta sempre il nome vero del file. Il nome che gli dà Filo, come «Bolletta della luce», sta accanto, più piano.',
+        'Gli avvisi sui crediti, sulla tua chiave OpenRouter e sugli allegati del feedback non caricati li mostra Filo nella sua barra, non più la pagina del sito che hai davanti.',
       ],
     },
     {
