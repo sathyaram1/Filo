@@ -214,6 +214,19 @@ function impronteDellAncora(doc) {
   return out;
 }
 
+// I file che electron-updater può scaricare da questo feed, coi nomi e le impronte scritti nel yml: `files`, o `path`
+// quando manca, e ogni pacchetto.
+function fileDaAncorare(info) {
+  if (!info || typeof info !== 'object') return [];
+  const voce = (f, campo) => ({ nome: f && f[campo], sha512: f && f.sha512 });
+  const lista = Array.isArray(info.files) && info.files.length ? info.files.map((f) => voce(f, 'url'))
+    : info.path != null ? [voce(info, 'path')] : [];
+  if (info.packages && typeof info.packages === 'object') {
+    for (const p of Object.values(info.packages)) lista.push(voce(p, 'path'));
+  }
+  return lista;
+}
+
 // `ancora`: { letta: false } se Firestore non ha risposto; { letta: true, impronte, altre } se sì, con `impronte` null
 // quando questa release non ha documento e `altre` vero se ne esiste almeno uno. Raccolta vuota: il server non ha
 // ancorato ancora niente. Il controllo si accende da solo alla prima àncora, e il server non ne cancella.
