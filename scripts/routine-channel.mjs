@@ -237,8 +237,23 @@ export function readTicketReply(status, body) {
 }
 
 export async function ticket(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase, ...creditiDi(opts) }, opts);
+  const accensione = haFormaDiAccensione(opts?.accensione) ? opts.accensione : '';
+  const { status, body } = await call('routineTicket', { passphrase, ...(accensione ? { accensione } : {}), ...creditiDi(opts) }, opts);
   return readTicketReply(status, body);
+}
+
+/**
+ * L'accensione da mandare col biglietto: quella ricordata per questa parola d'ordine, altrimenti la apre un sondaggio
+ * e la ricorda. Un sondaggio in guasto non si ricorda, così il biglietto dopo ci riprova. '' se il server non la dà.
+ */
+export async function accensioneDelGiro(passphrase, opts = {}) {
+  const dove = opts.dirAccensione ? { dir: opts.dirAccensione } : {};
+  const nota = leggiAccensione(passphrase, dove);
+  if (nota.nota) return nota.accensione;
+  const r = await probe(passphrase, opts);
+  if (r.outcome === 'fault') return '';
+  scriviAccensione(passphrase, r.accensione || '', dove);
+  return r.accensione || '';
 }
 
 /**
