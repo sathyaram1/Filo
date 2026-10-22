@@ -19,8 +19,7 @@
   const GUARDIANO_REGISTRI = false;
 
   const CLASSI = Object.freeze({
-    // Le chat passate solo per le tue parole e le risposte nate da quelle: una nata da testo di altri vale quella lettura (#1508).
-    1: 'Filo e te: la chat, le memorie, le impostazioni, il manifesto, le tue parole e le risposte di Filo nelle chat passate',
+    1: 'Filo e te: la chat, le memorie, le impostazioni, il manifesto, le chat passate che non avevano letto testo di altri',
     2: 'I file su cui lavori: l\'editor, quelli toccati di recente',
     3: 'Autori fidati: mittenti a cui hai risposto o che hai segnato, siti di un autore solo segnati da te',
     4: 'Gli altri file del computer',
