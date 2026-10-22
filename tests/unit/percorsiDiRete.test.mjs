@@ -38,11 +38,25 @@ const PERCORSI = [
   '\\Windows\\System32', '/etc', '/Volumes/Disco', '/net/nas/condivisa', '/Library/Keychains',
 ];
 
+// Su Windows una cartella da / prende l'unità corrente, che può non essere quella della casa: lì path.relative dà un
+// percorso assoluto, non un «..» (#1610).
+function dentroCasa(ctx, p) {
+  const r = ctx.path.relative(ctx.casa, p);
+  return r === '' || (!r.startsWith('..') && !ctx.path.isAbsolute(r));
+}
+
+// /net porta a un altro computer sul Mac e su Linux; su Windows è una cartella dell'unità corrente, e il nome di
+// rete nativo è \\nas (#1610). Il resto della prova è uguale sui due lati.
+const WIN = process.platform === 'win32';
+const RETE_DEL_SISTEMA = WIN ? '\\\\nas\\condivisa' : '/net/nas/condivisa';
+const ARCHIVIO_DI_RETE = WIN ? '\\\\nas\\archivio' : '/net/nas/archivio';
+
 // Il disco non si tocca: ogni stat e ogni risoluzione su un percorso col nome del computer di rete si registra.
+// «nas» come pezzo intero del percorso: dentro un nome (una cartella temporanea, un utente) non è quel computer.
 function spiaDelDisco() {
   const chiesti = [];
   const orig = { statSync: fs.statSync, stat: fsp.stat, realpath: fs.realpathSync.native, existsSync: fs.existsSync };
-  const nota = (p) => { if (/nas/i.test(String(p))) chiesti.push(String(p)); };
+  const nota = (p) => { if (/(^|[\\/])nas([\\/]|$)/i.test(String(p))) chiesti.push(String(p)); };
   fs.statSync = (p, ...r) => { nota(p); return orig.statSync(p, ...r); };
   fsp.stat = (p, ...r) => { nota(p); return orig.stat(p, ...r); };
   fs.realpathSync.native = (p, ...r) => { nota(p); return orig.realpath(p, ...r); };
