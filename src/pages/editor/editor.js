@@ -3584,9 +3584,10 @@
       const thinking = { role: 'assistant', content: '…' };
       m.data.messages.push(thinking);
       renderLog();
-      const docText = docPlainText().slice(0, 6000);
+      const letto = docPerIlModello();
+      const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
       const messages = [
-        { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + docText },
+        { role: 'system', content: CHAT_FORMAT_INSTRUCTIONS + (avviso ? `${avviso}\n\n` : '') + letto.testo },
         ...m.data.messages.filter((x) => x !== thinking).map((x) => ({ role: x.role, content: x.content })),
       ];
       try {
