@@ -318,7 +318,7 @@ test('il testo messo da uno script resta com\'è, e con la correzione automatica
 });
 
 // Il campo che ha il cursore prima che il correttore parta non ha più un focusin da dare: si scrive subito, senza clic.
-test('un campo che ha già il cursore all\'apertura si corregge subito: la chat di casa e una pagina in autofocus', async ({ app, openTab, testServer }) => {
+test('nella chat di casa e in una pagina in autofocus, scritto subito senza clic, «perchè » diventa «perché»', async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       featureFlags: { spellcheck: true, spellcheckContext: false },
@@ -340,11 +340,11 @@ test('un campo che ha già il cursore all\'apertura si corregge subito: la chat 
   await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché ');
 
   // Acceso mentre il cursore è già nel campo, vale da subito.
-  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { featureFlags: { spellcheck: false } } },
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { featureFlags: { spellcheck: false, spellcheckContext: false }, correttore: { automatica: false } } },
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.waitForTimeout(500);
   await page.keyboard.type('poi ');
-  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { featureFlags: { spellcheck: true } } },
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { correttore: { automatica: true } } },
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.waitForTimeout(500);
   await page.keyboard.type('perchè ');
