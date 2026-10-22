@@ -251,9 +251,9 @@ menu disegnato fuori dalla pagina (D14, #1052–#1056), che lo chiude; la sua pr
 Lo shadow chiuso non nasconde il **testo**: `window.find` trova anche quello
 scritto in una casella dentro un riquadro chiuso, e `getSelection().modify()`
 allarga la selezione trovata fino alla riga intera, che `toString()` restituisce
-(#1071). Basta indovinare una lettera. Ancora più semplice: gli inserimenti
-(`beforeinput`, `input`) e l'Esc escono dallo shadow verso la finestra del sito, e
-un `execCommand` del sito scrive nella casella che ha il fuoco (#1071.1). Il testo di una voce si può rendere come
+(#1071). Basta indovinare una lettera. Ancora più semplice: l'Esc esce dallo
+shadow verso la finestra del sito, e un `execCommand` del sito scrive nella
+casella che ha il fuoco (#1071.1); gli inserimenti non escono più (#1509). Il testo di una voce si può rendere come
 contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi
