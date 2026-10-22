@@ -852,10 +852,12 @@ function finalizeManual(rec, state, savePath) {
     // marca "è un programma" si rifà su QUELLO, non sul nome proposto.
     try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) {}
   }
+  const marca = state === 'completed' ? marcaDi(rec) : Promise.resolve(false);
   rec.state = state;
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
   // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
+  return marca;
 }
 
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
