@@ -304,10 +304,20 @@ test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i
   });
   await page.reload();
   await expect(page.locator('#reissueBtn')).toBeVisible({ timeout: 15000 });
+
+  // #1503: un rifiuto del server si legge con la sua frase, non con quella generica, e il bottone resta per riprovare.
+  reissueRifiuto = 'too_soon';
+  await page.click('#reissueBtn');
+  const tooSoon = await app.evaluate(() => globalThis.SN_WALLET.REDEEM_MESSAGES.too_soon);
+  await expect(page.locator('#walletNote')).toHaveText(tooSoon, { timeout: 15000 });
+  await expect(page.locator('#reissueBtn')).toBeVisible();
+  await expect(page.locator('#reissueBtn')).toBeEnabled();
+  await page.screenshot({ path: 'tests/.shots/1503-nuova-chiave-rifiutata.png' });
+
   await page.click('#reissueBtn');
   await expect(page.locator('#walletNote')).toContainText('Nuova chiave pronta', { timeout: 15000 });
   await expect(page.locator('#reissueBtn')).toBeHidden();
-  expect(seen.reissues).toBe(1);
+  expect(seen.reissues).toBe(2);
   expect(await app.evaluate(() => globalThis.SN_WALLET_MAIN.keySource())).toBe('personal');
 });
 
