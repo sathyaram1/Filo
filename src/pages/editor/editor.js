@@ -1055,11 +1055,11 @@
       if (f0 && f0.meta) f0.meta.titleAuto = true;
       writeCollection();
     }
-    const text = (docPlainText() || '').trim().slice(0, 6000);
-    if (!text) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    const letto = docPerIlModello();
+    if (!letto.testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
     const chat = editorChatMessages();
     const memory = await filoMemoryText();
-    const parts = [`DOCUMENTO:\n${text}`];
+    const parts = [bloccoDocumento(letto)];
     if (chat.length) {
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
