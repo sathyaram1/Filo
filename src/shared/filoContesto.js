@@ -391,6 +391,7 @@
       messaggi: out,
       visti,
       azioni,
+      perUnaNuova,
       inizio,
       ripresi: ripresi.indici.length,
       vecchi: lista.slice(0, inizio),
