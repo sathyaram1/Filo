@@ -148,7 +148,8 @@ function storageKey() {
 
 // Nome file sicuro: niente separatori, caratteri di controllo o traversal. Chromium ha già
 // cambiato le barre in `_`, quindi ogni fila di due o più punti si comprime a uno, ovunque.
-function safeName(name) {
+// Regola unica per i due cammini: anche «Salva immagine come…» propone nel dialogo questo nome (#1510).
+function safeName(name, ripiego = 'download') {
   // I caratteri di direzione (U+202E & co.) non cambiano l'estensione vera ma
   // capovolgono come si LEGGE il nome: «fattura<RLO>txt.exe» si mostra come
   // «fatturaexe.txt». Il file su disco non deve poterlo fare (#588).
