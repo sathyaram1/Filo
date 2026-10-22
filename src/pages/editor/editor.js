@@ -2706,6 +2706,17 @@
     walk(docEl);
     return out;
   }
+  // Quello che chat, titolo e riassunto mandano al modello: intero fino al tetto, oltre col taglio detto (#1475).
+  function docPerIlModello() {
+    return window.SN_EDITOR_SUMMARY.testoAlModello(docPlainText());
+  }
+  function notaTaglio(letto, perCosa) {
+    return window.SN_EDITOR_SUMMARY.notaTaglio(letto, perCosa);
+  }
+  function bloccoDocumento(letto) {
+    const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
+    return `DOCUMENTO:\n${avviso ? `${avviso}\n` : ''}${letto.testo}`;
+  }
   function textStats() {
     const text = (docPlainText() || '').replace(/ /g, ' ').trim();
     // Una "parola" ha almeno un carattere alfanumerico: i token di sola
