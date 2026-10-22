@@ -2159,8 +2159,20 @@
     const text = cd.getData('text/plain');
     if (!text) return;
     e.preventDefault();
-    document.execCommand('insertText', false, text);
+    const righe = text.split(/\r\n?|\n/);
+    if (righe.length < INCOLLA_A_PARAGRAFI) { document.execCommand('insertText', false, text); return; }
+    document.execCommand('insertHTML', false, incollaComeParagrafi(righe));
   });
+  // insertText spende una pausa per ogni a capo, e un testo di mille righe fermava la pagina per minuti (#1475): oltre
+  // la soglia le righe entrano in un colpo solo, come paragrafi, e l'annulla resta uno.
+  const INCOLLA_A_PARAGRAFI = 50;
+  function incollaComeParagrafi(righe) {
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
+    const spazi = (s) => esc(s.replace(/\t/g, '    ')).replace(/ {2,}/g, (m) => ` ${' '.repeat(m.length - 1)}`).replace(/^ /, ' ');
+    const [prima, ...resto] = righe;
+    return spazi(prima) + resto.map((r) => `<p>${r ? spazi(r) : '<br>'}</p>`).join('');
+  }
 
   // ── Zoom del foglio ─────────────────────────────────────────────────
   // Pinch sul trackpad e Ctrl+rotella generano wheel events con ctrlKey=true;
