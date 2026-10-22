@@ -1093,6 +1093,8 @@
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
+    if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
       return `${o.host || 'il sito'} è fra i siti ${quali}`;
