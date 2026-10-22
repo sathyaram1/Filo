@@ -7,11 +7,16 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const R = require(join(ROOT, 'src', 'main', 'aggiornamentoRegole.js'));
 const U = require(join(ROOT, 'src', 'main', 'updater.js'));
+// Niente Firestore nelle prove: dove non si dice altro, nessuna àncora in tutta la raccolta.
+U.ancoraPerProva();
 const { AppUpdater } = require('electron-updater/out/AppUpdater');
 // Il semver di electron-updater: una SemVer di un'altra copia non la riconosce.
 const semver = createRequire(require.resolve('electron-updater'))('semver');
