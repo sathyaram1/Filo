@@ -235,6 +235,18 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
+// Diagnosi delle passkey (#1608): solo con FILO_PASSKEY_DIAGNOSI nell'ambiente del main, pagine http(s), frame principale.
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const diag = ipcRenderer.sendSync('filo:passkey-diagnosi');
+    if (diag && diag.attiva) {
+      const { buildSource } = require('./passkey-diagnosi.js');
+      webFrame.executeJavaScript(buildSource(diag), false).catch(() => {});
+    }
+  }
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
 try {
