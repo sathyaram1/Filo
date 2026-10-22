@@ -206,6 +206,15 @@
     if ((campo.minuscoli || 0) >= 2) return true;
     return scriveMinuscolo({ minuscoli: (campo.minuscoli || 0) + (pagina.minuscoli || 0), maiuscoli: pagina.maiuscoli || 0 });
   }
+  // Come si scrive in un posto, sommato ai testi nuovi: oltre il tetto i conti si dimezzano, così pesa il modo recente.
+  const STILE_MAX = 40;
+  function sommaStile(a, b) {
+    const n = (o, k) => { const v = Number(o && o[k]); return Number.isFinite(v) && v > 0 ? Math.min(Math.round(v), STILE_MAX * 4) : 0; };
+    let minuscoli = n(a, 'minuscoli') + n(b, 'minuscoli');
+    let maiuscoli = n(a, 'maiuscoli') + n(b, 'maiuscoli');
+    while (minuscoli + maiuscoli > STILE_MAX) { minuscoli = Math.round(minuscoli / 2); maiuscoli = Math.round(maiuscoli / 2); }
+    return { minuscoli, maiuscoli };
+  }
 
   // ── Cosa Filo impara ────────────────────────────────────────────────────────
   // Distanza fra due parole contando anche lo scambio di due lettere vicine; si ferma oltre `tetto`.
