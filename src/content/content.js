@@ -2778,6 +2778,7 @@
     // Un pannello chiesto da un riquadro (#405), o un'azione di PAGINA premuta nella barra laterale (tradurre,
     // condividere, salvare, QR, screenshot…): solo il frame principale è "la pagina".
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
+      console.log('[SNPROBE] cmd', msg.iconId, location.href, document.hasFocus());
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
         else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
