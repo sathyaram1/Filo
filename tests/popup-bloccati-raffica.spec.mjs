@@ -46,9 +46,13 @@ test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi a
     await shell.evaluate((u) => window.filoShell.tabs.open(u), raffica(testServer, quando, 12, `Sito ${i}`));
   }
   const vista = await avvisi();
+  const altre = vista.locator('.avvisi-testa [data-pila="apri"]');
   await expect(vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toHaveCount(5, { timeout: 15000 });
+  await expect(altre, 'le cinque oltre il tetto non si perdono').toHaveText('+5 avvisi', { timeout: 15000 });
   await shell.waitForTimeout(1500);
   await expect(vista.locator('.shell-notif'), 'il tetto tiene anche a raffica finita').toHaveCount(5);
+  await expect(altre).toHaveText('+5 avvisi');
+  await expect(shell.locator('.shell-notif'), 'un avviso per scheda').toHaveCount(10);
 
   // La vista sta sotto la barra e dentro la finestra, larga quanto le carte: il resto del lato destro è della pagina.
   await expect.poll(async () => (await posa(app)).b.height).toBeGreaterThan(0);
