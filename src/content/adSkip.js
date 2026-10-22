@@ -183,12 +183,33 @@
     giro();
   }
 
+  function segui(el) {
+    if (!seguiti.has(el)) seguiti.set(el, { visto: Date.now(), visibile: false, tentativi: 0, prossimo: 0, finto: false });
+  }
+
   function suAnimazione(e) {
     if (!attivo || e.animationName !== ANIM) return;
     const el = e.target;
     if (!el || el.nodeType !== 1) return;
-    if (!seguiti.has(el)) seguiti.set(el, { visto: Date.now(), visibile: false, tentativi: 0, prossimo: 0, finto: false });
+    segui(el);
     giro();
+  }
+
+  // Solo i «Salta» a schermo: uno spento che il lettore tiene nel DOM non va seguito a ogni giro.
+  function vegliaNascosta() {
+    if (veglia) { clearTimeout(veglia); veglia = null; }
+    if (!attivo || !nascosta()) return;
+    veglia = setTimeout(() => {
+      veglia = null;
+      let nuovi = 0;
+      try {
+        for (const el of document.querySelectorAll(SELETTORE)) {
+          if (!seguiti.has(el) && premibile(el)) { segui(el); nuovi++; }
+        }
+      } catch (_) {}
+      if (nuovi) giro();
+      vegliaNascosta();
+    }, VEGLIA_MS);
   }
 
   // Il lettore incorporato si presenta alla pagina sopra, e ogni frame intermedio fa lo stesso col suo: così ciascuno
