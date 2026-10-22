@@ -32,7 +32,7 @@
 //     traccia di chi gira in questa directory.
 //   - STATO PER BRANCH (verdetti, contatore bocciature, esito sicurezza): lo
 //     tiene il SERVER. Il file locale <stateDir>/<id>.json è un ripiego che si
-//     riallinea a ogni busta ricevuta.
+//     riallinea a ogni busta ricevuta: il ramo dalla busta, i punti fermi dal posizionamento.
 //   - INTERRUTTORE MASTER (`config/routines.enabled`): lo guarda il preflight
 //     (prima del setup) e lo applica il server (niente biglietti nuovi da
 //     spento). Un biglietto già emesso si porta a termine: il feedback in
@@ -1928,16 +1928,18 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
-  if (res.discarded) {
+  if (res.rewritten) {
+    process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${res.discarded ? `; i commit locali restano su ${res.discarded}` : ''}\n`);
+  } else if (res.discarded) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
   }
 
   // Identità attesa del contenuto: è il valore che le transizioni (C) e il
-  // ripristino (D) confronteranno.
-  const state = withCheckpoint(
-    { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch },
-    res.head, `${bucket.role}:checkout`,
-  );
+  // ripristino (D) confronteranno. I punti fermi di un'altra storia (un altro ramo, o questo prima di una
+  // riscrittura) se ne vanno: la pulizia dopo un «pass» li consulterebbe ancora (#1486).
+  const base = { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch };
+  if (prev?.branch !== branch || res.rewritten) base.checkpoints = [];
+  const state = withCheckpoint(base, res.head, `${bucket.role}:checkout`);
   writeState(state);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
   writeExpectation(ROOT, { branch, id: bucket.id });

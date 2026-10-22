@@ -463,7 +463,8 @@ export function ensureSessionExcludes(root) {
  *   checkpoint   ultimo punto fermo (SHA) a cui riportare il branch, o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null}}
+ *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
@@ -525,8 +526,17 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // raggiungibile; altrimenti lo stato remoto del branch (che È la consegna).
   // NB: senza punto fermo NON si torna a main — su un branch di revisione il
   // contenuto consegnato è tutto ciò che abbiamo.
+  const tip = hasRemote ? g(['rev-parse', `origin/${branch}`]) : null;
+  const remoteTip = tip && tip.ok ? tip.out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  if (!target) target = hasRemote ? g(['rev-parse', `origin/${branch}`]).out : headSha(root);
+  // Un punto fermo fuori dalla linea della punta pubblicata è di una storia riscritta altrove (un riallineamento):
+  // vince la punta. Antenato della punta resta il caso dell'interruzione (#507), discendente è lavoro non spedito (#1486).
+  let rewritten = null;
+  if (target && remoteTip && !sullaStessaLinea(g, target, remoteTip)) {
+    rewritten = target;
+    target = remoteTip;
+  }
+  if (!target) target = remoteTip || headSha(root);
   if (!target) return { ok: false, kind: 'transient', message: `impossibile risolvere il contenuto atteso di ${branch}` };
 
   const before = headSha(root);
@@ -545,7 +555,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     // già non è dirottabile dalla configurazione, ma la forma refs/heads/… è
     // l'unica che si può controllare a colpo d'occhio (e con cui una sentinella
     // può dire "qui nessuno spedisce senza dire dove").
-    if (pushed) g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+    // Mai su un commit fuori dalla linea della punta remota: riporterebbe origin a una storia già riscritta.
+    if (pushed && (!remoteTip || sullaStessaLinea(g, target, remoteTip))) {
+      g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+    }
     if (!parked) discarded = null;
   } else {
     g(['reset', '--hard', target]);
@@ -555,7 +568,14 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded };
+  return { ok: true, head: headSha(root), discarded, rewritten };
+}
+
+/** `a` e `b` stanno sulla stessa storia: uguali, o uno antenato dell'altro. */
+function sullaStessaLinea(g, a, b) {
+  return a === b
+    || g(['merge-base', '--is-ancestor', a, b]).ok
+    || g(['merge-base', '--is-ancestor', b, a]).ok;
 }
 
 // ─── C: il controllo che ogni scrittura di stato deve fare ───────────────────

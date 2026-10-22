@@ -144,6 +144,11 @@ inizia a correggere e viene interrotto → **D riparte dal branch come l'aveva
 lasciato A, più la critica di B**, non da zero.
 
 - Il ripristino riporta il branch all'**ultimo punto fermo registrato** (C).
+- **Ramo riscritto altrove** (#1486): se il punto fermo non sta sulla linea
+  della punta pubblicata (né suo antenato né suo discendente), il ramo è stato
+  rifatto da un riallineamento e si riparte dalla punta pubblicata; i punti
+  fermi della storia di prima si azzerano, e origin non si forza mai su un
+  commit fuori dalla sua linea.
 - Il caso "lavoro nuovo interrotto subito" non è un'eccezione: è quello senza
   punti fermi, quindi si torna alla linea principale = da zero. **Una regola
   sola.**
