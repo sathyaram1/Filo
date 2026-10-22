@@ -164,22 +164,107 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     assert.match(tracce.corpo, /name:\s*suite-tracce-\$\{\{\s*matrix\.parte\s*\}\}/, 'due parti con lo stesso nome di artifact: la seconda verrebbe respinta');
   });
 
-  describe('un rosso nuovo su main apre un feedback', () => {
-    const allarme = elencoVerdetto.find((p) => /build-alarm\.mjs/.test(p.corpo));
+  // #1504: la parola della costruzione sta in un lavoro suo, nell'ambiente fisso. I lavori che fanno girare il codice
+  // provato (npm ci, prove) non nominano segreti: senza ambiente un segreto arriva col valore omonimo del repo.
+  describe('un rosso nuovo su main apre un feedback, da un lavoro a parte', () => {
+    const allarme = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Suite Playwright rossa/.test(p.corpo));
+    const allarmeUnit = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
+    const seAvviso = (avvisoJob.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
+    const corsa = ({ ref = 'refs/heads/main', suite: s = 'success', verdetto = 'success', unit = 'success', cancellata = false } = {}) => ({
+      github: { ref },
+      cancellata,
+      needs: {
+        suite: { result: s, outputs: {} },
+        verdetto: { result: verdetto, outputs: {} },
+        [LAVORO_UNIT_WINDOWS]: { result: unit, outputs: {} },
+      },
+    });
+    const passoCon = (re) => elencoAvviso.find((p) => re.test(p.corpo));
+    const condizione = (p) => (p.corpo.match(/^ {8}if:\s*(.+)$/m) || [])[1] || '';
 
-    test('con la stessa credenziale del cancello unit, e solo su main', () => {
-      assert.ok(allarme, 'un rosso nuovo deve diventare un feedback, non un silenzio');
-      assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
-      assert.match(senzaCommenti(job('release')), /secrets\.FILO_BUILD_PASSPHRASE/, 'il cancello unit usa FILO_BUILD_PASSPHRASE');
-      assert.match(allarme.corpo, /if:[^\n]*github\.ref == 'refs\/heads\/main'/, 'una prova su un ramo non apre feedback');
-      assert.match(allarme.corpo, /if:[^\n]*steps\.verdetto\.outcome == 'failure' \|\| failure\(\)/,
-        'anche una parte rossa prima della suite (npm ci, Electron, xvfb) deve diventare un feedback');
-      assert.match(allarme.corpo, /PARTI_ESITO:\s*\$\{\{\s*needs\.suite\.result\s*\}\}/, 'l\'allarme deve sapere se una parte è rossa fuori dalla suite');
-      for (const p of [...elenco, ...elencoVerdetto].filter((x) => /secrets\./.test(x.corpo))) {
-        assert.match(p.corpo, /github\.ref == 'refs\/heads\/main'/, `il passo «${p.nome}» porta una credenziale fuori da main`);
+    test('gira su main a ogni rosso, anche con npm ci rosso prima della suite; salta una corsa verde, un ramo, una corsa annullata', () => {
+      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
+      const apre = {
+        'rossi nuovi della suite': { verdetto: 'failure' },
+        'npm ci rosso in una parte, prima della suite': { suite: 'failure', verdetto: 'failure' },
+        'una parte rossa con il verdetto verde': { suite: 'failure' },
+        'unit rossi su Windows': { unit: 'failure' },
+        'unit su Windows fermati dal tetto del lavoro': { unit: 'cancelled' },
+        'suite e unit rossi insieme': { verdetto: 'failure', unit: 'failure' },
+      };
+      for (const [caso, esiti] of Object.entries(apre)) {
+        assert.equal(valutaCondizione(seAvviso, corsa(esiti)), true, `${caso}: su main il feedback non partirebbe`);
       }
-      assert.doesNotMatch(suite, /secrets\.|environment:/, 'le parti non aprono feedback: la credenziale sta solo dove serve');
-      assert.match(allarme.corpo, /exit 1/, 'a rosso nuovo il job deve uscire rosso');
+      assert.equal(valutaCondizione(seAvviso, corsa()), false, 'una corsa verde salta l\'avviso');
+      assert.equal(valutaCondizione(seAvviso, corsa({ ref: 'refs/heads/prova', verdetto: 'failure', unit: 'failure' })), false,
+        'su un ramo l\'avviso si salta prima dell\'ambiente, che lo respingerebbe');
+      assert.equal(valutaCondizione(seAvviso, corsa({ verdetto: 'failure', cancellata: true })), false);
+    });
+
+    test('un passo per lavoro rosso, e il secondo parte anche se il primo non ha consegnato', () => {
+      assert.ok(allarme && allarmeUnit, 'un rosso deve diventare un feedback, non un silenzio');
+      const scaricaSuite = passoCon(/download-artifact[\s\S]*name:\s*suite-playwright-/);
+      const scaricaUnit = passoCon(/download-artifact[\s\S]*name:\s*unit-windows-registro/);
+      for (const p of [allarme, scaricaSuite]) {
+        assert.equal(valutaCondizione(condizione(p), corsa({ verdetto: 'failure' })), true, `«${p.nome}» salta a suite rossa`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ suite: 'failure', verdetto: 'failure' })), true, `«${p.nome}» salta con una parte rossa`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), false, `«${p.nome}» apre la suite per un rosso degli unit`);
+      }
+      for (const p of [allarmeUnit, scaricaUnit]) {
+        assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), true, `«${p.nome}» salta a unit rossi`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ verdetto: 'failure' })), false, `«${p.nome}» apre gli unit per un rosso della suite`);
+      }
+      for (const p of [allarme, allarmeUnit, scaricaSuite, scaricaUnit]) {
+        assert.match(condizione(p), /^always\(\) && !cancelled\(\)/, `«${p.nome}» senza always(): dopo un passo rosso verrebbe saltato`);
+      }
+    });
+
+    test('la credenziale sta solo in `avviso`, nell\'ambiente fisso, e lì il codice non si installa', () => {
+      assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
+      assert.match(allarmeUnit.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
+      assert.match(senzaCommenti(job('release')), /secrets\.FILO_BUILD_PASSPHRASE/, 'il cancello unit usa FILO_BUILD_PASSPHRASE');
+      assert.match(avvisoJob, /^ {4}environment:\s*rilascio\s*$/m, 'la parola si legge solo nell\'ambiente `rilascio`, scritto fisso');
+      for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob]]) {
+        assert.doesNotMatch(testo, /secrets\.|environment:/, `\`${nome}\` fa girare il codice provato: niente segreti né ambiente`);
+      }
+      assert.doesNotMatch(avvisoJob, /npm-ci-ritenta|npm (ci|install)\b|npx /, 'in `avviso` niente installazione: lo stesso lavoro che legge la parola non esegue dipendenze');
+      assert.match(allarme.corpo, /PARTI_ESITO:\s*\$\{\{\s*needs\.suite\.result\s*\}\}/, 'l\'allarme deve sapere se una parte è rossa fuori dalla suite');
+    });
+
+    test('gli strumenti dell\'avviso usano solo moduli di Node: senza npm ci un import da node_modules lo farebbe tacere', () => {
+      const daVedere = [...new Set([...avvisoJob.matchAll(/node (scripts\/[\w./-]+\.mjs)/g)].map((m) => m[1]))];
+      assert.ok(daVedere.length >= 2, 'l\'avviso chiama build-alarm.mjs e ultima-suite-verde.mjs');
+      const visti = new Set();
+      while (daVedere.length) {
+        const rel = daVedere.pop();
+        if (visti.has(rel)) continue;
+        visti.add(rel);
+        const src = readFileSync(resolve(ROOT, rel), 'utf8');
+        const importati = [...src.matchAll(/^\s*import\s+(?:[^'"]*?\sfrom\s*)?['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)/gm)].map((m) => m[1] || m[2]);
+        for (const spec of importati) {
+          if (spec.startsWith('node:')) continue;
+          assert.ok(spec.startsWith('.'), `${rel} importa «${spec}»: in \`avviso\` non c'è npm ci`);
+          daVedere.push(posix.normalize(posix.join(posix.dirname(rel), spec)));
+        }
+      }
+    });
+
+    test('legge gli allegati dei lavori provati, gli stessi che loro caricano', () => {
+      const caricaVerdetto = elencoVerdetto.find((p) => /upload-artifact/.test(p.corpo));
+      const caricaUnit = passi(unitJob).find((p) => /upload-artifact/.test(p.corpo));
+      for (const [scarica, carica, cartella] of [
+        [passoCon(/download-artifact[\s\S]*name:\s*suite-playwright-/), caricaVerdetto, 'esiti-suite'],
+        [passoCon(/download-artifact[\s\S]*name:\s*unit-windows-registro/), caricaUnit, 'esiti-unit'],
+      ]) {
+        assert.ok(scarica && carica);
+        const nome = (p) => (p.corpo.match(/^ {10}name:\s*(\S+)\s*$/m) || [])[1];
+        assert.equal(nome(scarica), nome(carica), 'l\'avviso cerca un allegato con un altro nome: resterebbe senza dati');
+        assert.match(scarica.corpo, /continue-on-error:\s*true/, 'un allegato che manca non ferma l\'avviso');
+        assert.match(scarica.corpo, new RegExp(`path:\\s*${cartella}\\s*$`, 'm'), 'gli allegati in una cartella loro, lontano dagli strumenti');
+        const letti = [...avvisoJob.matchAll(new RegExp(`${cartella}/([\\w.-]+)`, 'g'))].map((m) => m[1]);
+        assert.ok(letti.length, `l'avviso non legge niente da ${cartella}`);
+        for (const f of letti) assert.ok(carica.corpo.includes(f), `l'avviso legge ${f}, che «${carica.nome}» non carica`);
+      }
     });
 
     test('il testo: i rossi con un tetto dichiarato, il link alla corsa, i commit entrati dopo l\'ultimo verde', () => {
