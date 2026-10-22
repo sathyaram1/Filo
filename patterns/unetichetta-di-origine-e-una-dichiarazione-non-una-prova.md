@@ -21,7 +21,7 @@ La regola, in tre pezzi:
   peso a schermo. In mezzo ci sono i casi che vanno detti per nome: firma che non
   torna, firmatario fuori dall'elenco, file cambiato dopo la firma. Quando una
   firma non regge non si riferisce nemmeno cosa affermava: ripeterlo è darle voce.
-- **Chi ha firmato si riconosce da una cosa sola: l'elenco ufficiale.** La catena
+- **Chi ha firmato si riconosce da un elenco pubblicato, mai dal nome.** La catena
   del certificato deve arrivare a un'autorità dell'elenco dei firmatari che
   pubblica chi gestisce lo standard, e il certificato deve essere fatto per
   firmare credenziali. Il nome scritto nel certificato non conta: un certificato
