@@ -185,7 +185,7 @@
       const primo = p[0];
       if (primo !== primo.toLowerCase()) {
         if (conMaiuscole(p) || p.length === 1) out.maiuscoli++;
-      } else if (primo !== primo.toUpperCase() && INIZIO_FRASE.test(testo.slice(Math.max(0, s - 12), s))) {
+      } else if (primo !== primo.toUpperCase() && inizioDiFrase(testo, s)) {
         out.minuscoli++;
       }
     }
