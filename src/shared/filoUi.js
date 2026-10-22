@@ -170,7 +170,7 @@
       const x = Number(e.clientX);
       const y = Number(e.clientY);
       const colPuntatore = Number.isFinite(x) && Number.isFinite(y) && (x !== 0 || y !== 0) && e.detail !== 0;
-      try { if (colPuntatore || e.type === 'contextmenu') giu = r.elementFromPoint(x, y); } catch (_) { giu = null; }
+      try { if (colPuntatore || e.type === 'contextmenu' || e.type === 'drop') giu = r.elementFromPoint(x, y); } catch (_) { giu = null; }
       if (!giu || giu === t) giu = r.activeElement;
       if (!giu || giu === t) break;
       t = giu;
