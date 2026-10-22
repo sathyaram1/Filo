@@ -31,7 +31,7 @@ const path = require('node:path');
 // su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
 // I preludi che mettono la shell di Windows in UTF-8 (#551) stanno in un posto
 // solo, accanto ai comandi one-shot dell'assistente: due copie divergono.
-const { resolveShell, PRELUDI_CODIFICA, righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL } = require('./terminal');
+const { resolveShell, PRELUDI_CODIFICA, righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL, ambienteComandi } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
@@ -167,7 +167,7 @@ function randSid() {
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
-  const ambiente = env ? { env } : {};
+  const ambiente = { env: ambienteComandi(env || process.env) };
   // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
   // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
   // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
@@ -197,7 +197,7 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       file: process.env.ComSpec || 'cmd.exe',
       // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
       args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
+      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...ambiente.env, [VALORI_CMD]: fileValori } },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
       wrap: (command) => {
         let { testo, file } = comandoPerCmd(command);
@@ -478,7 +478,7 @@ function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS
     const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     try {
       // L'env dei probe: vedi existenceProbes.
-      const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
+      const env = ambienteComandi({ ...process.env, ...(probeEnv || {}) });
       proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve('incerto'); return; }
     const timer = setTimeout(() => finish('incerto'), attesaMs);

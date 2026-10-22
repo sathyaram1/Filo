@@ -626,6 +626,7 @@
     accesso: 'un token del tuo accesso a Filo',
     identita: "l'identità di questa copia di Filo",
     portafoglio: 'la chiave del tuo portafoglio',
+    feedback: 'la chiave che apre i feedback cifrati',
   });
   const LETTI = Object.freeze({
     codice: 'un codice letto',
@@ -706,7 +707,21 @@
     }
     const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (largo && regola === 'carta' && u.cifre.some((f) => f.includes(norm))) return true;
+    if (largo && regola === 'chiave' && pezzoDiChiave(v, u)) return true;
     return norm.length >= 8 && u.alnum.includes(norm);
+  }
+
+  // La parte variabile di una chiave senza il suo prefisso, o un suo pezzo di almeno FINESTRA caratteri (#1507): basta a
+  // ricostruirla. Le finestre di ciò che esce si calcolano una volta per uscita.
+  function pezzoDiChiave(valore, u) {
+    const G = global.SN_GUARDIANO_STATICO;
+    if (!G || typeof G.partiSegreto !== 'function') return false;
+    const p = G.partiSegreto(valore);
+    if (p.nuclei.some((n) => u.alnum.includes(n))) return true;
+    if (p.a <= p.da) return false;
+    if (!u.finestre) u.finestre = G.finestreDi({ norm: u.alnum, da: 0, a: u.alnum.length - G.FINESTRA + 1 });
+    for (const f of G.finestreSegreto(p)) if (u.finestre.has(f)) return true;
+    return false;
   }
 
   // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
@@ -734,7 +749,7 @@
       const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
       // Lo stesso riconoscimento che lo toglie dai messaggi verso i modelli: travestito, al contrario o codificato, esce uguale.
       const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [v]) !== uscente;
-      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm))) {
+      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm)) || pezzoDiChiave(v, u)) {
         return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }

@@ -17,6 +17,15 @@ function killTree(child) {
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
 
+// Le variabili segrete di Filo (chiave dei feedback, chiavi di fabbrica) non arrivano ai comandi: un `env` le
+// stamperebbe davanti al modello (#1507). Restano quelle che i comandi di sistema leggono (FILO_SIS_*) e quelle dell'utente.
+const VARIABILE_SEGRETA = /^FILO_(?!SIS_)\w*(?:KEY|SECRET|TOKEN|PASSWORD)/i;
+function ambienteComandi(base = process.env) {
+  const out = {};
+  for (const [k, v] of Object.entries(base || {})) if (!VARIABILE_SEGRETA.test(k)) out[k] = v;
+  return out;
+}
+
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
 // Fuori da Windows è la shell di SISTEMA, non bash: dev'essere lo stesso
@@ -307,8 +316,9 @@ function extractCwdMark(rawStdout, mark) {
 
 // Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
 // esito da mostrare.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false } = {}) {
   const cmd = String(command || '').trim();
+  const env = ambienteComandi(chiesto || process.env);
   const startedAt = Date.now();
   const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
@@ -353,7 +363,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     try {
       child = spawn(file, args, {
         cwd: cartella,
-        env: env || process.env,
+        env,
         windowsHide: true,
         shell: false,
       });
@@ -518,7 +528,7 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
 }
 
 module.exports = {
-  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
+  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS, ambienteComandi,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
   encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
