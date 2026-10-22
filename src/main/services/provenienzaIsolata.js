@@ -94,7 +94,7 @@ function avvia() {
   return w;
 }
 
-// `elenco`: { versione, pem, pemTsa }. Il thread riconverte l'elenco solo quando cambia versione.
+// `elenco`: { versione, pem, pemTsa, pemProvvisorio, pemAmmessi }. Il thread riconverte l'elenco solo quando cambia versione.
 function analizza(byte, elenco) {
   return chiedi(byte, elenco, false);
 }
