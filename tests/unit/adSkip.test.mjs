@@ -150,6 +150,8 @@ test('il clic dal riquadro parte solo se ogni frame sopra conferma il punto, dal
 });
 
 // #1494 — in una scheda nascosta i frame rispondono al passo dei timer, un secondo: il tentativo dopo arriva prima.
+const entroPoco = (p) => Promise.race([p, new Promise((ok) => setTimeout(() => ok({ code: 'appeso' }), 200))]);
+
 test('mentre un clic al riquadro aspetta le risposte, un altro sulla stessa scheda non parte', async () => {
   const s = annidati('https://www.youtube.com/embed/x');
   const eventi = [];
@@ -158,7 +160,7 @@ test('mentre un clic al riquadro aspetta le risposte, un altro sulla stessa sche
   let rispondi = null;
   const lento = () => new Promise((ok) => { rispondi = ok; });
   const primo = A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 });
-  const secondo = await A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 + 5000 });
+  const secondo = await entroPoco(A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { chiedi: lento, ora: 3e7 + 5000 }));
   assert.equal(secondo.code, 'presto');
   rispondi({ x: 5, y: 5, tag: 'bb' });
   assert.deepEqual(await primo, { ok: true });
@@ -175,12 +177,12 @@ test('una risposta del protocollo che non arriva non ferma il clic né lascia at
   // Lo spostamento in una pagina nascosta non risponde mai; pressione e rilascio sì.
   wc.debugger = { isAttached: () => false, attach() {}, detach() { staccato++; },
     sendCommand: (c, p) => { comandi.push(p.type); return p.type === 'mouseMoved' ? new Promise(() => {}) : Promise.resolve(); } };
-  assert.deepEqual(await A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 4e7 }), { ok: true });
+  assert.deepEqual(await entroPoco(A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 4e7 })), { ok: true });
   assert.deepEqual(comandi, ['mouseMoved', 'mousePressed', 'mouseReleased']);
   assert.equal(staccato, 1);
   // Nemmeno la pressione risponde: dopo il tetto il clic si dà per fallito e il debugger si stacca.
   wc.debugger.sendCommand = () => new Promise(() => {});
-  assert.deepEqual(await A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 5e7, tetto: 20 }), { ok: false, code: 'scheda' });
+  assert.deepEqual(await entroPoco(A.clicNelRiquadro(wc, { x: 1, y: 1 }, { view: vista, ora: 5e7, tetto: 20 })), { ok: false, code: 'scheda' });
   assert.equal(staccato, 2);
 });
 
