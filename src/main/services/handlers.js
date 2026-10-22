@@ -582,16 +582,26 @@ function noteServedProvider(settings, action, result) {
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
   }
-  if (violation && settings.openWeightsOnly === true) {
-    try {
-      broadcastToTabs({
-        type: MSG.SHOW_TOAST,
-        text: I18n.t('toast_open_weights_violated', servedBy),
-        duration: 8000,
-      });
-    } catch (_) {}
-  }
+  if (violation) avvisaFuoriPolitica(settings, why, servedBy, model);
   return { servedBy, violation };
+}
+
+// Un avviso per host e motivo ogni dieci minuti: una pagina tradotta a pezzi dallo stesso host non ne impila cinquanta.
+const AVVISO_FUORI_POLITICA_MS = 10 * 60 * 1000;
+const avvisatiFuoriPolitica = new Map();
+function avvisaFuoriPolitica(settings, why, servedBy, model) {
+  const chiave = `${why}|${SN_CONST.normalizeProviderName(servedBy)}`;
+  const ora = Date.now();
+  if (ora - (avvisatiFuoriPolitica.get(chiave) || 0) < AVVISO_FUORI_POLITICA_MS) return;
+  avvisatiFuoriPolitica.set(chiave, ora);
+  let text;
+  if (why === 'not-producer') {
+    const regola = SN_CONST.producerOnlyRule(model);
+    text = I18n.t('toast_served_not_producer', servedBy, (regola && regola.nome) || 'il suo produttore');
+  } else {
+    text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
+  }
+  try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000 }); } catch (_) {}
 }
 
 // ─── Dettatura ───────────────────────────────────────────────────────────────
