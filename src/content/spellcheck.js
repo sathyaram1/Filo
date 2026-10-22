@@ -1,5 +1,5 @@
 // Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, e i valori
-// dei segnaposti (#1448). Il codice segna subito i candidati, sbiaditi; i controlli del modello li confermano o scartano.
+// dei segnaposti (#1448). Il codice segna subito i suoi candidati, pieni i sicuri e sbiaditi i dubbi; il modello giudica i dubbi.
 // Le regole senza DOM stanno in correttoreRegole.js e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
@@ -753,7 +753,7 @@
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
-      rimandati: new Set(), luogo: null, luogoAlle: 0, inVista: [],
+      rimandati: new Set(), inVista: [],
       // I valori dei segnaposti sopra le x e i lampi dei valori appena messi (#1448), in uno strato che riceve il mouse.
       valori: null, badge: new Map(), lampi: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
@@ -1284,7 +1284,8 @@
     }
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
     if (state.lampi.length) state.lampi = riallineaIssues(state.lampi, prima, ora).issues;
-    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo.
+    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche
+    // il suo testo nuovo, se è più stretto del pezzo (il ragionato rilegge tutto).
     if (state.inViaggio.length) {
       const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora).issues.map((v) => [v.id, v]));
       for (const v of state.inViaggio) {
@@ -1646,7 +1647,7 @@
     state.baseRagionato = g.base;
     const numero = ++state.inviatiRagionato;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
-    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     // Coi suggerimenti spenti il pezzo si manda solo se ha delle x, e la domanda è soltanto sui segnaposti.
     const soloSegnaposti = !suggerimentiAttivi();
     if (soloSegnaposti && !candidati.some((c) => c.fonte === 'segnaposto')) { state.baseRagionato = baseDiPrima; return; }
@@ -1658,7 +1659,12 @@
       ripetizioni: ripetizioniAttive(),
       segnaposti: segnapostiAttivi(),
       ...(soloSegnaposti ? { soloSegnaposti: true } : {}),
-      luogo: { sito: luogoDi(state).sito },
+      luogo: { sito: sitoDellaPagina() },
+    };
+    const [regioneCampo, nuovoCampo] = d.riporta([{ start: g.start, end: g.end }, g.nuovo]);
+    const viaggio = {
+      id: `g${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0,
+      nuovo: nuovoCampo || null,
     };
     state.inViaggio.push(viaggio);
     let res = null;
@@ -1693,6 +1699,8 @@
       tipi: rapido ? ['errore'] : [
         ...(suggerimentiAttivi() ? ['errore', 'suggerimento', 'contraddizione'] : []), ...(segnapostiAttivi() ? ['segnaposto', 'cerca'] : []),
       ],
+      // Una riga che ha perso il tipo: nel ragionato vale il segno che decide l'utente, non un errore.
+      senzaTipo: rapido ? 'errore' : 'suggerimento',
       citata: (c) => !!contesto && !!Coerenza() && Coerenza().citazioneNelContesto(c, contesto),
       fonte,
       nuovo: nuovo && nuovo.start >= 0 && nuovo.end > nuovo.start ? nuovo : null,
@@ -1726,6 +1734,14 @@
         correzioni: rapido ? (s.correzioni.length ? s.correzioni : c.correzioni) : (c.correzioni.length ? c.correzioni : s.correzioni),
         citazione: s.citazione,
       });
+    }
+    // Il rapido tace sui candidati giusti (prompt del banco, #1580): uno mandato e non confermato è scartato, se la
+    // risposta è leggibile.
+    if (rapido && viaggio && Array.isArray(viaggio.candidati) && !Rg.senzaRighe(raw)) {
+      for (const k of viaggio.candidati) {
+        const v = state.verdetti.get(k);
+        if (!confermati.has(k) && !(v && v.stato === 'confermato')) state.verdetti.set(k, { stato: 'scartato', alle: ora, da: fonte });
+      }
     }
     const giudicato = viaggio && !viaggio.perso ? viaggio : null;
     // Un segnaposto già deciso: se la rilettura chiede un dato, decide la sua domanda (la stessa lo tiene, un'altra lo

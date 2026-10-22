@@ -453,21 +453,23 @@
   // segno sta sulle sole x, e una riga che non le ha non è un segnaposto.
   function segnoDelSegnaposto(r, testo, dove, fonte) {
     const base = { segno: 'suggerimento', dubbio: false, fonte, tipo: 'segnaposto', citazione: '' };
+    const pezzo = r.pezzo.trim();
+    const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
     if (r.tipo === 'segnaposto') {
-      const stretto = r.correzione.trim() ? restringi(r.pezzo, r.correzione.trim()) : null;
+      const stretto = r.correzione.trim() ? restringi(pezzo, r.correzione.trim()) : null;
       if (!stretto) return null;
-      const start = dove.start + stretto.da;
-      const end = dove.start + stretto.a;
+      const start = dove.start + pos[stretto.da];
+      const end = dove.start + pos[stretto.a];
       const valore = stretto.sostituto.trim();
       if (end <= start || !/x/i.test(testo.slice(start, end)) || !valore || /xx/i.test(valore)) return null;
       return { ...base, start, end, segment: testo.slice(start, end), motivo: corta(r.motivo, MOTIVO_MAX), correzioni: [valore] };
     }
-    const x = xDelPezzo(r.pezzo);
+    const x = xDelPezzo(pezzo);
     const dc = DOVE_CERCARE.exec(r.citazione.toLowerCase());
     const domanda = corta(r.motivo, 200);
     if (!x || !dc || !domanda) return null;
-    const start = dove.start + x.da;
-    const end = dove.start + x.a;
+    const start = dove.start + pos[x.da];
+    const end = dove.start + pos[x.a];
     return {
       ...base, start, end, segment: testo.slice(start, end), motivo: '', correzioni: [],
       cerca: { domanda, dove: dc[0].startsWith('web') ? 'web' : `wiki:${dc[1] || 'en'}` },
@@ -525,9 +527,14 @@
     return null;
   }
 
-  // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `citata(c)`: la prova di
-  // una contraddizione, che deve stare nella pagina; `inScrittura`: la parola che non si segna.
-  function segniDaRisposta(raw, testo, { tipi = ['errore'], citata = () => false, inScrittura = null, fonte = 'rapido' } = {}) {
+  // Le tolleranze della lettura valgono anche per il giudizio: una correzione che cambia solo spazi o la forma degli apici
+  // è uguale al pezzo, e non è un errore da correggere.
+  const formaLetta = (s) => String(s ?? '').replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim();
+
+  // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `senzaTipo`: quello di una
+  // riga che l'ha perso; `citata(c)`: la prova di una contraddizione, che deve stare nella pagina; `inScrittura`: la
+  // parola che non si segna; `nuovo`: il testo nuovo della chiamata, per un pezzo citato che compare più volte.
+  function segniDaRisposta(raw, testo, { tipi = ['errore'], senzaTipo = 'errore', citata = () => false, inScrittura = null, fonte = 'rapido', nuovo = null } = {}) {
     const ammessi = new Set(tipi);
     const segni = [];
     const giusti = [];
@@ -537,14 +544,14 @@
       const pezzo = r.pezzo.trim();
       const dove = trovaPezzo(testo, pezzo, nuovo);
       if (!dove) continue;
-      if (r.tipo === 'giusto') { giusti.push(dove); continue; }
-      if (r.tipo === 'contraddizione' && !citata(r.citazione)) continue;
-      if (r.tipo === 'segnaposto' || r.tipo === 'cerca') {
+      if (tipo === 'giusto') { giusti.push(dove); continue; }
+      if (tipo === 'contraddizione' && !citata(r.citazione)) continue;
+      if (tipo === 'segnaposto' || tipo === 'cerca') {
         const s = segnoDelSegnaposto(r, testo, dove, fonte);
         if (s && !(inScrittura && s.start < inScrittura.end && s.end > inScrittura.start)) segni.push(s);
         continue;
       }
-      const errore = r.tipo === 'errore';
+      const errore = tipo === 'errore';
       let start = dove.start;
       let end = dove.end;
       let correzioni = [];
@@ -583,9 +590,9 @@
   const chiaveVerdetto = (it) => `${it.fonte}\u0001${String(it.segment || '').replace(/’/g, "'").toLowerCase()}`;
 
   global.SN_CORRETTORE = {
-    REGIONE_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
-    senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, frasiDaGiudicare,
-    leggiRighe, trovaUnaVolta, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, segnaposti, xDelPezzo,
+    REGIONE_MAX, TESTO_INTERO_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
+    senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
+    leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO, segnaposti, xDelPezzo,
     valoreTrovato, chiaveRicerca, stessaFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

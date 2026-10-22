@@ -268,9 +268,16 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     ];
   }
   if (action === ACTIONS.SPELLCHECK_CONTEXT) {
+    const p = payload || {};
     // La data la dà l'orologio di qui, non la pagina. Le fonti di un segnaposto (#1448) le mette il main, mai la pagina.
-    if (payload && payload.segnaposto) return [{ role: 'user', content: PROMPTS.spellcheckSegnaposto({ ...payload, oggi: new Date() }) }];
-    return [{ role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...(payload || {}), oggi: new Date() }) }];
+    if (p.segnaposto) return [{ role: 'user', content: PROMPTS.spellcheckSegnaposto({ ...p, oggi: new Date() }) }];
+    return [
+      {
+        role: 'system',
+        content: PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: p.ripetizioni !== false, segnaposti: !!p.segnaposti, soloSegnaposti: !!p.soloSegnaposti }),
+      },
+      { role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...p, oggi: new Date() }) },
+    ];
   }
   if (action === ACTIONS.EDIT_TEXT) {
     return [{ role: 'user', content: PROMPTS.editText({ original: payload.original, instruction: payload.instruction }) }];
