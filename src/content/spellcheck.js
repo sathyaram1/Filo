@@ -96,6 +96,7 @@
     window.addEventListener('resize', queueSync, true);
     document.addEventListener('visibilitychange', riprendiRimandati);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggiMemorie(); });
+    adottaIlFuoco();
 
     // Le memorie cambiate altrove (la pagina del correttore, un'altra scheda) arrivano spinte dal main (#1447).
     try {
