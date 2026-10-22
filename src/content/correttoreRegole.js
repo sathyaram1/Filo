@@ -388,7 +388,7 @@
       // Ristretto ai soli spazi, il segno torna sul pezzo intero con la correzione intera: quella ristretta lo cancellerebbe.
       if (end <= start || !testo.slice(start, end).trim()) {
         start = dove.start;
-        end = dove.start + dove.end - dove.start;
+        end = dove.end;
         if (correzioni.length) correzioni = [correzione];
       }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
