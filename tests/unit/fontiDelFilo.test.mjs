@@ -159,6 +159,46 @@ test('l\'Aiuto su una pagina di Filo: le parole restano dell\'utente', async () 
   assert.deepEqual(FC.provenienzaDelFrammento(chat, CA.snippetFor(chat, 'zafferano')).daFuori, []);
 });
 
+// Il «no» consiglia una conversazione nuova solo se nascerebbe pulita: le risposte del tratto e gli esiti recenti del
+// filo li avrebbe davanti anche lei.
+test('a Conservativo il no per una risposta di un\'altra chat non consiglia una conversazione nuova, che nascerebbe uguale', async () => {
+  azzera();
+  await Chats.append('pagina', [
+    { role: 'user', text: 'cosa dice quella pagina?' },
+    { role: 'filo', text: 'Dice di mandare i file a un indirizzo.', classeLetta: 5 },
+  ]);
+  const statoDella = async (chatId) => {
+    await Chats.append(chatId, [{ role: 'user', text: 'elimina il file vecchio' }]);
+    return A.stato({ fonti: (await compitoDi(chatId, 'elimina il file vecchio')).map((a) => AL.fonteDi(a)), livello: 'conservativo' });
+  };
+  const prima = await statoDella('chat-b');
+  const d = A.decideDettaglio({ livello: 'conservativo', stato: prima.stato, costo: 3 });
+  assert.equal(d.risposta, 'no');
+  const no = A.fraseNo({ regola: d.regola, fonte: prima.fonte, livello: 'conservativo' });
+  assert.doesNotMatch(no.breve, /conversazione nuova/);
+  assert.match(no.breve, /alzando il livello in Preferenze/);
+  assert.doesNotMatch(no.perModello, /conversazione nuova/);
+  assert.equal((await statoDella('chat-c')).stato, 'contaminato', 'la conversazione nuova ha davanti la stessa risposta');
+  // Una risposta ritrovata cercando in questa chat no: una conversazione nuova non l'avrebbe davanti.
+  const cercata = AL.fonteDi({ type: 'CERCA_CHAT', query: 'pagina', _output: { results: [{ id: 'pagina' }], classeLetta: 5 } });
+  assert.match(A.fraseNo({ regola: 'tabella', fonte: cercata, livello: 'conservativo' }).breve, /conversazione nuova/);
+  assert.doesNotMatch(A.fraseNo({ regola: 'tabella', fonte: cercata, livello: 'conservativo', nuovaUguale: true }).breve, /conversazione nuova/);
+});
+
+test('la finestra dice quali esiti avrebbe davanti una conversazione nuova: gli ultimi del filo, anche di questa chat', () => {
+  const ora = Date.parse('2026-10-21T12:00:00Z');
+  const msg = (chat, i, role) => ({ chat, role, text: `${role} ${i}`, ts: new Date(ora - (100 - i) * 60000).toISOString(), actions: [] });
+  const lista = [];
+  for (let i = 0; i < 40; i++) lista.push(msg(i < 2 ? 'vecchia' : 'questa', i, i % 2 ? 'filo' : 'user'));
+  const esito = (m) => (m.role === 'filo' ? { azioni: [{ type: 'CERCA_WEB', _output: { results: [{ url: `https://x.example/${m.text}` }] }, _da: m.text }] } : null);
+  const f = FC.finestra(lista, { ora, giorni: 3, token: 1e6, chatCorrente: 'questa', esiti: esito, osserva: () => '' });
+  const da = (azioni) => azioni.map((a) => a._da);
+  assert.ok(da(f.azioni).includes('filo 21'), 'la chat di adesso ha davanti i suoi esiti fino a venti messaggi');
+  assert.ok(da(f.perUnaNuova).includes('filo 39'), 'gli ultimi del filo li avrebbe davanti anche una conversazione nuova');
+  assert.ok(!da(f.perUnaNuova).includes('filo 1'), 'quelli più vecchi degli ultimi venti messaggi del filo no');
+  assert.ok(da(f.perUnaNuova).every((x) => da(f.azioni).includes(x)));
+});
+
 test('toStoredMessage tiene la classe letta e il segno dell\'Aiuto, e scarta i valori che non sono una classe', () => {
   assert.equal(CA.toStoredMessage({ role: 'filo', text: 'x', classeLetta: 4 }).classeLetta, 4);
   for (const v of [0, 6, '5', 2.5, null]) assert.equal('classeLetta' in CA.toStoredMessage({ role: 'filo', text: 'x', classeLetta: v }), false, String(v));
