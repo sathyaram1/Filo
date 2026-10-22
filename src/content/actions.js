@@ -41,7 +41,7 @@
         Popup.showToast(I18n.t('toast_copied'));
         pushClipboardEntry({ type: 'text', text });
       },
-      () => {/* niente toast su errore — UX silenziosa */}
+      (e) => { console.log('[SNPROBE] clip err', e && e.message, document.hasFocus()); }
     );
   }
 
