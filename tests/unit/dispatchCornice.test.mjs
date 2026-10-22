@@ -80,3 +80,17 @@ test('testoDentroCornice legge dentro la busta col codice del fascicolo, qualunq
     assert.match(String(checkEnvelope(p(`<<<DATI_UTENTE ${C}>>>\n${vuoto}\n<<<FINE_DATI_UTENTE ${C}>>>`))), /feedback vuoto/, JSON.stringify(vuoto));
   }
 });
+
+test('il codice della busta arriva a chi lavora insieme al feedback, per ogni ruolo e caso', () => {
+  const C = 'b9f0c3e17a2d4c58';
+  const casi = [['verifier', {}], ['fixer', {}], ['fixer', { ripresa: { domanda: 'd', risposta: 'r' } }], ['new-work', {}]];
+  for (const [role, extra] of casi) {
+    const bucket = { role, id: 'fid-1', num: '#700', branch: 'worker/x', loopCount: 0 };
+    const busta = { ...BUSTA, role, payload: { ...BUSTA.payload, role, codiceBusta: C, ...extra } };
+    const parsed = JSON.parse(captureStdout(() => emit(bucket, serverCtx(bucket, busta))));
+    assert.equal(parsed.payload.codiceBusta, C, `${role} ${JSON.stringify(extra)}`);
+    // Da un server vecchio non arriva niente, e il campo non si inventa.
+    const vecchio = JSON.parse(captureStdout(() => emit(bucket, serverCtx(bucket, { ...BUSTA, role, payload: { ...BUSTA.payload, role, ...extra } }))));
+    assert.equal('codiceBusta' in vecchio.payload, false);
+  }
+});

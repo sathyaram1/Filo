@@ -803,6 +803,10 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
 function conDecisioni(ctx) {
   return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
 }
+// Il codice della busta che il server mette attorno ai testi del fascicolo (#1514): senza, chi lavora non sa dove finiscono.
+function conBusta(ctx) {
+  return typeof (ctx && ctx.codiceBusta) === 'string' && ctx.codiceBusta ? { codiceBusta: ctx.codiceBusta } : {};
+}
 // Le schermate della segnalazione e delle risposte (#900): le apre il server, `scaricaPayload` le scrive su file.
 function conImmagini(ctx) {
   return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
@@ -844,6 +848,7 @@ export function buildPayload(bucket, ctx = {}) {
       // ha risolto): senza, ogni giro trova UNA porta e la serie non converge.
       return {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
+        ...conBusta(ctx),
         feedback: ctx.feedback || null,
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
@@ -860,7 +865,7 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
+          ...conBusta(ctx), feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
@@ -873,6 +878,7 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
+        ...conBusta(ctx),
         feedback: ctx.feedback || null,
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
@@ -880,7 +886,7 @@ export function buildPayload(bucket, ctx = {}) {
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, ...conBusta(ctx), feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
@@ -2053,6 +2059,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // feedback per chi lo riceve (solo il verifier); un server vecchio non lo
     // manda e qui arriva semplicemente vuoto.
     return {
+      ...conBusta(payload),
       feedback: (payload && payload.feedback) || null,
       decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
       immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [],
