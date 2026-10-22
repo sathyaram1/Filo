@@ -2604,10 +2604,15 @@
     // muovono) e vale solo nei primi minuti di vita di un profilo. Metterlo
     // sopra la frontiera farebbe ripagare l'intero manuale di istruzioni a
     // ogni chat di ogni utente, per sempre.
-    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
+    // #1398: rifatta o ripresa, l'intervista ha davanti memoria e filo di un utente noto; dirgli «è appena arrivato»
+    // lasciava al modello indovinare perché fosse lì (un «test» che nessuno aveva nominato).
+    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
-        + `È appena arrivato su Filo e questa è la sua prima conversazione. Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
+        + (onboardingRifatta
+          ? `Non è il primo avvio: l'intervista di benvenuto l'ha riaperta lui, e la memoria e le conversazioni passate qui intorno parlano di lui. Fai comunque le domande che restano nell'elenco, perché quello che risponde oggi vale più di quello che hai salvato, e non tirare in ballo cose delle conversazioni passate che qui non ha nominato. `
+          : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
+        + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
         + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
         + `- L'ordine lo decide la conversazione, non l'elenco: aggancia quello che l'utente ha appena detto.\n`
@@ -2622,9 +2627,9 @@
         + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
 
-    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
+    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       `${INIZIO_CONTESTO_CHAT}\n` +
-      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
+      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) +
       rigaNomeModello(modelName) +
       `${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n\n` +
       `STATO:\n${stato || '(vuoto)'}\n\n` +
