@@ -95,6 +95,33 @@ test('la cartella spostata su main durante finish:check: la prova resta sul comm
   }
 });
 
+test('un file nuovo fuori dai commit ferma finish:check col suo nome: la prova sul commit non lo salta in silenzio', () => {
+  const { casa, lavoro } = deposito();
+  const segnali = join(casa, 'segnali');
+  mkdirSync(segnali);
+  writeFileSync(join(segnali, 'vai'), '');
+  try {
+    writeFileSync(join(lavoro, 'tests', 'unit', 'rosso.test.mjs'), "import { test } from 'node:test';\ntest('rosso', () => { throw new Error('rosso'); });\n");
+    const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
+    const r = spawnSync(process.execPath, [join(lavoro, 'scripts', 'finish-local.mjs'), '--check'], {
+      cwd: lavoro, encoding: 'utf8', env: { ...env, FILO_PROVA_SEGNALI: segnali, FILO_ROUTINE: '' },
+    });
+    const out = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 1, out);
+    assert.match(out, /modifiche fuori dai commit[^\n]*tests\/unit\/rosso\.test\.mjs/);
+    assert.doesNotMatch(out, /Controlli passati/);
+  } finally {
+    togli(casa, lavoro);
+  }
+});
+
+test('testoFuoriDaiCommit nomina i file e dice quanti altri ne restano', () => {
+  const t = testoFuoriDaiCommit(Array.from({ length: 12 }, (_, i) => `f${i}.js`));
+  assert.match(t, /f0\.js, f1\.js/);
+  assert.match(t, /e altri 2/);
+  assert.doesNotMatch(t, /f11\.js/);
+});
+
 test('la cartella di prova: staccata sullo sha, coi moduli raggiungibili, e la pulizia dei resti non la tocca mentre vive', () => {
   const { casa, lavoro } = deposito();
   const sha = git(lavoro, 'rev-parse', 'HEAD');
