@@ -444,6 +444,7 @@
     for (const m of s.match(CARTA_RE) || []) {
       if (cartaValida(m)) out.push({ valore: m.replace(/[\s-]/g, ''), regola: 'carta' });
     }
+    if (oltre) out.saturo = true;
     return fine();
   }
 
