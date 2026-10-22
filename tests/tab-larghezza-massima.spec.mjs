@@ -116,6 +116,7 @@ test('#1493 — «schede più larghe» in chat cambia il massimo, e il controllo
   await expect(cursore).toHaveAttribute('min', '110');
   await expect(cursore).toHaveAttribute('max', '1000');
   await expect(cursore).toHaveValue('320');
+  await page.locator('.sn-refine-panel').screenshot({ path: 'tests/.shots/tab-larghezza-massima-cursore.png' });
   await cursore.evaluate((el) => { el.value = '500'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await expect.poll(() => tokensSalvati(app), { timeout: 8_000 }).toMatchObject({ 'tab.larghezza': '500px' });
   await shell.mouse.move(600, 500);

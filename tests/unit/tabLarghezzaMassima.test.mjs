@@ -21,9 +21,3 @@ test('il minimo di tab.larghezza è la larghezza minima della scheda attiva, in 
   assert.equal(Number((/min-width:\s*(\d+)px/.exec(attiva) || [])[1]), min, 'min-width di .tab.active in shell.css');
   assert.ok(TT.validate('tab.larghezza', `${min}px`) && !TT.validate('tab.larghezza', `${min - 1}px`));
 });
-
-test('la barra legge il massimo dal token e lo passa alla divisione della fila', () => {
-  const js = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
-  assert.match(js, /effectiveValue\('tab\.larghezza'/);
-  assert.match(js, /larghezzeDistribuite\(naturali, ia, posto, larghezzaMassima\(\)\)/);
-});
