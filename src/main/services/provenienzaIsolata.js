@@ -21,6 +21,7 @@ const { parentPort } = require('node:worker_threads');
 let versione = null;
 let ancore = null;
 let ancoreTsa = null;
+let provvisorio = null;
 parentPort.on('message', ({ id, byte, elenco, marchi }) => {
   try {
     if (marchi) {
