@@ -178,7 +178,8 @@ test('«Salva immagine come» salva col nome vero, senza caratteri che capovolgo
       const marca = readFileSync(`${file}:Zone.Identifier`, 'utf8');
       expect(marca).toContain('ZoneId=3');
       expect(marca).toContain(`HostUrl=${imgUrl}`);
-      expect(marca).toContain(`ReferrerUrl=${pageUrl}`);
+      // L'immagine sta su un'altra origine: della pagina resta l'origine, come nel Referer.
+      expect(marca).toContain(`ReferrerUrl=${new URL(pageUrl).origin}/\r\n`);
     } else if (process.platform === 'darwin') {
       expect(execFileSync('/usr/bin/xattr', ['-p', 'com.apple.quarantine', file], { encoding: 'utf8' })).toMatch(/^0081;[0-9a-f]+;Filo;/);
     } else {
