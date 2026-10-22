@@ -4,7 +4,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 test('r3 nell\'elenco dei siti bloccati quello che si scrive resta com\'è', async ({ shell, openTab }) => {
   await shell.evaluate(() => window.filoShell.message({
-    type: 'update_settings', settings: { security: { siteBlock: { enabled: true, blacklist: [] } } },
+    type: 'update_settings', settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [] } } },
   }));
   const page = await openTab('filo://security/security.html');
   const lista = page.locator('#sec-siteblock-blacklist');
