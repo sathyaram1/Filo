@@ -6516,10 +6516,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     const dopo = await appendToChatArchive(
       chatId,
       {
-        role: 'filo', text: textReply, actions: successe,
+        role: 'filo', text: textReply, actions: successe, classeLetta,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
