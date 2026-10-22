@@ -26,6 +26,20 @@ test('su un PDF Condividi della barra copia l\'indirizzo del documento', async (
   await expect.poll(() => appunti(app), { timeout: 5000, message: 'l\'indirizzo del PDF arriva negli appunti' }).toBe(url);
 });
 
+test('su un PDF Screenshot della barra salva la foto della pagina', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, SITO);
+  await naviga(app, testServer.asset(readFileSync('tests/fixtures/documenti/documento-con-testo.pdf'), 'application/pdf'));
+  await pausa(2500);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    globalThis.__fotoSalvate = [];
+    t.view.webContents.session.on('will-download', (e, item) => { globalThis.__fotoSalvate.push(item.getFilename()); e.preventDefault(); });
+  });
+  await (await iconaDellaBarra(app, 'screenshot')).click();
+  await expect.poll(() => app.evaluate(() => globalThis.__fotoSalvate.length), { timeout: 15_000, message: 'la foto parte anche se gli appunti del PDF restano sospesi' }).toBeGreaterThan(0);
+});
+
 test('su una pagina che sta ancora arrivando Condividi della barra aspetta la pagina e copia il suo indirizzo', async ({ app, openTab, testServer }) => {
   const lento = createServer((_req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

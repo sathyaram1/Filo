@@ -19,6 +19,7 @@
         'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',
         'Quando un sito non risponde, Condividi, il QR code e Salva per dopo usano l\'indirizzo del sito che volevi aprire, non quello della pagina d\'errore di Filo.',
         'Se riordini le icone della barra laterale e poi chiedi a Filo «rimetti come prima», rimette la disposizione di prima e lascia stare il cambio che avevi fatto prima ancora.',
+        'Su un PDF Condividi copia l\'indirizzo e Screenshot salva la foto, come sulle altre pagine. Prima il clic non faceva niente.',
       ],
     },
     {

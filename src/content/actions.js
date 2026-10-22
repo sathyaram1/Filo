@@ -1611,13 +1611,7 @@
         return;
       }
       let copied = false;
-      try {
-        const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
-        if (pngBlob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      try { copied = await scriviImmagine(await dataUrlToPngBlob(cap.dataUrl), cap.dataUrl); } catch (_) {}
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
@@ -1804,12 +1798,7 @@
       if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       const { dataUrl, blob } = region;
       let copied = false;
-      try {
-        if (blob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      try { copied = await scriviImmagine(blob, dataUrl); } catch (_) {}
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
@@ -1844,7 +1833,8 @@
       if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
-      try { await navigator.clipboard.writeText(text); } catch (_) {
+      const via = await scriviTesto(text);
+      if (!via) {
         // Fallback DOM se la Clipboard API è bloccata.
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -1853,7 +1843,7 @@
         try { document.execCommand('copy'); } catch (_) {}
         ta.remove();
       }
-      try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
+      if (via !== 'filo') { try { pushClipboardEntry({ type: 'text', text }); } catch (_) {} }
       // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
@@ -1901,9 +1891,7 @@
       const result = giaScelto ? { sRGBHex: scelto } : await new window.EyeDropper().open();
       const hex = (result?.sRGBHex || '').toUpperCase();
       if (!hex) return;
-      try {
-        await navigator.clipboard.writeText(hex);
-      } catch (_) {
+      if (!(await scriviTesto(hex))) {
         // Fallback: textarea + execCommand se la clipboard API è bloccata.
         const ta = document.createElement('textarea');
         ta.value = hex;
@@ -2048,9 +2036,7 @@
     const copyBtn = mkBtn(I18n.t('qr_copy_link'), false);
     copyBtn.addEventListener('click', async (e) => {
       if (!gestoVero(e)) return;
-      try {
-        await navigator.clipboard.writeText(url);
-      } catch (_) {
+      if (!(await scriviTesto(url))) {
         const ta = document.createElement('textarea');
         ta.value = url; ta.style.position = 'fixed'; ta.style.left = '-9999px';
         document.body.appendChild(ta); ta.select();

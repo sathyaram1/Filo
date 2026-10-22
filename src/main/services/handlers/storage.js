@@ -434,6 +434,19 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // L'immagine di un'azione sulla pagina quando gli appunti della pagina restano sospesi (il visore PDF, #1343): la
+  // cronologia la scrive chi chiama, come prima.
+  on(MSG.COPY_IMAGE_TO_CLIPBOARD, async (msg, sender, origin) => {
+    const dataUrl = typeof msg.dataUrl === 'string' ? msg.dataUrl : '';
+    if (!/^data:image\/png;base64,/.test(dataUrl)) return { ok: false, error: 'formato' };
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, { type: 'image', dataUrl })) return vietato;
+    const { clipboard, nativeImage } = require('electron');
+    const img = nativeImage.createFromDataURL(dataUrl);
+    if (img.isEmpty()) return { ok: false, error: 'immagine' };
+    try { clipboard.writeImage(img); } catch (_) { return { ok: false, error: 'clipboard' }; }
+    return { ok: true };
+  });
+
   async function inCronologia(e, via) {
     if (!e) return { ok: true };
     // `tenuta: false` dice alla pagina di non far descrivere a un modello un'immagine che la cronologia non tiene.
