@@ -544,6 +544,10 @@ test('nei riquadri su un sito quello che l\'utente scrive, compone, incolla e tr
   await page.keyboard.press('Control+V');
   const scritto = 'Il conto è 1234 漢 IBAN IT60X0542811101000000123456';
   await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text')).valore).toBe(scritto);
+  // Un'immagine incollata diventa un allegato.
+  await app.evaluate(({ clipboard, nativeImage }, png) => clipboard.writeImage(nativeImage.createFromDataURL(`data:image/png;base64,${png}`)), PNG_1X1);
+  await page.keyboard.press('Control+V');
+  await expect.poll(() => conta(app, page, '.sn-fb-thumb')).toBe(1);
 
   // Un file trascinato da fuori sul riquadro diventa un allegato.
   const cartella = cartellaTemporanea('filo-1509-');

@@ -165,7 +165,7 @@ test('riquadro «Modifica», senza invito: il motivo ha lo stile dell’errore, 
   await siApre(app, 'filo://credits');
 });
 
-test('«Traduci la pagina» coi crediti finiti: l’avviso porta ai Crediti, col clic e dal tasto destro', async ({ app, shell, openTab, testServer }) => {
+test('«Traduci la pagina» coi crediti finiti: l’avviso porta ai Crediti, col clic e dal tasto destro', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await creditiFiniti(app);
@@ -180,10 +180,11 @@ test('«Traduci la pagina» coi crediti finiti: l’avviso porta ai Crediti, col
   const tasto = avviso.locator('.sn-msg-rimedio');
   await expect(tasto).toHaveText('Apri Crediti');
   await page.screenshot({ path: `${SHOTS}/663-avviso-traduzione.png` }).catch(() => {});
-  // Anche l'avviso dei crediti finiti che il main manda a ogni scheda: nessun avviso nomina Crediti senza il tasto.
-  const nominano = page.locator('.sn-toast', { hasText: 'pagina Crediti' });
-  await expect.poll(() => nominano.count()).toBeGreaterThan(1);
-  for (const a of await nominano.all()) await expect(a.locator('.sn-msg-rimedio')).toHaveText('Apri Crediti');
+  // Anche l'avviso dei crediti finiti che manda il main, nella barra di Filo (#1509): nessun avviso nomina Crediti senza il tasto.
+  const nellaBarra = (await avvisi()).locator('.shell-notif', { hasText: 'pagina Crediti' });
+  await expect(nellaBarra).toHaveCount(1, { timeout: 15_000 });
+  await expect(nellaBarra.locator('.shell-notif-action')).toHaveText('Apri Crediti');
+  for (const a of await page.locator('.sn-toast', { hasText: 'pagina Crediti' }).all()) await expect(a.locator('.sn-msg-rimedio')).toHaveText('Apri Crediti');
 
   // Il tasto destro sull'avviso offre la stessa strada.
   await avviso.click({ button: 'right', position: { x: 10, y: 10 } });

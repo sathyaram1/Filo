@@ -750,18 +750,10 @@ test('(M) «Traduci la pagina» con la chiave propria rifiutata: al primo pezzo 
   await prepare(app);
   const page = await testServer.openReady(openTab, '<!doctype html><html lang="en"><meta charset="utf-8"><title>Article</title>'
     + '<p id="p1">The quick brown fox jumps over the lazy dog, again and again, in the morning light.</p>');
-  await page.evaluate(() => {
-    window.__toasts = [];
-    new MutationObserver((muts) => {
-      for (const m of muts) for (const n of m.addedNodes) {
-        if (n.nodeType === 1 && n.classList && n.classList.contains('sn-toast')) window.__toasts.push(n.textContent || '');
-      }
-    }).observe(document.documentElement, { childList: true, subtree: true });
-  });
+  const avvisi = await osservaAvvisi(page, app);
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
   await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
-  const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
   await page.waitForTimeout(6000);
   expect((await avvisi()).split(RIGA).length - 1).toBe(1);
@@ -817,15 +809,7 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   await prepare(app);
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Scansione</title>'
     + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da trascrivere</p>');
-  await page.evaluate(() => {
-    window.__toasts = [];
-    new MutationObserver((muts) => {
-      for (const m of muts) for (const n of m.addedNodes) {
-        if (n.nodeType === 1 && n.classList && n.classList.contains('sn-toast')) window.__toasts.push(n.textContent || '');
-      }
-    }).observe(document.documentElement, { childList: true, subtree: true });
-  });
-  const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
+  const avvisi = await osservaAvvisi(page, app);
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
 
   // «Trascrivi» (tasto destro, «Altro…»): il testo arriva coi crediti di Filo, e l'avviso lo dice.
@@ -862,7 +846,8 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
 
 // La riga sotto la risposta e l'avviso sono la stessa frase: le chiamate che accompagnano la
 // richiesta (Filo che impara dalla chat, i lavori sulla pagina) non la ripetono in un avviso.
-async function osservaAvvisi(page) {
+// Gli avvisi della pagina e quelli della barra di Filo, dove il main manda il ripiego (#1509).
+async function osservaAvvisi(page, app) {
   await page.evaluate(() => {
     window.__toasts = [];
     new MutationObserver((muts) => {
@@ -871,7 +856,24 @@ async function osservaAvvisi(page) {
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   });
-  return () => page.evaluate(() => window.__toasts.join(' | '));
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__barra1509 = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs || w.webContents.__spiaBarra) continue;
+      const wc = w.webContents;
+      const manda = wc.send.bind(wc);
+      wc.__spiaBarra = true;
+      wc.send = (canale, ...resto) => {
+        if (canale === 'shell:toast') globalThis.__barra1509.push(String((resto[0] && resto[0].text) || ''));
+        return manda(canale, ...resto);
+      };
+    }
+  });
+  return async () => [...await page.evaluate(() => window.__toasts), ...await app.evaluate(() => globalThis.__barra1509)].join(' | ');
+}
+async function azzeraAvvisi(page, app) {
+  await page.evaluate(() => { window.__toasts = []; });
+  await app.evaluate(() => { globalThis.__barra1509 = []; });
 }
 
 test('(Q) la chat della home con la chiave propria rifiutata: la riga sotto la risposta, e nessun avviso che la ripete', async ({ app, shell, openTab }) => {
@@ -883,7 +885,7 @@ test('(Q) la chat della home con la chiave propria rifiutata: la riga sotto la r
   await redeemWallet(openTab);
   await prepare(app);
   await home.bringToFront().catch(() => {});
-  const avvisi = await osservaAvvisi(home);
+  const avvisi = await osservaAvvisi(home, app);
   await home.locator('#input').fill('ciao ripiego');
   await home.locator('#sendBtn').click();
   await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
@@ -901,7 +903,7 @@ test('(R) l’Aiuto della pagina con la chiave propria rifiutata: la riga sta so
   await redeemWallet(openTab);
   await prepare(app);
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Sito</title><p>Un sito qualunque.</p>');
-  const avvisi = await osservaAvvisi(page);
+  const avvisi = await osservaAvvisi(page, app);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
   await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
@@ -937,7 +939,7 @@ test('(S) selezionare un testo con la chiave propria rifiutata, senza aprire il 
   await prepare(app);
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Selezione</title>'
     + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da spiegare</p>');
-  const avvisi = await osservaAvvisi(page);
+  const avvisi = await osservaAvvisi(page, app);
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
   const prima = seen.completions.length;
   await selezionaColMouse(page, '#t');
@@ -954,7 +956,7 @@ test('(T) selezionare un testo e aprire subito il menu: la riga del ripiego sta 
   await prepare(app);
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Selezione</title>'
     + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da spiegare</p>');
-  const avvisi = await osservaAvvisi(page);
+  const avvisi = await osservaAvvisi(page, app);
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
   await selezionaColMouse(page, '#t');
   const box = await page.locator('#t').boundingBox();
@@ -976,7 +978,7 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Chiuso prima</title>'
     + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Una frase da chiudere presto.</p>'
     + '<textarea id="campo" style="margin:40px;width:400px;height:80px;font:16px sans-serif">Un testo con un erore.</textarea>');
-  const avvisi = await osservaAvvisi(page);
+  const avvisi = await osservaAvvisi(page, app);
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
   const allaPersonale = async (prima) => {
     await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 10_000 }).toContain(PERSONAL_KEY);
@@ -1007,7 +1009,7 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   // Il riquadro di modifica, chiuso con Esc prima della proposta. L'avviso sopra ha già parlato:
   // si riparte da una chiave nuova, come chi la cambia, per sentirlo di nuovo.
   await app.evaluate(async () => { await globalThis.SN_WALLET_MAIN.ownKeyChanged(); });
-  await page.evaluate(() => { window.__toasts = []; });
+  await azzeraAvvisi(page, app);
   await page.locator('#campo').click();
   await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
   await page.locator('#campo').click({ button: 'right' });
@@ -1024,7 +1026,7 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
 
   // «spiega» chiuso appena compare la risposta: la riga è stata a schermo un istante, non letta.
   await app.evaluate(async () => { await globalThis.SN_WALLET_MAIN.ownKeyChanged(); });
-  await page.evaluate(() => { window.__toasts = []; });
+  await azzeraAvvisi(page, app);
   personalDelayMs = 0;
   await page.evaluate(() => {
     const r = document.createRange();
