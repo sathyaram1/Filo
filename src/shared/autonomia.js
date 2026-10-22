@@ -19,7 +19,7 @@
   const GUARDIANO_REGISTRI = false;
 
   const CLASSI = Object.freeze({
-    1: 'Filo e te: la chat, le memorie, le impostazioni, il manifesto, le chat passate che non avevano letto testo di altri',
+    1: 'Filo e te: la chat, le memorie, le impostazioni, il manifesto, le chat passate in cui non è entrato testo di altri',
     2: 'I file su cui lavori: l\'editor, quelli toccati di recente',
     3: 'Autori fidati: mittenti a cui hai risposto o che hai segnato, siti di un autore solo segnati da te',
     4: 'Gli altri file del computer',
