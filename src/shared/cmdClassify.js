@@ -645,7 +645,7 @@
   // sh e bash (anche su Windows) tolgono i backslash e decodificano `$'…'`; PowerShell e cmd no.
   // Fuori da Windows una shell non indicata è POSIX: lì non ce ne sono altre. Senza contesto il sistema non si sa.
   function shellPosix(c) {
-    if (c.ignoto) return false;
+    if (c.sistemaIgnoto) return false;
     return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
   }
 
@@ -840,7 +840,7 @@
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
     const shell = String(x.shell || '').toLowerCase();
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, ignoto: x === SENZA_CONTESTO };
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
