@@ -553,7 +553,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     // già non è dirottabile dalla configurazione, ma la forma refs/heads/… è
     // l'unica che si può controllare a colpo d'occhio (e con cui una sentinella
     // può dire "qui nessuno spedisce senza dire dove").
-    if (pushed) g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+    // Mai su un commit fuori dalla linea della punta remota: riporterebbe origin a una storia già riscritta.
+    if (pushed && (!remoteTip || sullaStessaLinea(g, target, remoteTip))) {
+      g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+    }
     if (!parked) discarded = null;
   } else {
     g(['reset', '--hard', target]);
