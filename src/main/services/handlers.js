@@ -3348,6 +3348,17 @@ async function eseguiAzioneFilo(action, {
           console.warn('[Filo] ricerca nei documenti fallita', e?.message || e);
           return { executed: false, kept: true, output: { cercato: cosa, risultati: [], errore: 'la ricerca non è riuscita' } };
         }
+        if (r.cartellaDiRete) return { executed: false, kept: true, output: ricercaSuAltroComputer(action) };
+        if (r.cartellaFuori) {
+          return {
+            executed: false,
+            kept: true,
+            output: {
+              cercato: cosa, cartella, risultati: [], errore: 'fuori_perimetro',
+              detail: 'la cartella sta fuori dalla cartella personale: richiedila col percorso esatto e l\'utente confermerà',
+            },
+          };
+        }
         const risultati = r.risultati.map((x) => ({ ...x, scaricato: fileScaricato(x.percorso) }));
         return {
           executed: !r.cartellaMancante,
