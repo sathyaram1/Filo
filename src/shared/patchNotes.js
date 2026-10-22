@@ -22,6 +22,7 @@
         'Nei riquadri incorporati dello stesso sito, come un blocco commenti, Alt+E e il tasto destro di Filo funzionano sempre. Prima, se il riquadro finiva di caricare dopo la pagina o ci passavi sopra col puntatore mentre caricava, lì dentro Filo non rispondeva più.',
         'La Cronologia AI resta svelta anche con migliaia di voci. Mentre scrivi nella ricerca la pagina non si blocca più, e scorrendo verso le voci vecchie non scatta.',
         'Il tasto destro su un link non visita più i siti che Filo ti segnala come sospetti né quelli della tua lista dei siti bloccati. Per un sito in lista il menu ti dice che è bloccato. Le zone cliccabili di un\'immagine e i link dentro un disegno ora hanno le voci del link e l\'avviso giusto quando imitano un sito noto.',
+        'Nei siti divisi in frame la rotella premuta su un frame apre sempre lo zoom, anche se il frame finisce di caricare dopo la pagina o ci muovi sopra il mouse mentre carica. Prima a volte lì dentro non succedeva niente.',
       ],
     },
     {
