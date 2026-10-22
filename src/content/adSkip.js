@@ -131,7 +131,13 @@
   // Una pagina nascosta col «Salta» fuori dalla vista (si leggevano i commenti) nessuno la guarda: la si porta sul
   // pulsante per il clic vero e la si rimette com'era appena il clic è arrivato (#1494). Torna la funzione che rimette.
   const RIMETTI_MS = 10000;
+  // Una sola rimessa alla volta: un secondo tentativo prima del clic segnerebbe come «com'era» la pagina già spostata.
+  let rimettiInAttesa = null;
   function portaInVista(el) {
+    if (rimettiInAttesa) {
+      try { el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); } catch (_) {}
+      return rimettiInAttesa;
+    }
     const posti = [];
     for (let n = el.parentElement; n; n = n.parentElement) posti.push([n, n.scrollLeft, n.scrollTop]);
     const se = document.scrollingElement;
@@ -142,6 +148,7 @@
     const rimetti = () => {
       if (fatto) return;
       fatto = true;
+      rimettiInAttesa = null;
       clearTimeout(timer);
       window.removeEventListener('click', suClic, true);
       for (const [n, l, t] of posti) {
@@ -152,6 +159,7 @@
     function suClic(e) { if (e.isTrusted && e.target instanceof Node && el.contains(e.target)) setTimeout(rimetti, 0); }
     window.addEventListener('click', suClic, true);
     timer = setTimeout(rimetti, RIMETTI_MS);
+    rimettiInAttesa = rimetti;
     return rimetti;
   }
 

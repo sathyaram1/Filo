@@ -338,6 +338,9 @@ al secondo, anche a finestra nascosta. Lo stesso Electron senza Playwright rispo
 Misurato su Electron 44 e Linux, una pagina nascosta tiene la sua misura;
 `getBoundingClientRect`, `checkVisibility` ed `elementFromPoint` rispondono giusto, i
 timer girano a un secondo, `MutationObserver` funziona e `sendInputEvent` arriva al frame
-principale come clic vero. Il clic del protocollo di debug instradato a un riquadro
-d'altro sito a volte non gli arriva e lo riceve la pagina che lo ospita, e lo
-spostamento del mouse dello stesso protocollo non risponde finché la pagina non disegna.
+principale come clic vero. Il clic del protocollo di debug mandato alla pagina e
+instradato dal punto a un riquadro d'altro sito, con la pagina nascosta o appena tornata
+davanti (non ancora disegnata), lo riceve spesso la pagina che lo ospita; mandato alla
+sessione del riquadro stesso (`Target.setAutoAttach` con `flatten`), nel suo punto, gli
+arriva anche nascosta. Lo spostamento del mouse dello stesso protocollo non risponde
+finché la pagina non disegna.

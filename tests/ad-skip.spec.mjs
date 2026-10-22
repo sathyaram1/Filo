@@ -192,16 +192,19 @@ test('con la scheda dietro il «Salta» si preme lo stesso, su YouTube e negli a
 
 // La finestra dei test, parcheggiata fuori schermo, tiene nascoste anche le schede davanti: per vedere la differenza fra
 // davanti e dietro serve la finestra vera, e solo su Linux lo schermo è virtuale e non la vede nessuno.
-test('a finestra vera: con Filo ridotto a icona salta, e il video incorporato in una scheda dietro aspetta senza dare il gesto al sito', async ({ testServer, suYouTube }) => {
-  test.skip(process.platform !== 'linux', 'la finestra vera comparirebbe sullo schermo di chi prova');
-  await conFiloSenzaPlaywright({ env: { FILO_HIDE_WINDOW: '0' } }, async ({ filo, nel, quando, apri, arrivato, nascosta, saltata, clic }) => {
-    const visibile = (url, perche) => quando(async () => (await nel(url, 'document.visibilityState')) === 'visible', perche);
-    const finestra = (azione) => filo.evaluate(({ BrowserWindow }, a) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs)[a](); }, azione);
-    const attiva = (url) => filo.evaluate(({ BrowserWindow }, u) => {
-      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-      tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
-    }, url);
+const conFinestraVera = (corpo) => conFiloSenzaPlaywright({ env: { FILO_HIDE_WINDOW: '0' } }, (h) => corpo({
+  ...h,
+  visibile: (url, perche) => h.quando(async () => (await h.nel(url, 'document.visibilityState')) === 'visible', perche),
+  finestra: (azione) => h.filo.evaluate(({ BrowserWindow }, a) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs)[a](); }, azione),
+  attiva: (url) => h.filo.evaluate(({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
+  }, url),
+}));
 
+test('a finestra vera: con Filo ridotto a icona salta, e il video incorporato in una scheda dietro salta senza dare il gesto al sito né il fuoco a chi scrive altrove', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'la finestra vera comparirebbe sullo schermo di chi prova');
+  await conFinestraVera(async ({ nel, quando, apri, arrivato, nascosta, saltata, clic, visibile, finestra }) => {
     const yt = suYouTube(testServer.html(lettore({ dopoMs: -1, titolo: 'Canzone' })));
     await apri(yt, true);
     await arrivato(yt);
@@ -220,19 +223,63 @@ test('a finestra vera: con Filo ridotto a icona salta, e il video incorporato in
       await apri(ospitante, true);
       await arrivato(dentro);
       await visibile(dentro, `${host}: il lettore davanti non si vede`);
-      await apri(testServer.html('<title>Altra</title><p>altra scheda</p>'), true);
+      // Si scrive una mail in un'altra scheda mentre il video suona dietro.
+      const posta = testServer.html('<!doctype html><title>Posta</title><textarea id="t"></textarea>'
+        + '<script>window.__via=0;document.getElementById("t").addEventListener("blur",()=>window.__via++);</script>');
+      await apri(posta, true);
+      await quando(async () => (await nel(posta, '(() => { const t = document.getElementById("t"); if (t) t.focus(); return document.activeElement && document.activeElement.id; })()')) === 't', 'la posta non si apre');
       await nascosta(dentro);
       await nel(dentro, 'window.__mostra()');
-      await new Promise((ok) => setTimeout(ok, 3000));
-      expect(await nel(ospitante, 'window.__gesti'), `${host}: il sito ha ricevuto il clic di Filo`).toEqual([]);
-      expect((await clic(dentro)).some((c) => c.vero), host).toBe(false);
-      // Tornati sulla scheda, il «Salta» si preme subito, e il gesto resta al lettore.
-      await attiva(ospitante);
-      await visibile(dentro, `${host}: la scheda non è tornata davanti`);
       await saltata(dentro);
       expect((await clic(dentro)).every((c) => c.vero), host).toBe(true);
-      expect(await nel(ospitante, 'window.__gesti'), host).toEqual([]);
+      expect(await nel(ospitante, 'window.__gesti'), `${host}: il sito ha ricevuto il clic di Filo`).toEqual([]);
+      expect(await nel(posta, 'document.activeElement.id + ":" + window.__via'), `${host}: chi scrive ha perso il fuoco`).toBe('t:0');
     }
+  });
+});
+
+// #1494 — la pagina appena tornata davanti non è ancora disegnata: un clic instradato dal punto dello schermo cadeva sul sito.
+test('a finestra vera: la pubblicità del video incorporato che compare mentre si torna sulla scheda si salta, e il sito non riceve il clic', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'la finestra vera comparirebbe sullo schermo di chi prova');
+  await conFinestraVera(async ({ nel, quando, apri, arrivato, nascosta, saltata, clic, visibile, attiva }) => {
+    // Sbagliava in più di metà dei ritorni: quattro giri lo fanno vedere.
+    for (let i = 0; i < 4; i++) {
+      const dentro = suYouTube(testServer.html(lettore({ dopoMs: -1, titolo: `Video ${i}` })));
+      const ospitante = testServer.html(ospite(dentro), { pubblico: i % 2 === 1 });
+      await apri(ospitante, true);
+      await arrivato(dentro);
+      await visibile(dentro, `giro ${i}: il lettore davanti non si vede`);
+      await apri(testServer.html(`<title>Altra ${i}</title><p>altra</p>`), true);
+      await nascosta(dentro);
+      await nel(dentro, 'window.__mostra()');
+      await attiva(ospitante);
+      await saltata(dentro);
+      expect((await clic(dentro)).every((c) => c.vero), `giro ${i}`).toBe(true);
+      expect(await nel(ospitante, 'window.__gesti'), `giro ${i}: il sito ha ricevuto il clic di Filo`).toEqual([]);
+      await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', `giro ${i}: non è tornata davanti`);
+    }
+  });
+});
+
+// #1494 — dietro, il lettore fuori dalla vista (si leggevano i commenti) non lo vede nessuno: aspettare vuol dire sentirla tutta.
+test('a finestra vera: YouTube lasciato dietro mentre si leggevano i commenti salta lo stesso, e si ritrova la pagina dove la si era lasciata', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'la finestra vera comparirebbe sullo schermo di chi prova');
+  await conFinestraVera(async ({ nel, apri, arrivato, nascosta, saltata, clic, visibile, attiva }) => {
+    const yt = suYouTube(testServer.html(lettore({ dopoMs: -1, titolo: 'Canzone' }).replace('</body>', '<div style="height:3000px">commenti</div></body>')));
+    await apri(yt, true);
+    await arrivato(yt);
+    await visibile(yt, 'la canzone davanti non si vede');
+    await nel(yt, 'scrollTo(0, 1500); scrollY');
+    await apri(testServer.html('<title>Altra</title><p>altra</p>'), true);
+    await nascosta(yt);
+    await nel(yt, 'window.__mostra()');
+    await saltata(yt);
+    // Un'anteprima della scheda la sveglia per un attimo: lì, col lettore fuori dalla vista, prova il clic dello script.
+    expect((await clic(yt)).some((c) => c.vero)).toBe(true);
+    await expect.poll(() => nel(yt, 'scrollY'), { timeout: 5_000 }).toBe(1500);
+    await attiva(yt);
+    await visibile(yt, 'non è tornata davanti');
+    expect(await nel(yt, 'scrollY')).toBe(1500);
   });
 });
 
