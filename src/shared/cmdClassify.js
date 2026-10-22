@@ -1497,7 +1497,7 @@
     const c = { ...contesto(ctx), stampaLibera: true };
     const letture = comeLaShell(cmd, c);
     if (letture == null) return TRE;
-    const contesti = forseDash(c) && cmd.includes('$\'') ? [c, { ...c, senzaAnsi: true }] : [c];
+    const contesti = forseDash(c) && APICE_CHE_DASH_CHIUDE.test(cmd) ? [c, { ...c, senzaAnsi: true }] : [c];
     return letture.flatMap((l) => contesti.map((cc) => classifica(l, cc, 0))).reduce(peggiore);
   }
 
