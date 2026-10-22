@@ -16,6 +16,7 @@
         'Nell\'Editor la chat del documento legge tutto il documento, non più solo l\'inizio, e lo stesso fanno il titolo e il riassunto automatici. Prima, su un testo lungo, la chat rispondeva come se il resto non esistesse. Se il documento supera i 350.000 caratteri, o è più lungo di quanto regge il modello che hai scelto, Filo legge l\'inizio e sotto la risposta ti dice quanta parte ha letto.',
         'Incollare un testo lungo nell\'Editor non blocca più la pagina: anche mille righe entrano in un attimo.',
         'Se una risposta arriva da un fornitore che Filo esclude, te lo dice un avviso sulla pagina, anche senza «Solo modelli a pesi aperti», e «Segnala» apre il feedback già scritto. Nella Cronologia AI quella richiesta resta segnata e la trovi cercando il nome del fornitore.',
+        'Su Windows e macOS i file che scarichi con Filo, anche con «Salva immagine come», risultano arrivati da Internet, come da qualunque browser. Se apri un programma fuori da Filo il sistema ti avvisa prima, e Office apre i documenti in Visualizzazione protetta. «Salva immagine come» ti propone anche il nome vero del file, lo stesso che poi trovi fra i download.',
       ],
     },
     {

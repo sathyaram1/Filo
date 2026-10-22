@@ -165,7 +165,7 @@ test('«Salva immagine come» salva col nome vero, senza caratteri che capovolgo
       .toContain('ricordogpj.png');
     const file = join(dir, 'ricordogpj.png');
     expect(readFileSync(file).equals(PNG)).toBe(true);
-    expect(readdirSync(dir).filter((n) => /[​-‏‪-‮⁦-⁩]/.test(n))).toEqual([]);
+    expect(readdirSync(dir).filter((n) => /[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/.test(n))).toEqual([]);
 
     // La voce nella barra dice lo stesso nome del file su disco.
     await expect.poll(async () => {

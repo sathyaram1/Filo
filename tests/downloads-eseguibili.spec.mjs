@@ -868,7 +868,7 @@ test('uno scaricamento da link arriva col nome vero e marcato come arrivato da I
     };
     await expect.poll(arrivato, { timeout: 20000 }).not.toBeNull();
     const v = await arrivato();
-    const BIDI = /[​-‏‪-‮⁦-⁩]/;
+    const BIDI = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/;
     expect(v.filename).not.toMatch(BIDI);
     expect(v.filename).toMatch(/\.pdf$/);
     expect(v.savePath).toBe(join(dir, v.filename));

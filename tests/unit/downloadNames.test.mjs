@@ -63,9 +63,9 @@ test('shortName: un nome normale resta identico', () => {
 
 test('safeName: i caratteri di direzione e quelli invisibili non arrivano al nome, e un nome vuoto prende il ripiego di chi chiama (#1510)', () => {
   require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
-  assert.equal(DL.safeName('foto‮gpj.exe'), 'fotogpj.exe');
-  assert.equal(DL.safeName('ricordo​⁦gnp.png⁩'), 'ricordognp.png');
-  assert.equal(DL.safeName('‮', 'immagine'), 'immagine');
+  assert.equal(DL.safeName('foto\u202Egpj.exe'), 'fotogpj.exe');
+  assert.equal(DL.safeName('ricordo\u200B\u2066gnp.png\u2069'), 'ricordognp.png');
+  assert.equal(DL.safeName('\u202E', 'immagine'), 'immagine');
   assert.equal(DL.safeName('../', 'video'), 'video');
   assert.equal(DL.safeName(''), 'download');
 });
