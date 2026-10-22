@@ -371,7 +371,8 @@ service cloud.firestore {
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'])
+        // `inCoda` (#1515): il segno che la coda delle routine legge; lo scrive solo il server a ogni cambio di stato.
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
