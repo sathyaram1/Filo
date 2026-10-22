@@ -2,6 +2,7 @@
 // come la barra laterale dal bordo sinistro. Ogni prova asserisce quello che l'utente vede: la fila delle schede scoperta.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuAperto } from './helpers/barra.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 const sito = (titolo = 'Pagina a schermo intero') => `<!doctype html><html><head><title>${titolo}</title></head>
@@ -137,4 +138,73 @@ test('lo schermo pieno di un video tiene per sé il bordo in alto', async ({ app
   await page.mouse.move(400, 0, { steps: 3 });
   await pausa(800);
   expect((await vista(app)).y).toBe(0);
+});
+
+// Il puntatore che entra in una finestrella di Filo aperta dalla fila (il menu di una scheda, quello della linguetta
+// della barra) lascia la shell: è quello che il sistema le dice. Il menu aperto tiene le schede, come la barra laterale.
+const shellLasciata = (app, x, y) => app.evaluate(({ BrowserWindow }, p) => {
+  const w = BrowserWindow.getAllWindows().find((z) => z._filoTabs && !z._filoIncognito);
+  w.webContents.sendInputEvent({ type: 'mouseLeave', x: p.x, y: p.y });
+}, { x: Math.round(x), y: Math.round(y) });
+
+for (const [titolo, dove] of [
+  ['col menu di una scheda aperto le schede restano finché il menu è aperto, e chiuso se ne vanno (#1343)', '.tab:has-text("Prima")'],
+  ['col menu della linguetta della barra aperto le schede restano finché il menu è aperto (#1343)', '#barra-maniglia'],
+]) {
+  test(titolo, async ({ app, shell, openTab, testServer }) => {
+    await testServer.openReady(openTab, sito('Prima'));
+    const page = await testServer.openReady(openTab, sito('Seconda'));
+    await schermoIntero(app, true);
+    await page.mouse.move(400, 200);
+    await page.mouse.move(400, 0, { steps: 4 });
+    await expect.poll(async () => { const v = await vista(app); return v.y === v.fila; }).toBe(true);
+    const bersaglio = shell.locator(dove).first();
+    const box = await bersaglio.boundingBox();
+    await shell.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await bersaglio.click({ button: 'right' });
+    const menu = await menuAperto(app);
+    expect(menu, 'il menu si apre').not.toBeNull();
+    await shellLasciata(app, box.x + box.width / 2, box.y + box.height + 20);
+    await menu.mouse.move(20, 20);
+    await menu.mouse.move(30, 40, { steps: 3 });
+    await pausa(1200);
+    const v = await vista(app);
+    expect(v.y, 'col menu aperto le schede non se ne vanno, e il menu resta attaccato alla sua scheda').toBe(v.fila);
+    // Chiuso il menu, col puntatore lontano dalla fila le schede se ne vanno.
+    await menu.keyboard.press('Escape');
+    await page.mouse.move(400, 500);
+    await expect.poll(async () => (await vista(app)).y, { timeout: 4000 }).toBe(0);
+  });
+}
+
+// Il puntatore resta fermo sullo schermo: se la pagina risalisse fra pressione e rilascio, il rilascio cadrebbe su un
+// altro punto della pagina, ed è lì che lo si manda, come fa il sistema.
+const allaPagina = (app, ev) => app.evaluate(({ BrowserWindow }, e) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  const tm = w._filoTabs;
+  tm.tabs.find((x) => x.id === tm.activeId).view.webContents.sendInputEvent({ ...e, x: Math.round(e.x), y: Math.round(e.y) });
+}, ev);
+
+test('con le schede scoperte un clic su un collegamento della pagina lo segue, e le schede se ne vanno al rilascio (#1343)', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif;height:1400px">
+    <div style="height:100px"></div><a id="link" href="#arrivato" style="display:inline-block;height:20px;margin-left:200px">vai al capitolo</a>
+    <div style="height:400px"></div><h2 id="arrivato">Capitolo</h2></body></html>`);
+  await schermoIntero(app, true);
+  await expect.poll(async () => (await vista(app)).y).toBe(0);
+  await page.mouse.move(400, 200);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => { const v = await vista(app); return v.y === v.fila; }).toBe(true);
+
+  const box = await page.locator('#link').boundingBox();
+  const x = box.x + 20;
+  const y = box.y + 10;
+  await page.mouse.move(x, y);
+  const prima = (await vista(app)).y;
+  await allaPagina(app, { type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+  await pausa(80);
+  const salita = prima - (await vista(app)).y;
+  expect(salita, 'col tasto premuto la pagina non si sposta').toBe(0);
+  await allaPagina(app, { type: 'mouseUp', x, y: y + salita, button: 'left', clickCount: 1 });
+  await expect.poll(() => page.evaluate(() => location.hash), { timeout: 3000 }).toBe('#arrivato');
+  await expect.poll(async () => (await vista(app)).y, { timeout: 3000 }).toBe(0);
 });
