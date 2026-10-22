@@ -179,7 +179,7 @@ test('l\'indice rifiuta una cartella di rete prima di guardarla: nella ricerca, 
       assert.equal((await Indice.cartellaChiesta(cartella)).rete, true);
     }
     const occ = (await Indice.stato()).occasionali;
-    assert.deepEqual(occ.map((o) => [o.percorso, o.esiste]).sort(), [['//nas/condivisa', false], ['/net/nas/archivio', false]]);
+    assert.deepEqual(occ.map((o) => [o.percorso, o.esiste]).sort(), [['//nas/condivisa', false], [ARCHIVIO_DI_RETE, false]].sort());
     assert.deepEqual(await Indice.cartelleMancanti(['//nas/condivisa', DOC]), ['//nas/condivisa']);
     assert.deepEqual(spia.chiesti, [], 'nessuno stat su un percorso di rete');
     // Si possono ancora dimenticare.
