@@ -1,5 +1,6 @@
-// #480 — Le pagine che aprono tanti popup insieme: gli avvisi «Bloccato popup da…» restano pochi, dentro l'area
-// della pagina e chiudibili. Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
+// #480 — Le pagine che aprono tanti popup insieme: gli avvisi «Bloccato popup da…» a schermo restano pochi, dentro
+// l'area della pagina e chiudibili; quelli oltre il tetto aspettano dietro il «+N» (#1477).
+// Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
 
 import { test, expect } from './fixtures/electron.mjs';
 
