@@ -46,7 +46,7 @@ function lettore(titolo) {
   </script></body></html>`;
 }
 
-test('r2 un video di YouTube incorporato in un blog, visto e poi lasciato dietro: la pubblicità si salta senza tornare sulla scheda', async ({ testServer, suYouTube }) => {
+test('r2 YouTube lasciato dietro mentre si leggevano i commenti più giù: la pubblicità si salta lo stesso', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'finestra vera');
   test.setTimeout(120_000);
   const filo = await apriFiloSenzaPlaywright({ args: ARGOMENTI_RETE, env: { FILO_HIDE_WINDOW: '0' } });
@@ -55,14 +55,14 @@ test('r2 un video di YouTube incorporato in un blog, visto e poi lasciato dietro
   const apri = (url) => filo.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
     .find((w) => w._filoTabs)._filoTabs.openTab(u, { activate: true }), url);
   try {
-    const dentro = suYouTube(testServer.html(lettore('Video')));
-    const blog = testServer.html(`<!doctype html><title>Blog</title><p>articolo</p><iframe src="${dentro}" width="720" height="420"></iframe>`, { pubblico: true });
-    await apri(blog);
-    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', 'il video non si vede');
+    const yt = suYouTube(testServer.html(lettore('Canzone').replace('</body>', '<div style="height:3000px">commenti</div></body>')));
+    await apri(yt);
+    await quando(async () => (await nel(yt, 'document.visibilityState')) === 'visible', 'yt non visibile');
+    await nel(yt, 'scrollTo(0, 1500); scrollY');
     await apri(testServer.html('<title>Altra</title><p>altra</p>'));
-    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'hidden', 'il video non è dietro');
-    await nel(dentro, 'window.__mostra()');
-    await quando(async () => (await nel(dentro, 'window.__saltate')) === 1, 'pubblicità non saltata finché la scheda resta dietro', 10_000);
+    await quando(async () => (await nel(yt, 'document.visibilityState')) === 'hidden', 'yt non nascosta');
+    await nel(yt, 'window.__mostra()');
+    await quando(async () => (await nel(yt, 'window.__saltate')) === 1, 'pubblicità non saltata', 10_000);
   } finally {
     await filo.chiudi();
   }

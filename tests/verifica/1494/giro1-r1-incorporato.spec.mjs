@@ -46,7 +46,7 @@ function lettore(titolo) {
   </script></body></html>`;
 }
 
-test('r1 YouTube lasciato dietro mentre si leggevano i commenti più giù: la pubblicità si salta lo stesso', async ({ testServer, suYouTube }) => {
+test('r1 un video di YouTube incorporato in un blog, visto e poi lasciato dietro: la pubblicità si salta senza tornare sulla scheda', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'finestra vera');
   test.setTimeout(120_000);
   const filo = await apriFiloSenzaPlaywright({ args: ARGOMENTI_RETE, env: { FILO_HIDE_WINDOW: '0' } });
@@ -55,14 +55,47 @@ test('r1 YouTube lasciato dietro mentre si leggevano i commenti più giù: la pu
   const apri = (url) => filo.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
     .find((w) => w._filoTabs)._filoTabs.openTab(u, { activate: true }), url);
   try {
-    const yt = suYouTube(testServer.html(lettore('Canzone').replace('</body>', '<div style="height:3000px">commenti</div></body>')));
-    await apri(yt);
-    await quando(async () => (await nel(yt, 'document.visibilityState')) === 'visible', 'yt non visibile');
-    await nel(yt, 'scrollTo(0, 1500); scrollY');
+    const dentro = suYouTube(testServer.html(lettore('Video')));
+    const blog = testServer.html(`<!doctype html><title>Blog</title><p>articolo</p><iframe src="${dentro}" width="720" height="420"></iframe>`, { pubblico: true });
+    await apri(blog);
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', 'il video non si vede');
     await apri(testServer.html('<title>Altra</title><p>altra</p>'));
-    await quando(async () => (await nel(yt, 'document.visibilityState')) === 'hidden', 'yt non nascosta');
-    await nel(yt, 'window.__mostra()');
-    await quando(async () => (await nel(yt, 'window.__saltate')) === 1, 'pubblicità non saltata', 10_000);
+    await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'hidden', 'il video non è dietro');
+    await nel(dentro, 'window.__mostra()');
+    await quando(async () => (await nel(dentro, 'window.__saltate')) === 1, 'pubblicità non saltata finché la scheda resta dietro', 10_000);
+  } finally {
+    await filo.chiudi();
+  }
+});
+
+test('r1 la pubblicità di un video di YouTube incorporato comparsa mentre la scheda era dietro: tornando, si salta e il sito non riceve il clic', async ({ testServer, suYouTube }) => {
+  test.skip(process.platform !== 'linux', 'finestra vera');
+  test.setTimeout(240_000);
+  const filo = await apriFiloSenzaPlaywright({ args: ARGOMENTI_RETE, env: { FILO_HIDE_WINDOW: '0' } });
+  const nel = (u, c) => filo.nelFrame(u, c);
+  const quando = (fn, message, timeout = 10_000) => expect.poll(fn, { timeout, message }).toBe(true);
+  const apri = (url) => filo.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
+    .find((w) => w._filoTabs)._filoTabs.openTab(u, { activate: true }), url);
+  const attiva = (url) => filo.evaluate(({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.activate(tm.tabs.find((t) => t.view.webContents.getURL() === u).id);
+  }, url);
+  try {
+    // Il passaggio sbaglia in più della metà delle prove: quattro giri, uno basta a vederlo.
+    for (let i = 0; i < 4; i++) {
+      const dentro = suYouTube(testServer.html(lettore(`Video ${i}`)));
+      const blog = testServer.html(`<!doctype html><title>Blog ${i}</title><p>articolo</p><iframe src="${dentro}" width="720" height="420"></iframe>`
+        + '<script>window.__gesti=[];["pointerdown","mousedown","click"].forEach((t)=>document.addEventListener(t,(e)=>{if(e.isTrusted)window.__gesti.push(t);},true));</script>', { pubblico: i % 2 === 1 });
+      await apri(blog);
+      await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'visible', `giro ${i}: il video non si vede`);
+      await apri(testServer.html(`<title>Altra ${i}</title><p>altra</p>`));
+      await quando(async () => (await nel(dentro, 'document.visibilityState')) === 'hidden', `giro ${i}: il video non è dietro`);
+      await nel(dentro, 'window.__mostra()');
+      await new Promise((ok) => setTimeout(ok, 2500));
+      await attiva(blog);
+      await quando(async () => (await nel(dentro, 'window.__saltate')) === 1, `giro ${i}: tornati sulla scheda, la pubblicità non si salta`, 10_000);
+      expect(await nel(blog, 'window.__gesti'), `giro ${i}: il sito ha ricevuto il clic di Filo`).toEqual([]);
+    }
   } finally {
     await filo.chiudi();
   }
