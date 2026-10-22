@@ -1,7 +1,6 @@
 // Handler di dominio: account "Accedi con Google", triage admin dei feedback
 // e config condivisa "modelli predefiniti".
 
-const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const ProdottiGoogle = require('../../auth/prodottiGoogle');
 const Defaults = require('../defaultsStore');
