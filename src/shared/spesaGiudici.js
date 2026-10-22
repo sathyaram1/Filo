@@ -46,29 +46,21 @@
   }
 
   /**
-   * I soli campi ricevuti (`tettoUsd`, `maxCaratteri`), controllati. Vuoto torna al numero di fabbrica; un valore
-   * storto NON si aggiusta in silenzio: si rifiuta dicendo l'intervallo.
+   * I soli campi ricevuti (`tettoUsd`, `maxCaratteri`), controllati. `null` o vuoto torna al numero di fabbrica; un
+   * valore storto NON si aggiusta in silenzio: si rifiuta dicendo l'intervallo.
    * @returns {{ok:true, valori:Object}|{ok:false, testo:string}} `valori` per nome di campo del documento.
    */
   function valida(patch) {
     const p = patch && typeof patch === 'object' ? patch : {};
     const valori = {};
-    for (const [chiave, regola, campo, decimali] of [
-      ['tettoUsd', REGOLE.tetto, CAMPI.tetto, 2],
-      ['maxCaratteri', REGOLE.caratteri, CAMPI.caratteri, 0],
-    ]) {
+    for (const [chiave, tipo] of [['tettoUsd', 'tetto'], ['maxCaratteri', 'caratteri']]) {
       if (!(chiave in p) || p[chiave] === undefined) continue;
       const v = p[chiave];
-      if (v === null || (typeof v === 'string' && !v.trim())) { valori[campo] = regola.fabbrica; continue; }
-      const n = decimali ? numero(v) : intero(v);
-      if (n === null) return { ok: false, testo: `${regola.etichetta}: ci vuole un numero. Non salvato.` };
-      if (n < regola.min || n > regola.max) {
-        return { ok: false, testo: `${regola.etichetta}: da ${cifra(regola.min, decimali)} a ${cifra(regola.max, decimali)}. Non salvato.` };
-      }
-      if (decimali === 0 && !Number.isInteger(n)) {
-        return { ok: false, testo: `${regola.etichetta}: ci vuole un numero intero. Non salvato.` };
-      }
-      valori[campo] = decimali ? centesimi(n) : n;
+      const campo = CAMPI[tipo];
+      if (v === null || (typeof v === 'string' && !v.trim())) { valori[campo] = REGOLE[tipo].fabbrica; continue; }
+      const esito = global.SN_CAMPO_NUMERO.controlla(v, REGOLE_CAMPO[tipo]);
+      if (!esito.ok) return { ok: false, testo: `${esito.testo} Non salvato.` };
+      valori[campo] = tipo === 'tetto' ? centesimi(esito.valore) : esito.valore;
     }
     return { ok: true, valori };
   }
