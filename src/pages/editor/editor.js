@@ -1142,15 +1142,16 @@
     return true;
   }
 
-  async function generateSummaryForActive() {
+  // Con `manuale` chi ha chiesto il riassunto sa com'è andata.
+  async function generateSummaryForActive({ manuale = false } = {}) {
     if (!doc || !doc.meta) return false;
     syncActiveIntoCollection();
     const id = doc.id;
-    const text = (docPlainText() || '').trim().slice(0, 6000);
-    if (!text) return false;
+    const letto = docPerIlModello();
+    if (!letto.testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
     const chat = editorChatMessages();
     const memory = await filoMemoryText();
-    const parts = [`DOCUMENTO:\n${text}`];
+    const parts = [bloccoDocumento(letto)];
     if (chat.length) {
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
