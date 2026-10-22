@@ -557,6 +557,8 @@ module.exports = function register(on, ctx) {
   const isoO = (x) => (typeof x === 'string' && !Number.isNaN(Date.parse(x)) ? x : null);
   on(MSG.FILO_CODA, soloFilo(async (msg) => {
     const r = await Coda.pezzo({ prima: isoO(msg.prima), fino: isoO(msg.fino), dopo: isoO(msg.dopo), quanti: Number(msg.quanti) || undefined });
+    // Le frasi di Filo che la home disegna ritrovano i verdetti dei loro collegamenti, anche dopo un riavvio (#1505).
+    try { ricordaVerdettiArchiviati((r.elementi || []).filter((e) => e && e.k === 'msg')); } catch (_) {}
     // L'incognito non saluta: il saluto sta nel filo di disco, che da lì non si vede.
     if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
     return { ok: true, ...r };

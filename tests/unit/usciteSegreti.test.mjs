@@ -1238,6 +1238,20 @@ describe('la porta chiude a guasto e ogni collegamento ha un verdetto', () => {
   });
 });
 
+test('la home riceve dal filo i verdetti delle frasi di Filo, anche dopo un riavvio', () => {
+  require(join(ROOT, 'src', 'shared', 'filoCoda.js'));
+  const chiede = [{ url: 'https://chiede.test/b', motivo: 'contiene un tuo dato' }];
+  const chats = [{ id: 'c1', messages: [
+    { role: 'filo', text: 'vedi https://chiede.test/b', ts: '2026-10-22T10:00:00.000Z', linkDaConfermare: chiede },
+    { role: 'filo', text: 'a metà https://interrotta.test/c', ts: '2026-10-22T10:01:00.000Z', senzaVerdetto: true },
+  ] }];
+  const voci = globalThis.SN_FILO_CODA.elementi({ chats }).filter((e) => e.k === 'msg');
+  assert.deepEqual(voci.map((v) => [v.linkDaConfermare || null, !!v.senzaVerdetto]), [[chiede, false], [null, true]]);
+  const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+  assert.match(corpo(handlers, 'on(MSG.FILO_CODA,'), /ricordaVerdettiArchiviati\(/);
+  assert.match(corpo(handlers, 'on(MSG.FILO_CHAT_GET,'), /ricordaVerdettiArchiviati\(/);
+});
+
 describe('sentinella: nessun chiamante della porta prende un guasto per via libera', () => {
   const src = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
   const handlers = src('main', 'services', 'handlers.js');

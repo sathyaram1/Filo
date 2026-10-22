@@ -87,9 +87,8 @@ function sitoDaConfermare(url) {
   return false;
 }
 
-// I collegamenti di un testo giudicati uno per uno. `porta(url)` dà il verdetto della porta; `chiede(url, verdetto)`
-// dice se quel verdetto al clic chiederebbe l'OK. Una porta che lancia o un collegamento oltre il tetto chiede l'OK col
-// suo motivo. Torna quelli che lo chiedono, già segnati; gli altri restano giudicati.
+// `chiede(url, verdetto)`: se quel verdetto della porta, al clic, chiederebbe l'OK. Una porta che lancia o un
+// collegamento oltre il tetto lo chiede col suo motivo. Torna quelli che lo chiedono; gli altri restano giudicati.
 async function giudica(indirizzi, { porta, chiede = async () => true, tetto = MAX_GIUDICATI_PER_TESTO } = {}) {
   const out = [];
   const visti = new Set();
@@ -144,9 +143,8 @@ function contattabile(url, { proposta = false } = {}) {
   return !(proposta && !giudicato(web));
 }
 
-// Una chat riaperta, anche dopo un riavvio, ritrova i verdetti dei suoi collegamenti. `linkDi(testo)` = gli indirizzi
-// che la chat rende cliccabili. Una frase di Filo mai giudicata (`senzaVerdetto`: risposta interrotta, riga scritta
-// dalla pagina) non ne ha.
+// Una chat riaperta, anche dopo un riavvio, ritrova i verdetti dei suoi collegamenti; una frase mai giudicata
+// (`senzaVerdetto`: risposta interrotta, riga scritta dalla pagina) non ne ha. `linkDi(testo)` = i suoi cliccabili.
 function ricordaArchiviati(messages, linkDi) {
   for (const m of Array.isArray(messages) ? messages : []) {
     if (!m || m.role !== 'filo') continue;

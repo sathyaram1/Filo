@@ -1,6 +1,6 @@
 // #1505 — la porta delle uscite chiude a guasto, e ogni collegamento che un modello mostra ha un verdetto. Le richieste
 // del main ai nomi qui sotto arrivano a un server di prova che le conta (come in link-anteprima.spec.mjs); il modello è
-// finto. Regole pure: tests/unit/usciteSegreti.test.mjs.
+// finto. Regole pure e sentinelle: tests/unit/usciteSegreti.test.mjs.
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
@@ -25,7 +25,7 @@ async function serverCheConta() {
 }
 
 // Il main crede che questi nomi stiano su internet e li raggiunge al server di prova. La chat legge l'uscita di un
-// comando (testo di altri, dove compare solo il collegamento pulito) e risponde con i due collegamenti.
+// comando (testo di altri) e risponde con due collegamenti: quello pulito l'ha scritto l'utente, l'altro il modello.
 async function preparaMain(app, port, { home = null } = {}) {
   await app.evaluate(async (_e, { port: p, hosts, LINK_RACCOLTA: raccolta, LINK_PULITO: pulito, home: casa }) => {
     const C = globalThis.SN_CONST;
@@ -85,13 +85,15 @@ async function newtab(app, prefisso = 'filo://newtab') {
   throw new Error('newtab non trovata');
 }
 
-const apertoVerso = (app, url) => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } });
+// Una scheda aperta su quell'indirizzo, anche se il sito finto non risponde e la pagina resta di errore.
+const apertoVerso = (app, url) => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
+  .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.url === u)), url);
 const arrivateA = (rete, host) => rete.arrivate.filter((u) => u.startsWith(`/${host}/`));
 
 async function chiediLaFonte(app, page) {
   await page.reload();
   await expect(page.locator('#input')).toBeVisible();
-  await page.locator('#input').fill('trovami la fonte del documento');
+  await page.locator('#input').fill(`trovami la fonte del documento, mi pare fosse ${LINK_PULITO}`);
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo a', { hasText: 'il riepilogo' })).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
@@ -120,7 +122,7 @@ test('il tasto destro su un collegamento della chat in attesa di OK non manda ni
   // Il collegamento scritto dal modello dopo il testo di altri chiede l'OK al clic: prima, il sito non sa niente.
   await anteprima(page, 'il riepilogo');
   expect(arrivateA(rete, RACCOLTA), 'il menu ha chiesto al sito un indirizzo in attesa di OK').toEqual([]);
-  // Quello che compariva nell'uscita del comando ha il verdetto: l'anteprima lo legge, come sempre.
+  // Quello che l'utente aveva scritto ha il verdetto: l'anteprima lo legge, come sempre.
   await anteprima(page, 'la fonte');
   await expect.poll(() => arrivateA(rete, PULITO)).toEqual([`/${PULITO}/articolo-1505`]);
   expect(arrivateA(rete, RACCOLTA)).toEqual([]);
@@ -141,12 +143,27 @@ test('un collegamento della chat rimasto senza verdetto chiede l\'OK al clic; ri
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
   await expect.poll(() => confirmText(page)).toContain('non ho potuto controllare prima di mostrartelo');
   await expect.poll(() => confirmText(page)).toContain(LINK_PULITO);
+  await page.screenshot({ path: 'tests/.shots/uscite-verdetti-senza-verdetto.png' });
   await clickConfirm(page, 'cancel');
   await page.waitForTimeout(500);
-  expect(apertoVerso(app, LINK_PULITO), 'annullato: non si apre').toBe(false);
+  expect(await apertoVerso(app, LINK_PULITO), 'annullato: non si apre').toBe(false);
   // Prima dell'OK nemmeno l'anteprima lo contatta.
   await anteprima(page, 'la fonte');
   expect(arrivateA(rete, PULITO)).toEqual([]);
+
+  // La home ridisegnata dal filo ritrova i verdetti: il collegamento giudicato si apre senza chiedere.
+  await page.reload();
+  await page.locator('.dash-bubble-filo a', { hasText: 'la fonte' }).click();
+  await expect.poll(() => apertoVerso(app, LINK_PULITO), { timeout: 10_000 }).toBe(true);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      const t = tm && tm.tabs.find((x) => x.url === u);
+      if (t) tm.closeTab(t.id);
+    }
+  }, LINK_PULITO);
+  await expect.poll(() => apertoVerso(app, LINK_PULITO)).toBe(false);
 
   // Riaperta dalla Cronologia: il collegamento giudicato si apre senza chiedere, l'altro chiede ancora.
   let id = null;
@@ -196,7 +213,7 @@ test('con la porta guasta niente esce: NAVIGA non parte, la pagina web non apre,
     expect(dalSito).toMatchObject({ ok: true, aperto: false });
     expect(dalSito.frase).toMatch(/^non ho aperto l'indirizzo: il controllo dei dati in uscita non ha funzionato/);
     await pagina.waitForTimeout(500);
-    expect(apertoVerso(app, LINK_PULITO)).toBe(false);
+    expect(await apertoVerso(app, LINK_PULITO)).toBe(false);
   } finally {
     await app.evaluate(() => { globalThis.SN_URL_EXFIL.valutaUscita = globalThis.__valutaVera; });
   }
