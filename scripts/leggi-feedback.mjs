@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { motiviDiLettura, rigaSporco } from './lib/biglietto-locale.mjs';
+import { inBusta } from './lib/busta.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
