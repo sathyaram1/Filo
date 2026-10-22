@@ -425,17 +425,25 @@ function riassuntoIndice(rs, sotto) {
 
 /**
  * Cerca fra i documenti. `cartella`: solo dentro quella (anche fuori dall'elenco, letta per l'occasione).
- * → { risultati: [...], indice: {...}, fermata, cartellaMancante }
+ * `fuori(percorso)`: il motivo per non leggere la cartella risolta ('' = si legge), chiesto prima di toccarla.
+ * → { risultati: [...], indice: {...}, fermata, cartellaMancante, cartellaDiRete, cartellaFuori }
  */
-async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null, segnale = null } = {}) {
+async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null, segnale = null, fuori = null } = {}) {
   await carica();
   const rs = await radici();
   let sotto = daPercorrere(rs);
   let extra = [];
   let cartellaMancante = '';
   if (cartella) {
-    const c = voceCartella(cartella);
-    const p = c && DI_SERIE[c] ? cartellaDiSerie(c) : c;
+    const ch = await cartellaChiesta(cartella, rs);
+    const p = ch.percorso;
+    const negata = p && !ch.serie && !ch.rete && typeof fuori === 'function' ? fuori(p) : '';
+    if (ch.rete || negata) {
+      return {
+        risultati: [], indice: riassuntoIndice(rs, sotto), fermata: false, cartellaMancante: '',
+        cartellaDiRete: ch.rete ? String(cartella) : '', cartellaFuori: negata || '',
+      };
+    }
     let esiste = false;
     if (p) { try { esiste = (await fsp.stat(p)).isDirectory(); } catch (_) { esiste = false; } }
     if (!esiste) cartellaMancante = String(cartella);
