@@ -21,6 +21,7 @@ function custoditi({ impostazioni = [], chiaveFeedback = null } = {}) {
   da('../auth/wallet-store', 'personalKey', 'portafoglio');
   da('../auth/google-auth', 'segreti', 'accesso');
   da('../auth/anon-auth', 'segreti', 'identita');
+  metti(chiaveFeedback, 'feedback');
   for (const s of impostazioni) {
     const chiavi = s && s.apiKeys && typeof s.apiKeys === 'object' ? s.apiKeys : {};
     for (const v of Object.values(chiavi)) metti(v, 'chiave');
