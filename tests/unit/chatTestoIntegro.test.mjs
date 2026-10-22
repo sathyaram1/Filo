@@ -23,8 +23,7 @@ function aPezziDiToken(testo) {
   let i = 0;
   const passi = [3, 1, 4, 2, 5, 3, 2];
   for (let k = 0; i < testo.length; k++) {
-    let n = passi[k % passi.length];
-    // Una coppia surrogata (l'emoji) a cavallo fra due pezzi: alcuni host la spezzano così.
+    const n = passi[k % passi.length];
     out.push(testo.slice(i, i + n));
     i += n;
   }
