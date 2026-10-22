@@ -102,7 +102,8 @@ function nellaPagina(campi, posa) {
 // pagina, e l'immagine non deve partire.
 async function campiSegretiNeiRiquadri(webContents) {
   let riquadri = [];
-  try { riquadri = webContents.mainFrame.framesInSubtree.filter((f) => f !== webContents.mainFrame); } catch (_) {}
+  // Un riquadro in arrivo non ha ancora campi da coprire.
+  try { riquadri = webContents.mainFrame.framesInSubtree.filter((f) => f !== webContents.mainFrame && riquadroArrivato(f)); } catch (_) {}
   if (!riquadri.length) return { campi: [], nonCoperti: false };
   const codice = codiceMisura();
   const campi = [];
