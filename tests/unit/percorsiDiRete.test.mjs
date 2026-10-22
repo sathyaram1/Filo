@@ -84,6 +84,12 @@ test('il costo di CERCA_DOCUMENTI misura la cartella che l\'indice leggerà: un 
       }
     }
   }
+  // Quello che vede un Windows che lavora su D: con la casa su C:, provato su ogni sistema.
+  const win = CONTESTI[0];
+  for (const [cartella, risolta] of [['«\\Windows\\System32', 'D:\\Windows\\System32'], ['/etc', 'D:\\etc'], ['\\Users\\Mario', 'D:\\Users\\Mario']]) {
+    assert.equal(dentroCasa(win, risolta), false, risolta);
+    assert.equal(AL.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _cartella: risolta, _perimetro: win.perimetro }), 2, risolta);
+  }
 });
 
 test('nelle cartelle di sempre e nella cartella personale la ricerca resta libera, anche coi segni di citazione', () => {
