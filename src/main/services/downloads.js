@@ -178,9 +178,11 @@ function indirizzoPerMarca(u) {
 }
 
 // In incognito gli indirizzi sarebbero cronologia che sopravvive alla finestra: la zona basta ad armare gli avvisi.
+// Da un altro sito la pagina vale solo per la sua origine, come il Referer che i browser presentano.
 function testoZoneIdentifier({ hostUrl, referrerUrl, incognito } = {}) {
   const host = incognito ? '' : indirizzoPerMarca(hostUrl);
-  const ref = incognito ? '' : indirizzoPerMarca(referrerUrl);
+  let ref = incognito ? '' : indirizzoPerMarca(referrerUrl);
+  if (ref && host && new URL(ref).origin !== new URL(host).origin) ref = `${new URL(ref).origin}/`;
   const righe = ['[ZoneTransfer]', 'ZoneId=3'];
   if (ref) righe.push(`ReferrerUrl=${ref}`);
   righe.push(`HostUrl=${host || 'about:internet'}`);
