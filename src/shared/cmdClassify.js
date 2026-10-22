@@ -752,7 +752,7 @@
         continue;
       }
       // Il classificatore misura il percorso che vedrà la shell: `$'\x2essh'` è `.ssh`, `.\ssh` pure (#1511).
-      if (posix && ch === '$' && s[i + 1] === '\'') {
+      if (posix && !c.senzaAnsi && ch === '$' && s[i + 1] === '\'') {
         const r = ansiC(s, i + 2);
         cur += r.testo;
         if (r.ignoto) ignoto = true;
