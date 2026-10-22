@@ -10,7 +10,7 @@ const RIEMPIMENTO = 'Il bilancio del trimestre segue le stesse voci del preceden
 
 // Il modello finto risponde solo da quello che gli arriva: trova la frase in fondo se il documento gli arriva intero.
 async function prepara(app) {
-  await app.evaluate(async ({ fondo }) => {
+  await app.evaluate(async (_electron, { fondo }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -77,7 +77,7 @@ async function dalMenuDelTitolo(editor, voce) {
   await editor.locator('.ed-title-ctxmenu .sn-select-option', { hasText: voce }).click();
 }
 
-const richieste = (app, tipo) => app.evaluate((t) => globalThis.__richieste.filter((r) => r.tipo === t), tipo);
+const richieste = (app, tipo) => app.evaluate((_electron, t) => globalThis.__richieste.filter((r) => r.tipo === t), tipo);
 
 test('un documento lungo arriva intero: la chat trova la frase in fondo, titolo e riassunto lo leggono tutto', async ({ app, openTab }) => {
   test.setTimeout(120_000);
@@ -91,8 +91,12 @@ test('un documento lungo arriva intero: la chat trova la frase in fondo, titolo 
   await expect(chat.locator('.ed-chat-msg.assistant')).toHaveText('Sotto il vaso di gerani.', { timeout: 15_000 });
   await expect(chat.locator('.ed-chat-note')).toHaveCount(0);
 
-  await dalMenuDelTitolo(editor, 'Rigenera titolo');
+  // Il titolo automatico, partito dall'input, ha già letto il documento fino in fondo; quello rifatto a mano anche.
   await expect(editor.locator('#docTitle')).toHaveText('Gerani e magazzino', { timeout: 15_000 });
+  await dalMenuDelTitolo(editor, 'Rigenera titolo');
+  await expect.poll(async () => (await richieste(app, 'titolo')).length, { timeout: 15_000 }).toBe(2);
+  expect((await richieste(app, 'titolo')).every((r) => r.utente.includes(FONDO))).toBe(true);
+  await expect(editor.locator('#docTitle')).toHaveText('Gerani e magazzino');
 
   await dalMenuDelTitolo(editor, 'Rigenera riassunto');
   await expect.poll(async () => (await richieste(app, 'riassunto')).some((r) => r.utente.includes(FONDO)), { timeout: 15_000 }).toBe(true);
