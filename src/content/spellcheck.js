@@ -37,10 +37,19 @@
   const ascoltate = new WeakSet();
   let activeEl = null;
   let personalDict = new Set();
+  // Le parole del dizionario personale nella forma in cui sono scritte: «Zanzottera» corregge «zanzottera» (#1447).
+  let formeDizionario = new Map();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
   let settings = null;
   // L'applyFix dell'autocorrect dispatcha un input che rientrerebbe nel listener: questa flag salta una passata.
   let suppressAutocorrect = false;
+  // Quello che Filo impara dai rifiuti (#1447), com'è salvato: conti e parole da non correggere più da sé.
+  let imparato = null;
+  // Come si scrive in questa pagina: gli inizi di frase dei testi già mandati e le maiuscole annullate. Resta alla pagina.
+  const stilePagina = { minuscoli: 0, maiuscoli: 0 };
+  const STILE_PAGINA_MAX = 40;
+  const AUTOMATICHE_MAX = 200;
+  let progressivo = 0;
 
   // Suggerimenti del correttore NATIVO per l'ultima parola su cui è stato chiesto il menu: il main li spinge al tasto
   // destro (`_spell:native`, tabs.js). Servono alle caselle di una riga e ai blocchi sigillati (#438).
