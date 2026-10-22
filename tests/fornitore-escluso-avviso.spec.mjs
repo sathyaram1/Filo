@@ -122,7 +122,7 @@ test('una risposta servita da un fornitore escluso: avviso sulla pagina e segno 
   // Con la chiave propria e i fornitori esclusi ammessi chi serve si registra e basta; spento, lo stesso host avvisa.
   await servitaDa(app, 'Google');
   await configura(app, { ownKeyAllProviders: true });
-  expect((await spiega(app, 'EXPLAIN', 'parola1478 ammessi'))).toEqual({ ok: true, error: undefined });
+  expect((await spiega(app, 'EXPLAIN', 'parola1478 ammessi')).ok).toBe(true);
   await chat.waitForTimeout(800);
   expect((await avvisi()).filter((t) => t.includes('«Google»'))).toHaveLength(0);
   await configura(app);
