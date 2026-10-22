@@ -1600,16 +1600,18 @@
     const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
-      const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
+      const tutte = Array.from(host.querySelectorAll(':scope > .shell-notif'));
+      const carte = tutte.filter((c) => c.dataset.attesa !== '1').map((c) => ({
         id: c.dataset.nid || '',
         testo: c.querySelector('.shell-notif-msg')?.textContent || '',
         azioni: Array.from(c.querySelectorAll('.shell-notif-action')).map((b) => b.textContent || ''),
         chiusa: c.dataset.closing === '1',
       }));
+      const altre = tutte.filter((c) => c.dataset.attesa === '1' && c.dataset.closing !== '1').length;
       const cs = getComputedStyle(document.documentElement);
       const vars = {};
       for (const k of VAR_TEMA) vars[k] = cs.getPropertyValue(k).trim();
-      try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
+      try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
       if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
