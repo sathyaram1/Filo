@@ -1061,6 +1061,7 @@ function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null
   dip.riapri = (p) => { registro.riaperture.push(p); };
   dip.avviso = avvisoVero ? (t) => { registro.avvisi.push(t); mandaAvviso(t); } : (t) => { registro.avvisi.push(t); };
   dip.argv = () => registro.argv || [];
+  ancoraPerProva(ancora);
   riavvioInCorso = false;
   collega(finto, { chiesta: null, annuncia: annunciaHome });
   return { finto, registro };
