@@ -17,6 +17,7 @@ const SCEGLI_JS = readFileSync(resolve(ROOT, 'scripts', 'ultima-suite-verde.mjs'
 const { PASSI, casella } = await import('../../scripts/release-platform-alarm.mjs');
 const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS } = await import('../../scripts/ultima-suite-verde.mjs');
 const { nomeEsitoParte, rossiDellePartiMancanti } = await import('../../scripts/suite-verdict.mjs');
+const { chiaviDelRegistroUnit } = await import('../../scripts/build-alarm.mjs');
 
 // I commenti raccontano: si guardano solo le righe di comando/configurazione.
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
