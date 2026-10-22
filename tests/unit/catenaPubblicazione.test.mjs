@@ -72,11 +72,11 @@ describe('i segreti si leggono solo dentro l\'ambiente rilascio', () => {
     });
 
     test(`${nome}: ogni job che nomina un segreto dichiara \`environment: ${AMBIENTE}\`, fisso`, () => {
-      for (const j of jobSenzaAmbiente(testo)) {
-        assert.fail(`il job ${j.job} di ${nome} legge ${j.segreti.join(', ')} con l'ambiente ${j.ambiente === null ? 'assente' : `«${j.ambiente}»`}: ` +
-          `senza \`environment: ${AMBIENTE}\` il segreto arriva col valore omonimo del repo, se c'è, anche alla corsa di un ramo. ` +
-          'Il lavoro che legge il segreto sta a parte, nell\'ambiente fisso, con un `if:` che lo salta fuori da main');
-      }
+      const scoperti = jobSenzaAmbiente(testo)
+        .map((j) => `${j.job} legge ${j.segreti.join(', ')} con l'ambiente ${j.ambiente === null ? 'assente' : `«${j.ambiente}»`}`);
+      assert.deepEqual(scoperti, [],
+        `in ${nome}, senza \`environment: ${AMBIENTE}\` il segreto arriva col valore omonimo del repo, se c'è, anche alla corsa di un ramo. ` +
+        'Il lavoro che legge il segreto sta a parte, nell\'ambiente fisso, con un `if:` che lo salta fuori da main');
     });
   }
 
