@@ -10,6 +10,7 @@ const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./reso
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
+const VerdettiUscite = require('./verdettiUscite');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
