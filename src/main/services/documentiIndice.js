@@ -118,6 +118,23 @@ async function radici(impostazioni) {
   return out;
 }
 
+const diRete = (...ps) => ps.some((p) => require('./documentRead').percorsoDiRete(p));
+
+/**
+ * La cartella chiesta a una ricerca, risolta come la legge l'indice: { voce, percorso, serie, rete }. `rete`: porta a
+ * un altro computer e non sta dentro una cartella dell'elenco (lì quel computer l'ha scelto l'utente): non si tocca.
+ */
+async function cartellaChiesta(v, rs = null) {
+  const voce = voceCartella(v);
+  const serie = !!DI_SERIE[voce];
+  const percorso = serie ? cartellaDiSerie(voce) : voce;
+  let rete = false;
+  if (percorso && !serie && diRete(v, percorso)) {
+    rete = !(rs || await radici()).some((r) => r.esiste && r.percorso && dentro(percorso, r.percorso));
+  }
+  return { voce, percorso, serie, rete };
+}
+
 // Le cartelle da percorrere: quelle che esistono, senza quelle già dentro un'altra (si leggerebbero due volte).
 function daPercorrere(rs) {
   const vive = rs.filter((r) => r.esiste && r.percorso).map((r) => r.percorso);
