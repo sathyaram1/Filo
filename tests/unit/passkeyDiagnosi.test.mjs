@@ -25,6 +25,7 @@ function pagina({ hybrid, esito }) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
+  ctx.Function = vm.runInContext('Function', ctx);
   vm.runInContext(buildSource({ hybrid }), ctx);
   return { ctx, logs, ricevute };
 }
