@@ -36,6 +36,7 @@ function finestra({ incognito = false } = {}) {
   schede._siteAllowedIn = () => false;
   const pagina = { url: '' };
   const campo = { executeJavaScript: async () => ({ hasPassword: true, shownPassword: true, hasPayment: false, shownPayment: false }) };
+  campo.top = campo;
   const wc = { getURL: () => pagina.url, isDestroyed: () => false, send() {}, mainFrame: { framesInSubtree: [campo] } };
   const tab = { id: 1, view: { webContents: wc } };
   schede.tabs = [tab];

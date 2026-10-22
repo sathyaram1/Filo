@@ -129,13 +129,24 @@ function buildRiquadriVuotiSource(corpi) {
   function inPagina(t) { try { return connesso.call(t); } catch (e) { return true; } }
   // Una stringa che nomina un ospite; ciò che non è una stringa si converte da sé, e si guarda dopo.
   function testoConOspiti(v) { return typeof v !== 'string' || /<\s*(i?frame|object|embed)/i.test(v); }
+  var tuttiIn = [Element.prototype.querySelectorAll, DocumentFragment.prototype.querySelectorAll];
+  // Un ospite inserito (anche solo spostato) si ricarica da capo: torna in volo fino al suo load nuovo.
+  function ripartono(n) {
+    if (ospite(n)) { arrivati.delete(n); return; }
+    for (var i = 0; i < tuttiIn.length; i++) {
+      try { var l = tuttiIn[i].call(n, OSPITI); for (var j = 0; j < l.length; j++) arrivati.delete(l[j]); return; } catch (e) {}
+    }
+  }
   var SE = {
     nodi: function (t, a) {
       if (!inPagina(t)) return false;
-      for (var i = 0; i < a.length; i++) if (conOspiti(a[i])) return true;
-      return false;
+      var giro = false;
+      for (var i = 0; i < a.length; i++) if (conOspiti(a[i])) { ripartono(a[i]); giro = true; }
+      return giro;
     },
-    gamma: function (t, a) { return conOspiti(a[0]); },
+    // moveBefore sposta tenendo il documento: niente da ricaricare.
+    sposta: function (t, a) { return inPagina(t) && conOspiti(a[0]); },
+    gamma: function (t, a) { if (!conOspiti(a[0])) return false; ripartono(a[0]); return true; },
     testo: function (i) { return function (t, a) { return inPagina(t) && testoConOspiti(a[i]); }; },
     sempre: function () { return true; },
   };
@@ -203,7 +214,7 @@ function buildRiquadriVuotiSource(corpi) {
       var P = proto(w, c);
       if (!P) return;
       ['append', 'prepend', 'replaceChildren', 'before', 'after', 'replaceWith', 'moveBefore', 'insertAdjacentElement',
-        'insertAdjacentHTML', 'setHTMLUnsafe', 'setHTML'].forEach(function (m) { if (Object.hasOwn(P, m)) dopo(P, m, conTesto[m] || SE.nodi); });
+        'insertAdjacentHTML', 'setHTMLUnsafe', 'setHTML'].forEach(function (m) { if (Object.hasOwn(P, m)) dopo(P, m, conTesto[m] || (m === 'moveBefore' ? SE.sposta : SE.nodi)); });
       if (c !== 'Document') ['innerHTML', 'outerHTML'].forEach(function (p) { if (Object.hasOwn(P, p)) dopoLaScrittura(P, p); });
     });
     var Doc = proto(w, 'Document');

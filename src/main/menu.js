@@ -91,7 +91,7 @@ async function staScrivendo(wc) {
     if (qui !== null) return !!qui;
     const riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || [];
     const risposte = await Promise.all(riquadri
-      .filter((f) => f !== wc.mainFrame && !f.detached)
+      .filter((f) => f !== wc.mainFrame && require('./services/riquadroArrivato').riquadroArrivato(f))
       .map((f) => f.executeJavaScript(sorgente, false).catch(() => true)));
     return risposte.some((r) => r === true);
   } catch (_) {

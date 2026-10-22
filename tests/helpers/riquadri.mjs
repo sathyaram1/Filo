@@ -25,6 +25,7 @@ export async function nelMondoDiFilo(app, page, fn, arg = null, frame = null) {
 // Il mondo isolato di un riquadro incorporato lo raggiunge solo il protocollo di debug: si cerca il contesto
 // isolato del frame che ha Filo dentro, e lo si tiene finché il frame non cambia pagina.
 const sessioni = new WeakMap();
+const ATTESA_MONDO_MS = 10_000;
 async function nelRiquadro(page, frame, code) {
   const scelta = async () => {
     for (const da of [frame, page]) {
@@ -45,7 +46,15 @@ async function nelRiquadro(page, frame, code) {
     throw new Error(`nelMondoDiFilo: nessun mondo di Filo nel riquadro ${frame.url()}`);
   };
   let m = sessioni.get(frame);
-  if (!m) { m = await scelta(); sessioni.set(frame, m); }
+  // Nel riquadro Filo si monta al primo tocco, dopo il frame, e expect.poll non riprova una funzione che lancia:
+  // l'attesa sta qui (#1429).
+  for (const fine = Date.now() + ATTESA_MONDO_MS; !m;) {
+    try { m = await scelta(); } catch (e) {
+      if (Date.now() > fine || frame.isDetached()) throw e;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+  sessioni.set(frame, m);
   const { result, exceptionDetails } = await m.s.send('Runtime.evaluate', {
     contextId: m.id, expression: code, awaitPromise: true, returnByValue: true,
   });
