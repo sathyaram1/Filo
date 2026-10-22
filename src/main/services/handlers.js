@@ -4455,12 +4455,11 @@ async function cambiPerChat(query) {
 // La rilettura di una conversazione con CERCA_CHAT e l'id: intera fino a `cap`, oltre testa e coda, e con `da` un pezzo
 // che non supera la stessa misura. `intera`: il modello l'ha davanti tutta, e i suoi pezzi non si ripescano (#868.1).
 function rilettura(chat, { da = null, cap }) {
-  const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
+  // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: non quelle di Filo, che le ha scritte
+  // il modello, né quelle scritte nell'Aiuto sopra un sito, che le vedeva il sito (#1508).
+  const { daFuori, parole: scrittoDallUtente, classeLetta } = globalThis.SN_FILO_CONTESTO.provenienzaDellaChat(chat);
   const transcript = ChatArchive.transcriptForReading(chat.messages, { da, cap, pezzo: Math.min(ChatArchive.PEZZO_RILETTURA, cap) });
   const conDa = da != null && da !== '' && Number.isFinite(Number(da));
-  // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: quelle di Filo le ha scritte il modello.
-  const scrittoDallUtente = (Array.isArray(chat.messages) ? chat.messages : [])
-    .filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
   return {
     chatRead: chat.id,
     found: true,
