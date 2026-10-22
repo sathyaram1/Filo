@@ -276,6 +276,15 @@ test('#1592 — aperta da Gestione la rivede chi non è owner, senza riavvio; ri
   await expect(b.locator('#bdMie')).toBeVisible();
   await expect(b.locator('.bd-head')).toBeHidden();
   expect(await vociDelMenuApp(app, shell)).toContain('Le tue segnalazioni');
+
+  // Lo stesso per il Deck builder: aperto lo usa, rimesso in pausa la pagina aperta lascia la sola frase.
+  docs['config/mazzi'] = { openToAll: true };
+  expect(await rileggi(app)).toEqual({ bacheca: false, mazzi: true });
+  const d = await openTab('filo://decks/decks.html');
+  await expect(d.locator('h1').first()).toHaveText('Deck builder MTG');
+  docs['config/mazzi'] = { openToAll: false };
+  expect(await rileggi(app)).toEqual({ bacheca: false, mazzi: false });
+  await expect.poll(() => d.evaluate(() => document.body.innerText.trim()).catch(() => ''), { timeout: 10_000 }).toBe(PAUSA_MAZZI);
 });
 
 test('#1592 — all’agente di chi non è owner, in pausa, non arrivano né la Bacheca né il Deck builder', async ({ app, shell }) => {
