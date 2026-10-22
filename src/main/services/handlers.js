@@ -1380,9 +1380,11 @@ async function shellDeiComandi() {
 async function segretiCustoditi() {
   let salvate = {};
   let effettive = {};
+  let chiaveFeedback = null;
   try { salvate = await Storage.getSettings(); } catch (_) {}
   try { effettive = await getEffectiveSettings(); } catch (_) {}
-  return require('./segretiCustoditi').custoditi({ impostazioni: [salvate, effettive] });
+  try { chiaveFeedback = await require('./chiaveFeedback').getPrivateKey(); } catch (_) {}
+  return require('./segretiCustoditi').custoditi({ impostazioni: [salvate, effettive], chiaveFeedback });
 }
 
 // Quello che l'assistente vede nella schermata, non solo il testo in chiaro: riquadri, caselle, parti
