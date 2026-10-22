@@ -66,11 +66,11 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       'annullare una suite a metà butta un\'ora e non dice niente di nessun commit');
   });
 
-  test('prova il commit della spinta, con la storia per elencare i commit dell\'avviso', () => {
-    for (const lavoro of [suite, verdettoJob]) {
+  test('prova il commit della spinta; l\'avviso lo prende con la storia, per elencare i commit dopo l\'ultimo verde', () => {
+    for (const lavoro of [suite, verdettoJob, avvisoJob]) {
       assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
-      assert.match(lavoro, /fetch-depth:\s*0/);
     }
+    assert.match(avvisoJob, /fetch-depth:\s*0/);
   });
 
   test('permessi di sola lettura: legge le corse, non scrive niente', () => {
