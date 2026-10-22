@@ -18,7 +18,8 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-const spazi = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+// Il markdown fa di ogni riga un blocco suo e gli a capo spariscono dal testo: si confrontano le lettere, non gli spazi.
+const lettere = (s) => String(s || '').replace(/\s+/g, '');
 
 test('la risposta spezzata a metà parola arriva in bolla e su disco identica a quella ricevuta', async ({ app, shell }) => {
   test.setTimeout(60_000);
@@ -78,7 +79,7 @@ test('la risposta spezzata a metà parola arriva in bolla e su disco identica a 
     c.querySelectorAll('.dash-bubble-actions').forEach((n) => n.remove());
     return c.textContent;
   });
-  expect(spazi(mostrato), 'il testo nella bolla è quello ricevuto').toBe(spazi(RISPOSTA));
+  expect(lettere(mostrato), 'il testo nella bolla è quello ricevuto').toBe(lettere(RISPOSTA));
 
   const salvato = await app.evaluate(async () => {
     const chats = await globalThis.SN_FILO_CHATS.list();

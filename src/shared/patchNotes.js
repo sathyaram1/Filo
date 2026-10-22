@@ -137,6 +137,13 @@
       ],
     },
     {
+      version: '0.2.246', date: '2026-10-22',
+      features: [],
+      fixes: [
+        'Quando rifai o riprendi l\'intervista di benvenuto, Filo non ti tratta più come appena arrivato e resta su quello che vi dite, senza tirare in ballo cose delle conversazioni passate.',
+      ],
+    },
+    {
       version: '0.2.245', date: '2026-10-22',
       features: [
         'Col tasto destro su un\'immagine fatta con ChatGPT, Firefly o Bing prima del 2026, Filo ora ti dice che è generata con l\'AI e chi lo dichiara, per esempio OpenAI. Prima diceva solo che chi l\'aveva firmata non era riconosciuto. Lo stesso se lo chiedi in chat.',
