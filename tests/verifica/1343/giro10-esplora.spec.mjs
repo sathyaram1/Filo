@@ -55,3 +55,25 @@ test('annullo di un riordino vecchio dopo un altro spostamento: torna solo quell
   expect((await statoBarra(app)).secondary).toContain('qrCode');
   expect((await statoBarra(app)).bar).not.toContain('qrCode');
 });
+
+test('a schermo intero, schede scoperte: il pulsante Massimizza della fila', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  const stato = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const tm = w._filoTabs; const tt = tm.tabs.find((x) => x.id === tm.activeId);
+    return { cf: tm.contentFullscreen, fs: w.isFullScreen(), max: w.isMaximized(), y: tt.view.getBounds().y, h: tt.view.getBounds().height, win: w.getContentSize() };
+  });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.setContentFullscreen(true));
+  await pausa(1000);
+  console.log('dentro', JSON.stringify(await stato()));
+  await page.mouse.move(400, 200);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => (await stato()).y).toBeGreaterThan(0);
+  console.log('scoperte', JSON.stringify(await stato()), await shell.locator('#win-max').getAttribute('data-tip'), await shell.locator('#win-max').isVisible());
+  await shell.locator('#win-max').click();
+  await pausa(1500);
+  console.log('dopo max', JSON.stringify(await stato()));
+  await shell.mouse.move(600, 20);
+  await pausa(1500);
+  console.log('dopo attesa', JSON.stringify(await stato()));
+});
