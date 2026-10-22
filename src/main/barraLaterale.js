@@ -449,6 +449,8 @@ class BarraLaterale {
       pagina: !!t && this.tabs.vistaSottoIlVuoto() === t.view,
       // Lì il content script non le esegue (#843): accese, sembrerebbero premute a vuoto (#1343 r2).
       spento: !!t && this._spentoSu(t),
+      // Filo non c'è nella pagina e non sta arrivando (la stessa notizia dell'Aiuto): un clic andrebbe perso.
+      senzaFilo: !!t && !t.aiuto && !t.loading,
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
