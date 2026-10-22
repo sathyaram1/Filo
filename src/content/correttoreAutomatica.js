@@ -151,7 +151,7 @@
   // dell'utente prima, poi gli errori fissi, poi la maiuscola dei nomi. `rifiutate`: le parole di cui l'utente ha
   // annullato la correzione abbastanza volte; `minuscolo` (o una funzione che lo dice): lì si scrive tutto minuscolo.
   function correzioneAFineParola(testo, fine, {
-    personali = {}, rifiutate = new Set(), nomeDi = () => '', minuscolo = false,
+    personali = {}, rifiutate = new Set(), nomeDi = () => '', minuscolo = false, accento = null,
   } = {}) {
     testo = String(testo ?? '');
     if (typeof fine !== 'number' || fine < 1 || fine > testo.length) return null;
