@@ -103,6 +103,7 @@ const COLLEZIONI = {
   '/redteam-handles/{h}': { frase: 'il nome in classifica, che scegli tu' },
   '/redteam-codes/{code}': { frase: 'Servono il login e un codice' },
   '/config/models': { frase: 'tiene la configurazione condivisa' },
+  '/ancoreRilascio/{tag}': { frase: 'tiene l\'impronta dei file di ogni versione di Filo' },
   '/config/secrets': CONFIGURAZIONE,
   '/config/judgeSecrets': CONFIGURAZIONE,
   '/config/automation': CONFIGURAZIONE,
