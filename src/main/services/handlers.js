@@ -3486,7 +3486,7 @@ async function eseguiAzioneFilo(action, {
         const p = String(action.percorso ?? action.path ?? '').trim();
         let dove = '';
         if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
-          try { dove = await require('./documentiIndice').doveSta(require('./documentRead').normalizePath(p)); } catch (_) {}
+          try { dove = await require('./documentiIndice').doveSta(DR.normalizePath(p)); } catch (_) {}
         }
         return { executed: true, kept: true, ...(dove ? { output: { dove } } : {}) };
       }
