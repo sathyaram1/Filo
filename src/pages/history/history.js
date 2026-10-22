@@ -153,6 +153,9 @@
         it.output || '',
         it.origin || '',
         it.model || '',
+        // Quello che la riga mostra si deve poter cercare: l'host che ha servito e il segno di fornitore non ammesso.
+        it.servedBy || '',
+        it.policyViolation ? I18n.t('history_policy_violation') : '',
       ].join(' ').toLowerCase();
       haystacks.set(it, h);
     }

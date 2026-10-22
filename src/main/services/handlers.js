@@ -582,14 +582,14 @@ function noteServedProvider(settings, action, result) {
       + 'esclusione): aggiornare excludedProviders in config/models.',
     );
   }
-  if (violation) avvisaFuoriPolitica(settings, why, servedBy, model);
+  if (violation) avvisaFuoriPolitica(settings, why, servedBy, model, action);
   return { servedBy, violation };
 }
 
 // Un avviso per host e motivo ogni dieci minuti: una pagina tradotta a pezzi dallo stesso host non ne impila cinquanta.
 const AVVISO_FUORI_POLITICA_MS = 10 * 60 * 1000;
 const avvisatiFuoriPolitica = new Map();
-function avvisaFuoriPolitica(settings, why, servedBy, model) {
+function avvisaFuoriPolitica(settings, why, servedBy, model, action) {
   const chiave = `${why}|${SN_CONST.normalizeProviderName(servedBy)}`;
   const ora = Date.now();
   if (ora - (avvisatiFuoriPolitica.get(chiave) || 0) < AVVISO_FUORI_POLITICA_MS) return;
@@ -601,7 +601,8 @@ function avvisaFuoriPolitica(settings, why, servedBy, model) {
   } else {
     text = I18n.t(settings && settings.openWeightsOnly === true ? 'toast_open_weights_violated' : 'toast_served_excluded', servedBy);
   }
-  try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000 }); } catch (_) {}
+  const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
+  try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000, segnala }); } catch (_) {}
 }
 
 // ─── Dettatura ───────────────────────────────────────────────────────────────

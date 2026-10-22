@@ -516,7 +516,7 @@
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }
     // Broadcast main→content per un toast di sistema (es. esito differito di un invio).
     // Lo mostra solo la scheda in primo piano. { text, duration? }
-    SHOW_TOAST: 'show_toast',                      // { text, duration? }
+    SHOW_TOAST: 'show_toast',                      // { text, duration?, rimedio?, segnala? (testo già scritto per «Invia feedback») }
     // F4 — l'avviso della segnalazione automatica (#784.6): la segnalazione aspetta che si chiuda. «Annulla» la ferma
     // (partita, la ritira solo l'owner; `frase` dice perché no); chiuso senza Annulla, parte. Solo dalle superfici di
     // Filo e solo per un `id` che questo Filo ha messo nell'avviso (#784.3). { id } → { ok, frase? }
