@@ -1,6 +1,6 @@
 # La suite Playwright completa (in parti, poi un verdetto solo) e gli unit test su Windows, a ogni fusione su main: la
 # pubblicazione (release.yml) prende solo un commit la cui corsa qui e' verde. A mano su un ramo prova quel ramo, senza feedback.
-# Garanzie: tests/unit/releaseSuite.test.mjs.
+# Garanzie: tests/unit/releaseSuite.test.mjs e, per i segreti, tests/unit/catenaPubblicazione.test.mjs.
 
 name: Suite Playwright completa
 
