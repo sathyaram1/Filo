@@ -22,7 +22,7 @@
   function numero(v) {
     if (typeof v === 'number') return Number.isFinite(v) ? v : null;
     if (typeof v === 'string' && v.trim()) {
-      const n = Number(v.trim().replace(/\s/g, '').replace(',', '.'));
+      const n = Number(v.trim().replace(/[\s$]/g, '').replace(',', '.'));
       return Number.isFinite(n) ? n : null;
     }
     return null;
