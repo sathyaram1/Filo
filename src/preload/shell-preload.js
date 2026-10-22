@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('filoShell', {
     // Toggle se `muted` è omesso.
     setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
     duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),
+    // Ctrl/Cmd+Shift+T e la voce del menu della scheda (#1476).
+    riapriChiusa: () => ipcRenderer.invoke('tabs:riapri-chiusa'),
+    ciSonoChiuse: () => ipcRenderer.invoke('tabs:ci-sono-chiuse'),
     help: (id) => ipcRenderer.invoke('tabs:help', { id }),
     snapshot: () => ipcRenderer.invoke('tabs:snapshot'),
     setActiveVisible: (visible) => ipcRenderer.invoke('tabs:set-active-visible', { visible }),

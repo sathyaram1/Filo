@@ -661,6 +661,16 @@ function registerIpcHandlers() {
     const newId = await win._filoTabs.duplicateTab(id);
     return { ok: !!newId, id: newId };
   });
+  // Ctrl/Cmd+Shift+T con la barra a fuoco e «Riapri scheda chiusa» del menu della scheda (#1476): solo la cornice.
+  ipcMain.handle('tabs:riapri-chiusa', async (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false };
+    return { ok: !!(await win._filoTabs.riapriChiusa()) };
+  });
+  ipcMain.handle('tabs:ci-sono-chiuse', async (event) => {
+    const win = finestraDellaBarra(event.sender);
+    return { ok: true, ci: !!(win && await win._filoTabs.ciSonoChiuse()) };
+  });
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) gesto(win, 'help-sidebar', () => win._filoTabs.openHelp(id));

@@ -2,6 +2,7 @@
 // colore/attività dal content script, triage manuale e schede archiviate.
 
 const { soloFilo } = require('./origine');
+const { daArchivio } = require('../../tabs/schedeChiuse');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, contattabilePrimaDelClic } = ctx;
@@ -221,20 +222,13 @@ module.exports = function register(on, ctx) {
     }
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
-      const scroll = voce ? voce.scrollPosition : msg.scrollPct;
-      const pct = typeof scroll === 'number' ? scroll : null;
-      // Per il giudizio sui siti la riapertura è di Filo: la chiedono solo le sue pagine (#814).
-      const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
+      // Scroll e paese come li aveva: la stessa porta di Ctrl+Shift+T, che dopo questa non la riapre di nuovo.
+      const px = voce ? voce.proxy : msg && msg.proxy;
+      const id = await win._filoTabs.riapri(voce ? daArchivio(voce) : daArchivio({ url, scrollPosition: msg.scrollPct, proxy: px }));
+      if (voce) win._filoTabs.segnaRiaperta(voce.id);
       // Una scheda chiusa dal riordino e riaperta (#1470): il riordino ha sbagliato. Esce solo il tempo, in fasce.
       if (id && voce) require('../contatoriFinestra').misura('riapertaDallArchivio', voce);
       if (id && voce) contaRiaperta(voce, win);
-      // Se la tab archiviata era instradata "da un altro paese", riaprila
-      // proxata sulla stessa location: setTabProxy ricrea la view nella
-      // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
-      const px = voce ? voce.proxy : msg.proxy;
-      if (id && px && px.country) {
-        try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined, conseguenza: true }); } catch (_) {}
-      }
     }
     return { ok: true };
   }));

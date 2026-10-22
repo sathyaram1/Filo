@@ -105,6 +105,11 @@ const nuovaScheda = contata('new-tab', () => {
   try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 });
 
+function riapriSchedaChiusa() {
+  const win = finestra();
+  try { win && win._filoTabs.riapriChiusa().catch(() => {}); } catch (_) {}
+}
+
 // Dal tasto è Ctrl/Cmd+W, da un clic sulla voce un'altra strada (contatori della finestra, #1470).
 const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {
   const c = schedaAttiva();
@@ -244,6 +249,7 @@ function template(piattaforma) {
     label: 'Schede',
     submenu: [
       { label: 'Nuova scheda', accelerator: 'CommandOrControl+T', click: nuovaScheda, ...SOLO_SCRITTA },
+      { label: 'Riapri scheda chiusa', accelerator: 'CommandOrControl+Shift+T', click: riapriSchedaChiusa, ...SOLO_SCRITTA },
       { label: 'Nuova finestra in incognito', click: finestraIncognito },
       { type: 'separator' },
       { label: 'Indietro', accelerator: tasto('Alt+\u2190'), click: indietro, ...SOLO_SCRITTA },

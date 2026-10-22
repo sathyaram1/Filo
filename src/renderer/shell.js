@@ -943,10 +943,11 @@
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
     // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi, impostazioni] = await Promise.all([
+    const [proxy, permessi, impostazioni, chiuse] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
       senzaErrore(() => api.message({ type: 'get_settings' })),
+      senzaErrore(() => api.tabs.ciSonoChiuse()),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
@@ -998,10 +999,10 @@
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
     }
-    entries.push(
-      { type: 'separator' },
-      { label: 'Chiudi', icon: 'close', action: 'tab-close' },
-    );
+    entries.push({ type: 'separator' });
+    // Come Ctrl+Shift+T (#1476); senza niente da riaprire la voce non c'è.
+    if (chiuse && chiuse.ci) entries.push({ label: 'Riapri scheda chiusa', icon: 'undo', action: 'tab-riapri-chiusa' });
+    entries.push({ label: 'Chiudi', icon: 'close', action: 'tab-close' });
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
@@ -1072,6 +1073,7 @@
       else if (action === 'tab-mute') api.tabs.setMuted(id);
       else if (action === 'tab-help') api.tabs.help(id);
       else if (action === 'tab-close') api.tabs.close(id, 'tasto_destro_scheda');
+      else if (action === 'tab-riapri-chiusa') api.tabs.riapriChiusa();
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
@@ -2397,7 +2399,9 @@
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 't') {
       e.preventDefault();
-      api.tabs.open('filo://newtab/');
+      // Con Shift riapre l'ultima scheda chiusa, come in ogni browser (#1476).
+      if (e.shiftKey) api.tabs.riapriChiusa();
+      else api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'w') {
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id, 'ctrl_w');
