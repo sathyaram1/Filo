@@ -178,23 +178,55 @@
     return t;
   }
 
-  // Da fuori un tasto scritto in un riquadro chiuso parte dall'host, che per il sito non è una casella: le sue scorciatoie,
-  // anche in cattura, si prenderebbero quello che l'utente scrive (#1071). Lo ferma il primo ascolto della pagina (il ponte
-  // in page-preload, a document_start) e al campo arriva una copia nostra che non esce dallo shadow; l'Esc resta di tutti (#514).
-  function tastoNelRiquadro(e) {
+  // Un evento nato in un riquadro chiuso esce dallo shadow verso la finestra del sito: un tasto per lui non sta in una
+  // casella e le sue scorciatoie si prenderebbero quello che l'utente scrive (#1071); inserimenti, composizione, incolla
+  // e rilascio gli portano il testo e i file (#1509). Lo ferma il primo ascolto della pagina (il ponte in page-preload, a
+  // document_start), che ascolta questi tipi; al campo arriva una copia nostra che non esce dallo shadow. Fermare la
+  // propagazione non toglie l'azione predefinita: il testo entra lo stesso. L'Esc resta di tutti (#514).
+  const modificatori = (e) => ({ ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey });
+  const base = (e) => ({ bubbles: true, cancelable: e.cancelable, composed: false, view: e.view });
+  const tasto = (e) => new KeyboardEvent(e.type, {
+    ...base(e), ...modificatori(e), cancelable: true,
+    key: e.key, code: e.code, location: e.location, repeat: e.repeat, isComposing: e.isComposing,
+    keyCode: e.keyCode, charCode: e.charCode, which: e.which,
+  });
+  const inserimento = (e) => {
+    let targetRanges = [];
+    try { targetRanges = e.getTargetRanges(); } catch (_) {}
+    return new InputEvent(e.type, {
+      ...base(e), data: e.data, inputType: e.inputType, isComposing: e.isComposing,
+      dataTransfer: e.dataTransfer || null, targetRanges,
+    });
+  };
+  const COPIE = {
+    keydown: tasto,
+    keypress: tasto,
+    keyup: tasto,
+    beforeinput: inserimento,
+    input: inserimento,
+    compositionstart: (e) => new CompositionEvent(e.type, { ...base(e), data: e.data }),
+    compositionupdate: (e) => new CompositionEvent(e.type, { ...base(e), data: e.data }),
+    compositionend: (e) => new CompositionEvent(e.type, { ...base(e), data: e.data }),
+    paste: (e) => new ClipboardEvent(e.type, { ...base(e), clipboardData: e.clipboardData }),
+    drop: (e) => new DragEvent(e.type, {
+      ...base(e), ...modificatori(e), dataTransfer: e.dataTransfer,
+      clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY, button: e.button, buttons: e.buttons,
+    }),
+  };
+  // textInput porta il testo come beforeinput, ma nessuno di Filo lo ascolta: si ferma e basta.
+  const EVENTI_DEL_RIQUADRO = Object.freeze([...Object.keys(COPIE), 'textInput']);
+  // La copia nasce solo da un gesto vero (o nostro): uno fabbricato dal sito sull'host si ferma, e Chromium manda
+  // compositionend non fidato col testo composto.
+  function eventoNelRiquadro(e) {
     try {
-      if (!e || !e.isTrusted || e.key === 'Escape') return;
+      if (!e || e.key === 'Escape' || !EVENTI_DEL_RIQUADRO.includes(e.type)) return;
       const host = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (!host || !ombre.has(host)) return;
-      const campo = bersaglio(e);
-      if (!campo || campo === host) return;
       e.stopImmediatePropagation();
-      const copia = nostro(new KeyboardEvent(e.type, {
-        key: e.key, code: e.code, location: e.location, repeat: e.repeat, isComposing: e.isComposing,
-        ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
-        keyCode: e.keyCode, charCode: e.charCode, which: e.which,
-        bubbles: true, cancelable: true, composed: false, view: e.view,
-      }));
+      const fai = veroONostro(e) ? COPIE[e.type] : null;
+      const campo = fai ? bersaglio(e) : null;
+      if (!campo || campo === host) return;
+      const copia = nostro(fai(e));
       campo.dispatchEvent(copia);
       if (copia.defaultPrevented) e.preventDefault();
     } catch (_) {}
