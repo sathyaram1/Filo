@@ -99,7 +99,8 @@ test('da riga di comando: il primo biglietto apre l\'accensione, i successivi la
       ricevute.push(body);
       res.setHeader('Content-Type', 'application/json');
       if (body.probe) return res.end(JSON.stringify({ ok: true, work: true, accensione: accensioneDelServer }));
-      res.end(JSON.stringify({ ok: true, work: true, ticket: BIGLIETTO, role: 'new-work', ...(body.cambia ? {} : {}), ...(ricevute.length === 3 ? { accensione: ACC2 } : {}) }));
+      // La risposta al secondo biglietto (terza richiesta) cambia l'accensione.
+      res.end(JSON.stringify({ ok: true, work: true, ticket: BIGLIETTO, role: 'new-work', ...(ricevute.length === 3 ? { accensione: ACC2 } : {}) }));
     });
   });
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
