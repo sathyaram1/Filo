@@ -100,3 +100,32 @@ test('lampo a vista, chiaro e scuro', async ({ app, openTab, testServer }) => {
     await page.screenshot({ path: `tests/.shots/1447-g7-lampo-${nome}.png`, clip: { x: 0, y: 0, width: 800, height: 160 } });
   }
 });
+
+import { menuDi } from '../../helpers/menuContestuale.mjs';
+test('annulla dal tasto destro dopo aver scritto prima della parola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await imposta(app);
+  const page = await testServer.openReady(openTab, PAGINA(), { pubblico: true });
+  await pronta(app, page);
+  await page.locator('#ce').click();
+  await page.keyboard.type('Domani vedo marco al mare. ');
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.type('Ciao. ');
+  const t = await ce(page);
+  console.log('DX prima', JSON.stringify(t));
+  const p = await page.evaluate(() => {
+    const el = document.getElementById('ce');
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const i = n.nodeValue.indexOf('Marco');
+      if (i >= 0) { const r = document.createRange(); r.setStart(n, i + 1); r.setEnd(n, i + 4); const q = r.getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; }
+    }
+    return null;
+  });
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  const voce = menuDi(page).voce('Annulla correzione');
+  const vista = await voce.isVisible({ timeout: 4000 }).catch(() => false);
+  console.log('DX voce', vista);
+  if (vista) { await voce.click(); await page.waitForTimeout(300); }
+  console.log('DX dopo', JSON.stringify(await ce(page)));
+});

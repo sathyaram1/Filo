@@ -28,8 +28,10 @@ test('in incognito', async ({ app, shell, testServer }) => {
   await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
   await page.bringToFront();
   await page.locator('#ta').click();
-  for (const m of ['ok ci vediamo', 'si va bene', 'zanzibarro arriva', 'zanzibarro torna', 'zanzibarro parte']) {
+  for (const m of ['ok ci vediamo', 'si va bene', 'che zanzibarro', 'che zanzibarro', 'che zanzibarro']) {
     await page.keyboard.type(m + ' ');
+    await page.waitForTimeout(1500);
+    console.log('INCO SEGNI', JSON.stringify(await page.locator('.sn-spell-overlay .sn-errore').allTextContents()));
     await page.keyboard.press('Enter');
   }
   await page.keyboard.type('allora perchè ');
