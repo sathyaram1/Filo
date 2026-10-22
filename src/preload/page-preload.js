@@ -144,15 +144,17 @@ try {
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// Un tasto scritto in un riquadro chiuso di Filo lo prende Filo prima di ogni script del sito, anche in cattura (#1071):
-// per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
+// Un tasto, un inserimento, un incolla o un rilascio in un riquadro chiuso di Filo li prende Filo prima di ogni script
+// del sito, anche in cattura (#1071, #1509): per questo l'ascolto nasce qui, a document_start. Li smista
+// SN_FILO_UI.eventoNelRiquadro (src/shared/filoUi.js); i tipi sono i suoi EVENTI_DEL_RIQUADRO (sentinella in tests/unit/filoUi.test.mjs).
 try {
-  for (const tipo of ['keydown', 'keypress', 'keyup']) {
+  for (const tipo of ['keydown', 'keypress', 'keyup', 'beforeinput', 'input', 'compositionstart', 'compositionupdate',
+    'compositionend', 'paste', 'drop', 'textInput']) {
     const ascolto = (e) => {
       const UI = globalThis.SN_FILO_UI;
       // L'Esc va prima a ogni ascolto di Filo: un sito che lo ferma sulla finestra lasciava aperto il riquadro (#859).
       if (tipo === 'keydown' && e.key === 'Escape') { escPrimaAFilo(e, ascolto, UI); return; }
-      if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
+      if (UI && typeof UI.eventoNelRiquadro === 'function') UI.eventoNelRiquadro(e);
     };
     window.addEventListener(tipo, ascolto, { capture: true });
   }
