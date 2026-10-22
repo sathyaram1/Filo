@@ -716,7 +716,14 @@
     if (!ascoltate.has(el)) {
       ascoltate.add(el);
       el.addEventListener('input', (e) => { const vivo = monitored.get(el); if (vivo && vivo.attivo) suInput(vivo, e); });
-      el.addEventListener('beforeinput', (e) => { const vivo = monitored.get(el); if (vivo) primaDellAnnulla(vivo, e); }, true);
+      // Prima del tasto si vede la casella che la chat ha svuotato da sé all'invio, senza un input: il messaggio partito
+      // dice come si scrive qui (seguiIlTesto).
+      el.addEventListener('beforeinput', (e) => {
+        const vivo = monitored.get(el);
+        if (!vivo) return;
+        if (vivo.attivo) seguiIlTesto(vivo);
+        primaDellAnnulla(vivo, e);
+      }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
     }
     if (!state.ro) {
