@@ -91,16 +91,23 @@
     return JSON.stringify(ev) + '\n';
   }
 
+  // Una riga sola: l'evento, null se rotta o fuori formato, undefined se vuota. La lettura del file la usa riga per
+  // riga (un file grande non sta in una stringa); `analizza` per un testo intero, come un export.
+  function analizzaRiga(r) {
+    if (!r || !r.trim()) return undefined;
+    try {
+      const ev = JSON.parse(r);
+      return valido(ev) ? ev : null;
+    } catch (_) { return null; }
+  }
+
   // Una riga rotta (scrittura interrotta da un guasto di corrente) si salta e si conta, non ferma la lettura.
   function analizza(testo) {
     const eventi = [];
     let scartate = 0;
     for (const r of String(testo || '').split('\n')) {
-      if (!r.trim()) continue;
-      try {
-        const ev = JSON.parse(r);
-        if (valido(ev)) eventi.push(ev); else scartate++;
-      } catch (_) { scartate++; }
+      const ev = analizzaRiga(r);
+      if (ev) eventi.push(ev); else if (ev === null) scartate++;
     }
     return { eventi, scartate };
   }
@@ -234,11 +241,17 @@
           id: ev.id, ts: ev.ts, url: ev.url, titolo: ev.titolo, scheda: ev.scheda ?? null, dispositivo: ev.dispositivo,
           // Una scheda chiusa prima del filo, entrata alla sua data (#872): riassunto e vettore restano nel suo archivio.
           ...(stringa(ev.archivio) ? { archivio: ev.archivio } : {}),
+          // Tagliati alla misura (src/main/services/misurePagine.js): un indirizzo a metà non si riapre come intero.
+          ...(ev.urlTagliato === true ? { urlTagliato: true } : {}),
+          ...(ev.titoloTagliato === true ? { titoloTagliato: true } : {}),
         });
         break;
       case TIPI.TITOLO_PAGINA: {
         const p = stato.pagine.get(ev.visita);
-        if (p) p.titolo = ev.titolo;
+        if (p) {
+          p.titolo = ev.titolo;
+          if (ev.titoloTagliato === true) p.titoloTagliato = true; else delete p.titoloTagliato;
+        }
         break;
       }
       case TIPI.CANCELLAZIONE: {
@@ -317,7 +330,7 @@
       if (i >= 0) return { tipo: 'messaggio', chat: c.id, i, ts: c.messages[i].ts, role: c.messages[i].role, app: c.app || null };
     }
     const p = stato.pagine.get(id);
-    if (p) return { tipo: 'pagina', id: p.id, ts: p.ts, url: p.url, titolo: p.titolo };
+    if (p) return { tipo: 'pagina', id: p.id, ts: p.ts, url: p.url, titolo: p.titolo, ...(p.urlTagliato ? { urlTagliato: true } : {}) };
     return null;
   }
 
@@ -409,7 +422,7 @@
 
   global.SN_FILO_EVENTI = {
     VERSIONE, TIPI, AUTORI, PERIODI,
-    uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat, dove,
+    uuid, valido, crea, riga, analizza, analizzaRiga, nuovoStato, applica, compatta, elencoChat, copiaChat, dove,
     daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, delSito, coperto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

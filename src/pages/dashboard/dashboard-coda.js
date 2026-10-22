@@ -155,8 +155,9 @@
     elenco.replaceChildren(...g.pagine.slice().reverse().map((p) => {
       const a = el('a', 'dash-pagina');
       a.dataset.id = p.id;
-      a.href = /^https?:\/\//i.test(p.url) ? p.url : '#';
-      a.title = p.url;
+      const dove = global.SN_FILO_CODA.daAprire(p);
+      a.href = dove ? dove.url : '#';
+      a.title = dove && dove.sito ? `${dove.url} · indirizzo troppo lungo, si apre il sito` : p.url;
       a.append(el('span', 'dash-pagina-titolo', String(p.titolo || '').trim() || sito(p.url)), el('span', 'dash-pagina-sito', `${sito(p.url)} · ${ora(p.ts)}`));
       if (p.altrove) a.append(el('span', 'dash-pagina-sito', 'da un altro dispositivo'));
       a.addEventListener('click', (e) => { e.preventDefault(); riapri(p).catch(() => {}); });
@@ -172,9 +173,10 @@
   // Un indirizzo che il filo ricorda l'ha scritto un sito: si riapre solo se è una pagina web.
   // Una scheda chiusa prima del filo si riapre com'era (scroll, paese), dalla sua voce d'archivio (#872).
   async function riapri(p) {
-    if (!/^https?:\/\//i.test(String(p.url || ''))) return;
-    const riaperta = p.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
-    if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: p.url });
+    const dove = global.SN_FILO_CODA.daAprire(p);
+    if (!dove) return;
+    const riaperta = p.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
+    if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
   }
 
   async function togliPagine(r, ids) {
@@ -645,9 +647,10 @@
     if (pagina && gruppo && gruppo._gruppo) {
       const p = gruppo._gruppo.pagine.find((x) => x.id === pagina.dataset.id);
       if (!p) return [];
+      const dove = global.SN_FILO_CODA.daAprire(p);
       return [
-        { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => { riapri(p).catch(() => {}); } },
-        { type: 'item', icon: icona('copy', 16), label: 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(p.url).catch(() => {}); } },
+        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { riapri(p).catch(() => {}); } },
+        { type: 'item', icon: icona('copy', 16), label: dove && dove.sito ? 'Copia l’indirizzo del sito' : 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(dove && dove.sito ? dove.url : p.url).catch(() => {}); } },
         { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togliPagine(gruppo, [p.id]).catch(() => {}); } },
       ];
     }

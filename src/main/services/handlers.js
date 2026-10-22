@@ -4048,9 +4048,14 @@ async function paginePerChat(query) {
     const delicata = fuori(p.url) || (p.chiusa && restaQui(p._voce || {}, fuori));
     let sito = '';
     try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: al modello va il sito, detto come tale.
+    const tagliata = !!(p._voce && p._voce.urlTagliato);
+    let origine = '';
+    try { origine = new URL(p.url).origin; } catch (_) {}
     out.push(delicata
       ? { url: sito ? `https://${sito}/` : '', title: sito || 'sito', date: p.date, chiusa: !!p.chiusa, delicata: true }
-      : { url: p.url, title: p.title, date: p.date, chiusa: !!p.chiusa, ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
+      : { url: tagliata ? (origine ? `${origine}/` : '') : p.url, title: p.title, date: p.date, chiusa: !!p.chiusa,
+        ...(tagliata ? { tagliata: true } : {}), ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
   }
   return out.filter((p) => p.url);
 }
@@ -4226,7 +4231,7 @@ function chatSearchesForPrompt(actions) {
       const righe = pagine.map((pg) => {
         const when = pg.date ? new Date(pg.date).toLocaleString('it-IT') : '';
         const stato = pg.chiusa ? 'scheda chiusa' : 'visitata';
-        return `- ${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
+        return `- ${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}${pg.tagliata ? ' · indirizzo troppo lungo: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
       });
       blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Per riaprirne una usa NAVIGA col suo indirizzo.]\n`
         + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));

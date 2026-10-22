@@ -244,12 +244,18 @@
     mostraEsitoCancella(I18n.t('security_wipe_fail'), true);
   }
 
-  // La chat porta qui con #cancella-tutto: sul tasto, che non cancella da solo.
+  // La chat porta qui con #cancella-tutto, l'avviso del filo pesante con #cancella-pagine (#1525): sul tasto, che
+  // non cancella da solo.
+  const TASTI_DA_INDIRIZZO = {
+    '#cancella-tutto': { tasto: 'sec-wipe-btn', riga: 'sec-wipe-row' },
+    '#cancella-pagine': { tasto: 'sec-visite-ora', riga: 'sec-visite' },
+  };
   function portaAlTasto() {
-    if (location.hash !== '#cancella-tutto') return;
+    const dove = TASTI_DA_INDIRIZZO[location.hash];
+    if (!dove) return;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
-    const btn = $('sec-wipe-btn');
-    const centra = () => $('sec-wipe-row').scrollIntoView({ block: 'center' });
+    const btn = $(dove.tasto);
+    const centra = () => $(dove.riga).scrollIntoView({ block: 'center' });
     centra();
     btn.focus({ preventScroll: true });
     btn.classList.remove('sn-card-highlight');
