@@ -172,9 +172,18 @@ async function conServer(risposta, fn) {
 }
 
 // Le stesse prove sul bake vero e su una sua copia ritoccata: `percorsoBake` dice quale.
+// Ogni variabile che il bake chiede si accende e si rifà il giro, finché non ne chiede di nuove: una chiave scritta solo
+// se la sua fonte è piena, con qualunque nome, anche composto a runtime, arriva così nel file e la prova la vede.
 async function bakeColJob(percorsoBake = BAKE) {
   const { job } = fontiDelBake(readFileSync(percorsoBake, 'utf8'));
-  return bake(job, percorsoBake);
+  for (let giro = 0; giro < 20; giro++) {
+    const r = await bake(job, percorsoBake);
+    assert.ok(Array.isArray(r.lette), 'il registro delle variabili chieste dal bake non è stato scritto');
+    const nuove = r.lette.filter((n) => !VARIABILI_DI_COMANDO.has(n) && !(n in job));
+    if (!nuove.length) return r;
+    for (const n of nuove) job[n] = `job-${n.toLowerCase()}`;
+  }
+  assert.fail('il bake chiede variabili nuove a ogni giro');
 }
 
 async function bakeColServer(percorsoBake = BAKE) {
