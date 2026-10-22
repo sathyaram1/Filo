@@ -163,6 +163,13 @@ test('con la scheda dietro il «Salta» si preme lo stesso, su YouTube e negli a
     const altra = testServer.html('<title>Altra</title><p>altra scheda</p>');
     await apri(altra, true);
     await arrivato(yt);
+    // Le anteprime svegliano per un attimo la scheda dietro che cambia, e lì l'animazione partirebbe: spente, a premere
+    // il «Salta» resta solo Filo a pagina nascosta.
+    await filo.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      tm.anteprime.chiudi();
+      tm.layout();
+    });
     for (const u of [yt, ima]) await nascosta(u);
 
     await filo.evaluate(({ BrowserWindow }, u) => {
