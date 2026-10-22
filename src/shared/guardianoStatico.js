@@ -17,10 +17,12 @@
   // guardiano, che vede la frase intera. Qui restano i marchi del codice
   // MONOUSO, che nessuno usa per il cancello di casa (#536): il nome del codice col suo senso, anche oltre un
   // complemento («codice di sicurezza monouso») o una parola («two-factor authentication code»).
-  const NOME_CODICE = '(?:codic\\w*|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
-  const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w+|temporary|monouso|usa\\s+e\\s+getta|recovery'
+  // Ogni ripetizione ha un tetto: su un token di milioni di caratteri una regex senza tetto finiva la pila e
+  // la porta delle uscite si fermava (#1505). Prova: tests/unit/usciteSegreti.test.mjs.
+  const NOME_CODICE = '(?:codic\\w{0,20}|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
+  const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w{1,20}|temporary|monouso|usa\\s+e\\s+getta|recovery'
     + '|one[\\s-]?time|single[\\s-]?use|(?:a|in)\\s+due\\s+(?:fattori|passaggi)|two[\\s-]?(?:factor|step))';
-  const PAROLA = "[\\wÀ-ÿ'’-]+";
+  const PAROLA = "[\\wÀ-ÿ'’-]{1,64}";
   const MARCHI_MONOUSO = new RegExp(
     '(?:\\b(?:otp|mfa|2fa)\\b(?:\\s+(?:codes?|codice|pin))?'
     + `|\\b${NOME_CODICE}(?:\\s+(?:di|da|per)\\s+${PAROLA})?\\s+(?:di\\s+|da\\s+)?${SENSO_MONOUSO}\\b`
