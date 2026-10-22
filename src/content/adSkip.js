@@ -25,6 +25,10 @@
 
   const PASSO_MS = 250;
   const PASSO_NASCOSTI_MS = 1000;
+  // Una pagina nascosta (scheda dietro, finestra ridotta o coperta) non disegna e l'animazione non parte, ma l'audio
+  // della pubblicità si sente: lì i «Salta» si cercano nel DOM, al passo che Chromium concede ai timer nascosti.
+  const VEGLIA_MS = 1000;
+  const SELETTORE = SALTA.join(',');
   // Un clic che non ha effetto non si ripete a raffica: i tentativi si diradano fino a uno ogni dieci secondi.
   const ATTESE_MS = [500, 1000, 1500, 2500, 5000, 10000];
   const TENTATIVI = 12;
