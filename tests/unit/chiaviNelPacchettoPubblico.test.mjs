@@ -249,6 +249,12 @@ test('le regole: un campo in più è rosso e nomina la chiave', () => {
   assert.match(errori[0], /^apiKeys\.anthropic: campo fuori elenco/);
 });
 
+test('le regole: un campo fuori elenco è rosso anche vuoto, una chiave uscita vuota no', () => {
+  const errori = controllaPacchetto(con((g) => { g.apiKeys.anthropic = ''; g.mapsKey = '  '; return g; }));
+  assert.deepEqual(errori.map((e) => e.split(':')[0]).sort(), ['apiKeys.anthropic', 'mapsKey']);
+  assert.deepEqual(controllaPacchetto(con((g) => { g.apiKeys.openrouter = ''; return g; })), []);
+});
+
 test('le regole: una chiave fuori dalla mappa apiKeys o dentro una lista è rossa uguale', () => {
   const errori = controllaPacchetto(con((g) => { g.extra = { chiavi: ['k1'] }; g.openrouter = 'or'; return g; }));
   assert.deepEqual(errori.map((e) => e.split(':')[0]).sort(), ['extra.chiavi[0]', 'openrouter']);
