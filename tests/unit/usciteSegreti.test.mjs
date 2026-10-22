@@ -1236,6 +1236,23 @@ describe('la porta chiude a guasto e ogni collegamento ha un verdetto', () => {
     assert.deepEqual(V.alClic('https://chiede.test/b', { proposta: true }), { daChiedere: true, motivo: 'contiene un tuo dato' });
     assert.equal(V.alClic('https://interrotta.test/c', { proposta: true }).daChiedere, true);
   });
+
+  test('una risposta con più collegamenti da confermare di quanti l\'archivio ne tenga: riaperta, nessuno passa per controllato', async () => {
+    require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+    V.svuota();
+    const indirizzi = Array.from({ length: 5600 }, (_, i) => `https://sito${i}.example/p`);
+    const chiedono = await V.giudica(indirizzi, { porta: pulita });
+    assert.equal(chiedono.length, 5400);
+    const archiviato = globalThis.SN_CHAT_ARCHIVE.toStoredMessage({ role: 'filo', text: indirizzi.join('\n'), linkDaConfermare: chiedono });
+    assert.equal(archiviato.linkDaConfermare.length, 5000);
+    assert.equal(archiviato.senzaVerdetto, true);
+    V.svuota();
+    V.ricordaArchiviati([archiviato], (t) => t.split('\n'));
+    assert.equal(V.alClic(indirizzi[5599], { proposta: true }).daChiedere, true);
+    assert.equal(V.alClic(indirizzi[300], { proposta: true }).daChiedere, true);
+    const sotto = globalThis.SN_CHAT_ARCHIVE.toStoredMessage({ role: 'filo', text: 'x', linkDaConfermare: chiedono.slice(0, 10) });
+    assert.equal(sotto.senzaVerdetto, undefined);
+  });
 });
 
 test('la home riceve dal filo i verdetti delle frasi di Filo, anche dopo un riavvio', () => {
