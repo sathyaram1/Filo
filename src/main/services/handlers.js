@@ -6225,22 +6225,46 @@ async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
         .filter((s) => s.text);
     }
   }
-  // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): la home
-  // chiede l'icona del sito appena lo mostra, prima di ogni clic, e al clic deve dire cosa ha fermato.
+  // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): al clic la home
+  // deve dire cosa ha fermato. La porta guarda la home come un compito che ha letto testo di altri (#1505).
+  const casa = contestoDellaHome(inputs);
   for (let i = 0; i < suggestions.length; i++) {
-    let u = null;
-    try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
+    const u = suggestions[i].action ? await controllaUscita(suggestions[i].action, casa) : null;
     if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
-    // La home legge titoli di pagine e frasi di Filo, cioè testo di altri: un indirizzo con un dato dell'utente chiede l'OK.
+    // Un indirizzo con un dato dell'utente, o composto dal modello, chiede l'OK al clic; un controllo mancato pure.
     const a = suggestions[i].action;
     const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
     if (!/^https?:/i.test(url)) continue;
     let chiede = [];
-    try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
+    try {
+      chiede = await linkCheChiedonoOk('', { ...casa, sempre: true, indirizzi: [url] });
+    } catch (_) { chiede = [{ motivo: VerdettiUscite.MOTIVI.guasto }]; }
     if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
+  // I collegamenti del messaggio di Filo nella home hanno lo stesso giudizio dei suggerimenti.
+  let linkDaConfermare = [];
+  let senzaVerdetto = false;
+  if (message) {
+    try { linkDaConfermare = await linkCheChiedonoOk(message, { ...casa, sempre: true }); } catch (_) { senzaVerdetto = true; }
+  }
   await FiloMem.setDashboardCache({ message: message || cached?.message || '', suggestions, signature: inputs.signature });
-  return { message, suggestions, ts: new Date().toISOString() };
+  return { message, suggestions, ts: new Date().toISOString(), ...(linkDaConfermare.length ? { linkDaConfermare } : {}), ...(senzaVerdetto ? { senzaVerdetto } : {}) };
+}
+
+// La home legge testo di altri (titoli di schede e di pagine salvate, notifiche, conversazioni, cose successe): per la
+// porta è un compito contaminato (#1505). Un indirizzo che compare in schede, salvate o cronologia si apre; uno composto
+// dal modello chiede l'OK, e un codice letto lì non esce. `parole` = quello che l'utente ha scritto, che può uscire.
+function contestoDellaHome(inputs) {
+  const p = (inputs && inputs.payload) || {};
+  const letto = ['stato', 'notifiche', 'salvati', 'appunti', 'lezioni', 'eventi']
+    .map((k) => (typeof p[k] === 'string' ? p[k] : '')).filter((t) => t.trim()).join('\n');
+  const provenienza = PageRead.contestoChat();
+  PageRead.annotaLink(provenienza, ((inputs && inputs.saved) || []).map((x) => x && x.url).filter(Boolean).join('\n'));
+  return {
+    contesto: [{ type: 'LETTURA_HOME', _output: { daFuori: [{ testo: letto || '(la home non ha letto niente)', fonte: 'da ciò che legge la home' }] } }],
+    provenienza,
+    parole: (inputs && inputs.parole) || '',
+  };
 }
 
 function schedeWebAperte() {
