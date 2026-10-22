@@ -368,6 +368,7 @@ html, body {
   margin-left: 8px;
   color: var(--sn-error);
   font-weight: 600;
+  white-space: nowrap;
   cursor: help;
 }
 
