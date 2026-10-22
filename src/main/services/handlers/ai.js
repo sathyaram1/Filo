@@ -142,8 +142,8 @@ module.exports = function register(on, ctx) {
 
   // «Valuta» dell'Aiuto (#1449) risponde col modello della chat. Se quello non vede le immagini la pagina gli arriva
   // senza la foto: outline, indirizzo e testo del campo bastano a giudicare.
-  async function chiediValuta(payload, origin) {
-    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, modelloDi: SN_CONST.ACTIONS.FILO_CHAT });
+  async function chiediValuta(payload, origin, sender) {
+    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, sender, modelloDi: SN_CONST.ACTIONS.FILO_CHAT });
     try {
       return await chiedi(payload);
     } catch (e) {

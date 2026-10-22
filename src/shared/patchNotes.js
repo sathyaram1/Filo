@@ -10,7 +10,9 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.245', date: '2026-10-22',
-      features: [],
+      features: [
+        'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta». L\'Aiuto legge tutto il testo e ti segnala errori, frasi poco chiare, un tono sbagliato e fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
+      ],
       fixes: [
         'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
         'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',
@@ -20,7 +22,6 @@
       version: '0.2.244', date: '2026-10-21',
       features: [
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
-        'Col tasto destro su un campo dove stai scrivendo c\'è «Valuta». L\'Aiuto legge tutto il testo e ti segnala errori, frasi poco chiare, un tono sbagliato e fatti dubbi. Ogni correzione che propone la scrivi nel campo con un clic, e con un altro clic la togli.',
       ],
       fixes: [
         'Se in chat qualcuno ti chiede la password del wifi o un pin e tu rispondi, il correttore non manda più al modello la password o il pin. Il resto del messaggio lo controlla come sempre.',
