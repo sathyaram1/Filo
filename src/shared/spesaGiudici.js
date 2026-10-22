@@ -67,7 +67,7 @@
       if (!(chiave in p) || p[chiave] === undefined) continue;
       const v = p[chiave];
       if (v === null || (typeof v === 'string' && !v.trim())) { valori[campo] = regola.fabbrica; continue; }
-      const n = numero(v);
+      const n = decimali ? numero(v) : intero(v);
       if (n === null) return { ok: false, testo: `${regola.etichetta}: ci vuole un numero. Non salvato.` };
       if (n < regola.min || n > regola.max) {
         return { ok: false, testo: `${regola.etichetta}: da ${cifra(regola.min, decimali)} a ${cifra(regola.max, decimali)}. Non salvato.` };
