@@ -1123,7 +1123,7 @@
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw, c.win).slice(1);
+    const args = argomenti(raw, c).slice(1);
     const testi = args.map((a) => a.testo);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
