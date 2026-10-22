@@ -5227,7 +5227,7 @@
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
     if (strade) body.appendChild(strade);
-    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb, liv));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
     // Un ridisegno a metà risposta non porta via il cursore a chi sta scrivendo.
@@ -5364,11 +5364,13 @@
     return JSON.stringify([n.status, n.statusReason || '', l4.esito || '', l4.at || '']);
   }
 
-  function pannelloSaltaAudit(fb) {
+  function pannelloSaltaAudit(fb, liv) {
     const fermo = esitiSalta.get(fb._id);
     const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', { releasedVersion });
     if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
     if (fermo) esitiSalta.delete(fb._id);
+    // Lo sha mostrato nel pannello parte col salto: un ramo andato avanti dopo l'audit non si salta alla cieca (#1502).
+    const sha = (liv && liv.pannello && liv.pannello.sha) || '';
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const btn = document.createElement('button');
@@ -5409,7 +5411,7 @@
       esito.dataset.kind = 'wait';
       esito.textContent = 'Chiedo al server…';
       try {
-        const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
+        const r = await sendToMain(Object.assign({ type: LIVELLO4_SALTA, feedbackId: fb._id }, sha ? { sha } : {}));
         if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
         const m = SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
         esito.dataset.kind = m.kind;

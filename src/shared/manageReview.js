@@ -1495,6 +1495,9 @@
       });
     }
     const righe = [riga('Esito', info.etichetta)];
+    // Il commit che l'audit ha letto: il salto lo rimanda al server, che salta solo quello (#1502).
+    const sha = /^[0-9a-f]{40}$/.test(String(l.sha || '')) ? String(l.sha) : '';
+    if (sha) righe.push(riga('Commit esaminato', sha.slice(0, 8)));
     if (l.by) righe.push(riga('Deciso da', l.by === 'owner' ? 'te' : String(l.by)));
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim();
@@ -1506,6 +1509,7 @@
       // Bocciato: l'owner legge e può andare avanti lo stesso. Il cancello di fusione (L5) resta,
       // quindi non è un via libera cieco.
       azioni: esito === 'fail' ? ['salta_l4'] : [],
+      sha,
     });
   }
 

@@ -172,6 +172,13 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 /* Ogni voce è un paragrafo di direzione a sé: una scritta da destra non rigira le vicine (#1502). */
 .sn-mac-branch, .sn-mac-recent-branch, .sn-mac-block-items, .sn-mac-voce-dove, .sn-mac-voce-testo, .sn-mac-intorno-riga { unicode-bidi: isolate; }
 .sn-mac-block-list > [hidden], .sn-mac-serve-aprire[hidden] { display: none; }
+/* Un carattere invisibile scritto per esteso: col colore dell'errore, perché è quello da notare. */
+.sn-mac-invisibile {
+  color: var(--sn-error);
+  background: color-mix(in srgb, var(--sn-error) 12%, transparent);
+  border-radius: 3px;
+  padding: 0 1px;
+}
 /* Le voci oltre le prime: un tasto discreto sotto l'elenco, come un rimando e non come un'azione. */
 .sn-mac-tutte {
   align-self: flex-start;

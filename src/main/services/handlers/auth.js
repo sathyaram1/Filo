@@ -1386,7 +1386,10 @@ module.exports = function register(on, ctx) {
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
-    const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
+    // Il commit che l'owner ha visto bocciato: il server salta solo quello (#1502).
+    const sha = String(msg?.sha || '').trim();
+    if (sha && !/^[0-9a-f]{40}$/.test(sha)) return { ok: false, error: 'Il commit da saltare non è uno sha valido.' };
+    const r = await callSecurityFunction('ownerSkipSecaudit', sha ? { feedbackId, sha } : { feedbackId });
     if (!r || r.ok === false) {
       // `error` è la frase del server per l'owner; `reason` il codice, solo se la frase manca.
       return { ok: false, error: (r && (r.error || r.detail || r.reason)) || 'Il server non ha saltato il controllo.' };

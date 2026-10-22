@@ -63,3 +63,34 @@ test('la pagina non ha rami per nome di tipo: etichetta e «una per una» vengon
   assert.ok(ordine.every((i) => i >= 0), 'manage.html deve caricare domande.js, manageReview.js, manageDomande.js e manage.js');
   assert.deepEqual(ordine.slice().sort((a, b) => a - b), ordine, 'domande.js va caricato prima di chi lo usa');
 });
+
+// Una domanda non fidata non rigira né nasconde testo sotto gli occhi dell'owner (#1502).
+test('domanda non fidata: i caratteri invisibili si vedono; azioni e testi dell’owner restano com’erano', () => {
+  require(join(RADICE, 'src', 'shared', 'mergeApprovals.js'));
+  const vis = globalThis.SN_MERGE_APPROVALS.caratteriVisibili;
+  const RLO = '‮';
+  const azione = { tipo: 'riprendi', feedbackId: 'fb902' };
+  const d = {
+    id: 'q1', fiducia: 'non_fidato', titolo: `Scegli ${RLO}A`, contesto: `c${RLO}`, problema: 'p​', notePerAgenti: `n${RLO}`,
+    opzioni: [{ testo: `Archivia${RLO}`, pro: `si${RLO}`, contro: 'no', azione }],
+    consiglio: { opzione: 0, perche: `perché${RLO}` },
+    conversazione: [{ autore: { tipo: 'owner' }, testo: `mio 👩‍💻${RLO}` }, { autore: { tipo: 'agente', ruolo: 'resolver' }, testo: `suo${RLO}` }],
+  };
+  const v = D.testiVisibili(d, vis);
+  assert.equal(v.titolo, 'Scegli ⟨U+202E⟩A');
+  assert.deepEqual([v.contesto, v.problema, v.notePerAgenti], ['c⟨U+202E⟩', 'p⟨U+200B⟩', 'n⟨U+202E⟩']);
+  assert.deepEqual([v.opzioni[0].testo, v.opzioni[0].pro, v.opzioni[0].contro], ['Archivia⟨U+202E⟩', 'si⟨U+202E⟩', 'no']);
+  assert.equal(v.opzioni[0].azione, azione, 'l’azione è la stessa, non una copia rifatta dal testo');
+  assert.equal(v.consiglio.perche, 'perché⟨U+202E⟩');
+  assert.equal(v.conversazione[0].testo, `mio 👩‍💻${RLO}`, 'quello che scrive l’owner non si tocca');
+  assert.equal(v.conversazione[1].testo, 'suo⟨U+202E⟩');
+  assert.equal(d.titolo, `Scegli ${RLO}A`, 'l’originale non cambia');
+
+  // Fidata: i suoi testi restano, ma un turno non fidato dentro di lei si mostra.
+  const f = D.testiVisibili(Object.assign({}, d, { fiducia: 'fidato', conversazione: [
+    { autore: { tipo: 'agente', fiducia: 'fidato' }, testo: `pulito${RLO}` }, { autore: { tipo: 'agente' }, testo: `sporco${RLO}` },
+  ] }), vis);
+  assert.equal(f.titolo, d.titolo);
+  assert.deepEqual(f.conversazione.map((t) => t.testo), [`pulito${RLO}`, 'sporco⟨U+202E⟩']);
+  assert.equal(D.testiVisibili(d, null), d, 'senza la resa la domanda passa com’è');
+});
