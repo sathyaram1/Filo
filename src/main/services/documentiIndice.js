@@ -515,14 +515,21 @@ async function doveSta(percorso) {
   return pezzi.length > 2 ? `${pezzi[0]} › … › ${pezzi[pezzi.length - 1]}` : pezzi.join(' › ');
 }
 
-/** Le voci dell'elenco che non sono una cartella di questo computer (per dirlo prima di salvarle). */
+/**
+ * Le voci dell'elenco che non sono una cartella di questo computer (per dirlo prima di salvarle). Le scrive il modello
+ * e si guardano prima dell'OK: una su un altro computer non si tocca (#1499), la si sceglie da Preferenze.
+ */
 async function cartelleMancanti(elenco) {
   const out = [];
+  let rs = null;
   for (const v of Array.isArray(elenco) ? elenco : []) {
     const voce = voceCartella(v);
     if (voce && DI_SERIE[voce]) continue;
     let ok = false;
-    if (voce) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
+    if (voce && diRete(v, voce)) {
+      if (!rs) rs = await radici();
+      ok = (await cartellaChiesta(v, rs)).rete === false;
+    } else if (voce) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
     if (!ok) out.push(String(v));
   }
   return out;
