@@ -132,6 +132,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'tasti.js'), 'SN_TASTI'); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'disposizioneIcone.js'), 'SN_DISPOSIZIONE_ICONE'); // dove sta ogni icona globale: PRIMA di menuIcons
   safe(path.join(SHARED, 'gestiContati.js'), 'SN_GESTI'); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
+  safe(path.join(SHARED, 'guardianoStatico.js'), 'SN_GUARDIANO_STATICO'); // «è un segreto?» e la forma di una carta: PRIMA di campoTesto ed extractContext (#810.7, #810.8)
   safe(path.join(SHARED, 'campoTesto.js'), 'SN_CAMPO_TESTO'); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'schedeInChat.js'), 'SN_SCHEDE_IN_CHAT'); // #2085 — gettoni delle schede: PRIMA di sidebar.js
   safe(path.join(SHARED, 'schedaTrascinata.js'), 'SN_SCHEDA_TRASCINATA'); // #2084 — la scheda lasciata qui: PRIMA di sidebar.js
@@ -153,7 +154,6 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'qr.js'), 'SN_QR');
   safe(path.join(SHARED, 'calcMarkers.js'), 'SN_CALC'); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js'), 'SN_PLACE'); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
-  safe(path.join(SHARED, 'guardianoStatico.js'), 'SN_GUARDIANO_STATICO'); // #810.7 — la forma di un numero di carta: PRIMA di extractContext
   safe(path.join(SHARED, 'campiSegreti.js'), 'SN_CAMPI_SEGRETI'); // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js

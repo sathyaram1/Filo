@@ -297,6 +297,7 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
   if (!G || !wc) return;
   const p = await testoDellaPagina(sender);
   const dallaPagina = p && p.host ? `dalla pagina ${p.host}` : 'dalla pagina';
+  // Quello che l'utente ha immesso qui lo ferma la porta di questa pagina, ma il registro che resta non lo tiene (#810.8).
   const fonti = [{ testo: p ? p.testo : '', fonte: dallaPagina }];
   if (payload && typeof payload.outline === 'string') fonti.push({ testo: payload.outline, fonte: dallaPagina });
   const risultati = payload && payload.esterno && payload.esterno.ricercaWeb && payload.esterno.ricercaWeb.results;
@@ -321,6 +322,12 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
     reg.aggiungiTutti(trovati, f.fonte);
     SegretiLetti.aggiungiTutti(trovati, f.fonte);
   }
+}
+
+// Il testo che l'assistente propone per un campo e che la porta delle uscite lascia passare non conteneva niente di
+// letto: è suo, e nel campo lo mette l'utente accettandolo. Dove la pagina lo mostra poi, non è letto da fuori (#810.8).
+function ricordaPropostaDellAiuto(_sender, testo) {
+  SegretiLetti.valoriDellUtente(String(testo || ''), { maxRiga: 500 });
 }
 
 function ricordaLettoInChat(azioni, storia = []) {
@@ -933,6 +940,7 @@ module.exports = {
   shellDeiComandi,
   segretiCustoditi,
   ricordaLettoDallAiuto,
+  ricordaPropostaDellAiuto,
   ricordaLettoInChat,
   testoDiAltriNelleAzioni,
   controllaUscita,

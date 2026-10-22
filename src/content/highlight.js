@@ -200,6 +200,8 @@
     const accettaIlValore = () => {
       if (!activeTarget) return false;
       fillElement(activeTarget, fillValue);
+      // Accettato, il testo è dell'utente anche quando poi lo ritocca (#810.8).
+      try { global.SN_IMMESSI?.accettato?.(activeTarget, fillValue); } catch (_) {}
       const cb = onAction;
       // Disattiva subito per evitare doppi trigger su doppio click.
       if (onTargetClick === cb) onTargetClick = null;

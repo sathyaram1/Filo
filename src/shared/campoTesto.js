@@ -69,5 +69,22 @@
       + '; return scriveQui(document); })()';
   }
 
-  global.SN_CAMPO_TESTO = { campoDiTesto, scriveQui, sorgenteScriveQui };
+  // Il segreto che l'utente scrive in un campo (password, carta, codice) non va al modello: gli basta sapere che il campo
+  // è compilato (#810.8). Il resto di quello che scrive lo vede, per aiutarlo; il valore che il sito ha messo resta del sito.
+  // Lo scritto a mano lo segna il browser (:user-valid/:user-invalid) o è il campo col fuoco.
+  const CAMPO_RISERVATO = /password|cc-number|cc-csc|one-time-code/i;
+  function segretoDellUtente(el) {
+    if (!el || typeof el.matches !== 'function' || !el.matches('input, textarea')) return false;
+    const v = String(el.value || '');
+    if (!v || v === String(el.defaultValue || '')) return false;
+    let aMano = false;
+    try { aMano = el.matches(':user-valid, :user-invalid'); } catch (_) { /* motore senza le due pseudo-classi */ }
+    const radice = typeof el.getRootNode === 'function' ? el.getRootNode() : null;
+    if (!aMano && !(radice && radice.activeElement === el && !el.readOnly && !el.disabled)) return false;
+    if (String(el.type || '').toLowerCase() === 'password' || CAMPO_RISERVATO.test(String(el.autocomplete || ''))) return true;
+    const G = global.SN_GUARDIANO_STATICO;
+    return !!(G && G.segretiNelTesto(v).length);
+  }
+
+  global.SN_CAMPO_TESTO = { campoDiTesto, scriveQui, sorgenteScriveQui, segretoDellUtente };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
