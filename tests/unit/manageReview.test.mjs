@@ -1549,6 +1549,13 @@ test('livelli L4: verde passa, rosso boccia (col tasto), ambra saltato, grigio n
   assert.deepEqual(fail.pannello.azioni, ['salta_l4']);
   assert.match(fail.pannello.testo, /Scrive su una chiave/);
 
+  // Il commit che l'audit ha letto si vede, e il salto lo porta con sé (#1502); uno sha storto no.
+  const conSha = MR.livelloL4({ livelli: { l4: { esito: 'fail', sha: 'ab12'.repeat(10), testo: 'x' } } });
+  assert.equal(conSha.pannello.sha, 'ab12'.repeat(10));
+  assert.deepEqual(conSha.pannello.righe.find((r) => r.etichetta === 'Commit esaminato'), { etichetta: 'Commit esaminato', valore: 'ab12ab12' });
+  assert.equal(MR.livelloL4({ livelli: { l4: { esito: 'fail', sha: 'main; rm -rf' } } }).pannello.sha, '');
+  assert.equal(fail.pannello.sha, '');
+
   const saltato = MR.livelloL4({ livelli: { l4: { esito: 'saltato', by: 'owner', at: '2026-09-13T09:00:00Z' } } });
   assert.equal(saltato.colore, MR.REASONS.spam.color);
   assert.match(saltato.pannello.righe.map((r) => r.valore).join(' '), /Saltato dall/);

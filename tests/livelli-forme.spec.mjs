@@ -102,7 +102,7 @@ const FB_BOCCIATO = {
     verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'aligned', reasoning: 'Ok.' })),
   },
   livelli: {
-    l4: { esito: 'fail', at: '2026-09-12T12:00:00Z', testo: 'Il fix scrive nelle regole del database.' },
+    l4: { esito: 'fail', at: '2026-09-12T12:00:00Z', sha: 'f00d'.repeat(10), testo: 'Il fix scrive nelle regole del database.' },
   },
 };
 
@@ -789,6 +789,9 @@ test('pentagono rosso: il problema trovato e il tasto «Salta il controllo»', a
   const chiamata = await page.evaluate(() => window.__chiamate[0]);
   expect(chiamata.type).toBe('livello4_salta');
   expect(chiamata.feedbackId).toBe(FB_BOCCIATO._id);
+  // Si salta il commit che il pannello mostra, non quello su cui il ramo sarà arrivato (#1502).
+  await expect(page.locator('#mgSideBody')).toContainText('f00df00d');
+  expect(chiamata.sha).toBe('f00d'.repeat(10));
 
   // L'esito vero del server, detto in italiano.
   await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText(/entrato in main/i);
