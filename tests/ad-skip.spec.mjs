@@ -131,71 +131,66 @@ test('con la pagina ingrandita il clic vero cade ancora sul «Salta»', async ({
   expect((await stato(page)).clic.every((c) => c.vero)).toBe(true);
 });
 
-test('in una scheda in secondo piano salta lo stesso, col clic vero', async ({ app, openTab, testServer, suYouTube }) => {
-  // L'audio della pubblicità si sente anche da un'altra scheda: aspettare il ritorno vorrebbe dire sentirla tutta.
-  const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1 }))));
-  await apri(openTab, testServer.html('<title>Altra</title><p>altra scheda</p>'));
-  const dietro = () => app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().includes('www.youtube.com'));
-    const b = t.view.getBounds();
-    return t.id !== w._filoTabs.activeId && b.width === 0;
-  });
-  await expect.poll(dietro, { timeout: 5_000 }).toBe(true);
-  // Ogni tanto la scheda dietro riprende la sua misura per un attimo: conta il clic arrivato quando era grande zero.
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().includes('www.youtube.com'));
-    globalThis.__larghezzeAlClic = [];
-    t.view.webContents.on('input-event', (_e, i) => {
-      if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width);
-    });
-  });
-  await page.evaluate(() => window.__mostra());
-  await expect.poll(async () => (await stato(page)).saltata, { timeout: 3_000 }).toBe(true);
-  expect((await stato(page)).clic.every((c) => c.vero)).toBe(true);
-  expect(await app.evaluate(() => globalThis.__larghezzeAlClic)).toContain(0);
-});
+// L'audio della pubblicità si sente anche da dietro: aspettare il ritorno sulla scheda vorrebbe dire sentirla tutta (#1494).
+// Senza Playwright sulle pagine: lui le terrebbe visibili, e una pagina nascosta non fa partire l'animazione che segnala il «Salta».
+test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stesso, su YouTube e negli altri lettori', async ({ testServer, suYouTube }) => {
+  const filo = await apriFiloSenzaPlaywright({ args: ARGOMENTI_RETE });
+  try {
+    const nel = (url, codice) => filo.nelFrame(url, codice);
+    const quando = (fn, message, timeout = 10_000) => expect.poll(fn, { timeout, message }).toBe(true);
+    const nascosta = (url) => quando(async () => (await nel(url, 'document.visibilityState')) === 'hidden', `${url} non è nascosta`);
+    const apriScheda = (url, attiva) => filo.evaluate(({ BrowserWindow }, a) => BrowserWindow.getAllWindows()
+      .find((w) => w._filoTabs)._filoTabs.openTab(a.url, { activate: a.attiva }), { url, attiva });
+    const saltata = (url) => quando(async () => (await nel(url, 'window.__saltata')) === true, `${url}: il «Salta» non è stato premuto`);
+    const clic = (url) => nel(url, 'window.__clic');
 
-test('una canzone che Filo apre in secondo piano dalla home salta la pubblicità senza che la si guardi', async ({ app, openTab, testServer, suYouTube }) => {
-  await openTab('filo://newtab/');
-  const url = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
-  const r = await app.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Canzone', background: true }), url);
-  expect(r.output && r.output.background).toBe(true);
-  const page = await paginaDellaScheda(app, r.output.tabId, (w) => w.url().startsWith('https://www.youtube.com'));
-  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
-  const diag = () => page.evaluate(() => ({ w: innerWidth, h: innerHeight, vis: document.visibilityState, st: globalThis.SN_AD_SKIP?._stato?.(), clic: window.__clic }));
-  console.log('PRIMA', JSON.stringify(await diag()));
-  await page.evaluate(() => window.__mostra());
-  await page.waitForTimeout(4000);
-  console.log('DOPO', JSON.stringify(await diag()));
-  expect((await stato(page)).saltata).toBe(true);
-});
+    // La canzone che Filo mette dalla home nasce dietro, e l'utente resta dov'era.
+    const yt = suYouTube(testServer.html(lettore({ dopoMs: -1, titolo: 'Canzone' })));
+    const r = await filo.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Canzone', background: true }), yt);
+    expect(r.output && r.output.background).toBe(true);
+    // Il lettore incorporato in un altro sito e un lettore qualunque, visti e poi lasciati dietro.
+    const incorporato = testServer.html(lettore({ dopoMs: -1 })).replace('127.0.0.1', 'www.youtube-nocookie.com');
+    await apriScheda(testServer.html(ospite(incorporato), { pubblico: true }), true);
+    const ima = testServer.html(lettore({ classe: 'videoAdUiSkipButton', soloVeri: false, titolo: 'IMA' }), { pubblico: true });
+    await apriScheda(testServer.html(`<!doctype html><title>Ospite</title><p>articolo</p><iframe src="${ima}" width="720" height="420"></iframe>`), true);
+    for (const u of [incorporato, ima]) await quando(async () => (await nel(u, 'typeof window.__mostra')) === 'function', `${u} non è arrivato`);
+    await apriScheda(testServer.html('<title>Altra</title><p>altra scheda</p>'), true);
+    for (const u of [yt, incorporato, ima]) await nascosta(u);
 
-test('ESPERIMENTO dietro nascosta', async ({ app, openTab, testServer, suYouTube }) => {
-  const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1 }))));
-  await apri(openTab, testServer.html('<title>Altra</title><p>altra scheda</p>'));
-  const diag = async () => ({
-    pg: await page.evaluate(() => new Promise((ok) => { let n = 0; const f = () => { n++; requestAnimationFrame(f); }; requestAnimationFrame(f);
-      setTimeout(() => ok({ w: innerWidth, h: innerHeight, vis: document.visibilityState, raf: n, clic: window.__clic }), 1000); })),
-    mn: await app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-      const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().includes('www.youtube.com'));
-      return { vis: t.view.getVisible?.(), b: t.view.getBounds(), bt: t.view.webContents.getBackgroundThrottling?.(), min: w.isMinimized(), wv: w.isVisible() };
-    }),
-  });
-  for (let i = 0; i < 2; i++) { console.log('T', i, JSON.stringify(await diag())); }
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
-  for (let i = 0; i < 2; i++) { console.log('NOFOCUSEMU', i, JSON.stringify(await diag())); }
-  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.minimize(); });
-  for (let i = 0; i < 3; i++) { console.log('MIN', i, JSON.stringify(await diag())); }
-  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.restore(); w.hide(); });
-  for (let i = 0; i < 3; i++) { console.log('HIDE', i, JSON.stringify(await diag())); }
-  await page.evaluate(() => window.__mostra());
-  await page.waitForTimeout(5000);
-  console.log('DOPO', JSON.stringify(await diag()));
-  expect((await stato(page)).saltata).toBe(true);
+    await filo.evaluate(({ webContents }, u) => {
+      const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+      globalThis.__larghezzeAlClic = [];
+      const t = require('electron').BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.view.webContents === wc);
+      wc.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
+    }, yt).catch(() => filo.evaluate(({ BrowserWindow, webContents }, u) => {
+      const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+      const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.view.webContents === wc);
+      globalThis.__larghezzeAlClic = [];
+      wc.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
+    }, yt));
+    for (const u of [yt, incorporato, ima]) await nel(u, 'window.__mostra()');
+    for (const u of [yt, incorporato, ima]) await saltata(u);
+    expect((await clic(yt)).every((c) => c.vero)).toBe(true);
+    expect((await clic(incorporato)).every((c) => c.vero)).toBe(true);
+    expect((await clic(ima)).length).toBe(1);
+    // Ogni tanto la scheda dietro riprende la sua misura per un attimo: conta il clic arrivato quando era grande zero.
+    expect(await filo.evaluate(() => globalThis.__larghezzeAlClic)).toContain(0);
+    expect(await nel(yt, 'document.visibilityState'), 'la scheda è rimasta dietro').toBe('hidden');
+
+    // Filo ridotto a icona, con la canzone davanti.
+    await filo.evaluate(({ BrowserWindow, webContents }, u) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      tm.activate(tm.tabs.find((t) => t.view.webContents === webContents.getAllWebContents().find((w) => w.getURL() === u)).id);
+    }, yt);
+    await quando(async () => (await nel(yt, 'document.visibilityState')) === 'visible', 'la canzone non è tornata davanti');
+    await filo.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).hide());
+    await nascosta(yt);
+    await nel(yt, 'window.__saltata = false; window.__mostra()');
+    await saltata(yt);
+    expect((await clic(yt)).filter((c) => c.vero).length).toBe(2);
+  } finally {
+    await filo.chiudi();
+  }
 });
 
 test('mentre si scrive in un campo della pagina aspetta, poi salta', async ({ openTab, testServer, suYouTube }) => {
