@@ -4565,6 +4565,11 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
+  if (res.output && res.output.blocked === 'segreto' && res.output.guasto) {
+    return `Azione ${type} NON eseguita: ${res.output.frase}. Non contiene per forza un segreto: il controllo non ha `
+      + 'risposto, e senza di lui niente esce. Non riprovare con un\'altra azione che porta fuori le stesse cose. Di\' '
+      + 'all\'utente in una riga che non l\'hai fatto e perché.';
+  }
   if (res.output && res.output.blocked === 'segreto') {
     return `Azione ${type} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
       + 'È un blocco fisso di Filo: nessuna conferma e nessun livello lo sblocca. Non riprovare in un\'altra forma '
