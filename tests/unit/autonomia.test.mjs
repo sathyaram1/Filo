@@ -279,7 +279,7 @@ test('le letture dichiarano cosa portano nel compito: web e disco lo sporcano, l
   assert.equal(AL.fonteDi(scaricato).classe, 5);
   assert.equal(AL.fonteDi(comando).classe, 4);
   assert.equal(AL.fonteDi(scarica).classe, 5);
-  assert.equal(AL.fonteDi(chat), null, 'le chat passate sono di Filo e dell’utente');
+  assert.equal(AL.fonteDi(chat), null, 'una ricerca con sole chat nate dalle parole dell’utente non sporca');
   assert.equal(AL.fonteDi({ type: 'CERCA_WEB', query: 'x', _output: { results: [] } }), null, 'una ricerca vuota non ha portato niente');
   assert.equal(AL.fonteDi({ type: 'ESEGUI_COMANDO', comando: 'ls', _output: { blocked: 'disabled' } }), null);
   assert.equal(A.stato({ fonti: daAzioni([editor, chat]), livello: 'default' }).stato, 'pulito');
