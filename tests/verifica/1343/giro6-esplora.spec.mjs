@@ -107,3 +107,92 @@ test('esplora: le azioni sulla pagina dalla home di Filo', async ({ app, openTab
   console.log('save home', await s.getAttribute('aria-disabled'));
   void barra;
 });
+
+test('esplora: menu della linguetta della barra nella fila a schermo intero', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, sito('Prima'));
+  const page = await testServer.openReady(openTab, sito('Seconda'));
+  await schermoIntero(app, true);
+  await page.mouse.move(400, 200);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => (await vista(app)).visibili).toBe(true);
+  const btn = shell.locator('#barra-maniglia');
+  console.log('maniglia visibile', await btn.isVisible());
+  if (!(await btn.isVisible())) return;
+  const box = await btn.boundingBox();
+  await btn.click({ button: 'right' });
+  const menu = await menuAperto(app);
+  console.log('menu maniglia', !!menu);
+  await allaShell(app, { type: 'mouseLeave', x: Math.round(box.x + 5), y: Math.round(box.y + 60) });
+  if (menu) { await menu.mouse.move(20, 20); await menu.mouse.move(30, 40, { steps: 3 }); }
+  await pausa(1200);
+  console.log('dopo menu maniglia', JSON.stringify(await vista(app)));
+  expect((await vista(app)).visibili).toBe(true);
+});
+
+test('esplora: barra laterale aperta mentre le schede vanno e vengono a schermo intero', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, sito('Prima'));
+  const page = await testServer.openReady(openTab, sito('Seconda'));
+  await schermoIntero(app, true);
+  await comandaBarra(app, 'tasto');
+  await pausa(600);
+  console.log('barra senza schede', JSON.stringify((await statoBarra(app)).bounds), (await statoBarra(app)).alto);
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.schedeInAlto.mostra(); });
+  await pausa(600);
+  console.log('barra con schede', JSON.stringify((await statoBarra(app)).bounds), (await statoBarra(app)).alto, JSON.stringify(await vista(app)));
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.schedeInAlto.nascondi(); });
+  await pausa(600);
+  console.log('barra schede via', JSON.stringify((await statoBarra(app)).bounds), (await statoBarra(app)).alto, JSON.stringify(await vista(app)));
+  void page;
+});
+
+test('esplora: un clic su un collegamento con le schede scoperte', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:0;font:16px sans-serif;height:1400px">
+    <div style="height:100px"></div><a id="link" href="#arrivato" style="display:inline-block;height:20px;margin-left:200px">vai al capitolo</a>
+    <div style="height:400px"></div><h2 id="arrivato">Capitolo</h2>
+    <script>document.getElementById('link').addEventListener('click', () => { window.__cliccato = true; });</script></body></html>`);
+  await schermoIntero(app, true);
+  await expect.poll(async () => (await vista(app)).y).toBe(0);
+  await page.mouse.move(400, 200);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => (await vista(app)).visibili).toBe(true);
+  const fila = (await vista(app)).fila;
+  // Il collegamento come lo vede l'utente: sullo schermo sta a 100 + fila. Lo punta e preme subito.
+  const box = await page.locator('#link').boundingBox();
+  const x = box.x + 20; const yPagina = box.y + 10;
+  await page.mouse.move(x, yPagina);
+  await page.mouse.down();
+  await pausa(80);
+  const dopo = await vista(app);
+  console.log('dopo mouseDown', JSON.stringify(dopo));
+  // Il dito non si è mosso sullo schermo: se la pagina è salita della fila, sotto c'è un altro punto della pagina.
+  await page.mouse.up({});
+  await page.mouse.move(x, yPagina + (dopo.y === 0 ? fila : 0));
+  console.log('cliccato (stesso punto della pagina)', await page.evaluate(() => !!window.__cliccato));
+});
+
+test('esplora: Condividi dalla barra mentre la pagina si carica ancora', async ({ app, openTab, testServer }) => {
+  const { createServer } = await import('node:http');
+  const lento = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.write('<!doctype html><title>Lenta</title><h1>Arriva…</h1>' + ' '.repeat(4096));
+    setTimeout(() => res.end('<p>finita</p>'), 6000);
+  });
+  await new Promise((r) => lento.listen(0, '127.0.0.1', r));
+  try {
+    await testServer.openReady(openTab, sito('Prima'));
+    const url = `http://127.0.0.1:${lento.address().port}/lenta`;
+    await app.evaluate(({ BrowserWindow }, u) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      w._filoTabs.navigate(w._filoTabs.activeId, u);
+    }, url);
+    await pausa(1500);
+    await app.evaluate(({ clipboard }) => clipboard.writeText('niente'));
+    const share = await iconaDellaBarra(app, 'share');
+    console.log('share in carica', await share.getAttribute('aria-disabled'));
+    await share.click();
+    await pausa(1200);
+    console.log('appunti in carica:', await app.evaluate(({ clipboard }) => clipboard.readText()), 'voluto', url);
+    await pausa(6000);
+    console.log('appunti a pagina finita:', await app.evaluate(({ clipboard }) => clipboard.readText()));
+  } finally { lento.close(); }
+});
