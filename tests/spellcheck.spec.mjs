@@ -30,7 +30,7 @@ test.describe('spellcheck', () => {
       const targets = webContents.getAllWebContents().filter((w) => {
         try { return new URL(w.getURL()).host === host; } catch { return false; }
       });
-      for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
+      for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions, segnoPerLeProve: true });
       return targets.length;
     }, { host, word, suggestions });
   }
@@ -781,7 +781,7 @@ test.describe('spellcheck-native', () => {
       const targets = webContents.getAllWebContents().filter((w) => {
         try { return new URL(w.getURL()).host === host; } catch { return false; }
       });
-      for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
+      for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions, segnoPerLeProve: true });
       return targets.length;
     }, { host, word, suggestions });
   }
@@ -1378,7 +1378,7 @@ test.describe('spellcheck-shadow-editable', () => {
       const targets = webContents.getAllWebContents().filter((w) => {
         try { return new URL(w.getURL()).host === host; } catch { return false; }
       });
-      for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions });
+      for (const wc of targets) wc.send('filo:broadcast', { type: '_spell:native', word, suggestions, segnoPerLeProve: true });
       return targets.length;
     }, { host, word, suggestions });
   }
