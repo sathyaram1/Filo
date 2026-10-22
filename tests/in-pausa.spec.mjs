@@ -13,6 +13,7 @@ import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
+import { home as homeChat, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
 
 test.use({ inPausaAperte: false });
 
@@ -162,11 +163,18 @@ test('#1592 — chi non è owner, in pausa: niente Bacheca né Deck builder, le 
   expect(await entra(app, 'utente')).toEqual({ admin: false, bacheca: false, mazzi: false });
 
   expect(await vociDelMenuApp(app, shell)).toEqual(['Editor', 'Aperti per dopo', 'Download', 'Memorie', 'Le tue segnalazioni']);
+  // La voce porta alle segnalazioni, come la cella della home e il comando /feedback.
+  await popupAperti(app)[0].locator('.item', { hasText: 'Le tue segnalazioni' }).click();
+  await expect.poll(() => app.windows().some((w) => { try { return w.url() === 'filo://board/board.html#segnalazioni'; } catch (_) { return false; } }),
+    { message: 'la voce non ha aperto le segnalazioni' }).toBe(true);
 
   const h = await home(app);
-  await expect(h.locator('#altro .dash-altro-app[data-id="bacheca"]')).toHaveText('Le tue segnalazioni');
+  await expect(h.locator('#altro .dash-altro-app[data-id="bacheca"]')).toHaveText('Segnalazioni');
+  await expect(h.locator('#altro .dash-altro-app[data-id="bacheca"]')).toHaveAttribute('title', 'Apri Segnalazioni');
   await expect(h.locator('#tieni .dash-carta[data-chiave="mazzi"]')).toHaveCount(0);
   await expect(h.locator('#altro')).not.toContainText(/Bacheca|Mazzi/);
+  mkdirSync(SHOTS, { recursive: true });
+  await h.screenshot({ path: `${SHOTS}/1592-home-in-pausa.png` });
 
   // Il Deck builder da indirizzo dice solo la pausa, da qualunque nome della sua cartella.
   for (const url of ['filo://decks/decks.html', 'filo://decks/decks.js', 'filo://decks/decks.html#/deck/abc']) {
@@ -184,9 +192,11 @@ test('#1592 — chi non è owner, in pausa: niente Bacheca né Deck builder, le 
   for (const sel of ['.bd-head', '.bd-auth', '#bdList', '#bdLoading', '#bdMiglioramentiTitolo']) await expect(b.locator(sel), sel).toBeHidden();
   await expect(b.locator('.bd-reopen-link')).toHaveCount(0);
   await expect(b).toHaveTitle('Filo — Le tue segnalazioni');
-  await expect(b.locator('body')).not.toContainText(/Ancora rotto|Bacheca|vot/i);
-  mkdirSync(SHOTS, { recursive: true });
+  await expect(b.locator('body')).not.toContainText(/Ancora rotto|Bacheca|vot/i, { useInnerText: true });
   await b.screenshot({ path: `${SHOTS}/1592-segnalazioni-in-pausa.png` });
+  await b.evaluate(() => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }));
+  await b.waitForTimeout(500);
+  await b.screenshot({ path: `${SHOTS}/1592-segnalazioni-in-pausa-scuro.png` });
 
   // Un voto o un «Ancora rotto?» forzati (una pagina vecchia) si fermano nel main.
   for (const m of [{ type: 'board_cast_vote', id: 'fb-1', vote: 'works' }, { type: 'board_clear_vote', id: 'fb-1' }, { type: 'board_reopen', id: 'fb-1', text: 'ancora rotto' }]) {
@@ -233,6 +243,9 @@ test('#1592 — aperta da Gestione la rivede chi non è owner, senza riavvio; ri
   await expect(mg.locator('#mgIpMsg-mazzi')).toHaveText('In pausa: lo vedi solo tu. I mazzi di chi ne aveva restano sul suo computer.');
   mkdirSync(SHOTS, { recursive: true });
   await mg.locator('#panel-stats').screenshot({ path: `${SHOTS}/1592-gestione-in-pausa.png` });
+  await mg.evaluate(() => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }));
+  await mg.waitForTimeout(500);
+  await mg.locator('#panel-stats').screenshot({ path: `${SHOTS}/1592-gestione-in-pausa-scuro.png` });
 
   await levetta.click();
   await expect(mg.locator('#mgIpToggle-bacheca')).toBeChecked();
@@ -262,4 +275,33 @@ test('#1592 — aperta da Gestione la rivede chi non è owner, senza riavvio; ri
   await expect(b.locator('#bdMie')).toBeVisible();
   await expect(b.locator('.bd-head')).toBeHidden();
   expect(await vociDelMenuApp(app, shell)).toContain('Le tue segnalazioni');
+});
+
+test('#1592 — all’agente di chi non è owner, in pausa, non arrivano né la Bacheca né il Deck builder', async ({ app, shell }) => {
+  void shell; // Filo avviato del tutto: il fetch del main si ridirige dopo che l'avvio ha messo il suo
+  await preparaMain(app);
+  await entra(app, 'utente');
+  const page = await homeChat(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"rimetti","carta":"mazzi"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  try {
+    await chiedi(page, 'rimetti la carta dei mazzi');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+    const [prima, seconda] = await chiamateAlModello(app);
+    const sistema = prima.filter((m) => m.role === 'system').map((m) => JSON.stringify(m.content)).join('\n');
+    expect(sistema, 'il prompt non porta l’indice delle capacità').toContain('[segnalazioni-mie]');
+    expect(sistema, 'l’indice delle capacità nomina le funzioni in pausa').not.toMatch(/\[board\]|\[deck-builder\]|Bacheca dei miglioramenti|Deck builder/);
+    const esito = seconda.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    // L'esito dice che la carta non c'è e descrive la home senza i Mazzi (l'utente li ha nominati, l'agente no).
+    const dati = JSON.parse(esito.match(/\{"error"[^]*?\}/)[0]);
+    expect(dati.error).toBe('carta sconosciuta');
+    expect([...dati.destra, ...dati.altro]).toEqual(['Editor', 'Filo ti suggerisce', 'Impostazioni rapide']);
+    await page.reload();
+    await expect(page.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#tieni .dash-carta[data-chiave="mazzi"]')).toHaveCount(0);
+  } finally {
+    await ripristina(app);
+  }
 });

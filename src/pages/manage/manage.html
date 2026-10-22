@@ -1499,7 +1499,9 @@
     }
     /* Un riquadro per levetta, uno sotto l'altro: la griglia di Automazioni li stirerebbe a due terzi della finestra. */
     #mgRtRoot, #mgIpRoot { display: block; max-width: 640px; }
-    #mgIpRoot .mg-auto-block { margin-top: 12px; }
+    /* Le levette di Bacheca e Deck builder seguono quella del Red Team come un elenco solo. */
+    #mgRtRoot { padding-bottom: 0; }
+    #mgIpRoot { padding-top: 0; }
     /* Crediti: un riquadro per account più la taratura, affiancati finché c'è posto. */
     .mg-crediti {
       padding: 24px 0 32px;
