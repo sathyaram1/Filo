@@ -1635,6 +1635,15 @@ test('livelli L5: ferma al cancello senza richiesta viva, a elenchi letti, offre
   const dopo = MR.livelloL5(fb, { fusioniLette: true, fusioni: { recent: [fusa] } });
   assert.deepEqual(dopo.pannello.azioni, []);
   assert.match(dopo.pannello.testo, /Approvata e fusa/);
+  // Una fusa che non è l'ultima richiesta, o di un altro ramo, o di un lavoro server, non vuol dire «sta per uscire».
+  const vecchia = { id: 'r0', feedbackId: 'f1040', used: true, outcome: 'merged', branch: 'worker/vecchio', createdAtMs: 1 };
+  const nuova = { id: 'r4', feedbackId: 'f1040', expired: true, used: false, branch: 'worker/nuovo', createdAtMs: 2 };
+  const conRamo = { ...fb, branch: 'worker/nuovo' };
+  assert.deepEqual(MR.livelloL5(conRamo, { fusioniLette: true, fusioni: { recent: [vecchia, nuova] } }).pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  assert.deepEqual(MR.livelloL5(conRamo, { fusioniLette: true, fusioni: { recent: [vecchia] } }).pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  const serverFusa = MR.livelloL5({ ...fb, localOnly: { by: 'routine', at: 1 } }, { fusioniLette: true, fusioni: { recent: [fusa] } });
+  assert.deepEqual(serverFusa.pannello.azioni, ['rimanda', 'archivia']);
+  assert.doesNotMatch(serverFusa.pannello.testo, /Approvata e fusa/);
   // Un lavoro anche sul server non si riapre da qui: lo ferma anche il cancello del server, che non apre richieste.
   const server = MR.livelloL5({ ...fb, localOnly: { by: 'routine', at: 1 } }, { fusioniLette: true, fusioni: {} });
   assert.deepEqual(server.pannello.azioni, ['rimanda', 'archivia']);

@@ -1803,8 +1803,12 @@
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
     if (!ferme.length && fermaDaStato) {
-      // Una richiesta approvata e fusa lascia la pratica qui finché non arriva lo stato nuovo: non è da riaprire.
-      const fusa = lista('recent').some((r) => r.used === true && r.outcome === 'merged');
+      // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
+      // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
+      const ultima = lista('recent').slice().sort((a, b) => (Number(b.createdAtMs) || 0) - (Number(a.createdAtMs) || 0))[0];
+      const ramo = String(fb.branch || '');
+      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
+        && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
       if (fusa) {
         return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
           titolo,
