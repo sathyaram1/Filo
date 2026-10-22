@@ -27,7 +27,7 @@ test('esplora pdf', async ({ app, openTab, testServer }) => {
   const r = await app.evaluate(({ BrowserWindow, clipboard }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
-    return { clip: clipboard.readText(), cons: global.__cons, frames: t.view.webContents.mainFrame.framesInSubtree.map((f) => f.url) };
+    return { clip: String(clipboard.readText()), cons: global.__cons, frames: t.view.webContents.mainFrame.framesInSubtree.map((f) => f.url) };
   });
   console.log('ESPLORA', JSON.stringify(r));
   const pg = app.windows().find((w) => { try { return w.url().endsWith('/a2') || w.url().includes('.pdf'); } catch (_) { return false; } });

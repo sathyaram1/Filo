@@ -35,16 +35,19 @@
   // ------------------------------------------------------------
   // Clipboard: copia / taglia
   // ------------------------------------------------------------
-  function copyToClipboard(text) {
-    console.log('[SNPROBE] copy start', text);
-    setTimeout(() => console.log('[SNPROBE] copy 1s later'), 1000);
+  // Gli appunti li scrive il main, come il «Copia» delle risposte (popup.js): la pagina può non darli, e il visore PDF
+  // lascia la scrittura in sospeso senza dire niente (#1343 r2). Se il main dice no, ci prova la pagina.
+  async function copyToClipboard(text) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text });
+      if (r && r.ok) { Popup.showToast(I18n.t('toast_copied')); return; }
+    } catch (_) {}
     navigator.clipboard.writeText(text).then(
       () => {
-        console.log('[SNPROBE] copy ok');
         Popup.showToast(I18n.t('toast_copied'));
         pushClipboardEntry({ type: 'text', text });
       },
-      (e) => { console.log('[SNPROBE] clip err', e && e.message, document.hasFocus()); }
+      () => {/* niente toast su errore — UX silenziosa */}
     );
   }
 
