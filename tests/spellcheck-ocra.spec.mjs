@@ -192,7 +192,7 @@ test('aspetto: i puntini accanto all\'onda degli errori, anche sulla stessa paro
   await app.evaluate(() => {
     const prima = globalThis.SN_PROVIDERS.completeWithFallback;
     const finto = async (req) => {
-      if (JSON.stringify(req.messages).includes('Sei il controllo rapido di un correttore')) {
+      if (JSON.stringify(req.messages).includes('Sei il controllo rapido')) {
         return { text: '[ieri sonno stato][ieri sono stato][verbo essere][errore]\n[mercoledì][martedì][x][errore]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       }
       return prima(req);

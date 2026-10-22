@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.246', date: '2026-10-22',
+      features: [],
+      fixes: [
+        'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
+      ],
+    },
+    {
       version: '0.2.245', date: '2026-10-22',
       features: [],
       fixes: [

@@ -1074,7 +1074,7 @@
     },
     {
       scrive: ['correttore.modelloErrori'],
-      aiuto: 'true | false (un modello controlla gli errori del correttore; spento restano solo quelli che Filo trova da sé, sbiaditi, e non si spende)',
+      aiuto: 'true | false (un modello controlla gli errori del correttore; spento restano solo quelli che Filo trova da sé, sbiaditi i dubbi, e non si spende)',
       costo: 1,
       keys: ['modello errori', 'controllo rapido', 'correttore col modello', 'correttore senza modello', 'correttore senza ai', 'modello del correttore'],
       build(v) {

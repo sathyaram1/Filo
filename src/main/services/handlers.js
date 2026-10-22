@@ -265,13 +265,21 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     ] }];
   }
 
-  // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti.
+  // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti. Le regole
+  // nel messaggio di sistema, che va in cache (#1580); il testo che cambia in quello dell'utente.
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
-    return [{ role: 'user', content: PROMPTS.spellcheckErrori(payload || {}) }];
+    return [
+      { role: 'system', content: PROMPTS.spellcheckErroriSistema() },
+      { role: 'user', content: PROMPTS.spellcheckErrori(payload || {}) },
+    ];
   }
   if (action === ACTIONS.SPELLCHECK_CONTEXT) {
+    const p = payload || {};
     // La data la dà l'orologio di qui, non la pagina.
-    return [{ role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...(payload || {}), oggi: new Date() }) }];
+    return [
+      { role: 'system', content: PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: p.ripetizioni !== false }) },
+      { role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...p, oggi: new Date() }) },
+    ];
   }
   if (action === ACTIONS.EDIT_TEXT) {
     return [{ role: 'user', content: PROMPTS.editText({ original: payload.original, instruction: payload.instruction }) }];

@@ -1,5 +1,5 @@
 // Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo. Il codice
-// segna subito i candidati, sbiaditi; il controllo rapido e quello ragionato del modello li confermano o li scartano.
+// segna subito i suoi candidati, pieni i sicuri e sbiaditi i dubbi; i controlli del modello confermano o scartano i dubbi.
 // Le regole senza DOM stanno in correttoreRegole.js e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
@@ -15,13 +15,11 @@
   const CONTESTO_MAX = 12000;
   const CONTESTO_DOPO_MAX = 3000;
   const CONTESTO_NODI_MAX = 20000;
-  // Il campo intorno al pezzo nuovo: l'inizio di «prima» si sposta a scatti, così il prefisso della domanda resta uguale.
-  const PRIMA_MIN = 3000;
-  const PRIMA_SCATTO = 2000;
-  const DOPO_MAX = 1000;
-  // Al controllo rapido basta la coda della conversazione per il registro; il ragionato ha la pagina intera.
+  // Il testo prima del pezzo nuovo del controllo rapido: il paragrafo in corso e quello prima, come sul banco del 19/10
+  // (#1580); un paragrafo lunghissimo si accorcia alla parte vicina. Il ragionato rilegge il campo intero.
+  const PRIMA_MAX = 4000;
+  // Il testo sopra il campo che resta al main, dove si cerca chi chiede una password (correttoreRiservati.js).
   const CONVERSAZIONE_MAX = 1500;
-  const LUOGO_VALE_MS = 10000;
   // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
   const PASSAGGIO_MS = 320;
   // Oltre, i candidati del codice si ricalcolano a una pausa breve invece che a ogni tasto.
@@ -395,7 +393,7 @@
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
-      rimandati: new Set(), luogo: null, luogoAlle: 0, inVista: [],
+      rimandati: new Set(), inVista: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
       giudicati: { rapido: new Map(), ragionato: new Map() },
     };
@@ -826,12 +824,14 @@
     // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora».
     if (!ora.trim()) state.ignorate.clear();
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
-    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo.
+    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche
+    // il suo testo nuovo, se è più stretto del pezzo (il ragionato rilegge tutto).
     if (state.inViaggio.length) {
       const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora).issues.map((v) => [v.id, v]));
       for (const v of state.inViaggio) {
         const n = vivi.get(v.id);
         if (n) { v.start = n.start; v.end = n.end; } else v.perso = true;
+        if (v.nuovo) v.nuovo = riallineaIssues([v.nuovo], prima, ora).issues[0] || null;
       }
     }
   }
@@ -864,13 +864,14 @@
     return { issues: out, perse: out.length !== lista.length };
   }
 
+  // Una data impossibile è sbagliata comunque, come un errore fisso (correttoreRegole.CERTO).
   const segnoDaData = (d) => ({
-    ...d, segno: 'suggerimento', dubbio: true, fonte: 'data', tipo: 'data', motivo: d.spiegazione || '',
+    ...d, segno: 'suggerimento', ...R().CERTO, fonte: 'data', tipo: 'data', motivo: d.spiegazione || '',
     correzioni: Array.isArray(d.correzioni) ? d.correzioni : [], citazione: '',
   });
 
-  // I candidati del codice sul testo di adesso: subito, gratis, sbiaditi finché un controllo non li giudica. Vero se ce
-  // n'è uno nuovo da far giudicare: il controllo rapido parte senza aspettare la pausa.
+  // I candidati del codice sul testo di adesso: subito e gratis; quelli in dubbio aspettano un controllo che li giudichi.
+  // Vero se ce n'è uno nuovo da far giudicare: il controllo rapido parte senza aspettare la pausa.
   function aggiornaCodice(state, { senzaDisegno = false } = {}) {
     const el = state.el;
     if (!senzaDisegno && getEditableText(el).length > LUNGO) {
@@ -907,7 +908,7 @@
     state.codiceT2 = [...errori, ...date];
     state.codice = d.riporta(state.codiceT2);
     const scrive = inScritturaNelCampo(state);
-    return state.codice.some((c) => c.segno === 'errore' && !verdetto(state, c) && !state.richiesti.has(Rg.chiaveVerdetto(c))
+    return state.codice.some((c) => c.segno === 'errore' && c.dubbio && !verdetto(state, c) && !state.richiesti.has(Rg.chiaveVerdetto(c))
       && !(scrive && c.start < scrive.end && c.end > scrive.start));
   }
 
@@ -940,7 +941,8 @@
   }
 
   // I segni da disegnare: errori e suggerimenti, del modello e del codice coi loro giudizi. Fra due che si coprono vince
-  // quello del modello, poi un candidato confermato, poi uno ancora in dubbio.
+  // quello del modello, poi un candidato sicuro o confermato, poi uno ancora in dubbio. Un candidato che `attende` non
+  // si vede finché il modello non lo conferma; spenta la parte del modello non c'è niente da aspettare, e si vede sbiadito.
   function segniInVista(state, { ignoraScrittura = false } = {}) {
     const el = state.el;
     const testo = getEditableText(el);
@@ -948,12 +950,13 @@
     const scrive = ignoraScrittura ? null : inScritturaNelCampo(state);
     const Rg = R();
     if (!Rg) return [];
+    const nascosto = (c) => c.attende && modelloErrori();
     const codice = [];
     for (const c of state.codice) {
       const v = verdetto(state, c);
-      if (!v) { codice.push(c); continue; }
+      if (!v) { if (!nascosto(c)) codice.push(c); continue; }
       if (v.stato === 'scartato') {
-        if (ora - v.alle < PASSAGGIO_MS) codice.push({ ...c, svanisce: v.alle });
+        if (ora - v.alle < PASSAGGIO_MS && !nascosto(c)) codice.push({ ...c, svanisce: v.alle });
         continue;
       }
       codice.push({
@@ -1038,22 +1041,25 @@
 
   // Gli esiti già pagati, per domanda (#1097.5): un campo lasciato e ripreso, o un annulla che torna a un testo già
   // controllato, non ripagano. Le domande in viaggio si aspettano invece di rifarle.
+  // `ripeti`: la risposta di prima era illeggibile (correttoreRegole.senzaRighe), e non va riletta né qui né nella cache
+  // del main.
   const esiti = new Map();
   const domandeInViaggio = new Map();
-  function chiedi(action, payload, { suRichiesta = false, giorno = '' } = {}) {
+  function chiedi(action, payload, { suRichiesta = false, giorno = '', ripeti = false } = {}) {
     const chiave = `${action}\u0000${giorno}\u0000${JSON.stringify({ ...payload, campo: undefined, sopra: undefined })}`;
-    if (esiti.has(chiave)) {
+    if (esiti.has(chiave) && !ripeti) {
       const r = esiti.get(chiave);
       esiti.delete(chiave);
       esiti.set(chiave, r);
       return Promise.resolve(r);
     }
-    let p = domandeInViaggio.get(chiave);
+    let p = ripeti ? null : domandeInViaggio.get(chiave);
     if (!p) {
       p = Promise.resolve(chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST, action, payload,
         // Senza il tasto destro è un lavoro automatico: l'uso lo conta il menu che mostra la correzione (#969).
         ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
+        ...(ripeti ? { riprova: true } : {}),
       })).then((res) => {
         if (res && res.ok && typeof res.text === 'string') {
           esiti.set(chiave, { ok: true, text: res.text, senzaContesto: !!res.senzaContesto });
@@ -1068,36 +1074,42 @@
     return p;
   }
 
-  // Il campo prima del pezzo nuovo, da un inizio che si sposta a scatti di PRIMA_SCATTO caratteri.
   function inizioPrima(testo, start) {
-    let da = Math.max(0, start - PRIMA_MIN);
-    da = Math.floor(da / PRIMA_SCATTO) * PRIMA_SCATTO;
-    while (da > 0 && da < start && isWordCharLocal(testo[da - 1])) da++;
+    const inizioParagrafo = (pos) => (pos <= 0 ? 0 : testo.lastIndexOf('\n', pos - 1) + 1);
+    let da = inizioParagrafo(start);
+    let fine = da;
+    while (fine > 0 && /\s/.test(testo[fine - 1])) fine--;
+    if (fine > 0) da = inizioParagrafo(fine);
+    if (start - da > PRIMA_MAX) {
+      da = start - PRIMA_MAX;
+      while (da < start && isWordCharLocal(testo[da - 1]) && isWordCharLocal(testo[da])) da++;
+    }
     return da;
   }
 
-  // I tre pezzi che partono, più campo intero e testo sopra (letto a ogni richiesta), che restano al main: chi presenta
+  // I due pezzi che partono, più campo intero e testo sopra (letto a ogni richiesta), che restano al main: chi presenta
   // una password può stare fuori dal pezzo, o essere la domanda a cui si risponde (correttoreRiservati.js).
   function pezziDa(testo, start, end, sopra = '') {
     const da = inizioPrima(testo, start);
-    return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), dopo: testo.slice(end, end + DOPO_MAX), campo: testo, campoDa: da, sopra };
+    return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), campo: testo, campoDa: da, sopra };
   }
 
   const sopraIlCampo = (el) => contestoDelCampo(el, { soloPrima: CONVERSAZIONE_MAX }).prima;
 
-  // Dove si scrive: il sito e la coda del testo della pagina prima del campo (in una chat, gli ultimi messaggi). Si
-  // rilegge ogni LUOGO_VALE_MS: la conversazione cambia, ma non a ogni tasto. Il sito lo rimette il main.
-  function luogoDi(state) {
-    if (state.luogo && Date.now() - state.luogoAlle < LUOGO_VALE_MS) return state.luogo;
-    let sito = '';
-    try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
-    const contesto = contestoDelCampo(state.el);
-    state.luogo = { sito, conversazione: contesto.prima ? contesto.prima.slice(-CONVERSAZIONE_MAX) : '' };
-    state.luogoAlle = Date.now();
-    return state.luogo;
+  // Il sito dove si scrive, per il ragionato: il main lo rimette comunque col suo.
+  function sitoDellaPagina() {
+    try { return location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) { return ''; }
   }
 
   const perche = (c) => c.motivo || (c.fonte === 'dizionario' ? t('spell_perche_dizionario') : '');
+
+  // Una risposta senza righe leggibili che non dice «nessuno» si chiede una volta ancora (#1580, D8).
+  async function chiediERipeti(action, payload, opz = {}) {
+    const res = await chiedi(action, payload, opz);
+    if (!res || !res.ok || typeof res.text !== 'string' || !R().senzaRighe(res.text)) return res;
+    const ancora = await chiedi(action, payload, { ...opz, ripeti: true });
+    return ancora && ancora.ok && typeof ancora.text === 'string' ? ancora : res;
+  }
 
   async function controlloRapido(state, { suRichiesta = false, ignoraScrittura = false } = {}) {
     if (!modelloErrori() || !state.el || !state.el.isConnected) return;
@@ -1116,19 +1128,21 @@
     state.baseRapido = g.base;
     const numero = ++state.inviatiRapido;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
-    const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     for (const c of candidati) state.richiesti.add(Rg.chiaveVerdetto(c));
     const payload = {
       ...pezziDa(d.testo, g.start, g.end, sopraIlCampo(state.el)),
       candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
-      luogo: luogoDi(state),
     };
     const [regioneCampo] = d.riporta([{ start: g.start, end: g.end }]);
-    const viaggio = { id: `r${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0 };
+    const viaggio = {
+      id: `r${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0,
+      candidati: candidati.slice(0, 40).map((c) => Rg.chiaveVerdetto(c)),
+    };
     state.inViaggio.push(viaggio);
     let res = null;
     try {
-      res = await chiedi(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta });
+      res = await chiediERipeti(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta });
     } catch (err) {
       console.warn('[SN] correttore, controllo rapido:', err);
     } finally {
@@ -1157,28 +1171,33 @@
       if (pos < 0) return;
       finoA = Rg.ultimaFineFrase(d.testo, pos);
     }
-    const g = Rg.frasiDaGiudicare(state.baseRagionato, d.testo, { finoA });
+    // Il campo intero, non le sole frasi cambiate (#1580, D3): contraddizioni e ripetizioni stanno anche fra una frase e
+    // l'altra. Il campo parte intero anche verso il main, che ci cerca i dati riservati (correttoreRiservati.js).
+    const g = Rg.testoDaRileggere(state.baseRagionato, d.testo, { finoA });
     if (!g) return;
     const baseDiPrima = state.baseRagionato;
     state.baseRagionato = g.base;
     const numero = ++state.inviatiRagionato;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
-    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     const contesto = contestoDelCampo(state.el);
     const payload = {
-      ...pezziDa(d.testo, g.start, g.end, contesto.prima.slice(-CONVERSAZIONE_MAX)),
+      prima: '', nuovo: d.testo.slice(g.start, g.end), dopo: '', campo: d.testo, campoDa: g.start, sopra: contesto.prima.slice(-CONVERSAZIONE_MAX),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       contesto,
       ripetizioni: ripetizioniAttive(),
-      luogo: { sito: luogoDi(state).sito },
+      luogo: { sito: sitoDellaPagina() },
     };
-    const [regioneCampo] = d.riporta([{ start: g.start, end: g.end }]);
-    const viaggio = { id: `g${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0 };
+    const [regioneCampo, nuovoCampo] = d.riporta([{ start: g.start, end: g.end }, g.nuovo]);
+    const viaggio = {
+      id: `g${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0,
+      nuovo: nuovoCampo || null,
+    };
     state.inViaggio.push(viaggio);
     let res = null;
     try {
       // Le date relative cambiano a mezzanotte: il giorno è parte della domanda.
-      res = await chiedi(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString() });
+      res = await chiediERipeti(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString() });
     } catch (err) {
       console.warn('[SN] correttore, controllo ragionato:', err);
     } finally {
@@ -1200,10 +1219,15 @@
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     const rapido = fonte === 'rapido';
+    const zona = viaggio && !viaggio.perso ? (viaggio.nuovo === undefined ? viaggio : viaggio.nuovo) : null;
+    const nuovo = zona ? { start: d.verso(zona.start), end: d.verso(zona.end) } : null;
     const { segni, giusti } = Rg.segniDaRisposta(raw, d.testo, {
       tipi: rapido ? ['errore'] : ['errore', 'suggerimento', 'contraddizione'],
+      // Una riga che ha perso il tipo: nel ragionato vale il segno che decide l'utente, non un errore.
+      senzaTipo: rapido ? 'errore' : 'suggerimento',
       citata: (c) => !!contesto && !!Coerenza() && Coerenza().citazioneNelContesto(c, contesto),
       fonte,
+      nuovo: nuovo && nuovo.start >= 0 && nuovo.end > nuovo.start ? nuovo : null,
     });
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const ora = Date.now();
@@ -1211,19 +1235,29 @@
     const tocca = (a, b) => a.start < b.end && a.end > b.start;
     const candidati = state.codiceT2.filter((c) => c.segno === suo);
     for (const g of giusti) {
-      for (const c of candidati) if (tocca(c, g)) state.verdetti.set(Rg.chiaveVerdetto(c), { stato: 'scartato', alle: ora, da: fonte });
+      for (const c of candidati) if (!c.certo && tocca(c, g)) state.verdetti.set(Rg.chiaveVerdetto(c), { stato: 'scartato', alle: ora, da: fonte });
     }
     const nuovi = [];
+    const confermati = new Set();
     for (const s of segni) {
       const c = candidati.find((x) => x.start === s.start && x.end === s.end)
         || (!rapido && s.segno === 'suggerimento' ? candidati.find((x) => tocca(x, s)) : null);
       if (!c) { nuovi.push({ ...s, confermatoAlle: ora }); continue; }
+      confermati.add(Rg.chiaveVerdetto(c));
       state.verdetti.set(Rg.chiaveVerdetto(c), {
         stato: 'confermato', alle: ora, da: fonte,
         motivo: rapido ? (s.motivo || c.motivo) : (c.motivo || s.motivo),
         correzioni: rapido ? (s.correzioni.length ? s.correzioni : c.correzioni) : (c.correzioni.length ? c.correzioni : s.correzioni),
         citazione: s.citazione,
       });
+    }
+    // Il rapido tace sui candidati giusti (prompt del banco, #1580): uno mandato e non confermato è scartato, se la
+    // risposta è leggibile.
+    if (rapido && viaggio && Array.isArray(viaggio.candidati) && !Rg.senzaRighe(raw)) {
+      for (const k of viaggio.candidati) {
+        const v = state.verdetti.get(k);
+        if (!confermati.has(k) && !(v && v.stato === 'confermato')) state.verdetti.set(k, { stato: 'scartato', alle: ora, da: fonte });
+      }
     }
     const delCampo = d.riporta(nuovi);
     const giustiCampo = d.riporta(giusti);
@@ -1374,17 +1408,14 @@
     if (!modelloErrori() || !el || !wordCtx) return null;
     const testo = campoDiTesto(el) ? String(el.value || '') : getEditableText(el);
     if (testo.slice(wordCtx.start, wordCtx.end) !== wordCtx.word) return null;
-    let sito = '';
-    try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
     const payload = {
       ...pezziDa(testo, wordCtx.start, wordCtx.end, sopraIlCampo(el)),
       candidati: [{ pezzo: wordCtx.word, perche: t('spell_perche_chiesta') }],
-      luogo: { sito },
     };
     let res;
-    try { res = await chiedi(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta: true }); } catch (_) { return null; }
+    try { res = await chiediERipeti(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta: true }); } catch (_) { return null; }
     if (!res || !res.ok || typeof res.text !== 'string') return null;
-    const { segni } = R().segniDaRisposta(res.text, testo, { fonte: 'rapido' });
+    const { segni } = R().segniDaRisposta(res.text, testo, { fonte: 'rapido', nuovo: { start: wordCtx.start, end: wordCtx.end } });
     const e = segni.find((s) => s.start < wordCtx.end && s.end > wordCtx.start);
     if (!e) return { errore: false };
     return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo };

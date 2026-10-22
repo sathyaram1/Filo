@@ -40,7 +40,7 @@ async function fornitoreFinto(app) {
       let tipo = 'altro';
       let text = 'ok';
       if (t.includes('ha selezionato un testo')) { tipo = 'spiega'; text = 'Spiegazione di prova'; globalThis.__ultimaSpiega = t; }
-      else if (t.includes('Sei il controllo rapido di un correttore')) {
+      else if (t.includes('Sei il controllo rapido')) {
         tipo = 'scan';
         // Con `__segnaXq` il controllo segna come errore ogni parola «xq…», come un modello vero coi refusi.
         const parole = globalThis.__segnaXq ? [...new Set(t.match(/xq[a-z]+\d+/g) || [])] : [];
