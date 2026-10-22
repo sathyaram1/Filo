@@ -2138,6 +2138,8 @@
     // pretende), il riconoscimento di un URL del bucket e le intestazioni con
     // cui l'owner lo scarica. Pure, e usate anche dal main.
     attachmentPath,
+    VOCE_DOCUMENTO,
+    voceDocumento,
     isAttachmentUrl,
     attachmentFetchHeaders,
     // La scritta di un collegamento che arriva da fuori: dice dove si va (#582).
