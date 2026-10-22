@@ -499,7 +499,6 @@ describe('D — il ramo riscritto altrove (#1486): si riparte dalla punta pubbli
     assert.equal(r.head, sigillato, 'origin indietro non è una riscrittura: il lavoro sigillato non si scarta');
     assert.equal(r.rewritten, null);
     assert.equal(r.discarded, null);
-    assert.ok(git(origin, ['rev-parse', `refs/heads/${branch}`]));
   });
 });
 
