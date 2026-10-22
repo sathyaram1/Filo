@@ -126,6 +126,24 @@
     return '';
   }
 
+  // L'articolo o la preposizione attaccati col'apostrofo: il nome è quello che segue («l'italia» → «l'Italia»).
+  const ELISIONE = /^(?:l|d|un|dell|dall|nell|sull|all|coll|pell|quell|quest|bell|sant)['’](?=[\p{L}])/iu;
+
+  // L'apostrofo al posto dell'accento («perche'», «piu'», «sara'»): la forma accentata che il dizionario conosce, o ''.
+  // Restano i troncamenti giusti («po'», «di'», «fa'», «de' Medici»). `giusta(p)`: il dizionario dice che p esiste.
+  const TRONCHI = new Set(['po', 'mo', 'be', 'di', 'da', 'fa', 'va', 'sta', 'to', 'de', 'ca', 'vo', 'pie']);
+  const ACCENTI = { a: ['à'], e: ['è', 'é'], i: ['ì'], o: ['ò'], u: ['ù'] };
+  function formaAccentata(parola, giusta) {
+    const m = /^(.*?)([aeiou])['’]$/iu.exec(String(parola ?? ''));
+    if (!m || typeof giusta !== 'function' || TRONCHI.has(chiave(m[1] + m[2]))) return '';
+    const basso = chiave(parola).slice(0, -1);
+    for (const acc of ACCENTI[m[2].toLowerCase()]) {
+      const c = basso.slice(0, -1) + acc;
+      if (giusta(c)) return R().comeScritto(parola, c);
+    }
+    return '';
+  }
+
   // Una correzione che cambia solo maiuscole: in un posto dove si scrive tutto minuscolo non si fa.
   const soloMaiuscole = (a, b) => a !== b && String(a).toLowerCase() === String(b).toLowerCase();
 
