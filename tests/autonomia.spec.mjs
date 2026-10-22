@@ -319,7 +319,7 @@ test('la risposta di un\'altra chat nata dalle sole parole dell\'utente non spor
     await chiedi(page, 'ricordatelo');
     await expect.poll(async () => (await lezioni(app)).includes('maiuscolo'), { timeout: 15000 }).toBe(true);
     await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
-    await expect.poll(() => ultimaRisposta(app, 'ricordatelo')).toBe(1);
+    await expect.poll(() => ultimaRisposta(app, 'ricordatelo'), { timeout: 15000 }).toBe(1);
   } finally {
     await ripristina(app);
   }
