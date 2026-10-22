@@ -1088,6 +1088,7 @@
     const esito = !r || !r.ok
       ? `ricerca fra i documenti ${r && r.annullata ? 'annullata' : 'non riuscita'}`
       : (r.cartellaMancante ? `cartella non trovata: ${breve(r.cartellaMancante, 80)}`
+        : r.cartellaDiRete ? `cartella su un altro computer, non ci cerco: ${breve(r.cartellaDiRete, 80)}`
         : `${esitoDocumenti(r)} fra i tuoi documenti «${breve(p.cosa, 60)}»${r.fermata ? ', fermata da te' : ''}`);
     const fatta = riga || appendActionLog('');
     if (fatta) {
@@ -1743,6 +1744,7 @@
           indice: r.indice || null,
           fermata: !!r.fermata,
           cartellaMancante: r.cartellaMancante || '',
+          cartellaDiRete: r.cartellaDiRete || '',
         };
         setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: location.href, dopoDocumenti: true }), 50);
         return;
