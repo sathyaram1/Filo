@@ -2226,6 +2226,13 @@ function fraseNo(ing, decisione, sender) {
   });
 }
 
+// L'esito di una ricerca fra i documenti chiesta in una cartella di un altro computer (#1499): niente disco, si dice.
+function ricercaSuAltroComputer(action) {
+  const cosa = String(action.cosa ?? action.query ?? action.testo ?? action.q ?? '').trim();
+  const cartella = String(action.cartella ?? '').trim();
+  return { cercato: cosa, cartella, risultati: [], cartellaDiRete: cartella };
+}
+
 async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
   const via = opzioni.assistente ? 'assistente' : 'chat';
