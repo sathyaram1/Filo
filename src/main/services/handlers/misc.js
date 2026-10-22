@@ -402,7 +402,7 @@ module.exports = function register(on, ctx) {
       entry.fail(); await dropPart();
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
-    entry.done(dest.filePath);
+    await entry.done(dest.filePath);
     return { ok: true, path: dest.filePath, filename: path.basename(dest.filePath) };
   };
 
