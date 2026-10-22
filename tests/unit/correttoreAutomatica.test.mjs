@@ -274,3 +274,37 @@ test('quello che si impara passa da una fila sola nel main: tre schede insieme n
     Object.assign(globalThis, prima);
   }
 });
+
+test('come si scrive in un sito si somma, si dimezza oltre il tetto e resta nel main per sito', async () => {
+  assert.deepEqual(A.sommaStile({ minuscoli: 2, maiuscoli: 0 }, { minuscoli: 1, maiuscoli: 0 }), { minuscoli: 3, maiuscoli: 0 });
+  assert.deepEqual(A.sommaStile(null, { minuscoli: -4, maiuscoli: 'x' }), { minuscoli: 0, maiuscoli: 0 });
+  const grande = A.sommaStile({ minuscoli: 30, maiuscoli: 10 }, { minuscoli: 1e9, maiuscoli: 0 });
+  assert.ok(grande.minuscoli + grande.maiuscoli <= A.STILE_MAX, JSON.stringify(grande));
+  assert.ok(grande.maiuscoli > 0, 'il modo di prima conta ancora');
+
+  const mem = {};
+  const prima = { chrome: globalThis.chrome, SN_STORAGE: globalThis.SN_STORAGE };
+  globalThis.chrome = { storage: { local: {
+    get: async (k) => ({ [k]: mem[k] }),
+    set: async (o) => { Object.assign(mem, o); },
+  } } };
+  try {
+    const I = require('../../src/main/services/correttoreImpara.js');
+    const chat = { origine: 'https://chat.example/stanza/1' };
+    await Promise.all([1, 2].map(() => I.passo({ passo: 'stile', minuscoli: 1, maiuscoli: 0 }, chat)));
+    assert.deepEqual((await I.passo({ passo: 'leggiStile' }, { origine: 'https://chat.example/altra' })).stile, { minuscoli: 2, maiuscoli: 0 },
+      'riaperta, la stessa chat lo sa già');
+    assert.deepEqual((await I.passo({ passo: 'leggiStile' }, { origine: 'https://altro.example/' })).stile, { minuscoli: 0, maiuscoli: 0 });
+    // Il sito lo dice chi manda, non la richiesta.
+    await I.passo({ passo: 'stile', minuscoli: 5, sito: 'https://altro.example' }, chat);
+    assert.deepEqual(Object.keys(mem[I.STILI]), ['https://chat.example']);
+    for (const origine of ['', 'about:blank', 'javascript:alert(1)', null]) {
+      assert.equal((await I.passo({ passo: 'stile', minuscoli: 1 }, { origine })).ok, false, String(origine));
+    }
+    for (let i = 0; i < I.STILI_MAX + 3; i++) await I.passo({ passo: 'stile', maiuscoli: 1 }, { origine: `https://s${i}.example/` });
+    assert.equal(Object.keys(mem[I.STILI]).length, I.STILI_MAX);
+    assert.equal(mem[I.STILI]['https://chat.example'], undefined, 'esce il sito usato meno di recente');
+  } finally {
+    Object.assign(globalThis, prima);
+  }
+});

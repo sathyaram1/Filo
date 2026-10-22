@@ -387,3 +387,64 @@ test('nella pagina del correttore una parola imparata si cambia scrivendoci, e u
   await expect(pagina.locator('#rifiutateList .sn-spell-word')).toHaveValue('marco');
   await expect.poll(async () => (await imparato(app))?.rifiutate).toEqual(['marco']);
 });
+
+// Una chat come tante: Invio manda il messaggio e la pagina svuota la casella da sé, senza un input.
+const CHAT = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;padding:20px;font:16px sans-serif">
+  <div id="log"></div>
+  <textarea id="ta" lang="it" style="display:block;width:760px;height:80px;font:22px monospace"></textarea>
+  <div id="ce" contenteditable="true" lang="it" style="width:760px;min-height:60px;font:22px monospace;border:1px solid #999;margin-top:12px"></div>
+  <script>
+    const manda = (testo) => { const d = document.createElement('p'); d.textContent = testo; document.getElementById('log').appendChild(d); };
+    document.getElementById('ta').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); manda(e.target.value); e.target.value = ''; }
+    });
+    document.getElementById('ce').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); manda(e.target.innerText); e.target.innerHTML = ''; }
+    });
+  </script>
+</body>`;
+
+async function apriChat(app, page) {
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+}
+const testoDi = (page, sel) => page.locator(sel).evaluate((el) => (el.tagName === 'TEXTAREA' ? el.value : el.innerText.replace(/\u00a0/g, ' ')));
+
+test('in una chat che svuota la casella da sé, i messaggi tutti minuscoli già mandati tengono «marco» minuscolo, anche riaperta', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: true },
+    });
+  });
+  const page = await testServer.openReady(openTab, CHAT, { pubblico: true });
+  await apriChat(app, page);
+  for (const sel of ['#ta', '#ce']) {
+    await page.locator(sel).click();
+    // Il primo messaggio, da solo, non basta a dirlo.
+    if (sel === '#ta') {
+      await page.keyboard.type('ciao marco ');
+      expect(await testoDi(page, sel)).toBe('ciao Marco ');
+      await page.keyboard.press('Enter');
+    }
+    await page.keyboard.type('ok porto la pizza');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('allora da marco ');
+    await page.waitForTimeout(200);
+    expect(await testoDi(page, sel), sel).toBe('allora da marco ');
+    await page.keyboard.press('Enter');
+  }
+  // Riaperta la chat, Filo sa già come si scrive lì; in un altro sito no.
+  await page.reload();
+  await apriChat(app, page);
+  await page.locator('#ta').click();
+  await page.keyboard.type('domani da marco ');
+  await page.waitForTimeout(200);
+  expect(await testoDi(page, '#ta')).toBe('domani da marco ');
+  const altro = await testServer.openReady(openTab, CHAT);
+  await apriChat(app, altro);
+  await altro.locator('#ta').click();
+  await altro.keyboard.type('domani da marco ');
+  await expect.poll(() => testoDi(altro, '#ta')).toBe('domani da Marco ');
+});
