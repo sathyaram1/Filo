@@ -448,6 +448,59 @@
   const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const STAMPABILE = /^[\x09\x0a\x0d\x20-\x7e]*$/;
 
+  // Un pezzo della parte variabile lungo così ricostruisce la chiave, anche senza il prefisso o con qualche carattere in
+  // meno (#1507). È la misura di ciò che si confronta con quello che l'agente ha letto (urlExfil.js, FINESTRA).
+  const FINESTRA = 20;
+
+  // `norm` è il segreto in sola forma alfanumerica minuscola; `nucleo` la stessa senza i pezzi fissi del suo tipo, se è
+  // abbastanza lungo da contare; `da`..`a` dove stanno le finestre che contano: una tutta dentro un pezzo fisso no.
+  function partiSegreto(valore) {
+    const v = testo(valore).trim();
+    const norm = alnumMinuscolo(v);
+    const pre = Math.min(norm.length, alnumMinuscolo((v.match(PREFISSO_FISSO) || [''])[0]).length);
+    const fine = Math.max(pre, norm.length - alnumMinuscolo((v.match(CODA_FISSA) || [''])[0]).length);
+    const nucleo = norm.slice(pre, fine);
+    return {
+      norm,
+      nucleo: nucleo.length >= SEGRETO_MIN && nucleo !== norm ? nucleo : '',
+      da: Math.max(0, pre - FINESTRA + 1),
+      a: Math.min(fine, norm.length - FINESTRA + 1),
+    };
+  }
+
+  function finestreDi(parti) {
+    const out = new Set();
+    for (let i = parti.da; i < parti.a; i++) out.add(parti.norm.slice(i, i + FINESTRA));
+    return out;
+  }
+
+  // `piatto` in sola forma alfanumerica minuscola.
+  function haFinestra(piatto, finestre) {
+    if (!finestre || !finestre.size) return false;
+    for (let i = 0; i + FINESTRA <= piatto.length; i++) if (finestre.has(piatto.slice(i, i + FINESTRA))) return true;
+    return false;
+  }
+
+  // Toglie i tratti che le finestre coprono. Posizioni e forma piatta nascono insieme: un carattere che cambia lunghezza
+  // quando diventa minuscolo non sposta il taglio.
+  function togliFinestre(t, finestre) {
+    const pos = [];
+    let piatto = '';
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (/[A-Za-z0-9]/.test(ch)) { pos.push(i); piatto += ch.toLowerCase(); }
+    }
+    const tratti = [];
+    for (let i = 0; i + FINESTRA <= piatto.length; i++) {
+      if (!finestre.has(piatto.slice(i, i + FINESTRA))) continue;
+      const u = tratti[tratti.length - 1];
+      if (u && i <= u[1]) u[1] = i + FINESTRA; else tratti.push([i, i + FINESTRA]);
+    }
+    let out = t;
+    for (let k = tratti.length - 1; k >= 0; k--) out = out.slice(0, pos[tratti[k][0]]) + OSCURATO + out.slice(pos[tratti[k][1] - 1] + 1);
+    return out;
+  }
+
   function decodifiche(tok) {
     const out = [];
     let cur = tok;
