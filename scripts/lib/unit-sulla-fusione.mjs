@@ -418,7 +418,9 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
   // Con main già dentro, il risultato della fusione è il ramo stesso: si prova lui.
   const contenuto = git(['merge-base', '--is-ancestor', mainSha, punta]).ok;
   if (contenuto && !ancheContenuto) return { esito: 'main_contenuto', mainSha };
-  const segno = contenuto ? { contenuto: true } : {};
+  // La base del ramo va detta: chi riprova un rosso «su main da solo» partendo da lì vede main di prima (#1580.1).
+  const base = contenuto ? null : git(['merge-base', mainSha, punta]);
+  const segno = contenuto ? { contenuto: true } : (base && base.ok && /^[0-9a-f]{40}$/i.test(base.out.trim()) ? { baseRamo: base.out.trim() } : {});
   const sulla = contenuto ? 'sul ramo' : 'sulla fusione';
 
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
