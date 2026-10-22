@@ -606,7 +606,7 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, suoneria del timer (quale motivo e quanto forte), durata, suono e volume degli avvisi in basso a destra (la durata vale anche per le conferme dentro le pagine, che restano più brevi in proporzione; ogni avviso aspetta finché ci tieni sopra il puntatore; quelli della barra si chiudono con la X, quelli nelle pagine con un clic; col tasto destro su un avviso il menu offre le sue azioni e «Chiudi», più «Chiudi tutti» quando sono più d’uno; nella barra se ne vedono cinque alla volta, e gli altri aspettano dietro un «+N» che li mostra tutti), e la modalità terminale con la sua shell.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, suoneria del timer (quale motivo e quanto forte), durata, suono e volume degli avvisi in basso a destra (la durata vale anche per le conferme dentro le pagine, che restano più brevi in proporzione; ogni avviso aspetta finché ci tieni sopra il puntatore; quelli della barra si chiudono con la X, quelli nelle pagine con un clic; col tasto destro su un avviso il menu offre le sue azioni e «Chiudi», più «Chiudi tutti» quando sono più d’uno; degli avvisi di Filo in basso a destra se ne vedono cinque alla volta, e gli altri aspettano dietro un «+N» che li mostra tutti), e la modalità terminale con la sua shell.',
       invoke: 'Pagina filo://preferences/preferences.html, oppure chiedendolo a Filo in chat.',
     },
     {
