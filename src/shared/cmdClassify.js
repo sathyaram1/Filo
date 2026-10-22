@@ -1496,7 +1496,9 @@
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
     const letture = comeLaShell(cmd, c);
-    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
+    if (letture == null) return TRE;
+    const contesti = forseDash(c) && cmd.includes('$\'') ? [c, { ...c, senzaAnsi: true }] : [c];
+    return letture.flatMap((l) => contesti.map((cc) => classifica(l, cc, 0))).reduce(peggiore);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
