@@ -175,6 +175,7 @@
       const warn = document.createElement('span');
       warn.className = 'sn-history-policy-warn';
       warn.textContent = I18n.t('history_policy_violation');
+      warn.title = I18n.t('history_policy_violation_title');
       left.appendChild(warn);
     }
     const right = document.createElement('span');
