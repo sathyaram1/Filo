@@ -17,23 +17,23 @@
     'Giacomo', 'Giancarlo', 'Gianluca', 'Gianni', 'Giorgio', 'Giovanni', 'Giulio', 'Giuseppe', 'Gennaro', 'Ivan',
     'Jacopo', 'Leonardo', 'Lorenzo', 'Luca', 'Luciano', 'Luigi', 'Manuel', 'Marcello', 'Marco', 'Mario', 'Matteo',
     'Mattia', 'Maurizio', 'Mauro', 'Michele', 'Mirko', 'Nicola', 'Nicolò', 'Paolo', 'Pietro', 'Raffaele', 'Riccardo',
-    'Roberto', 'Salvatore', 'Samuele', 'Sergio', 'Simone', 'Stefano', 'Tommaso', 'Umberto', 'Valerio', 'Vincenzo',
+    'Roberto', 'Samuele', 'Sergio', 'Simone', 'Stefano', 'Tommaso', 'Umberto', 'Valerio', 'Vincenzo',
     'Vittorio', 'Walter',
     'Alessandra', 'Alessia', 'Alice', 'Anna', 'Antonella', 'Arianna', 'Beatrice', 'Camilla', 'Carla', 'Caterina',
-    'Claudia', 'Cristina', 'Daniela', 'Elena', 'Elisa', 'Elisabetta', 'Emma', 'Federica', 'Francesca', 'Giada',
-    'Giorgia', 'Giovanna', 'Giulia', 'Greta', 'Ilaria', 'Irene', 'Laura', 'Lucia', 'Manuela', 'Margherita', 'Maria',
-    'Marta', 'Martina', 'Matilde', 'Michela', 'Monica', 'Noemi', 'Paola', 'Rebecca', 'Rita', 'Roberta', 'Sara',
+    'Claudia', 'Cristina', 'Daniela', 'Elena', 'Elisa', 'Elisabetta', 'Emma', 'Federica', 'Francesca',
+    'Giorgia', 'Giovanna', 'Giulia', 'Greta', 'Ilaria', 'Irene', 'Laura', 'Lucia', 'Manuela', 'Maria',
+    'Marta', 'Martina', 'Matilde', 'Michela', 'Monica', 'Noemi', 'Paola', 'Rebecca', 'Rita', 'Roberta',
     'Silvia', 'Simona', 'Sofia', 'Stefania', 'Teresa', 'Valentina', 'Valeria',
     // Città, paesi e regioni
     'Roma', 'Milano', 'Napoli', 'Torino', 'Palermo', 'Genova', 'Bologna', 'Firenze', 'Bari', 'Catania', 'Venezia',
     'Verona', 'Messina', 'Padova', 'Trieste', 'Brescia', 'Parma', 'Taranto', 'Modena', 'Perugia', 'Livorno', 'Ravenna',
     'Cagliari', 'Rimini', 'Salerno', 'Ferrara', 'Sassari', 'Monza', 'Siracusa', 'Pescara', 'Bergamo', 'Trento',
     'Vicenza', 'Bolzano', 'Novara', 'Piacenza', 'Ancona', 'Arezzo', 'Udine', 'Lecce', 'Pesaro', 'Varese', 'Pisa',
-    'Lucca', 'Siena', 'Aosta', 'Cremona', 'Mantova', 'Pavia', 'Treviso', 'Como', 'Londra', 'Parigi', 'Berlino',
+    'Lucca', 'Siena', 'Aosta', 'Cremona', 'Mantova', 'Pavia', 'Treviso', 'Londra', 'Parigi', 'Berlino',
     'Madrid', 'Barcellona', 'Lisbona', 'Vienna', 'Praga', 'Amsterdam', 'Bruxelles', 'Atene', 'Dublino', 'Zurigo',
     'Ginevra', 'Tokyo', 'Pechino',
     'Italia', 'Francia', 'Germania', 'Spagna', 'Portogallo', 'Inghilterra', 'Irlanda', 'Olanda', 'Belgio', 'Svizzera',
-    'Austria', 'Grecia', 'Polonia', 'Russia', 'Ucraina', 'Cina', 'Giappone', 'India', 'Brasile', 'Argentina',
+    'Austria', 'Grecia', 'Polonia', 'Russia', 'Ucraina', 'Cina', 'Giappone', 'India', 'Brasile',
     'Messico', 'Canada', 'Australia', 'Egitto', 'Turchia', 'Svezia', 'Norvegia', 'Danimarca', 'Finlandia', 'Croazia',
     'America', 'Europa', 'Asia', 'Africa', 'Sicilia', 'Sardegna', 'Lombardia', 'Piemonte', 'Liguria', 'Lazio',
     'Campania', 'Puglia', 'Calabria', 'Abruzzo',
@@ -42,7 +42,7 @@
     'Instagram', 'TikTok', 'LinkedIn', 'Netflix', 'Spotify', 'Amazon', 'Microsoft', 'iPhone', 'iPad', 'iCloud',
     'MacBook', 'macOS', 'Linux', 'Wikipedia', 'GitHub', 'PayPal', 'eBay', 'Airbnb', 'Samsung', 'Huawei', 'Xiaomi',
     'Nintendo', 'PlayStation', 'Xbox', 'Ferrari', 'Lamborghini', 'Vodafone', 'Trenitalia', 'Ryanair', 'Nutella',
-    'Barilla', 'Lavazza', 'Firefox', 'Dropbox', 'Reddit', 'Skype', 'Netflix', 'Starbucks', 'Coca-Cola',
+    'Barilla', 'Lavazza', 'Firefox', 'Dropbox', 'Reddit', 'Skype', 'Starbucks', 'Coca-Cola',
   ];
   const NOMI = new Map(NOMI_ELENCO.map((f) => [f.toLowerCase(), f]));
 
@@ -255,7 +255,7 @@
     const mem = memoria(m);
     const k = chiave(parola);
     const c = String(correzione ?? '').trim();
-    if (!k || !c || /\s/.test(k) || chiave(c) === k && c === parola) return { memoria: mem, impara: null };
+    if (!k || !c || /\s/.test(k) || c === parola) return { memoria: mem, impara: null };
     if (R().FISSI.get(k) === formaBase(parola, c)) return { memoria: mem, impara: null };
     const base = formaBase(parola, c);
     const id = `${k}\u0001${base}`;
