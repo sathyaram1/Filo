@@ -44,7 +44,8 @@ test('avanti/indietro spenti si trascinano lo stesso (niente attributo disabled 
     expect(await btn.evaluate((el) => el.disabled === true), `${id} non deve avere l'attributo disabled nativo`).toBe(false);
   }
   await trascina(barra, 'forward', 'home');
-  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 4)).toEqual(['back', 'reload', 'forward', 'home']);
+  // In cima c'è l'Aiuto (#1432).
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 5)).toEqual(['help', 'back', 'reload', 'forward', 'home']);
   await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'true');
 });
 
@@ -55,8 +56,8 @@ test('trascinare un\'altra icona non fa tornare attivi avanti/indietro', async (
   await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'true');
 
   await trascina(barra, 'home', 'back');
-  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['home', 'back']);
-  await expect.poll(() => barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id).slice(0, 2))).toEqual(['home', 'back']);
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 3)).toEqual(['help', 'home', 'back']);
+  await expect.poll(() => barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id).slice(0, 3))).toEqual(['help', 'home', 'back']);
   // Ridisegnate dopo la posa, restano spente: prima del fix tornavano colorate.
   await expect(barra.locator('#nav .ico[data-id="back"]')).toHaveAttribute('aria-disabled', 'true');
   await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'true');
