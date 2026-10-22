@@ -2,6 +2,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { paginaDellaScheda } from '../../helpers/schede.mjs';
 
+const GAP = Number(process.env.GAP || 0);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function info(app) {
@@ -22,13 +23,17 @@ function premi(app, keyCode, modifiers) {
 
 // Due pressioni di fila, nello stesso giro del main: come chi preme due volte svelto.
 function riapriDueVolte(app) {
-  return app.evaluate(({ BrowserWindow }) => {
+  return app.evaluate(({ BrowserWindow }, GAP) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
     t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['control', 'shift'] });
     t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['control', 'shift'] });
-    t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['control', 'shift'] });
-  });
+    return new Promise((r) => setTimeout(() => {
+      const u = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+      u.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['control', 'shift'] });
+      r();
+    }, GAP));
+  }, GAP);
 }
 
 function apriEAspetta(app, url) {
@@ -62,7 +67,8 @@ test('due pressioni svelte dopo un riavvio riaprono due schede diverse dall arch
   expect(dopo.urls.filter((u) => u === x)).toHaveLength(1);
 });
 
-test('due schede chiuse in fretta tornano tutte e due, la più recente prima', async ({ app, testServer }) => {
+test('due schede chiuse in fretta tornano tutte e due, la più recente prima', async ({ app, shell, testServer }) => {
+  await shell.waitForLoadState('domcontentloaded');
   const p = testServer.html('<title>P</title><h1>p</h1>');
   const q = testServer.html('<title>Q</title><h1>q</h1>');
   await apriEAspetta(app, p);
@@ -73,7 +79,7 @@ test('due schede chiuse in fretta tornano tutte e due, la più recente prima', a
   await riapriDueVolte(app);
   await expect.poll(() => info(app).then((i) => [i.urls.includes(p), i.urls.includes(q)]), { timeout: 10_000 }).toEqual([true, true]);
   const dopo = await info(app);
-  expect(dopo.activeUrl).toBe(p);
+  expect(dopo.activeUrl).toBe(q);
   expect(dopo.urls.indexOf(p)).toBeLessThan(dopo.urls.indexOf(q));
 });
 
