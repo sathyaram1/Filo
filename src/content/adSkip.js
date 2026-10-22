@@ -46,6 +46,7 @@
   let adottato = null;
   const seguiti = new Map();
   let timer = null;
+  let veglia = null;
   let premuto = false;
   const inCima = window.top === window;
   // Il nome con cui questo frame si presenta alla pagina sopra: pubblico, la pagina lo vede; lega le domande del main.
