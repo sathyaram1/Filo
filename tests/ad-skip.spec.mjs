@@ -180,6 +180,7 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
     for (const u of [yt, incorporato, ima]) await nel(u, 'window.__mostra()');
     await new Promise((ok) => setTimeout(ok, 5000));
     console.log('PILE', JSON.stringify(await nel(ima, 'window.__pile')));
+    console.log('RECT', JSON.stringify(await nel(ima, "(() => { const b = document.getElementById('salta'); const r = b.getBoundingClientRect(); return [r.width, r.height, getComputedStyle(b.parentNode).display, b.checkVisibility(), window.__clic.length]; })()")));
     console.log('MAIN', JSON.stringify(await filo.evaluate(() => globalThis.__diag)));
     for (const u of [yt, incorporato, ima]) console.log('DIAG', u, JSON.stringify(await nel(u, '({c: window.__clic, s: window.__saltata, v: document.visibilityState, iw: innerWidth})')));
     console.log('OSPITE', JSON.stringify(await filo.evaluate(({ webContents }) => Promise.all(webContents.getAllWebContents().map(async (w) => [w.getURL(), await w.executeJavaScript('({g: window.__gesti, v: document.visibilityState, iw: innerWidth})').catch((e) => String(e))])))));
