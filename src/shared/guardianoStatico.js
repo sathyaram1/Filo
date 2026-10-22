@@ -461,12 +461,21 @@
     const pre = Math.min(norm.length, alnumMinuscolo((v.match(PREFISSO_FISSO) || [''])[0]).length);
     const fine = Math.max(pre, norm.length - alnumMinuscolo((v.match(CODA_FISSA) || [''])[0]).length);
     const nucleo = norm.slice(pre, fine);
-    return { norm, nucleo: nucleo.length >= SEGRETO_MIN && nucleo !== norm ? nucleo : '', da: pre, a: fine - FINESTRA + 1 };
+    const conta = nucleo.length >= SEGRETO_MIN && nucleo !== norm;
+    return { norm, nucleo: conta ? nucleo : '', nuclei: conta ? [nucleo, rovescio(nucleo)] : [], da: pre, a: fine - FINESTRA + 1 };
   }
 
   function finestreDi(parti) {
     const out = new Set();
     for (let i = parti.da; i < parti.a; i++) out.add(parti.norm.slice(i, i + FINESTRA));
+    return out;
+  }
+
+  // Le finestre di un segreto in entrambi i versi: il valore intero si riconosce anche al contrario, e un suo pezzo
+  // deve ereditare lo stesso travestimento (#1507).
+  function finestreSegreto(parti) {
+    const out = finestreDi(parti);
+    for (const f of [...out]) out.add(rovescio(f));
     return out;
   }
 
@@ -542,7 +551,7 @@
       // Quanto del segreto porta: tutto (un segreto intero) o quante sue finestre.
       const quanto = (x) => {
         const forme = decodifiche(x.replace(/\s+/g, '')).map(alnumMinuscolo);
-        if (chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov) || (!!c.nucleo && f.includes(c.nucleo))))) return Infinity;
+        if (chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov) || c.nuclei.some((n) => f.includes(n))))) return Infinity;
         const viste = new Set();
         for (const f of forme) for (let i = 0; i + FINESTRA <= f.length; i++) if (finestre.has(f.slice(i, i + FINESTRA))) viste.add(f.slice(i, i + FINESTRA));
         return viste.size;
@@ -558,7 +567,7 @@
     // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
     let piatto = alnumMinuscolo(t);
     for (const c of chiavi) {
-      for (const cerca of [c.norm, c.rov, c.nucleo].filter(Boolean)) {
+      for (const cerca of [c.norm, c.rov, ...c.nuclei]) {
         let guardia = 0;
         while (piatto.includes(cerca) && guardia++ < 1000) {
           const pos = [];
@@ -579,8 +588,8 @@
       const v = testo(x).trim();
       const p = partiSegreto(v);
       if (v.length < SEGRETO_MIN || p.norm.length < SEGRETO_MIN) continue;
-      chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nucleo: p.nucleo, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
-      for (const f of finestreDi(p)) finestre.add(f);
+      chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nuclei: p.nuclei, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
+      for (const f of finestreSegreto(p)) finestre.add(f);
     }
     if (!chiavi.length || valore == null) return valore;
     // Lo stesso oggetto quando non c'è niente da togliere: chi lo riceve non paga una copia.
@@ -601,6 +610,6 @@
 
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
-    segretiNelTesto, oscuraSegreti, partiSegreto, finestreDi, haFinestra, SEGRETO_MIN, OSCURATO, FINESTRA,
+    segretiNelTesto, oscuraSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, OSCURATO, FINESTRA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -717,10 +717,10 @@
     const G = global.SN_GUARDIANO_STATICO;
     if (!G || typeof G.partiSegreto !== 'function') return false;
     const p = G.partiSegreto(valore);
-    if (p.nucleo && u.alnum.includes(p.nucleo)) return true;
+    if (p.nuclei.some((n) => u.alnum.includes(n))) return true;
     if (p.a <= p.da) return false;
     if (!u.finestre) u.finestre = G.finestreDi({ norm: u.alnum, da: 0, a: u.alnum.length - G.FINESTRA + 1 });
-    for (let i = p.da; i < p.a; i++) if (u.finestre.has(p.norm.slice(i, i + G.FINESTRA))) return true;
+    for (const f of G.finestreSegreto(p)) if (u.finestre.has(f)) return true;
     return false;
   }
 

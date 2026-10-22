@@ -705,6 +705,9 @@ describe('una chiave custodita si riconosce anche a pezzi: senza il prefisso, mo
     'un pezzo di trentacinque caratteri': VARIABILE.slice(5, 40),
     'la parte variabile a gruppi di otto': VARIABILE.match(/.{1,8}/g).join(' '),
     'un pezzo in base64': Buffer.from(`k=${VARIABILE.slice(0, 30)}`).toString('base64'),
+    // Al contrario come il valore intero: un comando che taglia il prefisso e rovescia la riga.
+    'la parte variabile al contrario': [...VARIABILE].reverse().join(''),
+    'la chiave senza gli ultimi tre caratteri, al contrario': [...OR.slice(9, -3)].reverse().join(''),
   };
   for (const [nome, forma] of Object.entries(forme)) {
     test(`${nome}: l'uscita si ferma con la riga del custodito, e al modello arriva oscurata`, () => {
@@ -723,7 +726,9 @@ describe('una chiave custodita si riconosce anche a pezzi: senza il prefisso, mo
       assert.ok(fuori.includes(G.OSCURATO), fuori);
       assert.ok(fuori.startsWith('uscita:\n') && fuori.endsWith('\nfine'), 'il testo attorno resta');
       const piatto = fuori.toLowerCase().replace(/[^a-z0-9]+/g, '');
-      assert.ok(!pezziDi(OR.toLowerCase().replace(/[^a-z0-9]+/g, '')).some((p) => piatto.includes(p)), `al modello arriva un pezzo: ${fuori}`);
+      const norm = OR.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const pezzi = pezziDi(norm).concat(pezziDi([...norm].reverse().join('')));
+      assert.ok(!pezzi.some((p) => piatto.includes(p)), `al modello arriva un pezzo: ${fuori}`);
     });
   }
 
@@ -746,7 +751,8 @@ describe('una chiave custodita si riconosce anche a pezzi: senza il prefisso, mo
       assert.equal(v.blocca, true, forma);
       assert.match(v.frase, /una chiave letta dall'output di un comando/);
     }
-    const altro = ['gh', 'p_', 'zyxwvutsrqponmlkjihgfedcba9876'].join('');
+    // Non il rovescio di quella letta: al contrario sarebbe lei.
+    const altro = ['gh', 'p_', 'q7lm2xc9rt4bv8np1kd6wf3hs5jg0y'].join('');
     assert.equal(X.valutaUscita({ type: 'NAVIGA', url: `https://raccolta.example/?t=${altro}` }, { azioni }).blocca, false);
   });
 });
