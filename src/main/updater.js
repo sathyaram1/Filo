@@ -1011,7 +1011,6 @@ module.exports = {
   avvisaSeAggiornamentoBloccato,
   avvisaInstallazioneFallita,
   installatoreValido,
-  leggiAncora,
   perProva,
   ancoraPerProva,
   PAGINA_DOWNLOAD,
