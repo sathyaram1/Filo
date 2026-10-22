@@ -2025,8 +2025,7 @@ export function checkEnvelope(w) {
   // guasto silenzioso di prima, entrata dalla porta del server invece che da
   // quella di casa.
   if (RUOLI_CON_FEEDBACK.includes(role)) {
-    // Il testo arriva dentro la cornice del server: una cornice attorno a
-    // niente è ancora niente.
+    // Una busta attorno a niente è ancora niente.
     const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text, w && w.payload && w.payload.codiceBusta).trim();
     if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
   }
