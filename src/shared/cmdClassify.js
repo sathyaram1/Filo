@@ -1735,5 +1735,7 @@
     return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
+  global.SN_CMD_CLASSIFY = {
+    classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
