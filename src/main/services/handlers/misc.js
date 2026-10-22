@@ -576,14 +576,9 @@ module.exports = function register(on, ctx) {
         } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
-        const names = failed.map((f) => f?.name || 'allegato').join(', ');
-        try {
-          broadcastToTabs({
-            type: MSG.SHOW_TOAST,
-            text: `Feedback inviato, ma non sono riuscito a caricare: ${names}`,
-            duration: 6000,
-          });
-        } catch (_) {}
+        // Il numero, non i nomi: i nomi dei file sono dell'utente, e l'avviso non deve dire più del necessario (#1509).
+        const quanti = failed.length === 1 ? 'un allegato' : `${failed.length} allegati`;
+        try { avvisoDiFilo(`Feedback inviato, ma non sono riuscito a caricare ${quanti}`, { durataSec: 8 }); } catch (_) {}
       },
       // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
