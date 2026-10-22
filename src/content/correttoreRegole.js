@@ -375,8 +375,9 @@
       let start = dove.start;
       let end = dove.end;
       let correzioni = [];
-      if (r.correzione.trim() || errore) {
-        const stretto = restringi(pezzo, r.correzione.trim() ? r.correzione : '');
+      const correzione = r.correzione.trim();
+      if (correzione || errore) {
+        const stretto = correzione && formaLetta(correzione) === formaLetta(pezzo) ? null : restringi(pezzo, correzione ? r.correzione : '');
         if (stretto) {
           const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
           start = dove.start + pos[stretto.da];
@@ -384,7 +385,12 @@
           correzioni = [stretto.sostituto];
         } else if (errore) continue;
       }
-      if (end <= start || !testo.slice(start, end).trim()) { start = dove.start; end = dove.end; }
+      // Ristretto ai soli spazi, il segno torna sul pezzo intero con la correzione intera: quella ristretta lo cancellerebbe.
+      if (end <= start || !testo.slice(start, end).trim()) {
+        start = dove.start;
+        end = dove.start + dove.end - dove.start;
+        if (correzioni.length) correzioni = [correzione];
+      }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
       segni.push({
         start, end, segment: testo.slice(start, end), segno: errore ? 'errore' : 'suggerimento', dubbio: false, fonte,
