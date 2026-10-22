@@ -1201,6 +1201,7 @@ module.exports = {
   _forgetExists: forgetExists,
   MISSING_TEXT,
   _shortName: shortName,
-  _safeName: safeName,
   _publicRecord: publicRecord,
+  _testoZoneIdentifier: testoZoneIdentifier,
+  _valoreQuarantena: valoreQuarantena,
 };
