@@ -1,8 +1,9 @@
 // Verifica #1580, giro 2: una riga del modello che corregge solo gli spazi (o la sola forma dell'apostrofo) non deve
-// diventare un errore la cui correzione cancella le parole: «Correggi tutti gli errori» le lascerebbe sparire.
-import { test, expect } from './../../fixtures/electron.mjs';
+// diventare un errore la cui correzione cancella le parole: un clic sulla correzione le farebbe sparire.
+import { test, expect } from '../../fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { menuDi, nelMondoDelMenu } from '../../helpers/menuContestuale.mjs';
+import { riquadroDelSegno } from '../../helpers/segniDelCorrettore.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../../src/content/correttoreRegole.js');
@@ -28,7 +29,7 @@ for (const [nome, testo] of [
   });
 }
 
-test('r1 nella pagina, «Correggi tutti gli errori» dopo una riga sugli spazi lascia «l\'altro giorno» al suo posto', async ({ app, openTab, testServer }) => {
+test('r1 nella pagina, la correzione proposta dopo una riga sugli spazi lascia «l\'altro giorno» al suo posto', async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -57,12 +58,14 @@ test('r1 nella pagina, «Correggi tutti gli errori» dopo una riga sugli spazi l
   await page.keyboard.type("ieri l'altro  giorno ho visto Marco ");
   await expect.poll(() => app.evaluate(() => globalThis.__rapide), { timeout: 6000 }).toBeGreaterThan(0);
   await page.waitForTimeout(800);
-  const box = await page.locator('#ta').boundingBox();
-  await page.mouse.click(box.x + 40, box.y + 20, { button: 'right' });
-  const menu = menuDi(page);
-  await expect(menu.pannelli.first()).toBeVisible({ timeout: 5000 });
-  const tutti = menu.voce('Correggi tutti gli errori');
-  if (await tutti.count()) await tutti.first().click();
-  else await page.keyboard.press('Escape');
+  // Se c'è un errore segnato, il suo tasto destro e la prima correzione: è il gesto che la pagina propone.
+  const segno = page.locator('.sn-spell-overlay .sn-errore').first();
+  if (await segno.count()) {
+    const b = await riquadroDelSegno(segno);
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
+    const menu = menuDi(page);
+    await expect(menu.pannelli.first()).toBeVisible({ timeout: 5000 });
+    await menu.principale.locator(':scope > *').first().locator('.sn-menu-correction-main').click();
+  }
   await expect(page.locator('#ta')).toHaveValue(/l'altro\s+giorno ho visto Marco/);
 });
