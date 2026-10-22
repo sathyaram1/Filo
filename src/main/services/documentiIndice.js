@@ -541,8 +541,10 @@ function elencoOccasionali(lista) {
   return Array.from(occasionali.keys()).sort((a, b) => occasionali.get(b) - occasionali.get(a)).map((c) => {
     let documenti = 0;
     for (const p of voci.keys()) if (dentro(p, c) && !inLista(p)) documenti += 1;
+    // Una cercata prima che la rete si rifiutasse (#1499): a ogni apertura delle Preferenze si contatterebbe quel computer.
+    const rete = diRete(c);
     let esiste = false;
-    try { esiste = fs.statSync(c).isDirectory(); } catch (_) { esiste = false; }
+    if (!rete) { try { esiste = fs.statSync(c).isDirectory(); } catch (_) { esiste = false; } }
     return { percorso: c, nome: nomeOccasionale(c), documenti, esiste, quando: occasionali.get(c) || null };
   });
 }
