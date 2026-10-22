@@ -158,8 +158,72 @@ function safeName(name, ripiego = 'download') {
   s = s.trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
   s = s.replace(/[<>:"|?*]/g, '_').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
-  if (!s || s === '.' || s === '..') s = 'download';
+  if (!s || s === '.' || s === '..') s = ripiego;
   return s.slice(0, 180);
+}
+
+// ─── marca d'origine (#1510) ─────────────────────────────────────────────
+// Senza, un file aperto da Esplora risorse o dal Finder salta SmartScreen e Gatekeeper, e Office non lo apre in
+// Visualizzazione protetta. Si scrive sempre, senza contare su Electron: un volume che non la regge (FAT, exFAT)
+// o un xattr che manca lasciano valido lo scaricamento.
+
+// Solo http(s), senza credenziali né frammento: nella marca va l'indirizzo, non le chiavi per entrarci.
+function indirizzoPerMarca(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol !== 'http:' && x.protocol !== 'https:') return '';
+    x.username = ''; x.password = ''; x.hash = '';
+    return x.href;
+  } catch (_) { return ''; }
+}
+
+// In incognito gli indirizzi sarebbero cronologia che sopravvive alla finestra: la zona basta ad armare gli avvisi.
+function testoZoneIdentifier({ hostUrl, referrerUrl, incognito } = {}) {
+  const host = incognito ? '' : indirizzoPerMarca(hostUrl);
+  const ref = incognito ? '' : indirizzoPerMarca(referrerUrl);
+  const righe = ['[ZoneTransfer]', 'ZoneId=3'];
+  if (ref) righe.push(`ReferrerUrl=${ref}`);
+  righe.push(`HostUrl=${host || 'about:internet'}`);
+  return righe.join('\r\n') + '\r\n';
+}
+
+// 0081: messo in quarantena da chi ha scaricato, mai aperto: Gatekeeper chiede alla prima apertura.
+function valoreQuarantena(ora = Date.now()) {
+  return `0081;${Math.floor(ora / 1000).toString(16)};Filo;`;
+}
+
+// `sistema` ({ platform, execFile }) esiste per provare i rami degli altri sistemi da uno solo. Risolve true se la
+// marca è scritta, false altrimenti; non rigetta mai.
+function marcaOrigine(file, { hostUrl, referrerUrl, incognito } = {}, sistema = {}) {
+  if (!file) return Promise.resolve(false);
+  const piattaforma = sistema.platform || process.platform;
+  if (piattaforma === 'win32') {
+    // Sincrona: «Apri file» subito dopo lo scaricamento deve già trovarla.
+    try {
+      fs.writeFileSync(`${file}:Zone.Identifier`, testoZoneIdentifier({ hostUrl, referrerUrl, incognito }));
+      return Promise.resolve(true);
+    } catch (_) { return Promise.resolve(false); }
+  }
+  if (piattaforma === 'darwin') {
+    return new Promise((resolve) => {
+      try {
+        const esegui = sistema.execFile || require('node:child_process').execFile;
+        esegui('/usr/bin/xattr', ['-w', 'com.apple.quarantine', valoreQuarantena(), file], (err) => resolve(!err));
+      } catch (_) { resolve(false); }
+    });
+  }
+  // Linux e gli altri: nessuna marca che il sistema guardi prima di aprire un file.
+  return Promise.resolve(false);
+}
+
+// HostUrl è chi ha servito i byte (dopo i rimandi), ReferrerUrl la pagina da cui è partito lo scaricamento.
+function marcaDi(rec) {
+  if (!rec || !rec.savePath) return Promise.resolve(false);
+  return marcaOrigine(rec.savePath, { hostUrl: rec._servito || rec.url, referrerUrl: rec._pagina, incognito: !!scopeOf(rec) });
+}
+
+function paginaDi(webContents) {
+  try { return webContents && !webContents.isDestroyed?.() ? String(webContents.getURL() || '') : ''; } catch (_) { return ''; }
 }
 
 // Un nome lunghissimo farebbe dell'avviso un riquadro enorme: si taglia in MEZZO, così
