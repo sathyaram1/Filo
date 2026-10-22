@@ -363,7 +363,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
     try {
       child = spawn(file, args, {
         cwd: cartella,
-        env: env || process.env,
+        env,
         windowsHide: true,
         shell: false,
       });
