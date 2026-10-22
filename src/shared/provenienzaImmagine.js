@@ -1356,7 +1356,7 @@
   }
 
   global.SN_PROVENIENZA = {
-    analizza, frase, notaPerModello, ancoreDaPem, esitoDaMarchio,
-    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario },
+    analizza, frase, notaPerModello, ancoreDaPem, ammessiDaPem, esitoDaMarchio, CONGELAMENTO_PROVVISORIO,
+    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario, fiducia },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
