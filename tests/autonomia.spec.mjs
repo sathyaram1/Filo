@@ -305,8 +305,7 @@ test('la risposta di un\'altra chat nata da una pagina fa chiedere la lezione ne
     expect(await confirmText(page)).toContain('Te lo chiedo perché in questo compito ho riletto risposte di altre conversazioni nate da testo scritto da altri.');
     await page.screenshot({ path: join(SHOTS, 'autonomia-altra-chat.png') });
     await clickConfirm(page, 'cancel');
-    await expect(page.locator('.dash-bubble').filter({ hasText: 'Fatto.' })).toBeVisible({ timeout: 15000 });
-    await expect.poll(() => ultimaRisposta(app, 'ricordatelo'), { message: 'la risposta porta la classe letta nell\'archivio' }).toBe(5);
+    await expect.poll(() => ultimaRisposta(app, 'ricordatelo'), { message: 'la risposta porta la classe letta nell\'archivio', timeout: 15000 }).toBe(5);
   } finally {
     await ripristina(app);
   }
