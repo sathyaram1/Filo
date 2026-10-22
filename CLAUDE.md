@@ -211,8 +211,8 @@ riscrive. Sono TRE testi distinti:
    riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
    singole).
 
-Prima di consegnare un testo destinato a un umano applica
-**`.claude/skills/unslop/SKILL.md`**.
+Prima di mandare un testo destinato a un umano, compresa ogni risposta in chat
+anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
 
 ## Fonti di verità singole (aggiornale nello stesso commit)
 

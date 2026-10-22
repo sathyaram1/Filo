@@ -1,18 +1,45 @@
 ---
 name: unslop
-description: Applicala SEMPRE prima di consegnare testo destinato a un umano — report per l'owner, frase per chi ha segnalato, righe di changelog e patch notes, testi visibili nella UI, documentazione, messaggi e note. Toglie i tic da testo generato e rende la scrittura chiara e immediata.
+description: Applicala SEMPRE prima di consegnare testo destinato a un umano, compresa ogni risposta in chat all'owner, anche di tre righe. Vale per report, frase per chi ha segnalato, righe di changelog e patch notes, testi visibili nella UI, documentazione, messaggi e note. Toglie quello che il lettore non usa e i tic da testo generato.
 ---
 
 # Unslop
 
-Rivedi il testo per togliere i pattern da testo AI e renderlo chiaro ed immediato.
+Rivedi il testo prima di mandarlo: togli quello che il lettore non usa, poi i pattern da testo AI.
 
 ## Procedura
 
-1. Cerca i pattern elencati sotto.
-2. Riscrivi. Conserva il significato, rispetta il tono voluto.
-3. Aggiungi voce (sezione seguente).
-4. Auto-verifica: "cosa rende questo testo riconoscibile come generato?" Correggi i tic rimasti.
+1. Taglia quello che il lettore non usa (sezione seguente). È il passo che conta di più.
+2. Cerca i pattern elencati sotto.
+3. Riscrivi. Conserva il significato, rispetta il tono voluto.
+4. Aggiungi voce.
+5. Auto-verifica: "quale frase posso togliere senza che il lettore perda niente?" e "cosa rende questo testo riconoscibile come generato?". Correggi.
+
+## Prima di tutto: cosa tenere
+
+Il difetto più grave non è lo stile, sono le frasi che il lettore non usa. Ognuna costa fatica e nasconde quelle che contano. Rileggi frase per frase e chiediti: gli serve per capire cosa è successo o per decidere cosa fare? Se no, via.
+
+Di solito si taglia:
+
+1. Quello che il lettore sa già: come funziona il suo sistema, dove sta un pulsante, che una fusione aspetta il suo sì.
+2. Il perché di uno stato, se non gli cambia niente. «È nato non fidato» basta, senza la causa interna.
+3. Le strade scartate e il motivo per cui le hai scartate. Si dice cosa succederà.
+4. Chi ha fatto cosa e dove l'hai scritto: «nel feedback ho indicato», «per le routine».
+5. Come ci sei arrivato: comandi lanciati, file letti, verifiche fatte.
+
+Le parole interne non arrivano al lettore: nomi di funzioni e di campi, e il gergo del sistema («sondaggio», «voce», «biglietto»). Al loro posto va cosa succede dal suo punto di vista: cosa vede, cosa si ferma, cosa si perde, per quanto. Un meccanismo raccontato senza la conseguenza lascia il lettore con le domande. Prima di mandare controlla che possa rispondere da solo a «si è fermato qualcosa? si perde lavoro? per quanto?».
+
+Esempio (21/10/2026). Prima:
+
+> Ho aperto **#1566**, priorità 2, per le routine: «Il pacemaker dà per morta la routine server anche quando lavora». È nato **non fidato**, perché il biglietto di questa sessione è sporco. Passa dai giudici, e la fusione aspetta il tuo sì. Se vuoi che parta subito, segnalo come fidato in Gestione.
+>
+> Nel feedback ho indicato come correzione più solida quella sul server: qualunque contatto della sessione dopo l'accensione vale come prova che è viva. Mandare il sondaggio dalle istruzioni dell'orchestratore funzionerebbe, ma consuma un posto del limite di 6 biglietti al minuto (#1495), e si rompe di nuovo se quel passo sparisce.
+
+Dopo, riscritto dall'owner:
+
+> Ho aperto #1566, priorità 2: «Il pacemaker dà per morta la routine server anche quando lavora». È nato non fidato.
+>
+> Con #1566 qualunque contatto vale come prova che è viva.
 
 ## Dare voce
 
