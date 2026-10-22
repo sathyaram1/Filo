@@ -950,7 +950,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO
       // il totale, e la riga non deve restare ferma al 95% a scaricamento finito.
       if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
-      finalizeManual(rec, 'completed', savePath);
+      return finalizeManual(rec, 'completed', savePath);
     },
     fail() { finalizeManual(rec, 'interrupted'); },
     cancel: requestCancel,
