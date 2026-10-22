@@ -12,17 +12,18 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { certificato } from './helpers/immagineFirmata.mjs';
-import { paginaDellaScheda } from './helpers/schede.mjs';
+import { apriFiloSenzaPlaywright } from './helpers/filoSenzaPlaywright.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ARGOMENTI_RETE = ['--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP www.youtube-nocookie.com 127.0.0.1, MAP sito-pubblico.test 127.0.0.1',
+  // In https Chromium passerebbe dal proxy dell'ambiente (https_proxy), che il server locale non lo raggiunge.
+  '--ignore-certificate-errors', '--no-proxy-server'];
 
 const test = base.extend({
   app: async ({}, use) => {
     const userData = cartellaTemporanea('filo-adskip-');
     const app = await electron.launch({
-      args: [...argomentiScala, '--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP www.youtube-nocookie.com 127.0.0.1, MAP sito-pubblico.test 127.0.0.1',
-        // In https Chromium passerebbe dal proxy dell'ambiente (https_proxy), che il server locale non lo raggiunge.
-        '--ignore-certificate-errors', '--no-proxy-server', '.'],
+      args: [...argomentiScala, ...ARGOMENTI_RETE, '.'],
       cwd: APP_ROOT,
       env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
     });
