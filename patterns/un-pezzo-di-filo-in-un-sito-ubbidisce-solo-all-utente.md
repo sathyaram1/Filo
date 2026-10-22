@@ -157,13 +157,18 @@ faceva spendere una chiamata.
   Lo stesso vale per il sito, che da fuori vede l'host e non un campo: le sue
   scorciatoie a un tasto («k» pausa, «/» alla ricerca) si prenderebbero quello
   che l'utente scrive, anche ascoltando in cattura (#1071, giro 3: fermarli alla
-  radice del riquadro copriva solo chi ascolta dopo). Un tasto vero scritto in un
-  riquadro lo prende Filo per primo, col ponte di `page-preload.js` registrato a
-  document_start, e `SN_FILO_UI.tastoNelRiquadro` consegna al campo una copia
-  segnata come nostra che non esce dallo shadow (chi la ascolta dentro guarda
-  `veroONostro`, non `isTrusted`); se la copia viene annullata si annulla anche
-  l'originale. L'Esc passa come prima (chiude in cattura, e serve allo schermo
-  intero, #514). Un ascoltatore
+  radice del riquadro copriva solo chi ascolta dopo). Lo stesso per inserimenti,
+  composizione, incolla e rilascio (`beforeinput`, `input`, `textInput`,
+  `composition*`, `paste`, `drop`): escono dallo shadow col testo e i file, e uno
+  script del sito che li ascolta sulla finestra ricostruiva quello che l'utente
+  scrive (#1509). Un evento vero di questi tipi nato in un riquadro lo prende
+  Filo per primo, col ponte di `page-preload.js` registrato a document_start, e
+  `SN_FILO_UI.eventoNelRiquadro` consegna al campo una copia segnata come nostra
+  che non esce dallo shadow (chi la ascolta dentro guarda `veroONostro`, non
+  `isTrusted`); se la copia viene annullata si annulla anche l'originale.
+  Fermare la propagazione non toglie l'azione predefinita: il testo entra lo
+  stesso. Uno finto sull'host si ferma senza copia. L'Esc passa come prima
+  (chiude in cattura, e serve allo schermo intero, #514). Un ascoltatore
   di quelli che dal nodo vero **fa** qualcosa (aprire un collegamento) accetta
   solo il gesto vero: un clic finto sull'host, con le coordinate giuste, ci
   arriva.
