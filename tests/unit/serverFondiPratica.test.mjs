@@ -10,6 +10,11 @@ import {
 } from '../../scripts/server-fondi-pratica.mjs';
 import { classifyServerMerge, messageForServerMerge } from '../../scripts/lib/owner-merge.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
+import { sessione } from '../../scripts/owner-feedback.mjs';
+import { PULITO } from '../helpers/bigliettoFinto.mjs';
+
+// Una sessione col biglietto pulito: la nota su un fidato da una sessione sporca ha le sue prove in notaTogliFiducia.test.mjs.
+sessione.biglietto = async () => PULITO;
 
 test('cartellaDelServer: il checkout del server accanto al repo, dal checkout principale e da una sua worktree', () => {
   const server = resolve('/x', 'filo-security', 'functions');

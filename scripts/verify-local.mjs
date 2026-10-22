@@ -1343,8 +1343,8 @@ if (isMain) {
     if (state[b].feedbackId) {
       const { annotaPratica } = await import('./owner-feedback.mjs');
       const nota = notaDelGiro(state[b], { branch: b, sha: state[b].requestedSha || headSha() });
-      const a = await annotaPratica(state[b].feedbackId, nota).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
       const chi = state[b].feedbackNum ? `#${state[b].feedbackNum}` : state[b].feedbackId;
+      const a = await annotaPratica(state[b].feedbackId, nota, { rif: chi }).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
       console.error(a.ok
         ? `Pratica ${chi}: ${a.from === a.to ? 'giro annotato' : 'presa in carico («In lavorazione») e giro annotato'}.`
         : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);

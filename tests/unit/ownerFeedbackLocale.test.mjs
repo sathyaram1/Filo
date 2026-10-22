@@ -7,9 +7,12 @@ import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { PULITO } from '../helpers/bigliettoFinto.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
+// Una sessione col biglietto pulito: la nota su un fidato da una sessione sporca ha le sue prove in notaTogliFiducia.test.mjs.
+mod.sessione.biglietto = async () => PULITO;
 
 const campo = (v) => (typeof v === 'string' ? { stringValue: v } : v);
 // Dal #1148 conta la fiducia, non la prova: le pratiche dell'owner e delle sessioni con la prova nascono (o la migrazione
