@@ -56,6 +56,7 @@ test('r1 la risposta arriva mentre si è su un sito dove Filo è spento: nella s
   await page.waitForTimeout(800);
   expect((await spiega(app, page.url(), 'neve')).ok).toBe(true);
   await page.waitForTimeout(1000);
+  expect(await page.locator('.sn-toast').count(), 'sul sito spento l’avviso non si mostra').toBe(0);
   const home = await openTab('filo://newtab/');
   await home.mouse.click(5, 5);
   expect((await spiega(app, home.url(), 'pioggia')).ok).toBe(true);
