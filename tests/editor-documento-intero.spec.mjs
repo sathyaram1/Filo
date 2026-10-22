@@ -53,12 +53,14 @@ async function prepara(app) {
 
 // Il documento come lo lascia chi incolla un testo lungo: tanti paragrafi, e la frase che conta nell'ultimo.
 async function scriviDocumento(editor, caratteri) {
-  await editor.evaluate(({ caratteri, riempimento, fondo }) => {
+  return editor.evaluate(({ caratteri, riempimento, fondo }) => {
     const per = riempimento.repeat(10);
     const n = Math.ceil(caratteri / per.length);
     const d = document.getElementById('doc');
     d.innerHTML = Array.from({ length: n }, () => `<p>${per}</p>`).join('') + `<p>${fondo}</p>`;
     d.dispatchEvent(new Event('input', { bubbles: true }));
+    // Ogni paragrafo chiude con un a capo: i caratteri che il documento ha davvero.
+    return n * (per.length + 1) + fondo.length;
   }, { caratteri, riempimento: RIEMPIMENTO, fondo: FONDO });
 }
 
@@ -102,9 +104,7 @@ test('oltre il tetto il taglio si dice: sotto la risposta, nell\'avviso del tito
   await prepara(app);
   const editor = await openTab('filo://editor/editor.html');
   await editor.waitForSelector('#doc');
-  await scriviDocumento(editor, 400_000);
-  const totale = await editor.evaluate(() => window.SN_EDITOR_SUMMARY.testoAlModello(
-    (() => { let o = ''; for (const p of document.querySelectorAll('#doc p')) o += p.textContent + '\n'; return o; })()).totale);
+  const totale = await scriviDocumento(editor, 400_000);
   const nota = `Il documento è lungo: ho letto i primi 350.000 caratteri su ${totale.toLocaleString('it-IT')}.`;
 
   const chat = await chiediAllaChat(editor, 'Dove sta la chiave del magazzino?');
@@ -114,8 +114,8 @@ test('oltre il tetto il taglio si dice: sotto la risposta, nell\'avviso del tito
   expect(domanda.sistema).toContain('Il resto non lo vedi');
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/1475-editor-taglio-chiaro.png` });
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
-  await editor.waitForTimeout(400);
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
+  await expect(editor.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
   await chat.screenshot({ path: `${SHOTS}/1475-editor-taglio-scuro.png` });
 
   await dalMenuDelTitolo(editor, 'Rigenera titolo');

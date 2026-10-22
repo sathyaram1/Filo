@@ -23,6 +23,7 @@
         'Se arrivano più di cinque avvisi insieme in basso a destra, quelli in più non spariscono più. Aspettano dietro un «+3» in cima alla pila: un clic li mostra tutti, e da lì li chiudi anche tutti insieme. Quando gli altri se ne vanno, entrano da soli.',
         'Una scheda non si allarga più fino a prendere mezza barra in alto, nemmeno quella aperta accanto a schede dal titolo lungo. Arriva al massimo a 240 pixel, e il titolo intero lo leggi passandoci sopra col mouse. Il massimo lo cambi in Preferenze, nelle impostazioni avanzate, o chiedendo a Filo «schede più larghe».',
         'Se chiedi «portami alla home» mentre sei già nella home, Filo non ti promette più di svuotarla. Ti dice che sei già lì, e il bottone sotto la risposta chiude la conversazione: quello che vi siete detti resta nella home.',
+        'Nell\'Editor la chat del documento legge tutto il documento, non più solo l\'inizio, e lo stesso fanno il titolo e il riassunto automatici. Prima, su un testo lungo, la chat rispondeva come se il resto non esistesse. Se il documento supera i 350.000 caratteri, sotto la risposta Filo ti dice quanta parte ha letto.',
       ],
     },
     {
