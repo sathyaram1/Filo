@@ -1762,6 +1762,8 @@ export function usageText() {
     '',
     'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
     '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
+    '      5 lavoro vivo nella cartella (--ticket, --linea-principale): un altro worker lavora ancora qui,',
+    '        e niente è stato toccato; il messaggio dice chi (biglietto, processi, ultimo commit)',
   ].join('\n');
 }
 

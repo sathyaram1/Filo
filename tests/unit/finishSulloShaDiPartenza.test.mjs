@@ -9,7 +9,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, symlinkSync
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { apriProvaSulCommit, pulisciResti, gitIn } from '../../scripts/lib/unit-sulla-fusione.mjs';
+import { apriProvaSulCommit, pulisciResti, gitIn, togliCollegamento } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -36,7 +36,8 @@ function deposito() {
   mkdirSync(join(semina, 'tests', 'unit'), { recursive: true });
   mkdirSync(join(semina, 'src', 'main', 'services'), { recursive: true });
   cpSync(join(REPO, 'scripts'), join(semina, 'scripts'), { recursive: true });
-  cpSync(join(REPO, 'src', 'main', 'services', 'mergeApprovalSignal.js'), join(semina, 'src', 'main', 'services', 'mergeApprovalSignal.js'));
+  // Quello che finish-local importa da src (il segnale della fusione, l'accesso, le transizioni condivise).
+  for (const d of [['main', 'services'], ['main', 'auth'], ['shared']]) cpSync(join(REPO, 'src', ...d), join(semina, 'src', ...d), { recursive: true });
   cpSync(join(REPO, 'package.json'), join(semina, 'package.json'));
   writeFileSync(join(semina, 'tests', 'unit', 'segno.test.mjs'), FINTO);
   writeFileSync(join(semina, 'segno.txt'), 'main\n');
@@ -56,6 +57,8 @@ function deposito() {
   appendFileSync(join(lavoro, '.git', 'info', 'exclude'), '\nnode_modules\n');
   return { casa, lavoro };
 }
+// Prima il collegamento, mai attraversato: una rimozione ricorsiva lo seguirebbe dentro node_modules vero.
+const togli = (casa, lavoro) => { togliCollegamento(join(lavoro, 'node_modules')); togliCartella(casa); };
 
 test('la cartella spostata su main durante finish:check: la prova resta sul commit del ramo, e l\'esito lo dice', async () => {
   const { casa, lavoro } = deposito();
@@ -83,7 +86,7 @@ test('la cartella spostata su main durante finish:check: la prova resta sul comm
     assert.equal(git(lavoro, 'branch', '--show-current'), 'main');
     assert.equal(git(lavoro, 'worktree', 'list').split('\n').length, 1, 'la cartella di prova se ne va a fine controlli');
   } finally {
-    togliCartella(casa);
+    togli(casa, lavoro);
   }
 });
 
@@ -102,6 +105,6 @@ test('la cartella di prova: staccata sullo sha, coi moduli raggiungibili, e la p
     assert.equal(albero.chiudi().ok, true);
     assert.equal(existsSync(albero.base), false);
     assert.ok(existsSync(join(REPO, 'node_modules', '@playwright')), 'node_modules vero intatto');
-    togliCartella(casa);
+    togli(casa, lavoro);
   }
 });
