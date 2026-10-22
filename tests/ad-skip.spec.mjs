@@ -163,8 +163,8 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
       globalThis.__larghezzeAlClic = [];
       t.view.webContents.on('input-event', (_e, i) => { if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width); });
     }, yt);
-    await filo.evaluate(() => {
-      const A = process.mainModule.require('./services/adSkip');
+    await filo.evaluate((_e, p) => {
+      const A = process.mainModule.require(p);
       globalThis.__diag = [];
       const orig = A.clicDalRiquadro;
       A.clicDalRiquadro = async (s, m, d, o) => {
@@ -175,7 +175,7 @@ test('con la scheda dietro o la finestra nascosta il «Salta» si preme lo stess
       };
       const oc = A.clicVero;
       A.clicVero = (...a) => { const r = oc(...a); globalThis.__diag.push(['vero', Date.now(), r]); return r; };
-    });
+    }, join(APP_ROOT, 'src', 'main', 'services', 'adSkip.js'));
     for (const u of [yt, incorporato, ima]) await nel(u, 'window.__mostra()');
     await new Promise((ok) => setTimeout(ok, 5000));
     console.log('MAIN', JSON.stringify(await filo.evaluate(() => globalThis.__diag)));

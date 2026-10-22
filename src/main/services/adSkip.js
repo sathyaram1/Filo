@@ -204,21 +204,30 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
  * Il lettore incorporato chiede il clic nel suo punto: ogni frame sopra di lui, dal più vicino alla pagina della
  * scheda, ritrova il riquadro figlio, vede che sopra non c'è altro e dà il punto nella sua vista.
  */
-async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now() } = {}) {
+// In una scheda nascosta i frame rispondono al passo dei loro timer, un secondo: il tentativo dopo del lettore
+// arriverebbe con la domanda di prima ancora aperta, e due clic intrecciati non ne fanno nessuno.
+const inCorso = new WeakSet();
+
+async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now(), adesso = Date.now } = {}) {
   const wc = sender.wc;
-  if (ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };
+  if (inCorso.has(wc) || ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };
   const anelli = catena(sender);
   if (!anelli) return { ok: false, code: 'forbidden', error: 'forbidden' };
   if (!msg || !numero(msg.x) || !numero(msg.y) || msg.x < 0 || msg.y < 0) return { ok: false, code: 'punto' };
   if (typeof msg.tag !== 'string' || !msg.tag || msg.tag.length > 64) return { ok: false, code: 'punto' };
-  let p = { x: msg.x, y: msg.y, tag: msg.tag };
-  for (const a of anelli) {
-    const r = await chiedi(wc, a.frame, { tag: p.tag, origine: a.origineFiglio, x: p.x, y: p.y });
-    if (!r) return { ok: false, code: 'tempo' };
-    if (r.no) return { ok: false, code: r.no };
-    p = r;
+  inCorso.add(wc);
+  try {
+    let p = { x: msg.x, y: msg.y, tag: msg.tag };
+    for (const a of anelli) {
+      const r = await chiedi(wc, a.frame, { tag: p.tag, origine: a.origineFiglio, x: p.x, y: p.y });
+      if (!r) return { ok: false, code: 'tempo' };
+      if (r.no) return { ok: false, code: r.no };
+      p = r;
+    }
+    return await clicNelRiquadro(wc, p, { ...dove, ora: adesso() });
+  } finally {
+    inCorso.delete(wc);
   }
-  return clicNelRiquadro(wc, p, { ...dove, ora });
 }
 
 module.exports = {
