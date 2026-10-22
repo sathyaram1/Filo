@@ -1151,6 +1151,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
 
 - Il pacemaker accende fino a `maxSessions` orchestratori, una sessione cloud
   ciascuno. Ogni orchestratore fa lavorare un worker alla volta, in fila.
+- Ogni orchestratore lavora dentro la sua accensione (§ 1.2): il primo
+  biglietto la apre, e da quando un suo biglietto è non fidato i successivi
+  nascono non fidati, fino all'accensione dopo.
 - Un orchestratore chiude quando:
   - la coda è vuota;
   - il suo contesto supera il 70%;
