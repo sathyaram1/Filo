@@ -79,6 +79,7 @@ import {
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
+  lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
