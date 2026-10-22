@@ -488,7 +488,8 @@ test('una pagina tolta dal filo mentre la sua scheda è aperta non torna nella r
 test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue visite e le schede chiuse', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const url = 'https://www.youtube.com/watch?v=orche';
-  await semina(app, { pagine: [{ url, titolo: 'YouTube: orche', ts: new Date(Date.now() - 900_000).toISOString() }, { url, titolo: 'YouTube: orche', ts: new Date(Date.now() - 600_000).toISOString() }] });
+  // Le due visite stanno nella stessa giornata anche subito dopo mezzanotte: un giorno in mezzo le metterebbe in due righe.
+  await semina(app, { pagine: [{ url, titolo: 'YouTube: orche', ts: oggiFa(0.25, 1000) }, { url, titolo: 'YouTube: orche', ts: oggiFa(1 / 6, 2000) }] });
   await app.evaluate((_e, u) => globalThis.SN_ARCHIVED_TABS.archive({ url: u, title: 'YouTube: orche', closedAt: new Date().toISOString() }), url);
   const page = await openTab('filo://newtab/');
   await expect(page.locator('.dash-pagine-testo').last()).toHaveText('2 pagine, fra cui YouTube: orche');
