@@ -955,7 +955,7 @@
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',
-    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
+    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita', APRI_FILE: 'File non mostrato',
     CERCA_SALVATE: 'Ricerca fra le pagine salvate non riuscita',
     APRI_SALVATA: 'Pagina salvata non aperta',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
@@ -1093,6 +1093,8 @@
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
+    if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
       return `${o.host || 'il sito'} è fra i siti ${quali}`;
@@ -1553,11 +1555,7 @@
   // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
   // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
   const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
-  // Un percorso sul disco (assoluto, con ~ o con la lettera del disco), non un indirizzo web.
-  const percorsoLocale = (p) => {
-    const s = String(p || '').trim();
-    return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && (/^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s));
-  };
+  const percorsoLocale = (p) => !!window.SN_NOMI_FILE && window.SN_NOMI_FILE.percorsoLocale(p);
   // Se il bottone non porta il «dove» coi nomi di Filo (una chat riaperta): le ultime due cartelle; il percorso intero sta
   // nel suggerimento.
   function cartellaBreve(p) {
@@ -1597,12 +1595,20 @@
     if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
     const nome = document.createElement('span');
     nome.className = 'dash-file-btn-nome';
+    // L'etichetta la sceglie il modello, e può aver letto un documento ostile: il nome che si apre è quello vero (#1499).
+    const etichetta = document.createElement('span');
+    etichetta.className = 'dash-file-btn-etichetta';
     const dove = document.createElement('span');
     dove.className = 'dash-file-btn-dove';
-    btn.append(icona, nome, dove);
+    btn.append(icona, nome, etichetta, dove);
     const disegna = () => {
       const p = String(a.percorso || a.path || '');
-      nome.textContent = a.etichetta || a.label || nomeDelPercorso(p) || 'File';
+      const vero = nomeDelPercorso(p);
+      nome.textContent = vero || 'File';
+      const detta = String(a.etichetta || a.label || '').trim();
+      const uguale = (x) => x.toLowerCase() === vero.toLowerCase() || x.toLowerCase() === vero.replace(/\.[^.]+$/, '').toLowerCase();
+      etichetta.textContent = detta && !uguale(detta) ? detta : '';
+      etichetta.hidden = !etichetta.textContent;
       const doveFilo = a._output && typeof a._output.dove === 'string' ? a._output.dove : '';
       dove.textContent = doveFilo || cartellaBreve(p);
       dove.hidden = !dove.textContent;
@@ -1669,6 +1675,7 @@
     const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
     const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
     if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
+    if (o.cartellaDiRete) return `Cartella su un altro computer · ${o.cartellaDiRete}`;
     const n = Array.isArray(o.risultati) ? o.risultati.length : null;
     const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
     return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;

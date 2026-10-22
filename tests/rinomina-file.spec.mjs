@@ -185,8 +185,9 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText('Rinominato: Bolletta marzo (2).pdf');
     await expect(page.locator('.sn-rinomina-stato')).toContainText('già preso');
     expect(readdirSync(dir).sort()).toEqual(['Bolletta marzo (2).pdf', 'Bolletta marzo.pdf']);
-    // Un'etichetta scelta dal modello resta, ma il riferimento punta al file nuovo.
-    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('La scansione');
+    // Un'etichetta scelta dal modello resta, accanto al nome vero, e il riferimento punta al file nuovo (#1499).
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('Bolletta marzo (2).pdf');
+    await expect(chip.locator('.dash-file-btn-etichetta')).toHaveText('La scansione');
     await expect(chip).toHaveAttribute('data-percorso', join(dir, 'Bolletta marzo (2).pdf'));
 
     // Esc chiude senza fare niente; vuoto e soli spazi non partono.

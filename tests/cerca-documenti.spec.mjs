@@ -406,3 +406,123 @@ test('lo stato dei documenti in Preferenze scrive tutti i numeri col punto delle
     await app.evaluate(() => { const I = globalThis.SN_DOCUMENTI_INDICE; I.stato = I.__statoVero; delete I.__statoVero; });
   }
 });
+
+// #1499 — un percorso di rete scritto dal modello, anche dietro un segno di citazione, non arriva al disco: niente bottone,
+// niente ricerca, e un clic forzato non tocca file system né shell. Il contatto SMB vero di Windows non si prova nel
+// contenitore: si prova che nessuno chiede quel percorso al disco. Il bottone di un file vero porta il suo nome vero.
+test('un percorso di rete non diventa un bottone né una ricerca, e un clic forzato non arriva al disco', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(await cartellaScaricamenti(app), 'Vero');
+  mkdirSync(dir, { recursive: true });
+  const vero = join(dir, 'scan_00231.pdf');
+  writeFileSync(vero, '%PDF-1.4');
+  try {
+    await shellCheRegistra(app);
+    await app.evaluate(() => {
+      const fs = process.getBuiltinModule('fs');
+      const fsp = process.getBuiltinModule('fs/promises');
+      globalThis.__rete = [];
+      const nota = (p) => { if (/nas-esterno/i.test(String(p))) globalThis.__rete.push(String(p)); };
+      const o = { statSync: fs.statSync, stat: fsp.stat, existsSync: fs.existsSync, realpath: fs.realpathSync.native, lstat: fsp.lstat };
+      fs.statSync = function statSync(p, ...r) { nota(p); return o.statSync.call(this, p, ...r); };
+      fs.existsSync = function existsSync(p) { nota(p); return o.existsSync.call(this, p); };
+      fs.realpathSync.native = function native(p, ...r) { nota(p); return o.realpath.call(this, p, ...r); };
+      fsp.stat = function stat(p, ...r) { nota(p); return o.stat.call(this, p, ...r); };
+      fsp.lstat = function lstat(p, ...r) { nota(p); return o.lstat.call(this, p, ...r); };
+      globalThis.__reteVia = () => {
+        fs.statSync = o.statSync; fs.existsSync = o.existsSync; fs.realpathSync.native = o.realpath; fsp.stat = o.stat; fsp.lstat = o.lstat;
+      };
+    });
+    await modelloFinto(app, [
+      { toolCalls: [
+        { id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: '//nas-esterno/condivisa/fattura.pdf', etichetta: 'La tua fattura' }) },
+        { id: 'f2', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: '«/net/nas-esterno/condivisa/fattura.pdf', etichetta: 'La tua fattura' }) },
+        { id: 'f3', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: '', path: '"//nas-esterno/c/fattura.pdf"' }) },
+        { id: 'f4', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: vero, etichetta: 'Bolletta della luce' }) },
+        { id: 'd1', name: 'CERCA_DOCUMENTI', arguments: JSON.stringify({ cosa: 'fattura', cartella: '«//nas-esterno/condivisa' }) },
+      ] },
+      { text: 'Ecco la fattura.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'trovami la fattura');
+
+    // Solo il file di questo computer è un bottone, col suo nome vero; l'etichetta di Filo sta accanto, più piana.
+    const file = page.locator('.dash-file-btn');
+    await expect(file).toHaveCount(1, { timeout: 20_000 });
+    await expect(file.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf');
+    await expect(file.locator('.dash-file-btn-etichetta')).toHaveText('Bolletta della luce');
+    await expect(page.locator('.dash-bubble-actions a.dash-action-btn')).toHaveCount(0);
+    await page.screenshot({ path: 'tests/.shots/cerca-documenti-rete.png' });
+    // Il diario dice perché gli altri non ci sono.
+    await page.locator('.dash-activity-head').first().click();
+    await expect(page.locator('.dash-activity-row', { hasText: 'File non mostrato · il file sta su un altro computer della rete' })).toHaveCount(3);
+    await expect(page.locator('.dash-activity-row', { hasText: 'la cartella sta su un altro computer della rete' })).toHaveCount(1);
+    // Il modello lo sa, e non gli è stato chiesto un OK per una ricerca che non sarebbe partita.
+    const esito = testoDeiMessaggi((await chiamateAlModello(app))[1]);
+    expect(esito).toMatch(/sta su un altro computer della rete: Filo non ci cerca/);
+    expect(esito).toMatch(/Bottone NON mostrato: il file sta su un altro computer della rete/);
+    expect(esito).not.toMatch(/In attesa della conferma/);
+
+    // Un clic forzato (il bottone di una chat di prima, un messaggio costruito a mano) non arriva al disco.
+    const filo = (msg) => app.evaluate((_e, m) => globalThis.SN_HANDLE_MESSAGE(m, { tab: { id: 9, url: 'filo://newtab/' }, url: 'filo://newtab/' }), msg);
+    for (const percorso of ['//nas-esterno/condivisa/fattura.pdf', '/net/nas-esterno/fattura.pdf', '«//nas-esterno/c/fattura.pdf']) {
+      for (const msg of [{ type: 'file_apri' }, { type: 'file_mostra_cartella' }, { type: 'file_nome_proponi' }, { type: 'file_rinomina', nome: 'Fattura' }]) {
+        const r = await filo({ ...msg, percorso });
+        expect(r, `${msg.type} ${percorso}`).toMatchObject({ ok: false, errore: 'rete' });
+        expect(r.frase).toMatch(/altro computer della rete/);
+      }
+    }
+    expect(await app.evaluate(() => globalThis.__rete)).toEqual([]);
+    expect(await app.evaluate(() => globalThis.__aperti)).toEqual([]);
+    expect(await app.evaluate(() => globalThis.__cartelle)).toEqual([]);
+    // Il file vero si apre ancora.
+    await file.click();
+    await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([vero]);
+  } finally {
+    await app.evaluate(() => { try { globalThis.__reteVia?.(); } catch (_) {} });
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// #1499 — il nome vero del file resta intero accanto a un nome lungo dato da Filo, e un percorso di questo computer
+// fra virgolette o caporali diventa lo stesso bottone di quello senza segni.
+test('il bottone tiene intero il nome vero accanto a un nome lungo di Filo, e un percorso fra virgolette è un bottone', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(await cartellaScaricamenti(app), 'Vero');
+  mkdirSync(dir, { recursive: true });
+  const vero = join(dir, 'malevolo.pdf');
+  writeFileSync(vero, '%PDF-1.4');
+  try {
+    await shellCheRegistra(app);
+    const lunga = 'Bolletta della luce di marzo 2026 del fornitore di energia elettrica, quella giusta da pagare entro venerdì '.repeat(3);
+    await modelloFinto(app, [
+      { toolCalls: [
+        { id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: vero, etichetta: 'Bolletta della luce Enel di marzo 2026, periodo dal 01/03 al 31/03' }) },
+        { id: 'f2', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: vero, etichetta: lunga }) },
+        { id: 'f3', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: `"${vero}"`, etichetta: 'Bolletta' }) },
+        { id: 'f4', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: '', path: `«${vero}»`, etichetta: 'Bolletta' }) },
+      ] },
+      { text: 'Ecco la bolletta.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'trovami la bolletta');
+    const nomi = page.locator('.dash-file-btn .dash-file-btn-nome');
+    await expect(nomi).toHaveText(Array(4).fill('malevolo.pdf'), { timeout: 20_000 });
+    await expect(page.locator('.dash-bubble-actions a.dash-action-btn')).toHaveCount(0);
+    // Anche una frazione di pixel in meno mette i puntini al posto delle ultime lettere: si misura il testo, non l'intero.
+    const misure = await nomi.evaluateAll((els) => els.map((el) => {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      return { testo: r.getBoundingClientRect().width, scatola: el.getBoundingClientRect().width };
+    }));
+    for (const m of misure) expect(m.testo, 'il nome vero non è tagliato').toBeLessThanOrEqual(m.scatola + 0.01);
+    await expect(page.locator('.dash-file-btn').nth(3)).toHaveAttribute('data-percorso', vero);
+    await page.screenshot({ path: 'tests/.shots/cerca-documenti-nome-vero.png' });
+    await page.locator('.dash-file-btn').nth(3).click();
+    await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([vero]);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

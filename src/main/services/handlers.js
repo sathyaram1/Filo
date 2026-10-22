@@ -2117,6 +2117,13 @@ function fraseNo(ing, decisione, sender) {
   });
 }
 
+// L'esito di una ricerca fra i documenti chiesta in una cartella di un altro computer (#1499): niente disco, si dice.
+function ricercaSuAltroComputer(action) {
+  const cosa = String(action.cosa ?? action.query ?? action.testo ?? action.q ?? '').trim();
+  const cartella = String(action.cartella ?? '').trim();
+  return { cercato: cosa, cartella, risultati: [], cartellaDiRete: cartella };
+}
+
 async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
   const via = opzioni.assistente ? 'assistente' : 'chat';
@@ -2416,6 +2423,15 @@ async function eseguiAzioneFilo(action, {
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
+  // #1499 — il costo misura la cartella che l'indice leggerà, risolta qui come la risolve lui (sopra quella arrivata col
+  // modello). Una su un altro computer non si cerca: lo si dice subito, senza chiedere un OK che non porterebbe a niente.
+  if (type === 'CERCA_DOCUMENTI') {
+    delete action._cartella;
+    let ch = null;
+    try { ch = await require('./documentiIndice').cartellaChiesta(action.cartella); } catch (_) { ch = null; }
+    if (ch) action._cartella = ch.serie ? '' : ch.percorso;
+    if (ch && ch.rete) return { executed: false, kept: true, output: ricercaSuAltroComputer(action) };
+  }
   // Il comando si giudica come lo legge la shell che lo eseguirà, e parte con quella stessa (#1072.1: cmd toglie i `^`).
   if (type === 'ESEGUI_COMANDO') action._perimetro.shell = await shellDeiComandi();
 
@@ -3166,10 +3182,16 @@ async function eseguiAzioneFilo(action, {
         const cosa = String(action.cosa ?? action.query ?? action.testo ?? action.q ?? '').trim();
         const cartella = String(action.cartella ?? '').trim();
         const Indice = require('./documentiIndice');
+        // Come LEGGI_DOCUMENTO: la cartella risolta si rimisura prima di toccarla, e se il gate ne ha misurata un'altra
+        // senza OK non si legge (#1499).
+        const C = globalThis.SN_CMD_CLASSIFY;
+        const fuori = (p) => (confirmed || decisione.conCosto(2) === 'si' ? ''
+          : (!C ? 'non si sa dove legge' : C.fuoriPerimetro(p, action._perimetro)));
         let r;
         try {
           r = await Indice.cerca(cosa, {
             cartella,
+            fuori,
             segnale,
             avanzamento: avanzamento ? (st) => {
               if (!st || st.fase !== 'lettura') return;
@@ -3180,6 +3202,17 @@ async function eseguiAzioneFilo(action, {
         } catch (e) {
           console.warn('[Filo] ricerca nei documenti fallita', e?.message || e);
           return { executed: false, kept: true, output: { cercato: cosa, risultati: [], errore: 'la ricerca non è riuscita' } };
+        }
+        if (r.cartellaDiRete) return { executed: false, kept: true, output: ricercaSuAltroComputer(action) };
+        if (r.cartellaFuori) {
+          return {
+            executed: false,
+            kept: true,
+            output: {
+              cercato: cosa, cartella, risultati: [], errore: 'fuori_perimetro',
+              detail: 'la cartella sta fuori dalla cartella personale: richiedila col percorso esatto e l\'utente confermerà',
+            },
+          };
         }
         const risultati = r.risultati.map((x) => ({ ...x, scaricato: fileScaricato(x.percorso) }));
         return {
@@ -3286,11 +3319,22 @@ async function eseguiAzioneFilo(action, {
         return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte, perSempre: action.per_sempre === true } };
       }
       case 'APRI_FILE': {
+        // Un file su un altro computer non diventa un bottone: al clic Windows si presenterebbe a quel computer con
+        // l'identità dell'utente, e il nome lo sceglie il modello (#1499). Ogni campo dove il bottone può trovarlo.
+        const DR = require('./documentRead');
+        const percorsi = [action.percorso, action.path].map((v) => DR.percorsoDelFile(v));
+        if (percorsi.some((v) => v === null)) {
+          return { executed: false, kept: false, output: { rete: true, error: 'il file sta su un altro computer della rete' } };
+        }
+        // Il bottone porta il percorso che si aprirà, pulito come lo pulisce il disco: fra virgolette la chat non lo
+        // riconosceva come file e ne faceva un collegamento morto.
+        const pulito = percorsi.find(Boolean);
+        if (pulito) { action.percorso = pulito; if (action.path) action.path = pulito; }
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
         const p = String(action.percorso ?? action.path ?? '').trim();
         let dove = '';
         if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
-          try { dove = await require('./documentiIndice').doveSta(require('./documentRead').normalizePath(p)); } catch (_) {}
+          try { dove = await require('./documentiIndice').doveSta(DR.normalizePath(p)); } catch (_) {}
         }
         return { executed: true, kept: true, ...(dove ? { output: { dove } } : {}) };
       }
@@ -4709,6 +4753,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
       + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
   }
   if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
+  if (type === 'APRI_FILE' && res.output && res.output.rete) {
+    return 'Bottone NON mostrato: il file sta su un altro computer della rete, e Filo mostra e apre solo i file di questo '
+      + 'computer. Dillo all\'utente in una riga; non riprovare con un altro percorso di rete.';
+  }
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
     return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
   }
@@ -5622,8 +5670,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         rawActions.push(a);
         // Fermata (#810): l'archivio la salva come tale.
         if (res.output && res.output.blocked === 'segreto') a._output = res.output;
-        // Contiene la home con il nome utente: serve solo al gate, non alla chat.
+        // Contengono la home con il nome utente: servono solo al gate, non alla chat.
         delete a._perimetro;
+        delete a._cartella;
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il

@@ -1465,11 +1465,21 @@
     return classifyDetail(cmd, ctx).level;
   }
 
+  // Un percorso scritto da un modello, senza i segni di citazione in testa e in coda, anche spaiati: la stessa pulizia
+  // per chi misura il perimetro e per chi tocca il disco, o uno dei due vede un altro percorso (#1499).
+  function pulisciPercorso(percorso) {
+    return String(percorso == null ? '' : percorso).trim().replace(/^["'«“‘‹]+|["'»”’›]+$/g, '').trim();
+  }
+
   // Un percorso singolo (LEGGI_DOCUMENTO): '' se sta nel perimetro, altrimenti il motivo.
   function fuoriPerimetro(percorso, ctx) {
-    let p = String(percorso == null ? '' : percorso).trim();
-    if (/^(["']).*\1$/.test(p)) p = p.slice(1, -1).trim();
-    return fuoriDa(p, contesto(ctx));
+    return fuoriDa(pulisciPercorso(percorso), contesto(ctx));
+  }
+
+  // Il percorso fa contattare a Windows (o al Mac, con /net) un altro computer della rete.
+  function diRete(percorso, ctx) {
+    const p = pulisciPercorso(percorso);
+    return !!p && dove(p, contesto(ctx)) === MOTIVI.rete;
   }
 
   // Nella cartella personale ma privato per la lettura (nascosto, cartella di profilo come la Libreria del Mac): chi
@@ -1486,5 +1496,7 @@
     return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
+  global.SN_CMD_CLASSIFY = {
+    classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

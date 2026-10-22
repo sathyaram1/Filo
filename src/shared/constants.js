@@ -1926,6 +1926,12 @@
       const E = esterno();
       const aiuto = per === 'aiuto';
       const cercato = E.perCanaleSistema(out.cercato || '');
+      if (out.cartellaDiRete) {
+        return `[La cartella "${E.perCanaleSistema(out.cartellaDiRete)}" sta su un altro computer della rete: Filo non ci cerca. Dillo all'utente: se è una cartella sua, la aggiunge alla ricerca da Preferenze, alla voce Ricerca nei documenti.]`;
+      }
+      if (out.errore === 'fuori_perimetro') {
+        return `[La cartella "${E.perCanaleSistema(out.cartella || '')}" sta fuori dalla cartella personale e l'utente non ha confermato: non ci ho cercato. Richiedila col percorso esatto e l'utente confermerà.]`;
+      }
       if (out.errore) return `[La ricerca fra i documenti "${cercato}" non è riuscita: dillo all'utente.]`;
       if (out.cartellaMancante) {
         return `[La cartella "${E.perCanaleSistema(out.cartellaMancante)}" non c'è sul computer: chiedi all'utente dove sta, o cerca senza cartella.]`;

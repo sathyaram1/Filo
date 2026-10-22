@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.247', date: '2026-10-22',
+      features: [],
+      fixes: [
+        'Il bottone di un file che Filo ti trova in chat porta sempre il nome vero del file. Il nome che gli dà Filo, come «Bolletta della luce», sta accanto, più piano.',
+      ],
+    },
+    {
       version: '0.2.246', date: '2026-10-22',
       features: [],
       fixes: [

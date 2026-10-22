@@ -591,6 +591,7 @@
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
     APRI_SALVATA: 'non ho aperto la pagina salvata',
+    CERCA_DOCUMENTI: 'non ho cercato fra i documenti',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
@@ -601,12 +602,21 @@
   });
   const verboUscita = (tipo) => USCITE[tipo] || USCITE_PAGINA[tipo] || '';
 
-  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo, non a un file del computer. Conta ogni
-  // campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
+  // Un percorso che fa contattare un altro computer (`\\host\…`, `//host/…`, `/net/host` del Mac): il nome del computer
+  // e della cartella escono dalla macchina come un indirizzo (#1499). La regola è quella del perimetro, su ogni sistema.
+  function diRete(v) {
+    const C = global.SN_CMD_CLASSIFY;
+    // Senza la regola non si sa: si guarda come un'uscita (il controllo dei segreti, niente di più).
+    if (!C || !C.diRete) return !!String(v ?? '').trim();
+    return C.diRete(v, { win: true }) || C.diRete(v, { win: false });
+  }
+
+  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo o a un altro computer, non a un file di questo.
+  // Conta ogni campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
   function puntaFuori(action) {
     return [action.percorso, action.path, action.url].some((v) => {
       const meta = String(v ?? '').trim().match(/^([a-z][a-z0-9+.-]*):/i);
-      return !!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file';
+      return (!!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file') || diRete(v);
     });
   }
 
@@ -709,6 +719,11 @@
     const verbo = verboUscita(tipo);
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
     if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
+    // Una ricerca fra i documenti esce dal computer solo con una cartella su un altro computer: esce il suo nome.
+    if (tipo === 'CERCA_DOCUMENTI') {
+      if (!diRete(action.cartella)) return niente;
+      action = { type: tipo, cartella: action.cartella };
+    }
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
     const u = formeDi(uscente);

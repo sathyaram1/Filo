@@ -163,11 +163,16 @@
   }
 
   // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
+  // Si misura la cartella che la ricerca leggerà: `_cartella` la risolve il main come la risolve l'indice ('' = una di
+  // serie o nessuna); senza, il nome pulito come lo pulisce lui (#1499).
   function cartellaDocumentiFuori(a) {
-    const c = String((a && a.cartella) || '').trim();
-    if (!c || /^(documenti|documents|download|downloads|scaricati|scrivania|desktop)$/i.test(c)) return '';
     const C = global.SN_CMD_CLASSIFY;
+    const pulisci = C && C.pulisciPercorso ? C.pulisciPercorso : (v) => String(v || '').trim();
+    const c = pulisci(a && a.cartella);
+    if (!c) return '';
     if (!C || !C.fuoriPerimetro) return 'non si sa dove legge';
+    if (typeof a._cartella === 'string') return a._cartella ? C.fuoriPerimetro(a._cartella, a._perimetro) : '';
+    if (/^(documenti|documents|download|downloads|scaricati|scrivania|desktop)$/i.test(c)) return '';
     return C.fuoriPerimetro(c, a && a._perimetro);
   }
 
@@ -613,7 +618,8 @@
       },
       describe: (a) => {
         const q = String((a && (a.cosa ?? a.query ?? a.testo)) || '').trim();
-        const c = String((a && a.cartella) || '').trim();
+        // La cartella che si leggerà davvero, se il main l'ha risolta: «"/etc» del modello è /etc.
+        const c = String((a && (a._cartella || a.cartella)) || '').trim();
         const perche = cartellaDocumentiFuori(a);
         // Richiesta e cartella le scrive il modello: intere, nel loro riquadro, come nell'Aiuto.
         return ['Cercare fra i tuoi documenti', ...(q ? [' ', cit(q)] : []), ...(c ? [' nella cartella ', cit(c, true)] : []),
