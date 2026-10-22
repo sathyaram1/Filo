@@ -150,6 +150,16 @@ const azioniChat = (app) => app.evaluate(async () => {
   const s = await globalThis.SN_CONTATORI_MAIN.letto();
   return Object.values(s.ore || {}).reduce((n, o) => n + ((o.azioni && o.azioni['chat-archive'] && o.azioni['chat-archive'].n) || 0), 0);
 });
+// La home sposta ancora una bolla dopo averla mostrata: un clic destro prima che si fermi cade nel vuoto.
+async function ferma(loc) {
+  let prima = null;
+  await expect.poll(async () => {
+    const b = await loc.boundingBox();
+    const fermo = Boolean(b && prima && b.x === prima.x && b.y === prima.y);
+    prima = b;
+    return fermo;
+  }, { timeout: 10_000, intervals: [250] }).toBe(true);
+}
 
 test('nascondere e rimettere una conversazione dal tasto destro contano l’attesa dell’azione', async ({ app, openTab }) => {
   test.setTimeout(120_000);
