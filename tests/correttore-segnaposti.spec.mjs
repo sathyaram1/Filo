@@ -327,9 +327,9 @@ async function rilettura(app, righe, valore) {
       const t = String(a.messages[a.messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
       if (t.includes('Chi scrive ha messo delle x')) return fine(valoreDi(t));
-      if (!t.includes('proponi SUGGERIMENTI')) return prima(a);
+      if (!String(a.messages[0].content).includes('proponi SUGGERIMENTI')) return prima(a);
       await prima(a);
-      const i = t.indexOf(M.inizio, t.indexOf('TESTO NUOVO:\n')) + M.inizio.length + 1;
+      const i = t.indexOf(M.inizio, t.indexOf('TESTO DA RILEGGERE:\n')) + M.inizio.length + 1;
       return fine(righeDi(t.slice(i, t.indexOf(M.fine, i) - 1)).join('\n') || '[][][][nessuno]');
     };
     globalThis.SN_PROVIDERS.completeWithFallback = f;
