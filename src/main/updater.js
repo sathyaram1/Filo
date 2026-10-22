@@ -32,6 +32,7 @@ const dip = {
   chiudi: () => electronApp().quit(),
   riapri: (execPath) => electronApp().relaunch({ execPath, args: [] }),
   avviso: mandaAvviso,
+  leggiAncora: (tag) => leggiAncora(tag),
 };
 
 // I passi degli aggiornamenti per i contatori anonimi (#1466): uno per versione e sessione, e la versione non esce (quella
