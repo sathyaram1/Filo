@@ -1351,7 +1351,9 @@ if (isMain) {
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
-    const r = await ticket(args[0]);
+    const accensione = await accensioneDelGiro(args[0]);
+    const r = await ticket(args[0], { accensione });
+    if (r.accensione && r.accensione !== accensione) scriviAccensione(args[0], r.accensione);
     if (r.outcome === 'work') {
       // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
       const reg = registraDecisione(r);
