@@ -2446,6 +2446,10 @@ if (isMainModule) {
       }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
     } else if (flag === '--linea-principale') {
       const r = tornaAllaLineaPrincipale();
+      if (r.vivo) {
+        console.error(`[dispatch] LAVORO VIVO: ${r.message}\nChiudi il giro senza rilasciare niente: chi lavora qui consegna e rilascia da sé.`);
+        process.exit(USCITA_LAVORO_VIVO);
+      }
       if (!r.ok) {
         console.error(`[dispatch] ${r.uso ? '' : 'GUASTO (transient): '}${r.message}`);
         process.exit(r.uso ? 1 : 3);
