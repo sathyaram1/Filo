@@ -1032,7 +1032,13 @@ function togliAvvisiSuperati(inUso) {
 }
 
 // Solo nelle prove: un autoUpdater finto guidato dallo spec, e lancio/uscita registrati invece di eseguiti.
-function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null, cartella = null, avvisoVero = true } = {}) {
+// Le prove non vanno su Firestore: di serie nessuna àncora in tutta la raccolta, il controllo spento.
+const ANCORA_SPENTA = async () => ({ letta: true, impronte: null, altre: false });
+function ancoraPerProva(leggi) {
+  dip.leggiAncora = typeof leggi === 'function' ? leggi : ANCORA_SPENTA;
+}
+
+function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null, cartella = null, avvisoVero = true, ancora = null } = {}) {
   const { EventEmitter } = require('node:events');
   const registro = { lanciati: [], chiusure: 0, uscite: 0, riaperture: [], installazioni: 0, controlli: 0, scaricamenti: 0, risposta: null, avvisi: [] };
   const finto = new EventEmitter();
