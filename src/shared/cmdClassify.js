@@ -642,40 +642,113 @@
     return out;
   }
 
+  // sh e bash (anche su Windows) tolgono i backslash e decodificano `$'…'`; PowerShell e cmd no.
+  // Fuori da Windows una shell non indicata è POSIX: lì non ce ne sono altre.
+  function shellPosix(c) {
+    return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
+  }
+
+  const ESCAPE_ANSI = { a: 7, b: 8, e: 27, E: 27, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '\'': 39, '"': 34, '?': 63 };
+  const UTF8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
+
+  function byteUtf8(cp, b) {
+    if (cp < 0x80) b.push(cp);
+    else if (cp < 0x800) b.push(0xc0 | (cp >> 6), 0x80 | (cp & 63));
+    else if (cp < 0x10000) b.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+    else b.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+  }
+
+  // Il contenuto di `$'…'` come lo produce bash (da `i`, dopo l'apice). `ignoto`: un escape che non si
+  // riconosce, un NUL o byte che non sono UTF-8; lì le shell non concordano e il percorso non si sa.
+  function ansiC(s, i) {
+    const b = [];
+    let ignoto = false;
+    const hex = (k, max) => { let n = 0; while (n < max && /[0-9A-Fa-f]/.test(s[k + n] || '')) n += 1; return n; };
+    for (; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '\'') break;
+      if (ch !== '\\') { byteUtf8(ch.codePointAt(0), b); if (ch.codePointAt(0) > 0xffff) i += 1; continue; }
+      const e = s[i + 1];
+      if (e === undefined) { ignoto = true; break; }
+      i += 1;
+      if (Object.prototype.hasOwnProperty.call(ESCAPE_ANSI, e)) { b.push(ESCAPE_ANSI[e]); continue; }
+      if (/[0-7]/.test(e)) {
+        let v = Number(e);
+        for (let n = 0; n < 2 && /[0-7]/.test(s[i + 1] || ''); n++) { i += 1; v = v * 8 + Number(s[i]); }
+        b.push(v & 0xff);
+        continue;
+      }
+      if (e === 'x' || e === 'u' || e === 'U') {
+        const n = hex(i + 1, e === 'x' ? 2 : e === 'u' ? 4 : 8);
+        if (!n) { ignoto = true; continue; }
+        const v = parseInt(s.slice(i + 1, i + 1 + n), 16);
+        i += n;
+        if (e === 'x') b.push(v);
+        else if (v > 0x10ffff) ignoto = true;
+        else byteUtf8(v, b);
+        continue;
+      }
+      if (e === 'c') {
+        let x = s[i + 1];
+        if (x === '\\') { i += 1; x = s[i + 1]; }
+        if (x === undefined || x === '\'' && s[i] !== '\\' || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
+        i += 1;
+        b.push(x === '?' ? 0x7f : x.toUpperCase().charCodeAt(0) & 0x1f);
+        continue;
+      }
+      ignoto = true;
+    }
+    if (i >= s.length) ignoto = true;
+    let testo = '';
+    if (b.includes(0) || !UTF8) ignoto = true;
+    else { try { testo = UTF8.decode(new Uint8Array(b)); } catch (_) { ignoto = true; } }
+    return { testo, fine: i, ignoto };
+  }
+
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
   // Su Windows `\` prima di uno spazio è la fine di un percorso (`src\ \\host\x` sono due operandi), non un escape.
-  function argomenti(raw, win) {
+  function argomenti(raw, c) {
+    const win = c.win;
+    const posix = shellPosix(c);
     const out = [];
     const s = String(raw);
     let cur = '';
     let espande = ''; // il testo fuori dagli apici singoli, dove `$` si espande
     let q = '';
     let aperto = false;
+    let ignoto = false;
     const chiudi = () => {
       if (cur || aperto) {
         // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
         const nomi = nomiVariabili(espande, { percento: false })
           .concat(cur.startsWith('+') ? [] : nomiVariabili(cur, { dollaro: false }));
-        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)) });
+        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)), ignoto });
       }
-      cur = ''; espande = ''; aperto = false;
+      cur = ''; espande = ''; aperto = false; ignoto = false;
     };
     for (let i = 0; i < s.length; i++) {
       const ch = s[i];
       if (q) {
         if (ch === q) { q = ''; continue; }
+        if (posix && q === '"' && ch === '\\' && /[$`"\\]/.test(s[i + 1] || '')) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
         cur += ch;
         if (q === '"') espande += ch;
         continue;
       }
-      // `$'…'` (ANSI-C) e `$"…"` (traduzione locale) di bash: il `$` è prefisso
-      // di quoting, non testo. Toltolo, la stringa torna com'è, e le sequenze di
-      // escape restano col loro backslash — che `pezzi()` tratta da separatore,
-      // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
+      // Il classificatore misura il percorso che vedrà la shell: `$'\x2essh'` è `.ssh`, `.\ssh` pure (#1511).
+      if (posix && ch === '$' && s[i + 1] === '\'') {
+        const r = ansiC(s, i + 2);
+        cur += r.testo;
+        if (r.ignoto) ignoto = true;
+        aperto = true;
+        i = r.fine;
+        continue;
+      }
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
+      if (posix && ch === '\\' && i + 1 < s.length) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
       if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
       cur += ch;
