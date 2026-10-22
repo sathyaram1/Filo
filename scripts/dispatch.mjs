@@ -1770,10 +1770,11 @@ export function usageText() {
  * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
  * il giro senza travestirlo da giornata tranquilla.
  */
-function emitHalt(kind, message) {
-  process.stderr.write(`[dispatch] GUASTO (${kind}): ${message}\n`);
-  emit({ role: 'halt', kind, message }, {});
-  return { exit: 3 };
+// `vivo`: un altro lavora nella cartella, e i suoi marcatori (ruolo compreso) non si toccano (#1480).
+function emitHalt(kind, message, { vivo = false } = {}) {
+  process.stderr.write(`[dispatch] ${vivo ? 'LAVORO VIVO' : `GUASTO (${kind})`}: ${message}\n`);
+  emit({ role: 'halt', kind, message, ...(vivo ? { lavoroVivo: true } : {}) }, {});
+  return { exit: vivo ? USCITA_LAVORO_VIVO : 3 };
 }
 
 /** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
