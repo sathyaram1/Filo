@@ -95,16 +95,12 @@ jobs:
     needs: suite
     if: always() && !cancelled()
     runs-on: ubuntu-latest
-    # Il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main: un ramo, che l'avviso non lo
-    # apre, dichiarandolo verrebbe respinto prima di partire (#1073).
-    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
     timeout-minutes: 30
     steps:
-      - name: Checkout del commit provato (con la storia, per l'elenco dei commit dell'avviso)
+      - name: Checkout del commit provato
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
