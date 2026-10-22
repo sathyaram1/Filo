@@ -1247,8 +1247,7 @@
     add('Rigenera riassunto', () => {
       if (autoSummaryBusy) return;
       autoSummaryBusy = true;
-      Promise.resolve(generateSummaryForActive())
-        .then((ok) => { if (!ok) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); })
+      Promise.resolve(generateSummaryForActive({ manuale: true }))
         .finally(() => { autoSummaryBusy = false; });
     });
     add('Storico versioni', () => openVersionHistory());
