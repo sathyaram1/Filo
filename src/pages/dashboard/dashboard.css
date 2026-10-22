@@ -983,8 +983,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-file-btn-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove { opacity: 0.65; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-dove[hidden] { display: none; }
-/* Il nome dato da Filo: accanto al nome vero, più piano, mai al suo posto. Senza spazio cede per primo. */
-.dash-file-btn-etichetta { opacity: 0.8; min-width: 0; flex-shrink: 1000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Il nome dato da Filo: accanto al nome vero, più piano, mai al suo posto. Senza spazio cede tutto lui
+   prima che il nome vero perda una lettera: con un fattore più piccolo agli altri tocca una frazione di pixel, e i puntini. */
+.dash-file-btn-etichetta { opacity: 0.8; min-width: 0; flex-shrink: 100000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-file-btn-etichetta[hidden] { display: none; }
 /* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
    lì anche quando il modello non risponde. */
