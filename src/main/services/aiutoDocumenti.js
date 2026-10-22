@@ -58,16 +58,17 @@ function hostDi(origine) {
   try { return new URL(String(origine || '')).hostname; } catch (_) { return ''; }
 }
 
-// Perché la cartella esce dal perimetro di lettura ('' se ci sta): il costo di CERCA_DOCUMENTI in chat, e il suo motivo.
-function fuoriPerimetro(cartella) {
+// Perché la cartella esce dal perimetro di lettura ('' se ci sta): il costo di CERCA_DOCUMENTI in chat, e il suo motivo,
+// misurati sulla cartella che l'indice leggerà (`risolta`: '' per una di serie, #1499).
+function fuoriPerimetro(cartella, risolta) {
   if (!cartella) return '';
   const L = globalThis.SN_ACTION_LEVELS;
   const C = globalThis.SN_CMD_CLASSIFY;
   if (!L || !C) return 'non si sa dove legge';
   const win = process.platform === 'win32';
   const perimetro = { home: os.homedir(), win, maiuscole: win || process.platform === 'darwin' };
-  if (!(L.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _perimetro: perimetro }) > 0)) return '';
-  return C.fuoriPerimetro(cartella, perimetro) || 'non si sa dove legge';
+  if (!(L.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _cartella: risolta, _perimetro: perimetro }) > 0)) return '';
+  return C.fuoriPerimetro(risolta || cartella, perimetro) || 'non si sa dove legge';
 }
 
 function domanda({ cosa, cartella, host, perche }) {
