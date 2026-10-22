@@ -19,20 +19,13 @@
     caratteri: Object.freeze({ min: 1000, max: 130000, fabbrica: 40000, etichetta: 'Lunghezza giudicata' }),
   });
 
-  function numero(v) {
-    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-    if (typeof v === 'string' && v.trim()) {
-      const n = Number(v.trim().replace(/[\s$]/g, '').replace(',', '.'));
-      return Number.isFinite(n) ? n : null;
-    }
-    return null;
-  }
-  // «40.000» scritto all'italiana è quarantamila, non quaranta.
-  function intero(v) {
-    if (typeof v === 'string' && /^\s*\d{1,3}([.\s]\d{3})+\s*$/.test(v)) return Number(v.replace(/[.\s]/g, ''));
-    return numero(v);
-  }
+  const numero = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   const centesimi = (n) => Math.round(n * 100) / 100;
+  // Le regole per SN_CAMPO_NUMERO, che legge il numero scritto e compone la frase di rifiuto.
+  const REGOLE_CAMPO = Object.freeze({
+    tetto: Object.freeze({ min: REGOLE.tetto.min, max: REGOLE.tetto.max, intero: false, etichetta: REGOLE.tetto.etichetta }),
+    caratteri: Object.freeze({ min: REGOLE.caratteri.min, max: REGOLE.caratteri.max, intero: true, etichetta: REGOLE.caratteri.etichetta }),
+  });
 
   /** Le impostazioni come le legge il server: un campo assente o storto vale il numero di fabbrica. */
   function leggiImpostazioni(doc) {
