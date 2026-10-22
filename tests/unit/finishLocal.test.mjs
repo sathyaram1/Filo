@@ -250,7 +250,7 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
     // Meglio 5 secondi di errore chiaro che 15 minuti di controlli seguiti da
     // un conflitto. lastIndexOf: si guarda la CHIAMATA, non la definizione.
     const guardia = SORGENTE.lastIndexOf('behindMainStop(');
-    const controlli = SORGENTE.indexOf("'test:unit'");
+    const controlli = SORGENTE.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
     assert.ok(guardia > 0 && controlli > 0);
     assert.ok(guardia < controlli, 'il conflitto di fusione va scoperto prima di pagare i controlli');
   });
@@ -548,7 +548,7 @@ test('--check: un unit rosso del ramo non salta gli spec delle aree, e l\'esito 
   assert.match(finish.messaggio, /tests\/unit\/x\.test\.mjs › rotto/, 'si dice quale test ha rotto il ramo');
 
   const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
-  const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+  const unit = codice.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
   const spec = codice.indexOf('runSpecsALotti(blocking');
   assert.ok(unit > 0 && spec > unit, 'gli spec delle aree vengono dopo gli unit');
   const fraIDue = codice.slice(unit, spec);
@@ -611,10 +611,10 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
 
   test('il rosso del ramo da solo passa dalla prova sul ramo vero, anche quando contiene già main', () => {
     const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
-    const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+    const unit = codice.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
     const esito = codice.indexOf('esitoUnitDelRamo({ checkOnly, prova })', unit);
     assert.ok(unit > 0 && esito > unit);
-    assert.match(codice.slice(unit, esito), /const puntaProvata = git\(\['rev-parse', 'HEAD'\]\)\.out;\s*const prova = provaUnitSullaFusione\(\{ root: ROOT, punta: puntaProvata, ancheContenuto: true \}\);/);
+    assert.match(codice.slice(unit, esito), /const puntaProvata = shaProvato;\s*const prova = provaUnitSullaFusione\(\{ root: ROOT, punta: puntaProvata, ancheContenuto: true \}\);/);
     assert.match(codice.slice(esito, codice.indexOf('runSpecsALotti(blocking', esito)), /unitRossi = esito\.rosso;/);
   });
 });

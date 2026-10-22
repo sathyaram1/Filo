@@ -480,6 +480,7 @@ export { lottiPerRigaDiComando };
  * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
  */
 function runSpecsALotti(specs, label, albero) {
+  if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
   const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
   let ok = true;
   lotti.forEach((lotto, i) => {
@@ -672,7 +673,6 @@ async function main() {
   const shaProvato = git(['rev-parse', 'HEAD']).out;
   const albero = apriProvaSulCommit({ root: ROOT, sha: shaProvato });
   if (albero.errore) { console.error(`\n✗ ${albero.errore}`); process.exit(1); }
-  if (!albero.moduli) { albero.chiudi(); console.error('\n✗ node_modules manca: lancia npm install prima dei controlli.'); process.exit(1); }
   process.on('exit', () => { const c = albero.chiudi(); if (!c.ok) console.error(`[finish] ${c.motivo}: la cartella di prova resta, la toglie il prossimo giro`); });
   console.log(`\n▸ Controlli su ${branch} ${shaProvato.slice(0, 8)}, in una cartella staccata (${albero.dir})`);
 
@@ -686,8 +686,8 @@ async function main() {
 
   {
     const behind = Number(git(['rev-list', '--count', `${shaProvato}..${base}`]).out);
-    const fusione = !checkOnly && behind > 0 ? provaFusione(base, albero.dir) : null;
-    const stop = behindMainStop(behind, { checkOnly, prova: fusione });
+    const prova = !checkOnly && behind > 0 ? provaFusione(base, albero.dir) : null;
+    const stop = behindMainStop(behind, { checkOnly, prova });
     if (stop) { console.error(`\n${stop}`); process.exit(1); }
     const nota = behindMainNota(behind, { checkOnly });
     if (nota) console.log(`\n${nota}`);
@@ -792,7 +792,7 @@ async function main() {
   const ora = git(['rev-parse', 'HEAD']).out;
   const mossa = ora !== shaProvato ? `la cartella si è mossa durante i controlli (adesso ${git(['rev-parse', '--abbrev-ref', 'HEAD']).out || 'staccata'} ${ora.slice(0, 8)})` : '';
   if (checkOnly) {
-    console.log(`\n✓ Controlli passati su ${branch} ${shaProvato.slice(0, 8)} (--check: non chiedo la fusione).${mossa ? ` Valgono per quel commit: ${mossa}.` : ''}`);
+    console.log(`\n✓ Controlli passati (--check: non chiedo la fusione) su ${branch} ${shaProvato.slice(0, 8)}.${mossa ? ` Valgono per quel commit: ${mossa}.` : ''}`);
     return;
   }
   // Si spedisce e si chiede di fondere solo il commit provato.

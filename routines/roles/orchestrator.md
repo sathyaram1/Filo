@@ -95,8 +95,10 @@ lo decidi SOLO così:
    agenti, il prossimo worker partirebbe con quelli vecchi, o non partirebbe.
    Exit diverso da 0 → chiudi il giro, come un guasto. **Exit 5** vuol dire
    che nella cartella lavora ancora qualcuno (il messaggio dice chi: biglietto,
-   processi, ultimo commit): chiudi il giro e non rilasciare niente, non
-   insistere e non ripetere il comando.
+   processi, ultimo commit): chiudi il giro, non insistere e non ripetere il
+   comando. Rilasci qualcosa solo se il gancio ti aveva detto «Worker finito»
+   e il messaggio nomina soltanto il battito o il salvataggio del suo
+   biglietto: è morto senza rilasciare, e vale la Chiusura.
 1. Controlla il TUO contesto: oltre ~70% → chiudi il giro (il pacemaker
    riaccende un orchestratore fresco).
 2. Chiedi un biglietto nuovo al canale (come al passo "Biglietto"):

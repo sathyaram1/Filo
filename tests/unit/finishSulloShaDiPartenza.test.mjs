@@ -9,6 +9,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, symlinkSync
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 import { apriProvaSulCommit, pulisciResti, gitIn, togliCollegamento } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -22,7 +23,7 @@ import { join } from 'node:path';
 const S = process.env.FILO_PROVA_SEGNALI;
 test('il commit provato resta quello di partenza', async () => {
   writeFileSync(join(S, 'partito'), process.cwd());
-  for (let i = 0; i < 600 && !existsSync(join(S, 'vai')); i++) await new Promise((r) => setTimeout(r, 100));
+  while (!existsSync(join(S, 'vai'))) await new Promise((r) => setTimeout(r, 100));
   assert.equal(readFileSync(new URL('../../segno.txt', import.meta.url), 'utf8').trim(), 'ramo');
 });
 `;
@@ -74,14 +75,14 @@ test('la cartella spostata su main durante finish:check: la prova resta sul comm
     p.stdout.on('data', (c) => { out += c; });
     p.stderr.on('data', (c) => { out += c; });
     const fine = new Promise((ok) => p.on('close', ok));
-    for (let i = 0; i < 1200 && !existsSync(join(segnali, 'partito')) && p.exitCode === null; i++) await new Promise((r) => setTimeout(r, 100));
+    await aspettaChe(() => existsSync(join(segnali, 'partito')) || p.exitCode !== null, { ogniMs: 100, cosa: () => `i controlli non partono:\n${out}` });
     assert.ok(existsSync(join(segnali, 'partito')), `i controlli non sono partiti:\n${out}`);
     // Un altro porta la cartella su main mentre i controlli girano.
     git(lavoro, 'checkout', '-q', 'main');
     writeFileSync(join(segnali, 'vai'), '');
     const codice = await fine;
     assert.equal(codice, 0, out);
-    assert.match(out, new RegExp(`Controlli passati su claude/prova ${sha.slice(0, 8)}`));
+    assert.match(out, new RegExp(`Controlli passati \\(--check: non chiedo la fusione\\) su claude/prova ${sha.slice(0, 8)}\\. Valgono per quel commit`));
     assert.match(out, /la cartella si è mossa durante i controlli \(adesso main /);
     assert.equal(git(lavoro, 'branch', '--show-current'), 'main');
     assert.equal(git(lavoro, 'worktree', 'list').split('\n').length, 1, 'la cartella di prova se ne va a fine controlli');

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from '
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 import {
   segniDiLavoroVivo, questoProcesso, comandoLeggibile, testoLavoroVivo, lavoroVivo, sottoCartella, timbroFile,
   TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation,
@@ -134,7 +135,7 @@ function cartellaSulRamo() {
 
 // Un processo che vive in un'altra sessione, come un comando lanciato in sottofondo da chi lavora.
 function processoVivo(cwd) {
-  const p = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { cwd, detached: true, stdio: 'ignore' });
+  const p = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { cwd, detached: true, stdio: 'ignore' });
   p.unref();
   return p;
 }
@@ -175,7 +176,7 @@ test('--linea-principale con un processo che lavora nella cartella: esce 5 col p
   try {
     const r = lineaPrincipale(clone);
     assert.equal(r.status, USCITA_LAVORO_VIVO, r.stderr);
-    assert.match(r.stderr, new RegExp(`processo ${vivo.pid} «[^»]*setTimeout`));
+    assert.match(r.stderr, new RegExp(`processo ${vivo.pid} «[^»]*setInterval`));
     assert.equal(git(clone, 'branch', '--show-current'), 'worker/vivo');
   } finally {
     ferma(vivo);
@@ -316,10 +317,7 @@ test('il rilascio di un worker aspetta i suoi processi nella cartella', { skip: 
     assert.match(r.se, /Aspetta che finiscano/);
     assert.ok(!chiamate.some((u) => u.endsWith('/routineRelease')));
     ferma(vivo);
-    for (const fine = Date.now() + 10000; Date.now() < fine;) {
-      try { process.kill(vivo.pid, 0); } catch (_) { break; }
-      await new Promise((ok) => setTimeout(ok, 100));
-    }
+    await aspettaChe(() => { try { process.kill(vivo.pid, 0); return false; } catch (_) { return true; } }, { cosa: 'il processo fermato non esce' });
     const ok = await canale(clone, api, 'release', T1, '--role', 'resolver', '--senza-rapporto');
     assert.equal(ok.code, 0, ok.se);
   } finally {
