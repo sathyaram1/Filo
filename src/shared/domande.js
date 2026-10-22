@@ -480,6 +480,32 @@
     return 'in_lavorazione';
   }
 
+  /**
+   * La domanda coi testi degli autori non fidati passati da `visibile` (#1502): titolo, contesto, opzioni e turni di una
+   * domanda non fidata, e i turni non fidati di ogni domanda. Azioni, id e testi dell'owner restano com'erano. PURA.
+   */
+  function testiVisibili(domanda, visibile) {
+    if (!isOggetto(domanda) || typeof visibile !== 'function') return domanda;
+    const v = (s) => (typeof s === 'string' ? visibile(s) : s);
+    const nonFidata = domanda.fiducia !== FIDUCIA[0];
+    const out = Object.assign({}, domanda);
+    if (nonFidata) {
+      for (const k of ['titolo', 'contesto', 'problema', 'notePerAgenti', 'gruppo']) if (ha(out, k)) out[k] = v(out[k]);
+      if (Array.isArray(domanda.opzioni)) {
+        out.opzioni = domanda.opzioni.map((o) => (isOggetto(o) ? Object.assign({}, o, { testo: v(o.testo), pro: v(o.pro), contro: v(o.contro) }) : o));
+      }
+      if (isOggetto(domanda.consiglio)) out.consiglio = Object.assign({}, domanda.consiglio, { perche: v(domanda.consiglio.perche) });
+    }
+    if (Array.isArray(domanda.conversazione)) {
+      out.conversazione = domanda.conversazione.map((t) => {
+        const a = (isOggetto(t) && isOggetto(t.autore)) ? t.autore : {};
+        const daMostrare = a.tipo !== 'owner' && (nonFidata || (a.tipo !== 'server' && a.fiducia !== FIDUCIA[0]));
+        return isOggetto(t) && daMostrare ? Object.assign({}, t, { testo: v(t.testo) }) : t;
+      });
+    }
+    return out;
+  }
+
   const ID_RE = /^D-([1-9]\d{0,8})$/;
   function idDi(numero) { return `D-${numero}`; }
   function numeroDi(id) {
@@ -500,7 +526,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
+    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
   };
 
