@@ -128,6 +128,7 @@ function messaggiDi(chats) {
         ...(Array.isArray(m.letti) ? { letti: m.letti } : {}),
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),
+        ...(classe > 1 ? { classeLetta: classe } : {}),
         ...(Number(m.images) > 0 ? { images: Number(m.images) } : {}),
         ...(m.role === 'user' && m.rispostaA ? { rispostaA: citata(m) } : {}),
         _i: i,
