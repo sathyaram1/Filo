@@ -1072,6 +1072,33 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.deepEqual(mancanti, [], `azioni che arrivano al main senza le parole dell'utente: ${mancanti.join(', ')}`);
   });
 
+  // Un parametro di testo nuovo in un metodo pagato del fornitore deve passare dall'oscuramento di `call` (#1507).
+  test('ogni parametro dei metodi pagati del fornitore è un campo di testo oscurato o un dato che non è testo', () => {
+    const or = readFileSync(join(ROOT, 'src', 'main', 'services', 'providers', 'openrouter.js'), 'utf8');
+    const NON_TESTO = new Set(['apiKey', 'model', 'cache', 'reasoning', 'maxTokens', 'providerRouting', 'tools', 'toolChoice',
+      'onDelta', 'onReasoning', 'onToolCall', 'signal', 'voice', 'speed', 'audioBase64', 'format', 'language', 'dim']);
+    const testo = new Set(globalThis.SN_MODEL_GATE.CAMPI_TESTO);
+    const ignoti = [];
+    for (const m of ['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed']) {
+      const firma = or.match(new RegExp(`async function ${m}\\(\\{([^}]*)\\}\\)`));
+      assert.ok(firma, `non trovo ${m} nel fornitore`);
+      for (const p of firma[1].split(',').map((x) => x.trim().split(/[\s=]/)[0]).filter(Boolean)) {
+        if (!testo.has(p) && !NON_TESTO.has(p)) ignoti.push(`${m}.${p}`);
+      }
+    }
+    assert.deepEqual(ignoti, [], `parametri che il cancello non sa se oscurare: ${ignoti.join(', ')}`);
+    assert.ok(testo.has('text') && testo.has('texts') && testo.has('messages'));
+  });
+
+  test('i segreti custoditi di Filo comprendono la chiave dei feedback, e nessun comando eredita l\'ambiente intero', () => {
+    assert.match(corpo(handlers, 'async function segretiCustoditi('), /chiaveFeedback = await require\('\.\/chiaveFeedback'\)\.getPrivateKey\(\)[\s\S]*custoditi\(\{ impostazioni: \[salvate, effettive\], chiaveFeedback \}\)/);
+    for (const f of ['terminal.js', 'shell.js']) {
+      const src = readFileSync(join(ROOT, 'src', 'main', 'services', f), 'utf8');
+      const intere = src.split('\n').filter((r) => /process\.env(?![\w.[])/.test(r) && !r.includes('ambienteComandi('));
+      assert.deepEqual(intere, [], `${f} passa a un processo l'ambiente di Filo senza togliere i segreti`);
+    }
+  });
+
   test('il cancello dei modelli oscura i segreti sia nelle risposte intere sia in quelle a flusso', () => {
     const gate = readFileSync(join(ROOT, 'src', 'main', 'services', 'modelGate.js'), 'utf8');
     // I messaggi oscurati stanno in una costante prima della chiamata: il piano della cache si fa su quelli (#1412).
