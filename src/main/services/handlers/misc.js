@@ -122,15 +122,6 @@ function filenameFromUrl(url) {
   } catch (_) { return ''; }
 }
 
-// Il nome dal server è dato ostile: separatori, caratteri di controllo e traversal vanno
-// neutralizzati, o il file esce dalla cartella scelta.
-function safeImageFilename(name) {
-  let n = require('node:path').basename(String(name || ''));
-  n = n.replace(/[\x00-\x1f<>:"/\\|?*]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
-  if (!n) n = 'immagine';
-  return n.slice(0, 200);
-}
-
 // #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
 // da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
 const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
