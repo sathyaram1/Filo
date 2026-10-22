@@ -347,7 +347,7 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
   // alla base e parcheggia il lavoro su discarded/ — è quello che è successo a
   // #502 (8 commit, 828 righe) e a #495.
   function scenaConsegna() {
-    const { work } = makeRepo();
+    const { work, origin } = makeRepo();
     const id = 'feed507';
     const branch = 'worker/feed507-x';
     // Come nel repo vero: i marcatori di sessione sono esclusi da git (senza,
