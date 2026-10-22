@@ -393,6 +393,22 @@
     return n;
   }
 
+  // Un carattere invisibile scritto per esteso si stacca dal codice intorno: è il segno da notare, non una parentesi.
+  var MARCA_RE = /(⟨U\+[0-9A-F]{4,6}⟩)/;
+  function segnaInvisibili(nodo) {
+    var t = nodo && nodo.textContent;
+    if (!t || !MARCA_RE.test(t)) return nodo;
+    nodo.textContent = '';
+    t.split(MARCA_RE).forEach(function (pezzo, i) {
+      if (!pezzo) return;
+      if (i % 2 === 0) { nodo.appendChild(document.createTextNode(pezzo)); return; }
+      var m = el('span', 'sn-mac-invisibile', pezzo);
+      m.title = 'Un carattere che non si vede: nel file c’è, qui è scritto per esteso.';
+      nodo.appendChild(m);
+    });
+    return nodo;
+  }
+
   /** Un collegamento a GitHub che si apre in una scheda; un indirizzo che non lo è resta testo. */
   function linkEsterno(cls, testo, url, titolo) {
     var u = linkGitHub(url);
@@ -414,9 +430,9 @@
     var li = el('li', 'sn-mac-voce');
     var testa = el('span', 'sn-mac-voce-testa');
     var dove = doveVoce(v);
-    if (dove) testa.appendChild(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub'));
+    if (dove) testa.appendChild(segnaInvisibili(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub')));
     var testo = v.testo ? caratteriVisibili(v.testo) : '';
-    if (testo) testa.appendChild(el('code', 'sn-mac-voce-testo', testo));
+    if (testo) testa.appendChild(segnaInvisibili(el('code', 'sn-mac-voce-testo', testo)));
     var prima = Array.isArray(v.prima) ? v.prima.map(caratteriVisibili) : [];
     var dopo = Array.isArray(v.dopo) ? v.dopo.map(caratteriVisibili) : [];
     if (!v.testo || (!prima.length && !dopo.length)) {
@@ -430,7 +446,7 @@
     det.appendChild(sum);
     var pre = el('pre', 'sn-mac-intorno');
     var riga = function (testo, scattata) {
-      var r = el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo);
+      var r = segnaInvisibili(el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo));
       r.dataset.segno = testo.charAt(0) === '+' ? 'piu' : testo.charAt(0) === '-' ? 'meno' : 'uguale';
       return r;
     };
@@ -478,7 +494,7 @@
         var voci = blockVoci(b);
         var lista = el('ul', 'sn-mac-block-list');
         var righe = voci.length ? voci.map(buildVoce)
-          : (Array.isArray(b.items) ? b.items : []).map(function (t) { return el('li', 'sn-mac-block-items', caratteriVisibili(t)); });
+          : (Array.isArray(b.items) ? b.items : []).map(function (t) { return segnaInvisibili(el('li', 'sn-mac-block-items', caratteriVisibili(t))); });
         righe.forEach(function (r) { lista.appendChild(r); });
         var nascoste = righe.slice(VOCI_A_VISTA);
         var more = Math.max(0, Math.floor(Number(b.more) || 0));
