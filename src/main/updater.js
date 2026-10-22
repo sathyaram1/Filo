@@ -310,13 +310,17 @@ function quandoScaricato(info) {
   stato.pronta = versione;
   let meta = null;
   try { meta = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'update-info.json'), 'utf8')); } catch (_) {}
-  const r = R.ricordaScaricato(leggiRicordo(), {
+  const sha512 = R.improntaDaRicordare({ versione, sha512: meta?.sha512 || shaDalFeed(info, file), ancora: stato.ancora });
+  const prec = leggiRicordo();
+  const r = sha512 ? R.ricordaScaricato(prec, {
     versione,
     file,
-    sha512: meta?.sha512 || shaDalFeed(info, file),
+    sha512,
     amministratore: meta?.isAdminRightsRequired === true,
-  });
+  }) : null;
   if (r && r.versione === versione) scriviRicordo(r);
+  // Senza l'impronta ancorata non resta niente da installare all'avvio, nemmeno il ricordo di prima di quella versione.
+  else if (!sha512 && prec && prec.versione === versione) scriviRicordo(null);
   stato.fase = 'pronto';
   stato.versione = versione;
   stato.percentuale = 100;
