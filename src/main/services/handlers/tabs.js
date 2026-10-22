@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, sitoDaConfermare } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, contattabilePrimaDelClic } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
@@ -194,8 +194,9 @@ module.exports = function register(on, ctx) {
     }
     const voci = async () => [...await globalThis.SN_SAVED_PAGES.list(), ...await ArchivedTabs.list()];
     const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
-    // Un indirizzo che al clic chiede l'OK (#848): né il suggerimento né la sua icona contattano il sito prima dell'OK.
-    const soloCopie = (msg && msg.soloCopie === true) || !!(sitoDaConfermare && sitoDaConfermare(msg && msg.url));
+    // Un indirizzo che al clic chiede l'OK (#848, #1505): né il suggerimento né la sua icona contattano il sito prima.
+    const url = msg && msg.url;
+    const soloCopie = (msg && msg.soloCopie === true) || !contattabilePrimaDelClic(url, { proposta: !!(msg && msg.proposta === true) });
     const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito, soloCopie });
     return { ok: true, dato };
   }));

@@ -1666,6 +1666,7 @@ const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
 // nel registro di verdettiUscite.js, che vale anche per icona e anteprima (#1505).
 const sitoDaConfermare = (url) => VerdettiUscite.sitoDaConfermare(url);
 const contattabilePrimaDelClic = (url, opzioni) => VerdettiUscite.contattabile(url, opzioni);
+const ricordaVerdettiArchiviati = (messages) => VerdettiUscite.ricordaArchiviati(messages, indirizziCliccabili);
 // Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
 const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
 
@@ -6379,9 +6380,11 @@ const handlerCtx = {
   controllaUscita,
   apriDaFilo,
   sitoDaConfermare,
+  contattabilePrimaDelClic,
   SCHEMI_USCITA,
   ricordaLettoDallAiuto,
   ricordaLettoInChat,
+  ricordaVerdettiArchiviati,
   decisioneAzionePagina,
   segnaLetturaAiuto,
   fileScaricato,

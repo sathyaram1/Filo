@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
+    executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
@@ -145,7 +145,7 @@ module.exports = function register(on, ctx) {
         const da = schedaDi(tm, sender);
         if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
       },
-      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true,
+      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true, proposta: true,
     });
     return { ok: true, ...r };
   });
@@ -160,8 +160,9 @@ module.exports = function register(on, ctx) {
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    // Il menu del tasto destro su un collegamento della chat di Filo vale quanto il clic: senza verdetto chiede l'OK.
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true, proposta: avvisato && msg.proposta === true,
       apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender), gesto }); },
     });
     return { ok: true, ...r, avvisato };
