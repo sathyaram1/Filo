@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.shots');
 const LUNGO = 'Un titolo lunghissimo di una pagina che non finisce mai e continua ancora e ancora con altre parole';
 const pagina = (t) => `<!doctype html><html><head><title>${t}</title></head><body>x</body></html>`;
-const larghezze = (shell) => shell.evaluate(() => ['W' + window.innerWidth + '/' + Math.round(document.querySelector('.tabs').getBoundingClientRect().width)].concat([...document.querySelectorAll('.tabs .tab')].map((el) => Math.round(el.getBoundingClientRect().width) + (el.classList.contains('active') ? '*' : '')));
+const larghezze = (shell) => shell.evaluate(() => ['W' + window.innerWidth + '/' + Math.round(document.querySelector('.tabs').getBoundingClientRect().width)].concat([...document.querySelectorAll('.tabs .tab')].map((el) => Math.round(el.getBoundingClientRect().width) + (el.classList.contains('active') ? '*' : ''))));
 
 test('scuro, finestra stretta con molte schede, poi larga con titoli corti e uno lungo', async ({ app, shell, openTab, testServer }) => {
   mkdirSync(SHOTS, { recursive: true });
