@@ -38,11 +38,25 @@ const PERCORSI = [
   '\\Windows\\System32', '/etc', '/Volumes/Disco', '/net/nas/condivisa', '/Library/Keychains',
 ];
 
+// Su Windows una cartella da / prende l'unità corrente, che può non essere quella della casa: lì path.relative dà un
+// percorso assoluto, non un «..» (#1610).
+function dentroCasa(ctx, p) {
+  const r = ctx.path.relative(ctx.casa, p);
+  return r === '' || (!r.startsWith('..') && !ctx.path.isAbsolute(r));
+}
+
+// /net porta a un altro computer sul Mac e su Linux; su Windows è una cartella dell'unità corrente, e il nome di
+// rete nativo è \\nas (#1610). Il resto della prova è uguale sui due lati.
+const WIN = process.platform === 'win32';
+const RETE_DEL_SISTEMA = WIN ? '\\\\nas\\condivisa' : '/net/nas/condivisa';
+const ARCHIVIO_DI_RETE = WIN ? '\\\\nas\\archivio' : '/net/nas/archivio';
+
 // Il disco non si tocca: ogni stat e ogni risoluzione su un percorso col nome del computer di rete si registra.
+// «nas» come pezzo intero del percorso: dentro un nome (una cartella temporanea, un utente) non è quel computer.
 function spiaDelDisco() {
   const chiesti = [];
   const orig = { statSync: fs.statSync, stat: fsp.stat, realpath: fs.realpathSync.native, existsSync: fs.existsSync };
-  const nota = (p) => { if (/nas/i.test(String(p))) chiesti.push(String(p)); };
+  const nota = (p) => { if (/(^|[\\/])nas([\\/]|$)/i.test(String(p))) chiesti.push(String(p)); };
   fs.statSync = (p, ...r) => { nota(p); return orig.statSync(p, ...r); };
   fsp.stat = (p, ...r) => { nota(p); return orig.stat(p, ...r); };
   fs.realpathSync.native = (p, ...r) => { nota(p); return orig.realpath(p, ...r); };
@@ -61,8 +75,7 @@ test('il costo di CERCA_DOCUMENTI misura la cartella che l\'indice leggerà: un 
         const risolta = Indice.voceCartella(cartella, { path: ctx.path, casa: ctx.casa });
         // Una voce che non è un percorso assoluto di quel sistema non porta la ricerca da nessuna parte.
         if (!risolta) continue;
-        const fuori = !ctx.path.relative(ctx.casa, risolta).split(/[\\/]/).every((x) => x && x !== '..')
-          || DR.percorsoDiRete(risolta, { win: ctx.perimetro.win, reti: () => [] });
+        const fuori = !dentroCasa(ctx, risolta) || DR.percorsoDiRete(risolta, { win: ctx.perimetro.win, reti: () => [] });
         assert.ok(fuori, `${ctx.nome} ${cartella} → ${risolta} sta fuori casa o in rete`);
         const a = { type: 'CERCA_DOCUMENTI', cosa: 'fattura', cartella, _cartella: risolta, _perimetro: ctx.perimetro };
         assert.equal(AL.costoFor(a), 2, `${ctx.nome} ${cartella} → ${risolta}`);
@@ -70,6 +83,12 @@ test('il costo di CERCA_DOCUMENTI misura la cartella che l\'indice leggerà: un 
         assert.equal(AL.costoFor({ ...a, _cartella: undefined }), 2, `${ctx.nome} ${cartella} senza risolta`);
       }
     }
+  }
+  // Quello che vede un Windows che lavora su D: con la casa su C:, provato su ogni sistema.
+  const win = CONTESTI[0];
+  for (const [cartella, risolta] of [['«\\Windows\\System32', 'D:\\Windows\\System32'], ['/etc', 'D:\\etc'], ['\\Users\\Mario', 'D:\\Users\\Mario']]) {
+    assert.equal(dentroCasa(win, risolta), false, risolta);
+    assert.equal(AL.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _cartella: risolta, _perimetro: win.perimetro }), 2, risolta);
   }
 });
 
@@ -143,7 +162,7 @@ before(() => {
   writeFileSync(join(DOC, 'nota.txt'), 'Bolletta energia elettrica marzo');
   // Una cartella di rete cercata prima che la rete si rifiutasse resta fra quelle cercate per l'occasione.
   mkdirSync(join(DATI, 'documenti'), { recursive: true });
-  writeFileSync(join(DATI, 'documenti', 'indice.jsonl'), `${JSON.stringify({ o: '//nas/condivisa', q: 1 })}\n${JSON.stringify({ o: '/net/nas/archivio', q: 2 })}\n`);
+  writeFileSync(join(DATI, 'documenti', 'indice.jsonl'), `${JSON.stringify({ o: '//nas/condivisa', q: 1 })}\n${JSON.stringify({ o: ARCHIVIO_DI_RETE, q: 2 })}\n`);
   Indice._azzera();
   Indice.configura({ impostazioni: async () => ({ documenti: { cartelle: [DOC] } }), cartellaDati: () => DATI, estrai: (p) => Testo.estrai(p) });
 });
@@ -152,7 +171,7 @@ after(() => { if (CASA) togliCartella(CASA); });
 test('l\'indice rifiuta una cartella di rete prima di guardarla: nella ricerca, nell\'elenco delle Preferenze e prima di aggiungerla', async () => {
   const spia = spiaDelDisco();
   try {
-    for (const cartella of ['//nas/condivisa', '«//nas/condivisa', '/net/nas/condivisa']) {
+    for (const cartella of ['//nas/condivisa', '«//nas/condivisa', RETE_DEL_SISTEMA, `"${RETE_DEL_SISTEMA}"`]) {
       const r = await Indice.cerca('bolletta', { cartella });
       assert.equal(r.cartellaDiRete, cartella);
       assert.deepEqual(r.risultati, []);
@@ -160,8 +179,8 @@ test('l\'indice rifiuta una cartella di rete prima di guardarla: nella ricerca, 
       assert.equal((await Indice.cartellaChiesta(cartella)).rete, true);
     }
     const occ = (await Indice.stato()).occasionali;
-    assert.deepEqual(occ.map((o) => [o.percorso, o.esiste]).sort(), [['//nas/condivisa', false], ['/net/nas/archivio', false]]);
-    assert.deepEqual(await Indice.cartelleMancanti(['//nas/condivisa', DOC]), ['//nas/condivisa']);
+    assert.deepEqual(occ.map((o) => [o.percorso, o.esiste]).sort(), [['//nas/condivisa', false], [ARCHIVIO_DI_RETE, false]].sort());
+    assert.deepEqual(await Indice.cartelleMancanti(['//nas/condivisa', RETE_DEL_SISTEMA, DOC]), ['//nas/condivisa', RETE_DEL_SISTEMA]);
     assert.deepEqual(spia.chiesti, [], 'nessuno stat su un percorso di rete');
     // Si possono ancora dimenticare.
     assert.equal((await Indice.dimentica('//nas/condivisa')).tolta, true);
