@@ -116,6 +116,11 @@ test.beforeAll(async () => {
       }
       if (url === '/walletReissue') {
         seen.reissues += 1;
+        if (reissueRifiuto) {
+          const status = reissueRifiuto;
+          reissueRifiuto = null;
+          return json(res, 200, { result: { status } });
+        }
         return json(res, 200, { result: { status: 'ok', key: 'sk-or-v1-test-personal-2', pseudonym: 'abcdef0123456789' } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
