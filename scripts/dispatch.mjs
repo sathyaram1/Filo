@@ -1937,7 +1937,7 @@ function positionOnBranch(bucket) {
 
   // Identità attesa del contenuto: è il valore che le transizioni (C) e il
   // ripristino (D) confronteranno. I punti fermi di un'altra storia (un altro ramo, o questo prima di una
-  // riscrittura) se ne vanno: guiderebbero ancora il ripristino e la pulizia dopo un «pass» (#1486).
+  // riscrittura) se ne vanno: la pulizia dopo un «pass» li consulterebbe ancora (#1486).
   const base = { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch };
   if (!stessoRamo || res.rewritten) base.checkpoints = [];
   const state = withCheckpoint(base, res.head, `${bucket.role}:checkout`);
