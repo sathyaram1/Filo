@@ -9,6 +9,10 @@
 
   // Le chiamate che fanno lavorare un modello, e quindi costano.
   const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed', 'decisions']);
+  // Gli argomenti di `call` che portano testo al fornitore: passano tutti dall'oscuramento, non solo i messaggi (la voce
+  // legge `text`, l'indicizzazione manda `texts`, #1507). Gli altri sono numeri, audio o funzioni: sentinella in
+  // tests/unit/usciteSegreti.test.mjs.
+  const CAMPI_TESTO = Object.freeze(['messages', 'text', 'texts', 'input', 'prompt']);
 
   // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
   // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello. Prima della prima
