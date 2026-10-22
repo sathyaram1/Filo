@@ -2722,6 +2722,15 @@
   function notaTaglio(letto, perCosa) {
     return window.SN_EDITOR_SUMMARY.notaTaglio(letto, perCosa);
   }
+  function contestoDelDocumento(chat, memory) {
+    const parts = [];
+    if (chat.length) {
+      parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
+        + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
+    }
+    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memoriaImbustata(memory));
+    return parts;
+  }
   function bloccoDocumento(letto) {
     const avviso = window.SN_EDITOR_SUMMARY.avvisoTaglio(letto);
     return `DOCUMENTO:\n${avviso ? `${avviso}\n` : ''}${letto.testo}`;
