@@ -202,7 +202,7 @@ export async function righeAllegati({ documenti, immagini }, { fetchImpl = fetch
  * coi byte degli allegati, che finiscono in `cartella` quando non si stampano.
  * @returns {Promise<{ codice: number, errore?: string, testo?: string }>}
  */
-export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, apriByte, cartella, seq = null, segno } = {}) {
+export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fetch, decifra, apriByte, cartella, seq = null, segno, ancheMaiGiudicato = false } = {}) {
   const maschera = CAMPI.map((c) => `mask.fieldPaths=${c}`).join('&');
   const res = await fetchImpl(`${base}/feedback/${encodeURIComponent(id)}?${maschera}`, { headers: { Authorization: `Bearer ${bearer}` } });
   if (!res.ok) return { codice: res.status >= 500 ? 4 : 3, errore: `lettura fallita (${res.status})` };
@@ -211,8 +211,11 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const giudizio = giudizioGrezzo(f);
   const prima = { _id: doc.name, status: f.status?.stringValue || '', ...(giudizio === undefined ? {} : { pipeline: giudizio }) };
   const stato = await decifra(prima).catch(() => ({}));
-  const vietato = vietatoLeggere(stato.status, giudizio === undefined ? undefined : giudizioAperto(stato.pipeline));
+  const aperto = giudizio === undefined ? undefined : giudizioAperto(stato.pipeline);
+  const fiducia = f.fiducia?.stringValue || '';
+  const vietato = vietatoLeggere(stato.status, aperto, fiducia, { ancheMaiGiudicato });
   if (vietato) return { codice: 3, errore: `${vietato}. Non ho decifrato il testo` };
+  const g = giudizioDelTesto(stato.status, aperto, fiducia);
   const pieno = await decifra({
     _id: doc.name, clientId: f.clientId?.stringValue || '', name: f.name?.stringValue || '',
     text: f.text?.stringValue || '', notes: f.notes?.stringValue || '', url: f.url?.stringValue || '',
