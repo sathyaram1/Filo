@@ -696,9 +696,16 @@
         continue;
       }
       if (e === 'c') {
-        let x = s[i + 1];
-        if (x === '\\') { i += 1; x = s[i + 1]; }
-        if (x === undefined || (x === '\'' && s[i] !== '\\') || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
+        const x = s[i + 1];
+        // Come bash: `\c\` è 0x1c e quel che segue resta com'è (`\c\/` tiene la barra); `\c\\` è uno solo, `\c\'` tiene l'apice.
+        if (x === '\\') {
+          b.push(0x1c);
+          i += 1;
+          if (s[i + 1] === '\\') i += 1;
+          else if (s[i + 1] === '\'') { b.push(39); i += 1; }
+          continue;
+        }
+        if (x === undefined || x === '\'' || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
         i += 1;
         b.push(x === '?' ? 0x7f : x.toUpperCase().charCodeAt(0) & 0x1f);
         continue;
