@@ -155,11 +155,17 @@
   // ============================================================================
   // Dizionari
   // ============================================================================
+  function usaDizionario(parole) {
+    const lista = Array.isArray(parole) ? parole.map(String) : [];
+    personalDict = new Set(lista.map((w) => w.toLowerCase()));
+    formeDizionario = new Map();
+    for (const w of lista) if (!formeDizionario.has(w.toLowerCase())) formeDizionario.set(w.toLowerCase(), w);
+  }
+
   async function loadDictionary() {
     try {
       const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-      const words = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
-      personalDict = new Set(words.map((w) => String(w).toLowerCase()));
+      usaDizionario(d?.[STORAGE_KEYS.PERSONAL_DICT] || []);
     } catch (_) {}
   }
 
@@ -169,6 +175,7 @@
     const wLower = w.toLowerCase();
     if (personalDict.has(wLower)) return;
     personalDict.add(wLower);
+    formeDizionario.set(wLower, w);
     try {
       // Lo storage tiene la parola come l'ha scritta l'utente («iPhone»); il confronto è senza maiuscole.
       const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
