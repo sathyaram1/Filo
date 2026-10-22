@@ -182,7 +182,7 @@ function entro(p, ms) {
 
 // Un lettore incorporato da un altro sito vive in un processo suo: sendInputEvent arriva solo al frame principale, che
 // riceverebbe lui il gesto. Il protocollo di debug instrada il clic come quello del mouse, fino al riquadro sotto il punto.
-async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
+async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now(), tetto = TETTO_CLIC_MS } = {}) {
   if (!wc || !view || (wc.isDestroyed && wc.isDestroyed())) return { ok: false, code: 'scheda' };
   if (ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };
   const b = areaDelClic(view, win);
