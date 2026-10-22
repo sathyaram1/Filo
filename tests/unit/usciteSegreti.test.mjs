@@ -1292,10 +1292,23 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
   });
 
   test('icona e anteprima chiedono alla stessa regola se un indirizzo si può contattare prima del clic', () => {
-    assert.match(corpo(src('main', 'services', 'handlers', 'tabs.js'), 'on(MSG.ICONA_SITO'), /contattabilePrimaDelClic\(/);
+    assert.match(corpo(src('main', 'services', 'handlers', 'tabs.js'), 'on(MSG.ICONA_SITO'), /await contattabilePrimaDelClic\(/);
     const meta = corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'");
     const i = meta.indexOf('contattabilePrimaDelClic(');
     assert.ok(i > 0 && i < meta.indexOf('perContoDellaScheda('), 'l\'anteprima contatta il sito prima di chiedere');
+    assert.match(meta, /delSito: msg\.delSito === true/);
+    // Sopra un sito l'anteprima fa la stessa domanda del clic su un collegamento di Filo.
+    assert.match(corpo(handlers, 'async function contattabilePrimaDelClic('), /exfilChiedeOk\(/);
+    assert.match(corpo(handlers, 'async function apriDaFilo('), /exfilChiedeOk\(/);
+  });
+
+  test('clic, tasto destro e anteprima riconoscono con la stessa regola un collegamento scritto da un modello', () => {
+    const regola = /SN_MARKDOWN(?:\?)?\.scrittoDaUnModello/;
+    assert.match(corpo(src('pages', 'dashboard', 'dashboard.js'), 'async function apriProposta('), regola);
+    assert.match(src('content', 'popup.js'), /const conVerdetto = [\s\S]{0,80}SN_MARKDOWN\?\.scrittoDaUnModello/);
+    const spiega = corpo(src('content', 'actions.js'), 'function buildInlineExplainLink(');
+    assert.match(spiega, regola);
+    assert.match(spiega, /type: 'fetch_link_meta', url, proposta, delSito: !proposta/);
   });
 
   test('l\'assistente di pagina tratta una porta che non risponde come una porta che ferma', () => {
