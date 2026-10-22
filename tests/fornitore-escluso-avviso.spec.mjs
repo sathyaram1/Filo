@@ -100,6 +100,7 @@ test('una risposta servita da un fornitore escluso: avviso sulla pagina e segno 
   const avviso = chat.locator('.sn-toast', { hasText: '«DeepSeek»' });
   await expect(avviso).toBeVisible({ timeout: 5_000 });
   await expect(avviso).toContainText('un fornitore che Filo esclude');
+  await chat.waitForTimeout(400);
   await chat.screenshot({ path: `${SHOTS}/1478-avviso-home.png` }).catch(() => {});
 
   // Lo stesso host subito dopo non ne impila un secondo.
