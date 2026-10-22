@@ -35,8 +35,11 @@ parentPort.on('message', ({ id, byte, elenco, marchi }) => {
       const t = P.ancoreDaPem(elenco.pemTsa);
       ancore = a.length ? a : null;
       ancoreTsa = t.length ? t : null;
+      const pa = P.ancoreDaPem(elenco.pemProvvisorio);
+      const pm = P.ammessiDaPem(elenco.pemAmmessi);
+      provvisorio = pa.length || pm.length ? { ancore: pa, ammessi: pm } : null;
     }
-    parentPort.postMessage({ id, res: P.analizza(byte, { ancore, ancoreTsa }) });
+    parentPort.postMessage({ id, res: P.analizza(byte, { ancore, ancoreTsa, provvisorio }) });
   } catch (e) {
     parentPort.postMessage({ id, errore: String((e && e.message) || e) });
   }
