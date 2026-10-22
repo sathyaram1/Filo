@@ -362,6 +362,64 @@ function rifiutoDelCancello(messaggio, info) {
   return Object.assign(new Error(messaggio), { rifiutata: String((info && info.version) || '?') });
 }
 
+// Allegati e latest.yml li riscrive chi ha un token del repo, l'àncora no (#1501). Firestore che non risponde non è
+// una release falsa: l'aggiornamento si rimanda come senza rete, senza dire all'utente che non è sicura.
+async function controllaAncora(tag, info) {
+  const ancora = await dip.leggiAncora(tag);
+  const a = R.esitoAncora({ file: R.fileDaAncorare(info), ancora });
+  if (a.esito === 'illeggibile') throw new Error(`aggiornamento rimandato: l'àncora di ${tag} adesso non si legge`);
+  if (a.esito === 'manca') throw rifiutoDelCancello(`release ${tag} rifiutata: il server non ha ancorato i suoi file`, info);
+  if (a.esito === 'diversa') {
+    const nome = String(JSON.stringify(a.nome === undefined ? null : a.nome)).slice(0, 120);
+    throw rifiutoDelCancello(`release ${tag} rifiutata: ${nome} non ha l'impronta ancorata dal server`, info);
+  }
+  if (a.esito === 'coincide') stato.ancora = { versione: info.version, impronte: { ...ancora.impronte } };
+  else console.log('[updater] nessuna àncora sul server: vale il solo latest.yml (#1501)');
+}
+
+// Lo stack di rete di Chromium, come electron-updater: un proxy di sistema che lascia passare GitHub lascia passare questa.
+function richiestaRete(url, opzioni) {
+  try {
+    const { net } = require('electron');
+    if (net && typeof net.fetch === 'function') return net.fetch(url, opzioni);
+  } catch (_) {}
+  return fetch(url, opzioni);
+}
+
+const TETTO_ANCORA_MS = 15000;
+
+async function chiediFirestore(url, richiesta) {
+  const ctrl = new AbortController();
+  let timer;
+  const tempo = new Promise((_, no) => {
+    timer = setTimeout(() => { ctrl.abort(); no(new Error('tempo scaduto')); }, TETTO_ANCORA_MS);
+  });
+  try {
+    const res = await Promise.race([richiesta(url, { signal: ctrl.signal }), tempo]);
+    if (res.status === 404) return { stato: 404, json: null };
+    if (!res.ok) return null;
+    return { stato: 200, json: await Promise.race([res.json(), tempo]) };
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Il documento del tag; se non c'è, se la raccolta ha almeno un'àncora (vedi R.esitoAncora). Lettura pubblica.
+async function leggiAncora(tag, richiesta = richiestaRete) {
+  const cfg = require('./auth/config');
+  const base = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents/${R.COLLEZIONE_ANCORE}`;
+  const chiave = `key=${encodeURIComponent(cfg.firebaseApiKey)}`;
+  const doc = await chiediFirestore(`${base}/${encodeURIComponent(String(tag))}?${chiave}`, richiesta);
+  if (!doc) return { letta: false };
+  if (doc.stato === 200) return { letta: true, impronte: R.impronteDellAncora(doc.json), altre: true };
+  const elenco = await chiediFirestore(`${base}?pageSize=1&mask.fieldPaths=versione&${chiave}`, richiesta);
+  if (!elenco || elenco.stato !== 200) return { letta: false };
+  const docs = elenco.json && elenco.json.documents;
+  return { letta: true, impronte: null, altre: Array.isArray(docs) && docs.length > 0 };
+}
+
 function soloTagDiRilascio(au) {
   if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
   if (!dalMotore(au)) return;
