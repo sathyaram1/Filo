@@ -706,7 +706,21 @@
     }
     const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (largo && regola === 'carta' && u.cifre.some((f) => f.includes(norm))) return true;
+    if (largo && regola === 'chiave' && pezzoDiChiave(v, u)) return true;
     return norm.length >= 8 && u.alnum.includes(norm);
+  }
+
+  // La parte variabile di una chiave senza il suo prefisso, o un suo pezzo di almeno FINESTRA caratteri (#1507): basta a
+  // ricostruirla. Le finestre di ciò che esce si calcolano una volta per uscita.
+  function pezzoDiChiave(valore, u) {
+    const G = global.SN_GUARDIANO_STATICO;
+    if (!G || typeof G.partiSegreto !== 'function') return false;
+    const p = G.partiSegreto(valore);
+    if (p.nucleo && u.alnum.includes(p.nucleo)) return true;
+    if (p.a <= p.da) return false;
+    if (!u.finestre) u.finestre = G.finestreDi({ norm: u.alnum, da: 0, a: u.alnum.length - G.FINESTRA + 1 });
+    for (let i = p.da; i < p.a; i++) if (u.finestre.has(p.norm.slice(i, i + G.FINESTRA))) return true;
+    return false;
   }
 
   // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
