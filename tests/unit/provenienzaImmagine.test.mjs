@@ -440,7 +440,7 @@ test('senza elenco delle autorità di marcatura, un certificato scaduto resta sc
 // Le immagini di ChatGPT, Firefly e Bing di prima del programma ufficiale arrivano a
 // un'autorità che sta solo lì (Truepic, Microsoft, Adobe G2): senza, non direbbero mai chi le ha fatte.
 
-const RADICE_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'RootCA', ca: true, da: new Date('2021-12-09') , a: new Date('2036-12-05') });
+const RADICE_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'RootCA', ca: true, da: new Date('2021-12-09'), a: new Date('2036-12-05') });
 const INTERMEDIA_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'WebClaimSigningCA', ca: true, emittente: RADICE_PROVV, da: new Date('2022-01-01'), a: new Date('2032-01-01') });
 const PROVV = { ancore: P.ancoreDaPem(elencoPem(RADICE_PROVV)), ammessi: [] };
 const PRIMA = new Date(P.CONGELAMENTO_PROVVISORIO - 200 * GIORNO);
