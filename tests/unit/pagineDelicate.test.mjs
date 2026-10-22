@@ -121,7 +121,7 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   // #1004.1 — l'owner tiene il correttore acceso anche qui: la protezione non deve promettere che non parte niente.
   assert.match(desc, /correttore resta acceso/);
   require('../../src/shared/capabilities.js');
-  const cap = globalThis.SN_CAPABILITIES.list().find((c) => c.id === 'pagine-delicate');
+  const cap = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'pagine-delicate');
   assert.match(cap.desc, /tranne il correttore/);
   assert.match(cap.doesNot, /Non ferma il correttore/);
   const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');
