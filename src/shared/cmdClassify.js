@@ -1135,8 +1135,9 @@
     if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
     if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (!stampaSoltanto && args.some((a) => a.ignoto)) return due(MOTIVI.ignoto);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
-    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    if (prog === 'git') return gitPerimetro(raw, c);
     if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     if (cerca) {
       if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
