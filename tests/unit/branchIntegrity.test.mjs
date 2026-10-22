@@ -488,7 +488,7 @@ describe('D — il ramo riscritto altrove (#1486): si riparte dalla punta pubbli
   });
 
   test('un punto fermo PIÙ AVANTI della punta pubblicata (spedizione fallita) resta il bersaglio', () => {
-    const { work, origin } = makeRepo();
+    const { work } = makeRepo();
     const branch = 'worker/non-spedito';
     git(work, ['checkout', '-q', '-b', branch]);
     commit(work, 'a.txt', 'spedito\n');
