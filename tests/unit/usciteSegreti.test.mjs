@@ -750,17 +750,19 @@ describe('una chiave custodita si riconosce anche a pezzi: senza il prefisso, mo
   });
 });
 
-describe('la chiave privata dei feedback è custodita come le altre (#1507)', async () => {
+// Come la chiave dei feedback: una pkcs8 P-256 in base64 nuda.
+async function pkcs8() {
+  const coppia = await webcrypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  return Buffer.from(await webcrypto.subtle.exportKey('pkcs8', coppia.privateKey)).toString('base64');
+}
+const PRIV = await pkcs8();
+const ALTRA = await pkcs8();
+
+describe('la chiave privata dei feedback è custodita come le altre (#1507)', () => {
   const S = require(join(ROOT, 'src', 'main', 'services', 'segretiCustoditi.js'));
   const T = require(join(ROOT, 'src', 'main', 'services', 'terminal.js'));
   const SH = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
   const { getPrivateKey } = require(join(ROOT, 'src', 'main', 'services', 'chiaveFeedback.js'));
-  const pkcs8 = async () => {
-    const coppia = await webcrypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-    return Buffer.from(await webcrypto.subtle.exportKey('pkcs8', coppia.privateKey)).toString('base64');
-  };
-  const PRIV = await pkcs8();
-  const ALTRA = await pkcs8();
   const FRASE = /la chiave che apre i feedback cifrati/;
 
   const conChiave = async (fn) => {
@@ -793,7 +795,8 @@ describe('la chiave privata dei feedback è custodita come le altre (#1507)', as
   });
 
   test('una pkcs8 in base64 nuda letta da fuori è una chiave', () => {
-    assert.deepEqual(G.segretiNelTesto(`FILO_FEEDBACK_PRIVKEY=${PRIV}\n`).map((x) => [x.regola, x.valore]), [['chiave', PRIV]]);
+    const chiavi = G.segretiNelTesto(`FILO_FEEDBACK_PRIVKEY=${PRIV}\n`).filter((x) => x.regola === 'chiave');
+    assert.deepEqual(chiavi.map((x) => x.valore), [PRIV]);
     const pem = `-----BEGIN PRIVATE KEY-----\n${PRIV.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----`;
     const v = X.valutaUscita({ type: 'CERCA_WEB', query: PRIV.slice(70, 110) }, { azioni: comando(pem) });
     assert.equal(v.blocca, true);

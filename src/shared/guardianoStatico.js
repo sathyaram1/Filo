@@ -539,16 +539,20 @@
     // Base64 a righe (il comando base64 va a capo ogni 76 caratteri) si legge come un pezzo solo.
     t = t.replace(/[A-Za-z0-9+/=_-]{16,}(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=_-]{4,})+|\S{8,}/g, (tok) => {
       if (/^data:image\//i.test(tok)) return tok;
-      const contiene = (x) => {
+      // Quanto del segreto porta: tutto (un segreto intero) o quante sue finestre.
+      const quanto = (x) => {
         const forme = decodifiche(x.replace(/\s+/g, '')).map(alnumMinuscolo);
-        return forme.some((f) => haFinestra(f, finestre))
-          || chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov) || (!!c.nucleo && f.includes(c.nucleo))));
+        if (chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov) || (!!c.nucleo && f.includes(c.nucleo))))) return Infinity;
+        const viste = new Set();
+        for (const f of forme) for (let i = 0; i + FINESTRA <= f.length; i++) if (finestre.has(f.slice(i, i + FINESTRA))) viste.add(f.slice(i, i + FINESTRA));
+        return viste.size;
       };
-      if (!contiene(tok)) return tok;
-      // Le righe in coda che non servono a ricomporre il segreto restano: sono il testo che segue.
+      const tutto = quanto(tok);
+      if (!tutto) return tok;
+      // Le righe in coda che non portano niente del segreto restano: sono il testo che segue.
       const righe = tok.split('\n');
       const coda = [];
-      while (righe.length > 1 && contiene(righe.slice(0, -1).join('\n'))) coda.unshift(righe.pop());
+      while (righe.length > 1 && quanto(righe.slice(0, -1).join('\n')) >= tutto) coda.unshift(righe.pop());
       return [OSCURATO, ...coda].join('\n');
     });
     // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
