@@ -1167,7 +1167,8 @@
       });
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       const ok = rawText != null && applyGeneratedSummary(id, rawText);
-      if (manuale) showEditorToast(ok ? notaTaglio(letto, 'per il riassunto') || 'Riassunto aggiornato.' : 'Non sono riuscito a generare il riassunto.');
+      if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
+      if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
       return ok;
     } catch (_) {
       if (manuale) showEditorToast('Non sono riuscito a generare il riassunto.');
