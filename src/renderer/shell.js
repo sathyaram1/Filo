@@ -1571,13 +1571,11 @@
   // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
   const NOTIFS = (() => {
     let host = null;
-    // Tetto al numero di card impilate insieme. Senza limite una raffica di
-    // eventi (es. tempesta di popup bloccati, o ripristino con molte schede su
-    // siti in blacklist) fa crescere lo stack oltre l'altezza della finestra e
-    // spinge le più vecchie fuori schermo, dove non si possono più chiudere.
-    // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
-    // vengono rimosse subito, senza attendere il timeout.
+    // Tetto alle carte a schermo: una raffica non spinge le più vecchie fuori dalla finestra. Quelle oltre il tetto
+    // non si buttano (#1477): aspettano dietro un «+N» che le mostra. Regole: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
     const MAX_STACK = 5;
+    // «+N» aperto: tutte a schermo finché sono più del tetto.
+    let aperta = false;
     // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
     const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
