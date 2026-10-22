@@ -357,6 +357,7 @@
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
       case 'linea': return 'Stile non valido: dotted, dashed, wavy, solid o double.';
       case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX}, es. 0 (nessuna animazione), 1 (normale) o 1,5.`;
+      case 'pixel': return `Misura non valida: pixel interi fra ${t.min} e ${t.max}, es. ${t.default}.`;
       default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
     }
   }
