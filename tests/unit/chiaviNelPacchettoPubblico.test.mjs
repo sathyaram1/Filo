@@ -132,16 +132,24 @@ function fontiDelBake(sorgente) {
 }
 
 // Il bake in un ambiente pulito più le sorgenti date, con l'uscita in una cartella usa e getta.
+// `lette`: le variabili assenti che il bake ha chiesto.
 async function bake(sorgenti, percorsoBake = BAKE) {
   const cartella = cartellaTemporanea('filo-bake-pubblico-');
   const out = join(cartella, 'generato.json');
+  const registro = join(cartella, 'registra-letture.cjs');
+  const lette = join(cartella, 'lette.json');
+  writeFileSync(registro, REGISTRA_LETTURE, 'utf8');
   const env = { ...process.env, FILO_BAKE_OUT: out, NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' };
   for (const n of Object.keys(env)) if (n.startsWith('FILO_DEFAULT_') || n === 'FILO_BUILD_PASSPHRASE' || n === 'FILO_ROUTINE_API') delete env[n];
-  Object.assign(env, sorgenti);
+  Object.assign(env, sorgenti, { FILO_SENTINELLA_LETTE: lette, FILO_SENTINELLA_CARTELLA: dirname(resolve(percorsoBake)) });
   try {
     let uscita = 0;
-    try { await esegui(process.execPath, [percorsoBake], { env }); } catch (e) { uscita = typeof e.code === 'number' ? e.code : 1; }
-    return { uscita, generato: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : null };
+    try { await esegui(process.execPath, ['--require', registro, percorsoBake], { env }); } catch (e) { uscita = typeof e.code === 'number' ? e.code : 1; }
+    return {
+      uscita,
+      generato: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : null,
+      lette: existsSync(lette) ? JSON.parse(readFileSync(lette, 'utf8')) : null,
+    };
   } finally {
     togliCartella(cartella);
   }
