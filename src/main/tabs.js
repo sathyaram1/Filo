@@ -1482,6 +1482,7 @@ class TabManager {
 
   // Ctrl/Cmd+L: l'indirizzo si scrive nel campo della home, la barra degli indirizzi non c'è. Già sulla home non la
   // ricarica, che butterebbe via quello che c'è scritto: dà il fuoco al campo col testo selezionato, come un browser.
+  // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
   async vaiAScrivereUnIndirizzo(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) { this.openTab('filo://newtab/'); return; }
