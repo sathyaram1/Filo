@@ -62,7 +62,7 @@
   // l'Aiuto comincia col sito (src/main/services/handlers/filo.js). Il segno si aggiunge e basta, mai si toglie.
   function conProvenienza(c) {
     const msgs = Array.isArray(c && c.messages) ? c.messages : [];
-    if (c.app !== 'aiuto' || String(c.rif || '').startsWith('filo|')) return msgs;
+    if (!c || c.app !== 'aiuto' || String(c.rif || '').startsWith('filo|')) return msgs;
     return msgs.map((m) => (m && m.role === 'user' && m.daPagina !== true ? { ...m, daPagina: true } : m));
   }
 
