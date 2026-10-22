@@ -2372,8 +2372,8 @@
         + `- Se l'utente chiede di CHIUDERE l'accoglienza («basta così», «salta», «non ho voglia di rispondere a queste domande»), chiudi SUBITO con ONBOARDING {"fine": true}: niente insistenze, i valori predefiniti vanno benissimo.\n`
         + `- Ma un «no grazie», «magari dopo», «non ora» che risponde a una tua PROPOSTA (l'accesso Google, il tema scuro, un approfondimento) rifiuta QUELLA proposta, non l'accoglienza: prendine atto in mezza riga, spunta la voce e vai avanti con quelle che restano. NON chiudere.\n`
         + `- Quando l'elenco è finito, chiudi con ONBOARDING {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
-        + `- Scambi usati finora: ${Number(onboardingTurns) || 0} su ${Number(onboardingMax) || 5}. Al quinto chiudi, a meno che sia l'utente a voler continuare.\n`
-        + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true e/o chiude l'intervista con fine: true).\n\n`
+        + `- Scambi usati finora: ${Number(onboardingTurns) || 0} su ${Number(onboardingMax) || 7}. All'ultimo chiudi, a meno che sia l'utente a voler continuare.\n`
+        + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true o quella dei contatori con contatori: true, e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
 
     filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>

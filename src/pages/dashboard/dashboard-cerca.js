@@ -12,6 +12,11 @@
   let attesa = null;
   let voci = [];
   let scelta = -1;
+  // La ricerca in corso, per i contatori (#1461): dall'apertura del pannello alla scelta, la posizione della voce, o niente.
+  let sessione = null;
+  function contaRicerca(evento) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'ricerca', pannello: 'cerca-filo', ...evento })).catch(() => {}); } catch (_) {}
+  }
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;
@@ -32,6 +37,8 @@
   }
 
   function chiudi({ svuota = false } = {}) {
+    if (sessione && !sessione.scelto) contaRicerca({ esito: 'vuota' });
+    sessione = null;
     pannello.hidden = true;
     pannello.replaceChildren();
     voci = [];
@@ -70,6 +77,11 @@
 
   async function apri(r) {
     if (r.k === 'significato') return significato(r);
+    if (sessione) {
+      const i = voci.findIndex((v) => v._risultato === r);
+      contaRicerca({ esito: 'scelta', attesaMs: Date.now() - sessione.t0, posizione: i >= 0 ? i + 1 : null });
+      sessione.scelto = true;
+    }
     if (r.k === 'nascosta') return rimetti(r);
     if (r.k === 'pagina') {
       const dove = global.SN_FILO_CODA.daAprire(r);
@@ -177,6 +189,10 @@
     }
     pannello.hidden = false;
     campo.setAttribute('aria-expanded', 'true');
+    if (!sessione) {
+      sessione = { t0: Date.now(), scelto: false };
+      contaRicerca({ esito: 'aperta' });
+    }
   }
 
   async function cerca() {

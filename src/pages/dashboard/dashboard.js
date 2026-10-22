@@ -115,6 +115,7 @@
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
     sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
+    sceltaContatori: (a) => Accoglienza.sceltaContatori(!(a._output && a._output.attivi === false)),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
     archiviaAzione: (type, cambi, a) => {
@@ -2035,6 +2036,7 @@
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
+      if (msg.settings && msg.settings.contatori) Accoglienza.aggiornaSceltaContatori(msg.settings.contatori.attivi !== false);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);

@@ -940,6 +940,7 @@ module.exports = function register(on, ctx) {
     lastNoticeAt = now;
     // L'avviso nomina la pagina Crediti: porta il tasto per andarci, come ogni frase sui crediti (#663).
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000, rimedio: { keyRefused: true } }); } catch (_) {}
+    try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:crediti_finiti'); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 

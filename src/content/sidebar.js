@@ -955,7 +955,11 @@
           ? await (res.needsConfirm >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : global.confirm(opts.text);
       } catch (_) { ok = false; }
-      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      if (!ok) {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_RIFIUTATA, action })).catch(() => {}); } catch (_) {}
+        appendActionLog(`${label}: annullata`);
+        return false;
+      }
       let c = null;
       try {
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
@@ -1284,6 +1288,9 @@
         try {
           ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
         } catch (_) { ok = false; }
+        if (d && d.conferma) {
+          try { global.SN_POPUP?.conta?.({ misura: 'conferma', chiave: String(d.conferma), esito: ok ? 'approvata' : 'rifiutata' }); } catch (_) {}
+        }
         if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       }
     }
@@ -1897,6 +1904,8 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText, { nelFilo: false });
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La bolla d'errore la legge chi ha chiesto: si conta il tipo, mai la frase (#1461).
+      try { global.SN_POPUP?.conta?.({ misura: 'errore-modello', code: String((err && (err.code || err.errorCode)) || ''), status: Number(err && err.status) || 0 }); } catch (_) {}
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
       mostraRimedio(assistantEl, err);

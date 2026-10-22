@@ -359,12 +359,27 @@ function gestoDiFilo(wc) {
 // Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
 // pagina ha già speso il gesto per la sua pubblicità (#737.1 giro 6). Lo segna il preload su un input vero, prima
 // che la pagina apra: vale per quell'indirizzo, una volta, subito.
-function aperturaScelta(wc, url) {
+function aperturaScelta(wc, url, azione = null) {
   const u = indirizzoPieno(url);
   if (!wc || !u) return;
   const ora = Date.now();
   wc._filoAperture = (wc._filoAperture || []).filter((x) => x.fino > ora && x.url !== u).slice(-7);
-  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS });
+  // L'azione del menu che apre (#1461): solo un nome breve e un istante del minuto appena passato.
+  const t0 = azione && Number(azione.t0);
+  const a = azione && /^[a-z0-9][a-z0-9-]{0,59}$/.test(String(azione.id || '')) && Number.isFinite(t0) && t0 <= ora && ora - t0 < 60000
+    ? { id: String(azione.id), t0 } : null;
+  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS, azione: a });
+}
+
+// L'azione che l'apertura scelta porta con sé, una volta: chi apre la scheda la misura fino alla pagina caricata.
+function azioneDellApertura(wc, url) {
+  const u = indirizzoPieno(url);
+  const ora = Date.now();
+  const x = u && wc ? (wc._filoAperture || []).find((v) => v.url === u && v.fino > ora && v.azione) : null;
+  if (!x) return null;
+  const a = x.azione;
+  x.azione = null;
+  return a;
 }
 
 // La finestra che la pagina chiede passa se l'utente l'ha scelta o se arriva col gesto; la scelta spende anche il gesto,
@@ -851,7 +866,7 @@ function siDato(ses, url, parte) {
 module.exports = {
   installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
+  gestoDiFilo, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },

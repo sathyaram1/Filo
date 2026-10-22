@@ -57,6 +57,7 @@
   // insieme da qui perché ogni superficie che scriveva solo la frase lasciava l'utente senza strada (#663).
   function scriviErrore(host, res, opts) {
     if (!host) return null;
+    conta({ misura: 'errore-modello', code: String((res && (res.code || res.errorCode)) || ''), status: Number(res && res.status) || 0 });
     host.textContent = frasePerLUtente(res);
     return mostraRimedio(host, res, opts);
   }
@@ -136,7 +137,7 @@
       if (!(await chiediOk(r))) return { ok: false, annullato: true };
       try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
     }
-    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) showToast(I18n.t('toast_file_save_failed'));
+    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) toastErrore('toast_file_save_failed');
     return r;
   }
 
@@ -1295,13 +1296,45 @@
 
   // Un errore dell'AI detto con un avviso (le strade senza un riquadro dove scriverlo): frase e tasto insieme.
   function avvisoErrore(res, opts = {}) {
+    conta({ misura: 'errore-modello', code: String((res && (res.code || res.errorCode)) || ''), status: Number(res && res.status) || 0 });
     return showToast(frasePerLUtente(res), { duration: 9000, ...opts, rimedio: res });
   }
+
+  // Un avviso d'errore per chiave del testo: chi lo vede lo legge tradotto, i contatori ne sanno la chiave e basta (#1461).
+  function toastErrore(chiave, opts = {}, ...args) {
+    conta({ misura: 'avviso', chiave: String(chiave || '') });
+    return showToast(I18n.t(chiave, ...args), opts);
+  }
+
+  // Un gesto contato dove la persona lo fa (#1461): solo nomi da elenchi chiusi e numeri, li controlla il main.
+  function conta(evento) {
+    try {
+      const r = chrome.runtime.sendMessage({ ...evento, type: MSG.CONTATORI_EVENTO });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+
+  // Disfare nel campo che Filo ha appena cambiato (una correzione, una riscrittura) si conta col tempo passato, e il
+  // main decide se era «subito dopo» (#1461). Si ascolta l'annullo e non il tasto: su Mac Cmd+Z lo prende il menu.
+  let ultimaModifica = null;
+  function modificaDiFilo(el, tipo) { ultimaModifica = el ? { el, tipo, t: Date.now() } : null; }
+  // Chi scrive dopo la modifica di Filo, col suo Ctrl+Z disfa prima quello che ha scritto lui: non è un annullo di Filo.
+  document.addEventListener('input', (e) => {
+    const m = ultimaModifica;
+    if (!m || !e.isTrusted) return;
+    const qui = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+    if (qui !== m.el && !(m.el.contains && m.el.contains(qui))) return;
+    ultimaModifica = null;
+    if (e.inputType === 'historyUndo') conta({ misura: 'annullato', tipo: m.tipo, msDopo: Date.now() - m.t });
+  }, true);
 
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
   function close() { closeTopmost(); }
 
   global.SN_POPUP = {
+    toastErrore,
+    conta,
+    modificaDiFilo,
     openStreaming,
     notaRipiego, ripiegoMostrato, notaInterrotta,
     close,

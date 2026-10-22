@@ -29,6 +29,7 @@
   let apriProposta = () => {};
   let archiviaAzione = () => {};
   let sceltaAutonomiaEl = () => null;
+  let sceltaContatoriEl = () => null;
   let prosegui = () => {};
   // #778 — mentre i popup di una risposta si aprono in fila, la ripresa aspetta l'ultimo: un turno partito a metà
   // fila troverebbe le altre richieste ancora senza risposta, e le rifarebbe.
@@ -833,6 +834,7 @@
     },
     ONBOARDING: (a) => {
       if (sceltaAutonomia(a)) return { icon: '👋', text: 'Accoglienza · scelta dell’autonomia' };
+      if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
       return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
@@ -1224,6 +1226,10 @@
   }
 
   // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
+  function sceltaContatori(a) {
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaContatori === true;
+  }
+
   function sceltaAutonomia(a) {
     return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
   }
@@ -1338,7 +1344,7 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = aspettaUtente(a) || rigaEBottone(a)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a)
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a) || sceltaContatori(a)
         || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
@@ -1915,7 +1921,11 @@
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
-        if (!ok) return;
+        if (!ok) {
+          // Il no non fa partire niente: lo sanno solo i contatori (#1461).
+          try { Promise.resolve(send({ type: MSG.FILO_CONFIRM_RIFIUTATA, action: a })).catch(() => {}); } catch (_) {}
+          return;
+        }
         btn.disabled = true;
         // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
         if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';
@@ -2047,6 +2057,7 @@
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
+    if (sceltaContatori(a)) return sceltaContatoriEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
@@ -2264,7 +2275,7 @@
     btn.textContent = '🧹 Riordina e archivia le schede';
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
-      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche))) return;
+      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) return;
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
@@ -2283,12 +2294,14 @@
 
   // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
   // `perche`: la frase della regola quando a far chiedere è ciò che il compito ha letto.
-  async function chiediSecondoRegola(domanda, opts, perche = '') {
+  // `tipo`: l'azione del pannello, perché i contatori sappiano cosa ha scelto la persona (#1461).
+  async function chiediSecondoRegola(domanda, opts, perche = '', tipo = '') {
     if (domanda === 'si') return true;
     if (perche) opts = { ...opts, text: `${opts.text}\n\n${perche}` };
     const Ui = window.SN_CONFIRM_UI;
-    if (!Ui) return window.confirm(opts.text);
-    return domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts);
+    const ok = Ui ? await (domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts)) : window.confirm(opts.text);
+    if (tipo) Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'conferma', chiave: `pannello:${tipo}`, esito: ok ? 'approvata' : 'rifiutata' })).catch(() => {});
+    return ok;
   }
 
   const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
@@ -2305,7 +2318,7 @@
     }
     // Chiesto come assistente (#825.3) torna dal popup generico, che dice `needsConfirm` invece di `domanda`.
     const domanda = r.domanda || (r.needsConfirm === 3 ? 'conferma' : 'chiede');
-    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche))) return { annullato: true };
+    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche, 'PULISCI_TAB'))) return { annullato: true };
     return esitoRiordino(await send({ type: MSG.RUN_TAB_TRIAGE }));
   }
 
@@ -2409,7 +2422,7 @@
         const scelta = spuntate();
         if (!scelta.length) return;
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
-        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche);
+        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche, 'CANCELLA_ARCHIVIO');
         if (!ok || del.disabled) return;
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
@@ -2444,6 +2457,7 @@
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
     if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
+    if (deps.sceltaContatori) sceltaContatoriEl = deps.sceltaContatori;
     if (deps.prosegui) prosegui = deps.prosegui;
   }
 

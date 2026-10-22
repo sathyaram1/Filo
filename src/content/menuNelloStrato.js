@@ -119,6 +119,7 @@
     if (corrente) chiudi();
     const m = { id: nuovoId(), funzioni: [], pulizie: [], inline: new Map(), montaggi: [], sezioni: 0 };
     corrente = m;
+    if (opzioni && typeof opzioni.alChiudere === 'function') m.pulizie.push(opzioni.alChiudere);
     // La pagina che scorre chiude il menu normale, come nel documento: lo strato non scorre con lei e resterebbe sopra un
     // punto che non è più quello cliccato.
     if (!(opzioni && opzioni.keepOnScroll)) {
@@ -238,7 +239,7 @@
     if (msg.type === MSG.STRATO_MENU_CHIUSO && corrente && msg.id === corrente.id) pulisci(corrente);
   });
 
-  Menu.open = (o) => (acceso() ? apri(o) : locale.open(o));
+  Menu.open = (o) => { if (o) Menu.misuraLeAzioni(o.items); return acceso() ? apri(o) : locale.open(o); };
   Menu.close = () => (acceso() ? chiudi() : locale.close());
   Menu.openIconGridSubmenu = (ancora, items, opts) => {
     if (!acceso()) return locale.openIconGridSubmenu(ancora, items, opts);
