@@ -367,7 +367,8 @@ async function spiaPartiti(app) {
   await app.evaluate(() => {
     const vero = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.__partiti = [];
-    const spia = async (req) => { globalThis.__partiti.push(String(req.messages[req.messages.length - 1].content)); return vero(req); };
+    // Le regole stanno nel system, il testo nell'ultimo messaggio (#1580): si guardano tutti e due.
+    const spia = async (req) => { globalThis.__partiti.push(req.messages.map((m) => String(m.content)).join('\n')); return vero(req); };
     globalThis.SN_PROVIDERS.completeWithFallback = spia;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = spia;
   });
