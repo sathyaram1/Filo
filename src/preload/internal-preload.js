@@ -315,6 +315,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'correttoreRegole.js')); // #1446 — candidati e risposte del correttore: PRIMA di spellcheck.js
+  safe(path.join(CONTENT, 'correttoreAutomatica.js')); // #1447 — correzione a fine parola: PRIMA di spellcheck.js
   try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));

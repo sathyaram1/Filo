@@ -118,7 +118,7 @@
     if (!k) return '';
     if (NOMI.has(k)) return NOMI.get(k);
     const p = personali && personali.get(k);
-    if (p && conMaiuscole(p)) return p;
+    if (p) return conMaiuscole(p) ? p : '';
     if (typeof sbagliata === 'function' && [...k].length >= 3 && /^[\p{Script=Latin}\p{M}'’-]+$/u.test(k) && sbagliata(k)) {
       const c = k[0].toUpperCase() + k.slice(1);
       if (!sbagliata(c)) return c;
@@ -131,12 +131,15 @@
 
   // Cosa correggere quando una parola finisce in `fine`: { start, end, originale, corretta, fonte } o null. Le correzioni
   // dell'utente prima, poi gli errori fissi, poi la maiuscola dei nomi. `rifiutate`: le parole di cui l'utente ha
-  // annullato la correzione abbastanza volte; `minuscolo`: lì si scrive tutto minuscolo apposta.
+  // annullato la correzione abbastanza volte; `minuscolo` (o una funzione che lo dice): lì si scrive tutto minuscolo.
   function correzioneAFineParola(testo, fine, {
     personali = {}, rifiutate = new Set(), nomeDi = () => '', minuscolo = false,
   } = {}) {
     testo = String(testo ?? '');
     if (typeof fine !== 'number' || fine < 1 || fine > testo.length) return null;
+    // Come si scrive lì costa una lettura del testo: si chiede solo se serve.
+    let visto = null;
+    const qui = () => (visto === null ? (visto = typeof minuscolo === 'function' ? !!minuscolo() : !!minuscolo) : visto);
     const da = Math.max(0, fine - 2000);
     const vicino = testo.slice(da, Math.min(testo.length, fine + 200));
     if (R().zoneEscluse(vicino).some(([a, b]) => da + a < fine && da + b >= fine)) return null;
@@ -144,7 +147,7 @@
     if (p && !rifiutate.has(chiave(p.key))) {
       const originale = testo.slice(p.start, fine);
       const corretta = R().comeScritto(originale, String(personali[p.key] ?? ''));
-      if (corretta && corretta !== originale && !(minuscolo && soloMaiuscole(originale, corretta))) {
+      if (corretta && corretta !== originale && !(soloMaiuscole(originale, corretta) && qui())) {
         return { start: p.start, end: fine, originale, corretta, fonte: 'personale' };
       }
     }
@@ -157,7 +160,7 @@
       const corretta = R().comeScritto(w.parola, giusta);
       return corretta !== w.parola ? { start: w.start, end: fine, originale: w.parola, corretta, fonte: 'fisso' } : null;
     }
-    if (minuscolo || !tuttaMinuscola(w.parola)) return null;
+    if (!tuttaMinuscola(w.parola) || qui()) return null;
     const forma = nomeDi(w.parola);
     return forma && forma !== w.parola ? { start: w.start, end: fine, originale: w.parola, corretta: forma, fonte: 'nome' } : null;
   }

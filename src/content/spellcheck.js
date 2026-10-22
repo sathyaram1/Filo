@@ -1,6 +1,6 @@
-// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo. Il codice
-// segna subito i suoi candidati, pieni i sicuri e sbiaditi i dubbi; i controlli del modello confermano o scartano i dubbi.
-// Le regole senza DOM stanno in correttoreRegole.js e coerenza.js, il menu del tasto destro in content.js.
+// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, e la
+// correzione automatica a fine parola (#1447). Le regole senza DOM stanno in correttoreRegole.js, correttoreAutomatica.js
+// e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
   'use strict';

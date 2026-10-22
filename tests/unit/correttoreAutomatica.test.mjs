@@ -105,7 +105,7 @@ test('si impara solo una parola che non è il refuso di una parola vera', () => 
   assert.equal(A.imparabile("qual'è", []), false);
   assert.equal(A.imparabile('perchè', []), false);
   assert.equal(A.imparabile('cmq', ['cm', 'mq']), true, 'le parole cortissime hanno sempre una parola vera vicina');
-  assert.equal(A.imparabile('Claude', ['Claude', 'clade']), true, 'la stessa parola con la maiuscola non è un refuso');
+  assert.equal(A.imparabile('Claude', ['Claude', 'Claudette']), true, 'la stessa parola con la maiuscola non è un refuso');
 });
 
 test('una correzione accettata tre volte diventa automatica, nella forma base, e non per gli errori fissi', () => {
