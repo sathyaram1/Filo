@@ -223,6 +223,12 @@
     return pareri;
   }
 
+  // Una parola che il dizionario dice giusta, solo a dizionario carico: prima ogni parola risulta giusta.
+  function giustaPerIlBrowser(parola) {
+    const v = sbagliataPerIlBrowser(parola);
+    return dizionarioPronto && !v;
+  }
+
   function proposteDelBrowser(parola) {
     const D = global.SN_DIZIONARIO;
     try { return D ? D.proposte(String(parola || '')).filter((p) => p && p !== parola) : []; } catch (_) { return []; }
