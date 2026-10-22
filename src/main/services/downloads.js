@@ -567,6 +567,7 @@ function completa(rec) {
       return;
     }
   }
+  marcaDi(rec);
   rec.state = 'completed';
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
