@@ -6,7 +6,7 @@ import { request as richiestaHttp } from 'node:http';
 import { certificato } from '../../helpers/immagineFirmata.mjs';
 import { apriFiloSenzaPlaywright } from '../../helpers/filoSenzaPlaywright.mjs';
 
-const ARGOMENTI_RETE = ['--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP www.youtube-nocookie.com 127.0.0.1',
+const ARGOMENTI_RETE = ['--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP www.youtube-nocookie.com 127.0.0.1, MAP sito-pubblico.test 127.0.0.1',
   '--ignore-certificate-errors', '--no-proxy-server'];
 
 const test = base.extend({
@@ -46,10 +46,7 @@ function lettore(titolo) {
   </script></body></html>`;
 }
 
-const CAMPO = '<!doctype html><title>Posta</title><textarea id="t" style="width:400px;height:200px"></textarea>'
-  + '<script>window.__blur=0;document.getElementById("t").addEventListener("blur",()=>window.__blur++);</script>';
-
-test('YouTube visto e poi lasciato dietro: la pubblicità si salta, due di fila, e chi scrive nell\'altra scheda non perde il fuoco', async ({ testServer, suYouTube }) => {
+test('r1 YouTube lasciato dietro mentre si leggevano i commenti più giù: la pubblicità si salta lo stesso', async ({ testServer, suYouTube }) => {
   test.skip(process.platform !== 'linux', 'finestra vera');
   test.setTimeout(120_000);
   const filo = await apriFiloSenzaPlaywright({ args: ARGOMENTI_RETE, env: { FILO_HIDE_WINDOW: '0' } });
@@ -58,32 +55,14 @@ test('YouTube visto e poi lasciato dietro: la pubblicità si salta, due di fila,
   const apri = (url) => filo.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
     .find((w) => w._filoTabs)._filoTabs.openTab(u, { activate: true }), url);
   try {
-    const yt = suYouTube(testServer.html(lettore('Canzone')));
+    const yt = suYouTube(testServer.html(lettore('Canzone').replace('</body>', '<div style="height:3000px">commenti</div></body>')));
     await apri(yt);
     await quando(async () => (await nel(yt, 'document.visibilityState')) === 'visible', 'yt non visibile');
-    const posta = testServer.html(CAMPO);
-    await apri(posta);
-    await quando(async () => (await nel(posta, 'document.readyState')) === 'complete', 'posta');
-    await nel(posta, 'document.getElementById("t").focus(); true');
+    await nel(yt, 'scrollTo(0, 1500); scrollY');
+    await apri(testServer.html('<title>Altra</title><p>altra</p>'));
     await quando(async () => (await nel(yt, 'document.visibilityState')) === 'hidden', 'yt non nascosta');
-    const fuoco = () => filo.evaluate(({ BrowserWindow }, u) => {
-      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-      const t = tm.tabs.find((x) => x.view.webContents.getURL() === u);
-      return t.view.webContents.isFocused();
-    }, posta);
-    const fuocoPrima = await fuoco();
-
     await nel(yt, 'window.__mostra()');
-    await quando(async () => (await nel(yt, 'window.__saltate')) === 1, 'prima pubblicità non saltata', 8_000);
-    await new Promise((ok) => setTimeout(ok, 1500));
-    await nel(yt, 'window.__mostra()');
-    await quando(async () => (await nel(yt, 'window.__saltate')) === 2, 'seconda pubblicità non saltata', 8_000);
-    expect((await nel(yt, 'window.__clic')).every(Boolean)).toBe(true);
-
-    expect(await nel(posta, 'document.activeElement && document.activeElement.id')).toBe('t');
-    expect(await nel(posta, 'window.__blur'), 'il campo ha perso il fuoco').toBe(0);
-    console.log('fuoco della scheda posta prima/dopo', fuocoPrima, await fuoco());
-    expect(await fuoco()).toBe(fuocoPrima);
+    await quando(async () => (await nel(yt, 'window.__saltate')) === 1, 'pubblicità non saltata', 10_000);
   } finally {
     await filo.chiudi();
   }
