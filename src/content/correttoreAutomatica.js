@@ -163,7 +163,13 @@
   }
 
   // ── Come scrive chi scrive, in quel posto ──────────────────────────────────
-  const INIZIO_FRASE = /(?:^|[.!?…]["'»”)\]]*\s+|\n\s*)["'«“(]*$/u;
+  const DOPO_FINE_FRASE = /(?:[.!?…]["'»”)\]]*\s+|\n\s*)["'«“(]*$/u;
+  const A_INIZIO_TESTO = /^\s*["'«“(]*$/u;
+  // Il pezzo prima della parola in `s` dice che lì comincia una frase.
+  function inizioDiFrase(testo, s) {
+    const prima = String(testo ?? '').slice(Math.max(0, s - 12), s);
+    return DOPO_FINE_FRASE.test(prima) || (s <= 12 && A_INIZIO_TESTO.test(prima));
+  }
 
   // Le maiuscole che mette chi scrive (le correzioni di Filo, in `esclusi`, non contano) e gli inizi di frase minuscoli,
   // nel testo fino a `finoA`. Le sigle («OK») non dicono niente.
