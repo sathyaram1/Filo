@@ -1595,12 +1595,20 @@
     if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
     const nome = document.createElement('span');
     nome.className = 'dash-file-btn-nome';
+    // L'etichetta la sceglie il modello, e può aver letto un documento ostile: il nome che si apre è quello vero (#1499).
+    const etichetta = document.createElement('span');
+    etichetta.className = 'dash-file-btn-etichetta';
     const dove = document.createElement('span');
     dove.className = 'dash-file-btn-dove';
-    btn.append(icona, nome, dove);
+    btn.append(icona, nome, etichetta, dove);
     const disegna = () => {
       const p = String(a.percorso || a.path || '');
-      nome.textContent = a.etichetta || a.label || nomeDelPercorso(p) || 'File';
+      const vero = nomeDelPercorso(p);
+      nome.textContent = vero || 'File';
+      const detta = String(a.etichetta || a.label || '').trim();
+      const uguale = (x) => x.toLowerCase() === vero.toLowerCase() || x.toLowerCase() === vero.replace(/\.[^.]+$/, '').toLowerCase();
+      etichetta.textContent = detta && !uguale(detta) ? detta : '';
+      etichetta.hidden = !etichetta.textContent;
       const doveFilo = a._output && typeof a._output.dove === 'string' ? a._output.dove : '';
       dove.textContent = doveFilo || cartellaBreve(p);
       dove.hidden = !dove.textContent;
