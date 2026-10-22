@@ -11,7 +11,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const RADICE = resolve(import.meta.dirname, '..', '..');
 const {
-  decidi, comando, installa, registraDecisione, impronta, AL_POSTO_DEL_TESTO, VALIDITA_MS, DURATA_VOCE_MS, AMBIENTE,
+  decidi, comando, installa, registraDecisione, impronta, AL_POSTO_DEL_TESTO, AL_POSTO_VIVO, VALIDITA_MS, DURATA_VOCE_MS, AMBIENTE,
   AMBIENTE_TOLTO, ETICHETTA, FILE_REGISTRO, MODELLI, SFORZI, MOTIVO_SOTTOFONDO, MOTIVO_SENZA_BIGLIETTO, MOTIVO_DUE_BIGLIETTI,
   MOTIVO_REGISTRO, MOTIVO_SCONOSCIUTO, MOTIVO_IGNOTO, MOTIVO_NOTIFICA, MATCHER_PRIMA,
 } = await import('../../scripts/lib/orchestratore-cieco.mjs');
@@ -43,6 +43,24 @@ test('nella sessione del giro: il testo del worker diventa la riga fissa, il sot
     assert.deepEqual(h.updatedInput, { subagent_type: 'routine-worker', prompt: PROMPT, run_in_background: false, model: 'fable', effort: 'max' });
   }
   assert.equal(decidi(dopo({ tool_name: 'Bash' }), OPZ), null);
+});
+
+// L'ingresso che Claude Code manda quando sposta in sottofondo un worker in primo piano (CLAUDE_AUTO_BACKGROUND_TASKS,
+// documentato nei ganci: status async_launched, senza i campi di consumo). D-90: diventava «Worker finito» (#1480).
+const SPOSTATO = { status: 'async_launched', agentId: 'a1b2c3', description: 'worker', prompt: PROMPT, outputFile: '/tmp/x/tasks/a1b2c3.output', resolvedModel: 'claude-opus' };
+const FINITO = { status: 'completed', agentId: 'a1b2c3', content: [{ type: 'text', text: 'FATTO' }], totalTokens: 10, totalDurationMs: 900000, totalToolUseCount: 3 };
+
+test('un worker spostato in sottofondo NON è «Worker finito»: il testo dice che è vivo e di aspettare (#1480)', () => {
+  const testo = (r) => decidi(dopo({ tool_response: r }), OPZ).hookSpecificOutput.updatedToolOutput;
+  assert.equal(testo(SPOSTATO), AL_POSTO_VIVO);
+  assert.equal(testo({ ...SPOSTATO, status: 'running' }), AL_POSTO_VIVO, 'uno stato che non è completed non è una fine');
+  assert.equal(testo(FINITO), AL_POSTO_DEL_TESTO);
+  assert.equal(testo({ agentId: 'a1', outputFile: '/tmp/x.output' }), AL_POSTO_VIVO, 'senza stato decide la forma del ritorno in sottofondo');
+  assert.notEqual(AL_POSTO_VIVO, AL_POSTO_DEL_TESTO);
+  assert.match(AL_POSTO_VIVO, /non rilasciare/i);
+  assert.match(AL_POSTO_VIVO, /non toccare la cartella/i);
+  assert.match(AL_POSTO_VIVO, /aspetta la notifica/i);
+  assert.doesNotMatch(AL_POSTO_VIVO, /FATTO|a1b2c3/, 'anche da vivo il testo del worker non passa');
 });
 
 test('biglietto noto: modello e sforzo sono quelli del server, anche sopra quelli messi dall\'orchestratore', () => {
@@ -152,6 +170,8 @@ test('il comando installato, dalla shell, acceca e mette la decisione del server
     assert.equal(h(avviso({ agent_id: 'w1' })).permissionDecisionReason, MOTIVO_NOTIFICA);
     assert.equal(run(JSON.stringify(avviso({ session_id: 's2' }))).stdout, '');
     assert.equal(JSON.parse(run(JSON.stringify(dopo())).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
+    assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: SPOSTATO }))).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_VIVO);
+    assert.equal(JSON.parse(run(JSON.stringify(dopo({ tool_response: FINITO }))).stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
     assert.equal(JSON.parse(run(JSON.stringify(cambio())).stdout).decision, 'block');
     assert.equal(run(JSON.stringify(dopo({ agent_id: 'w1' }))).stdout, '');
     assert.equal(run(JSON.stringify(prima(false, { agent_id: 'w1' }))).stdout, '');
