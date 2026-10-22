@@ -463,7 +463,8 @@ export function ensureSessionExcludes(root) {
  *   checkpoint   ultimo punto fermo (SHA) a cui riportare il branch, o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null}}
+ *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
