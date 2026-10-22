@@ -1,5 +1,5 @@
-// Il lettore dei feedback della sessione locale (#908): i segnalati come attacco non si leggono,
-// e il testo arriva sempre dentro una cornice che il testo stesso non può chiudere. Rete finta.
+// Il lettore dei feedback della sessione locale (#908): i segnalati come attacco non si leggono, né senza l'opzione i
+// mai giudicati dei Ricevuti (#1514), e il testo arriva sempre dentro una cornice che il testo stesso non può chiudere. Rete finta.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
