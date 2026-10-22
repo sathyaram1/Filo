@@ -626,6 +626,7 @@
     accesso: 'un token del tuo accesso a Filo',
     identita: "l'identità di questa copia di Filo",
     portafoglio: 'la chiave del tuo portafoglio',
+    feedback: 'la chiave che apre i feedback cifrati',
   });
   const LETTI = Object.freeze({
     codice: 'un codice letto',
