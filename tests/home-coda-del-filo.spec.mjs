@@ -421,9 +421,10 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
 
 test('il timer che suona ore dopo il saluto, con pagine visitate in mezzo, è un messaggio nuovo in fondo al filo', async ({ app, openTab }) => {
   test.setTimeout(90_000);
-  const inizio = new Date();
-  inizio.setHours(0, 5, 0, 0);
-  const passo = Math.max(60_000, Math.floor((Date.now() - inizio.getTime()) / 5));
+  // Saluto e pagine sempre fra la mezzanotte e adesso: alle 00:03 un saluto «alle 00:05» sarebbe dopo il timer.
+  const adesso = Date.now();
+  const inizio = new Date(Math.min(mezzanotte(adesso) + 5 * 60_000, (mezzanotte(adesso) + adesso) / 2));
+  const passo = (adesso - inizio.getTime()) / 5;
   await app.evaluate(async (_e, d) => {
     const E = globalThis.SN_FILO_EVENTI;
     const qui = await globalThis.SN_IL_FILO.dispositivo();
