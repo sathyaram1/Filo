@@ -195,7 +195,7 @@
     giro();
   }
 
-  // Solo i «Salta» a schermo: uno spento che il lettore tiene nel DOM non va seguito a ogni giro.
+  // Solo i «Salta» che il lettore mostra: uno spento che tiene nel DOM non va seguito a ogni giro.
   function vegliaNascosta() {
     if (veglia) { clearTimeout(veglia); veglia = null; }
     if (!attivo || !nascosta()) return;
