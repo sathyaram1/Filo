@@ -395,7 +395,7 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   test.setTimeout(60_000);
   const tolta = 'https://www.youtube.com/watch?v=orche';
   const cancellata = 'https://www.youtube.com/watch?v=delfini';
-  // Visite di poco fa e la cancellazione dell'ultima ora: con un'ora del giorno fissa e «oggi» era rosso dopo mezzanotte (#1599).
+  // Visite di poco fa e cancellazione dell'ultima ora: un'ora del giorno fissa, o «oggi», cambiano esito dopo mezzanotte (#1599).
   await semina(app, { pagine: [{ url: tolta, titolo: 'YouTube: orche', ts: new Date(Date.now() - 1_200_000).toISOString() }, { url: cancellata, titolo: 'YouTube: delfini', ts: new Date(Date.now() - 600_000).toISOString() }] });
   await app.evaluate(async (_e, urls) => {
     for (const [url, title, closedAt, openedAt] of urls) await globalThis.SN_ARCHIVED_TABS.archive({ url, title, closedAt: closedAt || new Date().toISOString(), openedAt });
