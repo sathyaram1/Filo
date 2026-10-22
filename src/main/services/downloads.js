@@ -835,8 +835,9 @@ function onWillDownload(item, webContents, scope = '') {
 
 // Scaricamenti a mano (#436): «Salva immagine come…» muove i byte da sé, unico modo di
 // presentare il Referer; senza questo registro quel cammino resterebbe muto per l'utente.
+// Risolve quando la marca d'origine è sul file finale (o non si è potuta scrivere).
 function finalizeManual(rec, state, savePath) {
-  if (rec._final) return;
+  if (rec._final) return Promise.resolve(false);
   rec._final = true;
   liveManual.delete(rec.id);
   // Una voce chiusa non aspetta più risposte: chi attendeva la domanda prosegue con un no.
