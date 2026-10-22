@@ -437,6 +437,10 @@
     if (turn.images) out.images = Number(turn.images) || 0;
     // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
     if (role === 'user' && turn.daModello) out.daModello = true;
+    // Scritto nell'Aiuto sopra un sito: riletto è testo da fuori (#1508, src/shared/filoContesto.js → daFuoriDi).
+    if (role === 'user' && turn.daPagina === true) out.daPagina = true;
+    // La classe peggiore che la conversazione aveva letto quando Filo ha risposto: riletta da un'altra chat, la porta (#1508).
+    if (role === 'filo' && Number.isInteger(turn.classeLetta) && turn.classeLetta >= 1 && turn.classeLetta <= 5) out.classeLetta = turn.classeLetta;
     // Da dove venivano i segreti che una frase di Filo ripete, o il testo stesso se l'ha scritto un comando (#810):
     // riaperta, la chat li tratta ancora da letti. Regole: src/shared/urlExfil.js (lettiNelTesto).
     if (role === 'filo') {
