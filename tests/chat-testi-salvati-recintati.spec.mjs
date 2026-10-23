@@ -380,9 +380,10 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   // #1446.2 — i passi dell'utente: visto il ✓ in chat scrive subito, e sotto il secondo messaggio arriva la risposta
   // a lui, non un pezzo del turno della lezione.
   await expect(page.locator('.dash-bubble-filo', { hasText: '✓ Ricordato' })).toBeVisible({ timeout: 5_000 });
-  await page.locator('#input').fill('puoi non chiedere conferma per cosa tu debba ricordarti?');
+  await page.locator('#input').fill(DOMANDA_DOPO);
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' }), 'la risposta al messaggio dopo l\'OK non compare')
+    .toBeVisible({ timeout: 15_000 });
   const bolle = await page.locator('.dash-bubble').evaluateAll((els) => els.map((b) => ({
     utente: b.classList.contains('dash-bubble-user'), testo: b.textContent,
   })));
@@ -398,7 +399,8 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   }), { timeout: 5_000 }).toContain('sviluppatore di Filo');
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  expect(calls).toHaveLength(rivedeEsito ? 3 : 2);
+  expect(calls, rivedeEsito ? 'col testo scritto insieme il modello rivede l\'esito «in attesa»' : 'la lezione da sola chiude il turno sul popup')
+    .toHaveLength(rivedeEsito ? 3 : 2);
   const nota = /«voce 1» è un segnaposto tuo[^\n]*l'utente non lo vede da nessuna parte[^\n]*non scriverlo mai/;
   if (rivedeEsito) {
     // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
