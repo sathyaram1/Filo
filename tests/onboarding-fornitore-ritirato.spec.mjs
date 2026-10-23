@@ -102,7 +102,8 @@ async function apriSchedaNuova(app, shell) {
   let nuova = vecchia;
   await expect.poll(async () => (nuova = await vistaDavanti(app)), { timeout: 10_000 }).not.toBe(vecchia);
   const page = await paginaDellaVista(app, nuova);
-  expect(page.url()).toBe('filo://newtab/');
+  // Il segno può cadere nel documento vuoto che precede la home: l'indirizzo si aspetta, non si legge una volta sola.
+  await expect(page).toHaveURL('filo://newtab/', { timeout: 10_000 });
   return page;
 }
 
