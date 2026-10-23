@@ -1254,205 +1254,26 @@
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
   //
-  // L'agente "Aiuto" può eseguire le stesse azioni del menu contestuale su
-  // testo/immagine/link. A differenza delle azioni tipizzate di Filo (sopra),
-  // queste vivono nel content script (SN_ACTIONS in src/content/actions.js,
-  // SN_TTS in tts.js) e operano sull'elemento o sulla selezione corrente. Ognuna
-  // dichiara solo il suo COSTO: se parte, chiede o no lo decide il main con la
-  // stessa regola del dispatch (#530, MSG.FILO_DECIDI_PAGINA). Uscire verso
-  // l'esterno (cercare, condividere) costa 2; il resto resta sul computer e costa 1.
-  //
-  // SN_ACTIONS/SN_TTS sono caricati DOPO sidebar.js (vedi i preload), quindi li
-  // risolviamo al volo dentro la funzione, non al top dell'IIFE.
-  const PAGE_ACTIONS = {
-    // testo / selezione
-    copy:         { target: 'text',  costo: 1, label: 'copia testo' },
-    cut:          { target: 'text',  costo: 1, label: 'taglia testo' },
-    search_text:  { target: 'text',  costo: 2, label: 'cerca testo sul web', viaFilo: true },
-    read_aloud:   { target: 'text',  costo: 1, label: 'leggi ad alta voce' },
-    stop_reading: { target: 'none',  costo: 1, label: 'ferma la lettura' },
-    edit_text:    { target: 'text',  costo: 1, label: 'modifica testo' },
-    // immagini
-    copy_image:      { target: 'image', costo: 1, label: 'copia immagine' },
-    save_image:      { target: 'image', costo: 1, label: 'salva immagine' },
-    copy_image_link: { target: 'image', costo: 1, label: 'copia link immagine' },
-    search_image:    { target: 'image', costo: 2, label: 'cerca immagine sul web', viaFilo: true },
-    // `viaFilo`: passa da NAVIGA, che il dispatch decide da sé (una ricerca porta `cerca` e costa 2 anche lì).
-    // Chiedere anche qui farebbe due domande per la stessa uscita.
-    open_link:  { target: 'link', costo: 1, label: 'apri link in nuova scheda', viaFilo: true },
-    copy_link:  { target: 'link', costo: 1, label: 'copia link' },
-    save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
-    share_link: { target: 'link', costo: 2, label: 'condividi link' },
-    // la pagina intera: la stessa strada di «Salva per dopo» del menu, che poi chiude la scheda (niente passo dopo).
-    save_page: { target: 'none', costo: 1, label: 'salva la pagina per dopo', chiude: true },
-  };
-
-  // Come Alt+S: le pagine di Filo non si mettono da parte, tranne quella d'errore, che salva il sito non caricato.
-  function paginaDaSalvare() {
-    try { return location.protocol !== 'filo:' || location.href.startsWith('filo://error/'); } catch (_) { return false; }
-  }
-
-  // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
-  function resolveActionText(page) {
-    const provided = String(page.text ?? page.testo ?? page.query ?? page.selection ?? '').trim();
-    if (provided) return provided;
-    try {
-      if (Extract?.selezioneSegreta?.()) return '';
-      return (window.getSelection?.()?.toString() || '').trim();
-    } catch (_) { return ''; }
-  }
-
-  // Immagine bersaglio: per selettore, per src, altrimenti la più grande visibile.
-  function resolveImageEl(page) {
-    const sel = String(page.selector ?? page.css ?? '').trim();
-    if (sel) {
-      try {
-        const el = document.querySelector(sel);
-        if (el) return el.tagName === 'IMG' ? el : el.querySelector('img');
-      } catch (_) {}
-    }
-    const wanted = String(page.src ?? page.url ?? page.href ?? '').trim();
-    const imgs = Array.from(document.images || []);
-    if (wanted) {
-      const hit = imgs.find((im) => (im.currentSrc || im.src || '') === wanted)
-        || imgs.find((im) => (im.currentSrc || im.src || '').includes(wanted));
-      if (hit) return hit;
-    }
-    let best = null; let bestArea = 0;
-    for (const im of imgs) {
-      const r = im.getBoundingClientRect();
-      const area = r.width * r.height;
-      if (area > bestArea && r.width > 32 && r.height > 32) { best = im; bestArea = area; }
-    }
-    return best;
-  }
-
-  // Link bersaglio: per selettore (anche su un figlio del link), per URL. Collegamento e indirizzo come li vede il menu.
-  function resolveLinkEl(page) {
-    const { SELETTORE_COLLEGAMENTO: LINK, indirizzoDelLink: indirizzo } = global.SN_ACTIONS;
-    const sel = String(page.selector ?? page.css ?? '').trim();
-    if (sel) {
-      try {
-        const el = document.querySelector(sel);
-        const a = el && (el.closest?.(LINK) || el.querySelector?.(LINK));
-        if (a && indirizzo(a)) return a;
-      } catch (_) {}
-    }
-    const wanted = String(page.url ?? page.href ?? '').trim();
-    if (wanted) {
-      const links = Array.from(document.querySelectorAll(LINK));
-      const hit = links.find((a) => indirizzo(a) === wanted) || links.find((a) => indirizzo(a).includes(wanted));
-      if (hit) return hit;
-    }
-    return null;
-  }
-
+  // Le stesse azioni del menu contestuale su testo, immagini e link: le fa la pagina (src/content/aiutoPagina.js), che
+  // dice com'è andata in una riga; quelle che escono passando da Filo (cercare, aprire un link) le fa da qui
+  // runFiloAction, con la sua conferma e la sua porta delle uscite.
   async function runPageAction(page) {
-    const spec = PAGE_ACTIONS[page.op];
-    if (!spec) return false;
-    const Actions = global.SN_ACTIONS;
-    const Tts = global.SN_TTS;
-    const label = spec.label;
-
-    // Risolvi il bersaglio in anticipo: se manca, niente popup né esecuzione.
-    let text = '';
-    let imgEl = null;
-    let linkEl = null;
-    if (spec.target === 'text') {
-      text = resolveActionText(page);
-      if (!text && page.op !== 'edit_text') {
-        appendActionLog(`${label}: nessun testo selezionato`);
-        return false;
-      }
-    } else if (spec.target === 'image') {
-      imgEl = resolveImageEl(page);
-      if (!imgEl) { appendActionLog(`${label}: immagine non trovata`); return false; }
-    } else if (spec.target === 'link') {
-      linkEl = resolveLinkEl(page);
-      const fallbackUrl = String(page.url ?? page.href ?? '').trim();
-      if (!linkEl && !(page.op === 'open_link' && fallbackUrl)) {
-        appendActionLog(`${label}: link non trovato`);
-        return false;
-      }
-    } else if (page.op === 'save_page' && !paginaDaSalvare()) {
-      appendActionLog(`${label}: le pagine di Filo non si salvano per dopo`);
-      return false;
-    }
-
-    // Senza risposta dal main si chiede: il caso prudente.
-    if (!spec.viaFilo) {
-      let d = null;
-      try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web' }); } catch (_) {}
-      const risposta = d && d.ok ? d.risposta : 'chiede';
-      if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
-      if (risposta !== 'si') {
-        const Ui = global.SN_CONFIRM_UI;
-        // Il testo intero e nel suo riquadro: si conferma quello che si legge, e il
-        // testo non può chiudere le virgolette e parlare come Filo (#592.7).
-        let detail = '';
-        if (spec.target === 'text') detail = text;
-        else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
-        else if (linkEl) detail = Actions.indirizzoDelLink(linkEl);
-        const perche = d && d.perche ? `\n\n${d.perche}` : '';
-        const parti = [...(detail ? [`${label}:`, { citazione: detail, nuda: spec.target !== 'text' }] : [label]), ...(perche ? [perche] : [])];
-        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}`, parti };
-        let ok = false;
-        try {
-          ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
-        } catch (_) { ok = false; }
-        if (!ok) { appendActionLog(`${label}: annullata`); return false; }
-      }
-    }
-
-    try {
-      switch (page.op) {
-        case 'copy': Actions?.copyToClipboard(text); break;
-        case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text), cerca: text }, { etichetta: label });
-        case 'read_aloud': await Tts?.readAloud(text); break;
-        case 'stop_reading': Tts?.stopReading(); break;
-        case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
-        case 'copy_image': await Actions?.copyImage(imgEl); break;
-        case 'save_image': Actions?.downloadImage(imgEl); break;
-        case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
-        case 'search_image': return await runFiloAction({
-          type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl), cerca: imgEl.currentSrc || imgEl.src || 'immagine',
-        }, { etichetta: label });
-        case 'open_link': {
-          // "Apri in nuova scheda" è un'azione di sistema già registrata: la
-          // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
-          const url = Actions.indirizzoDelLink(linkEl) || String(page.url ?? page.href ?? '').trim();
-          return await runFiloAction({ type: 'NAVIGA', url });
-        }
-        case 'copy_link': Actions?.copyUrlToClipboard(Actions.indirizzoDelLink(linkEl)); break;
-        case 'save_link': await Actions?.saveLink(linkEl); break;
-        case 'save_page': {
-          if (!(await Actions?.savePage())) { appendActionLog(`${label}: non riuscita`); return false; }
-          appendActionLog('pagina salvata in «Aperti per dopo»: chiudo la scheda');
-          return true;
-        }
-        case 'share_link': await Actions?.shareLink(linkEl); break;
-        default: appendActionLog(`${label}: non riuscita`); return false;
-      }
-    } catch (_) {
-      appendActionLog(`${label}: non riuscita`);
-      return false;
-    }
-    appendActionLog(`${label}: fatto`);
-    return true;
+    const r = await Pagina.azione(page);
+    if (!r) { appendActionLog(`${(azioniDiPagina()[page && page.op] || {}).label || 'azione'}: non riuscita`); return false; }
+    if (r.filo && r.filo.action) return runFiloAction(r.filo.action, { etichetta: String(r.filo.etichetta || '') });
+    if (r.riga) appendActionLog(String(r.riga));
+    return !!r.ok;
   }
 
   // ---------- Submit / loop ----------
 
-  function buildPayload(userMessage, userAction, esterno) {
-    const screenshot = null; // riempito dopo
-    const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
-    const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
+  function buildPayload(userMessage, userAction, esterno, letta) {
+    const qui = paginaOra();
     // history per l'AI: solo {role, content}, niente metadati UI.
     const aiHistory = history.map(({ role, content }) => ({ role, content }));
     return {
-      url: location.href,
-      title: document.title,
+      url: letta.url || qui.url,
+      title: letta.titolo ?? qui.titolo,
       userMessage: userMessage || undefined,
       userAction: userAction || undefined,
       // #593 — il contenuto esterno viaggia SEPARATO dalla nota di sistema, e
@@ -1461,123 +1282,17 @@
       // terzi diventa prompt resta uno solo.
       esterno: esterno || undefined,
       history: aiHistory,
-      screenshot,
-      outline,
-      viewport,
+      screenshot: letta.screenshot || undefined,
+      outline: letta.outline || '',
+      viewport: letta.viewport || null,
+      origineImmagini: letta.origineImmagini || undefined,
     };
   }
 
-  // #711 — «questa foto è fatta con l'AI?» chiesto qui deve avere la stessa lettura del
-  // tasto destro: si leggono le etichette delle immagini che l'utente ha davanti, dalle
-  // più grandi. Oltre il tetto il modello sa quante ne sono rimaste fuori.
-  const MAX_IMMAGINI_ORIGINE = 12;
-  // Un'immagine che non arriva non deve tenere ferma la risposta: conta come non letta.
-  const ATTESA_ORIGINE_MS = 3000;
-  // Un'immagine letta resta letta: le domande dopo non la riscaricano.
-  const origineLetta = new Map();
-  function immaginiVisibili() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const viste = new Set();
-    const out = [];
-    for (const im of Array.from(document.images || [])) {
-      if (root && root.contains(im)) continue;
-      const src = im.currentSrc || im.src;
-      if (!src || viste.has(src) || !im.complete || !im.naturalWidth) continue;
-      const r = im.getBoundingClientRect();
-      if (r.width < 48 || r.height < 48) continue;
-      if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue;
-      viste.add(src);
-      out.push({ im, src, r, area: r.width * r.height });
-    }
-    return out.sort((a, b) => b.area - a.area);
-  }
-  async function origineImmaginiVisibili() {
-    const Actions = global.SN_ACTIONS;
-    if (!Actions?.leggiOrigine || !Actions?.scaricaImmagine) return null;
-    const tutte = immaginiVisibili();
-    if (!tutte.length) return null;
-    const esiti = await Promise.all(tutte.slice(0, MAX_IMMAGINI_ORIGINE).map(async ({ im, src, r }, i) => {
-      try {
-        let lettura = origineLetta.get(src);
-        if (!lettura) {
-          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src, im)))();
-          lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
-          if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
-          origineLetta.set(src, lettura);
-        }
-        const p = await Promise.race([
-          lettura,
-          new Promise((ok) => setTimeout(() => ok(null), ATTESA_ORIGINE_MS)),
-        ]);
-        if (!p || !p.ok) return null;
-        return {
-          n: i + 1,
-          alt: String(im.alt || im.title || '').slice(0, 120),
-          larghezza: Math.round(r.width),
-          altezza: Math.round(r.height),
-          frase: p.frase || '',
-        };
-      } catch (_) { return null; }
-    }));
-    const lette = esiti.filter(Boolean);
-    return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
-  }
-
-  // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
-  // scatto, se la pagina scorre nel frattempo; quelli dei riquadri e dei componenti chiusi li misura il main, che
-  // con campi da coprire manda la foto piena: coperta prima di diventare leggera, il JPEG non sparge le cifre attorno.
-  // Se coprirli non riesce, l'immagine non parte.
-  async function captureScreenshot() {
-    try {
-      const prima = Extract.campiSegretiInVista();
-      const r = await chrome.runtime.sendMessage({
-        type: MSG.CAPTURE_VISIBLE_TAB, leggera: true, campiSegreti: true, campiNellaPagina: prima.length,
-      });
-      if (!r?.ok || !r.dataUrl) return null;
-      const campi = prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista());
-      if (!campi.length && !r.fattore) return r.dataUrl;
-      // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
-      return await Extract.fotoCoperta(r.dataUrl, campi, r);
-    } catch (_) {}
-    return null;
-  }
-
-  // Le SPA cambiano contenuto e URL in modo asincrono: si esce quando l'URL è cambiato e il
-  // DOM è quieto da `quietMs`, oppure dopo `maxMs`.
-  function waitForPageSettle({ initialUrl, minMs = 250, quietMs = 350, maxMs = 2500 } = {}) {
-    return new Promise((resolve) => {
-      const start = Date.now();
-      let lastMutation = Date.now();
-      let urlChanged = !initialUrl || location.href !== initialUrl;
-
-      const observer = new MutationObserver(() => {
-        lastMutation = Date.now();
-        if (!urlChanged && location.href !== initialUrl) urlChanged = true;
-      });
-      try {
-        observer.observe(document.documentElement, {
-          childList: true, subtree: true, attributes: true, characterData: true,
-        });
-      } catch (_) {}
-
-      const tick = () => {
-        const now = Date.now();
-        const elapsed = now - start;
-        const sinceMutation = now - lastMutation;
-        const ready = document.readyState === 'complete';
-        const longEnough = elapsed >= minMs;
-        const quiet = sinceMutation >= quietMs;
-        const enoughEvidence = urlChanged || elapsed >= maxMs / 2;
-        if ((longEnough && quiet && ready && enoughEvidence) || elapsed >= maxMs) {
-          observer.disconnect();
-          resolve();
-          return;
-        }
-        setTimeout(tick, 80);
-      };
-      tick();
-    });
+  // Quello che si sa della pagina sotto dopo una lettura: indirizzo e titolo, per il filo e per il passo dopo.
+  function ricordaPagina(letta) {
+    if (!nelloStrato || !letta || typeof letta.url !== 'string' || !letta.url) return;
+    paginaNota = { url: letta.url, titolo: String(letta.titolo || '') };
   }
 
   // Il passo che non parte resta nella cronologia con la fermata, così il modello sa a che punto era anche se l'utente
@@ -1659,16 +1374,9 @@
 
     // Sui proseguimenti automatici si aspetta la pagina aggiornata prima dello screenshot:
     // senza, l'AI vede quella vecchia e chiede di ripetere il click.
-    if (userAction) {
-      await waitForPageSettle({ initialUrl: preActionUrl || location.href });
-    }
-    const [screenshot, origineImmagini] = await Promise.all([
-      captureScreenshot(),
-      userMessage ? origineImmaginiVisibili().catch(() => null) : Promise.resolve(null),
-    ]);
-    const payload = buildPayload(userMessage, userAction, esterno);
-    payload.screenshot = screenshot || undefined;
-    payload.origineImmagini = origineImmagini || undefined;
+    const letta = (await Pagina.leggi({ attendi: !!userAction, daUrl: preActionUrl || '', origine: !!userMessage }).catch(() => null)) || {};
+    ricordaPagina(letta);
+    const payload = buildPayload(userMessage, userAction, esterno, letta);
 
     try {
       const res = await chrome.runtime.sendMessage({
