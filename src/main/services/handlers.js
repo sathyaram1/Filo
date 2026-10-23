@@ -3366,8 +3366,10 @@ async function eseguiAzioneFilo(action, {
             if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
             continue;
           }
+          const com = await FiloMem.descriviRiga(r.via);
           const id = await FiloMem.hideLine(r.via);
           if (!id) continue;
+          try { globalThis.SN_CONTATORI_MAIN?.memoriaCorretta('chat', 'togli', com); } catch (_) {}
           if (action.per_sempre === true) await FiloMem.forgetHiddenForever(id);
           tolte.push(r.testo);
         }
