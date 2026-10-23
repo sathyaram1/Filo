@@ -4,14 +4,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { builtinModules } from 'node:module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   ammesso, vociRichieste, baseDeiPacchetti, pacchettiDaInstallare, descrivi, electronInUso, allineaPacchetti, fileBlocco,
-  TETTO_INSTALLAZIONE_MS,
+  allineaPerLeProve, TETTO_INSTALLAZIONE_MS,
 } from '../../scripts/lib/pacchetti.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -231,6 +231,94 @@ describe('installare senza rompere niente', () => {
       assert.equal(electronInUso(dir, { platform: 'win32', apri: () => { throw Object.assign(new Error('x'), { code: 'ENOENT' }); } }), false);
       for (const platform of ['darwin', 'linux']) assert.equal(electronInUso(dir, { platform, apri: occupato }), false);
     } finally { togliCartella(dir); }
+  });
+});
+
+describe('prima delle prove (verifica #1572 giro 1, r1)', () => {
+  // Il proprietario del node_modules: npm installa solo lì, col suo lock, e i pacchetti finiti lì sono quelli che le prove vedono.
+  const conNpmFinto = (proprietario, metteDentro) => {
+    const chiamate = [];
+    const allinea = (d, o) => allineaPacchetti(d, {
+      ...o, inUso: () => false, cartellaBlocchi: proprietario,
+      installa: (r) => { chiamate.push(r); for (const [p, v] of Object.entries(metteDentro)) metti(proprietario, p, v); return { codice: 0, errore: '' }; },
+    });
+    return { chiamate, allinea };
+  };
+  const reale = (d) => realpathSync(d);
+
+  test('le prove lanciate nella cartella principale installano la libreria nuova prima di partire', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    try {
+      const f = conNpmFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      const r = allineaPerLeProve(dir, { allinea: f.allinea, log: () => {} });
+      assert.equal(r.esito, 'installati');
+      assert.deepEqual(f.chiamate.map(reale), [reale(dir)]);
+      assert.deepEqual(pacchettiDaInstallare(dir), []);
+      assert.equal(allineaPerLeProve(dir, { allinea: f.allinea, log: () => {} }).esito, 'allineati');
+      assert.equal(f.chiamate.length, 1, 'già allineati: npm non si chiama');
+    } finally { togliCartella(dir); }
+  });
+
+  test('da un worktree senza node_modules si installa nella cartella sopra, mai un albero intero nel worktree', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      copyFileSync(join(dir, 'package-lock.json'), join(wt, 'package-lock.json'));
+      const f = conNpmFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      const r = allineaPerLeProve(wt, { allinea: f.allinea, log: () => {} });
+      assert.equal(r.esito, 'installati');
+      assert.deepEqual(f.chiamate.map(reale), [reale(dir)]);
+      assert.equal(existsSync(join(wt, 'node_modules')), false);
+    } finally { togliCartella(dir); }
+  });
+
+  test('dalla cartella di prova di finish, col node_modules collegato, si installa dove il collegamento porta', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    const prova = cartellaTemporanea('filo-fusione-');
+    try {
+      symlinkSync(join(dir, 'node_modules'), join(prova, 'node_modules'), 'junction');
+      const albero = join(prova, 'ramo');
+      mkdirSync(albero);
+      copyFileSync(join(dir, 'package-lock.json'), join(albero, 'package-lock.json'));
+      const f = conNpmFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      const r = allineaPerLeProve(albero, { allinea: f.allinea, log: () => {} });
+      assert.equal(r.esito, 'installati');
+      assert.deepEqual(f.chiamate.map(reale), [reale(dir)]);
+      assert.deepEqual(pacchettiDaInstallare(albero), []);
+    } finally {
+      try { rmSync(join(prova, 'node_modules')); } catch (_) { /* già tolto */ }
+      togliCartella(prova);
+      togliCartella(dir);
+    }
+  });
+
+  test('una libreria che chiede solo il lock del ramo si dice, senza installare niente nel ramo', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0', 'node_modules/hash-wasm': '4.12.0' });
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    try {
+      mkdirSync(wt, { recursive: true });
+      writeFileSync(join(wt, 'package-lock.json'), JSON.stringify({
+        name: 'prova', lockfileVersion: 3,
+        packages: { '': { name: 'prova', version: '1.0.0' }, ...LOCK_FILO, 'node_modules/nuova': { version: '1.0.0' } },
+      }));
+      const f = conNpmFinto(dir, {});
+      const righe = [];
+      const r = allineaPerLeProve(wt, { allinea: f.allinea, log: (s) => righe.push(s) });
+      assert.equal(r.esito, 'non riuscita');
+      assert.deepEqual(r.mancanti.map((v) => v.nome), ['nuova']);
+      assert.deepEqual(f.chiamate, [], 'il lock della cartella sopra non chiede niente: npm non parte');
+      assert.match(righe.join('\n'), /Mancano ancora nuova 1\.0\.0/);
+      assert.equal(existsSync(join(wt, 'node_modules')), false);
+    } finally { togliCartella(dir); }
+  });
+
+  test('test:unit e gli spec Playwright passano dal controllo prima di partire', () => {
+    const unit = readFileSync(join(ROOT, 'scripts', 'run-unit-tests.mjs'), 'utf8');
+    assert.match(unit, /allineaPerLeProve\(REPO_ROOT/);
+    const setup = readFileSync(join(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs'), 'utf8');
+    assert.match(setup, /allineaPerLeProve\(radice/);
+    assert.match(readFileSync(join(ROOT, 'playwright.config.js'), 'utf8'), /globalSetup: '\.\/tests\/fixtures\/prima-della-corsa\.mjs'/);
   });
 });
 
