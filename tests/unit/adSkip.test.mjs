@@ -1,11 +1,13 @@
 // #737 — il «Salta» delle pubblicità dei video: chi può avere il clic vero, dove cade, quanto spesso, e chi lo spegne.
 // Il clic vero è un gesto dell'utente per la pagina: fuori da YouTube un sito si farebbe un pulsante finto per averlo.
 
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { inAttesa, svuota, scorri } from '../helpers/orologio.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -123,12 +125,41 @@ test('il lettore di YouTube incorporato, anche dentro altri riquadri: ogni anell
   assert.equal(A.hostIncorporato('https://youtube-nocookie.com.evil.example/'), false);
 });
 
-test('il clic dal riquadro parte solo se ogni frame sopra conferma il punto, dal più vicino alla pagina', async () => {
-  const s = annidati('https://www.youtube.com/embed/x', ['https://cdn.incorpora.example']);
-  const eventi = [];
-  const debuggerFinto = { isAttached: () => false, attach() {}, detach() {}, sendCommand: async (c, p) => { eventi.push([p.type, p.x, p.y]); } };
-  s.wc = Object.assign(s.wc, { isDestroyed: () => false, getZoomFactor: () => 1, debugger: debuggerFinto, sendInputEvent() {} });
-  const dove = { view: vista };
+// Il protocollo di debug finto: i riquadri della scheda (sessione, indirizzo, «Salta» sotto il punto) e i clic arrivati.
+function debuggerFinto(riquadri, { appeso = () => false } = {}) {
+  const clic = [];
+  const ascolta = new Set();
+  const d = {
+    clic, staccato: 0,
+    isAttached: () => false, attach() {}, detach() { d.staccato++; },
+    on(_n, fn) { ascolta.add(fn); }, removeListener(_n, fn) { ascolta.delete(fn); },
+    sendCommand: async (metodo, p, sid) => {
+      if (metodo === 'Target.setAutoAttach' && !sid) {
+        for (const r of riquadri) for (const fn of ascolta) fn({}, 'Target.attachedToTarget', { sessionId: r.sid, targetInfo: { type: 'iframe', url: r.url } });
+        return {};
+      }
+      if (metodo === 'Runtime.evaluate') return { result: { value: !!riquadri.find((r) => r.sid === sid).salta } };
+      if (metodo === 'Input.dispatchMouseEvent') {
+        clic.push([p.type, p.x, p.y, sid]);
+        if (appeso(p)) return new Promise(() => {});
+      }
+      return {};
+    },
+  };
+  return d;
+}
+
+const URL_LETTORE = 'https://www.youtube.com/embed/x';
+function conDebugger(s, riquadri, opz) {
+  const dbg = debuggerFinto(riquadri, opz);
+  s.wc = Object.assign(s.wc, { isDestroyed: () => false, getZoomFactor: () => 1, debugger: dbg, sendInputEvent() {} });
+  return dbg;
+}
+
+test('il clic dal riquadro con la scheda davanti parte solo se ogni frame sopra conferma il punto, e arriva al lettore nel suo punto', async () => {
+  const s = annidati(URL_LETTORE, ['https://cdn.incorpora.example']);
+  const dbg = conDebugger(s, [{ sid: 's-lettore', url: URL_LETTORE, salta: true }]);
+  const dove = { view: vista, davanti: true };
   const domande = [];
   const chiedi = (risposte) => async (wc, frame, q) => { domande.push([frame.frameTreeNodeId, q]); return risposte.shift(); };
   const r = await A.clicDalRiquadro(s, { x: 10, y: 20, tag: 'aa' }, dove, {
@@ -139,14 +170,105 @@ test('il clic dal riquadro parte solo se ogni frame sopra conferma il punto, dal
     [10, { tag: 'aa', origine: 'https://www.youtube.com', x: 10, y: 20 }],
     [1, { tag: 'bb', origine: 'https://cdn.incorpora.example', x: 16, y: 26 }],
   ]);
-  assert.deepEqual(eventi[1], ['mousePressed', 116, 226]);
+  // Non il punto nella pagina della scheda: instradato da lì, con la scheda non disegnata cadeva sul sito (#1494).
+  assert.deepEqual(dbg.clic[1], ['mousePressed', 10, 20, 's-lettore']);
   for (const [risposte, code] of [[[{ no: 'coperto' }], 'coperto'], [[{ x: 1, y: 1, tag: 'b' }, { no: 'ignoto' }], 'ignoto'], [[null], 'tempo']]) {
-    eventi.length = 0;
+    dbg.clic.length = 0;
     const r2 = await A.clicDalRiquadro(s, { x: 10, y: 20, tag: 'aa' }, dove, { chiedi: chiedi(risposte), ora: 9e6 });
     assert.equal(r2.code, code);
-    assert.equal(eventi.length, 0, 'nessun clic');
+    assert.equal(dbg.clic.length, 0, 'nessun clic');
   }
   assert.equal((await A.clicDalRiquadro(s, { x: 10, y: 20 }, dove, { chiedi: chiedi([]), ora: 9e6 })).code, 'punto', 'senza il nome del lettore');
+});
+
+// #1494 — una pagina nascosta nessuno la guarda né ci scrive: il clic va al lettore anche con la scheda dietro.
+test('con la scheda dietro, o la pagina che risponde di essere nascosta, il clic va dritto al lettore', async () => {
+  const s = annidati(URL_LETTORE, ['https://cdn.incorpora.example']);
+  const dbg = conDebugger(s, [{ sid: 's-lettore', url: URL_LETTORE, salta: true }]);
+  const domande = [];
+  const chiedi = (risposte) => async (wc, frame, q) => { domande.push(frame.frameTreeNodeId); return risposte.shift(); };
+  assert.deepEqual(await A.clicDalRiquadro(s, { x: 10, y: 20, tag: 'aa' }, { view: vista, davanti: false }, { chiedi: chiedi([]), ora: 6e6 }), { ok: true });
+  assert.deepEqual(domande, [], 'dietro non si chiede niente');
+  assert.deepEqual(dbg.clic[1], ['mousePressed', 10, 20, 's-lettore']);
+  dbg.clic.length = 0;
+  // La finestra davanti ma coperta da un'altra applicazione: la pagina sa di essere nascosta.
+  assert.deepEqual(await A.clicDalRiquadro(s, { x: 10, y: 20, tag: 'aa' }, { view: vista, davanti: true },
+    { chiedi: chiedi([{ no: 'nascosta' }]), ora: 7e6 }), { ok: true });
+  assert.deepEqual(domande, [10]);
+  assert.deepEqual(dbg.clic[1], ['mousePressed', 10, 20, 's-lettore']);
+});
+
+test('fra i riquadri il clic va solo a quello del lettore che ha il «Salta» sotto il punto', async () => {
+  const s = annidati(URL_LETTORE);
+  const dbg = conDebugger(s, [
+    { sid: 's-sito', url: 'https://sito.example/pub', salta: true },
+    { sid: 's-gemello', url: URL_LETTORE, salta: false },
+    { sid: 's-lettore', url: URL_LETTORE, salta: true },
+  ]);
+  assert.deepEqual(await A.clicNelRiquadro(s.wc, { x: 3, y: 4, url: URL_LETTORE }, { view: vista, ora: 8e6 }), { ok: true });
+  assert.deepEqual([...new Set(dbg.clic.map((c) => c[3]))], ['s-lettore']);
+  dbg.clic.length = 0;
+  const senza = annidati(URL_LETTORE);
+  const d2 = conDebugger(senza, [{ sid: 's-gemello', url: URL_LETTORE, salta: false }]);
+  assert.deepEqual(await A.clicNelRiquadro(senza.wc, { x: 3, y: 4, url: URL_LETTORE }, { view: vista, ora: 8e6 }), { ok: false, code: 'coperto' });
+  assert.deepEqual(d2.clic, []);
+  assert.equal(d2.staccato, 1, 'il debugger si stacca anche senza clic');
+  // Un lettore nello stesso processo della pagina non ha una sessione sua: vale il punto confermato dai frame sopra.
+  const stesso = annidati(URL_LETTORE);
+  const d3 = conDebugger(stesso, []);
+  assert.deepEqual(await A.clicNelRiquadro(stesso.wc, { x: 3, y: 4, url: URL_LETTORE, radice: { x: 50, y: 60 } }, { view: vista, ora: 8e6 }), { ok: true });
+  assert.deepEqual(d3.clic[1], ['mousePressed', 50, 60, undefined]);
+  assert.equal((await A.clicNelRiquadro(annidati(URL_LETTORE).wc, { x: 3, y: 4 }, { view: vista, ora: 9e6 })).code, 'punto', 'senza l\'indirizzo del lettore');
+});
+
+test('i «Salta» che il main cerca nel lettore sono fra quelli del content script', () => {
+  const testo = readFileSync(join(ROOT, 'src', 'content', 'adSkip.js'), 'utf8');
+  for (const sel of A.SALTA_YOUTUBE) assert.ok(testo.includes(`'${sel}'`), sel);
+});
+
+// #1494 — in una scheda nascosta i frame rispondono al passo dei timer, un secondo: il tentativo dopo arriva prima.
+test('mentre un clic al riquadro aspetta le risposte, un altro sulla stessa scheda non parte', async () => {
+  const s = annidati(URL_LETTORE);
+  const dbg = conDebugger(s, [{ sid: 's-lettore', url: URL_LETTORE, salta: true }]);
+  let rispondi = null;
+  const lento = () => new Promise((ok) => { rispondi = ok; });
+  const dove = { view: vista, davanti: true };
+  const primo = inAttesa(A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, dove, { chiedi: lento, ora: 3e7 }));
+  const secondo = inAttesa(A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, dove, { chiedi: lento, ora: 3e7 + 5000 }));
+  await svuota();
+  assert.equal(secondo.fatto && secondo.valore.code, 'presto');
+  rispondi({ x: 5, y: 5, tag: 'bb' });
+  await svuota();
+  assert.deepEqual(primo.valore, { ok: true });
+  assert.deepEqual(dbg.clic.map((c) => c[0]), ['mouseMoved', 'mousePressed', 'mouseReleased'], 'un clic solo, non due intrecciati');
+  const dopo = await A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, dove,
+    { chiedi: async () => ({ x: 5, y: 5, tag: 'bb' }), ora: 3e7 + 10_000 });
+  assert.deepEqual(dopo, { ok: true }, 'finito il primo, il prossimo passa');
+});
+
+test('una risposta del protocollo che non arriva non ferma il clic né lascia attaccato il debugger', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const s = annidati(URL_LETTORE);
+    // Lo spostamento in una pagina nascosta non risponde mai; pressione e rilascio sì.
+    let dbg = conDebugger(s, [{ sid: 's-lettore', url: URL_LETTORE, salta: true }], { appeso: (p) => p.type === 'mouseMoved' });
+    const msg = { x: 1, y: 1, url: URL_LETTORE };
+    const r = inAttesa(A.clicNelRiquadro(s.wc, msg, { view: vista, ora: 4e7 }));
+    await svuota();
+    assert.deepEqual(r.valore, { ok: true });
+    assert.deepEqual(dbg.clic.map((c) => c[0]), ['mouseMoved', 'mousePressed', 'mouseReleased']);
+    assert.equal(dbg.staccato, 1);
+    // Nemmeno la pressione risponde: passato il tetto il clic si dà per fallito e il debugger si stacca.
+    dbg = conDebugger(s, [{ sid: 's-lettore', url: URL_LETTORE, salta: true }], { appeso: () => true });
+    const appeso = inAttesa(A.clicNelRiquadro(s.wc, msg, { view: vista, ora: 5e7 }));
+    await scorri(A.TETTO_CLIC_MS - 1);
+    assert.equal(appeso.fatto, false);
+    await scorri(1);
+    assert.deepEqual(appeso.valore, { ok: false, code: 'scheda' });
+    assert.equal(dbg.staccato, 1);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('alla domanda del main risponde solo il frame interrogato', () => {
@@ -155,8 +277,8 @@ test('alla domanda del main risponde solo il frame interrogato', () => {
   main.send = (canale, m) => inviati.push(m);
   const wc = { mainFrame: main };
   // La domanda parte davvero dal main verso quel frame soltanto; la risposta la sblocca.
-  const s = { wc, tab: { id: 1 }, frame: { frameTreeNodeId: 5, url: 'https://www.youtube.com/embed/x', origin: 'https://www.youtube.com', parent: main } };
-  const attesa = A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { ora: 2e7 });
+  const s = { wc, tab: { id: 1 }, frame: { frameTreeNodeId: 5, url: URL_LETTORE, origin: 'https://www.youtube.com', parent: main } };
+  const attesa = A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista, davanti: true }, { ora: 2e7 });
   return Promise.resolve().then(async () => {
     const id = inviati[0].id;
     assert.equal(inviati[0].type, 'ad_skip_where');

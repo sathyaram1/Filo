@@ -306,3 +306,41 @@ prova, rossi solo in una routine. Il lanciatore toglie ai test nome e cartella d
 transcript (`ambientePerITest`, sentinella in `tests/unit/unitRunner.test.mjs`); un
 figlio che una prova lancia da sé prende l'ambiente da lì, così un `node --test` a mano
 dà lo stesso esito del lanciatore.
+
+## La pagina nascosta che Playwright tiene sveglia (#1494)
+
+«Salta le pubblicità dei video» riconosce il «Salta» da un'animazione CSS muta, che il
+motore fa partire quando disegna il pulsante. Una pagina nascosta (scheda dietro,
+finestra ridotta a icona o coperta) non disegna: `requestAnimationFrame` si ferma, le
+animazioni non partono, e la pubblicità suonava per intero. La prova «in una scheda in
+secondo piano salta lo stesso» era verde lo stesso.
+
+Playwright, per ogni pagina che aggancia, chiede a Chromium di emulare il fuoco
+(`Emulation.setFocusEmulationEnabled`), e Chromium tratta come visibile una pagina col
+fuoco emulato. Sotto Playwright una scheda dietro, con la vista grande zero e
+`setVisible(false)`, risponde `visibilityState === 'visible'` e disegna a 60 fotogrammi
+al secondo, anche a finestra nascosta. Lo stesso Electron senza Playwright risponde
+`hidden` e i fotogrammi vanno a zero.
+
+- Ciò che cambia a pagina nascosta (animazioni, `rAF`, `IntersectionObserver`,
+  `ResizeObserver`, `visibilitychange`, timer rallentati) si prova con
+  `apriFiloSenzaPlaywright()` di `tests/helpers/filoSenzaPlaywright.mjs`: guida il main
+  dal suo ispettore, come `app.evaluate`, e lascia le pagine senza client di debug.
+- La prova asserisce prima la precondizione, `document.visibilityState === 'hidden'`
+  nella pagina: senza, crede di guardare una scheda dietro e ne guarda una visibile.
+- Le anteprime delle schede svegliano per un attimo la scheda dietro che cambia
+  (`src/main/tabs/anteprime.js`): la prova che deve vedere la pagina nascosta le spegne
+  (`anteprime.chiudi()`), o l'esito dipende da quando scatta la foto.
+- La finestra dei test, parcheggiata fuori schermo e trasparente, tiene nascoste anche
+  le schede davanti. Per la differenza fra davanti e dietro serve la finestra vera
+  (`FILO_HIDE_WINDOW: '0'`), solo su Linux, dove lo schermo è virtuale.
+
+Misurato su Electron 44 e Linux, una pagina nascosta tiene la sua misura;
+`getBoundingClientRect`, `checkVisibility` ed `elementFromPoint` rispondono giusto, i
+timer girano a un secondo, `MutationObserver` funziona e `sendInputEvent` arriva al frame
+principale come clic vero. Il clic del protocollo di debug mandato alla pagina e
+instradato dal punto a un riquadro d'altro sito, con la pagina nascosta o appena tornata
+davanti (non ancora disegnata), lo riceve spesso la pagina che lo ospita; mandato alla
+sessione del riquadro stesso (`Target.setAutoAttach` con `flatten`), nel suo punto, gli
+arriva anche nascosta. Lo spostamento del mouse dello stesso protocollo non risponde
+finché la pagina non disegna.
