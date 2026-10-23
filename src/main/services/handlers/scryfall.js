@@ -659,6 +659,7 @@ module.exports = function register(on, ctx) {
         ...(sort && (cardIds.length || hadList) ? { sort } : {}),
         ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
         ...(retryable ? { retryable: true } : {}),
+        ...(rimedio ? { rimedio } : {}),
         ...(reasoning ? { reasoning } : {}),
         ...(deckOut ? { deck: deckOut } : {}),
         ...(importPending ? { importPending } : {}),
