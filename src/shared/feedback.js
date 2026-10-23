@@ -131,11 +131,12 @@
   // allegato in chiaro lì dentro lo legge chiunque si sia portato via il link.
   async function uploadImage(blob) {
     await assertSealed(blob);
-    const name = attachmentPath(blob.type || 'png');
+    const name = attachmentPath();
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      // Il tipo del blob non conta: un ciphertext è opaco, e il deposito ammette solo questo.
+      headers: { 'Content-Type': ATTACHMENT_CONTENT_TYPE },
       body: blob,
     });
     if (!res.ok) {
