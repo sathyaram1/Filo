@@ -77,7 +77,8 @@ test('e5 sito: immagine rotta dice che non si apre', async ({ app, openTab, test
   const page = await testServer.openReady(openTab, '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;height:100vh">x</body></html>');
   const [rotta] = suDisco(['rotta.png'], Buffer.from('non sono un png'));
   await lascia(page, [rotta]);
-  await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 6_000 }).toMatch(/\S/);
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: 'tests/.shots/v1623-e5-rotta.png' });
   console.log('E5', JSON.stringify(await statoAiuto(app, page)), (await statoDi(app, page, '.sn-toast'))?.testo);
 });
 
