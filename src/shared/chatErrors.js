@@ -100,6 +100,8 @@
   // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
   // gestisce Filo non ce l'ha (#1344.1).
   const DOVE_ALTRO_MODELLO = 'in Opzioni → Modelli per azione';
+  const FRASE_CONTESTO_PIENO = 'c\'è più testo di quanto il modello riesca a leggere insieme: chiedimi meno pagine alla volta, '
+    + 'accorcia il messaggio o ricomincia in una chat nuova.';
 
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
