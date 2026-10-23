@@ -43,6 +43,16 @@ test('accenti, apostrofi, maiuscole e le parole che Chromium aggiunge al suo diz
   assert.ok(D.proposte('perche').includes('perché'), 'le lettere accentate passano intere nelle proposte');
 });
 
+test('l\'apostrofo in fondo (imperativi, troncamenti, elisioni) e quello tipografico non fanno una parola sbagliata', async () => {
+  const D = await dizionario('it-IT');
+  const giuste = ["di'", "fa'", "va'", "sta'", "da'", "be'", "dell'", "Dell'", "sant'", "quell'", "un'", "tutt'", "nient'",
+    'l’albero', 'c’è', 'po’', 'va’'];
+  assert.deepEqual(giuste.filter((p) => D.sbagliate([p])[0]), []);
+  assert.deepEqual(giuste.filter((p) => D.proposte(p).length), [], 'una parola giusta non ha proposte');
+  assert.deepEqual(D.sbagliate(["andatto'", 'andatto’', 'l’andatto', "qzxw'"]), [true, true, true, true]);
+  assert.ok(D.proposte('l’andatto').length, 'una sbagliata con l\'apostrofo tipografico ha le sue proposte');
+});
+
 test('i limiti di Chromium: oltre 64 byte la parola non si controlla, oltre 24 niente proposte, al più cinque', async () => {
   const D = await dizionario('it-IT');
   assert.deepEqual(D.sbagliate(['x'.repeat(65), 'è'.repeat(33), '', '   ']), [false, false, false, false]);
