@@ -1691,9 +1691,12 @@ class TabManager {
   }
 
   // Una pulizia partita da sola senza il giudizio del modello lo dice (#1618): l'avviso resta finché non lo si chiude,
-  // perché il giro dell'inattività parte quando l'utente non c'è, e torna solo se cambia il motivo.
+  // perché il giro dell'inattività parte quando l'utente non c'è, e torna solo se cambia il motivo. Quella chiesta a
+  // mano lo dice già a chi l'ha chiesta.
   _dichiaraGiudizio(mancato, errore, trigger) {
     if (!mancato) { this._giudizioMancatoDetto = null; return; }
+    console.warn(`[Filo] pulizia delle schede (${trigger}) senza giudizio del modello:`, errore ? (errore.message || errore) : 'nessuna funzione di giudizio');
+    if (trigger === 'manual') return;
     let perche = '';
     try {
       const CE = globalThis.SN_CHAT_ERRORS;
