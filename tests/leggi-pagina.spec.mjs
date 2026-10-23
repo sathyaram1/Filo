@@ -368,7 +368,7 @@ test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece 
   const giri = await chiamate(app);
   const letto = esitiDi(giri[1]).join('\n');
   expect(letto).toContain('letta dalla scheda aperta');
-  expect(letto).toContain('solo la sua prima parte');
+  expect(letto).toContain('Filo ha solo la prima parte');
 });
 
 // #1574: su una macchina lenta la lettura di una scheda enorme scadeva e al modello non arrivava niente. Qui la scadenza
