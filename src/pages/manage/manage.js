@@ -5278,8 +5278,8 @@
     rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
     all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
     // Il salto vale per la versione che verifica e audit hanno letto (#1040.1): niente fusione e niente richiesta.
-    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto: non si fonde e non si chiede il via libera. Rimandala in lavorazione, così il giro nuovo li legge.', giroNuovo: true },
-    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza non si fonde. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
+    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto, quindi non entra in main e non chiede il tuo via libera. Rimandala in lavorazione e un giro nuovo li leggerà.', giroNuovo: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza quella il ramo non entra in main. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
   };
 
   // Un esito che chiede un giro nuovo resta per pratica: la rilettura dopo l'esito ridisegna il pannello e
