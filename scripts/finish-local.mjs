@@ -441,7 +441,11 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
     if (p.esito === 'rosso_anche_su_main') perche = 'sono rossi uguali anche su main da solo, senza test rotti in più';
     else if (p.contenuto) perche = `rifatti sul ramo (che contiene già main ${m}) in una cartella pulita sono verdi`;
     else perche = `sul risultato della fusione con main ${m}, che è ciò che arriva su main, sono verdi`;
-    const righe = [...(ins ? [testoProva(p)] : []), `▸ Controlli di logica rossi sul ramo da solo, ma ${perche}: non sono del ramo, proseguo.`];
+    const b = p.esito === 'verde' && !p.contenuto ? String(p.baseRamo || '').slice(0, 8) : '';
+    const base = b
+      ?` Il ramo parte da main ${b}, più vecchio: i commit arrivati dopo su main li rendono verdi. Per riprovarli su main da solo si usa ${m}, non la base del ramo.`
+      : '';
+    const righe = [...(ins ? [testoProva(p)] : []), `▸ Controlli di logica rossi sul ramo da solo, ma ${perche}: non sono del ramo, proseguo.${base}`];
     return { ferma: false, rosso: false, messaggio: righe.join('\n') };
   }
   let motivo;
