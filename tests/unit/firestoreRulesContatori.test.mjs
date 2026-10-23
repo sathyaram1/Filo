@@ -219,7 +219,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
     for (const c of C.MISURE_MODELLI) {
       ora[c][f] = {};
       for (const r of [...C.RESTI[c]].sort((a, b) => b.length - a.length)) {
-        ora[c][f][`${lunghissimo(k++)}|${r}`] = 7;
+        ora[c][f][`${lunghissimo(k++ % 1000)}|${r}`] = 7;
         ora[c][f][`altro|${r}`] = 7;
       }
     }
