@@ -65,11 +65,13 @@ test('la frase sotto la risposta nomina i siti delle pagine rimaste fuori e dice
     { url: 'https://www.esempio.it/a', parziale: false },
     { url: 'https://altro.example/b', parziale: false },
   ]);
-  assert.match(due, /lasciato fuori 2 pagine lette \(esempio\.it e altro\.example\)/);
+  assert.match(due, /lasciato fuori 2 pagine \(esempio\.it e altro\.example\)/);
   assert.match(due, /chiedimi di rileggerle/);
   const una = FC.frasePagineLasciate([{ url: 'https://esempio.it/a', parziale: true }]);
   assert.match(una, /di una pagina \(esempio\.it\) ho tenuto solo l'inizio/);
   assert.match(una, /chiedimi di rileggerla/);
+  const tutte = FC.frasePagineLasciate([{ url: 'https://a.it/', parziale: false }, { url: 'https://b.it/', parziale: true }]);
+  assert.match(tutte, /lasciato fuori una pagina \(a\.it\) e di un'altra \(b\.it\) ho tenuto solo l'inizio\. Se ti servono/);
   assert.equal(FC.frasePagineLasciate([]), '');
   assert.equal(FC.frasePagineLasciate(null), '');
   // Un indirizzo che non è un indirizzo non entra nella frase, e niente parentesi vuote.
