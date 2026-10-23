@@ -108,6 +108,9 @@
     LIMIT_REACHED: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
+    // Il modello di lettura vuole il nome di una voce, o non conosce quello scritto: si scrive in Preferenze.
+    TTS_VOICE_REQUIRED: 'voce',
+    TTS_VOICE_UNKNOWN: 'voce',
   };
   // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
   // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
