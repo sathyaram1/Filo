@@ -249,6 +249,8 @@ class StratoDelMenu {
       return;
     }
     if (canale === 'strato:esegui') {
+      // Una voce che apre una pagina di Filo la apre col clic dell'utente (handlers/origine.js, filoNegatoAllaPagina).
+      if (unClic) require('./services/permessiPagine').gestoSulloStrato(m.wc);
       if (d.inline != null) {
         const cammino = interi(d.cammino);
         if (!unClic || !Number.isInteger(d.inline) || !cammino) return;

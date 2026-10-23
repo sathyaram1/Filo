@@ -356,6 +356,12 @@ function gestoDiFilo(wc) {
   wc._filoGestoUiAlle = Date.now();
 }
 
+// Il clic vero su una voce dello strato del menu (src/main/stratoDelMenu.js) è sull'interfaccia di Filo sopra la scheda:
+// vale per gestoDellUtente come quello sul menu disegnato nella pagina, e alla pagina non dà niente (#1506).
+function gestoSulloStrato(wc) {
+  if (wc) wc._filoGestoUiAlle = Date.now();
+}
+
 // Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
 // pagina ha già speso il gesto per la sua pubblicità (#737.1 giro 6). Lo segna il preload su un input vero, prima
 // che la pagina apra: vale per quell'indirizzo, una volta, subito.
@@ -866,7 +872,7 @@ function siDato(ses, url, parte) {
 module.exports = {
   installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
+  gestoDiFilo, gestoSulloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },
