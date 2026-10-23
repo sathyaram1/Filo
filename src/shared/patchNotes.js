@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.248', date: '2026-10-23',
+      features: [
+        'Ctrl+Tab ti porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima si torna alla prima. Vanno anche Ctrl+PagGiù e Ctrl+PagSu, e su Mac si usa Control.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.247', date: '2026-10-22',
       features: [
         'Quando un sito si prende lo schermo intero, come il pulsante di un video, in alto compare per qualche secondo il suo nome vero con «Esc per uscire». Così sai chi hai davanti anche quando la pagina copre tutto lo schermo. Torna portando il mouse sul bordo alto, e quanto resta lo scegli in Preferenze, nelle impostazioni avanzate.',
