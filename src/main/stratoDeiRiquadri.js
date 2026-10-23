@@ -43,6 +43,10 @@ function numero(v) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function principaleDi(sender) {
+  try { return !!sender && !sender.frame?.parent; } catch (_) { return false; }
+}
+
 // L'ancora di una risposta arriva in px della pagina; lo strato, a zoom 1, la vuole in px della vista.
 function ancoraNellaVista(ancora, zoom) {
   if (!ancora || typeof ancora !== 'object') return null;
