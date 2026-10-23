@@ -462,5 +462,5 @@
     return out.join('\n');
   }
 
-  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, conversazioniRecenti, testoConversazioni, listTabs };
+  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, conversazioniRecenti, testoConversazioni, listTabs, SCHEDE_ELENCATE };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
