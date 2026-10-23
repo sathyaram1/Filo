@@ -2,7 +2,6 @@
 // «password»: gli indirizzi dei campi che l'aiuto del sito manda al modello, e il codice di una pagina di programmazione.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { vistaAvviso, copertura } from '../../helpers/avvisoSito.mjs';
-import { home } from '../../helpers/chatFinta.mjs';
 
 async function superaAvviso(app) {
   const coperta = async () => (await copertura(app).catch(() => null))?.coperta === true;
