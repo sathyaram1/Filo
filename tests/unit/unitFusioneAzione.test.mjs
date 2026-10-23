@@ -5,12 +5,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { MARCA, leggiArgomenti, campoEsito, rigaEsito, codiceUscita } from '../../scripts/unit-fusione-azione.mjs';
+import { workflowInVigore } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CARTELLA = join(ROOT, '.github', 'workflows');
@@ -51,8 +52,8 @@ test('strumenti di main, ramo dal suo sha, titolo che il server cerca', () => {
 
 // Gira codice non fidato nell'ambito delle cache di main: una cache letta da un'altra corsa sarebbe sua da avvelenare.
 test('nessun workflow usa le cache di Actions', () => {
-  for (const f of readdirSync(CARTELLA).filter((n) => /\.ya?ml$/.test(n))) {
-    const t = senzaCommenti(readFileSync(join(CARTELLA, f), 'utf8'));
+  for (const { nome: f, testo } of workflowInVigore()) {
+    const t = senzaCommenti(testo);
     assert.doesNotMatch(t, /actions\/cache@|^\s+cache:|package-manager-cache: true/m, `${f} usa una cache`);
   }
 });

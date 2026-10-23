@@ -11,6 +11,7 @@ import { dirname, join, relative } from 'node:path';
 import vm from 'node:vm';
 import nodeUrl from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
@@ -180,7 +181,7 @@ test('il pacchetto di Filo porta il preload impacchettato, scritto prima dell\'a
 
 test('i pacchetti per Windows, Mac e Linux si guardano dentro prima di uscire', () => {
   for (const f of ['release.yml', 'verifica-mac.yml', 'verifica-linux.yml']) {
-    const w = leggi('.github', 'workflows', f);
+    const w = leggiWorkflow(f);
     assert.match(w, /extractFile\(process\.argv\[1\], 'generato\/page-preload\.js'\)/, `${f}: nessuno controlla il preload nell'asar`);
     assert.match(w, /componi\(\)\.codice/, `${f}: il preload nel pacchetto non si confronta coi sorgenti`);
   }

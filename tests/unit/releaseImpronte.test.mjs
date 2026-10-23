@@ -10,6 +10,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { cartellaTemporanea, togliCartella, collegaCartella } from '../helpers/percorsi.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PKG = createRequire(resolve(ROOT, 'package.json'))('./package.json');
@@ -297,7 +298,7 @@ describe('Mac e Linux scrivono la stessa pagina nello stesso momento', () => {
 
   test('l\'attesa prima di rileggere supera la finestra in cui l\'altro lavoro può ancora scrivere', () => {
     // Lettura e scrittura altrui stanno ognuna sotto il tetto di gh: oltre, gh viene fermato e si rilegge da capo.
-    const yml = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+    const yml = leggiWorkflow('release.yml');
     const valori = [...yml.matchAll(/--verifica-dopo (\d+)/g)].map((m) => Number(m[1]));
     assert.equal(valori.length, 2, 'Mac e Linux rileggono entrambi');
     for (const s of valori) assert.ok(s * 1000 > 2 * M.GH_TETTO_MS, `${s} s non bastano: l'altro può scrivere dopo la rilettura`);

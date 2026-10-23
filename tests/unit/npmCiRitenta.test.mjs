@@ -3,17 +3,17 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve, join, delimiter } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { fileURLToPath } from 'node:url';
 import { installa, daRitentare, esegui, ATTESE_S } from '../../scripts/npm-ci-ritenta.mjs';
+import { leggiWorkflow, workflowInVigore } from '../helpers/workflowInVigore.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
-const WORKFLOWS = resolve(ROOT, '.github', 'workflows');
 
 const ROSSO_503 = 'npm error command sh -c node install.js\nnpm error HTTPError: Response code 503 (Service Unavailable)\n';
 const ROSSO_LOCK = 'npm error code EUSAGE\nnpm error `npm ci` can only install packages when your package.json and package-lock.json are in sync.\n';
@@ -121,24 +121,24 @@ describe('npm ci che ritenta', () => {
 describe('ogni workflow installa passando dallo script che ritenta', () => {
   const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
   const passiDi = (testo) => senzaCommenti(testo).split(/^ {6}- (?=name: |uses: |run: )/m).slice(1);
-  const files = readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
+  const files = workflowInVigore();
 
   test('nessun `npm ci` nudo', () => {
     assert.ok(files.length >= 4);
     let installazioni = 0;
-    for (const f of files) {
-      for (const passo of passiDi(readFileSync(resolve(WORKFLOWS, f), 'utf8'))) {
+    for (const { nome: f, testo } of files) {
+      for (const passo of passiDi(testo)) {
         // Come comando, non come parola: l'avviso della suite nomina `npm ci` nel testo.
         if (!/(?:^|run:|[;&|]|\bthen|\belse)\s*npm ci\b|npm-ci-ritenta/m.test(passo)) continue;
         installazioni++;
         assert.match(passo, /npm-ci-ritenta\.mjs/, `${f}: un passo lancia \`npm ci\` senza lo script che ritenta:\n${passo.slice(0, 200)}`);
       }
     }
-    assert.ok(installazioni >= 6, `trovate ${installazioni} installazioni: suite, due verifiche e tre pubblicazioni`);
+    assert.ok(installazioni >= 7, `trovate ${installazioni} installazioni: suite, due verifiche, il cancello e tre pubblicazioni`);
   });
 
   test('dove si costruisce un tag vecchio, lo script arriva dal riparo di questa corsa', () => {
-    const yml = readFileSync(resolve(WORKFLOWS, 'release.yml'), 'utf8');
+    const yml = leggiWorkflow('release.yml');
     for (const nome of ['release-mac', 'release-linux']) {
       const inizio = yml.search(new RegExp(`^ {2}${nome}:\\s*$`, 'm'));
       assert.ok(inizio >= 0, nome);
@@ -155,7 +155,7 @@ describe('ogni workflow installa passando dallo script che ritenta', () => {
   });
 
   test('la pubblicazione Windows regge un commit provato più vecchio dello script', () => {
-    const yml = senzaCommenti(readFileSync(resolve(WORKFLOWS, 'release.yml'), 'utf8'));
+    const yml = senzaCommenti(leggiWorkflow('release.yml'));
     assert.match(yml, /if \[ -f scripts\/npm-ci-ritenta\.mjs \]; then node scripts\/npm-ci-ritenta\.mjs; else npm ci; fi/);
   });
 });

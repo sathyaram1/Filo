@@ -10,6 +10,7 @@ import { dirname, resolve, join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import * as Letture from '../../scripts/lib/letture-esterne.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
@@ -106,7 +107,7 @@ test('cancellare le pagine visitate chiede solo un OK, e il documento sulla sicu
 });
 
 test('i pacchetti Mac e Linux ricostruiti dopo hanno la loro esecuzione, e il documento sulla sicurezza lo dice', () => {
-  const rel = leggi('.github', 'workflows', 'release.yml');
+  const rel = leggiWorkflow('release.yml');
   const aParte = /ripubblica_mac/.test(rel) && /Aggiunto il pacchetto Mac a/.test(rel);
   legame(aParte, sicurezza, '«Aggiunto il pacchetto Mac a v0.2.231»', 'esecuzione a parte per i pacchetti ricostruiti');
 });

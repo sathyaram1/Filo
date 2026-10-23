@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,7 +112,7 @@ test('la firma NON tocca le due copie intermedie della build universale', () => 
 
 // ── La pubblicazione automatica ─────────────────────────────────────────────
 
-const WORKFLOW = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+const WORKFLOW = leggiWorkflow('release.yml');
 // I file che devono stare nella release vivono in un posto solo dal #733:
 // il controllo del workflow li chiede a questo script invece di nominarli.
 const { PIATTAFORME } = await import('../../scripts/release-platform-alarm.mjs');

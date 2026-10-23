@@ -16,9 +16,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 import {
   classifyBump,
@@ -229,7 +229,7 @@ describe('il CLI', () => {
 
 describe('il lavoro di pubblicazione non scrive su main', () => {
   test('nel workflow non è rimasto nessun comando che scriva su git', () => {
-    const yml = readFileSync(resolve(__dirname, '..', '..', '.github', 'workflows', 'release.yml'), 'utf8');
+    const yml = leggiWorkflow('release.yml');
     // I commenti raccontano com'era prima: si guardano solo i comandi.
     const comandi = yml.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
     for (const vietato of [/git\s+push/, /git\s+commit/, /npm\s+version/]) {
@@ -243,7 +243,7 @@ describe('il lavoro di pubblicazione non scrive su main', () => {
   test('nel testo dell\'allarme l\'elenco dei test rossi ha un tetto, e il taglio si dice', () => {
     // Verifica del giro 3 sul lavoro di lancio: le righe oltre le ottanta
     // sparivano senza avviso, e con un modulo condiviso rotto sono cento test.
-    const yml = readFileSync(resolve(__dirname, '..', '..', '.github', 'workflows', 'release.yml'), 'utf8');
+    const yml = leggiWorkflow('release.yml');
     const comandi = yml.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
     assert.match(comandi, /head -80/, 'il tetto resta: il testo viaggia in un feedback');
     assert.match(comandi, /elenco tagliato/, 'ma oltre il tetto si dice che manca qualcosa');

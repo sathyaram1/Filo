@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicaVersione, confrontaVersioni } from '../../scripts/release-apply-version.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PKG = readFileSync(join(ROOT, 'package.json'), 'utf8');
@@ -62,7 +63,7 @@ describe('applicaVersione', () => {
 
 // La riga del conto si prende dal workflow, così la prova segue il file vero.
 describe('il conto "qualcosa di nuovo dal tag" di release.yml', () => {
-  const yml = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+  const yml = leggiWorkflow('release.yml');
   const riga = yml.split('\n').map((r) => r.trim()).find((r) => r.startsWith('AHEAD=$(git rev-list'));
   const comando = riga.replace(/^AHEAD=\$\(/, '').replace(/\)$/, '');
 

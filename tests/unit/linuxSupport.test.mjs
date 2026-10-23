@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -228,7 +229,7 @@ test('il pacchetto costruito, se c\'è, ha il lanciatore al posto giusto', () =>
 
 // ── La pubblicazione automatica ─────────────────────────────────────────────
 
-const WORKFLOW = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+const WORKFLOW = leggiWorkflow('release.yml');
 const linuxJob = () => {
   const i = WORKFLOW.search(/^\s{2}release-linux:/m);
   assert.notEqual(i, -1, 'il lavoro che costruisce la versione Linux è sparito dalla pubblicazione automatica');

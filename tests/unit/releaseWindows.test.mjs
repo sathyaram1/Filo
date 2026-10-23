@@ -9,9 +9,10 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const YML = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+const YML = leggiWorkflow('release.yml');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
 function jobWindows() {
@@ -82,7 +83,7 @@ test('il controllo sta fra il caricamento e la pubblicazione, e gira solo quando
   assert.ok(carica < controllo && controllo < pubblica,
     'il controllo deve stare DOPO il caricamento e PRIMA che la bozza diventi pubblica');
   const passo = job.slice(controllo).split(/\n\s{6}-\s+name:/)[0];
-  assert.match(passo, /if:\s*steps\.check\.outputs\.should_release == 'true'/);
+  assert.match(job, /^ {4}if:[^\n]*needs\.cancello\.outputs\.should_release == 'true'/m, 'il lavoro Windows parte solo quando c\'è qualcosa da pubblicare');
 });
 
 test('i nomi controllati sono quelli che la costruzione produce', () => {
