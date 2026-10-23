@@ -111,10 +111,22 @@
 
   // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo
   // invio uguale viene rifiutato. Id non ammesso → '', cioè nessuna idempotenza.
+  // La forma è quella che le regole chiedono alla create anonima (#1517): 20-128 caratteri.
   function sanitizeDocId(id) {
     if (!id) return '';
-    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 200);
-    if (!s || s === '.' || s === '..' || /^__.*__$/.test(s)) return '';
+    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 128);
+    if (s.length < 20 || /^__.*__$/.test(s)) return '';
+    return s;
+  }
+
+  // Un id che nessuno indovina, della forma degli id automatici di Firestore: un invio che occupa un id ricavato da
+  // dati pubblici fa passare un 409 per «già scritto da me» (#1517).
+  const ALFABETO_ID = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  function idCasuale(lunghezza = 24) {
+    const byte = new Uint8Array(lunghezza);
+    global.crypto.getRandomValues(byte);
+    let s = '';
+    for (const b of byte) s += ALFABETO_ID[b % ALFABETO_ID.length];
     return s;
   }
 
