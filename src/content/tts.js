@@ -250,7 +250,7 @@
   // `baseChar` è l'offset di `utterText` nel testo completo: mappa l'onboundary sui token
   // globali quando il ripiego parte a metà.
   function playBrowserChunk(s, utterText, baseChar) {
-    if (!ttsSupported()) { Popup.toastErrore('tts_not_supported'); clearHighlight(); reportReadingState(false); return; }
+    if (!ttsSupported()) { Popup.toastErrore('tts_not_supported'); clearHighlight(); reportReadingState(false); contaLettura(s, false); return; }
     const synth = window.speechSynthesis;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(utterText);
