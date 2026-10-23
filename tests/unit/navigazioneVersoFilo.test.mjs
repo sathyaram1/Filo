@@ -23,6 +23,12 @@ test('dalla finestrella vale lo stesso: senza dire niente la vista non è di Fil
   assert.equal(navigazioneVersoFilo(PAGINA_ERRORE), true);
 });
 
+test('la finestrella non arriva nemmeno sulla home nuda: lì non diventerebbe mai una home vera', () => {
+  assert.equal(navigazioneVersoFilo('filo://newtab/', { finestrella: true }), true);
+  assert.equal(navigazioneVersoFilo('filo://options/', { finestrella: true }), true);
+  assert.equal(navigazioneVersoFilo('https://accounts.google.com/', { finestrella: true }), false);
+});
+
 test('la home nuda resta raggiungibile, ma non coi parametri che legge', () => {
   assert.equal(navigazioneVersoFilo('filo://newtab/', { interna: false }), false);
   assert.equal(navigazioneVersoFilo('filo://newtab', { interna: false }), false);
