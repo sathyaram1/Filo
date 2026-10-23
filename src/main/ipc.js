@@ -523,6 +523,11 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.activate(id);
     return { ok: true };
   });
+  ipcMain.handle('tabs:accanto', (event, { verso } = {}) => {
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.attivaAccanto(verso === -1 ? -1 : 1);
+    return { ok: true };
+  });
   ipcMain.handle('tabs:navigate', (event, { id, url }) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.navigate(id, url);
