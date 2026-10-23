@@ -121,6 +121,8 @@ const strato = {
   onCursore: (fn) => { ipcRenderer.on('riquadri:cursore', (_e, forma) => { try { fn(forma); } catch (_) {} }); },
   onApri: (fn) => { ipcRenderer.on('riquadri:apri', (_e, d) => { try { fn(d); } catch (e) { console.error('[Filo riquadri] apri', e); } }); },
   onEsc: (fn) => { ipcRenderer.on('riquadri:esc', () => { try { fn(); } catch (_) {} }); },
+  // Dalla pagina sotto all'Aiuto che sta qui (#1509.3): icona premuta di nuovo, Aiuto spento, passo da scoprire, gesto sul passo.
+  onAiuto: (fn) => { ipcRenderer.on('riquadri:aiuto', (_e, d) => { try { fn(d); } catch (e) { console.error('[Filo riquadri] aiuto', e); } }); },
   // La pagina sotto: indirizzo, origine e titolo, per la bozza e il feedback. Chiesta una volta, prima dei moduli.
   pagina: (() => {
     let p = null;
