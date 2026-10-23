@@ -3619,6 +3619,12 @@ async function eseguiAzioneFilo(action, {
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
         return { executed: true, kept: true, output: dove };
       }
+      case 'CHIUDI_SCHEDE': {
+        const tm = winOf(sender)?._filoTabs;
+        const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
+        const restano = Array.isArray(action._restano) ? action._restano.length : 0;
+        return { executed: chiuse.length > 0, kept: false, output: { chiuse: chiuse.length, ...(restano ? { restano } : {}) } };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
