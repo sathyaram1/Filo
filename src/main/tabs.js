@@ -3874,16 +3874,17 @@ class TabManager {
   }
 
   async _maybeTriageOnReopen() {
-    const inizio = Date.now();
     try {
       const s = await this._readSettings();
       const aa = s && s.autoArchive;
       if (!aa || !aa.enabled || !aa.onClose) return;
       // Il riordino legge il contenuto delle pagine: parte quando la coda della riapertura le ha caricate tutte.
       await this.codaRiapertura.finita();
-      const attesa = Math.max(TRIAGE_DOPO_CODA_MS, TRIAGE_RIAPERTURA_MS - (Date.now() - inizio));
-      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, attesa);
-    } catch (_) {}
+      await Promise.all([new Promise((r) => setTimeout(r, TRIAGE_DOPO_CODA_MS)), this._coloriPronti()]);
+      await this.runAutoTriage({ trigger: 'reopen' });
+    } catch (e) {
+      console.warn('[Filo] riordino delle schede alla riapertura:', e?.message || e);
+    }
   }
 }
 
