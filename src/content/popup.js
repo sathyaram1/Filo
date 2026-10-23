@@ -1326,6 +1326,7 @@
     mountToast,
     unmountToast,
     sottoIlMenu,
+    accantoAllAiuto,
     tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,
