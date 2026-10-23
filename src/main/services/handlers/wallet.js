@@ -889,6 +889,30 @@ module.exports = function register(on, ctx) {
         log.lastErrorAt = null;
         return;
       }
+      ritenta(esito.errore, esito.rimaste, generazione);
+    } catch (e) {
+      // Prima di ogni invio (scriviIsolando non lancia): il lotto torna intero.
+      ritenta(e, batch, generazione);
+    } finally {
+      flushing = false;
+      await saveQueue();
+      if (queue.length && !flushTimer) scheduleFlush(5000);
+    }
+  }
+
+  function ritenta(errore, rimaste, generazione) {
+    log.lastError = String(errore?.message || errore);
+    log.lastErrorAt = new Date().toISOString();
+    if (generazione !== generazioneCoda) {
+      scarta(rimaste.length, 'ricomincia');
+      return;
+    }
+    console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
+    queue.unshift(...rimaste);
+    tagliaCoda();
+    scheduleFlush(30000);
+  }
+  /* FINE_FLUSH */
       log.lastError = String(esito.errore?.message || esito.errore);
       log.lastErrorAt = new Date().toISOString();
       if (generazione !== generazioneCoda) {
