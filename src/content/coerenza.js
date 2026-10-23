@@ -300,15 +300,17 @@
   // Dove sta un gruppo della corrispondenza, dentro il testo trovato: la prima volta che compare dopo `da`.
   const posizione = (testo, pezzo, da = 0) => testo.indexOf(pezzo, da);
 
-  function dateDi(testo, oggi) {
+  // `intorno` (facoltativo): { prima, dopo, titolo } della pagina intorno al campo, per le date senza anno.
+  function dateDi(testo, oggi, intorno) {
     const out = [];
+    const detti = anniDetti(testo, intorno, oggi);
     for (const motore of MOTORI) {
       for (const m of testo.matchAll(motore.giornoMese)) {
         const [tutto, giorno, numero, suffisso, mese, anno] = m;
         const pm = valeLaParola(motore, mese, motore.mesi);
         if (!pm || (!anno && motore.L.ambigue && motore.L.ambigue.has(mese.toLowerCase()))) continue;
         const pn = posizione(tutto, numero, giorno.length);
-        out.push(verifica({ motore, testo: tutto, intero: testo, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
+        out.push(verifica({ motore, testo: tutto, intero: testo, detti, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
       }
       if (motore.meseGiorno) {
         for (const m of testo.matchAll(motore.meseGiorno)) {
@@ -316,7 +318,7 @@
           const pm = valeLaParola(motore, mese, motore.mesi);
           if (!pm) continue;
           const pn = posizione(tutto, numero, giorno.length + mese.length);
-          out.push(verifica({ motore, testo: tutto, intero: testo, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
+          out.push(verifica({ motore, testo: tutto, intero: testo, detti, inizio: m.index, oggi, giorno: [giorno, 0], numero: [numero, pn, suffisso], mese: pm.indice, anno }));
         }
       }
       for (const m of testo.matchAll(motore.numerica)) {
@@ -325,7 +327,7 @@
         const anno = annoBarra || annoAltro;
         if (!anno && !DOPO_NUMERICA.test(testo.slice(m.index + tutto.length))) continue;
         const pn = posizione(tutto, primo, giorno.length);
-        const base = { motore, testo: tutto, intero: testo, inizio: m.index, oggi, giorno: [giorno, 0], numero: [primo, pn, ''], anno };
+        const base = { motore, testo: tutto, intero: testo, detti, inizio: m.index, oggi, giorno: [giorno, 0], numero: [primo, pn, ''], anno };
         if (motore.lingua !== 'en') {
           out.push(verifica({ ...base, mese: Number(secondo) - 1 }));
           continue;
