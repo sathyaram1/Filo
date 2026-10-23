@@ -179,17 +179,18 @@ describe('installare senza rompere niente', () => {
   test('il doppio clic: il secondo avvio aspetta l\'installazione del primo invece di farne un\'altra insieme', () => {
     const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
     try {
-      const primo = installatoreFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      const blocco = fileBlocco(dir, dir);
       const secondo = installatoreFinto(dir, {});
-      let attese = 0;
-      let righe = [];
+      const righe = [];
+      const primo = installatoreFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
       const r = allineaPacchetti(dir, {
         cartellaBlocchi: dir, log: () => {},
         installa: (x) => {
-          // Mentre il primo installa, parte il secondo.
+          assert.ok(existsSync(blocco), 'chi installa tiene il blocco');
+          // Mentre il primo installa parte il secondo; la sua attesa è il tempo in cui il primo finisce.
           const r2 = allineaPacchetti(dir, {
             cartellaBlocchi: dir, installa: secondo.installa, log: (s) => righe.push(s),
-            attendi: () => { attese++; if (attese === 1) primo.installa(x); rmSync(join(dir, readdirSync(dir).find((n) => n.endsWith('.lock')))); },
+            attendi: () => { primo.installa(x); rmSync(blocco); },
           });
           assert.equal(r2.esito, 'allineati', 'finito il primo, al secondo non resta niente');
           return { codice: 0, errore: '' };
@@ -199,17 +200,19 @@ describe('installare senza rompere niente', () => {
       assert.equal(primo.chiamate.length, 1);
       assert.deepEqual(secondo.chiamate, [], 'npm non è partito due volte insieme');
       assert.match(righe.join('\n'), /Un altro avvio sta installando/);
+      assert.equal(existsSync(blocco), false);
+    } finally { togliCartella(dir); }
+  });
 
-      // Un blocco rimasto da un avvio morto a metà non ferma per sempre: oltre il tetto si riprende.
-      rmSync(join(dir, 'node_modules', 'hash-wasm'), { recursive: true });
-      const vecchio = join(dir, 'vecchio');
-      mkdirSync(vecchio);
-      const terzo = installatoreFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
-      allineaPacchetti(dir, { cartellaBlocchi: vecchio, installa: () => { writeFileSync(join(vecchio, readdirSync(vecchio)[0]), ''); throw new Error('morto'); }, log: () => {} });
-      writeFileSync(join(vecchio, 'filo-pacchetti-finto.lock'), '');
-      const lontano = () => Date.now() + 16 * 60_000;
-      const r3 = allineaPacchetti(dir, { cartellaBlocchi: vecchio, installa: terzo.installa, log: () => {}, ora: lontano, attendi: () => { throw new Error('non doveva aspettare'); } });
-      assert.equal(r3.esito, 'installati');
+  test('un blocco rimasto da un avvio morto a metà non ferma per sempre: oltre il tetto si riprende', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    try {
+      writeFileSync(fileBlocco(dir, dir), '');
+      const f = installatoreFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      const dopo = () => Date.now() + TETTO_INSTALLAZIONE_MS + 60_000;
+      const nonAspettare = () => { throw new Error('non doveva aspettare'); };
+      assert.equal(allineaPacchetti(dir, { cartellaBlocchi: dir, installa: f.installa, log: () => {}, ora: dopo, attendi: nonAspettare }).esito, 'installati');
+      assert.equal(existsSync(fileBlocco(dir, dir)), false);
     } finally { togliCartella(dir); }
   });
 
