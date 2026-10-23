@@ -221,25 +221,34 @@
       return s.fine;
     };
     attiva = sessione;
+    inCorso();
     return sessione;
   }
 
+  function mandaConto(esito, invio, misura) {
+    try {
+      const r = chrome.runtime.sendMessage({
+        type: global.SN_MSG.MSG.CONTATORI_EVENTO, misura, cosa: 'dettatura', motivo: esito.motivo, frasi: esito.frasi,
+        invio: String(invio || ''), provvisorie: !!esito.provvisorie, id: esito.id,
+      });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
   // Una sessione si conta una volta (#1467), da chi sa che fine ha fatto il testo: `invio` dall'elenco dei contatori
   // (SN_CONTATORI.INVII_DETTATURA). Escono il motivo, quante frasi e l'invio, mai le parole.
   function contaSessione(esito, invio) {
     if (!esito || esito.contata) return;
     esito.contata = true;
-    try {
-      const r = chrome.runtime.sendMessage({
-        type: global.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'dettatura', motivo: esito.motivo, frasi: esito.frasi,
-        invio: String(invio || ''), provvisorie: !!esito.provvisorie,
-      });
-      if (r && typeof r.catch === 'function') r.catch(() => {});
-    } catch (_) {}
+    mandaConto(esito, invio, 'dettatura');
+  }
+  // Quello che si conterebbe se la pagina se ne andasse adesso, col testo ancora da mandare.
+  function segnaSessione(esito, invio) {
+    if (!esito || esito.contata || !esito.id) return;
+    mandaConto(esito, invio, 'in-corso');
   }
 
   global.SN_ASCOLTO = {
-    avvia, supportato, fraseMicrofono, fraseTrascrizione, contaSessione,
+    avvia, supportato, fraseMicrofono, fraseTrascrizione, contaSessione, segnaSessione,
     attiva: () => attiva,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
