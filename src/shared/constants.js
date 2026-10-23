@@ -2005,6 +2005,21 @@
       return [sistema, ...pulite].join('\n\n');
     },
 
+    // #1623 — le immagini che l'utente ha dato all'Aiuto, nel suo messaggio. Solo numeri: nomi e percorsi no, la
+    // risposta la legge il sito (come per i documenti).
+    allegatiAiuto: ({ immagini = 0, grandi = 0 } = {}) => {
+      const n = Math.max(0, Math.floor(Number(immagini) || 0));
+      const g = Math.max(0, Math.floor(Number(grandi) || 0));
+      if (!n && !g) return '';
+      const viste = n === 1 ? 'l’immagine di questo messaggio l’ha allegata l’utente'
+        : n > 1 ? `le ${n} immagini di questo messaggio le ha allegate l’utente` : '';
+      const pagina = n ? ': non sono la pagina, che vedi nello screenshot' : '';
+      const fuori = g ? `${n ? '; ' : ''}ha allegato anche ${g === 1 ? 'un’immagine' : `${g} immagini`} oltre i 4 MB, che non puoi vedere` : '';
+      return `(Sistema: ${esterno().perCanaleSistema(`${viste}${pagina}${fuori}`)}.)`;
+    },
+    // Il messaggio con le sole immagini, senza testo scritto.
+    soloAllegatiAiuto: () => '(Sistema: l’utente ti ha mandato le immagini allegate senza scrivere niente.)',
+
     // Modifica testo: l'utente seleziona un testo in una casella di input e dà
     // un'istruzione su come modificarlo. L'AI restituisce SOLO il testo modificato,
     // niente preamboli/virgolette.
