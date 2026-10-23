@@ -965,7 +965,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
       // Una lezione che ripete una riga tolta dalla persona non si scrive (#872): per i contatori è scartata.
       const buf = await FiloMem.appendLesson(l.testo, { fonti });
       const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
-      if (ultima && ultima.text === l.testo) scritte += 1; else scartate += 1;
+      if (ultima && ultima.text === String(l.testo).trim()) scritte += 1; else scartate += 1;
     }
     contaLezione({ scritte, scartate });
     if (await FiloMem.lessonsBufferShouldCompact()) {
