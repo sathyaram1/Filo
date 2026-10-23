@@ -1392,7 +1392,7 @@ function consumePendingConfirm(sender, action) {
   return rec.scade > Date.now();
 }
 function daPaginaDiFilo(sender) {
-  return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
+  return daFilo(origineDi(sender), sender);
 }
 // La richiesta in cui una finestra guardata resta approvata (#778): la scheda della chat, finché l'utente non scrive di nuovo.
 function chiaveSchermo(sender) {
