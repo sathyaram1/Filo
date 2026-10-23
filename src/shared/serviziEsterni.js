@@ -237,7 +237,7 @@
       base: [], indirizzo: 'il sito della pagina, o quello che ospita l’icona che la pagina dichiara',
       quando: 'pagina',
       occasione: 'a ogni pagina che apri in una scheda, per l’icona da mostrare nella barra',
-      riceve: 'la richiesta dell’icona, con i cookie e la sessione di quella scheda, come la farebbe la pagina',
+      riceve: 'la richiesta dell’icona, dalla sessione di quella scheda; i cookie solo se l’icona sta sul sito della pagina',
       frase: 'gli chiede anche l\'icona da mostrare sulla scheda',
       dove: ['src/main/services/iconaScheda.js'],
     },
