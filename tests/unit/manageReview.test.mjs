@@ -1729,6 +1729,26 @@ test('fusioniSenzaFeedback: restano solo quelle che non hanno una scheda dove vi
   assert.equal(MR.fusioniSenzaFeedback([RICHIESTA, locale], []).length, 2);
 });
 
+// #1517: un documento estraneo col numero della pratica non riceve la richiesta (e il suo via libera) nel dettaglio.
+test('richiestaDiQuesto: con l’id della pratica il numero non basta', () => {
+  const vero = { _id: 'vero', seq: 5, subSeq: 0 };
+  const estraneo = { _id: 'estraneo', seq: 5, subSeq: 0 };
+  const req = { id: 'r', num: '#5', feedbackId: 'vero' };
+  assert.equal(MR.richiestaDiQuesto(req, vero), true);
+  assert.equal(MR.richiestaDiQuesto(req, estraneo), false);
+  assert.equal(MR.richiestaDiQuesto({ id: 'r', num: '#5' }, estraneo), true, 'senza id vale ancora il numero');
+});
+
+test('descriviRiferimento: stato e mittente del documento, la riserva del server, il numero doppio', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'mittenti.js'));
+  const fb = { _id: 'a', seq: 5, status: 'todo', mittenteClasse: 'utente' };
+  assert.deepEqual(MR.descriviRiferimento(fb, null, 1), { testo: 'In coda · utente', doppi: 1 });
+  assert.deepEqual(MR.descriviRiferimento(fb, null, 2), { testo: 'In coda · utente', doppi: 2 });
+  assert.deepEqual(MR.descriviRiferimento(null, { stato: 'design', mittenteClasse: 'routine' }, 0), { testo: 'Design · routine', doppi: 0 });
+  assert.deepEqual(MR.descriviRiferimento(null, null, 3), { testo: '', doppi: 3 });
+  assert.equal(MR.descriviRiferimento(null, { stato: 'inventato' }, 1), null);
+});
+
 test('livelli L1: il pannello del triangolo porta anche la decisione già presa', () => {
   // Lo stato non è uno dei cinque controlli: non ha una forma sua, ma la
   // dashboard lo deve dire da qualche parte.
