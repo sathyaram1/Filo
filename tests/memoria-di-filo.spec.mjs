@@ -332,9 +332,12 @@ test('«dimentica per sempre»: righe arrivate mentre il popup è aperto restano
   await page.locator('#input').fill('dimentica per sempre la storia del caffè');
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  expect((await confirmState(page)).text).toContain('L’utente non beve caffè.');
+  const testo = (await confirmState(page)).text;
+  expect(testo).toContain('L’utente non beve caffè.');
+  // #592.23 — una riga sola: singolare fino in fondo.
+  expect(testo).toContain('Non entrerà più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.');
 
-  const nuove = ['Al bar ordina un caffè d’orzo per la madre.', 'Il caffè in ufficio lo paga Luca.', 'Il martedì porta il caffè ai colleghi.'];
+  const nuove =['Al bar ordina un caffè d’orzo per la madre.', 'Il caffè in ufficio lo paga Luca.', 'Il martedì porta il caffè ai colleghi.'];
   await app.evaluate(async (_e, righe) => {
     for (const r of righe) await globalThis.SN_FILO_MEMORY.appendLesson(r);
   }, nuove);
