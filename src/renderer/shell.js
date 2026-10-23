@@ -8,6 +8,7 @@
     console.error('[Filo shell] filoShell non disponibile (preload non caricato?)');
     return;
   }
+  window.SN_RILASCIO_VISTA?.ascolta(document, { percorsoDi: api.percorsoDelFile, manda: api.rilascioNellaChat });
 
   // Il nome del tasto si compone qui, non nell'HTML: regola in CLAUDE.md § Mac.
   const TASTI = window.SN_TASTI;

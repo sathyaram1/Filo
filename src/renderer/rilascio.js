@@ -34,13 +34,13 @@
   function ascolta(doc, { percorsoDi, manda }) {
     for (const tipo of ['dragenter', 'dragover']) {
       doc.addEventListener(tipo, (e) => {
-        if (e.defaultPrevented || !conImmagini(e.dataTransfer)) return;
+        if (!e.isTrusted || e.defaultPrevented || !conImmagini(e.dataTransfer)) return;
         e.preventDefault();
         try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
       });
     }
     doc.addEventListener('drop', async (e) => {
-      if (e.defaultPrevented || !conImmagini(e.dataTransfer)) return;
+      if (!e.isTrusted || e.defaultPrevented || !conImmagini(e.dataTransfer)) return;
       e.preventDefault();
       const lista = await voci(e.dataTransfer.files, percorsoDi);
       if (lista.length) manda(lista);
