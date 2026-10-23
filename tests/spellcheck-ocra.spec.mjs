@@ -502,7 +502,7 @@ for (const [nome, html] of [
   ['il titolo della pagina dice l\'anno', PAGINA_ANNO({ titolo: 'Diario 2024' })],
   ['l\'intestazione sopra il campo dice l\'anno', PAGINA_ANNO({ fuori: '<header><h1>Diario 2024</h1></header>' })],
 ]) {
-  test(`${nome}: una data giusta di quell'anno non si segna, una sbagliata si corregge su quell'anno`, async ({ app, openTab, testServer }) => {
+  test(`${nome}: una data giusta di quell'anno non si segna, una sbagliata propone il giorno di quell'anno`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await apri(app, openTab, testServer, '{"issues":[]}', html);
     await page.locator('#ta').click();
