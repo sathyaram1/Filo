@@ -154,6 +154,7 @@ class StratoDeiRiquadri {
       s.modale = !!(d && d.modale);
       // Un Aiuto chiuso mentre Filo risponde non si vede ma c'è: la sua risposta resta da aprire (#1432).
       s.aiuto = !!(d && d.aiuto);
+      s.zona = zonaValida(d && d.zona);
       if (!s.aperti && prima) this._restituisci(s);
       clearTimeout(s.timerVuoto);
       const vuoto = () => !s.aperti && !s.aiuto;
