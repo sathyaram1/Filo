@@ -227,16 +227,12 @@ class AvvisoSchermoPieno {
       { label: T('schermo_pieno_menu_regola'), action: 'schermo-pieno:regola' },
     ];
     const b = this.vista.getBounds();
-    // Il menu sta sopra tutto: la pillola non deve sparire sotto di lui mentre lo si legge.
-    this.sopra = true;
-    this._ferma();
     const { showPopupMenu } = require('./popup-menu');
+    // Le voci valgono anche se intanto la pillola è scaduta: il menu è una finestra sua.
     showPopupMenu(this.win, voci, b.x + coord(d && d.x), b.y + coord(d && d.y), (scelta) => {
       const s = testo(scelta);
-      this.sopra = false;
-      if (s === '@action:schermo-pieno:esci') { this.esci(); return; }
-      if (s === '@action:schermo-pieno:regola') { this.regola(); return; }
-      if (this.attivo) this._arma(DOPO_IL_PUNTATORE_MS);
+      if (s === '@action:schermo-pieno:esci') this.esci();
+      else if (s === '@action:schermo-pieno:regola') this.regola();
     });
   }
 
