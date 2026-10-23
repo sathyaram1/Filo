@@ -54,7 +54,7 @@ for (const [nome, html, sel] of [['ck', CK, '.ck-editor__editable'], ['iframe', 
   test(`esplora ${nome}`, async ({ app, openTab, testServer }) => {
     const page = await apri(app, openTab, testServer, html());
     const m = () => page.evaluate(() => window.modello().replace(/ /g, ' '));
-    const dom = () => page.evaluate((s) => document.querySelector(s).innerText.replace(/ /g, ' '), sel);
+    const dom = () => !sel ? m() : page.evaluate((s) => document.querySelector(s).innerText.replace(/ /g, ' '), sel);
     const log = [];
     await page.waitForTimeout(1000);
     if (sel) await page.locator(sel).click();
