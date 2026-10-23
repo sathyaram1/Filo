@@ -83,7 +83,9 @@ const chromeShim = {
         try { return Math.round(t.view.webContents.getZoomFactor() * 100); }
         catch (_) { return null; }
       };
-      const win = finestraConSchede();
+      const chiesta = windowId == null ? null
+        : require('electron').BrowserWindow.getAllWindows().find((w) => w.id === windowId && w._filoTabs && !w.isDestroyed());
+      const win = chiesta || finestraConSchede();
       const tm = win && win._filoTabs;
       if (!tm || !Array.isArray(tm.tabs)) return [];
       return tm.tabs.map((t) => ({
