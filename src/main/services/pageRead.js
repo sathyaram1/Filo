@@ -633,6 +633,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     pagine: esito.pagine || 0,
     scaricataInParte: !!esito.scaricataInParte,
     lettaInParte: !!esito.lettaInParte,
+    schedaNonRisponde,
     soloJavaScript: !!esito.soloJavaScript,
     sospetto: v && v.livello === 'sospetto' ? (v.messaggio || 'sito sospetto') : '',
     ...p,
