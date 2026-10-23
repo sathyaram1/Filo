@@ -101,7 +101,7 @@
       .filter(([, n]) => n > 0);
     const tot = voci.reduce((s, [, n]) => s + n, 0);
     if (!tot) return '';
-    const testa = tot === 1 ? 'Un consumo non è arrivato al registro dei crediti' : `${tot} consumi non sono arrivati al registro dei crediti`;
+    const testa = tot === 1 ? 'Un consumo non è stato registrato' : `${tot} consumi non sono stati registrati`;
     const frase = (m, n) => SCARTATE_MOTIVI[m][n === 1 ? 0 : 1];
     if (voci.length === 1) return `${testa}: ${frase(voci[0][0], tot)}.`;
     return `${testa}: ${voci.map(([m, n]) => `${n} ${frase(m, n)}`).join(', ')}.`;
