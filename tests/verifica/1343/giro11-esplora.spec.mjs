@@ -102,3 +102,18 @@ test('esplora: Condividi e QR sulla home di Filo', async ({ app }) => {
   const tr = await icona(app, 'translate');
   console.log('HOME TR disabled', await tr.getAttribute('aria-disabled'), 'sugg', await tr.getAttribute('data-sugg'));
 });
+
+test('esplora: Condividi sulla pagina d\'errore e sul PDF', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    tm.navigate(tm.activeId, 'http://127.0.0.1:9/irraggiungibile');
+  });
+  await pausa(4000);
+  await app.evaluate(({ clipboard }) => clipboard.writeText('niente'));
+  const share = await icona(app, 'share');
+  console.log('ERR SHARE disabled', await share.getAttribute('aria-disabled'));
+  await share.click({ force: true });
+  await pausa(2000);
+  console.log('ERR SHARE appunti', await appunti(app));
+});
