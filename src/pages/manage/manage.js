@@ -71,6 +71,12 @@
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515): un campo per chiave della risposta del main.
+  const mgJudgeCampi = {
+    tettoUsd: ['mgJudgeBudget', 'mgJudgeBudgetSave', 'mgJudgeBudgetRimetti', 'mgJudgeBudgetMsg'],
+    maxCaratteri: ['mgJudgeChars', 'mgJudgeCharsSave', 'mgJudgeCharsRimetti', 'mgJudgeCharsMsg'],
+  };
+  for (const k of Object.keys(mgJudgeCampi)) mgJudgeCampi[k] = mgJudgeCampi[k].map((id) => document.getElementById(id));
 
   const mgLogLoading = document.getElementById('mgLogLoading');
   const mgLogDenied  = document.getElementById('mgLogDenied');
