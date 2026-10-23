@@ -1659,8 +1659,10 @@ class TabManager {
             if (!Array.isArray(r && r.decisions)) throw erroreDiPulizia('Il modello ha risposto senza dire quali schede tenere. Riprova, o scegli un altro modello in Opzioni → Modelli per azione.');
             return r.decisions;
           })();
+          giudizio.catch(() => {});
           const scaduto = new Promise((_, no) => {
             tetto = setTimeout(() => no(erroreDiPulizia('Il modello non ha risposto in tempo. Riprova più tardi.')), GIUDIZIO_TETTO_MS);
+            tetto.unref?.();
           });
           decisions = await Promise.race([giudizio, scaduto]);
           giudizioMancato = false;
