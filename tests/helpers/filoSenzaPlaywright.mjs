@@ -10,19 +10,55 @@ import { argomentiScala } from './scala.mjs';
 import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const ELETTRONE = createRequire(import.meta.url)('electron');
+const richiedi = createRequire(import.meta.url);
 const PARTENZA_MS = 30_000;
 const RIGHE = 400;
+
+/**
+ * `valuta(espressione)` la esegue nel processo dell'ispettore a `url` e ne rende il valore.
+ * Il client è il `ws` di Playwright, non il WebSocket di Node: quello c'è solo dal 22, e su GitHub si gira col 20 (#1611).
+ */
+export async function collegaIspettore(url, uscita = () => '') {
+  const { ws: ClienteWs } = richiedi('playwright-core/lib/utilsBundle');
+  const sock = new ClienteWs(url);
+  await new Promise((ok, ko) => { sock.onopen = ok; sock.onerror = () => ko(new Error(`ispettore irraggiungibile\n${uscita()}`)); });
+
+  let n = 0;
+  const attese = new Map();
+  sock.onmessage = (e) => {
+    const m = JSON.parse(String(e.data));
+    const a = m.id && attese.get(m.id);
+    if (!a) return;
+    attese.delete(m.id);
+    if (m.error) a.ko(new Error(m.error.message));
+    else a.ok(m.result);
+  };
+  const manda = (method, params) => new Promise((ok, ko) => {
+    const id = ++n;
+    attese.set(id, { ok, ko });
+    sock.send(JSON.stringify({ id, method, params }));
+  });
+
+  async function valuta(expression) {
+    const r = await manda('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    if (r.exceptionDetails) {
+      const d = r.exceptionDetails;
+      throw new Error(`nel main: ${(d.exception && d.exception.description) || d.text}`);
+    }
+    return r.result.value;
+  }
+
+  return { valuta, chiudi: () => { try { sock.close(); } catch (_) {} } };
+}
 
 /**
  * Apre Filo con un profilo vuoto. `evaluate(fn, arg)` gira nel main come `app.evaluate` di Playwright (fn riceve il
  * modulo electron); `nelFrame(url, codice)` esegue `codice` nel mondo della pagina del frame a quell'indirizzo.
  */
 export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
-  if (typeof globalThis.WebSocket !== 'function') throw new Error('serve Node 22 o più nuovo: manca WebSocket');
   const userData = cartellaTemporanea('filo-senza-pw-');
   const gruppo = process.platform !== 'win32';
-  const proc = spawn(ELETTRONE, ['--inspect=0', ...argomentiScala, ...args, '.'], {
+  const proc = spawn(richiedi('electron'), ['--inspect=0', ...argomentiScala, ...args, '.'], {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test', ...env },
     detached: gruppo,
@@ -50,41 +86,16 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
   };
   const scadenza = (ms, cosa) => new Promise((_, ko) => { const t = setTimeout(() => ko(new Error(`${cosa}\n${uscita()}`)), ms); t.unref?.(); });
 
-  let sock;
+  let ispettore;
   try {
     const url = await Promise.race([indirizzo, morto.then(() => { throw new Error(`Filo è uscito prima di aprire l'ispettore\n${uscita()}`); }),
       scadenza(PARTENZA_MS, 'l\'ispettore del main non è comparso')]);
-    sock = new WebSocket(url);
-    await new Promise((ok, ko) => { sock.onopen = ok; sock.onerror = () => ko(new Error(`ispettore irraggiungibile\n${uscita()}`)); });
+    ispettore = await collegaIspettore(url, uscita);
   } catch (e) {
     ammazza();
     throw e;
   }
-
-  let n = 0;
-  const attese = new Map();
-  sock.onmessage = (e) => {
-    const m = JSON.parse(String(e.data));
-    const a = m.id && attese.get(m.id);
-    if (!a) return;
-    attese.delete(m.id);
-    if (m.error) a.ko(new Error(m.error.message));
-    else a.ok(m.result);
-  };
-  const manda = (method, params) => new Promise((ok, ko) => {
-    const id = ++n;
-    attese.set(id, { ok, ko });
-    sock.send(JSON.stringify({ id, method, params }));
-  });
-
-  async function grezzo(expression) {
-    const r = await manda('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-    if (r.exceptionDetails) {
-      const d = r.exceptionDetails;
-      throw new Error(`nel main: ${(d.exception && d.exception.description) || d.text}`);
-    }
-    return r.result.value;
-  }
+  const grezzo = ispettore.valuta;
 
   const evaluate = (fn, arg) => grezzo(`(async () => (${fn.toString()})(process.mainModule.require('electron'), ${JSON.stringify(arg ?? null)}))()`);
 
@@ -103,7 +114,7 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
 
   async function chiudi() {
     try { await Promise.race([evaluate(({ app }) => { setTimeout(() => app.quit(), 0); return true; }), scadenza(2000, 'quit')]); } catch (_) {}
-    try { sock.close(); } catch (_) {}
+    ispettore.chiudi();
     await Promise.race([morto, new Promise((ok) => setTimeout(ok, 5000).unref?.())]);
     ammazza();
     togliCartella(userData);

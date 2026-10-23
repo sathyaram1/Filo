@@ -395,11 +395,12 @@
 
   // L'avviso «manca il modello» si dà una volta per pagina: la descrizione parte a ogni
   // immagine e ripetere il toast sarebbe rumore.
+  // La frase dice dove si sceglie il modello: l'avviso porta il tasto per andarci (#663, #1344.1).
   const modelConfigWarned = new Set();
-  function warnModelConfigOnce(message) {
+  function warnModelConfigOnce(message, res) {
     if (!message || modelConfigWarned.has(message)) return;
     modelConfigWarned.add(message);
-    try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
+    try { Popup.showToast(message, { duration: 7000, rimedio: res || null }); } catch (_) {}
   }
 
   // «Descrizione…» solo finché può davvero arrivare: un'attesa che non finirà mai è una
@@ -442,25 +443,31 @@
       }).catch(() => {});
       return null;
     }
+    // La descrizione si chiede una volta sola: una richiesta andata male lascerebbe la voce in cronologia su
+    // «Descrizione…» per sempre (crediti finiti, rete, risposta vuota: #1344.1). Le si dice la verità.
+    const nonArrivera = (chiave) => {
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t(chiave),
+      }).catch(() => {});
+    };
     if (!res?.ok) {
       // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
       if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
-        warnModelConfigOnce(res.error);
-        // La voce in cronologia incolla resterebbe su «Descrizione…» per
-        // sempre: dille la verità invece di far finta che stia arrivando.
-        chrome.runtime.sendMessage({
-          type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
-          dataUrl,
-          description: I18n.t('clipboard_image_no_model'),
-        }).catch(() => {});
+        warnModelConfigOnce(res.error, res);
+        nonArrivera('clipboard_image_no_model');
+      } else {
+        nonArrivera('clipboard_image_non_descritta');
       }
       console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
     imageDescNoModel = false;
-    if (!res.text) {
+    if (!res.text || !res.text.replace(/\s+/g, ' ').trim()) {
       console.warn('[SN] descrizione immagine: risposta vuota');
+      nonArrivera('clipboard_image_non_descritta');
       return null;
     }
     const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);

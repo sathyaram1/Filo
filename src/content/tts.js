@@ -305,10 +305,21 @@
     // imposta — mostrarlo com'è vale molto più di una frase generica.
     // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
     // che Filo non conosce: il messaggio dice dove scriverlo.
-    // E quando nessun fornitore ammesso serve il modello: la richiesta non è partita.
-    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST'];
+    // E quando nessun fornitore ammesso serve il modello, o manca l'invito: la richiesta non è partita.
+    // L'avviso porta il tasto della pagina che la frase nomina (#663, #1344.1).
+    const CE = global.SN_CHAT_ERRORS;
+    const rimedio = { code: res.errorCode, keyRefused: !!res.keyRefused, reason: res.reason };
+    const spiegato = [...((CE && CE.CODICI_GIA_SCRITTI) || ['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY']), 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
     if (spiegato.includes(res.errorCode) && res.error) {
-      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000, rimedio: { code: res.errorCode } }); } catch (_) {}
+      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000, rimedio }); } catch (_) {}
+      return;
+    }
+    // La chiave rifiutata (crediti finiti compresi): il perché in italiano, non «non disponibile ora».
+    if (res.keyRefused && CE) {
+      const frase = CE.sentence(CE.fromResponse({
+        error: res.error, status: res.status, provider: res.provider, userMessage: res.userMessage, keyRefused: true,
+      }, ''));
+      try { Popup.showToast(I18n.t('tts_model_fallback_reason', frase), { duration: 9000, rimedio }); } catch (_) {}
       return;
     }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';

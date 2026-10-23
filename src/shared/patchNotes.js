@@ -12,8 +12,13 @@
       version: '0.2.248', date: '2026-10-23',
       features: [
         'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi.',
+        'Ctrl+Tab porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima scheda si riparte dalla prima. Su Mac si premono col tasto Control.',
       ],
-      fixes: [],
+      fixes: [
+        'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
+        'Il tasto che apre Crediti, Opzioni o Preferenze c\'è anche nell\'avviso di «Leggi», in quello della descrizione di un\'immagine copiata e sotto una ricerca dei mazzi il cui controllo delle carte non è partito. Nell\'Editor «Rigenera titolo» e «Rigenera riassunto», quando non riescono, dicono perché e portano dove si rimedia. «Leggi» coi crediti finiti dice che sono finiti, non più che la voce non è disponibile.',
+        'Quando un errore chiede di scegliere un altro modello, manda in Opzioni → Modelli per azione e ha il tasto per andarci. Prima nominava una pagina che solo chi gestisce Filo ha. Un\'immagine copiata la cui descrizione non può arrivare, per esempio coi crediti finiti, nella cronologia degli appunti non resta più su «Descrizione…».',
+      ],
     },
     {
       version: '0.2.247', date: '2026-10-22',

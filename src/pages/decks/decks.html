@@ -397,6 +397,11 @@
       margin-left: auto;
     }
     .dk-mod-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+    .dk-mod-btn + .dk-mod-btn { margin-left: 0; }
+    /* Il parere non è arrivato: il motivo col colore dell'errore, e in evidenza il tasto che toglie l'ostacolo. */
+    .dk-op-errore { color: var(--sn-error); font-size: 12px; }
+    .dk-mod-btn.dk-rimedio { background: var(--sn-accent); border-color: var(--sn-accent); color: var(--sn-on-accent, #fff); }
+    .dk-mod-btn.dk-rimedio:hover, .dk-mod-btn.dk-rimedio:focus-visible { filter: brightness(1.05); color: var(--sn-on-accent, #fff); outline: none; }
     /* Nel carosello il box modulare sta tra la barra e l'hint tastiera. */
     #carouselModule { margin-top: 2px; }
     /* Carosello: immagine piena, barra con indicatore, frecce e toggle. Occhi sull'immagine, mano sulla tastiera. */

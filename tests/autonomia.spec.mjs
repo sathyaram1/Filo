@@ -342,6 +342,7 @@ test('chat a Normale, dopo una ricerca: «dimentica per sempre» vuole la parola
     expect((await confirmState(page)).hasInput, 'dopo una lettura il «per sempre» vuole la parola, non un OK').toBe(true);
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
+    expect(testo).toContain('Non entrerà più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
 
@@ -381,6 +382,10 @@ test('Conservativo, dopo una pagina web letta in chat: «dimentica» chiede e di
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
+    // Una riga sola, al singolare fino in fondo (#592.23).
+    mkdirSync(SHOTS, { recursive: true });
+    await page.screenshot({ path: join(SHOTS, 'autonomia-dimentica-una-riga.png') });
+    expect(testo).toContain('Non entrerà più nelle conversazioni. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
     await clickConfirm(page, 'cancel');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
