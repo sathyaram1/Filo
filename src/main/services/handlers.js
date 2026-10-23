@@ -5365,7 +5365,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       tettoRispostaChat = (LR && LR.perAzione(ACTIONS.FILO_CHAT, settingsChat.lunghezzaRisposte, Defaults.get().lunghezzaRisposte)) || 0;
     } catch (_) {}
     const finestra = finestreDeiModelli.get(modelloChat);
-    if (finestra != null && finestra < tettiChat.token) tettiChat = { ...tettiChat, token: finestra };
+    if (finestra != null && finestra < tettiChat.token) {
+      tettiChat = { ...tettiChat, token: finestra };
+      contaSe('adattamento', ACTIONS.FILO_CHAT, modelloPrimo, 'finestra_piccola');
+    }
     filo = await componiFilo(tettiChat);
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
