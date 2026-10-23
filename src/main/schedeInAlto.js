@@ -8,6 +8,8 @@ const { tastoPremuto } = require('./tastoDelMouse');
 const BORDO_PX = 2;
 // Appena scese, la pagina si sposta sotto il puntatore: un movimento arrivato in quell'istante non è un'uscita.
 const ASSESTAMENTO_MS = 150;
+// Il mondo isolato in cui si guarda se la prima riga della pagina è un riquadro: la pagina non lo vede.
+const MONDO = 1343;
 
 class SchedeInAlto {
   // tabs: il TabManager della finestra (contentFullscreen, pageFullscreen, barra.opzioni, layout()).
@@ -15,6 +17,10 @@ class SchedeInAlto {
     this.tabs = tabs;
     this.visibili = false;
     this.scese = 0;
+    // I movimenti visti dal riquadro principale: uno che arriva solo da un altro riquadro non li fa crescere.
+    this.mossePagina = 0;
+    // La domanda in volo «la prima riga è un riquadro?»: un movimento lontano dal bordo la annulla (_ferma).
+    this.sondaCima = null;
     this.timer = { spinta: null, uscita: null };
     const shell = win && win.webContents;
     if (shell && typeof shell.on === 'function') shell.on('input-event', (_e, input) => this._dallaShell(input));
@@ -36,6 +42,7 @@ class SchedeInAlto {
     if (!sotto || sotto.webContents !== wc) return;
     if (input.type === 'mouseLeave') { this._ferma('spinta'); return; }
     if (input.type !== 'mouseMove') return;
+    this.mossePagina += 1;
     if (!this._attivo()) { this.nascondi(); return; }
     if (this.visibili) {
       if (Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
@@ -69,12 +76,13 @@ class SchedeInAlto {
       const y = Number(input.y);
       if (!(Number.isFinite(y) && y <= BORDO_PX) || tastoPremuto(input)) { this._ferma('spinta'); return; }
       if (this.timer.spinta || this.sondaCima) return;
-      const giro = this.mossePagina;
-      this.sondaCima = this._riquadroInCima(wc).then((si) => {
+      const sonda = this._riquadroInCima(wc).then((si) => {
+        if (this.sondaCima !== sonda) return;
         this.sondaCima = null;
-        if (!si || this.mossePagina !== giro || this.visibili || this.timer.spinta || !this._attivo()) return;
+        if (!si || this.visibili || this.timer.spinta || !this._attivo()) return;
         this.timer.spinta = setTimeout(() => { this.timer.spinta = null; this.mostra(); }, this._opzioni().attesaMs);
       });
+      this.sondaCima = sonda;
     });
   }
 
@@ -119,6 +127,7 @@ class SchedeInAlto {
   }
 
   _ferma(nome) {
+    if (nome === 'spinta') this.sondaCima = null;
     if (this.timer[nome]) { clearTimeout(this.timer[nome]); this.timer[nome] = null; }
   }
 }

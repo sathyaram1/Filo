@@ -2884,6 +2884,8 @@ class TabManager {
     // dal main (non dal content script, che manda un campione di attività anche
     // senza input e non è iniettato ovunque). Il semplice passaggio del mouse
     // NON conta: muovere il cursore sopra una scheda non è usarla.
+    // Il bordo in alto a schermo intero sopra un riquadro di un altro sito: `input-event` vede solo il principale.
+    wc.on('before-mouse-event', (_e, input) => this.schedeInAlto.dalRiquadro(wc, input));
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
       this.barra.inputDa(wc, input);
