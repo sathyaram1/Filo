@@ -87,10 +87,11 @@ function misureDelleRegole() {
   return out;
 }
 const M = misureDelleRegole();
+const MC = misureChiuse(CHIAMATE);
 
 // Le regole applicate a un documento, come le applica il server a una stringa unita.
-function passa(doc) {
-  for (const [campo, r] of Object.entries(M)) {
+function passa(doc, misure = M) {
+  for (const [campo, r] of Object.entries(misure)) {
     const v = doc[campo];
     if (r.lista) {
       if (!Array.isArray(v) || v.length > r.quante || v.join('#').length > r.tetto || !new RegExp(r.valori).test(v.join('#'))) return `${campo}`;
