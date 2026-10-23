@@ -29,4 +29,7 @@ contextBridge.exposeInMainWorld('barra', {
     ipcRenderer.on('barra:cursore', (_event, forma) => { try { fn(forma); } catch (_) {} });
   },
   chiedi: manda('barra:chiedi'),
+  // #1623 — le immagini lasciate sulla barra: { voci: [{ nome, percorso } | { nome, dataUrl }] }.
+  rilascio: manda('barra:rilascio'),
+  percorsoDelFile: (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } },
 });
