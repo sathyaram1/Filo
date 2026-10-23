@@ -809,7 +809,7 @@
       riaperte: { rapido: null, ragionato: null },
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
-      rimandati: new Set(), inVista: [],
+      rimandati: new Set(), inVista: [], intorno: null, ritaglio: '', fotogrammi: 0,
       // I valori dei segnaposti sopra le x e i lampi dei valori appena messi (#1448), in uno strato che riceve il mouse.
       valori: null, badge: new Map(), lampi: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
