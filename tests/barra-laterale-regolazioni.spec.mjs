@@ -28,7 +28,10 @@ test('da Preferenze: l\'attesa sul bordo, la chiusura, la striscia e l\'apertura
   // Fuori dai limiti torna dentro, a vista: il campo dice il valore in uso.
   await expect(pref.locator('#barraUscita')).toHaveValue('100');
   await pref.locator('#barraStriscia').uncheck();
-  await expect.poll(() => opzioni(app)).toEqual({ spinta: true, attesaMs: 900, uscitaMs: 100, striscia: false });
+  // Le schede che scendono dal bordo alto a schermo intero (#1246) hanno lo stesso posto e la stessa strada.
+  await expect(pref.locator('#barraSchede')).toBeChecked();
+  await pref.locator('#barraSchede').uncheck();
+  await expect.poll(() => opzioni(app)).toEqual({ spinta: true, attesaMs: 900, uscitaMs: 100, striscia: false, schede: false });
 
   const sito = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
