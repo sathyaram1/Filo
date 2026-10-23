@@ -81,6 +81,7 @@ test('un\'immagine si chiede dalla sessione della scheda, col suo user agent e l
   assert.equal(passi.length, 1);
   assert.equal(passi[0].ses, DIRETTA);
   assert.equal(passi[0].credenziali, 'include');
+  assert.equal(passi[0].iniziatore, 'null', 'il CDN è un altro sito: solo i cookie che concede a tutti');
   assert.equal(passi[0].headers.Referer, 'https://pagina.example/');
   assert.equal(passi[0].headers['User-Agent'], 'Mozilla/5.0 (Filo)');
   // Senza Referer la politica dichiarata è no-referrer, con: quella che dà lo stesso valore.
