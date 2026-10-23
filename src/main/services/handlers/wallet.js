@@ -381,12 +381,13 @@ module.exports = function register(on, ctx) {
     if (!msg || msg.confermato !== true) return { ok: false, status: 'needs_confirm' };
     identity.resetIdentity();
     walletStore.metteDaParte();
+    const righeTolte = await svuotaCodaPerRicominciare();
     lastServer = null;
     ultimaLettura = null;
     letturaValida = letturePartite;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
-    return { ok: true, state: await readState() };
+    return { ok: true, righeTolte, state: await readState() };
   }));
 
   // L'identità dell'installazione che non si crea è un problema diverso da «il server non
