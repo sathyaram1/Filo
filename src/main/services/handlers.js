@@ -4302,6 +4302,19 @@ function consiglioPaginaNonLetta(out) {
   }
 }
 
+// Una lettura fermata prima della fine della pagina lo dice in ogni pezzo, anche in quello vuoto oltre l'ultimo o in una
+// prima parte senza testo: se no il modello crede di avere la pagina intera e risponde che il dato non c'è (#1307.3).
+function avvisoLettaInParte(out, { indirizzo = '', oltre = false, vuota = false } = {}) {
+  const perche = out.lettaInParte ? 'la scheda aperta è troppo grande per leggerla tutta' : 'la pagina supera i 5 MB';
+  const fine = Number(out.totale) || 0;
+  const dove = oltre ? `finisce al carattere ${fine} e oltre non c'è altro da leggere, ma la pagina continua`
+    : vuota ? 'non contiene testo, ma la pagina continua'
+      : (out.troncata ? `finisce al carattere ${fine}` : 'finisce qui sopra');
+  return `[Della pagina${indirizzo ? ` "${indirizzo}"` : ''} Filo ha solo la prima parte, perché ${perche}: la parte letta ${dove}. `
+    + `Se il dato non c'è${out.troncata && !oltre ? ' nemmeno nei pezzi che seguono' : ''}, dillo all'utente invece di `
+    + 'concludere che la pagina non lo contiene.]';
+}
+
 // Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
 // imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
 function pageReadsForPrompt(actions) {
@@ -4313,19 +4326,32 @@ function pageReadsForPrompt(actions) {
     const out = a._output;
     if (!out || !('pageRead' in out)) continue;
     const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.url || out.pageRead || ''), 500));
+    // Il consiglio di aprirla in una scheda non vale per la scheda che c'era e non ha risposto.
+    const schedaMuta = (ripiego) => `[Pagina "${indirizzo}" non letta: la scheda aperta non ha risposto in tempo (forse è `
+      + `troppo grande, o è ancora occupata) e ${ripiego}. Puoi riprovare una volta; se non basta dillo all'utente, senza `
+      + 'inventare il contenuto e senza concludere che la pagina non ha il dato.]';
     if (!out.ok) {
-      blocks.push(`[Pagina "${indirizzo}" non letta: ${E.perCanaleSistema(out.dettaglio || 'lettura non riuscita')}. ${consiglioPaginaNonLetta(out)}]`);
+      const dettaglio = E.perCanaleSistema(out.dettaglio || 'lettura non riuscita');
+      blocks.push(out.schedaNonRisponde ? schedaMuta(`scaricarla a parte non è riuscito (${dettaglio})`)
+        : `[Pagina "${indirizzo}" non letta: ${dettaglio}. ${consiglioPaginaNonLetta(out)}]`);
       continue;
     }
     const totale = Number(out.totale) || 0;
     const da = Number(out.da) || 0;
     const fino = Number(out.fino) || 0;
     if (!out.testo) {
+      const inParte = out.lettaInParte || out.scaricataInParte;
       if (totale > 0 && da >= totale) {
-        blocks.push(`[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+        blocks.push(inParte
+          ? avvisoLettaInParte(out, { indirizzo, oltre: true })
+          : `[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+      } else if (inParte) {
+        blocks.push(avvisoLettaInParte(out, { indirizzo, vuota: true }));
       } else if (out.fonte === 'scheda') {
         blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
           + 'dillo all\'utente e non inventare il contenuto.]');
+      } else if (out.schedaNonRisponde) {
+        blocks.push(schedaMuta('la copia scaricata a parte è senza testo'));
       } else {
         blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
           + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '
@@ -4348,10 +4374,11 @@ function pageReadsForPrompt(actions) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
     }
-    if (out.scaricataInParte) blocco += '\n[La pagina supera i 5 MB: ne è arrivata solo la prima parte.]';
-    if (out.lettaInParte) {
-      blocco += '\n[La scheda aperta è troppo grande per leggerla tutta: qui sopra c\'è solo la sua prima parte. Se il dato '
-        + 'non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
+    if (out.lettaInParte || out.scaricataInParte) blocco += `\n${avvisoLettaInParte(out)}`;
+    if (out.schedaNonRisponde) {
+      blocco += '\n[La scheda aperta su questa pagina non ha risposto in tempo (forse è troppo grande, o è ancora occupata): '
+        + 'questo testo è stato scaricato a parte e può non essere quello che vede l\'utente, per esempio dove ha fatto l\'accesso. '
+        + 'Se il dato non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
     }
     if (out.soloJavaScript) {
       blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
