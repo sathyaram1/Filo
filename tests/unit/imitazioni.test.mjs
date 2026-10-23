@@ -124,6 +124,14 @@ test('il nome intero di un marchio dove non è suo dà l’avviso, all’apertur
   assert.deepEqual(male, []);
 });
 
+// Sul suffisso di un paese il nome intero è spesso del marchio stesso: lì decide il modello, non la forma certa.
+test('i siti veri di un marchio su un suffisso di paese, o col suo secondo nome, non si prendono l’avviso', () => {
+  for (const h of ['mastercard.com.au', 'mastercard.es', 'bancoposta.it', 'google.se', 'amazon.co.za', 'microsoft.it']) {
+    assert.equal(livello('https://' + h + '/'), 'safe', h);
+    assert.equal(imitazioneNelMenu('https://' + h + '/'), false, h);
+  }
+});
+
 test('un marchio corto caduto per caso in un nome generato (cloud, anteprime) non è un’imitazione', () => {
   const fissi = [
     'x1tuyb9bunqa2.esempio-ostile.com', 'xg2bukfvpsdh10.esempio-ostile.com', 'xr7in9n26zv16.esempio-ostile.com',
