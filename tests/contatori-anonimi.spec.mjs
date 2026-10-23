@@ -167,15 +167,19 @@ test('una risposta della chat porta nell’ora contesto, cache, ragionamento, us
   expect(Math.round(resti('spesa')[0][1])).toBe(420 * n);
   expect(o.chiamate['filo-chat']).toEqual({ c1: n });
 
-  // Il documento dell'ora passa la validazione, e non porta niente di quello che si è scritto.
+  // I due documenti dell'ora passano la validazione, e non portano niente di quello che si è scritto.
   const esito = await app.evaluate(async () => {
     const C = globalThis.SN_CONTATORI;
     const s = await globalThis.SN_CONTATORI_MAIN.letto();
     const k = C.oraDi(Date.now());
-    const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: k, app: '0.2.249', os: 'win', dati: s.ore[k] });
-    return { valida: C.valida(doc), testo: JSON.stringify(doc) };
+    const base = { pseudonimo: 'a'.repeat(20), chiave: k, app: '0.2.249', os: 'win', dati: s.ore[k] };
+    const ora = C.documento(base);
+    const chiamate = C.documentoChiamate(base);
+    return { ora: C.valida(ora), chiamate: C.validaChiamate(chiamate), vuote: C.senzaChiamate(chiamate), testo: JSON.stringify([ora, chiamate]) };
   });
-  expect(esito.valida.ok, esito.valida.motivo).toBe(true);
+  expect(esito.ora.ok, esito.ora.motivo).toBe(true);
+  expect(esito.chiamate.ok, esito.chiamate.motivo).toBe(true);
+  expect(esito.vuote).toBe(false);
   expect(esito.testo).not.toMatch(/mario|due più due|Ecco fatto/);
 });
 

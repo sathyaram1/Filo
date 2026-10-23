@@ -21,7 +21,7 @@ const OR = globalThis.SN_PROVIDER_OPENROUTER;
 beforeEach(() => OR.forgetReasoningRefusals());
 
 const M = 'deepseek/deepseek-v4-pro';
-const doc = (ora) => C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: ora });
+const doc = (ora) => C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: ora });
 const voci = (d, campo, f) => (d[campo][f] ? C.leggiModelli(campo, d[campo][f]).map((x) => `${x.modello}|${x.resto}|${x.n}`) : []);
 
 test('ogni misura va nella sua fascia, e quella senza dato non entra', () => {
@@ -47,7 +47,7 @@ test('ogni misura va nella sua fascia, e quella senza dato non entra', () => {
   assert.deepEqual(voci(d, 'adattamenti', 'filo-chat'), [`${M}|ragionamento_tolto|1`]);
   assert.deepEqual(voci(d, 'spesa', 'tts'), ['openai/gpt-4o-mini-tts|router|20']);
   for (const c of ['contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi']) assert.equal(d[c].tts, undefined, `${c}: la voce non ha quel dato`);
-  assert.equal(C.valida(d).ok, true, C.valida(d).motivo);
+  assert.equal(C.validaChiamate(d).ok, true, C.validaChiamate(d).motivo);
 });
 
 test('la spesa si somma con la virgola e si arrotonda quando parte, per modello e origine; un costo nullo non entra', () => {
@@ -86,7 +86,7 @@ test('oltre il tetto dell’ora il modello diventa «altro»: il conto resta int
   ora.contesto.help[`${M}|t3k`] = 4;
   ora.contesto['appunti di mario'] = { [`${M}|t2k`]: 1 };
   const d = doc(ora);
-  assert.equal(C.valida(d).ok, true, C.valida(d).motivo);
+  assert.equal(C.validaChiamate(d).ok, true, C.validaChiamate(d).motivo);
   assert.equal(d.contesto['appunti di mario'], undefined);
   assert.ok(!/t3k|un testo/.test(d.contesto.help));
 });
