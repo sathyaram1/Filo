@@ -1,15 +1,17 @@
 // Handler di dominio: ciclo di vita dei tab via shim chrome.tabs, segnali
 // colore/attività dal content script, triage manuale e schede archiviate.
 
-const { soloFilo } = require('./origine');
+const { soloFilo, filoNegatoAllaPagina } = require('./origine');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, contattabilePrimaDelClic } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
-  on('_tabs:create', async (msg, sender) => {
+  on('_tabs:create', async (msg, sender, origin) => {
     const win = winOf(sender);
     if (!win || !win._filoTabs) return { ok: false };
+    // chrome.tabs.create c'è anche nei content script dei siti.
+    if (filoNegatoAllaPagina(msg.url, sender, origin)) return { ok: false, code: 'forbidden' };
     const id = win._filoTabs.openTab(msg.url || 'filo://newtab/');
     return { ok: true, id };
   });

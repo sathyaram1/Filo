@@ -26,9 +26,4 @@ function paginaDeiBloccati(url) {
     && /^\/(security\.html)?$/.test(u.pathname) && !u.search && !u.hash);
 }
 
-/** Una pagina del web (o un content script che lei guida) apre una pagina di Filo solo col gesto dell'utente. */
-function aperturaVersoFiloNegata(url, { daFilo = false, gesto = false } = {}) {
-  return !daFilo && !gesto && navigazioneVersoFilo(url, { interna: false });
-}
-
-module.exports = { navigazioneVersoFilo, paginaDeiBloccati, aperturaVersoFiloNegata };
+module.exports = { navigazioneVersoFilo, paginaDeiBloccati };
