@@ -235,7 +235,7 @@
       let v = '';
       if (m[1] === ':' || m[1] === '=') {
         const pezzi = m[2].trim().split(/\s+/);
-        v = valorePassword(pezzi[0], { forma: pezzi.length > 1 });
+        v = MISURA.test(pezzi[1] || '') ? '' : valorePassword(pezzi[0], { forma: pezzi.length > 1 });
       } else if (/^[-–—→]$/.test(m[1])) v = valorePassword(m[2].trim().split(/\s+/)[0], { forma: true });
       else v = valorePassword(m[2]);
       if (v) out.push({ valore: v, regola: 'password' });
