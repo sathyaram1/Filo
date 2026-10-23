@@ -243,7 +243,7 @@
       righe.delete(chiave);
     }
     let posto = tbody.firstChild;
-    for (const { chiave, u } of elenco) {
+    for (const { chiave, u, nodo } of elenco) {
       let r = righe.get(chiave);
       if (!r) {
         r = nuovaRiga(u);
@@ -251,6 +251,7 @@
       } else if (JSON.stringify(u) !== r.impronta) {
         cambiaRiga(r, u);
       }
+      scriviAlbero(r, nodo);
       if (posto !== r.tr) tbody.insertBefore(r.tr, posto);
       if (r.tr.nextSibling !== r.detail) tbody.insertBefore(r.detail, r.tr.nextSibling);
       posto = r.detail.nextSibling;
