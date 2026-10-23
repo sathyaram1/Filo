@@ -153,7 +153,7 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), true, p);
   }
   const tipi = {
-    midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi',
+    midi: 'strumenti', midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi',
     'geolocation-approximate': 'posizione', 'local-network-access': 'rete', 'local-network': 'rete', 'loopback-network': 'rete',
   };
   for (const [p, tipo] of Object.entries(tipi)) {
