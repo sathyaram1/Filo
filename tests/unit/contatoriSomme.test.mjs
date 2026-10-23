@@ -162,7 +162,8 @@ test('impostazioni, conferme, intervista e prime volte contano le copie, nel ver
   const tema = riga(s.impostazioni, 'theme');
   assert.equal(tema.etichetta, 'Tema');
   assert.deepEqual(tema.principale, { n: 7, copie: 7 });
-  assert.deepEqual(tema.celle.valori.map((v) => [v.etichetta, v.copie]), [['scuro', { n: 7, copie: 7 }], ['chiaro', { sotto: true }]]);
+  // Un valore scelto da meno di cinque copie non esce nemmeno col nome.
+  assert.deepEqual(tema.celle.valori.map((v) => [v.etichetta, v.copie]), [['scuro', { n: 7, copie: 7 }]]);
   assert.deepEqual(tema.celle.vie.mano, { n: 7, copie: 7 });
   assert.deepEqual(tema.celle.vie.import, { sotto: true });
   const naviga = riga(s.conferme, 'NAVIGA');
@@ -173,7 +174,8 @@ test('impostazioni, conferme, intervista e prime volte contano le copie, nel ver
   assert.ok(riga(s.conferme, 'correzione').celle.soloPagina);
   const passi = s.intervista.map((r) => r.id);
   assert.deepEqual(passi, C.passiIntervista(), 'i passi dell’intervista nell’ordine in cui si fanno');
-  assert.deepEqual(riga(s.intervista, 'profilo').celle.scelte[0], { scelta: 'spuntata', copie: { n: 7, copie: 7 }, n: { n: 7, copie: 7 } });
+  assert.deepEqual(riga(s.intervista, 'profilo').celle.spuntata, { n: 7, copie: 7 });
+  assert.deepEqual(riga(s.intervista, 'profilo').celle.abbandono, { sotto: true });
   assert.deepEqual(riga(s.primeVolte, 'explain').principale, { n: 7, copie: 7 });
 });
 

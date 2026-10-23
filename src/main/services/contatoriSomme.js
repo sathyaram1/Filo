@@ -464,7 +464,7 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
   const outImpostazioni = lista(impostazioni).map((r) => chiusa(r, periodi, K.impostazione(r.id), {
     cambi: cella(r.cambi),
     valori: [...r.valori.entries()].map(([v, c]) => ({ valore: v, etichetta: K.valore(r.id, v), copie: cellaCopie(c) }))
-      .sort(perCella),
+      .filter((v) => !v.copie.sotto).sort(perCella),
     vie: Object.fromEntries(C.VIE.map((v) => [v, cellaCopie(r.vie.get(v))])),
   }, { copie: true }));
 
@@ -482,8 +482,10 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
   const outIntervista = lista(intervista)
     .sort((a, b) => indice(ordinePassi, a.id) - indice(ordinePassi, b.id))
     .map((r) => chiusa(r, periodi, K.passo(r.id), {
-      scelte: [...r.scelte.entries()].sort((a, b) => indice(C.SCELTE_INTERVISTA, a[0]) - indice(C.SCELTE_INTERVISTA, b[0]))
-        .map(([s, c]) => ({ scelta: s, copie: cellaCopie(c), n: cella(c) })),
+      scelte: [...r.scelte.entries()].filter(([s]) => s !== 'spuntata' && s !== 'abbandono')
+        .sort((a, b) => indice(C.SCELTE_INTERVISTA, a[0]) - indice(C.SCELTE_INTERVISTA, b[0]))
+        .map(([s, c]) => ({ scelta: s, copie: cellaCopie(c) })).filter((x) => !x.copie.sotto),
+      spuntata: cellaCopie(r.scelte.get('spuntata')), abbandono: cellaCopie(r.scelte.get('abbandono')),
     }, { copie: true }));
   const outPrime = lista(primeVolte).map((r) => chiusa(r, periodi, K.primaVolta(r.id), {}, { copie: true }));
 
@@ -499,18 +501,21 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
     },
     attese: ordina(outAttese),
     ricerche: outRicerche.sort((a, b) => indice(C.PANNELLI, a.id) - indice(C.PANNELLI, b.id)),
-    correttore: ordinaCorrettore(outCorrettore, C.TIPI_PROPOSTA),
+    correttore: ordinaCorrettore(outCorrettore.filter((r) => !r.celle.modello || visibile(r)), C.TIPI_PROPOSTA),
     conferme: ordina(outConferme),
     impostazioni: ordina(outImpostazioni),
     anticipi: ordina(outAnticipi),
     chiedi: ordina(outChiedi),
-    erroriVisti: ordina(outErrori),
-    guasti: ordina(outGuasti),
+    erroriVisti: ordina(outErrori.filter(visibile)),
+    guasti: ordina(outGuasti.filter(visibile)),
     intervista: outIntervista,
     primeVolte: ordina(outPrime),
   };
 }
 
+// Le voci che esistono solo perché qualcuno le ha viste (un modello, un codice d'errore) sotto la soglia non escono:
+// anche il nome direbbe che una copia l'ha incontrata. Quelle degli elenchi chiusi restano, col loro «meno di 5».
+const visibile = (r) => !r.principale.sotto;
 function indice(l, x) { const i = l.indexOf(x); return i < 0 ? l.length : i; }
 function perCella(a, b) {
   const va = a.copie && !a.copie.sotto ? a.copie.n : -1;
