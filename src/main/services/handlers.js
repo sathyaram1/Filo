@@ -4355,10 +4355,11 @@ function pageReadsForPrompt(actions) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
     }
-    if (out.scaricataInParte) blocco += '\n[La pagina supera i 5 MB: ne è arrivata solo la prima parte.]';
-    if (out.lettaInParte) {
-      blocco += '\n[La scheda aperta è troppo grande per leggerla tutta: qui sopra c\'è solo la sua prima parte. Se il dato '
-        + 'non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
+    if (out.lettaInParte || out.scaricataInParte) blocco += `\n[${avvisoLettaInParte(out)}]`;
+    if (out.schedaNonRisponde) {
+      blocco += '\n[La scheda aperta su questa pagina non ha risposto in tempo (forse è troppo grande, o è ancora occupata): '
+        + 'questo testo è stato scaricato a parte e può non essere quello che vede l\'utente, per esempio dove ha fatto l\'accesso. '
+        + 'Se il dato non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
     }
     if (out.soloJavaScript) {
       blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
