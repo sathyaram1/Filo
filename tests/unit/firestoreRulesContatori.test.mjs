@@ -132,7 +132,7 @@ test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; 
   assert.deepEqual(Object.keys(ora), [...C.CAMPI]);
   const giorno = C.documentoGiorno({ pseudonimo: 'a'.repeat(20), giorno: '2026-10-15', app: '0.2.243', os: 'win', dati: {} });
   assert.deepEqual(Object.keys(giorno), [...C.CAMPI_GIORNO]);
-  assert.deepEqual(Object.keys(M).sort(), [...C.MISURE].sort(), 'ogni misura ha il suo controllo nelle regole, e nessuna in più');
+  assert.deepEqual(Object.keys(M).sort(), [...C.MISURE_ORA].sort(), 'ogni misura ha il suo controllo nelle regole, e nessuna in più');
 });
 
 test('le chiavi chiuse vengono dagli elenchi dell’app; le altre hanno una forma che ogni voce dell’app rispetta', () => {
