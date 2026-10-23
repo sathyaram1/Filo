@@ -136,8 +136,19 @@ test.describe('con la home già pronta per la scheda nuova', () => {
     const inAttesa = await paginaDellaVista(app, pronta);
     await expect(inAttesa.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
 
-    await configCondivisa(app, { provider: 'gemini' });
+    // La chiave arriva come la mette l'utente nelle Opzioni, non scritta di nascosto nell'archivio.
+    await app.evaluate(() => {
+      const Defaults = globalThis.__filoDefaults;
+      const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+      globalThis.__filoDefaultsGet = origGet;
+      Defaults.get = () => ({ ...origGet(), provider: 'gemini' });
+    });
     await stubProviders(app);
+    const prima = await paginaDellaVista(app, await vistaDavanti(app));
+    await prima.evaluate(async () => {
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: 'k-test' } } });
+    });
+    await expect(prima.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
     const page = await apriSchedaNuova(app, shell);
     expect(page).toBe(inAttesa);
 
