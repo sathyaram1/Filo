@@ -264,6 +264,9 @@
       // «Password: deve…» è testo, e lo guardano le regole sopra; «dbpassword: …», «db_password: …» sono configurazione.
       if (tipo === 'password' && !virgolette && PAROLA_CHIAVE.test(nome) && sep === ':' && nudo !== undefined) continue;
       const g = dq !== undefined ? 4 : sq !== undefined ? 5 : 6;
+      // Una chiamata («password = input(…)») è codice; una frase («"password_label": "Inserisci la password"») è testo.
+      if (g === 6 && s[m.index + m[0].length] === '(') continue;
+      if (tipo === 'password' && /\s/.test(m[g].trim())) continue;
       const v = valorePerNome(nome, m[g]);
       if (v) out.push({ ...alPosto(v, m.indices[g][0], m[g]), regola: tipo === 'password' ? 'password' : 'chiave' });
     }
