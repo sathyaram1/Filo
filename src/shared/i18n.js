@@ -238,6 +238,8 @@
     aiuto_spento_barra: 'Aiuto spento in Preferenze',
     aiuto_spento_sito: 'Filo è spento su questo sito',
     aiuto_spento_pagina: 'Qui l\'Aiuto non c\'è',
+    azioni_spente_pagina: 'Su questa pagina Filo non può agire',
+    azioni_spente_interna: 'Questa pagina di Filo non ha un indirizzo da condividere',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
