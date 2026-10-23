@@ -50,6 +50,16 @@ function assicuraFinestraNormale() {
   return win;
 }
 
+// Chi vuole vedere Filo (seconda apertura, invito da fuori, clic sulla notifica) la finestra la chiede qui, mai a un
+// riferimento tenuto da parte: chiusa la principale con un'altra aperta, quello punta a una distrutta (#1606).
+function mostraFinestraNormale() {
+  const win = assicuraFinestraNormale();
+  if (!win || win.isDestroyed()) return null;
+  try { if (win.isMinimized()) win.restore(); } catch (_) {}
+  revealWindow(win);
+  return win;
+}
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
