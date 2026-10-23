@@ -1924,14 +1924,16 @@
         const price = card.priceEur != null
           ? `${card.priceEur.toFixed(2).replace('.', ',')} € (Cardmarket)` : 'n.d.';
         const prints = printsByName.get(card.name);
+        const fallite = prints == null && printsFailed.has(card.name);
         host.innerHTML = `
           <p class="dk-module-title">Prezzo e dati</p>
           <p>Prezzo: ${esc(price)}</p>
           <p data-prints>${prints != null
-            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}` : 'Ristampe: …'}</p>
+            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}`
+            : (fallite ? 'Ristampe: Scryfall non ha risposto, riprovo quando torni sulla pagina' : 'Ristampe: …')}</p>
           <p data-legal="${card.legalCommander ? 1 : 0}">${card.legalCommander
             ? '✓ Legale in Commander' : '✗ Non legale in Commander'}</p>`;
-        if (prints == null) fetchPrints(card);
+        if (prints == null && !fallite) fetchPrints(card);
       },
     },
     // Parere di Filo (§6): giudizio contestuale carta-vs-mazzo; stantio = pallino discreto
