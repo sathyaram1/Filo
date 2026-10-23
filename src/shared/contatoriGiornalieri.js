@@ -65,8 +65,75 @@
   const MISURE_MODELLI = Object.freeze(Object.keys(RESTI));
   const MISURE_CHIAMATE = Object.freeze([...MISURE_MODELLI, 'chiamate']);
   const CAMPI_CHIAMATE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_CHIAMATE]);
-  // Tutto quello che un'ora tiene sul disco, nei due documenti.
-  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE]);
+  // ── Le attività di Filo da solo o a metà con la persona (#1467) ─────────────
+  // Nel loro documento, accanto all'ora e con lo stesso id, come le chiamate. Per misura una mappa «combinazione → n»:
+  // la combinazione è fatta di nomi da elenchi chiusi uniti da «|», e le sue parti stanno in DIMENSIONI_ATTIVITA.
+  const VERSIONE_ATTIVITA = 1;
+  const COLLEZIONE_ATTIVITA = 'contatori-attivita';
+  const MIN_MS = 60 * 1000;
+  const ORA_MS = 60 * MIN_MS;
+  const GIORNO_MS = 24 * ORA_MS;
+  const SI_NO = Object.freeze(['si', 'no']);
+  const FASCE_PASSI = Object.freeze([['p0', 0], ['p1', 1], ['p2_5', 5], ['p6_20', 20], ['oltre', Infinity]]);
+  const FASCE_TROVATI = Object.freeze([['n0', 0], ['n1', 1], ['n2_oltre', Infinity]]);
+  const FASCE_RISULTATI = Object.freeze([['r0', 0], ['r1_2', 2], ['r3_5', 5], ['oltre', Infinity]]);
+  const FASCE_FRASI = Object.freeze([['f0', 0], ['f1', 1], ['f2_5', 5], ['oltre', Infinity]]);
+  const FASCE_LEZIONI = Object.freeze([['l0', 0], ['l1', 1], ['l2_3', 3], ['oltre', Infinity]]);
+  const FASCE_NON_RIMESSE = Object.freeze([['r0', 0], ['r1', 1], ['r2_5', 5], ['oltre', Infinity]]);
+  const FASCE_SCHEDE = Object.freeze([['s0', 0], ['s1', 1], ['s2_5', 5], ['s6_20', 20], ['oltre', Infinity]]);
+  const ETA_RIGA = Object.freeze([['giorno', GIORNO_MS], ['settimana', 7 * GIORNO_MS], ['mese', 31 * GIORNO_MS], ['oltre', Infinity]]);
+  const ETA_RIAPERTA = Object.freeze([['min10', 10 * MIN_MS], ['ora', ORA_MS], ['giorno', GIORNO_MS], ['oltre', Infinity]]);
+  const ETA_HOME = Object.freeze([['ora', ORA_MS], ['giorno', GIORNO_MS], ['oltre', Infinity]]);
+  const POSIZIONI_SUGGERIMENTO = Object.freeze([['1', 1], ['2', 2], ['3', 3], ['4_oltre', Infinity]]);
+  const ESITI_AIUTO = Object.freeze(['fatto', 'chiusa_prima', 'tetto_passi', 'errore']);
+  const DA_RICERCA = Object.freeze(['chat', 'aiuto']);
+  const FORNITORI_RICERCA = Object.freeze(['tavily', 'duckduckgo', 'nessuno']);
+  // I motivi con cui SN_ASCOLTO chiude una sessione del microfono.
+  const MOTIVI_DETTATURA = Object.freeze(['utente', 'finito', 'muto', 'tempo', 'errore', 'altro', 'annulla']);
+  // «a_mano»: inviata dalla persona senza cambiarla; «nessuno»: niente da inviare (nessuna frase, o la dettatura in un
+  // campo di una pagina, che non ha un invio).
+  const INVII_DETTATURA = Object.freeze(['da_sola', 'cambiata', 'tenuta', 'annullata', 'a_mano', 'nessuno']);
+  const VOCI_LETTURA = Object.freeze(['modello', 'browser', 'mista']);
+  // Perché la lettura è passata alla voce del browser: i codici che l'avviso spiega, la chiave rifiutata, nessun modello.
+  const CODICI_LETTURA = Object.freeze(['NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
+    'NO_ALLOWED_HOST', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN']);
+  const MOTIVI_LETTURA = Object.freeze(['nessuno', ...CODICI_LETTURA.map((c) => c.toLowerCase()), 'chiave_rifiutata',
+    'no_tts_model', ALTRO_ATTIVITA()]);
+  // «q100»: fermata nell'ultimo quarto; «fine»: letta fino in fondo.
+  const FINO_LETTURA = Object.freeze(['q25', 'q50', 'q75', 'q100', 'fine']);
+  const ESITI_COMPATTAZIONE = Object.freeze(['nessuna', 'applicata', 'rimandata']);
+  const VIE_MEMORIA = Object.freeze(['quaderno', 'chat']);
+  const OPERAZIONI_MEMORIA = Object.freeze(['togli', 'correggi', 'ripristina', 'svuota']);
+  const RIGHE_MEMORIA = Object.freeze(['profilo', 'preferenze', 'espansioni', 'lezione', 'tutte']);
+  const TRIGGER_PULIZIA = Object.freeze(['idle', 'reopen', 'manual']);
+  const CHIUSE_DA = Object.freeze(['pulizia', 'duplicato', 'persona']);
+  const ESITI_HOME = Object.freeze(['generata', 'senza_ai_chiave', 'senza_ai_pesi_aperti', 'senza_ai_modelli']);
+  // Il tipo dell'azione di un suggerimento cresce col registro: nelle regole ne sta la forma, l'elenco lo tiene l'app.
+  const TIPO_SUGGERIMENTO = 'tipo';
+  const nomiDi = (fasce) => Object.freeze(fasce.map(([k]) => k));
+  const ND_ETA = 'nd';
+  const conNd = (fasce) => Object.freeze([...nomiDi(fasce), ND_ETA]);
+  // Per misura, le forme possibili della combinazione: ogni forma è l'elenco chiuso di ogni sua parte.
+  const DIMENSIONI_ATTIVITA = Object.freeze({
+    aiuto: [[ESITI_AIUTO, nomiDi(FASCE_PASSI), nomiDi(FASCE_PASSI), nomiDi(FASCE_TROVATI), nomiDi(FASCE_TROVATI)]],
+    ricercaWeb: [[DA_RICERCA, FORNITORI_RICERCA, SI_NO, nomiDi(FASCE_RISULTATI)], [['aiuto'], ['al_tetto']]],
+    dettatura: [[MOTIVI_DETTATURA, nomiDi(FASCE_FRASI), INVII_DETTATURA, SI_NO]],
+    lettura: [[VOCI_LETTURA, MOTIVI_LETTURA, FINO_LETTURA]],
+    lezioni: [[['nulla']], [nomiDi(FASCE_LEZIONI), nomiDi(FASCE_LEZIONI)]],
+    compattazioni: [[ESITI_COMPATTAZIONE, nomiDi(FASCE_NON_RIMESSE)]],
+    memoria: [[VIE_MEMORIA, OPERAZIONI_MEMORIA, RIGHE_MEMORIA, conNd(ETA_RIGA)]],
+    pulizia: [[TRIGGER_PULIZIA, nomiDi(FASCE_SCHEDE), nomiDi(FASCE_SCHEDE), nomiDi(FASCE_SCHEDE), SI_NO]],
+    riaperte: [[CHIUSE_DA, nomiDi(ETA_RIAPERTA)]],
+    home: [[ESITI_HOME]],
+    suggerimenti: [[TIPO_SUGGERIMENTO, nomiDi(POSIZIONI_SUGGERIMENTO), conNd(ETA_HOME)]],
+  });
+  const MISURE_ATTIVITA = Object.freeze(Object.keys(DIMENSIONI_ATTIVITA));
+  const CAMPI_ATTIVITA = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_ATTIVITA]);
+  // Le combinazioni diverse di una misura in un'ora: oltre, la nuova si somma in «altro», e il conto non perde niente.
+  const TETTO_VOCI_ATTIVITA = 100;
+
+  // Tutto quello che un'ora tiene sul disco, nei tre documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_ATTIVITA]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
