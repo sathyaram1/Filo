@@ -104,6 +104,27 @@
     return valido(s) ? s : '';
   }
 
+  // Una riga coi siti incollati di fila («a.it, b.com», «a.it b.com»): un pezzo per sito, e quello che sta fra due siti
+  // in un pezzo solo com'era scritto, perché l'avviso lo ridica intero («studio rossi», non «studio» e «rossi»).
+  // Una riga che è già un sito (un indirizzo con virgole nei parametri) resta una; `salta` (le «e» della chat) non apre pezzi.
+  function pezziDi(riga, salta) {
+    const intera = String(riga == null ? '' : riga).trim();
+    if (!intera) return [];
+    if (daScritto(intera)) return [intera];
+    const out = [];
+    let da = -1;
+    let a = -1;
+    const chiudi = () => { if (da >= 0) out.push(intera.slice(da, a)); da = -1; };
+    for (const m of intera.matchAll(/[^\s,;]+/g)) {
+      if (daScritto(m[0])) { chiudi(); out.push(m[0]); continue; }
+      if (salta && salta.has(m[0].toLowerCase())) continue;
+      if (da < 0) da = m.index;
+      a = m.index + m[0].length;
+    }
+    chiudi();
+    return out;
+  }
+
   // Un elenco scritto a righe: i siti validi (ridotti, senza doppioni) e le righe scartate così com'erano, per dirle;
   // `scartate` le tiene col posto (quanti siti validi le precedevano), per ridarle dove l'utente le aveva scritte.
   // `riduci`, se c'è, dà a ogni sito la voce che l'elenco salva ('' la scarta): così fa la casella dei fidati.
@@ -112,14 +133,7 @@
     const invalid = [];
     const scartate = [];
     for (const line of String(raw == null ? '' : raw).split('\n')) {
-      const intera = line.trim();
-      if (!intera) continue;
-      // Più siti incollati su una riga («a.it, b.com», «a.it b.com») valgono uno per uno, come in chat;
-      // una riga che è già un sito intero (un indirizzo con virgole nei parametri) resta una.
-      // Una riga dove nessun pezzo è un sito («studio rossi») è una riga sola, e scartata torna com'era scritta.
-      const divisa = intera.split(/[\s,;]+/).filter(Boolean);
-      const pezzi = daScritto(intera) || !divisa.some((p) => daScritto(p)) ? [intera] : divisa;
-      for (const riga of pezzi) {
+      for (const riga of pezziDi(line)) {
         const scritto = daScritto(riga);
         const sito = scritto && typeof riduci === 'function' ? riduci(scritto) : scritto;
         if (!sito) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
