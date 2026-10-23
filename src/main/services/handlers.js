@@ -6293,6 +6293,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       if (turno.fermato) { fermato = true; break; }
       if (turno.seguiti.length) await leggiSeguiti();
+      if (pagineLette.length) await pagineNellaFinestra();
       // La scheda scrive la riga del ripiego sotto la risposta: niente avviso in più (#662).
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
