@@ -179,7 +179,7 @@ const SENZA_CORPO = new Set([101, 103, 204, 205, 304]);
 
 // Un passo solo, senza seguire i rimandi: torna { rimando } o { risposta } (una Response del fetch). Il net di Electron
 // e non il fetch della sessione: quello non sa né fermarsi a un rimando né rispondere al proxy che chiede la password.
-function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', referrerPolicy = 'no-referrer', signal } = {}) {
+function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', iniziatore = '', referrerPolicy = 'no-referrer', signal } = {}) {
   const { net } = require('electron');
   return new Promise((resolve, reject) => {
     let finito = false;
@@ -188,7 +188,7 @@ function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', referre
     try {
       req = net.request({
         url, session: ses, method: 'GET', redirect: 'manual', credentials: credenziali,
-        useSessionCookies: credenziali === 'include', referrerPolicy,
+        useSessionCookies: credenziali === 'include', referrerPolicy, ...(iniziatore ? { origin: iniziatore } : {}),
       });
     } catch (e) { reject(e); return; }
     const annulla = () => { try { req.abort(); } catch (_) {} fine(reject, new Error('aborted')); };
