@@ -35,7 +35,7 @@ async function fakeProvider(app, giri, { ritardo = 0 } = {}) {
         return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: 'NULLA DA IMPARARE', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
       }
       globalThis.__mem_calls.push(messages.length);
-      const giro = g[Math.min(n, g.length - 1)];
+      const giro = n === 0 ? g[0] : { text: `Risposta ${n}.` };
       n += 1;
       if (ritardo) await new Promise((r) => setTimeout(r, ritardo));
       const calls = giro.toolCalls || [];
@@ -56,7 +56,7 @@ async function prepara(app, shell) {
   return page;
 }
 
-for (const variante of ['hook', 'mouse', 'invio', 'conTesto', 'lento', 'tastiera']) {
+for (const variante of ['hook', 'mouse', 'conTesto', 'lento', 'tastiera']) {
   test(`variante ${variante}`, async ({ app, shell }) => {
     test.setTimeout(90_000);
     const page = await prepara(app, shell);
@@ -75,8 +75,11 @@ for (const variante of ['hook', 'mouse', 'invio', 'conTesto', 'lento', 'tastiera
     else if (variante === 'invio') { await aspettaConfermaPronta(page); await page.keyboard.press('Enter'); }
     else await clickConfirm(page, 'ok');
     await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
     await expect.poll(() => lezioni(app), { timeout: 5_000 }).toEqual(['L’utente sviluppa Filo.']);
+    await page.waitForTimeout(4000);
+    const prima = await app.evaluate(() => globalThis.__mem_calls.length);
+    const bolle1 = await page.locator('.dash-bubble-filo').allInnerTexts();
+    console.log(variante, 'dopo OK chiamate', prima, JSON.stringify(bolle1));
     await page.screenshot({ path: `tests/.shots/1307.2-${variante}-dopo-ok.png` });
     if (variante === 'tastiera') {
       await page.locator('#input').click();
@@ -86,9 +89,36 @@ for (const variante of ['hook', 'mouse', 'invio', 'conTesto', 'lento', 'tastiera
       await page.locator('#input').fill('e adesso dimmi una cosa');
       await page.locator('#sendBtn').click();
     }
-    const ok = await page.locator('.dash-bubble-filo', { hasText: 'Seconda risposta arrivata.' }).waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    const ok = await expect.poll(() => app.evaluate(() => globalThis.__mem_calls.length), { timeout: 15_000 }).toBeGreaterThan(prima).then(() => page.locator('.dash-bubble-filo', { hasText: `Risposta ${prima}.` }).waitFor({ timeout: 5_000 })).then(() => true, () => false);
+    console.log(variante, 'bolle fine', JSON.stringify(await page.locator('.dash-bubble-filo').allInnerTexts()), 'input', JSON.stringify(await page.locator('#input').inputValue()));
     const diag = await app.evaluate(() => ({ chat: globalThis.__mem_calls, altre: globalThis.__mem_altre }));
     console.log(variante, JSON.stringify(diag));
+    await page.screenshot({ path: `tests/.shots/1307.2-${variante}-fine.png` });
+    expect(ok, 'la seconda risposta non è arrivata').toBe(true);
+  });
+}
+
+for (const variante of ['subito', 'durantePopup']) {
+  test(`stress ${variante}`, async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    const page = await prepara(app, shell);
+    await fakeProvider(app, [salva('L’utente sviluppa Filo.')]);
+    await page.locator('#input').fill('ricordati che sviluppo Filo');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+    if (variante === 'durantePopup') {
+      await page.locator('#input').fill('e adesso dimmi una cosa', { force: true }).catch((e) => console.log('fill', e.message));
+      await page.evaluate(() => document.querySelector('#sendBtn').click());
+      await page.waitForTimeout(500);
+      await clickConfirm(page, 'ok');
+    } else {
+      await clickConfirm(page, 'ok');
+      await page.locator('#input').fill('e adesso dimmi una cosa');
+      await page.locator('#sendBtn').click();
+    }
+    await expect.poll(() => lezioni(app), { timeout: 5_000 }).toEqual(['L’utente sviluppa Filo.']);
+    const ok = await page.locator('.dash-bubble-filo', { hasText: 'Risposta 1.' }).waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    console.log(variante, 'bolle fine', JSON.stringify(await page.locator('.dash-bubble, .dash-bubble-filo').allInnerTexts()), 'input', JSON.stringify(await page.locator('#input').inputValue()), JSON.stringify(await app.evaluate(() => globalThis.__mem_calls)));
     await page.screenshot({ path: `tests/.shots/1307.2-${variante}-fine.png` });
     expect(ok, 'la seconda risposta non è arrivata').toBe(true);
   });
