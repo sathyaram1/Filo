@@ -35,7 +35,13 @@ function corpo(nome) {
   return m[1].replace(/\s+/g, ' ').trim();
 }
 const GIORNO = corpo('contatoriGiorno');
-const ORA = corpo('contatoriOra');
+const ORA_V3 = corpo('contatoriOra');
+const ORA_V2 = corpo('contatoriOraV2');
+const TESTA = corpo('testaOra');
+const MISURE_V2 = corpo('misureOra');
+const MISURE_CHIAMATE = corpo('misureChiamate');
+// Tutto quello che una v3 deve passare, scritto di seguito.
+const ORA = [ORA_V3, TESTA, MISURE_V2, MISURE_CHIAMATE].join(' && ');
 
 function regole() {
   const out = [];
