@@ -1620,7 +1620,13 @@ class TabManager {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
       const cands = this._triageCandidates();
-      if (!cands.length) return { archived: 0 };
+      // Un giro si conta coi suoi numeri, mai con le schede (#1467): quante candidate, archiviate, duplicate.
+      const contaGiro = (archiviate, duplicati, giudizioMancato) => {
+        try {
+          globalThis.SN_CONTATORI_MAIN?.attivita('pulizia', { trigger, candidate: cands.length, archiviate, duplicati, giudizioMancato }, { incognito: !!this.incognito });
+        } catch (_) {}
+      };
+      if (!cands.length) { contaGiro(0, 0, false); return { archived: 0 }; }
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
