@@ -214,7 +214,7 @@
         if (!s.frasi && !s.errore && !s.annullata && motivo !== 'altro') {
           avvisa(t(motivo === 'muto' ? 'voce_err_muto' : 'voce_vuoto'));
         }
-        const esito = { frasi: s.frasi, errore: s.errore, motivo, provvisorie: !!op.provvisorie };
+        const esito = { frasi: s.frasi, errore: s.errore, motivo, provvisorie: !!op.provvisorie, id };
         chiama(op.suFine, esito);
         return esito;
       });
