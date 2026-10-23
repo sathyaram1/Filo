@@ -252,8 +252,10 @@ describe('il pre-avvio', () => {
       writeFileSync(join(piccolo, 'index.js'), 'module.exports = 42;\n');
       const app = join(dir, 'app');
       mkdirSync(join(app, 'scripts', 'lib'), { recursive: true });
-      const pack = npm(['pack', '--pack-destination', app, piccolo], dir);
+      // Nessun percorso fra gli argomenti: su Windows npm passa da cmd.exe, e la temporanea ha uno spazio nel nome.
+      const pack = npm(['pack'], piccolo);
       assert.equal(pack.status, 0, pack.stderr);
+      copyFileSync(join(piccolo, 'piccolo-1.0.0.tgz'), join(app, 'piccolo-1.0.0.tgz'));
       writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0', private: true, dependencies: { piccolo: 'file:piccolo-1.0.0.tgz' } }));
       const prima = npm(['install'], app);
       assert.equal(prima.status, 0, prima.stderr);
