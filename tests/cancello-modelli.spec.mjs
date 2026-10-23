@@ -174,10 +174,11 @@ test('il riordino non manda al modello titolo, indirizzo e testo delle pagine de
       const prima = P.completeWithFallback;
       P.completeWithFallback = async (o) => { testo = JSON.stringify(o.messages); return prima(o); };
       try {
+        // Il modello finto non risponde col JSON delle decisioni, e il giudizio fallisce: qui conta cosa è partito.
         await globalThis.__filoHandlers.runTabTriageDecision({ tabs: [
           { url: 'http://192.168.1.1/admin?stok=abc', title: 'Router di casa', contentExtract: 'Password Wi-Fi: segreta', idleMin: 300 },
           { url: 'https://ricette.esempio.it/torta', title: 'Torta di mele', contentExtract: 'Farina e uova', idleMin: 200 },
-        ] });
+        ] }).catch(() => null);
       } finally { P.completeWithFallback = prima; }
       return testo;
     });
