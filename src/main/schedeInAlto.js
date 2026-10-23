@@ -10,22 +10,30 @@ const BORDO_PX = 2;
 const ASSESTAMENTO_MS = 150;
 // Il mondo isolato in cui si chiede alla pagina dove comincia sullo schermo: la pagina non lo vede.
 const MONDO = 1343;
+// Un trascinamento si segue sul puntatore del sistema quando la pagina tace: sopra un riquadro di un altro sito i suoi
+// eventi possono non arrivare a nessuno (#1343). La pagina ne parla ogni 100 ms finché lo vede; oltre, decide il puntatore.
+const TRASCINA_OGNI_MS = 50;
+const PAGINA_FRESCA_MS = 250;
+// Un trascinamento finito fuori dalla finestra non lo dice nessuno: dopo questo silenzio non lo si segue più.
+const TRASCINA_MAX_MS = 10000;
 
 class SchedeInAlto {
   // tabs: il TabManager della finestra (contentFullscreen, pageFullscreen, barra.opzioni, layout()).
   constructor(win, tabs) {
+    this.win = win;
     this.tabs = tabs;
     this.visibili = false;
     this.scese = 0;
     this.premuto = false;
     // Un trascinamento fermo contro il bordo (lo dice la pagina): i movimenti a tasto giù non fermano la sua spinta.
     this.trascinaSulBordo = false;
+    this.trascino = null;
     // I movimenti visti dal riquadro principale: uno che arriva solo da un altro riquadro non li fa crescere.
     this.mossePagina = 0;
     // Dove comincia la pagina sullo schermo (per scheda), e la domanda in volo: un movimento lontano dal bordo la annulla.
     this.cimaSulloSchermo = null;
     this.sondaCima = null;
-    this.timer = { spinta: null, uscita: null };
+    this.timer = { spinta: null, uscita: null, trascina: null };
     const shell = win && win.webContents;
     if (shell && typeof shell.on === 'function') shell.on('input-event', (_e, input) => this._dallaShell(input));
   }
@@ -68,12 +76,42 @@ class SchedeInAlto {
 
   // Chi porta un collegamento o un'immagine contro il bordo cerca una scheda su cui lasciarlo: a tasto giù il main non
   // lo distingue da una selezione, la pagina sì (src/preload/trascina-bordo.js). Le schede restano fino al rilascio.
-  dalTrascinamento(wc, sulBordo) {
+  // stato: 'bordo' | 'via' dalla pagina o da un suo riquadro, 'fine' al rilascio.
+  dalTrascinamento(wc, stato) {
     const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
     if (!sotto || sotto.webContents !== wc) return;
-    this.trascinaSulBordo = !!sulBordo && this._attivo() && !this.visibili;
-    if (this.trascinaSulBordo) this._sulBordo(0);
+    if (stato === 'fine' || !this._attivo() || this.visibili) { this._fineTrascinamento(); return; }
+    const ora = Date.now();
+    this.trascino = { bordo: stato === 'bordo', detto: ora, fino: ora + TRASCINA_MAX_MS };
+    if (!this.timer.trascina) this.timer.trascina = setInterval(() => this._seguiTrascinamento(), TRASCINA_OGNI_MS);
+    this._seguiTrascinamento();
+  }
+
+  _seguiTrascinamento() {
+    const t = this.trascino;
+    const ora = Date.now();
+    if (!t || ora > t.fino || !this._attivo() || this.visibili) { this._fineTrascinamento(); return; }
+    const bordo = ora - t.detto < PAGINA_FRESCA_MS ? t.bordo : this._puntatoreSulBordo();
+    this.trascinaSulBordo = bordo;
+    if (bordo) this._sulBordo(0);
     else this._ferma('spinta');
+  }
+
+  _puntatoreSulBordo() {
+    try {
+      const p = require('electron').screen.getCursorScreenPoint();
+      const cb = this.win.getContentBounds();
+      const sotto = this.tabs.vistaSottoIlVuoto();
+      const v = sotto ? sotto.getBounds() : { x: 0, y: 0, width: cb.width };
+      const x = p.x - cb.x - v.x;
+      return x >= 0 && x < v.width && p.y - cb.y - v.y <= BORDO_PX;
+    } catch (_) { return false; }
+  }
+
+  _fineTrascinamento() {
+    this.trascino = null;
+    if (this.timer.trascina) { clearInterval(this.timer.trascina); this.timer.trascina = null; }
+    if (this.trascinaSulBordo) { this.trascinaSulBordo = false; this._ferma('spinta'); }
   }
 
   _lasciaSpinta() {
@@ -146,6 +184,7 @@ class SchedeInAlto {
 
   // La modalità è cambiata: lo stato riparte da capo, e il layout lo rifà chi l'ha cambiata.
   azzera() {
+    this._fineTrascinamento();
     this._ferma('spinta');
     this._ferma('uscita');
     this.visibili = false;
