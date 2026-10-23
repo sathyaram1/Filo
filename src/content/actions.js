@@ -1243,11 +1243,12 @@
   }
 
   async function shareCurrentPage() {
-    const data = { title: document.title, url: location.href };
+    const url = indirizzoDellaPagina();
+    const data = { title: document.title, url };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
-    copyToClipboard(location.href);
+    copyToClipboard(url);
   }
 
   // Senza condivisione nativa si copia negli appunti: vale il discorso di «Copia URL»
