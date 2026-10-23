@@ -30,9 +30,15 @@ const stato = (app) => app.evaluate(({ BrowserWindow }) => {
     accesso: vive.filter((w) => !w._filoTabs && /^https:\/\/accounts\.google\.com\//.test(w.webContents.getURL())).length,
     normale: normale ? {
       visibile: normale.isVisible(),
-      schede: normale._filoTabs.tabs.map((t) => { try { return t.view.webContents.getURL(); } catch (_) { return t.url || ''; } }),
+      // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
+      schede: normale._filoTabs.tabs.map((t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } }),
     } : null,
   };
+});
+
+const sessioneSalvata = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.OPEN_TABS, null);
+  return (s && s.tabs) || [];
 });
 
 // I passi della segnalazione fino a Filo acceso senza finestra principale: la finestrella di accesso lo tiene in vita.
@@ -42,6 +48,8 @@ async function chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServ
   const negozio = page.url();
   await page.click('#b');
   await expect.poll(async () => (await stato(app)).accesso, { message: 'la finestrella di accesso non si è aperta', timeout: 10000 }).toBe(1);
+  // Chi aspetta la passkey ci mette più di quanto Filo impiega a scrivere le schede: la prova aspetta lo stesso.
+  await expect.poll(() => sessioneSalvata(app), { message: 'le schede aperte non sono state salvate', timeout: 10000 }).toContain(negozio);
   await shell.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(async () => (await stato(app)).normale, { message: 'la finestra principale non si è chiusa', timeout: 10000 }).toBeNull();
   expect((await stato(app)).accesso, 'chiusa la principale, la finestrella resta e tiene acceso Filo').toBe(1);
@@ -74,7 +82,7 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   const crediti = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/'), 'la pagina Crediti non è nata');
   await expect(crediti.locator('#walletNote')).toContainText('otto caratteri', { timeout: 15000 });
 
-  // Mac: la finestra si chiude e Filo resta acceso; il link arriva con open-url, e fa lo stesso.
+  // Mac: chiusa la finestra Filo resta acceso, e il link arriva con open-url: stessa strada, stesso esito.
   const barra = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/shell.html'), 'la barra della finestra rifatta non c\'è');
   await barra.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(async () => (await stato(app)).normale, { timeout: 10000 }).toBeNull();
