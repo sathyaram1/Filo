@@ -129,65 +129,64 @@ const strato = {
   }),
 };
 
+const SHARED_DIR = path.join(__dirname, '..', 'shared');
+const CONTENT_DIR = path.join(__dirname, '..', 'content');
+
+// Lo stesso elenco di internal-preload.js, senza ciò che descrive la scheda (colore, traduzione della pagina): lo strato
+// parla come la pagina, ma non è la pagina. Ogni require si legge da fermo: il pacchetto in sandbox lo porta dentro.
 function loadContentScripts() {
-  const SHARED = path.join(__dirname, '..', 'shared');
-  const CONTENT = path.join(__dirname, '..', 'content');
-  const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo riquadri]', p, e.message); } };
-  // Lo stesso elenco di internal-preload.js, senza ciò che descrive la scheda (colore, traduzione della pagina):
-  // lo strato parla come la pagina, ma non è la pagina.
-  safe(path.join(SHARED, 'constants.js'));
-  safe(path.join(SHARED, 'contenutoEsterno.js'));
-  safe(path.join(SHARED, 'filoUi.js'));
-  safe(path.join(SHARED, 'i18n.js'));
-  safe(path.join(SHARED, 'clipboardHistory.js'));
-  safe(path.join(SHARED, 'messages.js'));
-  safe(path.join(SHARED, 'tasti.js'));
-  safe(path.join(SHARED, 'disposizioneIcone.js'));
-  safe(path.join(SHARED, 'campoTesto.js'));
-  safe(path.join(SHARED, 'urlNav.js'));
-  safe(path.join(SHARED, 'nomiSito.js'));
-  safe(path.join(SHARED, 'wallet.js'));
-  safe(path.join(SHARED, 'filoMarkdown.js'));
-  safe(path.join(SHARED, 'linkSospetto.js'));
-  safe(path.join(SHARED, 'themeTokens.js'));
-  safe(path.join(SHARED, 'confirmUi.js'));
-  safe(path.join(SHARED, 'chatErrors.js'));
-  safe(path.join(SHARED, 'icons.js'));
-  safe(path.join(SHARED, 'qr.js'));
-  safe(path.join(SHARED, 'calcMarkers.js'));
-  safe(path.join(SHARED, 'overlayPlacement.js'));
-  safe(path.join(SHARED, 'guardianoStatico.js'));
-  safe(path.join(SHARED, 'campiSegreti.js'));
-  safe(path.join(CONTENT, 'extractContext.js'));
-  safe(path.join(CONTENT, 'gesto.js'));
-  safe(path.join(SHARED, 'avvisiTempo.js'));
-  safe(path.join(CONTENT, 'popup.js'));
-  safe(path.join(CONTENT, 'vistoDavvero.js'));
-  safe(path.join(CONTENT, 'menu.js'));
-  safe(path.join(CONTENT, 'highlight.js'));
-  safe(path.join(CONTENT, 'sidebar.js'));
-  safe(path.join(CONTENT, 'coerenza.js'));
-  safe(path.join(CONTENT, 'correttoreRegole.js'));
-  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo riquadri] dizionario', e.message); }
-  safe(path.join(CONTENT, 'spellcheck.js'));
-  safe(path.join(SHARED, 'feedback.js'));
-  safe(path.join(SHARED, 'feedbackClientIdHash.js'));
-  safe(path.join(SHARED, 'feedbackAttachTypes.js'));
-  safe(path.join(CONTENT, 'feedback.js'));
-  safe(path.join(CONTENT, 'redteamAttack.js'));
-  safe(path.join(SHARED, 'ttsChunk.js'));
-  safe(path.join(SHARED, 'modelCaps.js'));
-  safe(path.join(SHARED, 'ttsVoices.js'));
-  safe(path.join(SHARED, 'dictationSegmenter.js'));
-  safe(path.join(SHARED, 'ascolto.js'));
-  safe(path.join(SHARED, 'voceChat.js'));
-  if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
-  safe(path.join(CONTENT, 'tts.js'));
-  safe(path.join(CONTENT, 'editBox.js'));
-  safe(path.join(CONTENT, 'actions.js'));
-  safe(path.join(CONTENT, 'menuIcons.js'));
-  safe(path.join(CONTENT, 'content.js'));
-  safe(path.join(CONTENT, 'stratoRiquadri.js'));
+  try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo riquadri] constants.js', e); }
+  try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo riquadri] contenutoEsterno.js', e); }
+  try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo riquadri] filoUi.js', e); }
+  try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo riquadri] i18n.js', e); }
+  try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo riquadri] clipboardHistory.js', e); }
+  try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo riquadri] messages.js', e); }
+  try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo riquadri] tasti.js', e); }
+  try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo riquadri] disposizioneIcone.js', e); }
+  try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo riquadri] campoTesto.js', e); }
+  try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo riquadri] urlNav.js', e); }
+  try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo riquadri] nomiSito.js', e); }
+  try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo riquadri] wallet.js', e); }
+  try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo riquadri] filoMarkdown.js', e); }
+  try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo riquadri] linkSospetto.js', e); }
+  try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo riquadri] themeTokens.js', e); }
+  try { require(path.join(SHARED_DIR, 'confirmUi.js')); } catch (e) { console.error('[Filo riquadri] confirmUi.js', e); }
+  try { require(path.join(SHARED_DIR, 'chatErrors.js')); } catch (e) { console.error('[Filo riquadri] chatErrors.js', e); }
+  try { require(path.join(SHARED_DIR, 'icons.js')); } catch (e) { console.error('[Filo riquadri] icons.js', e); }
+  try { require(path.join(SHARED_DIR, 'qr.js')); } catch (e) { console.error('[Filo riquadri] qr.js', e); }
+  try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo riquadri] calcMarkers.js', e); }
+  try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo riquadri] overlayPlacement.js', e); }
+  try { require(path.join(SHARED_DIR, 'guardianoStatico.js')); } catch (e) { console.error('[Filo riquadri] guardianoStatico.js', e); }
+  try { require(path.join(SHARED_DIR, 'campiSegreti.js')); } catch (e) { console.error('[Filo riquadri] campiSegreti.js', e); }
+  try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo riquadri] extractContext.js', e); }
+  try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo riquadri] gesto.js', e); }
+  try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo riquadri] avvisiTempo.js', e); }
+  try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo riquadri] popup.js', e); }
+  try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo riquadri] vistoDavvero.js', e); }
+  try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo riquadri] menu.js', e); }
+  try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo riquadri] highlight.js', e); }
+  try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo riquadri] sidebar.js', e); }
+  try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo riquadri] coerenza.js', e); }
+  try { require(path.join(CONTENT_DIR, 'correttoreRegole.js')); } catch (e) { console.error('[Filo riquadri] correttoreRegole.js', e); }
+  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo riquadri] dizionario', e); }
+  try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo riquadri] spellcheck.js', e); }
+  try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo riquadri] feedback.js', e); }
+  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo riquadri] feedbackClientIdHash.js', e); }
+  try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo riquadri] feedbackAttachTypes.js', e); }
+  try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo riquadri] feedback.js', e); }
+  try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo riquadri] redteamAttack.js', e); }
+  try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo riquadri] ttsChunk.js', e); }
+  try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo riquadri] modelCaps.js', e); }
+  try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo riquadri] ttsVoices.js', e); }
+  try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo riquadri] dictationSegmenter.js', e); }
+  try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo riquadri] ascolto.js', e); }
+  try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo riquadri] voceChat.js', e); }
+  try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo riquadri] tts.js', e); }
+  try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo riquadri] editBox.js', e); }
+  try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo riquadri] actions.js', e); }
+  try { require(path.join(CONTENT_DIR, 'menuIcons.js')); } catch (e) { console.error('[Filo riquadri] menuIcons.js', e); }
+  try { require(path.join(CONTENT_DIR, 'content.js')); } catch (e) { console.error('[Filo riquadri] content.js', e); }
+  try { require(path.join(CONTENT_DIR, 'stratoRiquadri.js')); } catch (e) { console.error('[Filo riquadri] stratoRiquadri.js', e); }
   try { document.documentElement.dataset.filoReady = '1'; } catch (_) {}
 }
 
