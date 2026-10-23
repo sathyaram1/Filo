@@ -11,6 +11,8 @@ const require = createRequire(import.meta.url);
 const DNS = {
   'cdn.example': ['93.184.216.34'],
   'pagina.example': ['93.184.216.35'],
+  'img.pagina.example': ['93.184.216.36'],
+  'riquadro.example': ['93.184.216.37'],
   'interno.example': ['192.168.1.20'],
 };
 let chiestiAlDns = [];
