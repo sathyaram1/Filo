@@ -3321,6 +3321,7 @@
     AGENT_STYLE_MAX,
     agentStyleLength,
     BARRA_LATERALE_LIMITI,
+    ALLEGATI_CHAT,
     AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
     AVVISO_SCHERMO_PIENO_LIMITI,
