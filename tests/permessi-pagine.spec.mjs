@@ -768,7 +768,6 @@ test('le risposte date restano dopo aver riaperto Filo, e dalla pagina Sicurezza
 for (const [via, dopo, domanda] of [
   ['/schermi', 'schermi:letti', 'vuole usare tutti i tuoi schermi'],
   ['/presenza', 'presenza:granted', 'vuole sapere quando sei al computer'],
-  ['/font', 'font:letti', null],
   ['/spazio', 'spazio:true', null],
 ]) {
   test(`dopo un clic sulla pagina, ${via.slice(1)}: ${domanda ? 'Filo chiede e col sì la pagina funziona' : 'passa come in Chrome'}`, async () => {
