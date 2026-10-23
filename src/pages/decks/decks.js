@@ -1846,7 +1846,7 @@
       const opinions = r.opinions || {};
       for (const [id, op] of Object.entries(opinions)) opinionsByCard.set(id, op);
       const mancanti = r.mancanti || {};
-      for (const id of ask) if (!opinions[id]) opinionErrors.set(id, erroreDelParere({ error: mancanti[id] }));
+      for (const id of ask) if (!opinions[id]) opinionErrors.set(id, erroreDelParere(mancanti[id] || {}));
     } else {
       const errore = erroreDelParere(r);
       for (const id of ask) opinionErrors.set(id, errore);
