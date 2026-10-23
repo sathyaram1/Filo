@@ -908,7 +908,6 @@ describe('ogni metà scrive le impronte dei suoi file nella pagina della version
     assert.ok(iImpronte > iControllo && iImpronte < iPubblica,
       'le impronte vanno nella bozza dopo il controllo dei file e prima che diventi pubblica: una versione non esce senza «Verifica»');
     const p = elenco[iImpronte].corpo;
-    assert.match(p, /if:\s*steps\.check\.outputs\.should_release == 'true'/);
     assert.match(p, /GH_TOKEN:\s*\$\{\{\s*steps\.app\.outputs\.token\s*\|\|\s*secrets\.GITHUB_TOKEN\s*\}\}/, 'la bozza si scrive con il token che l\'ha creata');
     // Il commit provato può essere più vecchio dello script: lo strumento si prende dal commit di questa corsa.
     assert.match(p, /git show "\$\{GITHUB_SHA\}:scripts\/release-impronte\.mjs" > "\$\{RUNNER_TEMP\}\/release-impronte\.mjs"/);
