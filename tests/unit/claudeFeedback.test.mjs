@@ -460,9 +460,10 @@ test('#914 la create admin porta priorità cifrata e priorityManual; la create a
   const corpi = [];
   const origFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
-    if (init.method === 'POST' && /\/feedback\?/.test(String(url))) {
-      corpi.push({ auth: !!(init.headers && init.headers.Authorization), body: JSON.parse(init.body) });
-      return { ok: true, status: 200, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/x' }), text: async () => '' };
+    // La create passa da `:commit` (#1517): il documento è la scrittura.
+    if (init.method === 'POST' && /:commit\?/.test(String(url))) {
+      corpi.push({ auth: !!(init.headers && init.headers.Authorization), body: JSON.parse(init.body).writes[0].update });
+      return { ok: true, status: 200, json: async () => ({ writeResults: [{}] }), text: async () => '' };
     }
     return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
   };

@@ -44,7 +44,8 @@ async function preparaOwner(app, rete) {
         if (m === 'PATCH') { t.numeri++; contatore++; return J(200, {}); }
         return J(200, { fields: { value: { integerValue: String(contatore) } }, updateTime: `t${contatore}` });
       }
-      if (u.includes('/documents/feedback') && m === 'POST') {
+      // La create passa da `:commit` (#1517).
+      if (u.includes('/documents:commit') && m === 'POST') {
         const auth = !!(init.headers && init.headers.Authorization);
         t.create.push(auth ? 'admin' : 'anonimo');
         if (auth && t.rete === 'rifiuta') return J(403, { error: { message: 'PERMISSION_DENIED' } });
