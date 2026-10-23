@@ -58,6 +58,7 @@ function contaSe(metodo, ...args) {
     return C && typeof C[metodo] === 'function' ? C[metodo](...args) : undefined;
   } catch (_) { return undefined; }
 }
+const { TURNO_MUTO } = require('./contatori');
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -5383,13 +5384,20 @@ function entroIl(p, ms, ripiego) {
 
 async function handleFiloChat(richiesta) {
   const reqId = richiesta && richiesta.reasoningReqId;
-  const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc) };
+  // I contatori del turno (#1463): l'esito lo scrive il turno quando lo sa; un turno senza esito (il congedo
+  // dell'intervista, che non chiama il modello) non si conta.
+  const conto = contaSe('turnoChat', ACTIONS.FILO_CHAT) || TURNO_MUTO;
+  const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc), conto, esito: '' };
   try {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
     const turno = () => turnoFiloChat(richiesta, volo);
     return await unUsoContato(ACTIONS.FILO_CHAT, () => (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno()));
+  } catch (e) {
+    volo.esito = 'errore';
+    throw e;
   } finally {
+    try { conto.fine(volo.esito); } catch (_) {}
     if (volo.accoglienza) onbTurniInVolo -= 1;
     togliTurno(reqId, volo.turno);
   }
@@ -5461,6 +5469,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (onbActive && internal && onbBefore && onbBefore.fermato) onbBefore = await saveOnboarding(Onboarding.togliFermato(onbBefore));
   // Da qui lo stop si scrive nell'intervista quando si preme; uno arrivato mentre il messaggio entrava si scrive adesso.
   const turno = volo.turno;
+  const conto = volo.conto || TURNO_MUTO;
   if (onbActive) {
     turno.accoglienza = true;
     if (turno.fermato) onbBefore = await saveOnboarding(Onboarding.segnaFermato(onbBefore));
@@ -5886,14 +5895,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         r = await (KW && KW.conRipiegoDetto ? KW.conRipiegoDetto(giro) : giro());
       } catch (e) {
         if (turno.fermato) { fermato = true; break; }
-        if (await senzaFotoDopoRifiuto(e)) { round--; continue; }
+        if (await senzaFotoDopoRifiuto(e)) { conto.recupero('senza_foto'); round--; continue; }
         if (await stringiDopoRifiuto(e)) {
           contaSe('adattamento', ACTIONS.FILO_CHAT, (e && e.model) || modelloPrimo, 'contesto_stretto');
+          conto.recupero('contesto_stretto');
           round--;
           continue;
         }
         throw e;
       }
+      conto.giro();
       tempiPrima = null;
       if (finestraDaRicordare != null) { finestreDeiModelli.set(modelloChat, finestraDaRicordare); finestraDaRicordare = null; }
       if (r && r.keyFallback) keyFallback = r.keyFallback;
@@ -5912,6 +5923,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       // comunque dal registro invece di finire in chat come JSON grezzo.
       const legacy = (!actions.length && Tools) ? Tools.legacyEnvelope(text) : null;
       if (legacy) {
+        conto.recupero('formato_vecchio');
         text = legacy.text;
         // Un id anche a queste: la scheda le riconosce a fine turno senza ripetere la riga.
         actions = legacy.actions.map((a, i) => ({
@@ -5926,6 +5938,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         // modello sapendolo, una volta, perché quella frase poteva rispondere anche ad altro (#771).
         if (!text.trim() && !sollecitato && round < MAX_ROUNDS && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
           sollecitato = true;
+          conto.recupero('sollecito');
           threadMessages.push({ role: 'user', content: SOLLECITO_DOPO_RIFIUTO });
           continue;
         }
@@ -5937,6 +5950,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       }
       if (turno.fermato) { fermato = true; break; }
       passi += 1;
+      conto.azioni(actions.length);
       const roundRendered = [];
       const results = [];
       // Aperture di pagina e letture di fila partono insieme; il resto in ordine (regole in giroAzioni.js).
@@ -5953,6 +5967,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         }));
       const dopo = async (a, res) => {
         rawActions.push(a);
+        conto.strumento(a.type, globalThis.SN_CONTATORI.esitoStrumento({ argomenti: a._argsError, tagliati: a._argsError === ARGOMENTI_TAGLIATI }, res));
         // Fermata (#810): l'archivio la salva come tale.
         if (res.output && res.output.blocked === 'segreto') a._output = res.output;
         // Contengono la home con il nome utente: servono solo al gate, non alla chat.
@@ -6083,6 +6098,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
     await archiviaGiaFatto();
+    volo.esito = 'fermato';
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
       model: r && r.model, provider: r && r.provider, seguitiLetti,
@@ -6099,10 +6115,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let senzaRisposta = null;
   // Muto dopo sole letture: una frase di lavoro che diventa la bolla («cerco ancora…») non è una risposta (#557).
   const mutoDopoLetture = !exhausted && !interrotta && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
+  let nonDisponibile = false;
   if (exhausted) {
-    senzaRisposta = { passi };
+    senzaRisposta = { passi, motivo: 'tetto_giri' };
     textReply = unisciTesti([...risposta, textReply, fraseSenzaRisposta(passi)]);
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
+    nonDisponibile = true;
     // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
     // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
     const prima = notes.length > noteAllaRisposta ? notes.pop() : '';
@@ -6121,14 +6139,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     textReply = unisciTesti([...risposta, textReply]);
   }
   if (mutoDopoLetture) {
-    senzaRisposta = { passi };
+    senzaRisposta = { passi, motivo: 'muto_dopo_letture' };
     textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
   }
   if (interrotta && !senzaRisposta) {
-    senzaRisposta = { passi, interrotta: true };
+    senzaRisposta = { passi, interrotta: true, motivo: 'tagliato' };
     textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
+  const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
@@ -6152,13 +6172,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         : { ...proposal };
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
+      conto.recupero('proposta_segnalazione');
     }
   }
   // #947 — il documento che la risposta nomina ha il suo bottone anche se il modello non l'ha mostrato con APRI_FILE:
   // «eccolo» senza niente da cliccare è una promessa che dipende dal modello.
   for (const a of fileNominatiDallaRisposta(textReply, renderedActions)) {
     const res = await executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta });
-    if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
+    if (res && res.kept && res.executed && !res.needsConfirm) {
+      renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
+      conto.recupero('file_aggiunto');
+    }
   }
   segnaSalvateNominate(textReply, renderedActions);
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
@@ -6207,7 +6231,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // altrimenti resta «in corso» col titolo di mezza conversazione e Filo non
     // la ritrova più quando gli si chiede di riprenderla.
     if (dopo && dopo.closedAt) {
-      closeAndTriageChat(chatId)
+      closeAndTriageChat(chatId, { via: 'risposta_tardiva' })
         .then(() => { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} })
         .catch((e) => console.warn('[Filo] richiusura chat dopo la risposta:', e?.message || e));
     }
@@ -6253,6 +6277,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // un'azione fermata perché portava fuori un segreto (#810): il «non ho potuto» è voluto.
   const fermata = renderedActions.some((x) => x && x._output && x._output.blocked === 'segreto');
   if (!fermata) maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
+  volo.esito = esitoTurno;
   return {
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
     // Note di lavoro e ragionamento strutturato dell'ultimo giro: la scheda li tiene con la
@@ -6998,7 +7023,8 @@ function affidaChat(chatId, wc) {
     // in quel caso questa pagina non ha più niente da chiudere.
     if (proprietariDiChat.get(chatId) !== wc) return;
     proprietariDiChat.delete(chatId);
-    closeAndTriageChat(chatId)
+    contaSe('chatInUscita', chatId);
+    closeAndTriageChat(chatId, { via: 'uscita' })
       .then(() => { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} })
       .catch((e) => console.warn('[Filo] chiusura chat a scheda sparita:', e?.message || e));
   };
@@ -7035,7 +7061,7 @@ async function nascondiChat(id, nascosta = true) {
   if (!prima) return null;
   const chat = await FiloChats.nascondi(prima.id, nascosta);
   if (nascosta) {
-    if (!prima.closedAt && prima.messages.length) closeAndTriageChat(prima.id, { fine: true }).catch(() => {});
+    if (!prima.closedAt && prima.messages.length) closeAndTriageChat(prima.id, { fine: true, via: 'nascosta' }).catch(() => {});
     else dimenticaChat(prima.id);
   }
   try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, ...(nascosta ? { nascosta: prima.id } : { rimessa: prima.id }) }); } catch (_) {}
@@ -7177,24 +7203,44 @@ function closeAndTriageChat(chatId, opz = {}) {
   return ora;
 }
 
-async function chiudiEClassifica(chatId, { fine = false } = {}) {
+// `via` dice ai contatori come è finita (#1463, SN_CONTATORI.VIE_CHIUSURA): una chat si conta quando si chiude davvero,
+// e di nuovo se una risposta arriva a chat già chiusa. Senza `via` non si conta.
+async function chiudiEClassifica(chatId, { fine = false, via = '' } = {}) {
   if (!chatId || !FiloChats) return null;
   // La chat è finita: nessuna pagina la sta più vivendo.
   proprietariDiChat.delete(chatId);
+  let prima = null;
+  if (via) { try { prima = await FiloChats.get(chatId); } catch (_) {} }
   const chat = await FiloChats.close(chatId, { fine });
-  if (!chat) return null;                        // chat vuota o inesistente
+  if (!chat) { if (via === 'uscita') contaSe('uscitaFinita', chatId); return null; } // chat vuota o inesistente
+  const contata = !!via && !chat.app && ((prima && !prima.closedAt) || via === 'risposta_tardiva')
+    && !!(await contaSe('chatChiusa', chat.id, { via, ...misuraDellaChat(chat) }));
+  if (via === 'uscita' && !contata) contaSe('uscitaFinita', chat.id);
+  const classificata = (c) => { if (contata) contaSe('chatClassificata', chat.id, c && c.kind); return c; };
   // Già classificata e da allora non è successo niente: non si ripaga.
-  if (!FiloChats.needsTriage(chat)) return chat;
+  if (!FiloChats.needsTriage(chat)) return classificata(chat);
   const triage = await triageChat(chat);
   if (!triage) {
     // Il modello non ha risposto: il titolo di ripiego c'è lo stesso, il tipo
     // resta vuoto e si ritenta alla partenza dopo. Intanto la chat si vede.
     return FiloChats.setTriage(chat.id, { title: chat.title || ChatArchive.fallbackTitle(chat.messages), kind: null })
-      .then((c) => c)
-      .catch(() => chat);
+      .then(classificata)
+      .catch(() => { classificata({ kind: null }); return chat; });
   }
-  try { return await FiloChats.setTriage(chat.id, triage); }
-  catch (_) { return chat; }
+  try { return classificata(await FiloChats.setTriage(chat.id, triage)); }
+  catch (_) { classificata({ kind: null }); return chat; }
+}
+
+// Quanto è durata una chat per i contatori: i messaggi della persona e il tempo dal primo all'ultimo.
+function misuraDellaChat(chat) {
+  const messaggi = (chat && Array.isArray(chat.messages)) ? chat.messages : [];
+  let primo = Infinity;
+  let ultimo = -Infinity;
+  for (const m of messaggi) {
+    const t = Date.parse(m && m.ts);
+    if (Number.isFinite(t)) { primo = Math.min(primo, t); ultimo = Math.max(ultimo, t); }
+  }
+  return { messaggi: messaggi.filter((m) => m && m.role === 'user').length, durataMs: ultimo >= primo ? ultimo - primo : 0 };
 }
 
 // All'avvio: le chat lasciate aperte da una sessione finita di colpo (chiudere
@@ -7205,13 +7251,27 @@ async function sweepPendingChats() {
   if (chatSweepRunning || !FiloChats) return;
   chatSweepRunning = true;
   try {
+    // La chat la cui scheda se n'è andata con Filo è finita con l'uscita, non rimasta appesa come dopo un crash (#1463).
+    const inUscita = new Set((await contaSe('usciteInSospeso')) || []);
     const dangling = await FiloChats.listDangling();
-    for (const c of dangling) await closeAndTriageChat(c.id);
+    for (const c of dangling) {
+      const conFilo = inUscita.delete(c.id);
+      await closeAndTriageChat(c.id, { via: conFilo ? 'uscita' : 'appesa_all_avvio' });
+    }
+    // Chiuse davvero prima di uscire, ma col conto rimasto a metà: si conta adesso, col tipo se l'aveva già.
+    for (const id of inUscita) {
+      let chat = null;
+      try { chat = await FiloChats.get(id); } catch (_) {}
+      if (chat && chat.closedAt && !chat.app && (await contaSe('chatChiusa', chat.id, { via: 'uscita', ...misuraDellaChat(chat) }))) {
+        if (!FiloChats.needsTriage(chat)) contaSe('chatClassificata', chat.id, chat.kind);
+      } else contaSe('uscitaFinita', id);
+    }
     const untriaged = await FiloChats.listUntriaged();
     for (const c of untriaged) {
       const triage = await triageChat(c);
       if (!triage) break;   // il modello non c'è: inutile insistere su tutte
-      try { await FiloChats.setTriage(c.id, triage); } catch (_) {}
+      // Una chiusa prima dell'uscita aspettava il suo tipo per contarsi (#1463).
+      try { const fatta = await FiloChats.setTriage(c.id, triage); contaSe('chatClassificata', c.id, fatta && fatta.kind); } catch (_) {}
     }
   } catch (e) {
     console.warn('[Filo] riordino delle chat in sospeso fallito:', e?.message || e);
@@ -7816,4 +7876,6 @@ module.exports = {
   applySettingsUpdate,
   decisioneComandoAMano,
   contaSe,
+  // L'avvio la chiama da qui (main.js): fuori da questo elenco il giro delle chat appese non partiva mai.
+  sweepPendingChats,
 };

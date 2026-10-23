@@ -10,7 +10,7 @@ import { EventEmitter } from 'node:events';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-for (const f of ['constants', 'tasti', 'modelUsage', 'wallet', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'wallet', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'actionTools', 'contatoriGiornalieri']) {
   require(join(ROOT, 'src', 'shared', `${f}.js`));
 }
 require(join(ROOT, 'src', 'main', 'services', 'modelGate.js'));
@@ -673,4 +673,139 @@ test('a contatori spenti l’intervista aperta non si ricorda e non si conta', a
   await b.s.controlla();
   assert.equal((await b.s.letto()).intervista, null);
   assert.equal(b.inviati.length, 0);
+});
+
+// ── La chat e l'agente (#1463) ──────────────────────────────────────────────
+// La chat dell'ora parte nel suo documento, dopo quello dell'ora.
+const ultimaOra = async (b) => { b.t += ORA; await b.s.controlla(); return b.inviati.filter((x) => x.doc.v === C.VERSIONE_CHAT).pop().doc; };
+
+test('un turno di chat si conta alla fine, col suo esito: giri, azioni per giro, strumenti e strade di riserva', async () => {
+  const b = banco();
+  const t = b.s.turnoChat(A.FILO_CHAT);
+  t.giro(); t.azioni(2); t.strumento('CERCA_WEB', 'eseguito'); t.strumento('naviga', 'rifiutato');
+  t.recupero('contesto_stretto'); t.recupero('contesto_stretto'); t.recupero('una strada inventata');
+  t.giro(); t.azioni(1); t.strumento('LEGGI_PAGINA', 'eseguito');
+  t.giro();
+  await attendi();
+  assert.equal(b.disco.has(Servizio.CHIAVE) && Object.keys(b.disco.get(Servizio.CHIAVE).ore).length, false, 'prima della fine non c’è niente');
+  t.fine('risposta');
+  t.fine('errore');
+  await attendi();
+  // Un turno senza esito (il congedo dell'intervista) e uno da una funzione che non gira con gli strumenti non contano.
+  b.s.turnoChat(A.FILO_CHAT).fine('');
+  b.s.turnoChat(A.EXPLAIN).fine('risposta');
+  const errore = b.s.turnoChat(A.FILO_CHAT);
+  errore.fine('errore');
+  await attendi();
+  const doc = await ultimaOra(b);
+  assert.deepEqual(doc.chatTurni, { 'filo-chat': 'risposta|g3|1;errore|g1|1' });
+  assert.deepEqual(doc.azioniPerGiro, { 'filo-chat': '1,1,0,0' });
+  assert.deepEqual(doc.strumenti, { 'filo-chat': 'NAVIGA|rifiutato|1;CERCA_WEB|eseguito|1;LEGGI_PAGINA|eseguito|1' });
+  assert.deepEqual(doc.chatRecuperi, { contesto_stretto: '1' }, 'una strada si conta una volta per turno');
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+});
+
+test('un turno, una reazione o una copia in incognito non si contano', async () => {
+  const b = banco({ incognito: true, finestra: false });
+  const t = b.s.turnoChat(A.FILO_CHAT);
+  t.giro(); t.strumento('NAVIGA', 'eseguito');
+  b.incognito = false;
+  t.fine('risposta');
+  b.incognito = true;
+  assert.equal(b.s.reazione('riprova'), true);
+  assert.equal(b.s.copia('risposta'), true);
+  assert.equal(await b.s.chatChiusa('c1', { via: 'uscita', messaggi: 2, durataMs: 1000 }), false);
+  await attendi();
+  b.incognito = false;
+  b.t += GIORNO;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, 0, JSON.stringify(b.inviati.map((x) => x.doc)));
+  assert.equal(b.s.reazione('fermato a metà'), false);
+  assert.equal(b.s.copia('la bolla di mario'), false);
+});
+
+test('reazioni e copie entrano nell’ora in cui succedono', async () => {
+  const b = banco();
+  for (const v of ['ferma_durante_azioni', 'riprendi', 'riprova', 'riprova']) b.s.reazione(v);
+  for (const r of ['risposta', 'utente']) b.s.copia(r);
+  await attendi();
+  const doc = await ultimaOra(b);
+  assert.deepEqual(doc.chatReazioni, { ferma_durante_azioni: '1', riprendi: '1', riprova: '2' });
+  assert.deepEqual(doc.chatCopie, { risposta: '1', utente: '1' });
+});
+
+test('una chat chiusa aspetta il suo tipo sul disco: si conta quando arriva, anche dopo un riavvio, e dopo due giorni senza', async () => {
+  const b = banco();
+  assert.equal(await b.s.chatChiusa('c-oggi', { via: 'chat_nuova', messaggi: 3, durataMs: 4 * 60 * 1000 }), true);
+  assert.equal(await b.s.chatChiusa('c-uscita', { via: 'uscita', messaggi: 1, durataMs: 0 }), true);
+  assert.equal(await b.s.chatChiusa('c-vuota', { via: 'uscita', messaggi: 0, durataMs: 0 }), false, 'senza messaggi della persona non è una chat');
+  assert.equal(await b.s.chatChiusa('c-strana', { via: 'chiusa da mario', messaggi: 2 }), false);
+  assert.ok(b.disco.get(Servizio.CHIAVE).chiuse['c-uscita'], 'la chiusa aspetta sul disco, subito');
+  assert.equal(await b.s.chatClassificata('c-oggi', 'conversazione'), true);
+  assert.equal(await b.s.chatClassificata('c-oggi', 'comando'), false, 'una chat si conta una volta');
+  assert.equal(await b.s.chatClassificata('mai-chiusa', 'comando'), false);
+  await attendi();
+
+  // Filo si chiude prima della classificazione: al riavvio la chat aspetta ancora, e si conta quando la classifica il giro dopo.
+  const dopo = banco({ disco: b.disco });
+  dopo.t = b.t;
+  assert.equal(await dopo.s.chatClassificata('c-uscita', 'comando'), true);
+  await attendi();
+  const doc = await ultimaOra(dopo);
+  assert.deepEqual(doc.chatChiuse, { chat_nuova: 'm3_5|min5|conversazione|1', uscita: 'm1|min1|comando|1' });
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+  assert.equal(JSON.stringify(doc).includes('c-uscita'), false, 'l’id della chat resta sul disco di chi usa Filo');
+
+  // Una che il classificatore non raggiunge mai esce senza tipo dopo due giorni.
+  await dopo.s.chatChiusa('c-ferma', { via: 'appesa_all_avvio', messaggi: 2, durataMs: 0 });
+  dopo.t += 2 * GIORNO + ORA;
+  await dopo.s.controlla();
+  const tardi = await ultimaOra(dopo);
+  assert.deepEqual(tardi.chatChiuse, { appesa_all_avvio: 'm2|min1|nessuno|1' });
+  assert.deepEqual(dopo.disco.get(Servizio.CHIAVE).chiuse, {});
+});
+
+test('spenti, le chat chiuse in attesa si buttano e non se ne aggiungono', async () => {
+  const b = banco();
+  await b.s.chatChiusa('c1', { via: 'uscita', messaggi: 2, durataMs: 0 });
+  b.accesi = false;
+  assert.equal(await b.s.chatChiusa('c2', { via: 'uscita', messaggi: 2, durataMs: 0 }), false);
+  assert.deepEqual(b.disco.get(Servizio.CHIAVE).chiuse || {}, {});
+  b.accesi = true;
+  assert.equal(await b.s.chatClassificata('c1', 'comando'), false);
+});
+
+test('la chat dell’ora parte nel suo documento dopo l’ora; rifiutata, riparte il giorno dopo e l’ora già arrivata risponde 409', async () => {
+  const b = banco();
+  const fuori = (doc) => (doc.v === C.VERSIONE_CHAT ? 403 : 200);
+  b.risposta = fuori;
+  await usa(b, A.HELP, { attesa: 100 });
+  b.s.reazione('riprova');
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito');
+  assert.deepEqual(b.inviati.map((x) => x.doc.v), [C.VERSIONE, C.VERSIONE_CHAT]);
+  const [ora, chat] = b.inviati;
+  assert.equal(chat.url, `${BASE}/${C.COLLEZIONE}?documentId=${C.idDocumento(ora.doc)}_chat&key=K`);
+  assert.deepEqual(Object.keys(chat.doc), [...C.CAMPI_CHAT]);
+  assert.deepEqual([chat.doc.pseudonimo, chat.doc.giorno, chat.doc.ora], [ora.doc.pseudonimo, ora.doc.giorno, ora.doc.ora]);
+  assert.deepEqual(chat.doc.chatReazioni, { riprova: '1' });
+  assert.equal(Object.keys(b.disco.get(Servizio.CHIAVE).ore).length, 1, 'l’ora aspetta la sua chat');
+  assert.equal(ora.doc.primo, 'mese');
+
+  // Il giorno dopo le regole la conoscono: l'ora già arrivata risponde 409, la chat parte, e niente resta.
+  const gia = new Set([C.idDocumento(ora.doc)]);
+  b.risposta = (doc) => (gia.has(C.idDocumento(doc)) ? 409 : 200);
+  b.t += GIORNO;
+  await b.s.controlla();
+  const dopo = b.inviati.slice(2).filter((x) => x.doc.giorno === '2026-10-15');
+  assert.deepEqual(dopo.map((x) => x.doc.v), [C.VERSIONE, C.VERSIONE_CHAT]);
+  assert.deepEqual(Object.keys(b.disco.get(Servizio.CHIAVE).ore).filter((k) => k.startsWith('2026-10-15')), []);
+
+  // Un'ora senza niente della chat manda solo il suo documento.
+  await usa(b, A.HELP, { attesa: 100 });
+  const n = b.inviati.length;
+  b.t += ORA;
+  await b.s.controlla();
+  assert.deepEqual(b.inviati.slice(n).map((x) => x.doc.v), [C.VERSIONE]);
 });

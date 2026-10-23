@@ -2076,6 +2076,14 @@
     return items;
   }
 
+  // Il Copia del tasto destro non passa dall'evento «copy»: a una pagina di Filo lo dice «filo-copia», sull'elemento
+  // cliccato (la chat conta da quale bolla si copia, #1463). Mai sui siti.
+  function copiatoNellaPagina(target) {
+    if (!PAGINA_DI_FILO) return;
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    try { if (el) el.dispatchEvent(new CustomEvent('filo-copia', { bubbles: true })); } catch (_) {}
+  }
+
   // Le voci che una pagina di Filo dà ai suoi elementi (il segno di un cambio sulla bolla, #867): ogni
   // fornitore in SN_VOCI_PAGINA riceve l'elemento cliccato. Mai sui siti: lì quel nome è della pagina.
   function vociDellaPagina(target) {
@@ -2306,10 +2314,11 @@
   }) {
     const items = [];
     const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
+    const copia = () => { Actions.copyToClipboard(selInfo.selection); copiatoNellaPagina(target); };
 
     if (selInfo && editable) {
       items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
@@ -2326,7 +2335,7 @@
     }
 
     if (selInfo) {
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
       if (selInfo.segreto) return items;
       items.push({
         type: 'item',

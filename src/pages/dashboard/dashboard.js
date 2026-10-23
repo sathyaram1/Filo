@@ -377,11 +377,12 @@
   // risposta — chi è appena tornato alla home non deve stare fermo mentre un
   // modello legge la chat di prima.
   // `fine`: la chiude l'utente apposta, e le schede nuove non la continuano; una scheda che se ne va no.
-  function closeCurrentChat({ fine = false } = {}) {
+  // `via`: come è finita, per i contatori anonimi (#1463): «home» se la scheda passa a un'altra conversazione, «uscita» se se ne va.
+  function closeCurrentChat({ fine = false, via = fine ? 'chat_nuova' : 'uscita' } = {}) {
     if (!chatId) return;
     const id = chatId;
     chatId = null;
-    try { send({ type: MSG.FILO_CHAT_CLOSE, id, fine: fine || undefined }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_CLOSE, id, fine: fine || undefined, via }); } catch (_) {}
   }
 
   // ===== Stato UI =====
@@ -590,7 +591,7 @@
     }
     if (!trovata && !riprendi) return false;
     if (riprendi && chatId !== chat.id) {
-      if (chatId) closeCurrentChat();
+      if (chatId) closeCurrentChat({ via: 'home' });
       await adotta(chat.id);
     }
     inputEl.focus();
@@ -954,7 +955,8 @@
     // Reasoning VERO in diretta: sottoscrizione filtrata per reqId che il main usa per pushare i
     // thought summary. Se il modello non ragiona non arriva nulla.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const turno = { reqId: reasoningReqId, fermato: false, attivita: pending };
+    // `fase`: cosa la persona vede del turno quando lo ferma (#1463): niente ancora, le azioni, o la risposta che scorre.
+    const turno = { reqId: reasoningReqId, fermato: false, attivita: pending, fase: 'prima_del_testo' };
     turno.fermata = new Promise((ok) => { turno.ferma = ok; });
     turnoVivo = turno;
     aggiornaTasto();
@@ -999,6 +1001,7 @@
           return;
         }
         if (!data.delta || turno.fermato) return;
+        turno.fase = 'durante_testo';
         if (!giroIniziato) {
           giroIniziato = true;
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
@@ -1034,6 +1037,7 @@
     if (window.filo?.onAction) {
       offAction = window.filo.onAction((data) => {
         if (!data || data.reqId !== reasoningReqId) return;
+        if (['start', 'progress', 'done', 'round'].includes(data.kind) && !turno.fermato) turno.fase = 'durante_azioni';
         if (data.kind === 'fine') {
           fineDellaDiretta();
         } else if (data.kind === 'start') {
@@ -1341,7 +1345,7 @@
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
     if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
     else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) {
-      offriContinua(r._bubble, activity.el, { interrotta: r.senzaRisposta.interrotta === true });
+      offriContinua(r._bubble, activity.el, { interrotta: r.senzaRisposta.interrotta === true, motivo: String(r.senzaRisposta.motivo || '') });
     }
     aggiornaTasto();
     inputEl.focus();
@@ -1368,6 +1372,7 @@
   async function retryTurn(errBubble, args) {
     if (sending) return;
     sending = true;
+    contaReazione('riprova');
     chiudiRipresa();
     aggiornaTasto();
     try { errBubble.remove(); } catch (_) {}
@@ -1398,6 +1403,7 @@
     const t = turnoVivo;
     if (!t || t.fermato) return;
     t.fermato = true;
+    contaReazione(`ferma_${t.fase}`);
     fermatoAlle = Date.now();
     setTimeout(aggiornaTasto, PAUSA_RIPRESA + 20);
     t.attivita.taglia();
@@ -1426,11 +1432,38 @@
   }
   self.SN_VOCI_PAGINA = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
   if (!self.SN_VOCI_PAGINA.includes(vociAttesa)) self.SN_VOCI_PAGINA.push(vociAttesa);
+  // Il testo copiato da una bolla (#1463), con la tastiera, il Copia del sistema o quello del tasto destro: si conta il
+  // ruolo della bolla dove comincia la selezione, mai cosa c'è dentro né cosa va negli appunti.
+  function ruoloDellaBolla(nodo) {
+    const el = nodo && nodo.nodeType === 1 ? nodo : (nodo && nodo.parentElement) || null;
+    if (!el || !bubblesEl.contains(el)) return '';
+    if (el.closest('.dash-activity')) return 'attivita';
+    const bolla = el.closest('.dash-bubble');
+    if (!bolla) return '';
+    return bolla.classList.contains('dash-bubble-user') ? 'utente' : 'risposta';
+  }
+  function contaCopia(...nodi) {
+    const ruolo = nodi.map(ruoloDellaBolla).find(Boolean);
+    if (!ruolo) return;
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'copia', ruolo })).catch(() => {}); } catch (_) {}
+  }
+  document.addEventListener('copy', () => {
+    const sel = document.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    contaCopia(r.startContainer, r.endContainer);
+  });
+  document.addEventListener('filo-copia', (e) => {
+    const sel = document.getSelection();
+    const r = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    contaCopia(...(r ? [r.startContainer, r.endContainer] : []), e.target);
+  });
   // Riprendere non riesegue niente: le azioni già fatte stanno nello storico come tali, e il modello le vede.
   async function riprendi() {
     if (sending || !ripresa) return;
     const { nota } = ripresa;
     const testo = ripresa.messaggio || RIPRENDI;
+    contaReazione(ripresa.reazione || 'riprendi');
     chiudiRipresa();
     sending = true;
     aggiornaTasto();
@@ -1440,7 +1473,7 @@
   }
   // Un turno finito senza risposta (#557): la frase la scrive il main, qui il «Continua» sotto e lo stesso «riprendi»
   // di un turno fermato sul tasto d'invio e nel tasto destro del blocco.
-  function offriContinua(bolla, blocco, { interrotta = false } = {}) {
+  function offriContinua(bolla, blocco, { interrotta = false, motivo = '' } = {}) {
     let riga = bolla.querySelector('.dash-bubble-actions');
     if (!riga) {
       riga = document.createElement('div');
@@ -1454,7 +1487,14 @@
     tasto.title = interrotta ? 'Continua la risposta da dove si è interrotta' : 'Riprendi da dove si era fermato';
     tasto.addEventListener('click', () => { riprendi(); inputEl.focus(); });
     riga.appendChild(tasto);
-    ripresa = { nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA };
+    ripresa = {
+      nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA,
+      reazione: `continua_${motivo || (interrotta ? 'tagliato' : 'tetto_giri')}`,
+    };
+  }
+  // Fermare, riprendere, riprovare e scrivere mentre Filo lavora dicono che la risposta non andava (#1463): solo il nome.
+  function contaReazione(voce) {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'reazione', voce })).catch(() => {}); } catch (_) {}
   }
 
   // ===== Il seguito scritto mentre Filo lavora (#1296) =====
@@ -1465,6 +1505,7 @@
     const c = prendiComposizione(inputEl.value.trim());
     const t = turnoVivo;
     const s = { id: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, c, bolla: bollaUtente(c), turno: null };
+    contaReazione('seguito_scritto');
     s.bolla.classList.add('dash-bubble-attesa');
     s.bolla.title = 'In attesa';
     scrittoQui = true;
@@ -2697,7 +2738,7 @@
       // chiuderla qui vorrebbe dire pagare un titolo e un tipo a ogni
       // ricaricamento per una conversazione che non è finita.
       if (Accoglienza.isActive()) return;
-      closeCurrentChat();
+      closeCurrentChat({ via: 'uscita' });
     } catch (_) {}
   });
 

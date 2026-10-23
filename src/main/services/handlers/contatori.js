@@ -115,6 +115,11 @@ module.exports = function register(on, ctx) {
   }, [SETTINGS]);
 
   seguiCrash(contatori, C);
+  // I conti che aspettavano il salvataggio, e le chat delle schede che se ne vanno con Filo, sul disco prima di uscire.
+  try {
+    const { app } = require('electron');
+    for (const ev of ['before-quit', 'will-quit']) app.on(ev, () => { try { contatori.alChiudere(); } catch (_) {} });
+  } catch (_) {}
 
   on(MSG.CONTATORI_USO, async (msg) => ({
     ok: contatori.usoDallaPagina(msg && msg.action, msg && msg.attesaMs, { anticipata: Boolean(msg && msg.anticipata === true) }),
@@ -145,6 +150,8 @@ module.exports = function register(on, ctx) {
       case 'notifica': ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true }); break;
       // I gesti della personalizzazione (#1471): solo quelli che nascono in una pagina, coi campi dei loro elenchi.
       case 'gesto': ok = C.GESTI_DALLE_PAGINE.includes(testo(m.gesto)) && contatori.gesto(testo(m.gesto), m); break;
+      case 'reazione': ok = contatori.reazione(testo(m.voce)); break;
+      case 'copia': ok = contatori.copia(testo(m.ruolo)); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

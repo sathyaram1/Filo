@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'disposizioneIcone', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'disposizioneIcone', 'actionTools', 'contatoriGiornalieri']) {
   require(join(ROOT, 'src', 'shared', `${f}.js`));
 }
 const C = globalThis.SN_CONTATORI;
@@ -63,10 +63,11 @@ test('un’icona del tasto destro si conta una volta sola: o nella pagina, o nel
 
 test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri', () => {
   const tutto = contenuti.map(([, s]) => s).join('\n')
-    + leggi('src', 'pages', 'dashboard', 'dashboard-cerca.js') + leggi('src', 'pages', 'editor', 'editor.js') + leggi('src', 'shared', 'comboBox.js');
+    + leggi('src', 'pages', 'dashboard', 'dashboard-cerca.js') + leggi('src', 'pages', 'editor', 'editor.js') + leggi('src', 'shared', 'comboBox.js')
+    + leggi('src', 'pages', 'dashboard', 'dashboard.js');
   for (const m of tutto.matchAll(/misura: '([a-z-]+)'/g)) {
     assert.ok(['azione', 'icona', 'ricerca', 'proposta', 'annullato', 'chiesto', 'avviso', 'errore-modello', 'intervista',
-      'tasto-annulla', 'anticipo-aperto', 'conferma', 'gesto'].includes(m[1]), m[1]);
+      'tasto-annulla', 'anticipo-aperto', 'conferma', 'gesto', 'reazione', 'copia'].includes(m[1]), m[1]);
     assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), new RegExp(`case '${m[1]}':`), `il main riceve «${m[1]}»`);
   }
   for (const m of tutto.matchAll(/pannello: '([a-z-]+)'/g)) assert.ok(C.PANNELLI.includes(m[1]), m[1]);
@@ -156,4 +157,43 @@ test('i menu a comparsa contano apertura, scelta con il posto e chiusura senza s
   assert.match(pm, /contaRicerca\(s, 'scelta', \{ attesaMs: [^}]*posizione:/);
   assert.match(pm, /if \(ric && !ric\.fatta\) contaRicerca\(s, 'vuota'\);/);
   assert.match(pm, /C\.ricerca\('menu', \{ esito, \.\.\.extra \}, \{ incognito: !!\(s\.parent && s\.parent\._filoIncognito\) \}\)/);
+});
+
+// La chat (#1463): le reazioni e le copie che la home manda sono dell'elenco chiuso, e ogni chiusura di una chat dice
+// la sua via; una chiusura senza via non si conterebbe.
+test('la home manda reazioni e copie dell’elenco chiuso, e ogni chiusura di una chat dice come è finita', () => {
+  const home = leggi('src', 'pages', 'dashboard', 'dashboard.js');
+  const handlers = leggi('src', 'main', 'services', 'handlers.js');
+  const filo = leggi('src', 'main', 'services', 'handlers', 'filo.js');
+  const dette = [...home.matchAll(/contaReazione\('([a-z_]+)'\)/g)].map((m) => m[1]);
+  assert.deepEqual(dette.filter((v) => !C.REAZIONI.includes(v)), []);
+  assert.ok(dette.includes('riprova') && dette.includes('seguito_scritto'));
+  // Lo stop porta la fase che la persona vedeva; «Continua» il motivo che il main ha dato alla risposta senza risposta.
+  assert.match(home, /contaReazione\(`ferma_\$\{t\.fase\}`\)/);
+  const fasi = new Set([...home.matchAll(/fase(?: =|:) '([a-z_]+)'/g)].map((m) => m[1]));
+  assert.deepEqual([...fasi].sort(), ['durante_azioni', 'durante_testo', 'prima_del_testo']);
+  for (const f of fasi) assert.ok(C.REAZIONI.includes(`ferma_${f}`), f);
+  const motivi = new Set([...handlers.matchAll(/senzaRisposta = \{[^}]*motivo: '([a-z_]+)'/g)].map((m) => m[1]));
+  assert.deepEqual([...motivi].sort(), ['muto_dopo_letture', 'tagliato', 'tetto_giri']);
+  for (const m of motivi) { assert.ok(C.ESITI_TURNO.includes(m), m); assert.ok(C.REAZIONI.includes(`continua_${m}`), m); }
+  for (const m of home.matchAll(/ruolo: '([a-z_]+)'|return '([a-z_]+)';/g)) {
+    const r = m[1] || m[2];
+    if (['attivita', 'utente', 'risposta'].includes(r)) assert.ok(C.RUOLI_COPIA.includes(r), r);
+  }
+  assert.match(home, /document\.addEventListener\('copy',/);
+  assert.match(home, /document\.addEventListener\('filo-copia',/);
+  assert.match(leggi('src', 'content', 'content.js'), /onClick: copia \}/, 'il Copia del tasto destro lo dice alla pagina');
+
+  const chiamate = [...`${handlers}\n${filo}`.matchAll(/closeAndTriageChat\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map((m) => m[1])
+    .filter((a) => !/^chatId, opz = \{\}$/.test(a));
+  assert.ok(chiamate.length >= 5, chiamate.join(' / '));
+  for (const a of chiamate) assert.match(a, /\bvia\b/, `closeAndTriageChat(${a}) non dice la via`);
+  // Anche la via scelta fra due («uscita» se la scheda se n'è andata con Filo, se no «appesa_all_avvio»).
+  const vie = [...chiamate.join('\n').matchAll(/via: (?:\w+ \? )?'([a-z_]+)'(?: : '([a-z_]+)')?/g), ...home.matchAll(/closeCurrentChat\(\{[^}]*via: '([a-z_]+)'/g)]
+    .flatMap((m) => m.slice(1).filter(Boolean));
+  assert.ok(vie.length >= 6, vie.join(' '));
+  assert.deepEqual([...new Set(vie)].filter((v) => !C.VIE_CHIUSURA.includes(v)), []);
+  const dallaPagina = /\[([^\]]*)\]\.includes\(msg\.via\)/.exec(filo);
+  assert.ok(dallaPagina, 'la via che manda la pagina si controlla');
+  for (const v of [...dallaPagina[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1])) assert.ok(C.VIE_CHIUSURA.includes(v), v);
 });
