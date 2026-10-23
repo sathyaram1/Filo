@@ -4648,11 +4648,11 @@ const LEGACY_CONTINUE_NUDGE =
 // e un modello che la ritenta lo farebbe comparire due volte.
 // I nomi delle schede li scrivono i siti: tornano recintati, coi perché di Filo fuori dal recinto.
 const PERCHE_RESTA_APERTA = {
-  chat: 'è la scheda di questa conversazione: Filo non la chiude, la chiude l\'utente',
-  testo: 'c\'è del testo scritto e non ancora inviato',
-  sempre: 'sono di siti che l\'utente tiene sempre aperti',
-  chiusa: 'non c\'erano più',
-  nuova: 'si sono aperte dopo l\'elenco che avevi davanti',
+  chat: 'Non chiusa perché è la scheda di questa conversazione (se vuole, la chiude l\'utente)',
+  testo: 'Lasciate aperte perché hanno del testo scritto e non ancora inviato',
+  sempre: 'Lasciate aperte perché sono di siti che l\'utente tiene sempre aperti',
+  chiusa: 'Non c\'erano più',
+  nuova: 'Lasciate aperte perché si sono aperte dopo l\'elenco che avevi davanti',
 };
 function esitoChiusuraPerModello(action, o) {
   if (o.error) return `Nessuna scheda chiusa: ${o.error}. Correggi e riprova, o chiedi all'utente quali intende.`;
