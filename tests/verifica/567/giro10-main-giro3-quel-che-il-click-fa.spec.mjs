@@ -5,9 +5,9 @@
 //    schede, cancella dall'archivio) viene raccontata come «Azione non
 //    riuscita», e quella riga si mangia il bottone: la funzione non si
 //    raggiunge più dalla chat.
-// B) Quel che l'utente finisce da sé cliccando in chat (il comando confermato
-//    nel popup) non entra nel diario del lavoro, che resta «Come ha lavorato».
-//    La porta gemella (l'evento di calendario) ce l'ha il secondo giro.
+// B) Quel che l'utente finisce da sé cliccando in chat non entra nel diario del
+//    lavoro: il comando confermato nel popup sta in I di dashboard-chat-diario,
+//    l'evento di calendario in G4.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { newtabPage, configureModel, fakeProvider, restore, chiedi } from './aiuto.mjs';
