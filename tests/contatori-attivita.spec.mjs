@@ -270,7 +270,8 @@ test('un giro di pulizia conta candidate, chiuse e doppie; la scheda riaperta di
   const fascia = (n) => (n === 0 ? 's0' : n === 1 ? 's1' : n <= 5 ? 's2_5' : 's6_20');
   const doppie = archivio.filter((t) => t.reason === 'duplicato');
   expect(doppie.length).toBeGreaterThanOrEqual(1);
-  expect(Object.keys(giri)[0]).toMatch(new RegExp(`^manual\\|s[0-9_]+\\|${fascia(r.archived)}\\|${fascia(doppie.length)}\\|${r.giudizioMancato ? 'si' : 'no'}$`));
+  // Le doppie sono di più di quelle archiviate: una home doppia si chiude, ma le pagine di Filo non vanno in archivio.
+  expect(Object.keys(giri)[0]).toMatch(new RegExp(`^manual\\|s[0-9_]+\\|${fascia(r.archived)}\\|s(1|2_5)\\|${r.giudizioMancato ? 'si' : 'no'}$`));
 
   const voce = doppie[0];
   const riaperta = await home.evaluate((id) => chrome.runtime.sendMessage({ type: 'reopen_archived_tab', id }), voce.id);
