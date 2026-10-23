@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464): la collezione è a sola creazione, letta solo
-// dall'admin, e la forma che accetta è quella che l'app costruisce (v3), più le ore delle copie vecchie (v2) e i giorni
-// di prima (v1). Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica.
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464): le collezioni sono a sola creazione, lette solo
+// dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v2), i giorni di prima (v1) e le chiamate
+// ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,13 +35,7 @@ function corpo(nome) {
   return m[1].replace(/\s+/g, ' ').trim();
 }
 const GIORNO = corpo('contatoriGiorno');
-const ORA_V3 = corpo('contatoriOra');
-const ORA_V2 = corpo('contatoriOraV2');
-const TESTA = corpo('testaOra');
-const MISURE_V2 = corpo('misureOra');
-const MISURE_CHIAMATE = corpo('misureChiamate');
-// Tutto quello che una v3 deve passare, scritto di seguito.
-const ORA = [ORA_V3, TESTA, MISURE_V2, MISURE_CHIAMATE].join(' && ');
+const ORA = corpo('contatoriOra');
 
 function regole() {
   const out = [];
@@ -79,8 +73,8 @@ function misureDelleRegole() {
 const M = misureDelleRegole();
 
 // Le regole applicate a un documento, come le applica il server a una stringa unita.
-function passa(doc, campi = Object.keys(M)) {
-  for (const [campo, r] of Object.entries(M).filter(([c]) => campi.includes(c))) {
+function passa(doc) {
+  for (const [campo, r] of Object.entries(M)) {
     const v = doc[campo];
     if (r.lista) {
       if (!Array.isArray(v) || v.length > r.quante || v.join('#').length > r.tetto || !new RegExp(r.valori).test(v.join('#'))) return `${campo}`;
@@ -107,21 +101,15 @@ test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   }
   assert.ok(per('write').length === 0, 'una `write` scavalcherebbe il no a update e delete');
   assert.equal(per('create').length, 1);
-  assert.equal(per('create')[0].cond,
-    'contatoriGiorno(request.resource.data) || contatoriOraV2(request.resource.data) || contatoriOra(request.resource.data)');
+  assert.equal(per('create')[0].cond, 'contatoriGiorno(request.resource.data) || contatoriOra(request.resource.data)');
 });
 
-test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; le ore e i giorni delle copie vecchie tengono la loro forma', () => {
-  assert.deepEqual(elencoDopo(ORA_V3, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI]);
-  assert.deepEqual(elencoDopo(ORA_V3, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI]);
-  assert.match(ORA_V3, new RegExp(`&& d\\.v == ${C.VERSIONE} && testaOra\\(d\\) && misureOra\\(d\\) && misureChiamate\\(d\\)$`));
-  // Le copie di Filo di prima di #1464 mandano ancora la v2: stessa testa e stesse misure, senza le chiamate.
-  assert.deepEqual(elencoDopo(ORA_V2, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_V2]);
-  assert.deepEqual(elencoDopo(ORA_V2, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_V2]);
-  assert.match(ORA_V2, new RegExp(`&& d\\.v == ${C.VERSIONE_V2} && testaOra\\(d\\) && misureOra\\(d\\)$`));
-  assert.deepEqual(C.CAMPI.slice(0, C.CAMPI_V2.length), [...C.CAMPI_V2], 'la v3 è la v2 più le misure delle chiamate');
+test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; i giorni di prima tengono la loro forma', () => {
+  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI]);
+  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI]);
   assert.deepEqual(elencoDopo(GIORNO, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_GIORNO]);
   assert.deepEqual(elencoDopo(GIORNO, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_GIORNO]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(ORA)[1]), C.VERSIONE);
   assert.equal(Number(/d\.v == (\d+)/.exec(GIORNO)[1]), C.VERSIONE_GIORNO);
   const ora = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.243', os: 'win', dati: C.oraVuota() });
   assert.deepEqual(Object.keys(ora), [...C.CAMPI]);
@@ -139,9 +127,7 @@ test('le chiavi chiuse vengono dagli elenchi dell’app; le altre hanno una form
   assert.equal(new Set(FUNZIONI_REGOLE).size, FUNZIONI_REGOLE.length, 'una funzione scritta due volte nelle regole');
   assert.match(GIORNO, /d\.uso is map && d\.uso\.keys\(\)\.hasOnly\(funzioniContate\(\)\)/);
   assert.match(GIORNO, /d\.errori is map && d\.errori\.keys\(\)\.hasOnly\(funzioniContate\(\)\)/);
-  for (const campo of ['uso', 'errori', 'anticipi', 'chiedi', ...C.MISURE_MODELLI, 'chiamate']) {
-    assert.equal(M[campo].chiavi, FUNZIONI_REGOLE, `${campo} si chiude sulle funzioni`);
-  }
+  for (const campo of ['uso', 'errori', 'anticipi', 'chiedi']) assert.equal(M[campo].chiavi, FUNZIONI_REGOLE, `${campo} si chiude sulle funzioni`);
   assert.deepEqual(M.ricerche.chiavi, [...C.PANNELLI]);
   assert.deepEqual(M.correttore.chiavi, [...C.TIPI_PROPOSTA]);
 
@@ -171,7 +157,6 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
     uso: F.MISURA_FORMA, errori: F.ERRORI_FORMA, azioni: F.MISURA_FORMA, impostazioni: F.IMPOSTAZIONI_FORMA,
     ricerche: F.RICERCA_FORMA, correttore: F.CORRETTORE_FORMA, conferme: F.CONFERME_FORMA, annullati: F.CONTO_FORMA,
     anticipi: F.ANTICIPO_FORMA, chiedi: F.CONTO_FORMA, erroriVisti: F.CONTO_FORMA, intervista: F.INTERVISTA_FORMA,
-    ...F.MODELLI, chiamate: F.CHIAMATE_FORMA,
   };
   for (const [campo, f] of Object.entries(formaApp)) assert.equal(M[campo].valori, unite(f), `forma dei valori di ${campo}`);
   assert.match(GIORNO, new RegExp(`d\\.uso\\.values\\(\\)\\.join\\('#'\\)\\.matches\\('${unite(F.USO_FORMA).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`));
@@ -210,35 +195,12 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   for (const a of C.AVVISI_ERRORE) C.registraErroreVisto(ora, `avviso:${a}`);
   for (let i = 1; i < 300; i++) C.registraErroreVisto(ora, `rete:-${i}`);
   for (const p of C.passiIntervista()) for (const s of C.SCELTE_INTERVISTA) C.registraIntervista(ora, p, s);
-  // Le chiamate: per ogni funzione ogni resto, col modello più lungo che l'app lascia uscire; oltre il tetto dell'ora
-  // diventa «altro», e ogni funzione ha anche tutte le sue righe «altro».
-  const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i).padStart(3, '0')}`;
-  assert.equal(C.modelloPulito(lunghissimo(1)), lunghissimo(1));
-  let k = 0;
-  for (const f of C.funzioni()) {
-    for (const c of C.MISURE_MODELLI) {
-      ora[c][f] = {};
-      for (const r of [...C.RESTI[c]].sort((a, b) => b.length - a.length)) {
-        ora[c][f][`${lunghissimo(k++ % 1000)}|${r}`] = 7;
-        ora[c][f][`altro|${r}`] = 7;
-      }
-    }
-    for (const n of [1, 2, 4, 9, 40]) C.registraChiamate(ora, f, n);
-  }
   const gonfia = (o) => { for (const k of Object.keys(o)) { if (Number.isInteger(o[k])) o[k] = 999999999; else if (o[k] && typeof o[k] === 'object') gonfia(o[k]); } };
   gonfia(ora);
 
   const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
   assert.equal(passa(doc), '', 'il documento più carico dell’app deve passare le regole');
-  for (const c of C.MISURE_MODELLI) {
-    const voci = Object.values(doc[c]).flatMap((v) => C.leggiModelli(c, v));
-    assert.equal(voci.filter((x) => x.modello !== 'altro').length, C.TETTO_MODELLI_ORA, `${c}: le voci col modello si fermano al tetto`);
-    assert.equal(voci.filter((x) => x.modello === 'altro').length, C.funzioni().length * C.RESTI[c].length, `${c}: il resto finisce in «altro»`);
-  }
-  // La v2 delle copie vecchie passa ancora: è la v3 senza le misure delle chiamate.
-  const v2 = Object.fromEntries(C.CAMPI_V2.map((k2) => [k2, doc[k2]]));
-  assert.equal(passa({ ...v2, v: C.VERSIONE_V2 }, C.MISURE_V2), '');
   const totale = Object.values(M).reduce((a, r) => a + r.tetto + (r.tettoChiavi || 0), 0);
   assert.ok(totale <= 1000000, `i tetti delle regole sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
   assert.ok(JSON.stringify(doc).length < 1000000);
@@ -254,11 +216,6 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   assert.notEqual(manomesso('primeVolte', ['explain', 'appunti di mario']), '');
   assert.notEqual(manomesso('chiedi', { explain: { n: 3, nota: 'ciao' } }), '', 'una mappa al posto della stringa non si unisce: rifiutata');
   assert.notEqual(manomesso('annullati', { NAVIGA: '1 volta' }), '');
-  assert.notEqual(manomesso('contesto', { 'filo-chat': 'deepseek/v4|t2k|1;come stai oggi|t2k|1' }), '');
-  assert.notEqual(manomesso('uscita', { 'filo-chat': 'deepseek/v4|o1k|finito bene|1' }), '');
-  assert.notEqual(manomesso('spesa', { 'filo-chat': 'deepseek/v4|regalo|1' }), '');
-  assert.notEqual(manomesso('cache', { 'appunti di mario': 'deepseek/v4|q25|1' }), '', 'una chiave fuori dalle funzioni');
-  assert.notEqual(manomesso('chiamate', { 'filo-chat': '1,2,3' }), '');
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
