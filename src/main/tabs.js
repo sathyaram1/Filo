@@ -2342,13 +2342,10 @@ class TabManager {
     const shellWc = this.win && this.win.webContents;
     if (!shellWc || typeof shellWc.on !== 'function') return;
     shellWc.on('before-input-event', (event, input) => {
-      if (input.type !== 'keyDown') return;
-      const dir = globalThis.SN_ZOOM ? globalThis.SN_ZOOM.tastoZoom(input) : null;
-      if (!dir) return;
+      if (input.type !== 'keyDown' || !globalThis.SN_ZOOM || !globalThis.SN_ZOOM.tastoZoom(input)) return;
       event.preventDefault();
       const active = this.tabs.find((t) => t.id === this.activeId);
-      if (!active) return;
-      try { active.view.webContents.send('filo:zoom-key', dir); } catch (_) {}
+      if (active) zoomDaTasto(active.view.webContents, input);
     });
     // Stessa asimmetria per indietro/avanti: appena si clicca una scheda il
     // fuoco lascia la pagina e da lì il tasto non passava da nessuna parte.
