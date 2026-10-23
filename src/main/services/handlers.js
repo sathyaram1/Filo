@@ -4719,6 +4719,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `Schede riordinate: ${n} archiviate, restano nel filo della home (le ritrova col campo «Cerca nel filo»). Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
   }
+  if (type === 'CHIUDI_SCHEDE' && res.output && !res.needsConfirm) return esitoChiusuraPerModello(action, res.output);
   if (type === 'VEDI_SCHERMO') {
     const t = vediSchermoPerModello(action, res);
     if (t) return t;
