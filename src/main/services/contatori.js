@@ -677,6 +677,16 @@ function crea(dip = {}) {
     return esito;
   }
 
+  // Le chiamate ai modelli di un'ora (#1464), se ne ha: un documento che non passa la validazione non ferma l'ora.
+  function documentoChiamate(k, base) {
+    const d = C.documentoChiamate(base);
+    if (C.senzaChiamate(d)) return null;
+    const v = C.validaChiamate(d);
+    if (v.ok) return d;
+    log(`le chiamate di ${k} non partono: ${v.motivo}`);
+    return null;
+  }
+
   // Si ricordano i giorni che possono ancora partire (le ore restano in attesa al più due mesi) e tre mesi.
   function potaPrimi(oggi) {
     const giorniTenuti = Math.ceil(C.TETTO_ORE_IN_ATTESA / 24) + 1;
