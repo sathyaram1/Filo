@@ -4861,18 +4861,36 @@ function pageReadsForPrompt(actions) {
       }
       continue;
     }
+    // #1596 — `tenuti`: quanto ne è rimasto quando le letture del turno insieme non stavano nella finestra del modello.
+    const campi = { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) };
+    const tenuti = Number.isFinite(out.tenuti) ? Math.max(0, Math.min(out.testo.length, out.tenuti)) : out.testo.length;
+    if (tenuti === 0) {
+      blocks.push('[Pagina web letta ma lasciata fuori: con le altre letture di questo turno non stava nella memoria del modello. '
+        + 'Restano titolo e indirizzo, il testo non lo hai davanti: non inventarlo e rispondi con quello che hai. Non rileggerla in '
+        + 'questo turno; sotto la tua risposta Filo dice all\'utente quali pagine ha lasciato fuori, e se lui lo chiede la rileggi con '
+        + `LEGGI_PAGINA e lo stesso url${da > 0 ? `, da: ${da}` : ''}.]\n`
+        + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi, conIntestazione: true }));
+      continue;
+    }
+    const parziale = tenuti < out.testo.length;
+    const testo = parziale ? tagliaInteri(out.testo, tenuti) : out.testo;
+    const finoQui = parziale ? da + testo.length : fino;
     const meta = [out.fonte === 'scheda' ? 'letta dalla scheda aperta' : 'scaricata'];
     if (out.tipo === 'application/pdf') meta.push(out.pagine ? `un PDF di ${out.pagine} ${out.pagine === 1 ? 'pagina' : 'pagine'}` : 'un PDF');
-    if (da > 0 || out.troncata) meta.push(`caratteri da ${da} a ${fino} su ${totale}`);
+    if (da > 0 || out.troncata || parziale) meta.push(`caratteri da ${da} a ${finoQui} su ${totale}`);
     let blocco = `[Pagina web (${meta.join(', ')})]\n`
       + E.imbustaCampi({
         tipo: 'PAGINA_WEB',
-        campi: { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) },
-        corpo: out.testo,
+        campi,
+        corpo: testo,
         conIntestazione: true,
         max: PageRead.MAX_TEXT_CHARS + 4000,
       });
-    if (out.troncata) {
+    if (parziale) {
+      blocco += `\n[Letto fino al carattere ${finoQui} su ${totale}: il resto non stava nella memoria del modello insieme alle altre `
+        + 'letture di questo turno. Rispondi con quello che hai e, se il dato manca, dillo; non rileggerla in questo turno: se '
+        + `l'utente lo chiede, il seguito si legge con LEGGI_PAGINA, lo stesso url e da: ${finoQui}.]`;
+    } else if (out.troncata) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
     }
