@@ -235,7 +235,7 @@
   function tipoDiNome(nome) {
     const parti = nome.split(/[_.:\s-]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean).map((p) => p.toLowerCase());
     const pw = parti.findIndex((p) => PAROLA_CHIAVE.test(p) || /(?:password|passwd|passphrase)$/.test(p));
-    if (pw >= 0) return parti.slice(pw + 1).every((p) => DOPO_PASSWORD.test(p)) ? 'password' : '';
+    if (pw >= 0 && parti.slice(pw + 1).every((p) => DOPO_PASSWORD.test(p))) return 'password';
     if (parti.some((p, i) => /^(?:secrets?|tokens?|credentials?)$/.test(p) || /(?:secret|token|apikey)$/.test(p)
       || (/^keys?$/.test(p) && i > 0 && QUALIFICA_CHIAVE.test(parti[i - 1])))) return 'segreto';
     return '';
