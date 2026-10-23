@@ -6383,7 +6383,6 @@ async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
     origin: 'filo:dashboard',
     intera: true,
   });
-  try { globalThis.SN_CONTATORI_MAIN?.attivita('home', { esito: 'generata' }); } catch (_) {}
   const parsed = extractJson(r.text);
   let message = '';
   let suggestions = [];
