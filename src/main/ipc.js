@@ -64,11 +64,13 @@ function senderInfo(event) {
       if (r && r.possiede(wc)) { tab = { id: r.id, url: wc.getURL(), title: '' }; win = w; riserva = true; break; }
     }
   }
+  const isShell = Boolean(finestraDellaBarra(wc));
   return {
     riserva,
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null, paginaDal: tab.paginaDal || null } : null,
     url: wc.getURL(),
-    isShell: Boolean(finestraDellaBarra(wc)),
+    isShell,
+    interna: vistaInterna({ isShell, riserva, tab, segnata: wc._filoVistaInterna === true }),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
     // direttamente, non oltre il confine IPC) + flag incognito, così i servizi
     // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
