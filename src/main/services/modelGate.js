@@ -460,6 +460,7 @@
           },
           suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
         });
+        if (servite.length) m.chiamata(servite);
         if (esito.fermo) m.errore(esito.fermo, { modello: a.model, host: servedBy || (esito.fermo && esito.fermo.hostFallito) });
         let seen = { servedBy: null, violation: false };
         let costEur = 0;
