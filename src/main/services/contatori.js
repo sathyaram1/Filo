@@ -976,6 +976,17 @@ function crea(dip = {}) {
     return null;
   }
 
+  // La finestra di un'ora (#1470), se ne ha: come le chiamate, un documento fuori forma non ferma l'ora.
+  function documentoFinestra(k, base) {
+    if (!F) return null;
+    const d = F.documento(base);
+    if (F.senzaDati(d)) return null;
+    const v = F.valida(d);
+    if (v.ok) return d;
+    log(`la finestra di ${k} non parte: ${v.motivo}`);
+    return null;
+  }
+
   // Si ricordano i giorni che possono ancora partire (le ore restano in attesa al più due mesi) e tre mesi.
   function potaPrimi(oggi) {
     const giorniTenuti = Math.ceil(C.TETTO_ORE_IN_ATTESA / 24) + 1;
