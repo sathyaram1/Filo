@@ -162,18 +162,23 @@
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
     const forma = (pezzo) => { const v = formaVicina(pezzo); if (v) out.push({ valore: v, regola: 'password' }); };
+    const inizi = [];
+    for (let i = 0, o = 0; i < righe.length; o += righe[i].length + 1, i++) inizi.push(o);
     for (let i = 0; i < righe.length; i++) {
       for (const m of righe[i].matchAll(AL_POSTO)) {
         if (!DA_SOLA.test(m[2])) continue;
         const v = valorePassword(m[1]);
-        if (v) out.push({ valore: v, regola: 'password' });
+        if (v) out.push(alPosto(v, inizi[i] + m.indices[1][0], m[1]));
       }
       for (const re of [DOPO_LUNGO, DOPO_CORTA]) for (const m of righe[i].matchAll(re)) forma(m[1]);
       if (!SOLO_ETICHETTA.test(righe[i])) continue;
-      const sotto = rigaSotto(righe, i).trim().split(/\s+/);
-      if (sotto.length === 1) {
+      const { riga, j, saltate } = rigaSotto(righe, i);
+      const sotto = riga.trim().split(/\s+/);
+      // Oltre i bottoni o i puntini (la password mostrata coperta) la riga dopo è spesso un altro campo («Telefono»):
+      // lì conta solo la forma di una password.
+      if (sotto.length === 1 && !saltate) {
         const v = valorePassword(sotto[0]);
-        if (v) out.push({ valore: v, regola: 'password' });
+        if (v) out.push(alPosto(v, inizi[j], riga));
       } else forma(sotto[0]);
     }
   }
