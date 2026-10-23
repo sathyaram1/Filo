@@ -292,7 +292,8 @@
       return bolle.some((b) => b.dataset.senzaCrediti === '1')
         && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
     },
-    setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
+    // Arrivano col messaggio appena scritto: la loro età parte da adesso.
+    setSuggestions: (list) => { suggestions = list; suggerimentiDel = new Date().toISOString(); renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
