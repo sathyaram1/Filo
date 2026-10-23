@@ -329,8 +329,10 @@ Le regole (Firebase Security Rules) dicono:
   il codice dell'app.
 - Gli **allegati** (gli screenshot, cioè il tuo schermo) non sono pubblici.
   Chiunque può caricarne di nuovi insieme a un feedback, anche senza login, ma
-  nessuno può sovrascriverli, cancellarli o farsi dare l'elenco di quelli che
-  ci sono. Si aprono da una strada sola: il collegamento che nasce insieme
+  solo come li carica Filo: cifrati, con un nome che non si indovina e senza
+  scegliere niente di come si scaricano. Un file qualunque caricato da fuori
+  viene rifiutato. Nessuno può sovrascriverli, cancellarli o farsi dare
+  l'elenco di quelli che ci sono. Si aprono da una strada sola: il collegamento che nasce insieme
   all'allegato e che vive dentro il tuo feedback. Nemmeno chi riceve le
   segnalazioni ne ha un'altra, ed è voluto — è quello che rende utile ritirare
   quel collegamento se finisce in giro. Prima bastava il nome del deposito, che
