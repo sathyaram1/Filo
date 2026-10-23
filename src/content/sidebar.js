@@ -149,6 +149,7 @@
   // Già lì, ridotto o nascosto: «Aiuto» lo mostra intero, con la risposta arrivata nel frattempo.
   function mostra() {
     nascosto = false;
+    if (session && session.chiusaPrima) { session.chiusaPrima = false; segnaSessione(); }
     root.classList.remove('sn-sidebar-nascosta');
     expand({ ai: false });
     try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
