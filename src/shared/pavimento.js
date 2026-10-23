@@ -287,7 +287,30 @@
   const SEGRETO_SOLO = new RegExp(`^[ \\t]*${ETICHETTA_SEGRETO}[ \\t]*:?[ \\t]*$`, 'i');
   const BASIC = /\bAuthorization\s*:\s*Basic\s+([A-Za-z0-9+/]{8,}={0,2})/gi;
   const RIGA_DI_COMANDO = /\bsshpass\s+-p\s*(?:'([^'\n]+)'|"([^"\n]+)"|(\S+))|\b(?:mysql|mysqldump|mysqladmin|mariadb)\b[^\n]*?\s-p(?:'([^'\n]+)'|"([^"\n]+)"|([^\s'"]+))/gi;
+  // In una riga di comando la password sta nella coppia dell'utente («-u mario:x», «-U mario%x») o dopo l'opzione della
+  // password quando la riga nomina un utente («docker login -u mario -p x», «sqlcmd -U sa -P x»): «-p 8080:80» resta.
+  const COPPIA_UTENTE = /(?:^|\s)(?:-u|-U|--user(?:name)?)(?:\s+|=)['"]?[^\s:%'"]{1,64}[:%]([^\s'"]{3,128})/g;
+  const CON_UTENTE = /(?:^|\s)(?:-u|-U|-l|--user(?:name)?|login)(?:\s|=)/;
+  const OPZIONE_PASSWORD = /(?:^|\s)(?:-p|-P|-a|-pw|--pass(?:word)?|--passwd)(?:\s+|=)(['"]?)([^\s'"-][^\s'"]{2,127})\1/g;
+  const SOLO_REDIS = /\bredis-cli\b[^\n]*?\s-a\s+(['"]?)([^\s'"]{3,128})\1/g;
+  function passwordDiComando(s, out) {
+    for (const m of s.matchAll(COPPIA_UTENTE)) if (/[A-Za-z]/.test(m[1])) out.push({ valore: m[1], regola: 'password' });
+    for (const riga of s.split('\n')) {
+      if (CON_UTENTE.test(riga)) {
+        for (const m of riga.matchAll(OPZIONE_PASSWORD)) if (/[A-Za-z]/.test(m[2])) out.push({ valore: m[2], regola: 'password' });
+      }
+      for (const m of riga.matchAll(SOLO_REDIS)) out.push({ valore: m[2], regola: 'password' });
+    }
+  }
+  // Una chiave privata ha intestazione e coda fisse: si toglie il corpo che segue l'intestazione, qualunque sia il formato
+  // (OpenSSH, RSA, EC, cifrata), anche coi ritorni a capo scritti come «\n» dentro un JSON.
+  const CORPO_PEM = /-----BEGIN (?:[A-Z0-9]+ ){0,4}PRIVATE KEY-----((?:(?:\r?\n|\\r?\\n)[A-Za-z-]{1,20}:[^\n\\]{0,200}){0,4}(?:(?:\r?\n|\\r?\\n|[ \t]){1,8}[A-Za-z0-9+/=]{4,})+)/g;
+  // Il token di un bot Telegram ha la sua forma: l'id del bot, i due punti, trentacinque caratteri.
+  const TOKEN_TELEGRAM = /(?<![\w-])\d{8,10}:[A-Za-z0-9_-]{35}(?![\w-])/g;
   function chiaviInChiaro(s, out) {
+    passwordDiComando(s, out);
+    for (const m of s.matchAll(CORPO_PEM)) out.push({ valore: m[1].replace(/^(?:\s|\\r?\\n)+/, ''), regola: 'chiave' });
+    for (const m of s.matchAll(TOKEN_TELEGRAM)) out.push({ valore: m[0], regola: 'token' });
     for (const m of s.matchAll(SEGRETO_ACCANTO)) {
       const v = formaDiSegreto(m[1].replace(/[.»”"']+$/, ''));
       if (v) out.push({ valore: v, regola: 'chiave' });
