@@ -397,8 +397,22 @@
       risultato: true,
     },
     PULISCI_TAB: {
-      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede.',
+      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede e lascia a Filo la scelta; per chiudere quelle che dice lui c\'è CHIUDI_SCHEDE.',
       properties: {},
+      required: [],
+    },
+    CHIUDI_SCHEDE: {
+      description: 'CHIUDE le schede che l\'utente indica, in questa finestra, come il pulsante di chiusura: "chiudi tutte le schede tranne questa", "chiudi YouTube", "chiudi la 3 e la 5", "chiudi tutto tranne Gmail". Le pagine chiuse restano nel filo della home, da dove l\'utente le riapre. '
+        + 'Le schede si indicano col numero che hanno in TAB APERTE (`schede`), oppure con `sito` (tutte quelle di un sito, anche oltre l\'elenco), oppure con `tutte`; `tranne` sono i numeri da lasciare aperti. '
+        + 'La scheda [QUESTA CHAT] non la chiudi mai: "tranne questa" detto qui è lei, quindi basta `tutte`. '
+        + 'Con `tutte` o `sito` restano aperte anche le schede con del testo scritto e non inviato, e con `tutte` quelle dei siti tenuti sempre aperti: l\'esito te le nomina, e se l\'utente insiste le chiudi col loro numero. '
+        + 'Per riordinare lasciando a Filo la scelta di cosa non serve più c\'è PULISCI_TAB.',
+      properties: {
+        schede: { type: 'array', items: { type: 'integer' }, description: 'I numeri delle schede da chiudere, presi da TAB APERTE.' },
+        sito: S('Chiude tutte le schede di questo sito ("youtube.com", o il nome "youtube").'),
+        tutte: B('true per chiudere tutte le schede della finestra tranne [QUESTA CHAT] e quelle in `tranne`.'),
+        tranne: { type: 'array', items: { type: 'integer' }, description: 'Con `tutte` o `sito`: i numeri (da TAB APERTE) delle schede da lasciare aperte.' },
+      },
       required: [],
     },
     CANCELLA_ARCHIVIO: {

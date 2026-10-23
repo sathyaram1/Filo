@@ -59,10 +59,10 @@ function risolvi(action, { schede = [], viste = [], numerate = 12, chat = null, 
   const perId = new Map(schede.map((t) => [t.id, t]));
   const chiudere = [];
   const restano = [];
-  const viste2 = new Set();
+  const prese = new Set();
   const metti = (tab, modo) => {
-    if (viste2.has(tab.id)) return;
-    viste2.add(tab.id);
+    if (prese.has(tab.id)) return;
+    prese.add(tab.id);
     if (tenute.has(tab.id)) return;
     if (tab.id === chat) {
       if (modo === 'numero') restano.push({ tab, perche: 'chat' });
