@@ -16,16 +16,15 @@ const WORKFLOW = readdirSync(CARTELLA)
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 
 const AMBIENTE = 'rilascio';
-// Su un ramo l'ambiente respingerebbe il job: chi lavora anche sui rami lo dichiara solo su main.
-const AMBIENTE_SOLO_MAIN = "${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}";
-const SU_MAIN = "github.ref == 'refs/heads/main'";
 
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
 
+/** I segreti che un testo nomina, GITHUB_TOKEN escluso; anche quelli passati in blocco (`toJSON(secrets)`, `secrets: inherit`). */
 function segreti(testo) {
-  return [...senzaCommenti(testo).matchAll(/secrets\.([A-Za-z_][A-Za-z0-9_]*)/g)]
-    .map((m) => m[1])
-    .filter((n) => n !== 'GITHUB_TOKEN');
+  const righe = senzaCommenti(testo);
+  const nomi = [...righe.matchAll(/secrets\.([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]).filter((n) => n !== 'GITHUB_TOKEN');
+  if (/secrets\s*\[|toJSON\(\s*secrets\s*\)|^\s*secrets:\s*inherit\b/m.test(righe)) nomi.push('(tutti)');
+  return nomi;
 }
 
 function jobs(testo) {
@@ -46,13 +45,22 @@ function ambiente(testoJob) {
   const i = righe.findIndex((r) => /^ {4}environment:/.test(r));
   if (i < 0) return null;
   const valore = righe[i].replace(/^ {4}environment:\s*/, '').trim();
-  if (valore) return valore;
-  const nome = righe.slice(i + 1).find((r) => /^ {6}name:/.test(r));
-  return nome ? nome.replace(/^ {6}name:\s*/, '').trim() : '';
+  const nome = valore || (righe.slice(i + 1).find((r) => /^ {6}name:/.test(r)) || '').replace(/^ {6}name:\s*/, '').trim();
+  return nome.replace(/^(['"])(.*)\1$/, '$2');
 }
 
 function passi(testoJob) {
   return senzaCommenti(testoJob).split(/\n(?= {6}- )/).filter((p) => /^ {6}- /.test(p));
+}
+
+/**
+ * I job che nominano un segreto fuori dall'ambiente fisso. Un ambiente condizionale non basta (#1504): dove vale
+ * vuoto, cioè su un ramo, il segreto arriva lo stesso, col valore omonimo del repo, a un job che fa girare quel ramo.
+ */
+function jobSenzaAmbiente(testo) {
+  return jobs(testo)
+    .map((j) => ({ job: j.nome, segreti: [...new Set(segreti(j.testo))], ambiente: ambiente(j.testo) }))
+    .filter((j) => j.segreti.length && j.ambiente !== AMBIENTE);
 }
 
 describe('i segreti si leggono solo dentro l\'ambiente rilascio', () => {
@@ -63,24 +71,28 @@ describe('i segreti si leggono solo dentro l\'ambiente rilascio', () => {
         `${nome} legge segreti a livello di workflow: li vedrebbe ogni job, anche quelli senza ambiente`);
     });
 
-    for (const j of jobs(testo)) {
-      const usati = segreti(j.testo);
-      if (!usati.length) continue;
-      test(`${nome} → ${j.nome}: dichiara l'ambiente (${[...new Set(usati)].join(', ')})`, () => {
-        const amb = ambiente(j.testo);
-        assert.ok(amb === AMBIENTE || amb === AMBIENTE_SOLO_MAIN,
-          `il job ${j.nome} di ${nome} legge ${usati.join(', ')} senza \`environment: ${AMBIENTE}\` (trovato: ${amb ?? 'niente'}): ` +
-          'quando i segreti stanno nell\'ambiente, lì arriverebbero vuoti e il passo fallirebbe muto');
-        if (amb !== AMBIENTE_SOLO_MAIN) return;
-        for (const p of passi(j.testo)) {
-          if (!segreti(p).length) continue;
-          const se = (/^\s*if:\s*(.+)$/m.exec(p) || [])[1] || '';
-          assert.ok(se.includes(SU_MAIN),
-            `in ${nome} → ${j.nome} un passo legge un segreto senza \`${SU_MAIN}\` nel suo if: su un ramo l'ambiente non c'è`);
-        }
-      });
-    }
+    test(`${nome}: ogni job che nomina un segreto dichiara \`environment: ${AMBIENTE}\`, fisso`, () => {
+      const scoperti = jobSenzaAmbiente(testo)
+        .map((j) => `${j.job} legge ${j.segreti.join(', ')} con l'ambiente ${j.ambiente === null ? 'assente' : `«${j.ambiente}»`}`);
+      assert.deepEqual(scoperti, [],
+        `in ${nome}, senza \`environment: ${AMBIENTE}\` il segreto arriva col valore omonimo del repo, se c'è, anche alla corsa di un ramo. ` +
+        'Il lavoro che legge il segreto sta a parte, nell\'ambiente fisso, con un `if:` che lo salta fuori da main');
+    });
   }
+
+  test('la regola riconosce i job che la scavalcano', () => {
+    const wf = (corpo) => `on: workflow_dispatch\njobs:\n  lavoro:\n    runs-on: ubuntu-latest\n${corpo}    steps:\n      - name: x\n        env:\n          P: \${{ secrets.FILO_BUILD_PASSPHRASE }}\n        run: true\n`;
+    const scoperti = (corpo) => jobSenzaAmbiente(wf(corpo)).map((j) => j.job);
+    assert.deepEqual(scoperti(''), ['lavoro'], 'senza ambiente');
+    assert.deepEqual(scoperti("    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}\n"), ['lavoro'],
+      'l\'ambiente solo su main lascia il segreto del repo alla corsa di un ramo');
+    assert.deepEqual(scoperti("    environment:\n      name: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}\n"), ['lavoro']);
+    assert.deepEqual(scoperti('    environment: rilascio\n'), []);
+    assert.deepEqual(scoperti("    environment: 'rilascio'\n"), []);
+    assert.deepEqual(scoperti('    environment:\n      name: rilascio\n'), []);
+    const inBlocco = 'on: push\njobs:\n  chiama:\n    uses: ./.github/workflows/altro.yml\n    secrets: inherit\n';
+    assert.deepEqual(jobSenzaAmbiente(inBlocco).map((j) => j.job), ['chiama'], '`secrets: inherit` passa tutti i segreti');
+  });
 
   test('le metà della pubblicazione dichiarano l\'ambiente per intero, non solo su main', () => {
     const rel = WORKFLOW.find((w) => w.nome === 'release.yml');

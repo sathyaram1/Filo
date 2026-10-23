@@ -46,8 +46,11 @@ test("l'«In breve» non fa passare per completo un elenco più corto di quello 
 });
 
 // «Scrivi al maintainer» senza un indirizzo non è un canale (#1421); chi non usa Filo non ha quello dei feedback.
+// Chi valuta il progetto cerca qui chi risponde della sicurezza, con nome e indirizzo (#1559).
 test('una vulnerabilità ha i suoi canali privati, gli stessi nei due documenti di sicurezza', () => {
   const sezione = sec.slice(sec.indexOf('## Come segnalare un problema di sicurezza'));
+  assert.match(sezione, /maintainer del progetto, \*\*Sathyaram\s+Pontillo\*\*/);
+  assert.match(sezione, /email\*\* a Sathyaram Pontillo,\s+\[hello@filo\.red\]/);
   const trasparenza = readFileSync(join(ROOT, 'transparency', 'security.md'), 'utf8');
   for (const canale of ['https://github.com/sathyaram1/Filo/security/advisories/new', 'hello@filo.red']) {
     assert.ok(sezione.includes(canale), `SECURITY.md, «Come segnalare»: manca ${canale}`);

@@ -1,15 +1,6 @@
-// Motore di decisione: dai segnali (locali sincroni + dati asincroni di rete,
-// quando disponibili) calcola UN verdetto con livello e messaggio specifico.
-//
-// Livelli (esattamente due avvisi, vedi spec):
-//   'safe'       — nessun avviso.
-//   'sospetto'   — banner chiudibile con "ok".
-//   'pericoloso' — interstitial bloccante (scrivere "confermo").
-//
-// Principio: "pericoloso" poggia SOLO su segnali che l'attaccante non può
-// nascondere (blacklist, dominio, certificato, età). Il contenuto rinforza,
-// mai da solo. L'LLM è monotòno: può alzare a "sospetto", mai a "pericoloso",
-// mai dichiarare sicuro (applicato da chi orchestra, non qui).
+// Motore di decisione: dai segnali calcola UN verdetto con livello e messaggio.
+// Livelli: safe nessun avviso, sospetto banner chiudibile, pericoloso blocca la pagina.
+// «Pericoloso» poggia solo su segnali non nascondibili; l'LLM alza a sospetto, mai oltre.
 
 'use strict';
 
@@ -228,8 +219,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     };
   }
 
-  // ── PERICOLOSO ────────────────────────────────────────────────────────
-  // strict impersonation da sola basta; oppure rinforzi forti combinati.
+  // Pericoloso: la strict impersonation basta da sola, altrimenti servono rinforzi combinati.
   const strongCombo =
     (broad && (young || certBad)) ||
     // #728 — il typo su un brand corto blocca solo col secondo segnale.
@@ -246,7 +236,6 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     };
   }
 
-  // ── SOSPETTO ──────────────────────────────────────────────────────────
   const llmSus = llm && llm.suspicious;
   const impSus = weakTypo || broad;
   const suspectTriggers = !!(impSus || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || fileRisk || insecureForm || sandboxSus || llmSus);

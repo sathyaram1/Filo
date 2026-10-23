@@ -97,6 +97,8 @@ export function writeTicket(root, ticket) {
   if (!t) return null;
   try {
     mkdirSync(resolve(root, '.claude'), { recursive: true });
+    // Il timbro del gancio di salvataggio è del biglietto di prima: col nuovo varrebbe come suo lavoro vivo (#1480).
+    if (String((readMarkerFrom(root) || {}).ticket || '') !== t) rmSync(resolve(root, '.claude', 'routine-beat-hook.stamp'), { force: true });
     const marker = { ticket: t, since: new Date().toISOString() };
     writeFileSync(ticketFile(root), JSON.stringify(marker, null, 2) + '\n', 'utf8');
     return marker;
@@ -122,6 +124,34 @@ function readMarkerFrom(dir) {
     return o && typeof o === 'object' ? o : null;
   } catch (_) {
     return null;
+  }
+}
+
+/** Il marcatore di QUESTA cartella com'è, fresco o no. null se non c'è. */
+export function leggiMarcatoreBiglietto(root) {
+  return readMarkerFrom(root);
+}
+
+/** Il biglietto del marcatore è finito (rilasciato, o morto per il battito)? PURA. */
+export function bigliettoFinito(marker) {
+  return !!(marker && marker.morto && typeof marker.morto === 'object' && Number.isFinite(Date.parse(String(marker.morto.ora || ''))));
+}
+
+/**
+ * Segna nel marcatore che QUEL biglietto è finito (`perche`: rilasciato, dead_ticket, bad_ticket): da lì il gancio di
+ * salvataggio non spedisce più e il suo timbro non vale come lavoro vivo (#1480). Il marcatore di un altro biglietto
+ * non si tocca. Best-effort.
+ */
+export function segnaBigliettoFinito(root, ticket, perche, { now = Date.now() } = {}) {
+  const t = String(ticket || '').trim();
+  const m = readMarkerFrom(root);
+  if (!t || !m || String(m.ticket || '') !== t) return false;
+  if (bigliettoFinito(m)) return true;
+  try {
+    writeFileSync(ticketFile(root), JSON.stringify({ ...m, morto: { ora: new Date(now).toISOString(), perche: String(perche || '') } }, null, 2) + '\n', 'utf8');
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 

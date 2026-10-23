@@ -52,9 +52,8 @@
     return FORBIDDEN_RE.test(s) || CONTROL_RE.test(s);
   }
 
-  // Selettore valido: non vuoto, entro il limite, senza token vietati. Non
-  // verifichiamo che sia un selettore CSS sintatticamente perfetto (il browser
-  // ignora le regole che non sa parsare): ci interessa solo che sia SICURO.
+  // Non si verifica che il selettore sia sintatticamente perfetto (il browser ignora ciò che
+  // non sa parsare): interessa solo che sia SICURO.
   function cleanSelector(sel) {
     const s = String(sel == null ? '' : sel).trim();
     if (!s || s.length > MAX_SELECTOR_LEN) return null;
@@ -62,25 +61,20 @@
     return s;
   }
 
-  // Dichiarazioni valide: "prop: valore; prop2: valore2". Togliamo eventuali
-  // graffe che l'LLM potrebbe aver incluso per errore prima del check (cosi' una
-  // risposta tipo "{ font-weight: bold }" non viene scartata per via delle
-  // graffe esterne), poi sanifichiamo il resto.
+  // Le graffe esterne si tolgono PRIMA del controllo, così una risposta tipo
+  // «{ font-weight: bold }» non viene scartata per colpa loro.
   function cleanDeclarations(css) {
     let s = String(css == null ? '' : css).trim();
-    // togli UNA coppia di graffe esterne se avvolge tutto il blocco
     if (s.startsWith('{') && s.endsWith('}')) s = s.slice(1, -1).trim();
     if (!s || s.length > MAX_DECL_LEN) return null;
     if (isBadChunk(s)) return null;
-    // deve contenere almeno una coppia prop:valore
     if (!/[a-z-]+\s*:[^;]+/i.test(s)) return null;
-    // garantisci il ; finale per concatenare in sicurezza
+    // il ; finale serve a concatenare in sicurezza
     if (!s.endsWith(';')) s += ';';
     return s;
   }
 
-  // Estrae { selector, css } da una singola regola, accettando i sinonimi che
-  // un LLM puo' produrre. Ritorna null se non sanificabile.
+  // Accetta i sinonimi di chiave che un LLM può produrre; null se non sanificabile.
   function cleanRule(rule) {
     if (!rule || typeof rule !== 'object') return null;
     const selector = cleanSelector(
@@ -93,8 +87,7 @@
     return { selector, css };
   }
 
-  // Normalizza l'input dell'azione (oggetto azione, { regole/rules: [...] },
-  // array, o singola regola) in un array di regole sicure { selector, css }.
+  // Le forme che l'azione può avere: oggetto, { regole/rules }, array, singola regola.
   function normalizeRules(input) {
     let raw = input;
     if (input && typeof input === 'object' && !Array.isArray(input)) {
@@ -111,12 +104,8 @@
     return out;
   }
 
-  // Aggiunge !important a ogni dichiarazione che non ce l'ha gia'. SERVE: il
-  // main inietta il CSS con webContents.insertCSS, che lo applica a livello
-  // user-agent/user — piu' BASSO degli stili author del sito (il suo <style>).
-  // Senza !important, "scrivi in grassetto i titoli" perderebbe contro la regola
-  // del sito h1{font-weight:400} e non si vedrebbe nulla. L'utente ha chiesto
-  // esplicitamente questa estetica: deve vincere sulla pagina.
+  // !important SERVE: insertCSS applica a livello utente, più BASSO degli stili del sito, e
+  // «scrivi in grassetto i titoli» perderebbe. L'utente l'ha chiesto: deve vincere.
   function importantify(decls) {
     return decls
       .split(';')
@@ -126,7 +115,6 @@
       .join('; ') + ';';
   }
 
-  // Compone il blocco CSS finale da iniettare. Vuoto se non c'e' nulla di valido.
   function buildCss(rules) {
     const norm = Array.isArray(rules) && rules.length && rules[0] && rules[0].selector
       ? rules

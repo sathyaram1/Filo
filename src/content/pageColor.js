@@ -1,17 +1,12 @@
-// Colore della tab: campionatore del colore dominante della cima pagina
-// (spec §1.1, "vetro smerigliato" della tab attiva) + colore identità del
-// sito (spec §1.2, theme-color → manifest → favicon). Entrambi mandano il
-// risultato al main via IPC; la shell tinge le tab di conseguenza.
-// Estratto da content.js — viene caricato prima di lui dai preload.
+// Colore della tab: campiona il colore della cima pagina (§1.1) e il colore identità del
+// sito (§1.2: theme-color → manifest → favicon), e li manda al main.
+// A tingere le tab è la shell. Caricato prima di content.js.
 
 (function (global) {
   'use strict';
 
   const { MSG } = global.SN_MSG;
 
-  // ------------------------------------------------------------
-  // Campionatore colore dominante della cima pagina (spec §1.1)
-  // ------------------------------------------------------------
   function startTabColorSampler() {
     let lastSent;        // ultimo colore inviato (dedup)
     let scheduled = false;
@@ -26,7 +21,6 @@
       if (a < 0.5) return null; // troppo trasparente per "contare" come sfondo
       return [p[0], p[1], p[2]];
     }
-    // Risale dagli antenati finché trova uno sfondo opaco (max 6 salti).
     function bgOf(el) {
       let node = el; let hops = 0;
       while (node && node.nodeType === 1 && hops < 6) {
@@ -191,10 +185,8 @@
         img.onerror = () => finish(null);
         img.onload = () => {
           try {
-            // Spec "Colore identità delle tab": scala il favicon a 64×64 e
-            // delega l'estrazione (path cromatico con clustering per tinta +
-            // fallback acromatico) alla logica pura in SN_TAB_COLOR, condivisa
-            // e unit-testata. Se non è caricata, degrada alla vecchia media.
+            // L'estrazione vera sta in SN_TAB_COLOR (pura, unit-testata): qui si scala il favicon a
+            // 64×64 e si delega, ripiegando sulla media se non è caricata.
             const W = 64, H = 64;
             const cv = document.createElement('canvas');
             cv.width = W; cv.height = H;
@@ -224,13 +216,8 @@
     }
 
     async function compute() {
-      // Spec "Colore identità delle tab": il favicon è la fonte primaria — è
-      // l'unica universale e quasi sempre contiene il colore brand. theme-color
-      // e manifest sono quasi sempre bianchi/neri/assenti, quindi diventano solo
-      // un fallback di cortesia (e solo se hanno croma sufficiente) per i rari
-      // favicon non leggibili (CORS tainted, load error). Se il favicon non è
-      // disponibile e nemmeno theme/manifest portano identità, la tab resta
-      // neutra.
+      // Il favicon è la fonte primaria: quasi sempre porta il colore del marchio. theme-color
+      // e manifest restano un fallback per i favicon illeggibili; senza identità, tab neutra.
       const TC = self.SN_TAB_COLOR;
       const ident = (c) => c && (!TC || TC.hasIdentity(c));
 

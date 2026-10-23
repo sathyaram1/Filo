@@ -390,7 +390,13 @@
 
   // ── I pezzi ───────────────────────────────────────────────────────────────
 
-  async function carica() {
+  // In fila con chi allinea e ripassa: un annuncio arrivato mentre la coda si legge rilegge dopo di lei, non a vuoto.
+  function carica() {
+    const p = coda.then(caricaOra, caricaOra);
+    coda = p.then(() => {}, () => {});
+    return p;
+  }
+  async function caricaOra() {
     primo = null;
     finito = false;
     const res = await d.send({ type: MSG.FILO_CODA });
@@ -492,16 +498,23 @@
     else if (v.k === 'msg' && v.spontaneo && n.classList.contains('dash-bubble')) d.setBubbleText(n, v.text);
   }
 
-  // Pagine tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che il filo ha adesso. Un
-  // gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga, e la vecchia se ne va.
+  // Pagine entrate, rititolate o tolte da qualunque strada: le righe si rifanno su quelle che il filo ha adesso, le nuove
+  // entrano al loro posto. Un gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga e la vecchia va.
   // `importate`: un backup ha messo nel tratto già disegnato anche chat e pagine sue, che compaiono al loro posto (#1256).
+  const stessoGruppo = (g, v) => !!g && g.ts === v.ts && JSON.stringify(g.pagine) === JSON.stringify(v.pagine);
   function ripassaPagine({ importate = false } = {}) {
     if (!d) return Promise.resolve();
-    // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
-    if (!primo) return importate && ultimo != null && !d.occupata() ? carica().then(() => {}) : Promise.resolve();
     const fai = async () => {
+      // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
+      if (!primo) {
+        if (ultimo == null || d.occupata()) return;
+        await (importate ? caricaOra() : allineaOra(false));
+        return;
+      }
       const res = await d.send({ type: MSG.FILO_CODA, fino: primo });
       if (!res || !res.ok || !primo) return;
+      const giu = inFondo();
+      let messi = 0;
       const da = ms(primo);
       const gruppi = new Map((res.elementi || []).filter((v) => v.k === 'pagine' && ms(v.ts) >= da).map((v) => [v.key, v]));
       const perPagina = new Map();
@@ -514,18 +527,21 @@
         gruppi.delete(v.key);
         r.dataset.key = v.key;
         r.dataset.ts = v.ts;
-        disegnaGruppo(r, v);
+        // Ripassa a ogni visita: un gruppo che non è cambiato non si ridisegna, così non perde il fuoco né il passaggio.
+        if (!stessoGruppo(r._gruppo, v)) disegnaGruppo(r, v);
       }
-      for (const v of gruppi.values()) metti(v, { scorri: false });
+      for (const v of gruppi.values()) { metti(v, { scorri: false }); messi++; }
       if (importate) {
         const qui = d.chatId();
         for (const v of res.elementi || []) {
           if (v.k === 'pagine' || ms(v.ts) < da || conChiave(v.key)) continue;
           if (v.k === 'msg' && v.chat === qui) { riconosci(v); continue; }
           metti(v, { scorri: false });
+          messi++;
         }
       }
       segnaGiorni();
+      if (messi) seguiNuove(giu);
     };
     const p = coda.then(fai, fai);
     coda = p.then(() => {}, () => {});
@@ -669,17 +685,18 @@
       if (v.annullabile) return [{ type: 'item', icon: icona('undo', 16), label: `Annulla · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
     }
     // Una conversazione della home si toglie dal filo da una sua bolla: la Cronologia, che lo faceva, non c'è più (#872).
+    // `azione`: il menu del tasto destro misura l'attesa delle voci del catalogo (#1461).
     const bolla = e.closest('.dash-bubble[data-chat]');
     if (bolla && bolla.dataset.chat) {
       const id = bolla.dataset.chat;
       return [
-        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
-        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', azione: 'chat-archive', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', azione: 'chat-archive', onClick: () => { togliConversazione(id).catch(() => {}); } },
       ];
     }
     const nascosta = e.closest('.dash-nascosta');
     if (nascosta && nascosta.dataset.nascosta) {
-      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { nascosta.querySelector('button').click(); } }];
+      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { nascosta.querySelector('button').click(); } }];
     }
     return [];
   }
@@ -697,6 +714,7 @@
   }
 
   let attesaCambi = null;
+  let attesaPagine = null;
   function init(deps) {
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
@@ -729,7 +747,12 @@
     });
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
-        if (m && m.type === MSG.FILO_PAGINE_TOLTE) { ripassaPagine().catch(() => {}); return; }
+        if (m && m.type === MSG.FILO_PAGINE_CAMBIATE) {
+          // Una visita e il titolo che la pagina si dà subito dopo: una rilettura sola.
+          clearTimeout(attesaPagine);
+          attesaPagine = setTimeout(() => { ripassaPagine().catch(() => {}); }, 120);
+          return;
+        }
         if (m && m.type === MSG.DATI_IMPORTATI) { ripassaPagine({ importate: true }).catch(() => {}); return; }
         if (!m || m.type !== MSG.CAMBI_AGGIORNATI) return;
         clearTimeout(attesaCambi);

@@ -10,15 +10,13 @@
   const Storage = window.SN_STORAGE;
   const ModelChain = window.SN_MODEL_CHAIN;
 
-  // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
   // Catene lette che la griglia non mostra: il salvataggio riscrive la mappa intera, e senza
   // queste cancellerebbe la scelta di una funzione spostata in Gestione prima che lì la si salvi (#465).
   let hiddenModels = {};
 
-  // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
-  // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
-  // `null` = non ancora caricato; lista = caricato.
+  // Cataloghi per provider, recuperati dal MAIN con le chiavi predefinite: questa pagina non
+  // vede mai le chiavi. `null` = non ancora caricato.
   const providerModelCache = { openrouter: null };
 
   // Il tetto delle risposte per famiglia di funzioni (#1097.3): famiglia → campo.
@@ -38,9 +36,7 @@
     return `models-list-${provider}`;
   }
 
-  // Sorgente delle opzioni per il dropdown custom del campo "stringa modello":
-  // le <datalist> per-provider restano l'unica sorgente di verità, il combobox
-  // le legge senza duplicarle.
+  // Le <datalist> per-provider sono l'unica sorgente di verità: il combobox non le duplica.
   function readProviderOptions(provider) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return [];
@@ -50,8 +46,6 @@
     }));
   }
 
-  // Popola la datalist di un provider con [{ id, label }] (già ordinati dal più
-  // recente e etichettati per categoria dal main).
   function populateDatalist(provider, items) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return;
@@ -69,7 +63,6 @@
     if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
-  // Carica (una sola volta) il catalogo di un provider chiedendolo al main.
   // Silenzioso: in caso di errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
@@ -82,8 +75,7 @@
     } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
-  // Semina i combobox con gli id già nel registry (per provider) così il valore
-  // corrente compare subito; il fetch del catalogo completo poi li rimpiazza.
+  // Il valore corrente compare subito; il catalogo completo poi lo rimpiazza.
   function seedDatalistsFromRegistry(registry) {
     const byProv = { openrouter: [] };
     for (const nick of Object.keys(registry || {})) {
@@ -130,8 +122,7 @@
     return present ? I18n.t('admin_defaults_key_present') : I18n.t('admin_defaults_key_absent');
   }
 
-  // ── Registry editor (stesso schema single-provider della pagina Opzioni) ─────
-  // Ogni modello ha UN solo provider e la stringa concreta per chiamarlo.
+  // Registry: ogni modello ha UN solo provider e la stringa concreta per chiamarlo.
   function entryToSingle(entry) {
     const e = entry || {};
     if (e.provider && e.model) return { provider: e.provider, model: e.model };
@@ -139,8 +130,7 @@
     return { provider: 'openrouter', model: '' };
   }
 
-  // Livelli di reasoning esposti nel dropdown (fonte di verità: SN_CONST).
-  // 'auto' = nessun override (default, valore assente nella voce salvata).
+  // Fonte di verità SN_CONST; 'auto' = nessun override (valore assente nella voce salvata).
   const REASONING_LEVELS = (window.SN_CONST && window.SN_CONST.REASONING_LEVELS)
     || ['auto', 'off', 'low', 'medium', 'high'];
 
@@ -245,10 +235,8 @@
     });
     provSel.value = single.provider;
 
-    // Combobox custom (stile Filo, non il popup nativo della datalist): elenca
-    // il catalogo del provider scelto, si filtra digitando, resta libero di
-    // accettare un id non in lista. Il wrapper è position:relative per ancorare
-    // il popup .sn-select-pop.
+    // Combobox custom (stile Filo, non il popup nativo): filtra digitando e accetta anche un id
+    // fuori lista. Il wrapper è position:relative per ancorare .sn-select-pop.
     const idWrap = document.createElement('div');
     idWrap.className = 'sn-model-id-wrap';
     const idIn = document.createElement('input');
@@ -258,7 +246,6 @@
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
     idWrap.appendChild(idIn);
-    // Carica il catalogo la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
@@ -266,14 +253,11 @@
       });
     }
 
-    // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
       ensureProviderModels(provSel.value);
     });
 
-    // Livello di reasoning per QUESTO modello (#369): l'owner può forzarlo quando
-    // il modello lo supporta. Native select come il provider accanto → coerente
-    // coi controlli fratelli della riga (PATTERNS: controlli custom coerenti).
+    // Livello di reasoning per QUESTO modello (#369). Select nativa, come i controlli fratelli.
     const reasonSel = document.createElement('select');
     reasonSel.className = 'sn-model-reason';
     reasonSel.title = I18n.t('admin_defaults_reasoning_desc');
@@ -441,8 +425,7 @@
       if (out[nick]) { dupRows.push({ row, nick }); continue; }
       const entry = { provider, model };
       if (label) entry.label = label;
-      // Salviamo il livello solo se diverso da 'auto' (default): così le voci
-      // integrate restano pulite e "auto" non gonfia il doc condiviso.
+      // Il livello si salva solo se diverso da 'auto': «auto» non deve gonfiare il doc condiviso.
       if (reasoning) entry.reasoning = reasoning;
       if (sort) entry.sort = sort;
       // Ciò che la voce dichiara del modello resta solo se il modello è ancora quello.
@@ -738,7 +721,7 @@
     renderExcludedDrift();
   }
 
-  // ── Modelli per azione (stesso editor a segmenti della pagina Opzioni) ───────
+  // Modelli per azione: stesso editor a segmenti della pagina Opzioni.
   function renderModelsGrid(models) {
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
@@ -842,6 +825,7 @@
       const ta = document.createElement('textarea');
       ta.id = id;
       ta.dataset.categoria = k;
+      ta.spellcheck = false;
       ta.rows = 6;
       ta.style.width = '100%';
       ta.value = (delicateCaricate[k] || []).join('\n');
@@ -1005,10 +989,8 @@
       models: collectModels(),
       providerSort: normSort($('providerSort').value) || '',
     };
-    // Fornitori esclusi: si invia la lista SOLO se l'owner l'ha toccata (anche
-    // per svuotarla: [] è un valore, e viaggia). Salvarla a ogni salvataggio
-    // congelerebbe nel doc remoto la lista letta dal codice, e da lì in poi
-    // un'esclusione aggiunta con un rilascio non arriverebbe più a nessuno.
+    // La lista si invia SOLO se l'owner l'ha toccata, [] compreso: salvarla sempre congelerebbe
+    // nel doc quella letta dal codice, e un'esclusione aggiunta con un rilascio non arriverebbe.
     const excluded = collectExcluded();
     if (JSON.stringify(excluded) !== JSON.stringify(loadedExcluded)) {
       config.excludedProviders = excluded;
@@ -1026,15 +1008,13 @@
     const lunghezza = collectLunghezza();
     if (lunghezza) config.lunghezzaRisposte = lunghezza;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
-    // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();
     if (gsb) config.safeBrowsingKey = gsb;
 
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DEFAULTS_UPDATE, config });
       if (!res || !res.ok) throw new Error(res?.error || 'errore sconosciuto');
-      // Svuota i campi chiave dopo il salvataggio (non li riteniamo in pagina) e
-      // ri-applica lo stato "configurata/non" dalla config tornata dal main.
+      // I campi chiave si svuotano dopo il salvataggio; lo stato «configurata» torna dal main.
       $('apiKey').value = '';
       $('apiKeyTavily').value = '';
       $('apiKeySafebrowse').value = '';

@@ -20,9 +20,8 @@
     try {
       if (!global.chrome?.tabs?.query) return [];
       const tabs = await chrome.tabs.query({});
-      // Ordina per ultima attività (più recente prima). chrome.tabs espone
-      // lastAccessed in versioni recenti di Chrome; quando non c'è ripieghiamo
-      // su `id` (proxy debole per recency: id più alti = aperti più di recente).
+      // `lastAccessed` manca nelle versioni vecchie: si ripiega su `id`,
+      // proxy debole della recency (id più alti = aperti più di recente).
       const sorted = [...tabs].sort((a, b) => {
         const la = a.lastAccessed || 0;
         const lb = b.lastAccessed || 0;
@@ -209,9 +208,7 @@
           id: t.id,
           kind: t.kind || 'timer', // 'alarm' per le sveglie (#322)
           label: t.label,
-          // Giorni in cui la sveglia si ripete (['lun','mer']); assente = una
-          // volta sola. Serve all'agente per rispondere "quali sveglie ho?" e
-          // per capire a quale l'utente si riferisce.
+          // Assente = una volta sola. Serve all'agente per sapere a quale sveglia si riferisce.
           repeat: Array.isArray(t.repeat) && t.repeat.length ? t.repeat : null,
           endsAt: t.endsAt,
           paused: !!t.paused,
@@ -317,7 +314,6 @@
   function renderForPrompt(state, { soloSiti = false } = {}) {
     const lines = [];
     lines.push('═══ FILO STATE ═══', '');
-    // TEMPO
     lines.push('TEMPO');
     lines.push(`Data: ${state.time.humanNow}`);
     if (state.time.timeSinceLastInteractionMin != null) {
@@ -408,8 +404,8 @@
     else {
       lines.push(salvati(state.timers.map((t) => {
         if (t.kind === 'alarm') {
-          // #322 — le sveglie si descrivono con l'orario assoluto, non col
-          // countdown (che per una sveglia a ore di distanza confonderebbe).
+          // Le sveglie si descrivono con l'orario assoluto: a ore di distanza un countdown
+          // confonde.
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
           // Ricorrenza: dicitura unica con le carte della home (SN_FILO_MEMORY),

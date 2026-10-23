@@ -1,15 +1,6 @@
-// Sidebar Aiuto (Fase 2). Agente vision multi-turn.
-//
-// Modalità UI:
-// - Espansa: pannello completo con header, conversazione, input.
-// - Collassata: solo una barra con input. Click fuori dal pannello la collassa.
-//   Focus/typing nell'input la riapre.
-// - L'AI controlla via `collapse` se collassare dopo la sua risposta.
-//
-// Log azioni utente: dopo un click sul target o l'accept di un fill, viene
-// mostrata una riga grigia compatta ("click su menu", "testo inserito"…),
-// non un finto messaggio utente. La cronologia inviata all'AI contiene
-// comunque un marcatore testuale così l'agente sa cosa è successo.
+// Sidebar Aiuto: agente vision multi-turn. Espansa mostra la conversazione, collassata la
+// sola barra d'input; il click fuori collassa, il fuoco riapre, l'AI può chiedere collapse.
+// Le azioni dell'utente diventano una riga di log, non un finto messaggio suo.
 
 (function (global) {
   'use strict';
@@ -72,8 +63,8 @@
       documentiCount: 0,
     };
   }
-  // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
-  // Ignoriamo silenziosamente le ricerche oltre questo limite.
+  // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
+  // limite si ignorano in silenzio.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
   // Ogni passo che l'Aiuto fa da solo è una chiamata pagata, e una pagina può chiederne all'infinito (#1049): oltre il
   // tetto di fila si ferma e chiede. Largo, perché aprire una a una trenta sezioni è un uso vero e costa solo un clic.
@@ -151,9 +142,8 @@
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
     session.initialUrl = location.href;
-    // Se invocata dal menu tasto destro su una scheda, informiamo l'agente del
-    // contesto: una riga di storia (non mostrata in chat, ma inviata all'LLM)
-    // così "sa" che la richiesta parte da un click sulla tab.
+    // Aperta dal tasto destro su una scheda: una riga di storia non mostrata in chat dice
+    // all'agente che la richiesta parte da lì.
     if (context && context.source === 'tab') {
       const ctxTitle = context.title || document.title || '';
       const ctxUrl = context.url || location.href;
@@ -174,8 +164,7 @@
     root = document.createElement('div');
     root.className = 'sn-sidebar';
     global.SN_FILO_UI?.mark(root);
-    // Traccia osservabile della fonte di invocazione (utile a debug/test e a
-    // future differenziazioni UI): presente solo se aperta dal menu di una tab.
+    // Fonte di invocazione osservabile per i test: c'è solo se aperta dal menu di una scheda.
     if (context && context.source) root.dataset.invokedFrom = context.source;
     root.innerHTML = `
       <div class="sn-sidebar-header">
@@ -193,10 +182,8 @@
       </form>
     `;
     document.documentElement.appendChild(root);
-    // Partecipa allo stacking dei popup: la sidebar appare sopra ai box aperti
-    // prima e sotto a quelli aperti dopo (es. modale feedback). In passato la
-    // sidebar usava uno z-index hardcoded altissimo e finiva sempre sopra a
-    // tutto, schiacciando il modale feedback aperto successivamente (feedback alpha).
+    // Partecipa allo stacking dei popup: sopra quelli aperti prima, sotto quelli aperti dopo.
+    // Con uno z-index fisso altissimo finiva sopra al modale feedback, aperto dopo di lei.
     stackEntry = Popup?.registerStack?.(root) || null;
 
     root.querySelector('.sn-sidebar-close').addEventListener('click', close);
@@ -234,7 +221,6 @@
     ta.addEventListener('pointerdown', (e) => { if (e.isTrusted && collapsed) expand({ ai: false }); });
     ta.addEventListener('input', (e) => { if (collapsed && (e.isTrusted || !ridottoDallUtente)) expand({ ai: false }); });
 
-    // Click fuori dal pannello → collassa (se l'AI non ha richiesto chat aperta)
     docClickHandler = (e) => {
       if (!root || collapsed || nascosto) return;
       if (root.contains(e.target)) return;
@@ -246,8 +232,6 @@
     ta.focus();
     cambiato();
   }
-
-  // ---------- Espandi/collassa ----------
 
   function expand({ ai = false } = {}) {
     if (!root) return;
@@ -340,8 +324,7 @@
     window.addEventListener('mouseup', () => { dragging = false; });
   }
 
-  // Sposta la sidebar di lato se sta coprendo il rettangolo dato (di solito il
-  // target evidenziato). Mantiene l'ancoraggio al bottom; cambia solo l'asse X.
+  // Sposta la sidebar di lato se copre il rettangolo: cambia solo X, il bottom resta.
   function ensureNotOverTarget(rect) {
     if (!root || !rect) return;
     const sr = root.getBoundingClientRect();
@@ -352,7 +335,6 @@
     const w = root.offsetWidth;
     const margin = 16;
     const targetCenter = (rect.left + rect.right) / 2;
-    // Sposta la sidebar dalla parte opposta del target.
     const newLeft = targetCenter > window.innerWidth / 2
       ? margin
       : Math.max(0, window.innerWidth - w - margin);
@@ -367,8 +349,6 @@
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
     root.dataset.spostata = '1';
   }
-
-  // ---------- Rendering conv ----------
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
@@ -398,9 +378,8 @@
     if (role === 'assistant') rispostaArrivata();
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
-    // #418 — le risposte di Filo (assistant) vanno rese con la stessa
-    // formattazione leggera di popup e chat della home (grassetto, corsivo,
-    // codice, elenchi, LINK cliccabili). Il testo dell'utente resta letterale.
+    // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home;
+    // il testo dell'utente resta letterale.
     if (role === 'assistant' && global.SN_MARKDOWN) {
       msg.innerHTML = global.SN_MARKDOWN.render(text);
     } else {
@@ -450,7 +429,6 @@
       btn.addEventListener('click', (e) => {
         if (!gestoVero(e) || wrap.classList.contains('sn-sidebar-choices-used')) return;
         wrap.classList.add('sn-sidebar-choices-used');
-        // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
         submit({ userMessage: c.prompt, daScelta: true });
       });
@@ -461,9 +439,8 @@
     if (conv) conv.scrollTop = conv.scrollHeight;
   }
 
-  // Indicatore "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
-  // Le frasi non sono il reasoning vero (non disponibile), ma sono una prova di
-  // funzionamento — abbastanza varie e specifiche da non sembrare uno spinner.
+  // Non sono il reasoning vero, che non è disponibile: sono varie e specifiche quanto basta
+  // a non sembrare uno spinner.
   const THINKING_PHRASES = [
     'Leggo la pagina…',
     'Analizzo lo screenshot…',
@@ -496,7 +473,6 @@
     conv.appendChild(wrap);
     conv.scrollTop = conv.scrollHeight;
 
-    // Pool casuale senza ripetizioni ravvicinate
     const pool = THINKING_PHRASES.slice();
     let recent = [];
     function nextPhrase() {
@@ -508,7 +484,6 @@
       return phrase;
     }
 
-    // Inizializza con 3 frasi diverse
     lines[0].textContent = nextPhrase();
     lines[1].textContent = nextPhrase();
     lines[2].textContent = nextPhrase();
@@ -516,17 +491,14 @@
     let stopped = false;
     const tick = () => {
       if (stopped || !wrap.isConnected) return;
-      // Shift: top esce, mid → top, bottom → mid, nuovo → bottom
       lines[0].textContent = lines[1].textContent;
       lines[1].textContent = lines[2].textContent;
       lines[2].textContent = nextPhrase();
-      // Re-trigger animazione del bottom
       lines[2].classList.remove('sn-sidebar-thinking-enter');
       void lines[2].offsetWidth;
       lines[2].classList.add('sn-sidebar-thinking-enter');
     };
     const interval = setInterval(tick, 900);
-    // Primo enter
     lines[2].classList.add('sn-sidebar-thinking-enter');
 
     return {
@@ -535,7 +507,6 @@
     };
   }
 
-  // Riga grigia compatta per i log delle azioni utente
   function appendActionLog(text) {
     const conv = convEl();
     if (!conv) return null;
@@ -562,9 +533,8 @@
     q.className = 'sn-sidebar-feedback-q';
     q.textContent = 'Ha funzionato? Aiutami a migliorare:';
     wrap.appendChild(q);
-    // La domanda da sola sembrava un parere privato a chi scrive Filo, e
-    // invece il sì pubblica i passi dove li legge chiunque: dirlo dove si
-    // sceglie, non solo nella pagina che spiega la privacy (#584).
+    // La domanda da sola sembrava un parere privato, e invece il sì pubblica i passi dove li
+    // legge chiunque: va detto qui, dove si sceglie, non solo nella pagina sulla privacy (#584).
     const nota = document.createElement('div');
     nota.className = 'sn-sidebar-feedback-nota';
     // La riga dice cosa succede, e dice il vero: dall'indirizzo e dai nomi dei
@@ -688,11 +658,8 @@
     return { x: r.x + r.width / 2, y: r.y + r.height / 2, disabled: b.disabled, label: b.textContent };
   }
 
-  // Da questa pagina un percorso condiviso partirebbe? Lo sa solo il processo
-  // principale (protocollo, nome del sito, spazio nella coda), ed è la stessa
-  // risposta che darebbe la raccolta: una porta sola, o il riquadro promette
-  // una cosa e la raccolta ne fa un'altra (#584, settimo giro). Se la domanda
-  // non arriva a destinazione non si promette niente.
+  // Se da questa pagina un percorso partirebbe davvero lo sa solo il main, ed è la stessa
+  // porta che usa la raccolta: una sola, o il riquadro promette ciò che non accade (#584).
   async function percorsoRaccoglibile() {
     try {
       const r = await chrome.runtime.sendMessage({
@@ -709,13 +676,8 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Qui non parte NESSUN identificativo del mittente, neanche vuoto.
-          // Da #585 chi manda si presenta al server col token dell'identità
-          // dell'installazione, che il server verifica e che il processo
-          // principale allega al momento dell'invio; un identificativo
-          // generato in questa pagina sarebbe autodichiarato, e chi attacca ne
-          // scriverebbe un altro a ogni invio. Un campo vuoto che si porta
-          // dietro il nome è l'invito a riempirlo (#584).
+          // Nessun identificativo del mittente da qui, neanche vuoto: il main allega il token
+          // dell'installazione, che il server verifica (#585). Uno locale sarebbe autodichiarato.
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,
@@ -736,8 +698,6 @@
     return raw.split(' ').slice(0, 4).join(' ');
   }
 
-  // ---------- Parsing risposta AI ----------
-
   function parseAssistantOutput(text) {
     // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
     const salvato = String(text || '').includes('{') ? globalThis.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(text, ['text']) : null;
@@ -750,8 +710,8 @@
     try {
       const obj = JSON.parse(trimmed.slice(start, end + 1));
       if (!obj || typeof obj !== 'object') return fallback;
-      // Output speciale: richiesta di ricerca web. Bypass del flusso normale,
-      // viene processata in submit() prima di rendere la risposta in chat.
+      // Richiesta di ricerca web: scavalca il flusso normale, la processa submit() prima di
+      // rendere la risposta in chat.
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
         return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
       }
@@ -784,11 +744,7 @@
           };
         }
       }
-      // Output speciale: azione tipizzata di Filo (le stesse che la chat della
-      // dashboard può emettere — es. inviare un feedback agli sviluppatori). È
-      // ciò che l'utente farebbe col menu tasto destro. Non la eseguiamo qui:
-      // passa per il registro dei livelli di sicurezza nel main (e, se serve,
-      // per il popup di conferma) — vedi submit().
+      // Non si esegue qui: passa dal registro dei livelli di sicurezza nel main (vedi submit()).
       if (obj.action === 'filo' && obj.filo && typeof obj.filo === 'object'
         && typeof obj.filo.type === 'string' && obj.filo.type.trim()) {
         return {
@@ -798,12 +754,7 @@
           status: obj.status === 'continue' ? 'continue' : 'done',
         };
       }
-      // Output speciale: azione SULLA PAGINA (le stesse del menu tasto destro su
-      // testo/immagine/link: copia, taglia, cerca sul web, leggi ad alta voce,
-      // copia/salva/cerca immagine, copia/salva/condividi/apri link). Non sono
-      // azioni del main (vivono in src/content/actions.js + tts.js): le esegue
-      // direttamente la sidebar via runPageAction(), col popup di conferma di
-      // Filo quando l'azione esce verso l'esterno. Vedi PROMPTS.help().
+      // La esegue la sidebar con runPageAction(), più sotto.
       if (obj.action === 'page' && obj.page && typeof obj.page === 'object'
         && typeof obj.page.op === 'string' && PAGE_ACTIONS[obj.page.op]) {
         return {
@@ -827,7 +778,6 @@
           note: typeof obj.highlight.note === 'string' ? obj.highlight.note.trim() : '',
         };
       }
-      // choices: filtra voci valide, max 5
       let choices = [];
       if (Array.isArray(obj.choices)) {
         choices = obj.choices
@@ -853,16 +803,8 @@
     }
   }
 
-  // ---------- Azioni tipizzate di Filo (parità col menu tasto destro) ----------
-  //
-  // L'agente "Aiuto" può attivare le azioni che l'utente farebbe col tasto
-  // destro — a partire dall'invio di un feedback agli sviluppatori. Queste
-  // azioni NON vengono eseguite localmente: passano per executeFiloAction nel
-  // main, che consulta il registro statico dei livelli di sicurezza
-  // (src/shared/actionLevels.js) e, per i livelli ≥ 2, ci rimanda una
-  // spiegazione da mostrare nel popup di conferma di Filo (SN_CONFIRM_UI), lo
-  // STESSO usato dalla chat della dashboard. Così la sidebar non è un canale
-  // privilegiato: stesso registro, stesse conferme, stesse regole.
+  // Le azioni tipizzate non si eseguono qui: passano da executeFiloAction nel main, che
+  // consulta il registro dei livelli. La sidebar non è un canale privilegiato.
 
   // Etichetta breve per la riga di log in chat (cosa Filo ha fatto/sta facendo).
   function filoActionLabel(action) {
@@ -975,12 +917,15 @@
   }
 
   // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  // Senza una risposta della porta il testo non esce (#1505): un errore vale come fermato.
+  const CAMPO_SENZA_PORTA = 'non ho scritto nel campo: il controllo dei dati in uscita non ha funzionato, e senza quel controllo non lascio uscire niente';
   async function campoFermato(testo) {
     if (!String(testo || '').trim()) return '';
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
-      return r && r.blocca ? String(r.frase || '') : '';
-    } catch (_) { return ''; }
+      if (!r || r.ok !== true) return CAMPO_SENZA_PORTA;
+      return r.blocca ? String(r.frase || CAMPO_SENZA_PORTA) : '';
+    } catch (_) { return CAMPO_SENZA_PORTA; }
   }
 
   async function runFiloAction(action, { etichetta = '' } = {}) {
@@ -999,9 +944,8 @@
       return false;
     }
 
-    // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
-    // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
-    // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
+    // Livello ≥ 2: il main non ha eseguito e manda la spiegazione per il popup; solo dopo l'OK
+    // l'azione riparte, riclassificata di nuovo nel main.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
       const opts = { title: 'Filo chiede conferma', text: res.describe || '', parti: res.parti, avviso: res.avviso || '' };
@@ -1011,7 +955,11 @@
           ? await (res.needsConfirm >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : global.confirm(opts.text);
       } catch (_) { ok = false; }
-      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      if (!ok) {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_RIFIUTATA, action })).catch(() => {}); } catch (_) {}
+        appendActionLog(`${label}: annullata`);
+        return false;
+      }
       let c = null;
       try {
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
@@ -1088,6 +1036,7 @@
     const esito = !r || !r.ok
       ? `ricerca fra i documenti ${r && r.annullata ? 'annullata' : 'non riuscita'}`
       : (r.cartellaMancante ? `cartella non trovata: ${breve(r.cartellaMancante, 80)}`
+        : r.cartellaDiRete ? `cartella su un altro computer, non ci cerco: ${breve(r.cartellaDiRete, 80)}`
         : `${esitoDocumenti(r)} fra i tuoi documenti «${breve(p.cosa, 60)}»${r.fermata ? ', fermata da te' : ''}`);
     const fatta = riga || appendActionLog('');
     if (fatta) {
@@ -1257,7 +1206,6 @@
         || imgs.find((im) => (im.currentSrc || im.src || '').includes(wanted));
       if (hit) return hit;
     }
-    // Fallback: l'immagine visibile più grande (di norma l'immagine "principale").
     let best = null; let bestArea = 0;
     for (const im of imgs) {
       const r = im.getBoundingClientRect();
@@ -1340,6 +1288,9 @@
         try {
           ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
         } catch (_) { ok = false; }
+        if (d && d.conferma) {
+          try { global.SN_POPUP?.conta?.({ misura: 'conferma', chiave: String(d.conferma), esito: ok ? 'approvata' : 'rifiutata' }); } catch (_) {}
+        }
         if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       }
     }
@@ -1441,7 +1392,7 @@
       try {
         let lettura = origineLetta.get(src);
         if (!lettura) {
-          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src)))();
+          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src, im)))();
           lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
           if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
           origineLetta.set(src, lettura);
@@ -1483,9 +1434,8 @@
     return null;
   }
 
-  // Aspetta che la pagina si "stabilizzi" dopo un'azione utente: utile per
-  // SPA che cambiano contenuto/URL in modo asincrono. Esce quando l'URL
-  // cambia E il DOM smette di mutare per `quietMs`, oppure dopo `maxMs`.
+  // Le SPA cambiano contenuto e URL in modo asincrono: si esce quando l'URL è cambiato e il
+  // DOM è quieto da `quietMs`, oppure dopo `maxMs`.
   function waitForPageSettle({ initialUrl, minMs = 250, quietMs = 350, maxMs = 2500 } = {}) {
     return new Promise((resolve) => {
       const start = Date.now();
@@ -1507,8 +1457,6 @@
         const elapsed = now - start;
         const sinceMutation = now - lastMutation;
         const ready = document.readyState === 'complete';
-        // Condizione di uscita: minimo tempo trascorso, DOM quieto da quietMs,
-        // ready, e (URL cambiato oppure abbiamo aspettato almeno metà del max).
         const longEnough = elapsed >= minMs;
         const quiet = sinceMutation >= quietMs;
         const enoughEvidence = urlChanged || elapsed >= maxMs / 2;
@@ -1584,9 +1532,8 @@
       return;
     }
     const wasCollapsed = collapsed;
-    // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
-    // (dopo un click sul target) mantieni lo stato attuale: evita che il box
-    // si riapra mentre il modello sta elaborando.
+    // Si espande solo se l'utente ha scritto: sui proseguimenti automatici il box non deve
+    // riaprirsi mentre il modello elabora.
     if (userMessage) expand({ ai: false });
 
     if (userMessage) {
@@ -1601,10 +1548,8 @@
     const thinking = appendThinking();
     let assistantEl = null;
 
-    // Per i proseguimenti automatici dopo un'azione utente, aspetta che la
-    // pagina si sia aggiornata prima di catturare lo screenshot (SPA, ecc.):
-    // senza questa attesa l'AI vede ancora la vecchia pagina e chiede di
-    // ripetere il click.
+    // Sui proseguimenti automatici si aspetta la pagina aggiornata prima dello screenshot:
+    // senza, l'AI vede quella vecchia e chiede di ripetere il click.
     if (userAction) {
       await waitForPageSettle({ initialUrl: preActionUrl || location.href });
     }
@@ -1645,9 +1590,8 @@
       }
       const parsed = parseAssistantOutput(res.text);
 
-      // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
-      // mostra il log in chat, poi rilancia un turno con i risultati come
-      // nota di sistema così l'AI può produrre il JSON normale.
+      // L'AI ha chiesto una ricerca: si esegue e si rilancia un turno coi risultati come nota
+      // di sistema, così l'AI può produrre il JSON normale.
       if (parsed.kind === 'web_search') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
@@ -1743,16 +1687,14 @@
           indice: r.indice || null,
           fermata: !!r.fermata,
           cartellaMancante: r.cartellaMancante || '',
+          cartellaDiRete: r.cartellaDiRete || '',
         };
         setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: location.href, dopoDocumenti: true }), 50);
         return;
       }
 
-      // Caso speciale: l'AI vuole azionare un comando rapido della barra di Filo
-      // (le icone in alto: home, impostazioni, app, account, schermo intero,
-      // riduci a icona). Lo eseguiamo in autonomia, come per reveal/hover, senza
-      // chiedere il click all'utente: i bottoni vivono nella shell, non nella
-      // pagina, quindi l'utente non potrebbe "cliccarli" nel flusso normale.
+      // I bottoni della barra vivono nella shell, non nella pagina: l'utente non potrebbe
+      // cliccarli, quindi li eseguiamo noi.
       if (parsed.kind === 'shell') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         const human = {
@@ -1772,10 +1714,8 @@
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
         }
-        // Le azioni shell non modificano il DOM della pagina che l'agente vede
-        // (o la sostituiscono del tutto, come "home"): di norma chiudono il turno.
-        // Proseguiamo solo se l'AI chiede status:"continue" su un comando che
-        // NON ha cambiato pagina, così può concatenare più passi.
+        // Le azioni shell non cambiano il DOM che l'agente vede, o sostituiscono la pagina: si
+        // prosegue solo su status «continue» e solo se la pagina non è cambiata.
         if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
           const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
           setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
@@ -1786,11 +1726,6 @@
         return;
       }
 
-      // Caso speciale: azione tipizzata di Filo (es. inviare un feedback agli
-      // sviluppatori) — la stessa cosa che l'utente farebbe dal menu tasto
-      // destro. La eseguiamo passando per il registro dei livelli di sicurezza
-      // del main e, quando serve, per il popup di conferma di Filo (lo STESSO
-      // della chat dashboard): nessun canale privilegiato per la sidebar.
       if (parsed.kind === 'filo_action') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (parsed.display) {
@@ -1803,8 +1738,6 @@
         return;
       }
 
-      // Caso speciale: azione SULLA PAGINA (copia/cerca/leggi/immagine/link) —
-      // le stesse del menu tasto destro, eseguite dal content script.
       if (parsed.kind === 'page_action') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (parsed.display) {
@@ -1838,7 +1771,6 @@
         parsed.choices = [{ label: 'Continua', prompt: globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO }];
       }
 
-      // Aggiorna la storia AI
       if (userAction && !userMessage) {
         history.push({
           role: 'user',
@@ -1851,27 +1783,24 @@
       }
       history.push({ role: 'assistant', content: parsed.display || res.text });
 
-      // Choices: bottoni sotto al messaggio dell'assistente
       if (parsed.choices && parsed.choices.length) {
         renderChoices(assistantEl, parsed.choices);
       }
       // Dopo le scelte: inserito subito sotto il messaggio, il documento resta sopra di loro.
       mostraFile(assistantEl, daMostrare);
 
-      // Highlight. Il tooltip on-page usa SOLO highlight.note (testo dedicato),
-      // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
-      // Per i "fill" il riquadro è comunque mostrato (contiene valore + bottone Accetta).
+      // Il tooltip usa SOLO highlight.note, non il testo della chat, per non duplicare il
+      // messaggio; per i fill il riquadro resta comunque (valore + Accetta).
       Highlight.clear();
       // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
       if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
         if (act === 'reveal' || act === 'hover') {
-          // Auto-action: la eseguiamo noi senza coinvolgere l'utente.
-          // Validazione e whitelist sono dentro Highlight.autoAction.
+          // Eseguita da noi, senza l'utente: validazione e whitelist stanno in
+          // Highlight.autoAction.
           const result = Highlight.autoAction(parsed.highlight.selector, act);
           const targetLabel = result.target ? describeElementBriefly(result.target) : '';
           if (result.ok) {
-            // Traccia lo step per la telemetria a fine sessione.
             if (session) session.executedSteps.push({
               selector: parsed.highlight.selector,
               action: act,
@@ -1896,8 +1825,8 @@
               }), 150);
             }
           } else {
-            // Reveal rifiutato (whitelist) o target mancante: chiediamo
-            // all'AI di correggersi senza fare nulla sulla pagina.
+            // Reveal rifiutato dalla whitelist o bersaglio mancante:
+            // si chiede all'AI di correggersi senza toccare la pagina.
             const aiNote = act === 'reveal'
               ? `reveal rifiutato (motivo: ${result.reason}). L'elemento non è un disclosure sicuro (details/aria-expanded+aria-controls non-link non-submit). Usa "click" con highlight per chiedere conferma all'utente, oppure scegli un altro target.`
               : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
@@ -1926,10 +1855,8 @@
         }
       }
 
-      // Decisione collapse: se l'AI ha specificato, usa il suo valore. Altrimenti:
-      //   - ci sono choices → tieni aperta (l'utente deve poter cliccare)
-      //   - c'è un highlight click silenzioso (no note, no choices) → collapse
-      //   - altrimenti resta aperta
+      // Collapse: se l'AI ha deciso vale il suo valore; altrimenti le choices vanno cliccate e
+      // la chat resta aperta, un highlight silenzioso collassa, negli altri casi resta aperta.
       const isAutoHighlight = !!(parsed.highlight
         && (parsed.highlight.action === 'reveal' || parsed.highlight.action === 'hover'));
       let shouldCollapse;
@@ -1969,8 +1896,7 @@
     } catch (err) {
       if (thinking) { thinking.stop(); thinking.el.remove(); }
       const raw = err?.message || String(err);
-      // #360 — anche qui la chat non è un log: il messaggio grezzo ("fetch
-      // failed", "OpenRouter 400: …") non dice niente all'utente. Stessa
+      // #360 — la chat non è un log: «fetch failed» non dice niente all'utente. Stessa
       // traduzione della chat della home e di quella dei mazzi.
       const CE = globalThis.SN_CHAT_ERRORS;
       const errText = /context invalidated/i.test(raw)
@@ -1978,6 +1904,8 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText, { nelFilo: false });
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La bolla d'errore la legge chi ha chiesto: si conta il tipo, mai la frase (#1461).
+      try { global.SN_POPUP?.conta?.({ misura: 'errore-modello', code: String((err && (err.code || err.errorCode)) || ''), status: Number(err && err.status) || 0 }); } catch (_) {}
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
       mostraRimedio(assistantEl, err);
@@ -2003,8 +1931,7 @@
       // nella nota. Prima entrava fra parentesi dentro «(Sistema: …)».
       aiNote = 'l\'utente ha cliccato sull\'elemento che avevi indicato, descritto qui sotto';
     }
-    // Telemetria: traccia lo step eseguito. Niente value (anche se è un fill):
-    // i contenuti dei campi possono essere sensibili.
+    // Telemetria: niente value, anche per un fill — il contenuto dei campi può essere sensibile.
     if (session) session.executedSteps.push({
       selector: highlight.selector,
       action: highlight.action,
@@ -2016,9 +1943,8 @@
     // browser gestirà gli hover successivi naturalmente.
     try { Highlight.clearForceHover?.(); } catch (_) {}
 
-    // Cattura l'URL PRIMA del click così waitForPageSettle può rilevare un
-    // cambio di route (SPA o navigazione classica) e aspettare che la pagina
-    // sia effettivamente cambiata prima di fare lo screenshot.
+    // URL catturato PRIMA del click, così waitForPageSettle vede il cambio di route e aspetta
+    // la pagina nuova prima dello screenshot.
     const preActionUrl = location.href;
     submit({
       userAction: aiNote,

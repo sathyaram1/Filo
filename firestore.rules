@@ -123,14 +123,15 @@ service cloud.firestore {
     // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
     // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
     // parte fusa (una parte tardiva vale solo col suo nome). Lo scrivono il server e
-    // server:fondi (admin); la pratica si chiude all'ultima parte.
+    // server:fondi (admin); la pratica si chiude all'ultima parte. Il cancello delle
+    // routine ci scrive `worker/…`: fuori forma, ogni update dell'owner cadrebbe (#1336.1).
     function localMergesValido(d) {
       return !('localMerges' in d)
         || (d.localMerges is map
             && d.localMerges.keys().hasOnly(['app', 'server', 'solo', 'ramo'])
             && (!('ramo' in d.localMerges)
                 || (d.localMerges.ramo is string && d.localMerges.ramo.size() <= 200
-                    && d.localMerges.ramo.matches('^claude/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$')))
+                    && d.localMerges.ramo.matches('^(claude|worker)/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$')))
             && (!('app' in d.localMerges) || (d.localMerges.app is int && d.localMerges.app > 0))
             && (!('server' in d.localMerges) || (d.localMerges.server is int && d.localMerges.server > 0))
             && (!('solo' in d.localMerges) || d.localMerges.solo in ['app', 'server']));
@@ -931,33 +932,44 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // ── I contatori giornalieri (#969) ───────────────────────────────────────
+    // ── I contatori anonimi (#969, #1461, #1466) ─────────────────────────────
     //
-    // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), quante
-    // chiamate sono fallite e di che tipo, la versione dell'app e la famiglia di sistema. Un documento per copia di
-    // Filo e per giorno: l'id è pseudonimo più giorno, e si scrive una volta sola (create, mai update). Lo pseudonimo è
+    // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), i guasti
+    // delle chiamate, e (#1461) l'attesa delle azioni, le impostazioni cambiate, le ricerche nei pannelli, le
+    // proposte del correttore, le conferme di Filo, gli annulli, gli anticipi, gli errori visti, l'intervista e le
+    // prime volte del mese; (#1466, ore v3) i passi dell'avvio, i processi morti, i blocchi, le eccezioni del main, la
+    // memoria, le chiamate sincrone, la chiusura, il disco, la sessione e gli aggiornamenti, tutti in elenchi chiusi.
+    // Un documento per copia di Filo e per ora (v3; le ore v2 e i giorni v1 partono ancora dalle copie vecchie):
+    // l'id è pseudonimo, giorno e ora, e si scrive una volta sola (create, mai update). Lo pseudonimo è
     // casuale, cambia ogni mese, e non è il codice dei feedback né lo pseudonimo dei crediti.
     //
     // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
-    // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, le chiavi delle
-    // mappe dall'elenco chiuso delle funzioni, e i valori annidati: ognuno è una stringa di forma fissa (le regole non
-    // passano in rassegna una mappa, ma ne uniscono i valori in una stringa sola, che si misura e si confronta).
-    // L'elenco contiene quello dell'app (tests/unit/firestoreRulesContatori.test.mjs): una funzione nuova va aggiunta
-    // e ripubblicata, o i giorni che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
+    // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, e i valori
+    // annidati, ognuno una stringa di forma fissa (le regole non passano in rassegna una mappa, ma ne uniscono chiavi
+    // e valori in una stringa sola, che si misura e si confronta). Le chiavi degli elenchi piccoli e fermi (funzioni,
+    // pannelli, tipi del correttore) sono l'elenco; quelle degli elenchi che crescono a ogni funzione nuova (azioni,
+    // impostazioni, tipi d'azione, errori) ne hanno la forma, senza spazi né testo: l'elenco chiuso lo tiene l'app.
+    // tests/unit/firestoreRulesContatori.test.mjs confronta tutto con l'app: una funzione nuova va aggiunta e
+    // ripubblicata, o le ore che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
     // Legge solo l'admin.
+    // Le funzioni contate e il controllo delle mappe a chiavi chiuse servono alle ore e alle loro chiamate.
+    function funzioniContate() {
+      return [
+        'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
+        'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
+        'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
+        'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+        'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
+        'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
+        'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
+      ];
+    }
+    function chiuse(m, chiavi, tetto, valori) {
+      return m is map && m.keys().hasOnly(chiavi)
+        && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
+    }
     match /contatori-giornalieri/{docId} {
-      function funzioniContate() {
-        return [
-          'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
-          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
-          'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
-          'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
-          'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
-          'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
-          'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
-        ];
-      }
-      function contatoriValidi(d) {
+      function contatoriGiorno(d) {
         return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
           && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
           && d.v == 1
@@ -975,8 +987,102 @@ service cloud.firestore {
           && d.errori.values().join('#').size() <= 600000
           && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
       }
+      function aForma(m, chiavi, tettoChiavi, tetto, valori) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
+      }
+      // Pseudonimo, giorno, ora, versione, sistema e segno del primo documento: uguali per le ore v2 e v3.
+      function testaOra(d) {
+        return d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && d.primo in ['', 'giorno', 'mese'];
+      }
+      // Le misure dell'ora di #1461, uguali per le ore v2 e v3.
+      function misureOra(d) {
+        let funzioni = funzioniContate();
+        return chiuse(d.uso, funzioni, 15000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9})*)?$')
+          && chiuse(d.errori, funzioni, 300000, '^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.azioni, '^([a-z0-9][a-z0-9-]{0,59}(#[a-z0-9][a-z0-9-]{0,59})*)?$', 15000, 40000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9})*)?$')
+          && aForma(d.impostazioni, '^([A-Za-z0-9_.*-]{1,80}(#[A-Za-z0-9_.*-]{1,80})*)?$', 15000, 100000, '^([A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9}(;[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9})*(#[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9}(;[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ricerche, ['cerca-filo', 'incolla', 'font', 'modello', 'barra-laterale', 'tasto-destro', 'menu'], 4000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9})*)?$')
+          && chiuse(d.correttore, ['ortografia', 'frase', 'coerenza', 'suggerimento'], 40000, '^([a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9})*)*)?$')
+          && aForma(d.conferme, '^([A-Za-z][A-Za-z0-9_-]{0,39}(#[A-Za-z][A-Za-z0-9_-]{0,39})*)?$', 4000, 100000, '^((conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9}(;(conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9})*(#(conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9}(;(conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.annullati, '^([A-Za-z][A-Za-z0-9_-]{0,39}(#[A-Za-z][A-Za-z0-9_-]{0,39})*)?$', 4000, 2000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.anticipi, funzioni, 2000, '^([0-9]{1,9};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9})*)?$')
+          && chiuse(d.chiedi, funzioni, 1000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && aForma(d.erroriVisti, '^([a-z0-9_:.-]{1,80}(#[a-z0-9_:.-]{1,80})*)?$', 10000, 8000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && aForma(d.intervista, '^([a-z0-9_-]{1,30}(#[a-z0-9_-]{1,30})*)?$', 1000, 8000, '^([a-z0-9_-]{1,30}[|][0-9]{1,9}(;[a-z0-9_-]{1,30}[|][0-9]{1,9})*(#[a-z0-9_-]{1,30}[|][0-9]{1,9}(;[a-z0-9_-]{1,30}[|][0-9]{1,9})*)*)?$')
+          && d.primeVolte is list && d.primeVolte.size() <= 400
+          && d.primeVolte.join('#').size() <= 30000 && d.primeVolte.join('#').matches('^([a-z0-9][a-z0-9-]{0,59}(#[a-z0-9][a-z0-9-]{0,59})*)?$');
+      }
+      // Le ore delle copie che non hanno ancora le misure del sistema (fino alla 0.2.248).
+      function contatoriOra(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', 'uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', 'uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte'])
+          && d.v == 2
+          && testaOra(d) && misureOra(d);
+      }
+      // Le ore v3 (#1466): quelle di prima più il sistema in un campo solo, una stringa di voci da elenchi chiusi
+      // (avvio, processi morti, blocchi, eccezioni del main, memoria, chiamate sincrone, chiusura, disco, sessione,
+      // aggiornamenti). Controllato qui e non in una funzione: ogni uso di un argomento si rivaluta, e costa.
+      function contatoriOra3(d) {
+        let campi = ['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', 'uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte', 'sistema'];
+        return d.keys().hasOnly(campi)
+          && d.keys().hasAll(campi)
+          && d.v == 3
+          && testaOra(d) && misureOra(d)
+          && d.sistema is string && d.sistema.size() <= 16000
+          && d.sistema.matches('^((^|;)(avvioPasso[.](impostazioni_lette|protocollo_ipc|adblock|fingerprint|permessi|finestra_creata|prima_scheda_visibile|sessione_ripristinata)[.](ms500|s1|s2|s5|s10|s30|oltre)|avvioTipo[.](freddo|dopo_aggiornamento|seconda_istanza)|processoMorto[.](gpu|utility|zygote|sandbox_helper|pepper_plugin|scheda_in_recupero|altro)[.](abnormal-exit|killed|crashed|oom|launch-failed|integrity-failure|memory-eviction|altro)|finestraBloccata[.]((volte)|(tornata)[.](ms500|s1|s2|s5|s10|s30|oltre)|(chiusa_da_utente)[.](ms500|s1|s2|s5|s10|s30|oltre))|mainFermo[.]((max)[.](ms500|s1|s2|s5|s10|s30|oltre)|(blocchi)[.](ms200|ms1000|ms5000))|eccezioneMain[.](uncaught|rejection)[.](TypeError|RangeError|ReferenceError|SyntaxError|Error|altro)|memoria[.]((totale)[.](mb256|mb512|mb1024|mb2048|mb4096|oltre)|(vive)[.](n0|n1|n5|n20|n50|oltre)|(attesa)[.](n0|n1|n5|n20|n50|oltre))|ipcSincrono[.](fp-config|cookie-wipe|adblock-css|permessi-stato)[.](ms500|s1|s2|s5|s10|s30|oltre)|chiusura[.]((durata)[.](ms500|s1|s2|s5|s10|s30|oltre)|(tetto))|uscitaPrecedente[.](pulita|non_pulita)|storageEsito[.](lettura_ok|lettura_vuoto|lettura_illeggibile|lettura_rovinato_con_copia|lettura_rovinato_senza_copia|lettura_non_spostato_sola_memoria|salvataggio_fallito_enospc|salvataggio_fallito_eacces|salvataggio_fallito_eperm|salvataggio_fallito_erofs|salvataggio_fallito_ebusy|salvataggio_fallito_altro|salvataggio_tornato|rinomina_ritentata_ebusy|rinomina_ritentata_eperm|rinomina_ritentata_eacces|chiave_non_serializzabile|cambiato_senza_set|cifratura_assente|dimensione_mb1|dimensione_mb5|dimensione_mb20|dimensione_mb50|dimensione_mb100|dimensione_oltre|flush_ms500|flush_s1|flush_s2|flush_s5|flush_s10|flush_s30|flush_oltre)|sessione[.]((schede)[.](n0|n1|n5|n20|n50|oltre)|(esiti)[.](ripristinata|niente|lettura_fallita)|(vista)[.](ms500|s1|s2|s5|s10|s30|oltre)|(coda)[.](ms500|s1|s2|s5|s10|s30|oltre))|aggiornamento[.](trovato|scaricato|scaricamento_fallito|installatore_non_valido|installazione_lanciata_all_avvio|installazione_fallita|installazione_fallita_secondo_avviso|versione_rifiutata|bloccato_mac|bloccato_linux|installatore_non_avviato))[|][0-9]{1,9})*$');
+      }
+      // La forma si sceglie dalla versione prima di provarla: il server valuta al più mille espressioni a richiesta (ogni
+      // uso di un argomento si rivaluta, ogni elemento di un elenco conta), e un'ora v3 provata dopo le altre ci passerebbe
+      // sopra. Il margine lo misura solo il motore vero: tests/unit/contatoriRegole.motore-vero.mjs.
+      function contatori(d) {
+        return (d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 1 && contatoriGiorno(d));
+      }
       allow get, list: if isAdmin();
-      allow create: if contatoriValidi(request.resource.data);
+      allow create: if contatori(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── Le chiamate ai modelli dei contatori (#1464) ─────────────────────────
+    //
+    // Per ogni ora di contatori che ne ha, i numeri delle chiamate ai modelli: per funzione e modello il contesto, la
+    // cache, il ragionamento, l'uscita, i ripieghi, la spesa e gli adattamenti, in fasce; le chiamate per uso. Stesso
+    // pseudonimo, stessa ora e stesso id dell'ora; sta in un documento a parte perché le regole dell'ora sono già
+    // vicine al tetto di mille espressioni che Firestore valuta per scrittura. Le stesse regole dell'ora: sola
+    // creazione, senza login, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-chiamate/{docId} {
+      function contatoriChiamate(d) {
+        let f = funzioniContate();
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa', 'adattamenti', 'chiamate'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa', 'adattamenti', 'chiamate'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.contesto, f, 24000, '^([a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.cache, f, 22000, '^([a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ragionamento, f, 22000, '^([a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.uscita, f, 64000, '^([a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ripieghi, f, 28000, '^([a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.spesa, f, 18000, '^([a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.adattamenti, f, 20000, '^([a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.chiamate, f, 5000, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriChiamate(request.resource.data);
       allow update, delete: if false;
     }
 

@@ -52,16 +52,8 @@ const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
 
-// ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
-//
-// Le schede riaperte all'avvio di Filo nascono con il flag
-// '--filo-suppress-autoplay' (passato via additionalArguments dal main): i loro
-// media non devono partire da soli (i video YouTube ripartivano tutti insieme).
-// Installiamo SUBITO — prima ancora del caricamento della pagina — un listener
-// 'play' in fase di cattura che rimette in pausa qualunque media tenti di
-// autopartire. Si disattiva alla PRIMA interazione dell'utente con la scheda:
-// da lì in poi i media partono normalmente (è l'utente a comandarli). Il
-// listener vive nel mondo isolato del preload ma ascolta il DOM condiviso.
+// #145 — le schede riaperte all'avvio non fanno partire i media da sole, o ripartono tutte
+// insieme: il listener si installa prima della pagina e cade alla prima interazione.
 if (process.argv.includes('--filo-suppress-autoplay')) {
   try {
     let active = true;
@@ -85,20 +77,8 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
   } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
 }
 
-// ─── Bridge contextmenu installato a document_start ─────────────────────────
-//
-// Alcuni siti (YouTube, Reddit, …) registrano il PROPRIO listener `contextmenu`
-// in fase di CATTURA su window al primo script di pagina e lo bloccano con
-// stopImmediatePropagation() per mostrare il loro menu. Se il nostro content
-// script si registrasse solo a DOMContentLoaded arriverebbe DOPO il loro
-// listener window+capture: a parità di target/fase vince chi si registra prima,
-// quindi il loro stopImmediatePropagation impediva al nostro handler di partire
-// e il menu Filo non compariva (feedback alpha: «tasto destro non funziona su
-// YouTube»). Il preload gira PRIMA di qualunque script di pagina: registrando
-// qui — subito, a document_start — il listener window+capture, siamo sempre i
-// primi a ricevere l'evento, su ogni sito. Il vero handler (in content.js, che
-// ha bisogno di settings/spellcheck/Menu) si installa più tardi via
-// __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
+// Va registrato prima degli script di pagina: certi siti fermano il contextmenu in capture,
+// e a parità di fase vince chi si è registrato prima.
 let contextMenuHandler = null;
 // I siti col menu proprio (#975): la sonda va nel mondo della pagina prima dei suoi script. content.js dice, coi siti
 // scelti nelle impostazioni, se qui il tasto destro va prima alla pagina; Shift allora porta al menu di Filo.
@@ -349,13 +329,8 @@ try {
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
 const broadcastListeners = new Set();
-// #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
-// riquadro i content script si montano solo quando l'utente lo tocca; ma
-// «Traduci la pagina» arriva dalla pagina che lo ospita, non da un clic lì
-// dentro, e un riquadro addormentato lascerebbe il suo testo in lingua
-// originale sotto un avviso che dichiara finito. La costante di SN_MSG qui non
-// c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
-// l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
+// #407 — messaggi che devono SVEGLIARE un riquadro: senza, resterebbe in lingua originale
+// sotto un avviso che dice «fatto». Valore letterale: qui SN_MSG non è ancora caricato.
 const WAKE_BROADCASTS = new Set(['frame_translate']);
 
 // #503 — il giudizio di chi ospita il riquadro, arrivato per lettera dalla finestra madre (translatePage.js lo
@@ -445,9 +420,7 @@ function consegnaBroadcast(msg) {
     }
   };
   const type = msg && msg.type;
-  // Il ritorno all'originale non sveglia nessuno: un riquadro che dorme non ha
-  // mai tradotto niente, e montarci Filo dentro per non fare nulla sarebbe
-  // lavoro pagato per niente.
+  // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto.
   const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore';
   if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
     ensureContentScripts();
@@ -485,8 +458,7 @@ const chromeShim = {
           const requestId = `s${Date.now()}_${++streamCounter}`;
           const offMeta = (_e, data) => onMessage && onMessage({ type: 'meta', ...data });
           const offDelta = (_e, data) => onMessage && onMessage({ type: 'delta', delta: data.delta });
-          // reset = provider caduto a metà stream, il main riparte col fallback:
-          // il consumer deve buttare i delta accumulati finora (#273).
+          // #273 — reset: provider caduto a metà, i delta accumulati si buttano.
           const offReset = () => onMessage && onMessage({ type: 'reset' });
           const offDone = (_e, data) => {
             cleanup();
@@ -781,7 +753,11 @@ try {
     return stratoMenu;
   };
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
-  globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
+  // `azione`: l'azione del menu che apre (#1461), misurata dal main fino alla pagina caricata.
+  globalThis.SN_APERTURA_SCELTA = (url, azione) => {
+    const a = azione && typeof azione === 'object' ? { id: String(azione.id || ''), t0: Number(azione.t0) } : null;
+    try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || ''), a); } catch (_) {}
+  };
 } catch (_) {}
 
 // Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede
@@ -844,17 +820,6 @@ ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
   deliver();
 });
 
-// ─── inject CSS condivisi + carica content script ──────────────────────────
-//
-// Equivalente a quanto faceva il manifest dell'estensione:
-//   "css": [theme.css, menu.css, popup.css, sidebar.css, highlight.css,
-//           spellcheck.css, feedback.css]
-//   "js":  [constants, i18n, messages, icons, extractContext, popup, menu,
-//           highlight, sidebar, spellcheck, feedback shared, feedback content,
-//           content]
-// Il timing è document_idle nell'estensione; qui caricamento subito dopo
-// DOMContentLoaded della pagina ospite.
-
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
@@ -862,7 +827,7 @@ const STYLES = [
 
 let stiliMessi = false;
 function injectStyles() {
-  // Skip se il documento non è una pagina (es. about:blank, data:, view-source).
+  // Non è una pagina: about:blank, data:, view-source.
   if (!document.head) return;
   stiliMessi = true;
   for (const f of STYLES) {
@@ -888,13 +853,8 @@ const CONTENT_DIR = path.join(__dirname, '..', 'content');
 // Stesso elenco di loadContentScripts() in internal-preload.js: le differenze
 // ammesse stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadScripts() {
-  // Ordine identico a quello del manifest dell'estensione legacy.
-  // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo
-  // insieme (banner del sito pericoloso, proposta geografica, banner cookie,
-  // colore della tab): dentro un riquadro incorporato parlerebbero del
-  // rettangolo sbagliato — un avviso "sito pericoloso" disegnato dentro un
-  // video, il colore della scheda preso da una pubblicità — quindi lì non si
-  // caricano affatto (#405).
+  // #405 — `PAGE_ONLY` marca i moduli che parlano della SCHEDA intera (banner, colore della
+  // tab): in un riquadro descriverebbero il rettangolo sbagliato e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
@@ -934,7 +894,8 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'correttoreRegole.js')); } catch (e) { console.error('[Filo CS] correttoreRegole', e); } // #1446 — PRIMA di spellcheck.js
-  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(webFrame); } catch (e) { console.error('[Filo CS] dizionario', e); } // #1446 — PRIMA di spellcheck.js
+  try { require(path.join(CONTENT_DIR, 'correttoreAutomatica.js')); } catch (e) { console.error('[Filo CS] correttoreAutomatica', e); } // #1447 — DOPO correttoreRegole.js, PRIMA di spellcheck.js
+  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e); } // #1446 — PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
@@ -946,7 +907,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'campoAccesso.js')); } catch (e) { console.error('[Filo CS] campoAccesso', e); } // #1124 — quali campi chiedono l'email
   try { require(path.join(CONTENT_DIR, 'propostaEmail.js')); } catch (e) { console.error('[Filo CS] propostaEmail', e); } // #1124 — anche nei riquadri: il campo può stare lì
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
-  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
+  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); }
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
@@ -969,9 +930,8 @@ function loadScripts() {
 function start() {
   injectStyles();
   loadScripts();
-  // Marker DOM-visibile per i test: i moduli SN_* girano nel mondo isolato
-  // del preload, ma il DOM è condiviso. Annoto sul documentElement quali
-  // moduli si sono caricati con successo così smoke/Playwright può verificare.
+  // I moduli girano nel mondo isolato: il DOM è l'unico posto da cui i test
+  // possono vedere che si sono caricati.
   try {
     const loaded = ['SN_CONST', 'SN_MSG', 'SN_I18N', 'SN_ICONS', 'SN_EXTRACT',
       'SN_POPUP', 'SN_MENU', 'SN_HIGHLIGHT', 'SN_SIDEBAR', 'SN_SPELLCHECK',

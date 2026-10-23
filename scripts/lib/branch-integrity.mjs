@@ -29,10 +29,12 @@
 // test girano su repo git temporanei con un finto `origin`.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync, readlinkSync, statSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
+import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
+import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
@@ -463,7 +465,8 @@ export function ensureSessionExcludes(root) {
  *   checkpoint   ultimo punto fermo (SHA) a cui riportare il branch, o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null}}
+ *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
@@ -525,8 +528,17 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // raggiungibile; altrimenti lo stato remoto del branch (che È la consegna).
   // NB: senza punto fermo NON si torna a main — su un branch di revisione il
   // contenuto consegnato è tutto ciò che abbiamo.
+  const tip = hasRemote ? g(['rev-parse', `origin/${branch}`]) : null;
+  const remoteTip = tip && tip.ok ? tip.out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  if (!target) target = hasRemote ? g(['rev-parse', `origin/${branch}`]).out : headSha(root);
+  // Un punto fermo fuori dalla linea della punta pubblicata è di una storia riscritta altrove (un riallineamento):
+  // vince la punta. Antenato della punta resta il caso dell'interruzione (#507), discendente è lavoro non spedito (#1486).
+  let rewritten = null;
+  if (target && remoteTip && !sullaStessaLinea(g, target, remoteTip)) {
+    rewritten = target;
+    target = remoteTip;
+  }
+  if (!target) target = remoteTip || headSha(root);
   if (!target) return { ok: false, kind: 'transient', message: `impossibile risolvere il contenuto atteso di ${branch}` };
 
   const before = headSha(root);
@@ -545,7 +557,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     // già non è dirottabile dalla configurazione, ma la forma refs/heads/… è
     // l'unica che si può controllare a colpo d'occhio (e con cui una sentinella
     // può dire "qui nessuno spedisce senza dire dove").
-    if (pushed) g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+    // Mai su un commit fuori dalla linea della punta remota: riporterebbe origin a una storia già riscritta.
+    if (pushed && (!remoteTip || sullaStessaLinea(g, target, remoteTip))) {
+      g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
+    }
     if (!parked) discarded = null;
   } else {
     g(['reset', '--hard', target]);
@@ -555,7 +570,14 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded };
+  return { ok: true, head: headSha(root), discarded, rewritten };
+}
+
+/** `a` e `b` stanno sulla stessa storia: uguali, o uno antenato dell'altro. */
+function sullaStessaLinea(g, a, b) {
+  return a === b
+    || g(['merge-base', '--is-ancestor', a, b]).ok
+    || g(['merge-base', '--is-ancestor', b, a]).ok;
 }
 
 // ─── C: il controllo che ogni scrittura di stato deve fare ───────────────────
@@ -784,4 +806,163 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
  */
 export function escalationNote(count = IDENTITY_REJECT_LIMIT) {
   return `La lavorazione automatica si è disallineata ${count} volte di seguito: chi doveva registrare l'esito stava guardando una versione del codice diversa da quella in lavorazione, quindi il risultato non sarebbe attendibile. Ho sospeso i tentativi automatici invece di insistere; serve una tua decisione su come procedere.`;
+}
+
+// ─── Lavoro vivo nella cartella (#1480) ──────────────────────────────────────
+// Un worker che l'orchestratore crede finito può lavorare ancora qui: chi sposta la cartella o rilascia il suo
+// biglietto glielo toglie (D-90, D-91). Una guardia sola per tutte le porte; regole: tests/unit/lavoroVivo.test.mjs.
+
+export const USCITA_LAVORO_VIVO = 5;
+// Il gancio rinnova il timbro al più ogni 5 minuti: 10 coprono un salvataggio e il successivo.
+export const TIMBRO_VIVO_MS = 10 * 60 * 1000;
+export const SEGNI_TUTTI = Object.freeze(['battito', 'timbro', 'processi']);
+// Il battito si conta dal suo marcatore: i battiti singoli del gancio e il ciclo di un biglietto non sono lavoro.
+const COMANDO_BATTITO = /routine-channel\.mjs["']?\s+heartbeat\b/;
+
+export function timbroFile(root) {
+  return resolve(root, '.claude', 'routine-beat-hook.stamp');
+}
+
+/** `p` è `cartella` o ci sta dentro? PURA. */
+export function sottoCartella(p, cartella, platform = process.platform) {
+  const n = (x) => { const r = resolve(String(x || '')); return platform === 'win32' ? r.toLowerCase() : r; };
+  const a = n(p);
+  const b = n(cartella);
+  return !!String(p || '') && !!String(cartella || '') && (a === b || a.startsWith(b.endsWith(sep) ? b : b + sep));
+}
+
+/** Un comando da mostrare: una riga, accorciato, senza codici lunghi (un biglietto, una parola d'ordine). PURA. */
+export function comandoLeggibile(cmd) {
+  const s = String(cmd || '').replace(/\s+/g, ' ').trim().replace(/[A-Za-z0-9_-]{32,}/g, (m) => `${m.slice(0, 6)}…`);
+  return s.length > 160 ? `${s.slice(0, 159)}…` : s;
+}
+
+/**
+ * I segni di lavoro vivo, da dati già letti. PURA.
+ * `mio`: il biglietto di chi chiede (il suo battito e il suo timbro non contano). `cosa`: quali segni guardare.
+ * `processi`: null = non visti (fuori da Linux); ognuno { pid, sid, stato, cwd, cmd }.
+ */
+export function segniDiLavoroVivo({
+  mio = '', battito = null, battitoVivo = false, biglietto = null, timbroMs = null, processi = [], cartelle = [],
+  esclusi = new Set(), sessione = 0, adesso = Date.now(), cosa = SEGNI_TUTTI, platform = process.platform,
+} = {}) {
+  const segni = [];
+  const corto = (t) => String(t || '').slice(0, 8);
+  if (cosa.includes('battito') && battito && battitoVivo && String(battito.ticket || '') !== String(mio || '')) {
+    segni.push({ tipo: 'battito', biglietto: corto(battito.ticket), pid: Number(battito.pid) || 0 });
+  }
+  if (cosa.includes('timbro') && biglietto && biglietto.ticket && String(biglietto.ticket) !== String(mio || '')
+      && Number.isFinite(timbroMs) && adesso - timbroMs < TIMBRO_VIVO_MS && adesso - timbroMs > -60 * 1000) {
+    // Un timbro di prima della fine del biglietto è il suo ultimo salvataggio; uno dopo è un worker che lavora ancora.
+    const fine = bigliettoFinito(biglietto) ? Date.parse(biglietto.morto.ora) : NaN;
+    if (!(fine >= timbroMs)) segni.push({ tipo: 'timbro', biglietto: corto(biglietto.ticket), etaMs: Math.max(0, adesso - timbroMs) });
+  }
+  if (cosa.includes('processi') && Array.isArray(processi)) {
+    for (const p of processi) {
+      if (!p || esclusi.has(p.pid) || (sessione > 0 && p.sid === sessione) || p.stato === 'Z' || !p.cmd) continue;
+      if (COMANDO_BATTITO.test(p.cmd)) continue;
+      const cartella = cartelle.find((c) => sottoCartella(p.cwd, c, platform));
+      if (cartella) segni.push({ tipo: 'processo', pid: p.pid, cmd: comandoLeggibile(p.cmd), cwd: p.cwd });
+    }
+  }
+  return segni;
+}
+
+/** I processi della macchina, con cartella di lavoro e sessione. null dove non si sanno leggere. */
+export function processiDiSistema({ platform = process.platform, proc = '/proc' } = {}) {
+  if (platform === 'linux') {
+    let voci;
+    try { voci = readdirSync(proc).filter((n) => /^\d+$/.test(n)); } catch (_) { return null; }
+    const out = [];
+    for (const n of voci) {
+      try {
+        const stat = readFileSync(`${proc}/${n}/stat`, 'utf8');
+        const campi = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+        let cwd = '';
+        try { cwd = readlinkSync(`${proc}/${n}/cwd`).replace(/ \(deleted\)$/, ''); } catch (_) { /* di un altro utente, o già uscito */ }
+        let cmd = '';
+        try { cmd = readFileSync(`${proc}/${n}/cmdline`, 'utf8').split('\u0000').join(' ').trim(); } catch (_) { /* già uscito */ }
+        out.push({ pid: Number(n), stato: campi[0], ppid: Number(campi[1]), sid: Number(campi[3]), cwd, cmd });
+      } catch (_) { /* uscito mentre lo leggevo */ }
+    }
+    return out;
+  } else {
+    // Mac e Windows non hanno /proc: le routine girano su Linux, e qui restano battito e timbro.
+    return null;
+  }
+}
+
+/** Chi chiede e i suoi antenati, e la sessione da escludere se l'ha aperta uno di loro (la shell del comando). PURA. */
+export function questoProcesso(processi, pid = process.pid) {
+  const perPid = new Map((processi || []).map((p) => [p.pid, p]));
+  const esclusi = new Set();
+  for (let p = pid; p > 0 && !esclusi.has(p);) {
+    esclusi.add(p);
+    const v = perPid.get(p);
+    if (!v) break;
+    p = v.ppid;
+  }
+  const mia = perPid.get(pid);
+  const sessione = mia && mia.sid > 0 && esclusi.has(mia.sid) ? mia.sid : 0;
+  return { esclusi, sessione };
+}
+
+function worktreeEstranei(root) {
+  const l = gitIn(root)(['worktree', 'list', '--porcelain']);
+  if (!l.ok) return [];
+  const qui = percorsoVero(root);
+  return l.out.split(/\r?\n/).filter((r) => r.startsWith('worktree ')).map((r) => r.slice(9).trim())
+    .filter((d) => d && existsSync(d) && percorsoVero(d) !== qui).map(percorsoVero);
+}
+
+function ultimoCommit(root) {
+  const r = gitIn(root)(['log', '-1', '--format=%h%x00%cr%x00%s']);
+  if (!r.ok || !r.out) return null;
+  const [sha, quando, titolo] = r.out.split('\u0000');
+  return { ramo: currentBranch(root), sha, quando, titolo: String(titolo || '').slice(0, 80) };
+}
+
+/**
+ * C'è lavoro vivo in `root`? Battito di un altro biglietto, timbro fresco del gancio di salvataggio, processi con la
+ * cartella di lavoro qui o in un worktree estraneo dello stesso deposito. Esclusi chi chiede, i suoi antenati e la sua
+ * shell. @returns {{ vivo: boolean, segni: object[], processiVisti: boolean, commit: object|null }}
+ */
+export function lavoroVivo(root, {
+  mio = '', cosa = SEGNI_TUTTI, adesso = Date.now(), leggiProcessi = processiDiSistema, alive = pidAlive, pid = process.pid,
+} = {}) {
+  const radice = percorsoVero(resolve(root));
+  const battito = readBeat(radice);
+  const diQui = battito && (!battito.root || stessaCartella(battito.root, radice));
+  const battitoVivo = !!(diQui && beatIsLive(battito, battito.ticket, { now: adesso, alive }));
+  let timbroMs = null;
+  try { timbroMs = statSync(timbroFile(radice)).mtimeMs; } catch (_) { /* nessun salvataggio in questo giro */ }
+  const processi = cosa.includes('processi') ? leggiProcessi() : [];
+  const { esclusi, sessione } = questoProcesso(processi || [], pid);
+  const segni = segniDiLavoroVivo({
+    mio, battito: diQui ? battito : null, battitoVivo, biglietto: leggiMarcatoreBiglietto(radice), timbroMs,
+    processi, cartelle: processi && processi.length ? [radice, ...worktreeEstranei(radice)] : [radice],
+    esclusi, sessione, adesso, cosa,
+  });
+  return { vivo: segni.length > 0, segni, processiVisti: processi !== null, commit: segni.length ? ultimoCommit(radice) : null };
+}
+
+const MOSTRATI = 6;
+
+/** Il rifiuto, con chi lavora ancora e cosa fare: `azione` è ciò che non si è fatto. PURA. */
+export function testoLavoroVivo(esito, azione) {
+  const segni = (esito && esito.segni) || [];
+  // Prima i comandi veri, poi le shell che li avvolgono.
+  const shell = (s) => /^(\S*\/)?(ba|z)?sh -c /.test(s.cmd) ? 1 : 0;
+  const processi = segni.filter((s) => s.tipo === 'processo').sort((a, b) => shell(a) - shell(b));
+  // Una suite di test sono decine di processi: i primi bastano a dire chi è, il numero dice il resto.
+  const righe = [...segni.filter((s) => s.tipo !== 'processo'), ...processi.slice(0, MOSTRATI)].map((s) => {
+    if (s.tipo === 'battito') return `battito vivo del biglietto ${s.biglietto}… (pid ${s.pid})`;
+    if (s.tipo === 'timbro') return `il gancio di salvataggio del biglietto ${s.biglietto}… ha salvato ${Math.round(s.etaMs / 60000)} minuti fa`;
+    return `processo ${s.pid} «${s.cmd}» in ${s.cwd}`;
+  });
+  if (processi.length > MOSTRATI) righe.push(`e altri ${processi.length - MOSTRATI} processi`);
+  const c = esito && esito.commit;
+  const commit = c ? ` Ultimo commit della cartella: ${c.sha} (${c.quando}) «${c.titolo}»${c.ramo ? ` sul ramo ${c.ramo}` : ''}.` : '';
+  // Il testo finisce anche dentro un `--guasto "…"` copiato a mano: niente virgolette doppie, apici inversi, dollari.
+  return `lavoro ancora vivo nella cartella: non ho ${azione}. ${righe.join('; ')}.${commit}`.replace(/\\/g, '/').replace(/["`$]/g, "'");
 }

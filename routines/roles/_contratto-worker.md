@@ -76,6 +76,11 @@ capo. Lunghi di sicuro: le prove di un feedback (otto minuti e mezzo),
 `npm run finish:check` (da quindici a quarantacinque minuti), l'installazione
 di Electron.
 
+Un comando in sottofondo **si aspetta prima del rilascio**: finché un tuo
+processo lavora nella cartella il rilascio rifiuta (exit 5, coi pid e i
+comandi), perché dopo il rilascio cartella e ramo passano al prossimo worker.
+Aspettalo, o fermalo se non serve più, e rilancia lo stesso comando.
+
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 
 - **exit 4 — RIFIUTATO**: il server ha guardato ruolo, ramo e stato vero e ha

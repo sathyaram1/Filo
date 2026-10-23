@@ -19,17 +19,21 @@
 // sulla macchina di chi la riga l'ha scritta.
 //
 // Senza il fix è ROSSO tre volte: `allow read: if true`, `allow write` senza
-// `resource == null`, nessun vincolo sul nome.
+// `resource == null`, nessun vincolo sul nome. Senza #1518 è rosso sul tipo
+// (una lista di tipi in chiaro), sull'estensione libera e sui metadati.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
-import '../../src/shared/feedbackAttachTypes.js';
+import '../../src/shared/feedbackPublicKey.js';
+import '../../src/shared/feedbackCrypto.js';
 import '../../src/shared/feedback.js';
-import { mimeDiAllegato } from '../../scripts/claude-feedback.mjs';
+import { PUNTI_DI_CARICAMENTO } from '../helpers/puntiDiCaricamento.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -39,7 +43,6 @@ const ROOT = join(__dirname, '..', '..');
 const RULES = readFileSync(process.env.STORAGE_RULES_FILE || join(ROOT, 'storage.rules'), 'utf8');
 
 const FB = globalThis.SN_FEEDBACK;
-const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
 
 /** Il file senza commenti: una regola commentata non è una regola. */
 const VIVO = RULES.replace(/\/\/[^\n]*/g, ' ');
@@ -83,7 +86,7 @@ function espandi(cond) {
   let out = cond;
   for (let giro = 0; giro < 3; giro++) {
     for (const [nome, corpo] of FUNZIONI) {
-      out = out.split(`${nome}()`).join(`( ${corpo} )`).split(`${nome}(file)`).join(`( ${corpo} )`);
+      out = out.replace(new RegExp(`\\b${nome}\\([^()]*\\)`, 'g'), () => `( ${corpo} )`);
     }
   }
   return out;
@@ -183,73 +186,41 @@ test('il tetto di dimensione lascia passare un allegato da 4 MB anche CIFRATO', 
   assert.ok(limite > 4 * 1024 * 1024, `tetto ${limite}: non c’è margine per la cifratura di un allegato da 4 MB`);
 });
 
-test('i content-type ammessi sono solo quelli passivi, allineati al gate del client', () => {
-  const m = /function\s+tipoPassivo\(\)\s*\{([\s\S]*?)\n\s*\}/.exec(VIVO);
-  assert.ok(m, 'manca la funzione tipoPassivo()');
-  const corpo = m[1];
+// ── Nel deposito entra solo il blob cifrato dall'app (#1518) ────────────────
 
-  // Niente wildcard larghe: `text/.*` farebbe passare text/html, `image/.*`
-  // farebbe passare image/svg+xml. Sono documenti ATTIVI nel dominio di Google
-  // Storage, cioè eseguibili quando chi fa triage apre il link.
-  assert.doesNotMatch(corpo, /matches\('text\/[.*]/, 'wildcard su text/*: passerebbe text/html');
-  assert.doesNotMatch(corpo, /matches\('image\/[.*]/, 'wildcard su image/*: passerebbe image/svg+xml');
-  for (const vietato of ['text/html', 'image/svg', 'application/xhtml', 'text/xml', 'application/javascript']) {
-    assert.ok(!corpo.includes(vietato), `tipo attivo ammesso dalle regole: ${vietato}`);
-  }
+const CREATE = () => PERMESSI.find((p) => p.verbi.includes('create'));
 
-  // Simmetria col gate del client (src/shared/feedbackAttachTypes.js): quello
-  // che l'app lascia allegare deve poter arrivare nel bucket, altrimenti
-  // l'utente vede "caricamento non riuscito" senza capire perché.
-  for (const tipo of [...ATTACH.DOC_MIME]) {
-    assert.ok(corpo.includes(`'${tipo}'`), `il client accetta ${tipo} ma le regole no`);
-  }
-  for (const tipo of [...ATTACH.RASTER_IMAGE_MIME]) {
-    const sotto = tipo.split('/')[1];
-    assert.match(corpo, new RegExp(`image/\\([^)]*\\b${sotto}\\b`), `il client accetta ${tipo} ma le regole no`);
-  }
-
-  // Stessa simmetria con l'altro mittente: `npm run feedback:apri` dichiara il
-  // tipo dall'estensione, e diceva di usare «la stessa allowlist delle
-  // storage.rules». Non era vero: `.tsv` e `.yaml` partivano e venivano
-  // respinti dal bucket, con l'allegato perso e il feedback aperto lo stesso.
-  for (const nomeFile of ['a.txt', 'a.log', 'a.md', 'a.markdown', 'a.json', 'a.csv', 'a.tsv', 'a.yaml', 'a.yml', 'a.pdf']) {
-    const tipo = mimeDiAllegato(nomeFile);
-    assert.ok(tipo, `${nomeFile}: lo script non gli dà un tipo`);
-    assert.ok(corpo.includes(`'${tipo}'`), `feedback:apri manda ${nomeFile} come ${tipo}, ma le regole lo rifiutano`);
-  }
-  for (const nomeImmagine of ['a.png', 'a.jpg', 'a.jpeg', 'a.gif', 'a.webp', 'a.bmp']) {
-    const sotto = mimeDiAllegato(nomeImmagine).split('/')[1];
-    assert.match(corpo, new RegExp(`image/\\([^)]*\\b${sotto}\\b`), `feedback:apri manda ${nomeImmagine} come image/${sotto}, ma le regole lo rifiutano`);
-  }
+test('il deposito ammette un tipo solo: quello dei blob cifrati, lo stesso dell’app', () => {
+  // Con la lista dei tipi «passivi» chiunque, senza mandare un feedback, ci
+  // caricava byte qualunque come octet-stream o un testo in chiaro, e si
+  // portava via un link che non scade. Da #602 ogni caricatore cifra: nel
+  // deposito arrivano solo blob opachi, e il tipo vero sta nel documento.
+  const cond = espandi(CREATE().cond);
+  const confronti = [...cond.matchAll(/\.contentType\b(?:\s*(==)\s*'([^']*)')?/g)];
+  assert.equal(confronti.length, 1, `il tipo deve avere un confronto solo: ${cond}`);
+  assert.equal(confronti[0][1], '==', 'il tipo si confronta per uguaglianza, non con un’espressione');
+  assert.equal(confronti[0][2], FB.ATTACHMENT_CONTENT_TYPE, 'le regole e l’app non dicono lo stesso tipo');
+  assert.equal(FB.ATTACHMENT_CONTENT_TYPE, 'application/octet-stream');
+  assert.ok(!/contentType[^&]*\|\|/.test(cond), `un’alternativa sul tipo riapre la lista: ${cond}`);
 });
 
-test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', () => {
-  // Verifica #582, giro 7, stessa causa della tabella degli indirizzi: la
-  // chiave è l'estensione di un nome di file, e in una tabella normale
-  // `__proto__` e `constructor` ci sono già. Un file chiamato `note.__proto__`
-  // si faceva dare un «tipo» che non è una stringa, passava il controllo
-  // «tipo ammesso?» e partiva verso il deposito con `data:[object Object]`.
-  for (const nome of ['a.__proto__', 'a.constructor', 'a.tostring', 'a.valueof', 'a.exe', 'a']) {
-    const tipo = mimeDiAllegato(nome);
-    assert.equal(typeof tipo, 'string', `${nome}: il tipo non è una stringa`);
-    assert.equal(tipo, '', `${nome}: tipo non ammesso accettato come «${String(tipo)}»`);
+test('in creazione nessun metadato scelto da chi carica', () => {
+  // Il nome con cui il file si scarica (Content-Disposition), la codifica, la
+  // cache, la lingua e le chiavi personalizzate li sceglierebbe uno
+  // sconosciuto: `fattura.exe` su un dominio di Google, o un segno «già
+  // sistemato» che la pulizia degli allegati legge. Il motore vero di questa
+  // riga è tests/rules/storage-allegati-motore-vero.mjs.
+  const cond = espandi(CREATE().cond);
+  assert.match(cond, /\bmetadata\.size\(\)\s*==\s*0/, 'le chiavi personalizzate passano');
+  for (const campo of ['contentDisposition', 'contentEncoding', 'cacheControl', 'contentLanguage']) {
+    assert.match(cond, new RegExp(`\\.${campo}\\s*==\\s*null`), `${campo} lo sceglie chi carica`);
   }
-  // Controprova: i nomi veri continuano ad avere il loro tipo.
-  assert.equal(mimeDiAllegato('a.png'), 'image/png');
-  assert.equal(mimeDiAllegato('a.yaml'), 'application/x-yaml');
-});
-
-test('quello che il gate del client ammette, il deposito lo accetta — e viceversa per i tipi dei due mittenti', () => {
-  // Verifica #582, giro 7. Le liste sono tre (gate del client, storage.rules,
-  // strumento a riga di comando) e devono dire la stessa cosa: se lo strumento
-  // può mandare un .yaml e una persona non può allegarlo, è la stessa
-  // asimmetria che questo audit continua a trovare.
-  for (const nomeFile of ['a.tsv', 'a.yaml', 'a.yml']) {
-    const tipo = mimeDiAllegato(nomeFile);
-    assert.ok(
-      ATTACH.DOC_MIME.has(tipo),
-      `feedback:apri manda ${nomeFile} come ${tipo}, ma il gate del client lo rifiuta`,
-    );
+  // Il Content-Disposition ammette solo le forme che scrive Firebase, col nome dell'oggetto:
+  // un confronto in più, o un `matches`, rimette il nome di scarico nelle mani di chi carica.
+  const ammessi = new Set(["null", "''", "'inline'", `"inline; filename*=utf-8''" + file`]);
+  const usi = [...cond.matchAll(/\.contentDisposition\b(\s*==\s*(null|''|'inline'|"inline; filename\*=utf-8''" \+ file))?/g)];
+  for (const u of usi) {
+    assert.ok(u[2] && ammessi.has(u[2]), `uso del Content-Disposition non ammesso: ${u[0]}`);
   }
 });
 
@@ -267,32 +238,39 @@ function regexDelNome() {
 test('il nome che genera l’app è accettato dalle regole (ora e con l’etichetta)', () => {
   const re = regexDelNome();
   for (let i = 0; i < 200; i++) {
-    const percorso = FB.attachmentPath(i % 2 ? 'image/png' : 'application/octet-stream');
-    const file = percorso.replace(/^feedback\//, '');
+    const file = FB.attachmentPath().replace(/^feedback\//, '');
     assert.ok(re.test(file), `le regole rifiuterebbero un nome generato dall’app: ${file}`);
   }
   // Con etichetta: è la forma dei ritrovamenti dell'agente esploratore
-  // (tests/agent/feedback.mjs → `agent_<ms>_<uuid>.png`).
+  // (tests/agent/feedback.mjs → `agent_<ms>_<uuid>.octetstream`).
   for (const et of ['agent', 'routine']) {
-    const file = FB.attachmentPath('image/jpeg', et).replace(/^feedback\//, '');
+    const file = FB.attachmentPath(et).replace(/^feedback\//, '');
     assert.ok(re.test(file), `le regole rifiuterebbero l’allegato etichettato ${et}: ${file}`);
     assert.ok(file.startsWith(`${et}_`), `etichetta persa: ${file}`);
+  }
+});
+
+test('l’estensione è fissa: quella dell’app, nessun’altra', () => {
+  const re = regexDelNome();
+  assert.ok(re.source.endsWith(`\\.${FB.ATTACHMENT_EXT}$`), `le regole non fissano l’estensione dell’app: ${re.source}`);
+  const base = `${Date.now()}_${randomUUID()}`;
+  for (const ext of ['png', 'txt', 'exe', 'html', 'bin', 'OCTETSTREAM', 'octetstreamx', 'octetstream.exe']) {
+    assert.ok(!re.test(`${base}.${ext}`), `le regole accetterebbero l’estensione .${ext}`);
   }
 });
 
 test('un nome indovinabile NON passa (è quello che rende il percorso un segreto)', () => {
   const re = regexDelNome();
   const indovinabili = [
-    'screenshot.png',
+    'screenshot.octetstream',
     'schermata.png',
-    '1.png',
-    '1788891497000.png',            // solo il timestamp: si indovina a tentativi
-    '1788891497000_abc.png',        // troppo poca entropia
+    '1.octetstream',
+    '1788891497000.octetstream',            // solo il timestamp: si indovina a tentativi
+    '1788891497000_abc.octetstream',        // troppo poca entropia
     'index.html',
-    '../fuori.png',
-    'sotto/cartella.png',
-    'feedback.png',
-    `${Date.now()}_00000000-0000-0000-0000-00000000000.png`, // un carattere in meno
+    '../fuori.octetstream',
+    'sotto/cartella.octetstream',
+    `${Date.now()}_00000000-0000-0000-0000-00000000000.octetstream`, // un carattere in meno
   ];
   for (const file of indovinabili) {
     assert.ok(!re.test(file), `le regole accetterebbero un nome indovinabile: ${file}`);
@@ -308,9 +286,79 @@ test('l’uuid del nome viene dal generatore crittografico, non da Math.random',
   assert.match(corpo, /getRandomValues/, 'senza randomUUID si cadrebbe subito su Math.random');
   // Due nomi di fila non si somigliano: se il generatore fosse un contatore o
   // un timestamp, il percorso non sarebbe più un segreto.
-  const a = FB.attachmentPath('image/png');
-  const b = FB.attachmentPath('image/png');
-  assert.notEqual(a, b, 'due allegati consecutivi con lo stesso nome');
+  assert.notEqual(FB.attachmentPath(), FB.attachmentPath(), 'due allegati consecutivi con lo stesso nome');
+});
+
+// ── Ogni punto che carica produce quel tipo e quel nome ─────────────────────
+
+/** Il deposito e Firestore finti: registrano ogni caricamento (nome e tipo) e rispondono come Firebase. */
+function depositoFinto() {
+  const caricati = [];
+  const prima = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('uploadType=media')) {
+      const h = opts.headers || {};
+      caricati.push({
+        nome: decodeURIComponent((/[?&]name=([^&]+)/.exec(u) || [])[1] || ''),
+        tipo: String(h['Content-Type'] || h['content-type'] || ''),
+      });
+      return new Response(JSON.stringify({ downloadTokens: randomUUID() }), { status: 200 });
+    }
+    if (u.includes('/counters/')) {
+      if (opts.method === 'PATCH') return new Response('{}', { status: 200 });
+      return new Response(JSON.stringify({ fields: { value: { integerValue: '5' } }, updateTime: '2026-10-01T00:00:00Z' }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ name: 'projects/p/databases/(default)/documents/feedback/DOC' }), { status: 200 });
+  };
+  return { caricati, ripristina: () => { globalThis.fetch = prima; } };
+}
+
+const PNG_DATA_URL = 'data:image/png;base64,' + Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).toString('base64');
+
+// Per ogni file dell'elenco, le strade con cui carica davvero.
+const CARICATORI = {
+  'src/shared/feedback.js': async () => {
+    // L'invio di un feedback (immagine e documento), l'allegato di un commento,
+    // e un ciphertext che si presenta con un tipo d'immagine.
+    await FB.submit({
+      text: 'con allegati',
+      images: [{ dataUrl: PNG_DATA_URL }],
+      files: [{ name: 'note.txt', type: 'text/plain', dataUrl: 'data:text/plain;base64,' + Buffer.from('ciao').toString('base64') }],
+    });
+    await FB.uploadAttachment(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }), 'schermata.png');
+    const sigillato = await FB.sealForUpload(new Blob([new Uint8Array([4, 5, 6])], { type: 'text/plain' }));
+    await FB.uploadImage(new Blob([await sigillato.arrayBuffer()], { type: 'image/png' }));
+    return 4;
+  },
+  'tests/agent/feedback.mjs': async () => {
+    const { pushIssue } = await import('../agent/feedback.mjs');
+    const schermata = join(cartellaTemporanea('punti-caricamento-'), 'schermata.png');
+    writeFileSync(schermata, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    await pushIssue({
+      model: 'prova', severity: 'low', area: 'prova', title: 'prova', detail: 'prova',
+      foundAt: 'filo://dashboard', screenshotPath: schermata, idToken: 'tok-admin',
+    });
+    return 1;
+  },
+};
+
+test('ogni punto che carica nel deposito produce il tipo e il nome che le regole ammettono', async () => {
+  const re = regexDelNome();
+  const tipo = /\.contentType\s*==\s*'([^']+)'/.exec(espandi(CREATE().cond))[1];
+  for (const punto of PUNTI_DI_CARICAMENTO) {
+    const carica = CARICATORI[punto];
+    assert.ok(carica, `${punto} carica nel deposito e questa prova non sa farlo caricare: aggiungilo a CARICATORI`);
+    const deposito = depositoFinto();
+    let attesi;
+    try { attesi = await carica(); } finally { deposito.ripristina(); }
+    assert.equal(deposito.caricati.length, attesi, `${punto}: caricamenti visti ${deposito.caricati.length}, attesi ${attesi}`);
+    for (const c of deposito.caricati) {
+      assert.equal(c.tipo, tipo, `${punto} carica col tipo ${c.tipo}, le regole vogliono ${tipo}`);
+      assert.ok(c.nome.startsWith('feedback/'), `${punto} carica fuori da feedback/: ${c.nome}`);
+      assert.ok(re.test(c.nome.slice('feedback/'.length)), `${punto} carica un nome che le regole rifiutano: ${c.nome}`);
+    }
+  }
 });
 
 // ── La strada autenticata con cui l'owner legge gli allegati ────────────────

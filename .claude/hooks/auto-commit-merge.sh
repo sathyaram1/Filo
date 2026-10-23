@@ -169,6 +169,12 @@ is_spedibile() {
   [ -n "$1" ] && [ "$1" != "HEAD" ] && ! is_main_line "$1"
 }
 
+# Il biglietto della cartella e' finito (rilasciato, o il battito ha risposto che e' morto): il ramo puo' gia' essere
+# di un altro worker, e spedirci sopra gli cambia la storia sotto i piedi (#1480, D-90). Lo segna routine-ticket.mjs.
+biglietto_finito() {
+  [ -f "$1/.claude/routine-ticket.json" ] && grep -q '"morto"' "$1/.claude/routine-ticket.json" 2>/dev/null
+}
+
 # ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
 #
 # Fino al 2026-08-07 questo hook distingueva "lavoro di una routine, da
@@ -410,7 +416,9 @@ salva_cartella() {
   #
   # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
   # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
-  if is_spedibile "$BRANCH"; then
+  if is_spedibile "$BRANCH" && biglietto_finito "$wt"; then
+    segnala_avviso "$wt" "il biglietto di questo lavoro e' finito (rilasciato, o morto per il battito): ho committato in locale ma NON spedisco '$BRANCH', che adesso puo' essere di un altro worker. Se stai ancora lavorando fermati: questo lavoro non si consegna piu'."
+  elif is_spedibile "$BRANCH"; then
     if COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
       [ -n "$COPIE_NEL_RAMO" ] && segnala_avviso "$wt" "$COPIE_NEL_RAMO"
       spedisci_ramo "$BRANCH" "$wt" || true
@@ -456,7 +464,7 @@ salva_cartella "$CARTELLA"
 # consumo del battito (#1156).
 TICKET_FILE="$CARTELLA/.claude/routine-ticket.json"
 BEAT_STAMP="$CARTELLA/.claude/routine-beat-hook.stamp"
-if [ -f "$TICKET_FILE" ] && command -v node >/dev/null 2>&1; then
+if [ -f "$TICKET_FILE" ] && ! biglietto_finito "$CARTELLA" && command -v node >/dev/null 2>&1; then
   now_s=$(date +%s)
   last_s=$(date -r "$BEAT_STAMP" +%s 2>/dev/null || echo 0)
   if [ $((now_s - last_s)) -ge 300 ]; then

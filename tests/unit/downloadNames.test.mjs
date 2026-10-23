@@ -18,13 +18,13 @@ const DL = require(join(ROOT, 'src', 'main', 'services', 'downloads.js'));
 
 test('safeName: nessun nome può uscire dalla cartella Download', () => {
   for (const evil of ['../../../../evaso.txt', '..\\..\\evaso.txt', '/etc/passwd', 'a/b/c.txt']) {
-    const s = DL._safeName(evil);
+    const s = DL.safeName(evil);
     assert.ok(!s.includes('/') && !s.includes('\\'), `separatori rimasti in "${s}"`);
     assert.ok(!s.startsWith('.'), `nome che inizia con punto: "${s}"`);
   }
-  assert.equal(DL._safeName('..'), 'download');
-  assert.equal(DL._safeName(''), 'download');
-  assert.ok(DL._safeName('x'.repeat(500)).length <= 180);
+  assert.equal(DL.safeName('..'), 'download');
+  assert.equal(DL.safeName(''), 'download');
+  assert.ok(DL.safeName('x'.repeat(500)).length <= 180);
 });
 
 // Il traversal arriva anche in MEZZO al nome: Chromium ha già cambiato le barre
@@ -33,17 +33,17 @@ test('safeName: nessun nome può uscire dalla cartella Download', () => {
 // ostile», rosso per questo).
 test('safeName: un ".." in mezzo al nome non sopravvive, i punti normali sì', () => {
   for (const evil of ['_.._.._pwned.txt', 'a..b', 'pwned...txt', 'x.._y..']) {
-    const s = DL._safeName(evil);
+    const s = DL.safeName(evil);
     assert.ok(!s.includes('..'), `resta un ".." in "${s}" (da "${evil}")`);
   }
-  assert.equal(DL._safeName('_.._.._pwned.txt'), '_._._pwned.txt');
-  assert.equal(DL._safeName('pwned...txt'), 'pwned.txt');
+  assert.equal(DL.safeName('_.._.._pwned.txt'), '_._._pwned.txt');
+  assert.equal(DL.safeName('pwned...txt'), 'pwned.txt');
   // Estensioni e punti singoli non si toccano.
   for (const ok of ['a.b.txt', 'archivio.tar.gz', 'foto 2026.jpg', 'v1.2.3.zip']) {
-    assert.equal(DL._safeName(ok), ok);
+    assert.equal(DL.safeName(ok), ok);
   }
   // Solo punti: non resta niente, e niente diventa «download».
-  for (const nulla of ['.', '..', '...', '....']) assert.equal(DL._safeName(nulla), 'download');
+  for (const nulla of ['.', '..', '...', '....']) assert.equal(DL.safeName(nulla), 'download');
 });
 
 test('shortName: un nome lunghissimo viene accorciato in mezzo tenendo l\'estensione', () => {
@@ -59,4 +59,13 @@ test('shortName: un nome normale resta identico', () => {
   for (const ok of ['report.pdf', 'foto vacanze 2026.jpg', 'archivio.tar.gz']) {
     assert.equal(DL._shortName(ok), ok);
   }
+});
+
+test('safeName: i caratteri di direzione e quelli invisibili non arrivano al nome, e un nome vuoto prende il ripiego di chi chiama (#1510)', () => {
+  require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
+  assert.equal(DL.safeName('foto\u202Egpj.exe'), 'fotogpj.exe');
+  assert.equal(DL.safeName('ricordo\u200B\u2066gnp.png\u2069'), 'ricordognp.png');
+  assert.equal(DL.safeName('\u202E', 'immagine'), 'immagine');
+  assert.equal(DL.safeName('../', 'video'), 'video');
+  assert.equal(DL.safeName(''), 'download');
 });

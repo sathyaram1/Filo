@@ -29,6 +29,7 @@
   let apriProposta = () => {};
   let archiviaAzione = () => {};
   let sceltaAutonomiaEl = () => null;
+  let sceltaContatoriEl = () => null;
   let prosegui = () => {};
   // #778 — mentre i popup di una risposta si aprono in fila, la ripresa aspetta l'ultimo: un turno partito a metà
   // fila troverebbe le altre richieste ancora senza risposta, e le rifarebbe.
@@ -833,6 +834,7 @@
     },
     ONBOARDING: (a) => {
       if (sceltaAutonomia(a)) return { icon: '👋', text: 'Accoglienza · scelta dell’autonomia' };
+      if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
       return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
@@ -955,7 +957,7 @@
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',
-    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
+    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita', APRI_FILE: 'File non mostrato',
     CERCA_SALVATE: 'Ricerca fra le pagine salvate non riuscita',
     APRI_SALVATA: 'Pagina salvata non aperta',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
@@ -1093,6 +1095,8 @@
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
+    if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
       return `${o.host || 'il sito'} è fra i siti ${quali}`;
@@ -1222,6 +1226,10 @@
   }
 
   // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
+  function sceltaContatori(a) {
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaContatori === true;
+  }
+
   function sceltaAutonomia(a) {
     return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
   }
@@ -1336,7 +1344,7 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = aspettaUtente(a) || rigaEBottone(a)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a)
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a) || sceltaContatori(a)
         || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
@@ -1553,11 +1561,7 @@
   // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
   // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
   const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
-  // Un percorso sul disco (assoluto, con ~ o con la lettera del disco), non un indirizzo web.
-  const percorsoLocale = (p) => {
-    const s = String(p || '').trim();
-    return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && (/^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s));
-  };
+  const percorsoLocale = (p) => !!window.SN_NOMI_FILE && window.SN_NOMI_FILE.percorsoLocale(p);
   // Se il bottone non porta il «dove» coi nomi di Filo (una chat riaperta): le ultime due cartelle; il percorso intero sta
   // nel suggerimento.
   function cartellaBreve(p) {
@@ -1597,12 +1601,20 @@
     if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
     const nome = document.createElement('span');
     nome.className = 'dash-file-btn-nome';
+    // L'etichetta la sceglie il modello, e può aver letto un documento ostile: il nome che si apre è quello vero (#1499).
+    const etichetta = document.createElement('span');
+    etichetta.className = 'dash-file-btn-etichetta';
     const dove = document.createElement('span');
     dove.className = 'dash-file-btn-dove';
-    btn.append(icona, nome, dove);
+    btn.append(icona, nome, etichetta, dove);
     const disegna = () => {
       const p = String(a.percorso || a.path || '');
-      nome.textContent = a.etichetta || a.label || nomeDelPercorso(p) || 'File';
+      const vero = nomeDelPercorso(p);
+      nome.textContent = vero || 'File';
+      const detta = String(a.etichetta || a.label || '').trim();
+      const uguale = (x) => x.toLowerCase() === vero.toLowerCase() || x.toLowerCase() === vero.replace(/\.[^.]+$/, '').toLowerCase();
+      etichetta.textContent = detta && !uguale(detta) ? detta : '';
+      etichetta.hidden = !etichetta.textContent;
       const doveFilo = a._output && typeof a._output.dove === 'string' ? a._output.dove : '';
       dove.textContent = doveFilo || cartellaBreve(p);
       dove.hidden = !dove.textContent;
@@ -1669,6 +1681,7 @@
     const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
     const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
     if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
+    if (o.cartellaDiRete) return `Cartella su un altro computer · ${o.cartellaDiRete}`;
     const n = Array.isArray(o.risultati) ? o.risultati.length : null;
     const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
     return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
@@ -1908,7 +1921,11 @@
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
-        if (!ok) return;
+        if (!ok) {
+          // Il no non fa partire niente: lo sanno solo i contatori (#1461).
+          try { Promise.resolve(send({ type: MSG.FILO_CONFIRM_RIFIUTATA, action: a })).catch(() => {}); } catch (_) {}
+          return;
+        }
         btn.disabled = true;
         // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
         if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';
@@ -2040,6 +2057,7 @@
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
+    if (sceltaContatori(a)) return sceltaContatoriEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
@@ -2257,7 +2275,7 @@
     btn.textContent = '🧹 Riordina e archivia le schede';
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
-      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche))) return;
+      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) return;
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
@@ -2276,12 +2294,14 @@
 
   // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
   // `perche`: la frase della regola quando a far chiedere è ciò che il compito ha letto.
-  async function chiediSecondoRegola(domanda, opts, perche = '') {
+  // `tipo`: l'azione del pannello, perché i contatori sappiano cosa ha scelto la persona (#1461).
+  async function chiediSecondoRegola(domanda, opts, perche = '', tipo = '') {
     if (domanda === 'si') return true;
     if (perche) opts = { ...opts, text: `${opts.text}\n\n${perche}` };
     const Ui = window.SN_CONFIRM_UI;
-    if (!Ui) return window.confirm(opts.text);
-    return domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts);
+    const ok = Ui ? await (domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts)) : window.confirm(opts.text);
+    if (tipo) Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'conferma', chiave: `pannello:${tipo}`, esito: ok ? 'approvata' : 'rifiutata' })).catch(() => {});
+    return ok;
   }
 
   const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
@@ -2298,7 +2318,7 @@
     }
     // Chiesto come assistente (#825.3) torna dal popup generico, che dice `needsConfirm` invece di `domanda`.
     const domanda = r.domanda || (r.needsConfirm === 3 ? 'conferma' : 'chiede');
-    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche))) return { annullato: true };
+    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche, 'PULISCI_TAB'))) return { annullato: true };
     return esitoRiordino(await send({ type: MSG.RUN_TAB_TRIAGE }));
   }
 
@@ -2402,7 +2422,7 @@
         const scelta = spuntate();
         if (!scelta.length) return;
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
-        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche);
+        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche, 'CANCELLA_ARCHIVIO');
         if (!ok || del.disabled) return;
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
@@ -2437,6 +2457,7 @@
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
     if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
+    if (deps.sceltaContatori) sceltaContatoriEl = deps.sceltaContatori;
     if (deps.prosegui) prosegui = deps.prosegui;
   }
 

@@ -1,13 +1,5 @@
-// App deck builder Commander (DECK-BUILDER-SPEC.md): routing a tre schermate
-// (Mazzi / Builder / Partita stub), libreria, layout del Builder a tre colonne
-// FISSE con divisori trascinabili persistiti (§2), header-switcher del mazzo
-// (§8.2), chat unificata (§3) e pannello destro a tre stati (§5: statistiche /
-// preview su hover / carosello di triage). Le statistiche vere e i moduli del
-// detail arrivano coi task successivi.
-//
-// Routing su hash:  #/            → libreria (home)
-//                   #/deck/<id>   → builder del mazzo
-//                   #/game        → partita (stub)
+// App deck builder Commander (spec: DECK-BUILDER-SPEC.md): libreria, builder a tre
+// colonne, partita stub. Routing su hash: #/ libreria, #/deck/<id> builder, #/game partita.
 
 (function () {
   'use strict';
@@ -31,30 +23,18 @@
   let decks = [];        // cache della lista per la libreria
   let current = null;    // mazzo aperto nel builder
 
-  // ── Layout del Builder (§2): larghezze delle colonne ───────────────────────
-  // Tre colonne a larghezza FISSA: nessun resize automatico, mai. L'unico
-  // resize ammesso è il trascinamento deliberato dei due divisori; le larghezze
-  // finiscono in chrome.storage.local e sopravvivono alla riapertura.
+  // Layout del Builder (§2): tre colonne a larghezza FISSA, nessun resize automatico.
+  // L'unico resize è il trascinamento dei divisori; le larghezze si persistono.
   const LAYOUT_KEY = window.SN_CONST.STORAGE_KEYS.DECKS_UI;
-  // Colonne esterne FISSE (chat a sinistra, dettaglio a destra), colonna del
-  // MAZZO al centro flessibile (assorbe lo spazio in più). `rightW` sostituisce
-  // il vecchio `centerW`: prima il centro era il mazzo a larghezza fissa e la
-  // destra il "resto"; ora è il contrario, così il dettaglio (anteprima carta)
-  // resta di dimensione sana anche a piena larghezza.
+  // Colonne esterne FISSE (chat a sinistra, dettaglio a destra), colonna del MAZZO al
+  // centro flessibile: il dettaglio resta di dimensione sana anche a piena larghezza.
   const LAYOUT_DEFAULT = { leftW: 340, rightW: 340, module: 'default' };
   const LAYOUT_MIN = { leftW: 260, rightW: 280 };
   const CENTER_MIN = 260; // il mazzo (colonna flessibile) non deve sparire
   let layout = { ...LAYOUT_DEFAULT };
 
-  // Larghezze EFFETTIVE da mettere nel grid: partono dalle preferenze salvate
-  // (`layout`) ma vengono ristrette allo spazio realmente disponibile, così la
-  // colonna centrale del mazzo mantiene sempre almeno CENTER_MIN anche quando
-  // la finestra si rimpicciolisce o si riapre un mazzo con larghezze salvate
-  // più grandi dello schermo corrente. NON tocca `layout` (le preferenze
-  // restano intatte): allargando di nuovo la finestra tornano le misure scelte.
-  // Il calcolo (restringi le esterne, salva il minimo del centro, mai sotto i
-  // minimi) è lo STESSO della dashboard di gestione: vive in SN_PANE_LAYOUT,
-  // logica pura con unit test.
+  // Le preferenze salvate ristrette allo spazio reale: il centro tiene sempre CENTER_MIN.
+  // NON tocca `layout`: riallargando la finestra tornano le misure scelte.
   function effectiveWidths() {
     const grid = $('builderGrid');
     const avail = (grid && grid.clientWidth) || window.innerWidth || 0;
@@ -70,9 +50,8 @@
     const grid = $('builderGrid');
     if (!grid) return;
     const { leftW, rightW } = effectiveWidths();
-    // minmax(0, 1fr) sul centro: la colonna del mazzo può stringersi fino a 0
-    // invece di forzare la larghezza minima del contenuto e far traboccare le
-    // colonne laterali fuori dal riquadro (testo sovrapposto).
+    // minmax(0, 1fr) sul centro: può stringersi fino a 0 invece di forzare la larghezza
+    // minima del contenuto e far traboccare le colonne laterali fuori dal riquadro.
     grid.style.gridTemplateColumns =
       `${leftW}px 6px minmax(0, 1fr) 6px ${rightW}px`;
   }
@@ -83,8 +62,7 @@
       const saved = res && res[LAYOUT_KEY];
       if (saved && typeof saved === 'object') {
         layout.leftW = Math.max(LAYOUT_MIN.leftW, Number(saved.leftW) || LAYOUT_DEFAULT.leftW);
-        // Migrazione: i layout salvati prima avevano `centerW` (larghezza del
-        // mazzo, ora flessibile). Se manca `rightW`, riparti dal default.
+        // Un layout salvato senza `rightW` riparte dal default.
         layout.rightW = Math.max(LAYOUT_MIN.rightW, Number(saved.rightW) || LAYOUT_DEFAULT.rightW);
         if (DETAIL_MODULES[saved.module]) layout.module = saved.module;
       }
@@ -96,10 +74,8 @@
     chrome.storage.local.set({ [LAYOUT_KEY]: { ...layout } }).catch?.(() => {});
   }
 
-  // Trascinamento dei divisori: aggiorna la larghezza live, persiste al rilascio.
-  // `computeW(ev)` ritorna la larghezza desiderata della colonna dal cursore;
-  // oltre al minimo della colonna, si clampa perché il mazzo (colonna centrale
-  // flessibile) mantenga sempre almeno CENTER_MIN.
+  // Trascinamento dei divisori: larghezza live, persistita al rilascio. Oltre al minimo
+  // della colonna si clampa perché il mazzo al centro mantenga sempre CENTER_MIN.
   function wireDivider(el, prop, computeW) {
     el.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -124,14 +100,9 @@
   }
 
   function wireDividers() {
-    // Colonna sinistra (chat): dal bordo sinistro del grid al cursore.
     wireDivider($('dividerLeft'), 'leftW', (ev, rect) => ev.clientX - rect.left);
-    // Colonna destra (dettaglio): dal cursore al bordo destro del grid,
-    // meno la larghezza del divisore.
     wireDivider($('dividerRight'), 'rightW', (ev, rect) => rect.right - ev.clientX - 6);
   }
-
-  // ── Routing ────────────────────────────────────────────────────────────────
 
   function parseRoute() {
     const h = (location.hash || '#/').replace(/^#/, '');
@@ -145,12 +116,10 @@
     $('screenLibrary').hidden = screen !== 'library';
     $('screenBuilder').hidden = screen !== 'builder';
     $('screenGame').hidden = screen !== 'game';
-    // Solo il builder esce dal max-width di .sn-page per usare tutta la
-    // larghezza; libreria e partita restano centrate e leggibili.
+    // Solo il builder esce dal max-width di .sn-page: libreria e partita restano centrate.
     document.body.classList.toggle('dk-full', screen === 'builder');
-    // Il grid ha larghezza reale solo da visibile: ri-clampa ora, così un mazzo
-    // riaperto con larghezze salvate più grandi dello spazio corrente non fa
-    // sparire la colonna centrale.
+    // Il grid ha larghezza reale solo da visibile: ri-clampa ora, o un mazzo riaperto con
+    // larghezze salvate più grandi dello spazio corrente perde la colonna centrale.
     if (screen === 'builder') applyLayout();
   }
 
@@ -165,9 +134,9 @@
       if (!res || !res.ok) { location.hash = '#/'; return; }
       const prevId = current && current.id;
       current = res.deck;
-      // Cambio di mazzo/schermata: il pannello destro riparte dal riposo.
-      // I pareri sono per-mazzo (§6.2): cambiando mazzo la cache di pagina si svuota.
-      if (prevId !== current.id) opinionsByCard.clear();
+      // Cambio di mazzo o schermata: il pannello destro riparte dal riposo e la cache dei
+      // pareri si svuota, perché i pareri sono per-mazzo (§6.2).
+      if (prevId !== current.id) { opinionsByCard.clear(); opinionErrors.clear(); }
       carousel = null;
       setDetailState('stats');
       show('builder');
@@ -182,8 +151,6 @@
     await loadLibrary();
     show('library');
   }
-
-  // ── Libreria (§10) ─────────────────────────────────────────────────────────
 
   async function loadLibrary() {
     const res = await send({ type: MSG.DECKS_LIST });
@@ -349,7 +316,7 @@
     const next = Decks.renameDeck(r.deck, nome);
     if (next === r.deck) return;
     const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
-    if (!res || !res.ok) { showToast('Rinomina non riuscita.'); return; }
+    if (!res || !res.ok) { toastErrore('Rinomina non riuscita.'); return; }
     const i = decks.findIndex((d) => d.id === id);
     if (i >= 0) decks[i] = res.deck;
     const old = libraryCardEl(id);
@@ -423,11 +390,7 @@
     await loadLibrary();
   }
 
-  // ── Builder: identità del documento + switcher (§8.2) ──────────────────────
-
-  // Budget nell'intestazione e nel campo di modifica: formato italiano come
-  // tutti gli altri prezzi dell'app (virgola decimale), interi senza decimali
-  // («100», «40,50» — non «40.5»).
+  // Budget: formato italiano come ogni altro prezzo dell'app («40,50», non «40.5»).
   function fmtBudgetShort(n) {
     return Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
   }
@@ -435,8 +398,8 @@
     return (b === null || b === undefined) ? '' : fmtBudgetShort(b);
   }
 
-  // `stickChat`: all'apertura del mazzo la chat mostra l'ultimo scambio (fondo);
-  // nei refresh dopo una modifica si rispetta invece la posizione dell'utente.
+  // `stickChat`: all'apertura del mazzo la chat mostra l'ultimo scambio; nei refresh dopo
+  // una modifica si rispetta invece la posizione dell'utente.
   async function renderBuilder(stickChat) {
     $('deckNameText').textContent = current.nome;
     const line = $('commanderLine');
@@ -457,8 +420,7 @@
     $('commanderLine').title = current.commander
       ? 'Tasto destro per rimuovere il commander' : '';
     $('deckCount').textContent = `${Decks.deckCount(current)}/100 carte`;
-    // Cache-first: l'elenco compare SUBITO coi campi statici già in cache (le
-    // carte del mazzo sono state risolte quando sono entrate). I prezzi freschi
+    // Cache-first: l'elenco compare SUBITO coi campi statici già in cache; i prezzi freschi
     // arrivano dopo, in background, senza far aspettare le carte (feedback #380).
     await Promise.all([ensureSymbols(), loadDeckCards(), loadChatCards()]);
     refreshOpinionStaleness();
@@ -475,15 +437,13 @@
     if (res && res.ok) { current = res.deck; await renderBuilder(); }
   }
 
-  // La versione del mazzo è avanzata (edit): i pareri calcolati su versioni
-  // precedenti diventano stantii SUL POSTO (§6.2) — restano visibili, marcati.
+  // Versione del mazzo avanzata: i pareri calcolati su versioni precedenti diventano
+  // stantii SUL POSTO (§6.2) — restano visibili, marcati.
   function refreshOpinionStaleness() {
     for (const op of opinionsByCard.values()) {
       op.stale = (Number(op.versione) || 0) < (Number(current.versione) || 1);
     }
   }
-
-  // ── Colonna mazzo (§8.1): dati carta, gruppi collassabili, righe ───────────
 
   let cardsById = {};      // scryfall_id → carta semplificata (cache di pagina)
   let symbolsMap = null;   // '{U}' → svg_uri (symbology, chiesta una volta)
@@ -497,14 +457,8 @@
     symbolsMap = (r && r.ok && r.symbols) || {};
   }
 
-  // Carica i dati carta del mazzo. DUE modalità, per azzerare l'attesa
-  // all'apertura ("L'ATTESA è ATTRITO"):
-  //   - default (cache-first): chiede solo dalla cache i campi STATICI (nomi,
-  //     tipi, costi, colori — non scadono mai), così l'elenco del mazzo compare
-  //     SUBITO senza aspettare la rete. È il primo giro all'apertura.
-  //   - freshPrices: rifetcha i PREZZI stantii (TTL 6h, §9.2) — serializzato e
-  //     lento su un mazzo intero, quindi gira in BACKGROUND (refreshPrices),
-  //     mai bloccando la comparsa delle carte.
+  // Default cache-first sui campi STATICI: l'elenco compare subito, senza rete.
+  // freshPrices rifetcha i prezzi stantii (TTL 6h, §9.2): lento, sempre in background.
   async function loadDeckCards({ freshPrices = false } = {}) {
     const ids = current.carte.map((c) => c.scryfall_id);
     if (current.commander) ids.push(current.commander);
@@ -517,12 +471,8 @@
     Object.assign(cardsById, (r && r.ok && r.cards) || {});
   }
 
-  // Refresh dei prezzi in background (§9.2): sull'apertura il mazzo compare
-  // subito coi dati di cache (prezzi eventualmente stantii); qui si rifetchano
-  // i prezzi freschi SENZA bloccare e, quando arrivano, si riaggiornano le
-  // sole parti che dipendono dal prezzo (righe del mazzo, budget/statistiche).
-  // Il token invalida un refresh in corso se nel frattempo si è cambiato mazzo
-  // (altra apertura), così non si sovrascrive una vista diversa.
+  // Refresh prezzi in background (§9.2): aggiorna le sole parti che dipendono dal prezzo.
+  // Il token scarta un refresh in corso se intanto si è cambiato mazzo.
   let priceRefreshToken = 0;
   async function refreshPrices() {
     if (!current || !current.carte.length) return;
@@ -557,12 +507,8 @@
       </div>`;
   }
 
-  // Precarico immagini (§5.1 / "L'ATTESA è ATTRITO"): appena le righe carta sono
-  // visibili scaldiamo la cache HTTP del browser con le loro immagini, così il
-  // primo hover mostra la carta all'istante invece di attendere la rete. Warm
-  // via `new Image()` a priorità bassa (non ruba banda ad altro); l'ordine di
-  // assegnazione = ordine di lettura, quindi la prima riga — quella che l'utente
-  // più probabilmente aprirà — parte per prima. Dedup per URL: mai due fetch.
+  // Precarico immagini (§5.1): scaldare la cache HTTP appena le righe sono visibili rende
+  // istantaneo il primo hover. Priorità bassa, ordine di lettura, dedup per URL.
   function preloadImage(url) {
     if (!url || preloadedImgs.has(url)) return;
     preloadedImgs.add(url);
@@ -579,9 +525,8 @@
       if (card && card.backImage) preloadImage(card.backImage);
     }
   }
-  // Le righe carta VISIBILI ora: tutto il mazzo (elenco limitato, ~100 carte) +
-  // solo le liste risultati APERTE (una lista incollata può avere centinaia di
-  // righe collassate: si scaldano quando l'utente le espande, non prima).
+  // Solo le righe VISIBILI: tutto il mazzo più le liste risultati APERTE (una lista
+  // incollata ha centinaia di righe collassate: si scaldano quando l'utente le espande).
   function preloadVisibleCards() {
     const rows = [
       ...document.querySelectorAll('#deckList .dk-row[data-card-id]'),
@@ -612,9 +557,8 @@
     preloadVisibleCards();
   }
 
-  // Riepilogo di legalità (§8.4) sotto il conteggio: compare SOLO quando c'è
-  // un problema (doppioni / identity / banned). Il pannello statistiche
-  // completo arriva col suo task; i check devono esserci già.
+  // Riepilogo di legalità (§8.4): compare SOLO quando c'è un problema (doppioni,
+  // identity, banned).
   function renderLegality() {
     const el = $('deckLegality');
     const r = Decks.legalityChecks(current, cardsById);
@@ -626,10 +570,7 @@
     el.textContent = parts.length ? `⚠ ${parts.join(' · ')}` : '';
   }
 
-  // ── Statistiche (§9): stato di riposo del pannello destro ──────────────────
-  // Tutto calcolato in pagina da (current, cardsById) via SN_DECK_STATS (logica
-  // pura): curva CMC, colori richiesti/prodotti, composizione, legalità,
-  // budget. Rirenderizzate ad ogni renderBuilder (ogni edit del mazzo ci passa).
+  // Stato di riposo del pannello destro: statistiche calcolate in pagina (§9), non dal main.
 
   const Stats = window.SN_DECK_STATS;
   const COLOR_LABEL = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', C: 'Incolore' };
@@ -790,7 +731,7 @@
   }
 
   function runProb() {
-    const runId = ++probRunId; // ogni run nuova cancella i batch di quella vecchia
+    const runId = ++probRunId;
     const out = $('probResult');
     const want = probWants();
     if (!want.length) {
@@ -824,8 +765,7 @@
     step();
   }
 
-  // Riavvia la stima quando cambiano le condizioni, con un piccolo debounce così
-  // digitare più cifre o una raffica di rerender del mazzo non lancia mille run.
+  // Debounce: digitare più cifre o una raffica di rerender non deve lanciare mille run.
   function scheduleProb() {
     clearTimeout(probDebounce);
     // Il numero di prima non vale più: il puntino lo dice già durante l'attesa.
@@ -852,8 +792,7 @@
     renderStatLegality();
     renderBudget();
     renderProbForm();
-    // Il mazzo è cambiato (carte, quantità, tag): riraffina la probabilità con
-    // le categorie richieste correnti, senza che l'utente debba ricalcolare.
+    // Mazzo cambiato: riraffina da sé, senza che l'utente debba ricalcolare.
     scheduleProb();
   }
 
@@ -862,19 +801,15 @@
     if (removed) await saveDeck(deck);
   }
 
-  // "Sposta in gruppo": secondo livello del menu — i gruppi esistenti della
-  // vista corrente + il ritorno al gruppo naturale (toglie l'override). Lo
-  // spostamento è PER-VISTA (feedback #316): vale solo nella vista corrente,
-  // così cambiando raggruppamento la carta torna a raggrupparsi secondo il
-  // nuovo criterio invece di trascinarsi dietro il gruppo forzato altrove.
+  // Lo spostamento è PER-VISTA (feedback #316): cambiando raggruppamento la carta torna a
+  // raggrupparsi col nuovo criterio invece di trascinarsi dietro il gruppo forzato altrove.
   function chooseGroup(x, y, cardId) {
     const view = current.raggruppamento || 'tipo';
     const items = Decks.groupDeck(current, cardsById).map((g) => ({
       label: g.name,
       run: () => saveDeck(Decks.setGroupOverride(current, cardId, g.name, view)),
     }));
-    // "(gruppo naturale)" resetta l'override della vista corrente: mostralo solo
-    // se un override in questa vista c'è davvero (altrimenti sarebbe un no-op).
+    // «(gruppo naturale)» solo se in questa vista c'è un override: altrimenti è un no-op.
     const entry = current.carte.find((c) => c.scryfall_id === cardId);
     const ov = entry && entry.gruppo_override;
     if (ov && typeof ov === 'object' && ov[view]) {
@@ -886,17 +821,8 @@
     openCtx(x, y, items);
   }
 
-  // Rilascio di una carta su una categoria (#344). La categoria è il gruppo
-  // della vista corrente. Nella vista "per tag" la categoria È un tag, quindi
-  // c'è la scelta aggiungi-vs-sostituisci del feedback; nelle altre viste le
-  // categorie sono proprietà intrinseche della carta (tipo/costo/colore), che
-  // non si possono riscrivere: lì il trascinamento forza il gruppo, come già fa
-  // il menu "Sposta in gruppo…" (parità tra cammini equivalenti).
-  //
-  // Filo indovina quando può (meno attrito): il popup di scelta compare SOLO
-  // quando "aggiungi" e "sostituisci" darebbero risultati diversi. Se la carta
-  // non ha tag (le due opzioni coincidono) o ha già solo quel tag (nessun
-  // cambiamento reale) non c'è ambiguità → niente popup.
+  // Nella vista «per tag» la categoria È un tag: scelta aggiungi-vs-sostituisci; altrove il
+  // drop forza il gruppo. Popup SOLO se le due opzioni divergono (#344).
   function dropCardOnGroup(cardId, groupName, x, y) {
     const entry = current.carte.find((c) => c.scryfall_id === cardId);
     if (!entry) return;
@@ -909,8 +835,7 @@
       return;
     }
 
-    // Vista "per tag": la pseudo-categoria "Senza tag" raccoglie le carte senza
-    // tag → rilasciarci sopra significa togliere ogni tag (l'inverso del drag).
+    // «Senza tag»: rilasciarci sopra significa togliere ogni tag (l'inverso del drag).
     if (groupName === 'Senza tag') {
       const next = Decks.replaceCardTags(current, cardId, []);
       if (next !== current) { saveDeck(next); showToast(`Tag rimossi da ${name}.`); }
@@ -939,12 +864,8 @@
     ]);
   }
 
-  // "Copia/Sposta in un altro mazzo": secondo livello con l'elenco dei mazzi.
-  // Se la destinazione contiene GIÀ la carta le quantità si SOMMANO (mergeCard)
-  // — mai un no-op silenzioso, che nel "move" faceva sparire le copie. La
-  // rimozione dall'origine avviene SOLO dopo che la destinazione è stata
-  // salvata con successo: se qualcosa fallisce, l'origine resta intatta.
-  // Ogni esito (successo o errore) è comunicato con un toast.
+  // Se la destinazione ha già la carta le quantità si SOMMANO, mai un no-op silenzioso.
+  // L'origine si svuota solo dopo che la destinazione è salvata; ogni esito ha il suo toast.
   async function chooseDeck(x, y, cardId, move) {
     const res = await send({ type: MSG.DECKS_LIST });
     const others = Decks.sortForLibrary((res && res.decks) || [])
@@ -958,7 +879,7 @@
         const verb = move ? 'Spostare' : 'Copiare';
         const t = await send({ type: MSG.DECKS_GET, id: d.id });
         if (!t || !t.ok) {
-          showToast(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
+          toastErrore(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
           return;
         }
         const { deck: target, merged } = Decks.mergeCard(t.deck, cardId, {
@@ -966,7 +887,7 @@
         });
         const up = await send({ type: MSG.DECKS_UPDATE, deck: target });
         if (!up || !up.ok) {
-          showToast(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
+          toastErrore(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
           return;
         }
         if (move) await removeFromDeck(cardId);
@@ -983,7 +904,7 @@
   async function setCommanderTo(cardId) {
     const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
     if (!r || !r.ok) {
-      showToast('Non sono riuscito a cambiare il commander.');
+      toastErrore('Non sono riuscito a cambiare il commander.');
       return;
     }
     if (!current || r.deck.id !== current.id) return;
@@ -1186,10 +1107,8 @@
       </div>`;
   }
 
-  // Prosa con [[Nome Carta]] → span hoverable (§3.5), risolti fuzzy all'hover.
-  // I nomi già risolti in questa sessione (proseIdByName) rinascono col loro
-  // data-card-id anche dopo un rerender della chat: senza, ogni rerender
-  // "smemorava" gli span e click/evidenziazione smettevano di funzionare.
+  // Prosa con [[Nome Carta]] → span hoverable (§3.5). I nomi già risolti rinascono col loro
+  // data-card-id dopo un rerender: senza, click ed evidenziazione smettevano di funzionare.
   function proseHtml(text) {
     return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => {
       if (seg.type !== 'card') return esc(seg.text);
@@ -1200,10 +1119,8 @@
     }).join('');
   }
 
-  // Ragionamento del modello (CoT, #331): blocco collassabile in testa alla
-  // bolla — un click lo apre, un click lo richiude. Mentre Filo "pensa" resta
-  // aperto (si vede il ragionamento scorrere in diretta); a risposta arrivata
-  // torna collassato, salvo scelta esplicita dell'utente (m.cotOpen).
+  // Ragionamento del modello (#331): aperto mentre Filo pensa (si vede scorrere in diretta),
+  // collassato a risposta arrivata, salvo scelta esplicita dell'utente (m.cotOpen).
   function cotHtml(m) {
     if (!m.reasoning) return '';
     const open = m.cotOpen !== undefined ? m.cotOpen : !!m.pending;
@@ -1237,15 +1154,13 @@
     if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
+    // La frase nomina la pagina dove si rimedia: il tasto per andarci viene prima di «Riprova», che finché
+    // l'ostacolo resta rimanda la stessa domanda allo stesso muro (#663, #828.1). Come «Riprova», sull'ultima bolla.
+    const pagina = isLast && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
+    const via = pagina ? `<button class="dk-retry dk-rimedio" data-rimedio="1" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>` : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
     if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
-    if (m.error) {
-      // La frase nomina la pagina dove si rimedia: il tasto per andarci viene prima di «Riprova», che finché
-      // l'ostacolo resta rimanda la stessa domanda allo stesso muro (#663, #828.1). Come «Riprova», sull'ultima bolla.
-      const pagina = isLast && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
-      const via = pagina ? `<button class="dk-retry dk-rimedio" data-rimedio="1" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>` : '';
-      return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${via}${retry}</div>`;
-    }
+    if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${via}${retry}</div>`;
     const parts = [cotHtml(m)];
     // Risposta fermata a metà: la riga lo dice da nota, non da risposta, e l'ultima bolla offre «Continua».
     const CE = window.SN_CHAT_ERRORS;
@@ -1258,6 +1173,7 @@
       if (isLast) parts.push('<button class="dk-retry" data-continua="1" title="Continua la risposta da dove si è interrotta">Continua</button>');
     }
     // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
+    if (via) parts.push(via);
     if (m.retryable) parts.push(retry);
     if (m.clearChat) {
       parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
@@ -1503,7 +1419,7 @@
       bot.stopped = true;
     } else if (!r || !r.ok) {
       bot.error = (r && r.error) || 'nessuna risposta';
-      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, maxTokens: r.maxTokens, finishReason: r.finishReason };
+      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, reason: r.reason, maxTokens: r.maxTokens, finishReason: r.finishReason };
       if (window.SN_CHAT_ERRORS?.rimedioPagina?.(rimedio)) bot.rimedio = rimedio;
     } else {
       bot.reply = r.reply || '';
@@ -1517,6 +1433,8 @@
       }
       if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
       if (r.retryable) bot.retryable = true;
+      // Una parte del turno non è partita per un ostacolo che si toglie altrove (il controllo delle carte, #1344.1).
+      if (r.rimedio && window.SN_CHAT_ERRORS?.rimedioPagina?.(r.rimedio)) bot.rimedio = r.rimedio;
       // Import via chat (§11.2): quantità reali per riga (basics tipo
       // "37 Forest") + eventuale commander candidato, per il bottone
       // "Aggiungi tutte" e per il toggle per riga.
@@ -1529,6 +1447,7 @@
       // la cache di pagina si svuota così il prossimo hover legge dal main
       // i pareri freschi invece di mostrare quelli vecchi.
       opinionsByCard.clear();
+      opinionErrors.clear();
       // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
       // aggiornato torna nella risposta → header e statistiche si rinfrescano.
       if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
@@ -1594,15 +1513,12 @@
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (_) { /* resta il messaggio sotto */ }
       ta.remove();
-      if (!ok) { showToast('Non sono riuscito a copiare.'); return; }
+      if (!ok) { toastErrore('Non sono riuscito a copiare.'); return; }
     }
     showToast(done);
   }
 
-  // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
-  // nel gruppo giusto della colonna centrale, feedback immediato. `qty` arriva
-  // dall'import via chat (§11.2, es. basics con "×37"): default 1 per le
-  // ricerche normali.
+  // Toggle della riga (§3.4); `qty` dall'import via chat (§11.2), default 1 per le ricerche.
   async function toggleCard(cardId, qty = 1) {
     // Il commander sta nell'intestazione, non anche fra le 99 (§8.4): nessuna strada lo duplica nell'elenco.
     if (cardId === current.commander) return;
@@ -1611,9 +1527,8 @@
       ? Decks.addCard(current, cardId, { qty })
       : (() => { const r = Decks.removeCard(current, cardId); return { deck: r.deck, added: r.removed }; })();
     if (added) {
-      await saveDeck(deck); // renderBuilder → renderDeckList + renderChat
-      // Parere per la carta appena AGGIUNTA (§6.1): calcolato in background
-      // sulla versione nuova del mazzo, pronto in cache al prossimo hover.
+      await saveDeck(deck);
+      // Parere per la carta appena aggiunta (§6.1): in background, pronto al prossimo hover.
       if (adding) requestOpinions([cardId], { refresh: true }).catch(() => {});
     }
   }
@@ -1667,6 +1582,11 @@
     el.classList.remove('show');
     dkToastTempi.lascia(el);
   }
+  // Un avviso d'errore si conta per i contatori anonimi (#1461): la chiave, mai il testo.
+  function toastErrore(text) {
+    showToast(text);
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'mazzi_non_riuscito' })).catch(() => {}); } catch (_) {}
+  }
   function showToast(text) {
     let el = document.getElementById('dkToast');
     if (!el) {
@@ -1690,11 +1610,8 @@
     dkToastTempo = dkToastTempi.avvia(window.SN_AVVISI.durata(3400), () => hideToast(el));
   }
 
-  // ── Import/Export rigido (§11), via switcher ────────────────────────────────
-  // Dialog minimale (overlay + box, stesso linguaggio visivo dei confirm):
-  // il parser è DETERMINISTICO (mai LLM). L'import mostra sempre un'anteprima
-  // con conferma prima di scrivere nel mazzo; righe non riconosciute sono
-  // segnalate, mai indovinate.
+  // Import/Export rigido (§11): il parser è DETERMINISTICO, mai LLM. L'import mostra sempre
+  // un'anteprima con conferma; le righe non riconosciute sono segnalate, mai indovinate.
   let ioOverlayEl = null;
   function closeIoOverlay() {
     if (ioOverlayEl) { ioOverlayEl.remove(); ioOverlayEl = null; }
@@ -1767,7 +1684,7 @@
       if (!r || !r.ok) {
         btn.disabled = false;
         btn.textContent = 'Analizza';
-        showToast('Analisi non riuscita.');
+        toastErrore('Analisi non riuscita.');
         return;
       }
       renderImportPreview(body, r);
@@ -1807,17 +1724,15 @@
         const total = res.addedCount + res.updatedCount;
         showToast(`${total === 1 ? 'Importata 1 carta' : `Importate ${total} carte`}${res.updatedCount ? ` (${res.updatedCount} aggiornat${res.updatedCount === 1 ? 'a' : 'e'})` : ''}.`);
       } else {
-        showToast('Import non riuscito.');
+        toastErrore('Import non riuscito.');
         applyBtn.disabled = false;
         applyBtn.textContent = `Importa ${resolved.length} cart${resolved.length === 1 ? 'a' : 'e'}`;
       }
     });
   }
 
-  // Hover/click su un nome in prosa: risoluzione fuzzy una-tantum (§3.5).
-  // Ritorna una Promise dell'id risolto (o null): il carosello dal testo
-  // libero (#343) la attende per costruire la lista di navigazione. La cache
-  // per nome sopravvive ai rerender della chat (gli span si rigenerano).
+  // Risoluzione fuzzy una-tantum dei nomi in prosa (§3.5). Ritorna una Promise dell'id: il
+  // carosello dal testo libero (#343) la attende. La cache sopravvive ai rerender della chat.
   const proseIdByName = new Map();    // nome (lowercase) → scryfall id
   const proseResolving = new WeakMap(); // span → Promise in corso
 
@@ -1854,8 +1769,7 @@
         saveNamesSoon(deckId, m);
       }
       el.title = `${r.card.name} — ${r.card.typeLine}`;
-      // La risoluzione è arrivata DOPO il mouseover: se il puntatore è ancora
-      // sul nome non ci sarà un nuovo evento — la preview parte da qui.
+      // Risoluzione arrivata dopo il mouseover: senza un nuovo evento, la preview parte da qui.
       if (el.matches(':hover')) hoverEnter(r.card.id);
       return r.card.id;
     })();
@@ -1863,14 +1777,8 @@
     return p;
   }
 
-  // ── Pannello destro a tre stati (§5): statistiche / preview / carosello ────
-  // Le statistiche sono lo stato di RIPOSO; hover su una riga carta (ovunque:
-  // risultati in chat, righe mazzo, nomi [[...]] in prosa) → preview; click →
-  // carosello pinnato. Il contenuto cambia, la geometria MAI.
-  //
-  // Timing (§5.1, valori di partenza): apertura ~200ms (anti-flicker),
-  // passaggio riga→riga con grace ~100ms e aggiornamento SUL POSTO (mai
-  // chiudi-riapri), uscita con linger ~1s prima di tornare alle statistiche.
+  // Tre stati (§5): statistiche, preview all'hover, carosello pinnato. La geometria MAI.
+  // Timing (§5.1): apertura ~200ms, riga→riga con grace ~100ms, uscita con linger ~1s.
   const PREVIEW_OPEN_MS = 200;
   const PREVIEW_GRACE_MS = 100;
   const PREVIEW_LINGER_MS = 1000;
@@ -1890,18 +1798,28 @@
     if (s !== 'carousel') syncCarouselHighlight();
   }
 
-  // Box modulare del detail (§5.2): SLOT del sistema moduli — tasto destro sul
-  // box → scelta del modulo (sia in preview sia nel carosello, stesso slot).
-  // Moduli alpha: dati carta (default), mini curva di mana con l'evidenza di
-  // dove cadrebbe la carta, prezzo+dati (ristampe, legalità), parere di Filo
-  // (§6). La scelta è persistita col layout.
+  // Box modulare del detail (§5.2): SLOT dei moduli, tasto destro per sceglierlo (stesso
+  // slot in preview e nel carosello). La scelta è persistita col layout.
 
-  // ── Parere di Filo (§6): cache di pagina + richieste al main ──────────────
-  // opinionsByCard: cardId → { text, versione, stale } (solo per il mazzo
-  // corrente: si svuota al cambio mazzo). Il calcolo vero e la cache
-  // persistente per (carta, versione mazzo) vivono nel main.
+  // Parere di Filo (§6): opinionsByCard è cache di PAGINA, solo per il mazzo corrente; il
+  // calcolo e la cache persistente per (carta, versione mazzo) vivono nel main.
   const opinionsByCard = new Map();
   const opinionPending = new Set();
+  // Il parere che non è arrivato, col perché (la frase e quello che serve al tasto del rimedio): finché c'è, la
+  // carta non si richiede da sola. Senza, il riquadro la richiedeva a ogni ridisegno, centinaia di volte al secondo (#1344.1).
+  const opinionErrors = new Map();
+  const SENZA_RISPOSTA = 'non ho avuto risposta. Riprova.';
+  function erroreDelParere(r) {
+    const frase = r && r.error && r.error !== 'not_found' ? String(r.error) : SENZA_RISPOSTA;
+    return {
+      frase,
+      ...(r && r.code ? { code: r.code } : {}),
+      ...(r && r.keyRefused ? { keyRefused: true } : {}),
+      ...(r && r.reason ? { reason: r.reason } : {}),
+      ...(r && Number(r.maxTokens) > 0 ? { maxTokens: Number(r.maxTokens) } : {}),
+      ...(r && r.finishReason ? { finishReason: r.finishReason } : {}),
+    };
+  }
 
   // La carta mostrata ADESSO nel pannello destro (preview o carosello).
   function currentDetailCard() {
@@ -1910,38 +1828,52 @@
     return null;
   }
 
-  // Chiede al main i pareri per gli id dati (UNA richiesta, il main fa UN
-  // batch LLM per i soli mancanti/stantii). refresh=true ricalcola comunque
-  // (il refresh on-demand di §6.2). Al ritorno, se la carta mostrata è tra
-  // quelle chieste, il modulo si aggiorna sul posto.
+  // Una richiesta sola: il main fa UN batch LLM per i soli mancanti o stantii. refresh=true
+  // ricalcola comunque (§6.2); al ritorno il modulo si aggiorna sul posto.
   async function requestOpinions(ids, { refresh = false } = {}) {
-    // Senza refresh si chiedono solo i pareri che la pagina non ha: uno
-    // stantio resta visibile marcato, si ricalcola SOLO col bottone (§6.2).
+    // Uno stantio resta visibile marcato e si ricalcola SOLO col bottone (§6.2); uno mancato solo con «Riprova».
     const ask = ids.filter((id) => refresh
-      || (!opinionsByCard.has(id) && !opinionPending.has(id)));
+      || (!opinionsByCard.has(id) && !opinionPending.has(id) && !opinionErrors.has(id)));
     if (!ask.length || !current) return;
-    for (const id of ask) opinionPending.add(id);
+    for (const id of ask) { opinionPending.add(id); opinionErrors.delete(id); }
+    const deckId = current.id;
+    let r = null;
     try {
-      const r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
-      if (r && r.ok) {
-        for (const [id, op] of Object.entries(r.opinions || {})) opinionsByCard.set(id, op);
-      }
+      r = await send({ type: MSG.DECKS_OPINION, deckId, cardIds: ask, compute: true, refresh });
+    } catch (_) {
+      r = { ok: false, error: '' };
     } finally {
       for (const id of ask) opinionPending.delete(id);
+    }
+    // I pareri sono per mazzo: quelli di un mazzo lasciato nel frattempo non entrano nella cache del nuovo.
+    if (!current || current.id !== deckId) return;
+    if (r && r.ok) {
+      const opinions = r.opinions || {};
+      for (const [id, op] of Object.entries(opinions)) opinionsByCard.set(id, op);
+      const mancanti = r.mancanti || {};
+      for (const id of ask) if (!opinions[id]) opinionErrors.set(id, erroreDelParere(mancanti[id] || {}));
+    } else {
+      const errore = erroreDelParere(r);
+      for (const id of ask) opinionErrors.set(id, errore);
     }
     const cur = currentDetailCard();
     if (cur && layout.module === 'opinion' && ask.includes(cur.id)) renderDetailModule(cur);
   }
 
-  // ── Ristampe (modulo "Prezzo e dati"): conteggio lazy, cache nel main ─────
+  // Ristampe (modulo «Prezzo e dati»): conteggio lazy, cache nel main.
   const printsByName = new Map();
   const printsPending = new Set();
+  // Come per i pareri: un conteggio che Scryfall non ha dato non si richiede a ogni ridisegno del riquadro.
+  const printsFailed = new Set();
   async function fetchPrints(card) {
-    if (printsByName.has(card.name) || printsPending.has(card.name)) return;
+    if (printsByName.has(card.name) || printsPending.has(card.name) || printsFailed.has(card.name)) return;
     printsPending.add(card.name);
     try {
       const r = await send({ type: MSG.SCRYFALL_PRINTS, name: card.name });
       if (r && r.ok) printsByName.set(card.name, r.prints);
+      else printsFailed.add(card.name);
+    } catch (_) {
+      printsFailed.add(card.name);
     } finally { printsPending.delete(card.name); }
     const cur = currentDetailCard();
     if (cur && cur.name === card.name && layout.module === 'price') renderDetailModule(cur);
@@ -1959,8 +1891,7 @@
           <p>Costo di mana convertito: ${esc(String(card.cmc))} · Prezzo: ${esc(price)}</p>`;
       },
     },
-    // Mini curva di mana (§5.2.1): la curva del mazzo con EVIDENZIATA la
-    // colonna dove cadrebbe la carta — "mi fixa la curva?" ha risposta visiva.
+    // Mini curva (§5.2.1): dove cadrebbe la carta — «mi fixa la curva?» ha risposta visiva.
     curve: {
       label: 'Mini curva di mana',
       render(card, host) {
@@ -1969,8 +1900,7 @@
         const n = Math.max(0, Math.floor(Number(card.cmc) || 0));
         const bucket = land ? null : (n >= 7 ? '7+' : String(n));
         const already = inDeck(card.id);
-        // Se la carta NON è nel mazzo, la sua colonna mostra un segmento
-        // "fantasma" (+1) sopra la barra: dove cadrebbe aggiungendola.
+        // Carta non nel mazzo: segmento «fantasma» (+1) dove cadrebbe aggiungendola.
         const ghost = bucket !== null && !already;
         const max = Math.max(1, ...curve.map((b) => b.n + (ghost && b.label === bucket ? 1 : 0)));
         const unit = 36;
@@ -1993,33 +1923,39 @@
             : (already ? `Conta nella colonna ${esc(bucket)}.` : `Cadrebbe nella colonna ${esc(bucket)}.`)}</p>`;
       },
     },
-    // Prezzo + dati (§5.2.2): prezzo, ristampe (lazy, cache permanente), legalità.
     price: {
       label: 'Prezzo e dati',
       render(card, host) {
         const price = card.priceEur != null
           ? `${card.priceEur.toFixed(2).replace('.', ',')} € (Cardmarket)` : 'n.d.';
         const prints = printsByName.get(card.name);
+        const fallite = prints == null && printsFailed.has(card.name);
         host.innerHTML = `
           <p class="dk-module-title">Prezzo e dati</p>
           <p>Prezzo: ${esc(price)}</p>
           <p data-prints>${prints != null
-            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}` : 'Ristampe: …'}</p>
+            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}`
+            : (fallite ? 'Ristampe: Scryfall non ha risposto' : 'Ristampe: …')}</p>
           <p data-legal="${card.legalCommander ? 1 : 0}">${card.legalCommander
             ? '✓ Legale in Commander' : '✗ Non legale in Commander'}</p>`;
-        if (prints == null) fetchPrints(card);
+        if (prints == null && !fallite) fetchPrints(card);
       },
     },
-    // Parere di Filo (§6): giudizio contestuale carta-vs-mazzo. L'hover con
-    // questo modulo attivo È il trigger (§6.1): cache-first, LLM solo per i
-    // mancanti/stantii. Stantio = pallino discreto + "Aggiorna" (§6.2).
+    // Parere di Filo (§6): giudizio contestuale carta-vs-mazzo; stantio = pallino discreto
+    // più «Aggiorna» (§6.2).
     opinion: {
       label: 'Parere di Filo',
       render(card, host) {
         const op = opinionsByCard.get(card.id);
         const pending = opinionPending.has(card.id);
+        const errore = pending ? null : opinionErrors.get(card.id);
         let body;
-        if (op) {
+        if (op && errore) {
+          // L'«Aggiorna» non è andato: il parere vecchio resta, col perché e le stesse strade.
+          body = `<p class="dk-op-text">${proseHtml(op.text)}</p>${erroreParereHtml(card.id, errore, 'Non sono riuscito ad aggiornarlo.', 'Aggiorna')}`;
+        } else if (errore) {
+          body = erroreParereHtml(card.id, errore, 'Il parere non è arrivato.', 'Riprova');
+        } else if (op) {
           const staleBar = !op.stale ? '' : (pending
             ? `
               <div class="dk-mod-actions">
@@ -2037,16 +1973,26 @@
           body = `<p class="dk-mod-note dk-op-pending">${pending ? 'Filo sta pensando…' : 'Chiedo un parere a Filo…'}</p>`;
         }
         host.innerHTML = `<p class="dk-module-title">Parere di Filo</p>${body}`;
-        // L'hover con questo modulo attivo È il trigger (§6.1): cache-first.
-        // Un parere STANTIO invece non si ricalcola da solo: refresh solo su
-        // richiesta (§6.2), col bottone qui sopra.
-        if (!op && !pending) requestOpinions([card.id]).catch(() => {});
+        // L'hover con questo modulo attivo È il trigger (§6.1): cache-first, e uno stantio non si
+        // ricalcola mai da solo (§6.2), come uno mancato.
+        if (!op && !pending && !errore) requestOpinions([card.id]).catch(() => {});
       },
     },
   };
 
-  // Renderizza il modulo scelto nello slot dello stato ATTIVO del pannello
-  // (preview o carosello: stesso sistema, stesso menu col tasto destro).
+  // Il motivo prima, poi il tasto che toglie l'ostacolo (Crediti, Opzioni, Preferenze) e, accanto, quello per
+  // riprovare: finché l'ostacolo resta, riprovare rimanda la stessa richiesta allo stesso muro (#663, #828.1).
+  function erroreParereHtml(id, errore, apertura, riprova) {
+    const frase = String(errore.frase || '');
+    const pagina = window.SN_CHAT_ERRORS?.rimedioPagina?.(errore) || null;
+    const via = pagina
+      ? `<button class="dk-mod-btn dk-rimedio" data-op-rimedio="${esc(id)}" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>`
+      : '';
+    return `<p class="dk-mod-note dk-op-errore" role="status">${esc(apertura)} ${esc(frase.charAt(0).toUpperCase() + frase.slice(1))}</p>
+      <div class="dk-mod-actions">${via}<button class="dk-mod-btn" data-op-retry="${esc(id)}">${esc(riprova)}</button></div>`;
+  }
+
+  // Stesso slot per preview e carosello: il modulo scelto si disegna nello stato attivo.
   function renderDetailModule(card, hostId) {
     const host = $(hostId || (detailState === 'carousel' ? 'carouselModule' : 'previewModule'));
     if (!host) return;
@@ -2054,8 +2000,8 @@
     mod.render(card, host);
   }
 
-  // Riga di contesto del detail (§5.2): prezzo EUR + tag assegnati + "già nel
-  // mazzo" (vale anche per il commander, che nel mazzo c'è eccome).
+  // Riga di contesto (§5.2): prezzo EUR, tag assegnati e «già nel mazzo» — che vale anche
+  // per il commander.
   function renderDetailCtx(card) {
     const entry = current.carte.find((c) => c.scryfall_id === card.id);
     const parts = [];
@@ -2070,17 +2016,8 @@
     $('previewCtx').innerHTML = parts.join('');
   }
 
-  // Mostra/aggiorna la preview SUL POSTO: immagine (già scaldata in cache da
-  // preloadVisibleCards appena la riga è comparsa, §5.1 → hover istantaneo),
-  // contesto, modulo. Se lo stato era già preview non si passa dalle statistiche.
-  //
-  // OGNI riapertura riparte dal FRONTE (feedback #373): ridipingiamo l'immagine
-  // (→ fronte) sia quando la carta cambia, sia quando la preview era chiusa
-  // (stato ≠ preview), anche se è la STESSA carta di prima. Senza il secondo
-  // caso, una carta girata sul retro, uscita dall'hover (torna alle statistiche)
-  // e ri-hoverata riapriva ancora sul retro, in modo incoerente con il cambio
-  // carta. Se invece la preview è GIÀ aperta sulla stessa carta (re-hover mentre
-  // resta visibile), NON ridipingiamo: un flip volontario dell'utente resta.
+  // Ogni riapertura riparte dal FRONTE (#373): si ridipinge al cambio carta e da chiusa,
+  // ma non se è già aperta sulla stessa carta, o si perderebbe un flip voluto dall'utente.
   function showPreview(cardId) {
     const card = cardsById[cardId];
     if (!card) return;
@@ -2091,8 +2028,7 @@
     if (detailState !== 'preview') setDetailState('preview');
   }
 
-  // Dipinge una carta in uno slot immagine del detail (preview o carosello):
-  // riparte SEMPRE dalla faccia frontale e mostra il tasto "gira" solo per le
+  // Dipinge una carta in uno slot: sempre dalla faccia frontale, tasto «gira» solo per le
   // bifronte (transform / modal DFC). Il retro è già precaricato → flip istantaneo.
   function paintCardImage(img, card) {
     const frame = img.closest('.dk-card-frame');
@@ -2109,8 +2045,7 @@
     if (flip) flip.hidden = !hasBack;
   }
 
-  // Gira la carta mostrata nello slot: alterna fronte/retro SUL POSTO. No-op se
-  // la carta non ha un retro (carta a faccia unica).
+  // Alterna fronte e retro SUL POSTO; no-op sulle carte a faccia unica.
   function flipCardImage(img) {
     const card = cardsById[img.dataset.cardId];
     if (!card || !card.backImage) return;
@@ -2122,8 +2057,7 @@
     if (frame) frame.classList.toggle('dk-flipped', toBack);
   }
 
-  // L'id carta sotto il puntatore, qualunque sia il consumatore (§5.1):
-  // riga risultati/mazzo (.dk-row) o nome in prosa risolto (.dk-prose-card).
+  // L'id carta sotto il puntatore: da riga (.dk-row) o da nome in prosa (.dk-prose-card).
   function hoverCardId(target) {
     if (!target || !target.closest) return null;
     const row = target.closest('.dk-row[data-card-id]');
@@ -2141,6 +2075,13 @@
     hoverTimer = setTimeout(() => { hoverTimer = 0; showPreview(cardId); }, delay);
   }
 
+  // Sull'anteprima si va per usarla («Aggiorna», il tasto per Crediti o Opzioni): resta aperta finché il puntatore è
+  // lì, e il linger riparte quando esce.
+  function holdPreview() {
+    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
+    if (lingerTimer) { clearTimeout(lingerTimer); lingerTimer = 0; }
+  }
+
   function hoverLeave() {
     if (detailState === 'carousel') return;
     if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
@@ -2152,9 +2093,8 @@
     }
   }
 
-  // ── Carosello (§5.3): flusso di triage, pinnato al click ───────────────────
-  // Naviga la lista DA CUI è partito (i risultati di quella bolla, o l'elenco
-  // del mazzo). Occhi sull'immagine, mano sulla tastiera.
+  // Carosello (§5.3), flusso di triage pinnato al click: naviga la lista DA CUI è partito
+  // (i risultati di quella bolla, o l'elenco del mazzo).
   let carousel = null; // { ids: string[], i: number }
 
   function openCarousel(ids, i) {
@@ -2179,12 +2119,9 @@
     $('carouselPos').textContent = `${carousel.i + 1}/${carousel.ids.length}`;
     syncCarouselToggle();
     // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
-    // Stesso warm-up (dedup) del precarico delle righe visibili.
     preloadCardImages([carousel.ids[carousel.i - 1], carousel.ids[carousel.i + 1]].filter(Boolean));
-    // Il box modulare vive anche nel carosello (§5.2): stesso slot, stesso menu.
     if (card) renderDetailModule(card, 'carouselModule');
-    // Parere di Filo attivo → prefetch dei pareri delle carte VICINE (§6.1):
-    // scorrendo, il parere è già lì. Una sola richiesta per corrente+vicine.
+    // Parere attivo → prefetch delle vicine in una richiesta sola: scorrendo è già lì.
     if (card && layout.module === 'opinion') {
       const near = [carousel.i, carousel.i - 1, carousel.i + 1]
         .map((j) => carousel.ids[j]).filter(Boolean);
@@ -2219,16 +2156,13 @@
     renderCarousel();
   }
 
-  // Toggle aggiungi/rimuovi della carta corrente: all'aggiunta la riga appare
-  // nel gruppo giusto della colonna centrale (via saveDeck → renderDeckList).
   async function carouselToggle() {
     if (!carousel) return;
     await toggleCard(carousel.ids[carousel.i]);
     renderCarousel();
   }
 
-  // Apre il carosello dalla riga cliccata: la lista è l'ordine VISIBILE delle
-  // righe del contenitore di partenza (la CardList della bolla o #deckList).
+  // La lista è l'ordine VISIBILE delle righe del contenitore di partenza.
   function openCarouselFromRow(row, containerSel) {
     const box = row.closest(containerSel);
     if (!box) return;
@@ -2236,11 +2170,8 @@
     openCarousel(ids, ids.indexOf(row.dataset.cardId));
   }
 
-  // Carosello dal testo libero (#343): il click su un nome in prosa naviga
-  // TUTTE le carte citate nella stessa bolla (parità con le CardList), non
-  // solo quella cliccata. Apre subito sulla carta cliccata (risolvendola se
-  // il click è arrivato prima dell'hover — prima non succedeva nulla) e
-  // completa la lista appena gli altri nomi sono risolti.
+  // Carosello dal testo libero (#343): naviga TUTTE le carte citate nella bolla, in parità
+  // con le CardList. Apre subito sulla cliccata, risolvendola, e completa la lista dopo.
   async function openCarouselFromProse(span) {
     const bubble = span.closest('.dk-msg');
     const spans = bubble ? [...bubble.querySelectorAll('.dk-prose-card')] : [span];
@@ -2261,11 +2192,8 @@
     renderCarousel();
   }
 
-  // Evidenzia ovunque (nomi in prosa e righe carta) la carta ATTUALMENTE
-  // mostrata nel carosello (#343): il nome nel testo perde la sottolineatura
-  // e prende un fondo d'accento, così si vede a colpo d'occhio dove sei.
-  // Chiamata a ogni cambio del carosello E a ogni rerender di chat/mazzo
-  // (che rigenerano il DOM e perderebbero la classe).
+  // Evidenzia ovunque la carta mostrata nel carosello (#343): si vede a colpo d'occhio dove
+  // sei. Va richiamata anche ad ogni rerender di chat e mazzo, che rigenerano il DOM.
   function syncCarouselHighlight() {
     const activeId = (detailState === 'carousel' && carousel)
       ? carousel.ids[carousel.i] : '';
@@ -2278,16 +2206,15 @@
   }
 
   function wireDetailPanel() {
-    // Hover unificato (§5.1), in delega sul documento: un mouseover su una
-    // riga carta apre/aggiorna; su qualsiasi altra cosa fa partire il linger.
+    // Hover unificato (§5.1) in delega sul documento: fuori da una riga carta parte il linger.
     document.addEventListener('mouseover', (e) => {
       const id = hoverCardId(e.target);
       if (id) hoverEnter(id);
+      else if (detailState === 'preview' && e.target.closest && e.target.closest('#statePreview')) holdPreview();
       else hoverLeave();
     });
 
-    // Tastiera del carosello (§5.3): frecce naviga, Invio/Spazio aggiunge o
-    // rimuove, Esc chiude e torna alle statistiche.
+    // Tastiera (§5.3): frecce navigano, Invio o Spazio aggiunge e toglie, Esc chiude.
     document.addEventListener('keydown', (e) => {
       if (detailState !== 'carousel') return;
       if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;
@@ -2297,9 +2224,8 @@
       else if (e.key === 'Escape') { e.preventDefault(); closeCarousel(); }
     });
 
-    // Calcolatore di probabilità (§9.3): si aggiorna DA SOLO appena cambia una
-    // condizione (feedback #354). Delego l'ascolto a #stateStats perché le righe
-    // categoria (#probNeeds) sono ricostruite a ogni rerender delle statistiche.
+    // Probabilità (§9.3): si aggiorna da sola (feedback #354). L'ascolto è delegato a
+    // #stateStats perché le righe categoria si ricostruiscono ad ogni rerender.
     $('stateStats').addEventListener('input', (e) => {
       if (!e.target || !e.target.matches('#probTurn, #probNeeds input, #probMull, #probExtra')) return;
       if (e.target.id === 'probMull') onProbMull();
@@ -2319,9 +2245,8 @@
     $('carouselToggle').addEventListener('click', () => carouselToggle());
     $('carouselClose').addEventListener('click', () => closeCarousel());
 
-    // Gira la carta bifronte (feedback #373): tasto dedicato sopra l'immagine, e
-    // — gesto fisico naturale — anche il click sull'immagine stessa la volta.
-    // Vale in entrambi gli slot (preview e carosello): parità tra i due cammini.
+    // Gira la bifronte (feedback #373): tasto dedicato e — gesto fisico naturale — anche il
+    // click sull'immagine. Vale in entrambi gli slot: parità fra i cammini.
     $('previewFlip').addEventListener('click', (e) => { e.stopPropagation(); flipCardImage($('previewImg')); });
     $('carouselFlip').addEventListener('click', (e) => { e.stopPropagation(); flipCardImage($('carouselImg')); });
     $('previewImg').addEventListener('click', () => flipCardImage($('previewImg')));
@@ -2336,8 +2261,7 @@
     $('previewImg').addEventListener('contextmenu', openCardImageMenu);
     $('carouselImg').addEventListener('contextmenu', openCardImageMenu);
 
-    // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot —
-    // vale sia per la preview sia per il carosello (stesso sistema moduli).
+    // Tasto destro sul box modulare (§5.2): vale sia per la preview sia per il carosello.
     const openModuleMenu = (e) => {
       e.preventDefault();
       openCtx(e.clientX, e.clientY, Object.entries(DETAIL_MODULES).map(([key, mod]) => ({
@@ -2353,23 +2277,38 @@
     $('previewModule').addEventListener('contextmenu', openModuleMenu);
     $('carouselModule').addEventListener('contextmenu', openModuleMenu);
 
-    // "Aggiorna" di un parere stantio (§6.2): refresh on-demand della SOLA
-    // carta mostrata. In delega su entrambi gli slot del modulo.
+    // «Aggiorna» (§6.2): refresh della SOLA carta mostrata, in delega su entrambi gli slot.
     const onModuleClick = (e) => {
-      const btn = e.target.closest('[data-op-refresh]');
+      const via = e.target.closest('[data-op-rimedio]');
+      if (via) {
+        const errore = opinionErrors.get(via.dataset.opRimedio);
+        const pagina = errore ? window.SN_CHAT_ERRORS?.rimedioPagina?.(errore) : null;
+        if (pagina) send({ type: MSG.OPEN_URL, url: pagina.url });
+        return;
+      }
+      const btn = e.target.closest('[data-op-refresh], [data-op-retry]');
       if (!btn) return;
-      const id = btn.dataset.opRefresh;
+      const id = btn.dataset.opRefresh || btn.dataset.opRetry;
       btn.disabled = true;
+      // Esplicito come «Aggiorna»: passa sopra al parere mancato, e su una carta senza parere chiede solo lei.
       requestOpinions([id], { refresh: true }).catch(() => {});
       const cur = currentDetailCard();
       if (cur && cur.id === id) renderDetailModule(cur); // mostra "sta pensando"
     };
     $('previewModule').addEventListener('click', onModuleClick);
     $('carouselModule').addEventListener('click', onModuleClick);
+    // Chi torna da Crediti o dalle Opzioni ha di solito tolto l'ostacolo: i pareri mancati si richiedono, una volta,
+    // quando la carta si ridisegna.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || (!opinionErrors.size && !printsFailed.size)) return;
+      opinionErrors.clear();
+      printsFailed.clear();
+      const cur = currentDetailCard();
+      if (cur && (layout.module === 'opinion' || layout.module === 'price')) renderDetailModule(cur);
+    });
   }
 
-  // Lo switcher (§8.2): click sul nome → gestione mazzi, DOVE vive il mazzo.
-  // Popup ancorato sotto l'header (stesse classi dei menu di Filo).
+  // Switcher (§8.2): popup ancorato sotto l'header, stesse classi dei menu di Filo.
   let switcherEl = null;
   function closeSwitcher() {
     if (switcherEl) { switcherEl.remove(); switcherEl = null; }
@@ -2411,8 +2350,7 @@
       await saveDeck(Decks.renameDeck(current, v));
     }));
     add('Budget…', () => startEdit('deckBudgetEdit', fmtBudgetInput(current.budget), async (v) => {
-      // Virgola decimale italiana accettata (l'app mostra i prezzi come
-      // «12,50 €»); testo non numerico → il tetto resta com'era, con avviso.
+      // Virgola decimale italiana accettata; un testo non numerico lascia il tetto com'era.
       const parsed = Decks.parseBudgetInput(v);
       if (!parsed.ok) {
         showToast(`Budget non valido: «${v}» non è un numero. Il tetto resta invariato.`);
@@ -2420,8 +2358,7 @@
       }
       await saveDeck(Decks.setBudget(current, parsed.value));
     }));
-    // Solo se c'è un commander da togliere (feedback #302): l'inverso di
-    // "Imposta come commander", altrimenti non c'è modo di annullarlo.
+    // Solo se c'è un commander da togliere (feedback #302): senza, non c'è modo di annullarlo.
     if (current.commander) add('Rimuovi commander', () => removeCommander());
     if ((chatByDeck.get(current.id) || []).length) add('Svuota la chat…', () => clearChat());
     add('Elimina…', async () => {
@@ -2446,8 +2383,7 @@
     }, 0);
   }
 
-  // Scambia il bottone del nome con un campo di modifica (rinomina/budget):
-  // Invio o blur salvano, Escape annulla. Un solo campo attivo alla volta.
+  // Invio o blur salvano, Escape annulla; un solo campo attivo alla volta.
   function startEdit(inputId, value, save) {
     const btn = $('deckName');
     const input = $(inputId);
@@ -2471,8 +2407,6 @@
       if (e.key === 'Escape') { e.preventDefault(); finish(false); }
     };
   }
-
-  // ── Eventi ─────────────────────────────────────────────────────────────────
 
   function wire() {
     $('newDeck').addEventListener('click', async () => {
@@ -2547,8 +2481,6 @@
     wireDividers();
     wireDetailPanel();
 
-    // Chat unificata (§3): invio col form (Enter), toggle carta e collasso
-    // bolle in delega sul log, risoluzione fuzzy dei nomi in prosa all'hover.
     $('chatForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const input = $('chatInput');
@@ -2566,8 +2498,7 @@
     });
     $('chatStop').addEventListener('click', stopChat);
     const log = $('chatLog');
-    // Toggle del blocco Ragionamento (#331): click (o Invio/Spazio) apre e
-    // chiude. Vale per bolle normali, pending e d'errore.
+    // Toggle del Ragionamento (#331): vale per bolle normali, pending e d'errore.
     const toggleCot = (target) => {
       const cot = target.closest && target.closest('[data-toggle-cot]');
       if (!cot) return false;
@@ -2603,8 +2534,7 @@
       // Click su una riga risultato → carosello sulla lista di QUELLA bolla (§5.3).
       const row = e.target.closest('.dk-row[data-card-id]');
       if (row) { openCarouselFromRow(row, '.dk-cardlist'); return; }
-      // Click su un nome in prosa → carosello su TUTTE le carte della bolla
-      // (#343); risolve da sé anche i nomi su cui non c'è stato hover.
+      // Click su un nome in prosa → carosello su TUTTE le carte della bolla (#343).
       const span = e.target.closest('.dk-prose-card');
       if (span) openCarouselFromProse(span);
     });
@@ -2653,7 +2583,6 @@
       if (id && current && current.id === deckId) openCtx(e.clientX, e.clientY, cardMenuItems(id));
     });
 
-    // Colonna mazzo: collassa/espandi i gruppi al click sul divisore.
     const list = $('deckList');
     list.addEventListener('click', (e) => {
       const head = e.target.closest('.dk-group-head');
@@ -2687,10 +2616,8 @@
       }
       openCtx(e.clientX, e.clientY, items);
     });
-    // Trascina una carta su una categoria (#344). La riga è draggable; il drop
-    // avviene su un intero gruppo (intestazione o righe): rilasciare ovunque
-    // dentro il gruppo di destinazione conta. Un evidenziatore d'accento segue
-    // il gruppo sotto il cursore (feedback: ogni azione risponde).
+    // Drag di una carta su una categoria (#344): il drop vale su tutto il gruppo, intestazione
+    // o righe. Un evidenziatore segue il gruppo sotto il cursore: ogni azione risponde.
     let dragCardId = null;
     const clearDropHint = () => {
       for (const g of list.querySelectorAll('.dk-group.dk-drop-target')) g.classList.remove('dk-drop-target');
@@ -2745,10 +2672,8 @@
 
     window.addEventListener('hashchange', route);
 
-    // La finestra che si rimpicciolisce (o cambia schermo) deve ri-adattare le
-    // larghezze: senza questo, con larghezze salvate più grandi dello spazio
-    // disponibile la colonna centrale del mazzo spariva. Ri-applichiamo solo
-    // quando il builder è visibile.
+    // La finestra che si rimpicciolisce deve ri-adattare le larghezze: con misure salvate più
+    // grandi dello spazio disponibile la colonna centrale spariva. Solo a builder visibile.
     window.addEventListener('resize', () => {
       if (!$('screenBuilder').hidden) applyLayout();
     });

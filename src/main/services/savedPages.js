@@ -44,10 +44,8 @@
     const dalProxy = proxy && proxy.country ? { country: String(proxy.country), tier: proxy.tier || null } : null;
     const pages = await list();
 
-    // Dedupe per URL: salvare di nuovo una pagina già in "Aperti per dopo"
-    // NON deve creare un doppione. Aggiorna la voce esistente (rinfresca titolo,
-    // favicon, anteprima e data) e la riporta in cima, preservando id e categoria
-    // già assegnata. Così ri-salvare = "aggiorna e riporta su", senza attrito.
+    // Ri-salvare una pagina già in elenco aggiorna la voce e la riporta in cima, senza
+    // doppioni: id e categoria già assegnati restano.
     const idx = pages.findIndex((p) => p.url === page.url);
     if (idx >= 0) {
       const existing = pages[idx];

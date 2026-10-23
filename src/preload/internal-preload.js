@@ -1,23 +1,11 @@
-// Preload per le pagine interne (filo://...).
-//
-// contextIsolation è DISATTIVATO per queste pagine (vedi tabs.js): è codice
-// nostro fidato e ha bisogno di chrome.* in scope globale per riusare 1:1
-// quanto portato dall'estensione. Possiamo assegnare direttamente window.*
-// e l'assegnazione è visibile alla pagina.
+// Preload PRIVILEGIATO delle pagine filo://: espone window.filo e lo shim
+// chrome.*, con contextIsolation disattivato (codice nostro, che usa chrome.* in
+// scope globale). Niente di tutto questo deve uscire da un'origine filo:.
 
 const { ipcRenderer, webFrame, webUtils } = require('electron');
 
-// ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
-// Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
-// uno shim chrome.* con accesso a storage (chiavi API + TUTTI i dati utente) e
-// alle tab. È assegnato solo alle schede nate come filo://, ma il preload è
-// legato al WebContents, non all'URL corrente: se per qualunque motivo (un
-// redirect lato server a metà caricamento, o una navigazione in-place sfuggita
-// al guard will-navigate di tabs.js) un documento NON-filo finisse a girare qui,
-// NON deve ricevere le API privilegiate, altrimenti un sito esterno potrebbe
-// leggere/esfiltrare lo storage. Il preload gira DOPO il commit della
-// navigazione, quindi `location` riflette già l'origine reale del documento: se
-// non è filo:, non esponiamo nulla e non iniettiamo i content script.
+// SICUREZZA: il preload è legato al WebContents, non all'URL, e un documento non filo: può
+// finire a girare qui — avrebbe chiavi e dati utente. Gira dopo il commit: location è vera.
 const IS_FILO_ORIGIN = (() => {
   try { return location.protocol === 'filo:'; } catch (_) { return false; }
 })();
@@ -40,11 +28,8 @@ let streamCounter = 0;
 const filoApi = {
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
   getURL: (rel) => 'filo://' + String(rel || '').replace(/^\/+/, ''),
-  // Su quale sistema gira Filo: 'darwin' (Mac), 'win32' (Windows), 'linux'.
-  // Le pagine interne ne hanno bisogno per non MENTIRE all'utente — le
-  // scorciatoie hanno una forma diversa su Mac, e le shell fra cui scegliere
-  // nella modalità terminale non sono le stesse. È un dato pubblico del
-  // sistema, non un'informazione dell'utente: nessuna superficie in più.
+  // 'darwin' | 'win32' | 'linux': le pagine devono nominare il tasto giusto e
+  // offrire le shell che esistono davvero. Dato del sistema, non dell'utente.
   sistema: process.platform,
   // Il percorso su disco di un file trascinato in una pagina di Filo (#950): '' se non viene dal disco.
   percorsoDelFile: (file) => {
@@ -55,18 +40,14 @@ const filoApi = {
     ipcRenderer.on('filo:broadcast', wrapped);
     return () => ipcRenderer.removeListener('filo:broadcast', wrapped);
   },
-  // Reasoning "vero" in diretta dal modello durante una FILO_CHAT. Il main
-  // pusha { reqId, text } sul canale 'filo:reasoning' man mano che arrivano i
-  // thought summary; il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // { reqId, text }: il chiamante filtra per reqId. Ritorna un unsubscribe.
   onReasoning: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:reasoning', wrapped);
     return () => ipcRenderer.removeListener('filo:reasoning', wrapped);
   },
-  // #420 — la RISPOSTA in diretta durante una FILO_CHAT. Il main pusha
-  // { reqId, delta } (nuovi caratteri del testo) oppure { reqId, reset: true }
-  // (fallback provider: butta il testo mostrato finora) sul canale 'filo:answer'.
-  // Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // #420 — { reqId, delta } coi caratteri nuovi, oppure { reqId, reset: true }
+  // quando il ripiego impone di buttare il testo mostrato finora.
   onAnswer: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:answer', wrapped);
@@ -95,8 +76,7 @@ const filoApi = {
     const requestId = `s${Date.now()}_${++streamCounter}`;
     const offMeta = (_e, data) => onMeta && onMeta(data);
     const offDelta = (_e, data) => onDelta && onDelta(data.delta);
-    // reset = il provider è caduto a metà stream e il main riparte col fallback:
-    // il chiamante deve buttare i delta accumulati finora (#273).
+    // #273 — reset: il provider è caduto a metà, i delta accumulati si buttano.
     const offReset = (_e, data) => onReset && onReset(data);
     const offDone = (_e, data) => { cleanup(); onDone && onDone(data); };
     const offError = (_e, data) => { cleanup(); onError && onError(data); };
@@ -140,8 +120,6 @@ const filoApi = {
     };
   },
   shellHome: () => ipcRenderer.invoke('shell:home'),
-  // Esiste questo comando nella shell? Per l'evidenziazione live (rosso = non
-  // riconosciuto) della dashboard in modalità terminale.
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
   // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
   shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
@@ -151,12 +129,9 @@ const filoApi = {
   siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
 };
 
-// Espone window.filo SOLO su origine filo:// (vedi IS_FILO_ORIGIN sopra).
 if (IS_FILO_ORIGIN) window.filo = filoApi;
 
-// Shim chrome.* compatibile con il codice estensione: i file portati lo usano
-// senza sapere che siamo in Electron. Overscriviamo l'oggetto chrome stub
-// che Chromium predefinisce nel renderer.
+// Shim chrome.*: i moduli portati lo usano senza sapere che siamo in Electron.
 const chromeShim = {
   runtime: {
     id: 'filo-desktop',
@@ -281,9 +256,8 @@ if (IS_FILO_ORIGIN) {
   });
 }
 
-// Inietta i content script (menu, popup, sidebar, highlight, spellcheck,
-// feedback) su tutte le pagine filo:// — il tasto destro Filo deve funzionare
-// ovunque, come richiesto dall'utente.
+// I content script si iniettano su TUTTE le pagine filo://: il tasto destro di
+// Filo deve funzionare ovunque, pagine interne comprese.
 const path = require('node:path');
 const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
@@ -302,10 +276,10 @@ function injectContentScriptStyles() {
 function loadContentScripts() {
   const SHARED = path.join(__dirname, '..', 'shared');
   const CONTENT = path.join(__dirname, '..', 'content');
-  // i moduli SN_CONST/I18N/MSG/ICONS sono già caricati via <script> nelle
-  // pagine interne; require() li reseguirà ma è idempotente (riassegna gli
-  // stessi oggetti su globalThis).
+  // Alcuni moduli sono già caricati via <script> nelle pagine interne: il
+  // require li riesegue, ma è idempotente (riassegna gli stessi oggetti).
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
+  // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'));
   safe(path.join(SHARED, 'contenutoEsterno.js')); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
@@ -341,10 +315,11 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'correttoreRegole.js')); // #1446 — candidati e risposte del correttore: PRIMA di spellcheck.js
-  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
+  safe(path.join(CONTENT, 'correttoreAutomatica.js')); // #1447 — correzione a fine parola: PRIMA di spellcheck.js
+  try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
-  safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2
+  safe(path.join(SHARED, 'feedbackClientIdHash.js'));
   safe(path.join(SHARED, 'feedbackAttachTypes.js')); // allowlist tipi allegato
   safe(path.join(CONTENT, 'feedback.js'));
   safe(path.join(CONTENT, 'redteamAttack.js'));
@@ -369,16 +344,8 @@ function loadContentScripts() {
     document.documentElement.dataset.filoContentScripts = '1';
   } catch (_) {}
 }
-// Self è già aliasato a window/globalThis via il primo `globalThis.self = ...`
-// del shim chrome più sotto? No — non l'abbiamo fatto qui. I content script
-// usano `self.SN_*`. Con contextIsolation:false, `self` è già aliased a
-// window dal browser (è una proprietà standard del WindowOrWorkerGlobalScope).
-// Sovrascrivi lo stub di Chromium PRIMA di caricare i content script, così
-// chrome.runtime.sendMessage è già il nostro shim IPC quando content.js fa
-// fetchSettings() durante init().
-// Installa lo shim chrome.* SOLO su origine filo:// (vedi IS_FILO_ORIGIN). Su
-// un'origine non-filo finita qui per errore non esponiamo storage/IPC alla
-// pagina non fidata.
+// Lo stub chrome di Chromium va sovrascritto PRIMA dei content script: content.js legge le
+// impostazioni in init() e sendMessage dev'essere già il nostro. Solo su origine filo:.
 if (IS_FILO_ORIGIN) {
   try {
     Object.defineProperty(window, 'chrome', {
@@ -397,8 +364,6 @@ function bootContentScripts() {
   injectContentScriptStyles();
   loadContentScripts();
 }
-// I content script (e il loro accesso a chrome.*) girano solo sulle pagine
-// interne fidate. Su origine non-filo non iniettiamo nulla.
 if (IS_FILO_ORIGIN) {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootContentScripts, { once: true });

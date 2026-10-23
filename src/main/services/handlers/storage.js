@@ -9,16 +9,8 @@ module.exports = function register(on, ctx) {
   const Costs = globalThis.SN_COSTS;
   const I18n = globalThis.SN_I18N;
 
-  // ── SICUREZZA: confine d'origine sui canali privilegiati ───────────────
-  // Questi handler sono registrati sul canale generico `filo:message`, che è
-  // raggiungibile SIA dalle pagine interne filo:// SIA dai content script delle
-  // pagine web esterne (shim chrome.* in page-preload.js). I content script
-  // girano nel mondo isolato, quindi oggi una pagina ostile non può chiamarli
-  // direttamente — ma far poggiare TUTTA la barriera sul solo isolamento di
-  // contesto è fragile. Difesa-in-profondità: le operazioni potenti (cancellare
-  // tutto lo storage, leggere le chiavi API, scrivere i settings) sono ammesse
-  // solo da origine filo://; ciò che i content script fanno davvero (leggere le
-  // impostazioni, salvare dizionario/draft/layout) resta consentito.
+  // Difesa in profondità: le operazioni potenti (azzerare, leggere le chiavi, scrivere i
+  // settings) solo da filo://; ciò che i content script fanno davvero resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
   const ARCHIVE_KEY = SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
   // La cronologia AI ha file suoi (services/historyStore.js): nel backup torna sotto la chiave di sempre.
@@ -56,9 +48,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Quello che il correttore impara e il dizionario personale (#1447): una fila sola nel main, perché le schede e la
+  // pagina del correttore riscrivono le stesse chiavi. Dai siti si impara scrivendo; cambiare e togliere solo da filo://.
+  on(MSG.CORRETTORE_IMPARA, async (msg, sender, origin) => require('../correttoreImpara').passo(msg, { daFilo: isFilo(origin), origine: origin }));
+
   on('_storage:clear', async (msg, sender, origin) => {
-    // Azzerare TUTTI i dati utente non è mai un'operazione legittima per una
-    // pagina web: solo le pagine interne (Opzioni → "cancella dati") possono.
+    // Azzerare tutti i dati non è mai legittimo per una pagina web: solo le pagine interne.
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     await globalThis.chrome.storage.local.clear();
     return { ok: true };
@@ -66,11 +61,8 @@ module.exports = function register(on, ctx) {
 
   on(MSG.GET_SETTINGS, async (msg, sender, origin) => {
     const settings = await Storage.getSettings();
-    // #405 — indirizzo della PAGINA (non del riquadro incorporato che sta
-    // chiedendo). Serve a un riquadro per sapere se il sito che lo ospita è
-    // fra quelli dove l'utente ha spento Filo: da dentro un riquadro di
-    // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
-    // sarebbe ricomparso proprio nei siti esclusi.
+    // Indirizzo della PAGINA, non del riquadro che chiede: serve a sapere se il sito che lo
+    // ospita è fra quelli dove Filo è spento, e da dentro un riquadro è illeggibile.
     const pageUrl = String(sender?.tab?.url || '');
     // In incognito il testo della pagina non parte da solo verso i modelli (#591): la pagina lo deve sapere per non
     // preparare la spiegazione della selezione.
@@ -82,8 +74,14 @@ module.exports = function register(on, ctx) {
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
     // Da un sito passa solo la voce della dettatura scelta dal menu; qualunque
     // altro campo (chiavi, proxy, protezioni, spesa, stile) rifiuta la richiesta.
-    const incoming = msg.settings;
+    let incoming = msg.settings;
     if (!scritturaImpostazioniAmmessa(incoming, origin)) return vietato;
+    // Le Preferenze mandano solo i token toccati: si posano sulla mappa salvata adesso, senza che la pagina la rilegga
+    // prima di spedire (#1343.1).
+    if (msg.tokenModifica === true && incoming && incoming.themeTokens && typeof incoming.themeTokens === 'object') {
+      const salvati = (await Storage.getSettings()).themeTokens;
+      incoming = { ...incoming, themeTokens: globalThis.SN_THEME_TOKENS.conModifica(salvati, incoming.themeTokens) };
+    }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
@@ -102,13 +100,8 @@ module.exports = function register(on, ctx) {
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
-    // Ripristino completo (#184): riscrive TUTTE le impostazioni ai valori
-    // predefiniti in un colpo solo, così qualsiasi personalizzazione estetica
-    // sfuggita di mano (token, tema, colore identità delle tab, dimensione del
-    // testo…) torna allo stato di fabbrica. Sostituisce l'INTERO oggetto
-    // settings (non un merge), così spariscono anche eventuali chiavi residue.
-    // Si preservano SOLO le credenziali — chiavi API e registro dei modelli —
-    // per non disconnettere l'utente dai provider AI con un reset estetico.
+    // Ripristino completo: sostituisce l'INTERO oggetto settings, non un merge, così spariscono
+    // anche le chiavi residue. Si preservano solo le credenziali dei provider AI.
     const current = await Storage.getSettings();
     const defaults = JSON.parse(JSON.stringify(SN_CONST.DEFAULT_SETTINGS));
     if (current && current.apiKeys) defaults.apiKeys = current.apiKeys;
@@ -117,8 +110,6 @@ module.exports = function register(on, ctx) {
     const A = globalThis.SN_AUTONOMIA;
     if (A && current) defaults.autonomia = A.unisciPiuStretta(current.autonomia, defaults.autonomia);
     await Storage.setSettings(defaults);
-    // Ripersiste i default e li propaga ovunque (broadcast SETTINGS_UPDATED,
-    // tema nativo, sicurezza, fingerprint, safebrowse, cookie, colore tab).
     const merged = await applySettingsUpdate({});
     return { ok: true, settings: merged };
   });
@@ -169,15 +160,8 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Reimportazione dell'archivio esportato ────────────────────────────
-  // "Esporta dati" prometteva un backup e un trasferimento su un altro
-  // computer, ma senza un import quella promessa era irrealizzabile. L'import
-  // è in DUE passi apposta: il primo legge il file e dice all'utente COSA
-  // contiene, così la conferma è informata (quante sezioni, quante immagini,
-  // di quando è il backup); il secondo scrive, e solo dopo un sì esplicito.
-  // Il contenuto letto resta nel main fra i due passi (PENDING_IMPORT): non
-  // facciamo attraversare l'IPC a un dump completo dei dati utente — chiavi
-  // API comprese — solo per mostrarne il conteggio.
+  // Due passi apposta: prima si dice all'utente COSA contiene l'archivio, poi si scrive, dopo
+  // un sì esplicito. Il contenuto resta nel main: un dump completo non attraversa l'IPC.
   let PENDING_IMPORT = null;
   // Le chat e le pagine visitate non stanno in data.json ma nel filo (#866); un export di prima porta le chat qui.
   const FILO_CHATS_KEY = SN_CONST.STORAGE_KEYS.FILO_CHATS;
@@ -270,8 +254,8 @@ module.exports = function register(on, ctx) {
         proxySenzaCredenziali: proxyDaCompletare(merged, parsed.proxySenzaCredenziali).length > 0,
       };
     } catch (e) {
-      // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
-      // dall'errore generico, così la pagina può dirlo con parole umane.
+      // «Non è un archivio di Filo» si distingue dall'errore generico: la pagina lo dice con
+      // parole umane.
       const code = String(e?.message || e);
       if (code === 'zip_damaged') return { ok: false, error: 'damaged_file' };
       if (code === 'zip_method') return { ok: false, error: 'compressed_file' };
@@ -343,15 +327,8 @@ module.exports = function register(on, ctx) {
       const MIE_KEY = Mie ? Mie.CHIAVE_BACKUP : null;
       const { merged, stats } = mergeImportedData(current, dati, opzioniFusione());
 
-      // Le impostazioni passano da applySettingsUpdate come qualsiasi altra
-      // modifica: così tema, sicurezza, cookie, fingerprint e adblock del
-      // backup diventano attivi SUBITO, senza riavviare (la propagazione è la
-      // stessa del salvataggio dalle Preferenze). Tutto il resto è una
-      // scrittura diretta sullo storage.
-      //
-      // Riscriviamo SOLO le chiavi che l'import cambia davvero: rimettere a
-      // posto valori identici sveglierebbe per niente i listener onChanged
-      // (e i loro effetti collaterali) su tutto lo storage.
+      // Le impostazioni passano da applySettingsUpdate, così il backup è attivo subito senza
+      // riavviare. Si riscrivono solo le chiavi che cambiano: gli altri listener non si svegliano.
       const settings = merged[SETTINGS_KEY];
       // Un backup non alza l'autonomia di Filo: alzarla vuole «conferma» (#530).
       const A = globalThis.SN_AUTONOMIA;
@@ -524,12 +501,8 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // ── Cronologia interazioni AI + costi ─────────────────────────────────
-  // Questi tre canali sono usati SOLO dalle pagine interne (cronologia AI,
-  // opzioni): in produzione le voci AI le scrive il main da sé mentre esegue la
-  // richiesta, non un content script. La cronologia AI può contenere testi
-  // selezionati/tradotti dall'utente e i costi sono un dato riservato: nessuna
-  // pagina web deve poterli leggere, scrivere o cancellare. Solo filo://.
+  // Cronologia AI e costi solo dalle pagine interne: contengono testi dell'utente e un dato
+  // riservato, che nessuna pagina web deve leggere, scrivere o cancellare.
   on(MSG.GET_HISTORY, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     return { ok: true, items: (await History.list()).map(History.vistaPagina) };
@@ -541,10 +514,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, item };
   });
 
-  // Rimuovi una singola voce della cronologia AI. Stesso confine delle altre
-  // operazioni sulla cronologia AI: solo pagine interne filo:// (la cronologia AI
-  // può contenere testi selezionati/tradotti dall'utente, nessuna pagina web deve
-  // toccarla). Restituisce la lista aggiornata per riallineare la vista.
+  // Stesso confine del resto della cronologia AI; torna la lista aggiornata per riallineare.
   on(MSG.REMOVE_HISTORY_ENTRY, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     const items = await History.remove(msg.id);

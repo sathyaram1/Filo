@@ -5,6 +5,7 @@
 'use strict';
 
 const Permessi = require('../permessiPagine');
+const ProxyTab = require('../proxyTab');
 
 // Una sola finestra nascosta viva, qualunque cosa la chieda (#966).
 const MAX_CONCURRENT = 1;
@@ -47,6 +48,8 @@ function createDetonator({
   // Una memoria isolata per posto, riusata e svuotata fra un controllo e l'altro: Electron non ne libera mai una creata.
   const detonatorId = ++detonators;
   const freeSlots = Array.from({ length: maxConcurrent }, (_, i) => `filo-detonate-${detonatorId}-${i}`);
+  // La rete con cui esce ogni posto: le regole del proxy dell'ultima scheda servita, '' per quella del sistema.
+  const retiDeiPosti = new Map();
 
   function pump() {
     while (freeSlots.length && queue.length) {
@@ -82,25 +85,48 @@ function createDetonator({
   }
 
   // `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale con i segnali locali.
-  function detonate(url, evaluateFinal) {
-    return enqueue({ url, run: (partition) => runOne(url, evaluateFinal, partition) });
+  // `rete`: il proxy della scheda da cui parte il link (ProxyTab.reteDellaSessione), o null.
+  function detonate(url, evaluateFinal, { rete = null } = {}) {
+    return enqueue({ url, run: (partition) => runOne(url, evaluateFinal, partition, rete) });
   }
 
   // La destinazione vera di un link accorciato: si seguono i rimandi finché `prosegue(url)` dice che il passo è ancora
   // un rimando, e ci si ferma PRIMA del primo che non lo è, che è la destinazione: il sito d'arrivo non riceve visite.
   // Conta solo l'ultimo link chiesto: quello prima, in coda o già aperto, lascia il posto.
-  function destinazione(url, prosegue) {
+  function destinazione(url, prosegue, { rete = null } = {}) {
     for (const j of queue.filter((x) => x.corsia === 'destinazione')) {
       queue.splice(queue.indexOf(j), 1);
       j.resolve(null);
     }
     for (const j of running) if (j.corsia === 'destinazione' && j.annulla) j.annulla();
-    return enqueue({ url, corsia: 'destinazione', run: (partition, job) => runDestinazione(url, prosegue, partition, job) });
+    return enqueue({ url, corsia: 'destinazione', run: (partition, job) => runDestinazione(url, prosegue, partition, job, rete) });
   }
 
-  function finestra(partition) {
+  // La finestra esce come la scheda da cui parte il link (#753.1): da una scheda col proxy, dallo stesso proxy, o il sito
+  // vedrebbe l'indirizzo vero. Torna null se non c'è niente da cambiare, altrimenti la promessa del cambio: finché non
+  // è applicato non si carica niente, e se fallisce la pagina non si apre.
+  function impostaRete(ses, partition, rete) {
+    const chiave = rete ? JSON.stringify([rete.proxyRules, rete.proxyBypassRules || '']) : '';
+    // Lo stesso proxy con le credenziali di un altro paese: le vecchie si dimenticano prima di caricare.
+    let dimentica = null;
+    if (rete) dimentica = ProxyTab.registraRete(partition, ses, { proxyRules: rete.proxyRules, bypassRules: rete.proxyBypassRules, auth: rete.auth });
+    else ProxyTab.clearPartitionAuth(partition);
+    if ((retiDeiPosti.get(partition) || '') === chiave) return dimentica;
+    if (typeof ses.setProxy !== 'function') return Promise.reject(new Error('proxy non applicabile'));
+    const config = rete ? { proxyRules: rete.proxyRules, ...(rete.proxyBypassRules ? { proxyBypassRules: rete.proxyBypassRules } : {}) } : { mode: 'system' };
+    retiDeiPosti.delete(partition);
+    return Promise.resolve(ses.setProxy(config))
+      .then(() => (typeof ses.closeAllConnections === 'function' ? ses.closeAllConnections() : null))
+      .then(() => dimentica)
+      .then(() => { retiDeiPosti.set(partition, chiave); });
+  }
+
+  function finestra(partition, rete = null) {
     const e = el();
     const ses = e.session.fromPartition(partition, { cache: false });
+    let pronta = null;
+    try { pronta = impostaRete(ses, partition, rete); } catch (err) { pronta = Promise.reject(err); }
+    if (pronta) pronta.catch(() => {});
     // Una pagina riaperta di nascosto: nessuno può rispondere a una sua domanda, microfono e appunti compresi.
     Permessi.negaTutto(ses);
     const download = { started: false, name: '' };
@@ -126,6 +152,8 @@ function createDetonator({
       },
     });
     const wc = win.webContents;
+    // Come nella scheda col proxy: niente UDP fuori dal proxy, o WebRTC direbbe l'indirizzo vero.
+    if (rete) { try { wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch (_) {} }
     try {
       wc.on('did-create-window', (child) => { try { child.destroy(); } catch (_) {} }); // niente popup
       wc.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -135,11 +163,18 @@ function createDetonator({
       try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
       try { return Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { return null; }
     };
-    return { wc, download, cleanup };
+    return { wc, download, cleanup, pronta };
   }
 
-  function runOne(url, evaluateFinal, partition) {
-    const { wc, download, cleanup } = finestra(partition);
+  // Carica `url` appena la rete è pronta (`fallito`: il caricamento rifiutato); se non lo diventa, `senzaRete()`.
+  function carica(wc, url, pronta, fallito, senzaRete) {
+    const vai = () => { Promise.resolve(wc.loadURL(url)).catch(fallito); };
+    if (!pronta) vai();
+    else pronta.then(vai, senzaRete);
+  }
+
+  function runOne(url, evaluateFinal, partition, rete = null) {
+    const { wc, download, cleanup, pronta } = finestra(partition, rete);
     const redirects = [];
     let finalUrl = url;
     let finished = false;
@@ -157,6 +192,10 @@ function createDetonator({
         resolve({ result: { verdict, finalUrl, redirects, download: download.started ? (download.name || true) : false, ...extra }, cleared });
       };
       const byNow = () => (download.started ? 'dangerous' : 'clean');
+
+      const nessunEsito = () => {
+        if (!finished) { finished = true; clearTimeout(loadTimer); clearTimeout(lifeTimer); cleared = cleanup(); resolve({ result: null, cleared }); }
+      };
 
       loadTimer = setTimeout(() => done(byNow()), loadTimeoutMs);
       lifeTimer = setTimeout(() => done(byNow(), { expired: true }), maxLifetimeMs);
@@ -185,15 +224,15 @@ function createDetonator({
           if (code === -3 && download.started) return;
         });
 
-        Promise.resolve(wc.loadURL(url)).catch(() => done(byNow()));
+        carica(wc, url, pronta, () => done(byNow()), nessunEsito);
       } catch (_) {
-        if (!finished) { finished = true; clearTimeout(loadTimer); clearTimeout(lifeTimer); cleared = cleanup(); resolve({ result: null, cleared }); }
+        nessunEsito();
       }
     });
   }
 
-  function runDestinazione(url, prosegue, partition, job) {
-    const { wc, cleanup } = finestra(partition);
+  function runDestinazione(url, prosegue, partition, job, rete = null) {
+    const { wc, cleanup, pronta } = finestra(partition, rete);
     const passi = [url];
     return new Promise((resolve) => {
       let finito = false;
@@ -230,7 +269,7 @@ function createDetonator({
           clearTimeout(attesa);
           attesa = setTimeout(() => fine(null), attesaRimandoMs);
         });
-        Promise.resolve(wc.loadURL(url)).catch(() => {});
+        carica(wc, url, pronta, () => {}, () => fine(null));
       } catch (_) {
         fine(null);
       }

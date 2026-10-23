@@ -1,11 +1,12 @@
 // Il /llms.txt del sito su cui si apre l'Aiuto (https://llmstxt.org), in cache 24 ore per dominio: SN_LLMS_TXT.get.
 // Finisce nel prompt di un agente che agisce sulla pagina: si legge solo da quel sito, mai da un redirect verso
-// un altro o verso la rete di casa. Prove: tests/unit/llmsTxt.test.mjs.
+// un altro o verso la rete di casa, e lo chiede la scheda dell'Aiuto (#1272). Prove: tests/unit/llmsTxt.test.mjs.
 
 (function (global) {
   'use strict';
 
-  const { safeFetch, leggiTesto } = require('./safe-fetch');
+  const { leggiTesto } = require('./safe-fetch');
+  const { perContoDellaScheda } = require('./perContoDellaScheda');
   const Sito = require('../../shared/stessoSito');
 
   const STORAGE_KEY = 'sn_llmstxt_cache';
@@ -14,8 +15,7 @@
   // Una voce scritta prima del #1082 può essere un servizio della rete di casa raggiunto con un redirect: si rilegge.
   const VERSIONE = 2;
   const FETCH_TIMEOUT_MS = 4000;
-  // Bound difensivo sul totale della cache (#domini): evita che cresca
-  // indefinitamente. Quando lo superiamo, scartiamo gli entry più vecchi.
+  // Bound difensivo sui domini in cache: oltre il tetto si scartano i più vecchi.
   const MAX_DOMAINS_CACHED = 500;
 
   async function readCache() {
@@ -37,12 +37,12 @@
     return !!sito && Sito.sitoDi(prossimo.href) === sito;
   }
 
-  async function fetchOnce(url) {
+  async function fetchOnce(url, sender) {
     const ac = new AbortController();
     // Il tempo copre anche il corpo: un sito che lo manda a gocce non deve tenere ferma la risposta dell'Aiuto.
     const t = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
     try {
-      const r = await safeFetch(url, { signal: ac.signal, redirectAmmesso: stessoSito, lanSeGiaDiPartenza: true });
+      const r = await perContoDellaScheda(sender, url, { signal: ac.signal, redirectAmmesso: stessoSito, lanSeGiaDiPartenza: true });
       if (!r.ok) { try { r.body?.cancel?.(); } catch (_) {} return { present: false, text: '' }; }
       const ct = r.headers.get('content-type') || '';
       // Una pagina 404 servita come 200 non è un llms.txt.
@@ -61,24 +61,24 @@
   async function pruneIfNeeded(cache) {
     const keys = Object.keys(cache);
     if (keys.length <= MAX_DOMAINS_CACHED) return cache;
-    // Ordina per cachedAt asc e tieni solo i più recenti.
     const sorted = keys.sort((a, b) => (cache[a].cachedAt || 0) - (cache[b].cachedAt || 0));
     const toRemove = sorted.slice(0, sorted.length - MAX_DOMAINS_CACHED);
     for (const k of toRemove) delete cache[k];
     return cache;
   }
 
-  // Ritorna { text, present, cachedAt } per il dominio. Se in cache fresca,
-  // ritorna senza network. Se stale o assente, fetcha e aggiorna la cache.
-  // Non lancia mai: errori → { text:'', present:false }.
-  async function get(domain) {
+  // { text, present, cachedAt } del dominio: dalla cache se fresca, altrimenti chiesto dalla scheda di `sender`, che
+  // esce col suo proxy. Senza una scheda viva non parte niente e non si scrive niente. Non lancia mai.
+  async function get(domain, { sender } = {}) {
     if (!domain || typeof domain !== 'string') return { text: '', present: false, cachedAt: 0 };
     const cache = await readCache();
     const cached = cache[domain];
     if (cached && fresh(cached)) return cached;
+    const wc = sender && sender.wc;
+    if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return { text: '', present: false, cachedAt: 0 };
 
     const url = `https://${domain}/llms.txt`;
-    const fetched = await fetchOnce(url);
+    const fetched = await fetchOnce(url, sender);
     const entry = {
       text: fetched.text,
       present: fetched.present,

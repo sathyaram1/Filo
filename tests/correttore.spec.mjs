@@ -1,7 +1,8 @@
-// #1446 — il correttore a due segni con un modello finto: il codice segna subito i candidati, sbiaditi; il controllo
-// rapido li conferma (il segno si riempie) o li scarta (sfuma via), e aggiunge gli errori che il codice non vede; il
-// tasto destro mette la correzione in cima; «Correggi tutti gli errori» non tocca i suggerimenti; dove il sito chiede di
-// non correggere non c'è nessun segno. Nessuna chiamata esce dalla macchina.
+// #1446 e #1580 — il correttore a due segni con un modello finto: il codice segna subito pieni gli errori sicuri e
+// sbiaditi i dubbi (in attesa, senza segno, le parole maiuscole); il controllo rapido conferma o scarta i dubbi, e
+// aggiunge gli errori che il codice non vede; una risposta vuota si ripete una volta; il tasto destro mette la correzione
+// in cima; «Correggi tutti gli errori» non tocca i suggerimenti; dove il sito chiede di non correggere non c'è nessun
+// segno. Nessuna chiamata esce dalla macchina.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
@@ -21,7 +22,8 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 </body>`;
 
 // `errori` e `suggerimenti`: pezzo → [correzione, motivo] che il modello finto dà quando il pezzo sta nel testo nuovo;
-// `giusti`: i candidati che dice giusti. Con `__trattieni` la risposta del controllo rapido aspetta `__rilascia()`.
+// come il prompt del banco tace sui candidati giusti e risponde NIENTE se non trova niente. Con `__trattieni` la
+// risposta del controllo rapido aspetta `__rilascia()`; `__vuote`: quante risposte vuote dà prima di quella vera.
 async function apri(app, openTab, testServer, opz = {}) {
   await app.evaluate(async (_e, opz) => {
     const C = globalThis.SN_CONST;
@@ -31,11 +33,12 @@ async function apri(app, openTab, testServer, opz = {}) {
       models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       featureFlags: { spellcheck: true, spellcheckContext: opz.suggerimenti !== undefined },
-      correttore: { modelloErrori: true, ripetizioni: true, ...(opz.correttore || {}) },
+      // La correzione automatica (#1447) cambierebbe gli errori fissi battuti qui: la prova sta in correttore-automatica.spec.mjs.
+      correttore: { modelloErrori: true, ripetizioni: true, automatica: false, ...(opz.correttore || {}) },
     });
     Object.assign(globalThis, {
-      __rapide: [], __ragionate: [], __errori: opz.errori || {}, __giusti: opz.giusti || [],
-      __suggerimenti: opz.suggerimenti || {}, __trattieni: false, __inAttesa: [],
+      __rapide: [], __ragionate: [], __errori: opz.errori || {},
+      __suggerimenti: opz.suggerimenti || {}, __trattieni: false, __inAttesa: [], __vuote: 0,
     });
     globalThis.__rilascia = () => { globalThis.__trattieni = false; for (const r of globalThis.__inAttesa.splice(0)) r(); };
     const M = globalThis.SN_ESTERNO.marcature('TESTO_IN_PAGINA');
@@ -45,21 +48,31 @@ async function apri(app, openTab, testServer, opz = {}) {
       const a = t.indexOf(M.inizio, i) + M.inizio.length + 1;
       return t.slice(a, t.indexOf(M.fine, a) - 1);
     };
+    // Il contenuto imbustato dentro <nome>…</nome> del messaggio del controllo rapido.
+    const tag = (t, nome) => {
+      const a = t.indexOf(`<${nome}>\n`);
+      const b = t.indexOf(`</${nome}>`, a);
+      if (a < 0 || b < 0) return '';
+      const dentro = t.slice(a, b);
+      const i = dentro.indexOf(M.inizio);
+      return i < 0 ? '' : dentro.slice(i + M.inizio.length + 1, dentro.indexOf(M.fine) - 1);
+    };
     const finto = async ({ messages }) => {
+      // Le regole stanno nel system, il testo nel messaggio dell'utente (#1580).
+      const sistema = String(messages[0].content);
       const t = String(messages[messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
       const righe = (nuovo, voci, tipo) => Object.entries(voci).filter(([p]) => nuovo.includes(p)).map(([p, [c, m]]) => `[${p}][${c}][${m}][${tipo}]`);
-      if (t.includes('Sei il controllo rapido di un correttore')) {
-        const nuovo = busta(t, 'TESTO NUOVO:\n');
-        const candidati = busta(t, 'Candidati trovati da un controllo automatico');
-        globalThis.__rapide.push({ nuovo, candidati });
+      if (sistema.includes('Sei il controllo rapido')) {
+        const nuovo = tag(t, 'testo_nuovo');
+        const candidati = tag(t, 'candidati');
+        globalThis.__rapide.push({ nuovo, candidati, sistema: messages[0].role === 'system' });
         if (globalThis.__trattieni) await new Promise((r) => globalThis.__inAttesa.push(r));
-        const out = [...righe(nuovo, globalThis.__errori, 'errore'),
-          ...globalThis.__giusti.filter((g) => candidati.includes(g)).map((g) => `[${g}][][nome proprio][giusto]`)];
-        return fine(out.join('\n') || '[][][][nessuno]');
+        if (globalThis.__vuote > 0) { globalThis.__vuote -= 1; return fine(''); }
+        return fine(righe(nuovo, globalThis.__errori, 'errore').join('\n') || 'NIENTE');
       }
-      if (t.includes('proponi SUGGERIMENTI')) {
-        const nuovo = busta(t, 'TESTO NUOVO:\n');
+      if (sistema.includes('proponi SUGGERIMENTI')) {
+        const nuovo = busta(t, 'TESTO DA RILEGGERE:\n');
         globalThis.__ragionate.push({ nuovo });
         return fine(righe(nuovo, globalThis.__suggerimenti, 'suggerimento').join('\n') || '[][][][nessuno]');
       }
@@ -112,18 +125,88 @@ test('«quseta» compare sbiadito e diventa pieno alla conferma, con «questa» 
   await expect(errore(page, 'quseta')).toHaveCount(0);
 });
 
-test('un nome proprio fuori dizionario compare sbiadito e sparisce quando il controllo lo dice giusto', async ({ app, openTab, testServer }) => {
-  const page = await apri(app, openTab, testServer, { giusti: ['Zanzottera'] });
+test('un nome proprio fuori dizionario non ha segno finché il controllo non risponde, e taciuto non ne avrà', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
   expect(await nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("Zanzottera")')).toBe(true);
   await app.evaluate(() => { globalThis.__trattieni = true; });
   await page.locator('#ta').click();
-  await page.keyboard.type('ho parlato con Zanzottera ');
-  await expect(errore(page, 'Zanzottera')).toHaveClass(/sn-dubbio/, { timeout: 4000 });
+  await page.keyboard.type('ho parlato con Zanzottera e quseta ');
+  // «quseta», minuscola, è sbiadita subito: è la prova che i segni sono già disegnati mentre il nome aspetta.
+  await expect(errore(page, 'quseta')).toHaveClass(/sn-dubbio/, { timeout: 4000 });
+  await expect.poll(async () => (await rapide(app)).length).toBeGreaterThan(0);
+  expect((await rapide(app))[0].candidati).toContain('Zanzottera');
+  await expect(errore(page, 'Zanzottera')).toHaveCount(0);
   await app.evaluate(() => globalThis.__rilascia());
-  await expect(errore(page, 'Zanzottera')).toHaveCount(0, { timeout: 4000 });
+  await page.waitForTimeout(800);
+  await expect(errore(page, 'Zanzottera')).toHaveCount(0);
   await page.keyboard.type('e poi Zanzottera ');
   await page.waitForTimeout(800);
   await expect(errore(page, 'Zanzottera')).toHaveCount(0);
+});
+
+test('un dubbio sbiadito che il controllo rapido non conferma sparisce alla risposta', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  await app.evaluate(() => { globalThis.__trattieni = true; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('ciao quseta ');
+  await expect(errore(page, 'quseta')).toHaveClass(/sn-dubbio/, { timeout: 4000 });
+  await expect.poll(async () => (await rapide(app)).length).toBeGreaterThan(0);
+  expect((await rapide(app))[0].candidati).toContain('quseta');
+  await app.evaluate(() => globalThis.__rilascia());
+  await expect(errore(page, 'quseta')).toHaveCount(0, { timeout: 4000 });
+  await page.keyboard.type('e ancora quseta ');
+  await page.waitForTimeout(800);
+  await expect(errore(page, 'quseta')).toHaveCount(0);
+});
+
+test('una parola maiuscola fuori dizionario che il controllo dice sbagliata compare piena alla risposta', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { errori: { Zanzotterra: ['Zanzottera', 'Refuso nel cognome.'] } });
+  await app.evaluate(() => { globalThis.__trattieni = true; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('ho parlato con Zanzotterra ');
+  await expect.poll(async () => (await rapide(app)).length).toBeGreaterThan(0);
+  await page.waitForTimeout(300);
+  await expect(errore(page, 'Zanzotterra')).toHaveCount(0);
+  await app.evaluate(() => globalThis.__rilascia());
+  await expect(errore(page, 'Zanzotterra')).toHaveCount(1, { timeout: 4000 });
+  await expect(errore(page, 'Zanzotterra')).not.toHaveClass(/sn-dubbio/);
+});
+
+test('«qual\'è» e «il il» hanno il segno pieno subito, prima che il modello risponda', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  await app.evaluate(() => { globalThis.__trattieni = true; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('qual\'è il il motivo? ');
+  await expect(errore(page, 'qual\'è')).toHaveCount(1, { timeout: 4000 });
+  await expect(errore(page, 'qual\'è')).not.toHaveClass(/sn-dubbio/);
+  await expect(errore(page, 'il')).not.toHaveClass(/sn-dubbio/);
+  // Il modello non ha ancora risposto: i segni pieni non lo aspettavano, e non gli sono stati chiesti.
+  await expect.poll(async () => (await rapide(app)).length, { timeout: 4000 }).toBeGreaterThan(0);
+  await page.screenshot({ path: 'tests/.shots/1580-segni-pieni.png' }).catch(() => {});
+  const [prima] = await rapide(app);
+  expect(prima.candidati).toBe('');
+  expect(prima.sistema, 'le regole viaggiano nel messaggio di sistema').toBe(true);
+  const menu = await tastoDestroSu(page, errore(page, 'qual'));
+  await expect(menu.principale.locator(':scope > *').first()).toHaveText(/qual è/);
+  await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
+  await app.evaluate(() => globalThis.__rilascia());
+});
+
+test('una risposta vuota del controllo rapido si chiede una volta ancora, e la seconda segna l\'errore', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { errori: { 'oggi sonno andato': ['oggi sono andato', 'Qui va il verbo essere.'] } });
+  await app.evaluate(() => { globalThis.__vuote = 1; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi sonno andato al mare ');
+  await expect(errore(page, 'sonno')).toHaveCount(1, { timeout: 6000 });
+  const lista = await rapide(app);
+  expect(lista).toHaveLength(2);
+  expect(lista[1].nuovo).toBe(lista[0].nuovo);
+  // Due vuote di fila: una ripetizione sola, poi niente.
+  await app.evaluate(() => { globalThis.__vuote = 2; globalThis.__rapide = []; });
+  await page.keyboard.type('e oggi sonno stato bene ');
+  await expect.poll(async () => (await rapide(app)).length, { timeout: 6000 }).toBe(2);
+  await page.waitForTimeout(1500);
+  expect(await rapide(app)).toHaveLength(2);
 });
 
 test('«oggi sonno andato al mare»: un errore su «sonno», con «sono» in cima al tasto destro', async ({ app, openTab, testServer }) => {
@@ -256,11 +339,12 @@ test('un campo con spellcheck="false" e un editor di codice non hanno segni né 
   expect(await rapide(app)).toEqual([]);
 });
 
-test('spenta la parte del modello restano i candidati del codice, sbiaditi, e non parte niente', async ({ app, openTab, testServer }) => {
+test('spenta la parte del modello restano i segni del codice, pieni i sicuri e sbiaditi i dubbi, e non parte niente', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, { errori: { quseta: ['questa', 'Refuso.'] }, correttore: { modelloErrori: false } });
   await page.locator('#ta').click();
-  await page.keyboard.type('ciao quseta e il il cane, qual\'è? ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore.sn-dubbio')).toHaveText(['quseta', 'il', 'qual\'è'], { timeout: 4000 });
+  await page.keyboard.type('ciao quseta e il il cane, qual\'è? Zanzottera ');
+  await expect(page.locator('.sn-spell-overlay .sn-errore.sn-dubbio')).toHaveText(['quseta', 'Zanzottera'], { timeout: 4000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['il', 'qual\'è']);
   await page.waitForTimeout(1200);
   expect(await rapide(app)).toEqual([]);
   // Il tasto destro sul candidato propone lo stesso la correzione che il codice conosce.
@@ -284,7 +368,8 @@ async function spiaPartiti(app) {
   await app.evaluate(() => {
     const vero = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.__partiti = [];
-    const spia = async (req) => { globalThis.__partiti.push(String(req.messages[req.messages.length - 1].content)); return vero(req); };
+    // Le regole stanno nel system, il testo nell'ultimo messaggio (#1580): si guardano tutti e due.
+    const spia = async (req) => { globalThis.__partiti.push(req.messages.map((m) => String(m.content)).join('\n')); return vero(req); };
     globalThis.SN_PROVIDERS.completeWithFallback = spia;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = spia;
   });
@@ -357,4 +442,17 @@ test('il controllo ragionato, a fine frase, non porta la password data in rispos
   const tutti = await partiti();
   expect(tutti.some((t) => t.includes('proponi SUGGERIMENTI') && t.includes('certo, [dato riservato].'))).toBe(true);
   for (const t of tutti) expect(t).not.toContain('Gatto2024');
+});
+
+// #1447 — una chat che all'invio svuota la casella da script non manda input: i segni del testo partito non restano
+// sulla casella vuota.
+test('svuotata la casella da script, i segni del testo di prima spariscono', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  await page.locator('#ta').click();
+  await page.keyboard.type('qual\'è il il motivo');
+  await expect(errore(page, 'qual\'è')).toHaveCount(1, { timeout: 4000 });
+  await page.evaluate(() => { document.getElementById('ta').value = ''; });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 2000 });
+  await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.sn-spell-overlay')).map((o) => o.textContent).join('')))
+    .toBe('');
 });

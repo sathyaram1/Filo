@@ -17,10 +17,12 @@
   // guardiano, che vede la frase intera. Qui restano i marchi del codice
   // MONOUSO, che nessuno usa per il cancello di casa (#536): il nome del codice col suo senso, anche oltre un
   // complemento («codice di sicurezza monouso») o una parola («two-factor authentication code»).
-  const NOME_CODICE = '(?:codic\\w*|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
-  const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w+|temporary|monouso|usa\\s+e\\s+getta|recovery'
+  // Ogni ripetizione ha un tetto: su un token di milioni di caratteri una regex senza tetto finiva la pila e
+  // la porta delle uscite si fermava (#1505). Prova: tests/unit/usciteSegreti.test.mjs.
+  const NOME_CODICE = '(?:codic\\w{0,20}|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
+  const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w{1,20}|temporary|monouso|usa\\s+e\\s+getta|recovery'
     + '|one[\\s-]?time|single[\\s-]?use|(?:a|in)\\s+due\\s+(?:fattori|passaggi)|two[\\s-]?(?:factor|step))';
-  const PAROLA = "[\\wÀ-ÿ'’-]+";
+  const PAROLA = "[\\wÀ-ÿ'’-]{1,64}";
   const MARCHI_MONOUSO = new RegExp(
     '(?:\\b(?:otp|mfa|2fa)\\b(?:\\s+(?:codes?|codice|pin))?'
     + `|\\b${NOME_CODICE}(?:\\s+(?:di|da|per)\\s+${PAROLA})?\\s+(?:di\\s+|da\\s+)?${SENSO_MONOUSO}\\b`
@@ -40,18 +42,43 @@
   // Quanto lontano dalla parola si cerca la forma: una riga scarsa.
   const RAGGIO = 60;
 
+  // L'inizio fisso di una chiave privata pkcs8 in base64 senza intestazione (EC P-256 con e senza la pubblica, P-384,
+  // RSA, Ed25519): così la salvano le librerie, e così è la chiave dei feedback (#1507).
+  const INIZI_PKCS8 = [
+    'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg',
+    'MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCA',
+    'MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDA',
+    'MII[A-Za-z0-9+/]{3}IBADANBgkqhkiG9w0BAQEFAASC[A-Za-z0-9+/]{3}wgg[A-Za-z0-9+/]{2}AgEAAoI',
+    'MC4CAQAwBQYDK2VwBCIEI',
+  ];
+
   // Le chiavi si riconoscono dal prefisso che il loro emittente ci mette
   // apposta: cercare «stringa lunga e casuale» prenderebbe mezzo web.
+  // Una chiave vera sta in poche centinaia di caratteri: il corpo si legge fino a MAX_TOKEN, e il gruppo dopo dice
+  // che il token prosegue. Lì il testo è costruito apposta e chi controlla un'uscita lo tratta da saturo.
+  const MAX_TOKEN = 1024;
   const FORME_CHIAVE = [
-    /\bsk-[A-Za-z0-9_-]{16,}/,
-    /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}/,
-    /\bgh[pousr]_[A-Za-z0-9]{20,}/,
-    /\bgithub_pat_[A-Za-z0-9_]{20,}/,
-    /\bxox[baprs]-[A-Za-z0-9-]{10,}/,
-    /\bAIza[A-Za-z0-9_-]{20,}/,
-    /\bAKIA[A-Z0-9]{12,}/,
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-  ];
+    ['\\bsk-', '[A-Za-z0-9_-]', 16],
+    ['\\b(?:sk|pk|rk)_(?:live|test)_', '[A-Za-z0-9]', 10],
+    ['\\bgh[pousr]_', '[A-Za-z0-9]', 20],
+    ['\\bgithub_pat_', '[A-Za-z0-9_]', 20],
+    ['\\bxox[baprs]-', '[A-Za-z0-9-]', 10],
+    ['\\bAIza', '[A-Za-z0-9_-]', 20],
+    ['\\bAKIA', '[A-Z0-9]', 12],
+  ].map(([testa, corpo, min]) => new RegExp(`${testa}${corpo}{${min},${MAX_TOKEN}}(${corpo})?`))
+    .concat([
+      /-----BEGIN [A-Z ]{0,64}PRIVATE KEY-----/,
+      // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
+      new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n(?=[A-Za-z0-9+/])){20,}`),
+    ]);
+
+  // Il pezzo che ogni chiave dello stesso tipo ha uguale: dice di che tipo è, non quale. Di un JWT lo sono intestazione e
+  // dichiarazioni (l'emittente e la chiave di firma sono quelli di tutti): il segreto è la firma.
+  const PREFISSO_FISSO = new RegExp(`^(?:-----BEGIN [A-Z ]*PRIVATE KEY-----\\s*)?(?:${[
+    'sk-(?:or-v1-|ant-api\\d\\d-|proj-)?', '(?:sk|pk|rk)_(?:live|test)_', 'gh[pousr]_', 'github_pat_', 'xox[baprs]-', 'AIza', 'AKIA',
+    ...INIZI_PKCS8, 'eyJ[\\w-]*\\.eyJ[\\w-]*\\.',
+  ].join('|')})?`);
+  const CODA_FISSA = /\s*-----END [A-Z ]*PRIVATE KEY-----\s*$/;
 
   const IBAN_RE = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}[ ]?[A-Z0-9]{1,4}\b/g;
   const CARTA_RE = /\b(?:\d[ -]?){13,19}\b/g;
@@ -395,16 +422,21 @@
   }
 
   // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
-  // testo ne aveva più del tetto, e chi controlla un'uscita lì guarda la presenza dei suoi pezzi (urlExfil.js).
+  // testo ne aveva più del tetto, o una chiave più lunga di MAX_TOKEN, e chi controlla un'uscita lì guarda la presenza
+  // dei suoi pezzi (urlExfil.js).
   function segretiNelTesto(testoLetto) {
     const s = testo(testoLetto);
     const out = raccolta();
     const fine = () => Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
     if (!s.trim()) return fine();
+    let oltre = false;
     for (const re of FORME_CHIAVE) {
       const g = new RegExp(re.source, 'g');
       let m;
-      while ((m = g.exec(s)) && !out.saturo) out.push({ valore: m[0], regola: 'chiave' });
+      while ((m = g.exec(s)) && !out.saturo) {
+        if (m[1]) oltre = true;
+        out.push({ valore: m[1] ? m[0].slice(0, -m[1].length) : m[0], regola: 'chiave' });
+      }
     }
     codiciVicini(s, out);
     for (const m of s.match(IBAN_RE) || []) {
@@ -413,6 +445,7 @@
     for (const m of s.match(CARTA_RE) || []) {
       if (cartaValida(m)) out.push({ valore: m.replace(/[\s-]/g, ''), regola: 'carta' });
     }
+    if (oltre) out.saturo = true;
     return fine();
   }
 
@@ -427,6 +460,64 @@
   const rovescio = (s) => [...s].reverse().join('');
   const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const STAMPABILE = /^[\x09\x0a\x0d\x20-\x7e]*$/;
+
+  // Un pezzo della parte variabile lungo così ricostruisce la chiave, anche senza il prefisso o con qualche carattere in
+  // meno (#1507). È la stessa misura con cui urlExfil.js confronta un'uscita con quello che l'agente ha letto.
+  const FINESTRA = 20;
+
+  // `norm` è il segreto in sola forma alfanumerica minuscola; `nucleo` la stessa senza i pezzi fissi del suo tipo, se è
+  // abbastanza lungo da contare; le finestre cominciano fra `da` e `a`, tutte dentro la parte variabile: una che prende
+  // anche il prefisso fisso combacia con un'altra chiave dello stesso tipo appena ne condivide un carattere.
+  function partiSegreto(valore) {
+    const v = testo(valore).trim();
+    const norm = alnumMinuscolo(v);
+    const pre = Math.min(norm.length, alnumMinuscolo((v.match(PREFISSO_FISSO) || [''])[0]).length);
+    const fine = Math.max(pre, norm.length - alnumMinuscolo((v.match(CODA_FISSA) || [''])[0]).length);
+    const nucleo = norm.slice(pre, fine);
+    const conta = nucleo.length >= SEGRETO_MIN && nucleo !== norm;
+    return { norm, nucleo: conta ? nucleo : '', nuclei: conta ? [nucleo, rovescio(nucleo)] : [], da: pre, a: fine - FINESTRA + 1 };
+  }
+
+  function finestreDi(parti) {
+    const out = new Set();
+    for (let i = parti.da; i < parti.a; i++) out.add(parti.norm.slice(i, i + FINESTRA));
+    return out;
+  }
+
+  // Le finestre di un segreto in entrambi i versi: il valore intero si riconosce anche al contrario, e un suo pezzo
+  // deve ereditare lo stesso travestimento (#1507).
+  function finestreSegreto(parti) {
+    const out = finestreDi(parti);
+    for (const f of [...out]) out.add(rovescio(f));
+    return out;
+  }
+
+  // `piatto` in sola forma alfanumerica minuscola.
+  function haFinestra(piatto, finestre) {
+    if (!finestre || !finestre.size) return false;
+    for (let i = 0; i + FINESTRA <= piatto.length; i++) if (finestre.has(piatto.slice(i, i + FINESTRA))) return true;
+    return false;
+  }
+
+  // Toglie i tratti che le finestre coprono. Posizioni e forma piatta nascono insieme: un carattere che cambia lunghezza
+  // quando diventa minuscolo non sposta il taglio.
+  function togliFinestre(t, finestre) {
+    const pos = [];
+    let piatto = '';
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (/[A-Za-z0-9]/.test(ch)) { pos.push(i); piatto += ch.toLowerCase(); }
+    }
+    const tratti = [];
+    for (let i = 0; i + FINESTRA <= piatto.length; i++) {
+      if (!finestre.has(piatto.slice(i, i + FINESTRA))) continue;
+      const u = tratti[tratti.length - 1];
+      if (u && i <= u[1]) u[1] = i + FINESTRA; else tratti.push([i, i + FINESTRA]);
+    }
+    let out = t;
+    for (let k = tratti.length - 1; k >= 0; k--) out = out.slice(0, pos[tratti[k][0]]) + OSCURATO + out.slice(pos[tratti[k][1] - 1] + 1);
+    return out;
+  }
 
   function decodifiche(tok) {
     const out = [];
@@ -459,7 +550,7 @@
     return out;
   }
 
-  function oscuraTesto(s, chiavi) {
+  function oscuraTesto(s, chiavi, finestre) {
     // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
     if (/^data:image\//i.test(s.slice(0, 16))) return s;
     let t = s;
@@ -470,21 +561,26 @@
     // Base64 a righe (il comando base64 va a capo ogni 76 caratteri) si legge come un pezzo solo.
     t = t.replace(/[A-Za-z0-9+/=_-]{16,}(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=_-]{4,})+|\S{8,}/g, (tok) => {
       if (/^data:image\//i.test(tok)) return tok;
-      const contiene = (x) => {
+      // Quanto del segreto porta: tutto (un segreto intero) o quante sue finestre.
+      const quanto = (x) => {
         const forme = decodifiche(x.replace(/\s+/g, '')).map(alnumMinuscolo);
-        return chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov)));
+        if (chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov) || c.nuclei.some((n) => f.includes(n))))) return Infinity;
+        const viste = new Set();
+        for (const f of forme) for (let i = 0; i + FINESTRA <= f.length; i++) if (finestre.has(f.slice(i, i + FINESTRA))) viste.add(f.slice(i, i + FINESTRA));
+        return viste.size;
       };
-      if (!contiene(tok)) return tok;
-      // Le righe in coda che non servono a ricomporre il segreto restano: sono il testo che segue.
+      const tutto = quanto(tok);
+      if (!tutto) return tok;
+      // Le righe in coda che non portano niente del segreto restano: sono il testo che segue.
       const righe = tok.split('\n');
       const coda = [];
-      while (righe.length > 1 && contiene(righe.slice(0, -1).join('\n'))) coda.unshift(righe.pop());
+      while (righe.length > 1 && quanto(righe.slice(0, -1).join('\n')) >= tutto) coda.unshift(righe.pop());
       return [OSCURATO, ...coda].join('\n');
     });
     // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
     let piatto = alnumMinuscolo(t);
     for (const c of chiavi) {
-      for (const cerca of [c.norm, c.rov]) {
+      for (const cerca of [c.norm, c.rov, ...c.nuclei]) {
         let guardia = 0;
         while (piatto.includes(cerca) && guardia++ < 1000) {
           const pos = [];
@@ -495,21 +591,23 @@
         }
       }
     }
-    return t;
+    return haFinestra(piatto, finestre) ? togliFinestre(t, finestre) : t;
   }
 
   function oscuraSegreti(valore, segreti) {
     const chiavi = [];
+    const finestre = new Set();
     for (const x of Array.isArray(segreti) ? segreti : []) {
       const v = testo(x).trim();
-      const norm = alnumMinuscolo(v);
-      if (v.length < SEGRETO_MIN || norm.length < SEGRETO_MIN) continue;
-      chiavi.push({ v, norm, rov: rovescio(norm), re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
+      const p = partiSegreto(v);
+      if (v.length < SEGRETO_MIN || p.norm.length < SEGRETO_MIN) continue;
+      chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nuclei: p.nuclei, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
+      for (const f of finestreSegreto(p)) finestre.add(f);
     }
     if (!chiavi.length || valore == null) return valore;
     // Lo stesso oggetto quando non c'è niente da togliere: chi lo riceve non paga una copia.
     const giro = (v, n) => {
-      if (typeof v === 'string') return oscuraTesto(v, chiavi);
+      if (typeof v === 'string') return oscuraTesto(v, chiavi, finestre);
       if (n > 12 || !v || typeof v !== 'object') return v;
       let cambiato = false;
       const o = Array.isArray(v) ? [] : {};
@@ -525,6 +623,6 @@
 
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
-    segretiNelTesto, oscuraSegreti, SEGRETO_MIN, OSCURATO,
+    segretiNelTesto, oscuraSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, OSCURATO, FINESTRA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

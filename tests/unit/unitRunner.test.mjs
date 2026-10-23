@@ -648,6 +648,51 @@ test('in fondo alla corsa l\'appeso che resta dopo una chiusura si chiude da sol
   assert.deepEqual(ferma([], 2100), { tutto: true }, 'd è partito dopo la chiusura e non finisce nemmeno lui');
 });
 
+// #1573: chiuso il file fermo, una corsa che non finiva lo stesso si chiudeva con «non è andato avanti niente».
+test('chiusa la corsa senza file in corso, la tenevano ferma i chiusi dopo i quali nessun file è finito da sé', () => {
+  const g = guardiaPerFile(1000);
+  assert.equal(g([{ via: 'a' }, {}], 0), null);
+  assert.equal(g([{ via: 'b' }], 600), null);
+  assert.deepEqual(g.sospetti(), [], 'niente chiuso');
+  assert.deepEqual(g([], 1000), { file: ['a'] });
+  assert.equal(g([{ fine: 'a' }], 1100), null);
+  assert.deepEqual(g.sospetti(), ['a'], 'chiuso a, non è finito niente da sé: la corsa la tiene ferma lui');
+  assert.deepEqual(g([], 2100), { file: ['b'] });
+  assert.equal(g([{ fine: 'b' }], 2200), null);
+  assert.deepEqual(g.sospetti(), ['a', 'b'], 'chiuso anche b, e ancora niente è finito da sé: tutti e due');
+
+  const h = guardiaPerFile(1000);
+  h([{ via: 'a' }, {}], 0);
+  h([{ via: 'c' }], 500);
+  assert.deepEqual(h([], 1000), { file: ['a'] });
+  h([{ fine: 'a' }], 1100);
+  assert.equal(h([{ fine: 'c' }], 1200), null);
+  assert.deepEqual(h.sospetti(), [], 'c è finito da sé dopo la chiusura di a: la corsa era andata avanti');
+});
+
+test('se chiuso il file fermo la corsa non finisce lo stesso, l\'avviso che la chiude nomina quel file (#1573)', () => {
+  const dir = cartellaTemporanea('filo-chiuso-non-basta-');
+  try {
+    writeFileSync(join(dir, 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
+    // I reporter girano nel node --test: questo lo tiene acceso dopo l'ultimo file, come una corsa che non finisce.
+    const acceso = join(dir, 'tiene-acceso.mjs');
+    writeFileSync(acceso, 'setInterval(() => {}, 1000);\nexport default async function* (source) { for await (const _ of source); }\n');
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE, '--test-reporter=tap', '--test-reporter-destination=stdout',
+      `--test-reporter=${pathToFileURL(acceso).href}`, `--test-reporter-destination=${join(dir, 'acceso.txt')}`],
+    { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    const uscita = `${r.stdout}\n${r.stderr}`;
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.match(r.stdout, /^ok \d+ - prima di fermarsi$/m, uscita);
+    assert.match(r.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti per 3 secondi, e la corsa è stata chiusa/, uscita);
+    assert.doesNotMatch(r.stdout, /non è andato avanti niente/, uscita);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('il processo del file da chiudere si trova dalla riga di comando, coi suoi figli, e solo sotto il node --test', () => {
   const lista = leggiProcessi([
     '  100     1 /usr/bin/node /home/u/Filo/scripts/run-unit-tests.mjs',

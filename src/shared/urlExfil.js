@@ -24,14 +24,14 @@
 (function (global) {
   'use strict';
 
-  // Soglie (tarate per il caso realistico: il modello, istruito a "metti i dati
-  // nell'URL", li mette in chiaro o base64; non in forme cifrate sofisticate).
+  // Soglie tarate sul caso realistico: il modello istruito a mettere i dati nell'URL li
+  // mette in chiaro o base64, non in forme cifrate sofisticate.
   const MIN_TOKEN = 5;      // lunghezza minima di un token del corpus per contare
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
   const STRUCT_BLOB = 24;   // singolo blocco opaco (sottodominio/segmento) → sospetto
 
-  // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
-  // evitano che un URL legittimo che le contiene scateni il match a token singolo.
+  // Parole comuni (it/en) lunghe ma innocue: evitano che un URL legittimo che le contiene
+  // scateni il match a token singolo.
   const STOPWORDS = new Set([
     'preferenze', 'preferences', 'informazioni', 'information', 'impostazioni',
     'settings', 'configurazione', 'configuration', 'utente', 'browser',
@@ -39,8 +39,7 @@
     'applicazione', 'navigazione', 'navigation', 'messaggio', 'message',
   ]);
 
-  // Decodifica "best effort" un blob base64/base64url se sembra tale e produce
-  // testo stampabile; altrimenti ''. Serve a smascherare ?d=<base64 dei segreti>.
+  // Smaschera ?d=<base64 dei segreti>; '' se non sembra base64 o non dà testo stampabile.
   function tryBase64(tok) {
     if (tok.length < 8 || tok.length % 4 === 1) return '';
     if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(tok)) return '';
@@ -122,12 +121,11 @@
     return varianti(url).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
   }
 
-  // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
-  // email (interi e parte locale). Normalizzate in minuscolo alfanumerico.
+  // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) ed email, intere e
+  // come parte locale.
   function corpusTokens(corpus) {
     const text = String(corpus || '');
     const out = new Set();
-    // email: forti, le aggiungiamo intere e come parte locale.
     const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
     let m;
     while ((m = emailRe.exec(text))) {
@@ -142,8 +140,8 @@
     return out;
   }
 
-  // Un token combacia "forte" da solo? (lungo, NON stopword) oppure contiene una
-  // cifra (nomi+numeri, token, id) → segnale specifico, non parola comune.
+  // Combacia «forte» se lungo e non stopword, oppure se contiene una cifra (nomi+numeri,
+  // token, id): segnale specifico, non parola comune.
   function isStrong(tok) {
     if (/[0-9]/.test(tok) && tok.length >= MIN_TOKEN) return true;
     return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);
@@ -593,6 +591,7 @@
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
     APRI_SALVATA: 'non ho aperto la pagina salvata',
+    CERCA_DOCUMENTI: 'non ho cercato fra i documenti',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
@@ -603,12 +602,21 @@
   });
   const verboUscita = (tipo) => USCITE[tipo] || USCITE_PAGINA[tipo] || '';
 
-  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo, non a un file del computer. Conta ogni
-  // campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
+  // Un percorso che fa contattare un altro computer (`\\host\…`, `//host/…`, `/net/host` del Mac): il nome del computer
+  // e della cartella escono dalla macchina come un indirizzo (#1499). La regola è quella del perimetro, su ogni sistema.
+  function diRete(v) {
+    const C = global.SN_CMD_CLASSIFY;
+    // Senza la regola non si sa: si guarda come un'uscita (il controllo dei segreti, niente di più).
+    if (!C || !C.diRete) return !!String(v ?? '').trim();
+    return C.diRete(v, { win: true }) || C.diRete(v, { win: false });
+  }
+
+  // Il bottone «apri file» porta fuori solo quando punta a un indirizzo o a un altro computer, non a un file di questo.
+  // Conta ogni campo dove il bottone può trovarlo: un percorso vuoto non deve nascondere l'indirizzo nel campo accanto.
   function puntaFuori(action) {
     return [action.percorso, action.path, action.url].some((v) => {
       const meta = String(v ?? '').trim().match(/^([a-z][a-z0-9+.-]*):/i);
-      return !!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file';
+      return (!!meta && meta[1].length > 1 && meta[1].toLowerCase() !== 'file') || diRete(v);
     });
   }
 
@@ -618,6 +626,7 @@
     accesso: 'un token del tuo accesso a Filo',
     identita: "l'identità di questa copia di Filo",
     portafoglio: 'la chiave del tuo portafoglio',
+    feedback: 'la chiave che apre i feedback cifrati',
   });
   const LETTI = Object.freeze({
     codice: 'un codice letto',
@@ -698,7 +707,21 @@
     }
     const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (largo && regola === 'carta' && u.cifre.some((f) => f.includes(norm))) return true;
+    if (largo && regola === 'chiave' && pezzoDiChiave(v, u)) return true;
     return norm.length >= 8 && u.alnum.includes(norm);
+  }
+
+  // La parte variabile di una chiave senza il suo prefisso, o un suo pezzo di almeno FINESTRA caratteri (#1507): basta a
+  // ricostruirla. Le finestre di ciò che esce si calcolano una volta per uscita.
+  function pezzoDiChiave(valore, u) {
+    const G = global.SN_GUARDIANO_STATICO;
+    if (!G || typeof G.partiSegreto !== 'function') return false;
+    const p = G.partiSegreto(valore);
+    if (p.nuclei.some((n) => u.alnum.includes(n))) return true;
+    if (p.a <= p.da) return false;
+    if (!u.finestre) u.finestre = G.finestreDi({ norm: u.alnum, da: 0, a: u.alnum.length - G.FINESTRA + 1 });
+    for (const f of G.finestreSegreto(p)) if (u.finestre.has(f)) return true;
+    return false;
   }
 
   // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
@@ -711,6 +734,11 @@
     const verbo = verboUscita(tipo);
     const niente = { blocca: false, exfil: false, frase: '', reason: '' };
     if (!verbo || (tipo === 'APRI_FILE' && !puntaFuori(action))) return niente;
+    // Una ricerca fra i documenti esce dal computer solo con una cartella su un altro computer: esce il suo nome.
+    if (tipo === 'CERCA_DOCUMENTI') {
+      if (!diRete(action.cartella)) return niente;
+      action = { type: tipo, cartella: action.cartella };
+    }
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
     const u = formeDi(uscente);
@@ -721,7 +749,7 @@
       const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
       // Lo stesso riconoscimento che lo toglie dai messaggi verso i modelli: travestito, al contrario o codificato, esce uguale.
       const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [v]) !== uscente;
-      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm))) {
+      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm)) || pezzoDiChiave(v, u)) {
         return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }

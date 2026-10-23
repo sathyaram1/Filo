@@ -1,13 +1,9 @@
-// Preload della shell del browser (la finestra principale Filo).
-// Espone window.filoShell con API tab-control + IPC verso il main.
+// Preload della shell: espone window.filoShell (tab, download, finestra, account).
 
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('filoShell', {
-  // Su quale sistema gira Filo: 'darwin' (Mac), 'win32' (Windows), 'linux'.
-  // Serve alla barra in alto per NON mentire — il suggerimento del pulsante
-  // "Nuova scheda" nomina un tasto, e su Mac quel tasto è un altro. È un dato
-  // pubblico del sistema, non un'informazione dell'utente.
+  // Alla barra serve per nominare il tasto giusto: regola in CLAUDE.md § Mac.
   sistema: process.platform,
   // Dove sta il puntatore quando è fuori dal documento della barra (#428).
   puntatore: () => ipcRenderer.invoke('shell:puntatore'),
@@ -22,8 +18,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
     reload: (id) => ipcRenderer.invoke('tabs:reload', { id }),
-    // Menu tasto destro su tab: muta/riattiva audio (toggle se muted è omesso)
-    // e duplica.
+    // Toggle se `muted` è omesso.
     setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
     duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),
     help: (id) => ipcRenderer.invoke('tabs:help', { id }),
@@ -70,10 +65,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     // «Resta connesso qui»: dalla scheda (id) o dalla proposta dopo un accesso (sito).
     restaConnesso: (id, on, sito) => ipcRenderer.invoke('tabs:resta-connesso', { id, on, sito }),
   },
-  // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
-  // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
-  // main via il canale 'shell:download'. I type dei messaggi corrispondono a
-  // MSG.* in src/shared/messages.js.
+  // I `type` corrispondono a MSG.* in src/shared/messages.js.
   downloads: {
     list: () => ipcRenderer.invoke('filo:message', { type: 'downloads_list' }),
     clear: () => ipcRenderer.invoke('filo:message', { type: 'downloads_clear' }),
@@ -103,8 +95,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:menu-action', wrapped);
     return () => ipcRenderer.removeListener('shell:menu-action', wrapped);
   },
-  // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
-  // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
+  // L'agente "Aiuto" aziona le icone della barra: il main inoltra qui e la
+  // shell clicca il bottone vero, così il cammino è lo stesso dell'utente.
   onTriggerButton: (fn) => {
     const wrapped = (_event, info) => { try { fn(info && info.command, info && info.anchor); } catch (_) {} };
     ipcRenderer.on('shell:trigger-button', wrapped);
@@ -137,6 +129,12 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:sopra', wrapped);
       return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
     },
+    // I comandi della pila intera («+N», Riduci, Chiudi tutti).
+    onPila: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:pila', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:pila', wrapped);
+    },
   },
   // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
   barra: {
@@ -152,8 +150,6 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:feedback-dim', wrapped);
     return () => ipcRenderer.removeListener('shell:feedback-dim', wrapped);
   },
-  // Disegno annotazione sulla barra in alto: la shell segnala al main se ha
-  // tratti (per sincronizzare il box) e riceve l'ordine di cancellarli.
   feedbackDrawState: (has) => ipcRenderer.send('shell:feedback-draw-state', { has: !!has }),
   onFeedbackClearDraw: (fn) => {
     const wrapped = () => { try { fn(); } catch (_) {} };
@@ -165,10 +161,9 @@ contextBridge.exposeInMainWorld('filoShell', {
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
   },
-  // Apre una nuova finestra incognito (sessione effimera + storage in RAM).
+  // Finestra incognito: sessione effimera, storage solo in RAM.
   openIncognito: () => ipcRenderer.invoke('window:open-incognito'),
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
-  // Broadcast generici main→shell (es. SETTINGS_UPDATED per i token estetici).
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);

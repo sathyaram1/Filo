@@ -38,7 +38,6 @@ const rimandi = require('./rimandi');
 const links = require('./links');
 const { origineLink } = require('./origine');
 
-// ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
   constructor(ttlMs) { this.ttl = ttlMs; this.m = new Map(); }
   get(k) {
@@ -92,8 +91,9 @@ function configure(opts = {}) {
     rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
-    sandbox: enableSandbox ? ((url) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl))) : null,
-    destinazione: enableSandbox ? ((url) => sandbox.destinazione(url, rimandi.siApre)) : null,
+    // `rete`: il proxy della scheda da cui parte il link, che la finestra nascosta ripete (#753.1).
+    sandbox: enableSandbox ? ((url, _norm, rete) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl), { rete })) : null,
+    destinazione: enableSandbox ? ((url, rete) => sandbox.destinazione(url, rimandi.siApre, { rete })) : null,
   });
   gsbKeyOf = keyOf;
 }
@@ -286,8 +286,7 @@ function checkSync(url, ctx = {}) {
   return engine.evaluate(url, ctx, asyncData);
 }
 
-// Avvia le chiamate di rete mancanti in background. Aggiorna le cache e, se il
-// verdetto cambia, richiama onUpdate. Ritorna SUBITO il verdetto sincrono.
+// Il verdetto sincrono torna SUBITO: il resto aggiorna le cache in background.
 function analyze(url, ctx = {}, onUpdate) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
@@ -368,7 +367,7 @@ function analyze(url, ctx = {}, onUpdate) {
     // GET (una conferma, un token monouso): la finestra nascosta prova solo un link prima che si apra (#1081).
     if (providers.sandbox && ctx.daAprire === true && sandboxCache.get(key) === undefined) {
       const detonate = providers.sandbox;
-      out.push(deepen('sb', bKey, key, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
+      out.push(deepen('sb', bKey, key, siteKey, () => detonate(url, norm, ctx.rete || null), (r) => sandboxCache.set(key, r)));
     }
     return out.filter(Boolean);
   };
@@ -445,7 +444,7 @@ async function preDestinazione(voce, ctx) {
     if (!t) return cur;
     if (t.destinazione) { cur = t.destinazione; voce.passi.push(cur); continue; }
     if (ctx.incognito || !providers.destinazione) { voce.senzaFinestra = true; return null; }
-    const r = await providers.destinazione(cur);
+    const r = await providers.destinazione(cur, ctx.rete || null);
     if (!r || r.annullato) { voce.annullato = true; return null; }
     voce.passi.push(...(r.passi || []).slice(1));
     if (!r.destinazione) return null;
@@ -531,8 +530,7 @@ const API = {
   recordCert,
   setProviders,
   configure,
-  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica
-  // e test): gsb=true significa che la chiave Google Safe Browsing è in uso.
+  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica e test).
   activeProviders() {
     return {
       gsb: !!providers.gsb && (gsbKeyOf ? !!currentGsbKey() : true),

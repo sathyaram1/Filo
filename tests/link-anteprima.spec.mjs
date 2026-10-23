@@ -37,14 +37,23 @@ async function preparaMain(app, port) {
       models: { [C.ACTIONS.EXPLAIN_LINK]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
+    // L'anteprima esce dalla rete della scheda (#1272): si fingono il risolutore della sessione e il passo di rete.
+    const rq = process.mainModule.require;
     const dns = process.getBuiltinModule('dns');
-    const prima = { lookup: dns.promises.lookup, fetch: globalThis.fetch };
-    dns.promises.lookup = async (h, o) => (hosts.includes(h) ? [{ address: '93.184.216.34', family: 4 }] : prima.lookup.call(dns.promises, h, o));
-    globalThis.fetch = async (url, o) => {
+    const lookup = dns.promises.lookup;
+    dns.promises.lookup = async (h, o) => (hosts.includes(h) ? [{ address: '93.184.216.34', family: 4 }] : lookup.call(dns.promises, h, o));
+    const proto = Object.getPrototypeOf(rq('electron').session.defaultSession);
+    const resolveHost = proto.resolveHost;
+    proto.resolveHost = function (h, o) {
+      return hosts.includes(h) ? Promise.resolve({ endpoints: [{ address: '93.184.216.34', family: 'ipv4' }] }) : resolveHost.call(this, h, o);
+    };
+    const dip = rq(rq('node:path').join(process.cwd(), 'src/main/services/perContoDellaScheda.js'))._dip;
+    const richiesta = dip.richiesta;
+    dip.richiesta = (ses, url, o) => {
       let u = null;
       try { u = new URL(String(url)); } catch (_) {}
-      if (u && hosts.includes(u.hostname)) return prima.fetch(`http://127.0.0.1:${p}/${u.hostname}${u.pathname}${u.search}`, o);
-      return prima.fetch(url, o);
+      if (u && hosts.includes(u.hostname)) return richiesta(ses, `http://127.0.0.1:${p}/${u.hostname}${u.pathname}${u.search}`, o);
+      return richiesta(ses, url, o);
     };
     globalThis.__chieste1307 = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ messages, onDelta }) => {

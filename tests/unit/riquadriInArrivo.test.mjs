@@ -248,8 +248,51 @@ test('lato main: chi esegue codice in un riquadro chiede prima se è arrivato', 
     }
   };
   giro('src/main');
+  // Un riquadro si riconosce da chi non è una pagina, qualunque nome abbia (`genitore`, `figlio`…).
+  const PAGINA = new Set(['wc', 'pwc', 'webContents', 'contents']);
   const eseguono = file.filter((f) => !ECCEZIONI.has(f)
-    && /\b(f|frame|riquadro|fr)\.executeJavaScript(InIsolatedWorld)?\(/.test(readFileSync(join(ROOT, f), 'utf8')));
+    && [...readFileSync(join(ROOT, f), 'utf8').matchAll(/\b([A-Za-z_$][\w$]*)\.executeJavaScript(?:InIsolatedWorld)?\(/g)]
+      .some((m) => !PAGINA.has(m[1])));
   assert.ok(eseguono.length >= 4, `la ricerca non trova più chi esegue nei riquadri: ${eseguono.join(', ')}`);
   for (const f of eseguono) assert.match(readFileSync(join(ROOT, f), 'utf8'), /riquadroArrivato/, `${f} esegue in un riquadro forse ancora in arrivo`);
+});
+
+test('lato main: i campi segreti nei riquadri non toccano un riquadro in arrivo, e coprono quelli arrivati', async () => {
+  require('../../src/shared/guardianoStatico.js');
+  require('../../src/shared/campiSegreti.js');
+  const { campiSegretiNeiRiquadri } = require('../../src/main/services/campiNeiRiquadri.js');
+  const toccati = [];
+  const CAMPO = { left: 5, top: 5, width: 10, height: 10 };
+  const frame = (nome, url, parent) => {
+    const f = { nome, url, parent, detached: false, top: parent ? parent.top : null };
+    f.executeJavaScript = async (codice) => {
+      toccati.push(nome);
+      if (codice === '0') return 0;
+      if (codice.startsWith('new Promise')) return { left: 100, top: 200, width: 300, height: 300 };
+      if (codice.startsWith('parent.postMessage')) return undefined;
+      return [CAMPO];
+    };
+    if (!parent) f.top = f;
+    return f;
+  };
+  const pagina = (...riquadri) => {
+    const mainFrame = riquadri[0].top;
+    mainFrame.framesInSubtree = [mainFrame, ...riquadri];
+    return { mainFrame };
+  };
+
+  const top = frame('pagina', 'https://esempio.test/', null);
+  const carta = frame('carta', 'https://carta.test/', top);
+  const inArrivo = frame('in arrivo', '', top);
+  const r1 = await campiSegretiNeiRiquadri(pagina(carta, inArrivo));
+  assert.ok(!toccati.includes('in arrivo'), 'il riquadro senza documento non si esegue');
+  assert.equal(r1.nonCoperti, false);
+  assert.deepEqual(r1.campi.map((c) => [c.left, c.top]), [[105, 205]], 'il campo del riquadro arrivato resta coperto');
+
+  toccati.length = 0;
+  const genitore = frame('genitore in arrivo', '', top);
+  const nipote = frame('nipote', 'https://carta.test/', genitore);
+  const r2 = await campiSegretiNeiRiquadri(pagina(genitore, nipote));
+  assert.ok(!toccati.includes('genitore in arrivo'), 'il genitore senza documento non si esegue');
+  assert.equal(r2.nonCoperti, true, 'senza la misura del genitore la foto non parte');
 });

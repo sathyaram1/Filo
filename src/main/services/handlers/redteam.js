@@ -14,8 +14,7 @@ const auth = require('../../auth/google-auth');
 const Gate = require('../redteamGate');
 const { daFilo, soloFilo } = require('./origine');
 
-// Endpoint delle callable gen2. Region/progetto = quelli del deploy di
-// filo-security (europe-west1, filo-8b9cb). Override per i test via env.
+// Region e progetto sono quelli del deploy di filo-security; override per i test via env.
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
@@ -39,8 +38,7 @@ module.exports = function register(on, ctx) {
     return r;
   }
 
-  // Invoca una Cloud Function callable (protocollo onCall): POST {data} con
-  // Bearer ID token; risposta {result}. Lancia su errore (auth/rete/HTTP).
+  // Protocollo onCall: POST {data} con Bearer ID token, risposta {result}; lancia su errore.
   async function callable(name, data = {}) {
     const idToken = await auth.getIdToken();
     if (!idToken) throw new Error('not_signed_in');
@@ -66,7 +64,6 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  // Invio tentativo. { attackText, description } → vedi MSG.REDTEAM_SUBMIT.
   on(MSG.REDTEAM_SUBMIT, async (msg) => {
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
@@ -81,8 +78,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Stato gamification dell'utente per la tab Statistiche. Include `isOwner`
-  // così la pagina può mostrare il pannello owner di generazione codici.
+  // `isOwner` serve alla pagina per mostrare il pannello owner di generazione codici.
   on(MSG.REDTEAM_STATE, async () => {
     if (await inPausa()) return { paused: true, error: PAUSA, verified: false, signedIn: auth.isSignedIn(), isOwner: false };
     if (!auth.isSignedIn()) return { verified: false, signedIn: false, isOwner: false };
@@ -95,7 +91,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Un tentativo (polling della rivelazione live). { attemptId }.
   on(MSG.REDTEAM_ATTEMPT, async (msg) => {
     if (await inPausa()) return { paused: true, error: PAUSA, hidden: true };
     if (!auth.isSignedIn()) return { notFound: true };
@@ -107,7 +102,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Leaderboard (tutti i loggati).
   on(MSG.REDTEAM_LEADERBOARD, async () => {
     if (await inPausa()) return { paused: true, error: PAUSA, entries: [] };
     if (!auth.isSignedIn()) return { entries: [], signedIn: false };
@@ -120,7 +114,6 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Riscatto codice monouso → verifica + handle. { code, handle }.
   on(MSG.REDTEAM_REDEEM, async (msg) => {
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };

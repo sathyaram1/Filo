@@ -377,3 +377,303 @@ test('chat della home senza invito: «Apri Crediti» è il tasto in evidenza', a
   await principale.click();
   await siApre(app, 'filo://credits');
 });
+
+// ── #1344.1: le strade rimaste senza il tasto, e il «Parere di Filo» che si richiedeva da solo ─────────────────────
+
+// Scryfall finto: due carte rosse per la ricerca, più il commander.
+async function scryfallFinto(app) {
+  await app.evaluate(() => {
+    const carta = (id, name, extra) => ({
+      id, name, cmc: 1, type_line: 'Instant', oracle_text: 'Testo.', colors: ['R'], color_identity: ['R'],
+      image_uris: { normal: `https://cards.test/${id}.jpg` }, prices: { eur: '1.00' }, legalities: { commander: 'legal' },
+      scryfall_uri: `https://scryfall.com/card/${id}`, mana_cost: '{R}', ...extra,
+    });
+    const BY_ID = {
+      'niv-1': carta('niv-1', 'Niv-Mizzet, Parun', { type_line: 'Legendary Creature — Dragon Wizard', cmc: 6, colors: ['U', 'R'], color_identity: ['U', 'R'] }),
+      'bolt-1': carta('bolt-1', 'Lightning Bolt'),
+      'tome-1': carta('tome-1', 'Faithless Looting', { type_line: 'Sorcery' }),
+    };
+    globalThis.SN_SCRYFALL._setFetch(async (url) => {
+      const u = new URL(String(url));
+      let body = null;
+      if (u.pathname === '/cards/search') {
+        body = u.searchParams.get('unique') === 'prints' ? { total_cards: 3, data: [] } : { data: [BY_ID['bolt-1'], BY_ID['tome-1']], has_more: false };
+      } else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
+      else if (u.pathname === '/symbology') body = { data: [] };
+      if (!body) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => body };
+    });
+  });
+}
+
+// Il modello finto dei mazzi: la chat cerca, il giudice tiene tutto; il parere segue `__parere` ('salta' = risponde
+// senza la carta, '402' = crediti finiti) e il giudice `__giudice` ('esclusi' = nessun fornitore ammesso).
+async function modelloDeiMazzi(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: {
+        [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash', [C.ACTIONS.DECKS_OPINION]: 'deepseek-flash',
+        [C.ACTIONS.DECKS_AUTOTAG]: 'deepseek-flash', [C.ACTIONS.DECKS_SEARCH_FILTER]: 'deepseek-flash',
+      },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__pareri = 0;
+    globalThis.__parere = 'salta';
+    globalThis.__giudice = 'tiene';
+    const risposta = ({ attempts, messages }) => {
+      const tutto = messages.map((m) => String(m.content || '')).join('\n');
+      const fatto = (text) => ({ text, finishReason: 'stop', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [] });
+      if (tutto.includes('CARTE DA VALUTARE')) {
+        globalThis.__pareri += 1;
+        if (globalThis.__parere === '402') {
+          const e = new Error('OpenRouter 402: {"error":{"message":"Insufficient credits"}}');
+          e.status = 402; e.provider = 'openrouter';
+          throw e;
+        }
+        return fatto(JSON.stringify({ pareri: [] }));
+      }
+      if (tutto.includes('CARTE CANDIDATE')) {
+        if (globalThis.__giudice === 'esclusi') {
+          const e = new Error('No allowed providers are available for the selected model.');
+          e.code = 'NO_ALLOWED_HOST'; e.model = 'google/gemini-2.5-flash'; e.hosts = ['Google AI Studio'];
+          throw e;
+        }
+        return fatto('{"keep":[1,2]}');
+      }
+      return fatto(JSON.stringify({ reply: 'Ecco.', query: 'c:r' }));
+    };
+    const P = globalThis.SN_PROVIDERS;
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) {} return r; };
+  });
+}
+
+async function mazzoNuovo(page) {
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const deckId = decodeURIComponent((await page.evaluate(() => location.hash)).replace('#/deck/', ''));
+  await page.evaluate(async (id) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.DECKS_SET_COMMANDER, id, scryfallId: 'niv-1' }), deckId);
+  return deckId;
+}
+
+const pareri = (app) => app.evaluate(() => globalThis.__pareri);
+
+test('«Parere di Filo» che non arriva: una richiesta, non una raffica; il motivo, «Apri Crediti» e «Riprova»', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await scryfallFinto(app);
+  await modelloDeiMazzi(app);
+  const page = await openTab('filo://decks/decks.html');
+  await mazzoNuovo(page);
+  await page.fill('#chatInput', 'carte rosse che pescano');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla.locator('.dk-cardlist .dk-row')).toHaveCount(2, { timeout: 20_000 });
+  await bolla.locator('[data-add="bolt-1"]').click();
+  const riga = page.locator('#deckList .dk-row[data-card-id="bolt-1"]');
+  await expect(riga).toBeVisible();
+
+  await riga.hover();
+  await expect(page.locator('#statePreview')).toBeVisible();
+  await page.locator('#previewModule').click({ button: 'right' });
+  await page.locator('.sn-select-pop .sn-select-option', { hasText: 'Parere di Filo' }).click();
+  await riga.hover();
+  const modulo = page.locator('#previewModule');
+  // Il modello risponde senza il parere di quella carta: si dice, e non si richiede da solo.
+  await expect(modulo.locator('.dk-op-errore')).toContainText('senza il parere di questa carta', { timeout: 15_000 });
+  const prima = await pareri(app);
+  await page.waitForTimeout(3000);
+  expect(await pareri(app), 'richieste ripetute da sole a carta ferma').toBe(prima);
+  expect(prima).toBeLessThanOrEqual(2);
+  // La frase manda dove chi usa Filo cambia il modello, non nella Gestione, e il tasto porta lì.
+  await expect(modulo.locator('.dk-op-errore')).not.toContainText('Modelli predefiniti');
+  await expect(modulo.locator('.dk-op-errore')).toContainText('Opzioni → Modelli per azione');
+  await expect(modulo.locator('.dk-rimedio')).toHaveText('Apri Opzioni');
+
+  // Crediti finiti: «Riprova» chiede una volta, e il motivo porta il tasto per la pagina Crediti, in evidenza.
+  await app.evaluate(() => { globalThis.__parere = '402'; });
+  await modulo.locator('[data-op-retry]').click();
+  await expect(modulo.locator('.dk-op-errore')).toContainText('Crediti', { timeout: 15_000 });
+  expect(await pareri(app)).toBe(prima + 1);
+  await page.waitForTimeout(3000);
+  expect(await pareri(app), 'coi crediti finiti nessuna raffica').toBe(prima + 1);
+  const tasti = modulo.locator('.dk-mod-actions button');
+  await expect(tasti.first()).toHaveText('Apri Crediti');
+  await expect(tasti.nth(1)).toHaveText('Riprova');
+  await page.screenshot({ path: `${SHOTS}/1344-parere-crediti.png` }).catch(() => {});
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
+  await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
+  await modulo.screenshot({ path: `${SHOTS}/1344-parere-crediti-scuro.png` }).catch(() => {});
+  expect(await aperta(app, 'filo://credits')).toBe(false);
+  await tasti.first().click();
+  await siApre(app, 'filo://credits');
+});
+
+test('chat dei mazzi: il controllo delle carte senza fornitore ammesso porta «Apri Opzioni» prima di «Riprova», anche riaprendo', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await scryfallFinto(app);
+  await modelloDeiMazzi(app);
+  await app.evaluate(() => { globalThis.__giudice = 'esclusi'; });
+  const page = await openTab('filo://decks/decks.html');
+  await mazzoNuovo(page);
+  await page.fill('#chatInput', 'carte rosse che pescano');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Opzioni', { timeout: 20_000 });
+  const tasti = bolla.locator('button.dk-retry');
+  await expect(tasti.first()).toHaveText('Apri Opzioni');
+  await expect(tasti.nth(1)).toContainText('Riprova');
+  await page.screenshot({ path: `${SHOTS}/1344-mazzi-filtro.png` }).catch(() => {});
+
+  // La chat si rilegge dal salvataggio: il tasto resta.
+  await page.reload();
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const riletta = page.locator('.dk-msg-bot').last();
+  await expect(riletta.locator('button.dk-retry').first()).toHaveText('Apri Opzioni', { timeout: 10_000 });
+  await riletta.locator('button.dk-retry').first().click();
+  await siApre(app, 'filo://options');
+});
+
+test('Editor, tasto destro sul titolo senza invito: «Rigenera titolo» e «Rigenera riassunto» dicono perché e portano ai Crediti', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await senzaChiave(app);
+  const editor = await openTab('filo://editor/editor.html');
+  await editor.waitForSelector('#doc');
+  await editor.locator('#doc').click();
+  await editor.keyboard.type('Una nota sul bilancio del trimestre, con le spese di manutenzione.');
+
+  for (const [voce, cosa] of [['Rigenera titolo', 'il titolo'], ['Rigenera riassunto', 'il riassunto']]) {
+    await editor.locator('#docTitle').click({ button: 'right' });
+    await editor.locator('.ed-title-ctxmenu .sn-select-option', { hasText: voce }).click();
+    const avviso = editor.locator('.ed-toast', { hasText: `Non sono riuscito a generare ${cosa}` });
+    await expect(avviso).toBeVisible({ timeout: 15_000 });
+    await expect(avviso).toContainText('invito');
+    await expect(avviso.locator('.ed-toast-action')).toHaveText('Apri Crediti');
+  }
+  await editor.screenshot({ path: `${SHOTS}/1344-editor-titolo.png` }).catch(() => {});
+  await editor.locator('.ed-toast', { hasText: 'il riassunto' }).locator('.ed-toast-action').click();
+  await siApre(app, 'filo://credits');
+});
+
+test('«Leggi» senza invito: l’avviso dice perché e porta ai Crediti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await senzaChiave(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Leggi</title>'
+    + '<p id="t" style="font:18px sans-serif;margin:120px 40px">Questo testo va letto ad alta voce.</p>');
+  await page.evaluate(() => {
+    const r = document.createRange(); r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await page.locator('#t').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu-label', { hasText: 'Leggi' }).first().click();
+  const avviso = page.locator('.sn-toast', { hasText: 'voce del browser' });
+  await expect(avviso).toBeVisible({ timeout: 15_000 });
+  await expect(avviso).toContainText('invito');
+  await expect(avviso.locator('.sn-msg-rimedio')).toHaveText('Apri Crediti');
+  await avviso.locator('.sn-msg-rimedio').click();
+  await siApre(app, 'filo://credits');
+});
+
+test('«Leggi» coi crediti finiti porta ai Crediti; col modello che vuole il nome di una voce, alle Preferenze della lettura', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const T = globalThis.SN_TEST_MODELS;
+    const nick = C.parseModelRefs(T.models[C.ACTIONS.TTS])[0];
+    await globalThis.SN_STORAGE.setSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { ...T.registry, [nick]: { provider: 'openrouter', model: 'acme/voce-muta' } },
+      models: { ...T.models },
+      tts: { voice: '', rate: 1, pitch: 1, modelVoice: '' },
+    });
+    globalThis.__ttsMode = '402';
+    globalThis.SN_PROVIDER_OPENROUTER.synthesizeSpeech = async () => {
+      const e = globalThis.__ttsMode === '402'
+        ? Object.assign(new Error('OpenRouter 402: {"error":{"message":"Insufficient credits"}}'), { status: 402, provider: 'openrouter' })
+        : Object.assign(new Error('OpenRouter 400: {"error":{"message":"An explicit voice is required for this TTS provider.","code":400}}'), { status: 400 });
+      throw e;
+    };
+  });
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Leggi</title>'
+    + '<p id="t" style="font:18px sans-serif;margin:120px 40px">Questo testo va letto ad alta voce.</p>');
+  const leggi = async () => {
+    await page.evaluate(() => {
+      const r = document.createRange(); r.selectNodeContents(document.querySelector('#t'));
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    await page.locator('#t').click({ button: 'right' });
+    await menuDi(page).locator('.sn-menu-label', { hasText: 'Leggi' }).first().click();
+  };
+
+  await leggi();
+  const crediti = page.locator('.sn-toast', { hasText: 'voce del browser' }).last();
+  await expect(crediti).toContainText('crediti', { timeout: 15_000 });
+  await expect(crediti).not.toContainText('non disponibile ora');
+  await expect(crediti.locator('.sn-msg-rimedio')).toHaveText('Apri Crediti');
+  await page.screenshot({ path: `${SHOTS}/1344-leggi-crediti.png` }).catch(() => {});
+
+  await app.evaluate(() => { globalThis.__ttsMode = 'muto'; });
+  await page.keyboard.press('Escape');
+  await leggi();
+  const voce = page.locator('.sn-toast', { hasText: 'Lettura ad alta voce' });
+  await expect(voce).toBeVisible({ timeout: 15_000 });
+  await expect(voce.locator('.sn-msg-rimedio')).toHaveText('Apri Preferenze');
+  await voce.locator('.sn-msg-rimedio').click();
+  await siApre(app, 'filo://preferences/preferences.html#sec-lettura');
+});
+
+test('descrizione automatica di un’immagine copiata senza modello: l’avviso porta alle Opzioni', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.DESCRIBE_IMAGE]: '' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  const page = await newtabPage(app);
+  await page.waitForFunction(() => typeof window.SN_ACTIONS?.pushClipboardEntry === 'function', null, { timeout: 10_000 });
+  await page.evaluate((b64) => window.SN_ACTIONS.pushClipboardEntry({ type: 'image', dataUrl: `data:image/png;base64,${b64}`, description: 'Descrizione…' }), PNG_B64);
+  const avviso = page.locator('.sn-toast', { hasText: 'Opzioni' });
+  await expect(avviso).toBeVisible({ timeout: 15_000 });
+  await expect(avviso.locator('.sn-msg-rimedio')).toHaveText('Apri Opzioni');
+  await avviso.locator('.sn-msg-rimedio').click();
+  await siApre(app, 'filo://options');
+});
+
+test('immagine copiata coi crediti finiti: la cronologia non promette una descrizione che non arriverà', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const P = globalThis.SN_PROVIDER_OPENROUTER;
+    const boom = () => { const e = new Error('OpenRouter 402: {"error":{"message":"Insufficient credits"}}'); e.status = 402; e.provider = 'openrouter'; throw e; };
+    globalThis.SN_PROVIDER_OPENROUTER = { ...P, streamComplete: boom, complete: boom };
+  });
+  const page = await newtabPage(app);
+  await page.waitForFunction(() => typeof window.SN_ACTIONS?.pushClipboardEntry === 'function', null, { timeout: 10_000 });
+  await page.evaluate((b64) => window.SN_ACTIONS.pushClipboardEntry({ type: 'image', dataUrl: `data:image/png;base64,${b64}`, description: 'Descrizione…' }), PNG_B64);
+  await expect(page.locator('.sn-toast .sn-msg-rimedio', { hasText: 'Apri Crediti' })).toBeVisible({ timeout: 15_000 });
+  const descrizione = async () => {
+    const storia = await page.evaluate(async () => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_CLIPBOARD_HISTORY }));
+    return ((storia && storia.items) || [])[0]?.description || '';
+  };
+  await expect.poll(descrizione, { timeout: 10_000 }).not.toBe('Descrizione…');
+});

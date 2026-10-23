@@ -1,47 +1,11 @@
-// La vista pubblica dei feedback (#583): quali feedback hanno una scheda
-// leggibile da chiunque, e con quali campi dentro.
-//
-// PERCHÉ ESISTE
-//   Fino all'audit pre-alpha la collezione `feedback` si leggeva senza
-//   credenziali: la bacheca degli utenti scaricava i documenti INTERI e poi
-//   decideva in pagina cosa disegnare. Ma "filtrato in pagina" vuol dire solo
-//   "non disegnato": il testo, l'URL, lo user agent e i link agli screenshot
-//   erano già arrivati sul computer di chi guardava — e per i documenti
-//   anteriori al 25 giugno 2026 erano in chiaro. Le regole di Firestore
-//   decidono SE un documento si legge, non quali campi tornano: l'unico modo
-//   di dare alla bacheca i soli campi pubblici è scrivere quei campi da
-//   un'altra parte. Quella parte è la collezione `feedback-public`, un
-//   documento per feedback, stesso id, e dentro solo questa allowlist.
-//
-//   Chi la scrive ha bisogno di due cose che un utente non ha: l'autorità
-//   (owner o server) e la CHIAVE per leggere lo status vero, che viaggia
-//   cifrato. Per questo la decisione sta qui — logica pura, unit-testabile — e
-//   la esegue il main process dell'owner (src/main/services/handlers/auth.js),
-//   che ha entrambe.
-//
-// COSA NON ENTRA MAI
-//   text, url, title, userAgent, images, files, notes (il report per l'owner),
-//   clientId, priority, pipeline, reviewComment/reviewDecision/reviewedAt,
-//   branch, blockReason, claim*. Non per dimenticanza: l'allowlist è la
-//   definizione, e le firestore.rules la ripetono come rete di sicurezza (una
-//   scrittura con un campo fuori elenco viene respinta INTERA).
-//
-// COSA NON PUBBLICA MAI
-//   Tutto ciò che è passato dalle mani della sicurezza: attacchi, spam, file
-//   sospetti, bocciature d'audit, blocchi del pipeline, e qualunque feedback
-//   il cui status non si riesca a leggere. Il criterio è "in dubbio, niente
-//   scheda": una scheda mancante è un fix che non compare in bacheca, una
-//   scheda di troppo è materiale segnalato pubblicato.
-//
-// Pattern IIFE su globalThis (CLAUDE.md → Convenzione IIFE).
-// Testabile via `npm run test:unit` (tests/unit/feedbackPublicView.test.mjs).
+// La vista pubblica dei feedback (#583): quali hanno una scheda e con quali campi.
+// Le regole decidono SE un documento si legge, non quali campi tornano: perciò i campi
+// pubblici si scrivono in `feedback-public`, e le rules ripetono l'allowlist come rete.
 
 (function (global) {
   'use strict';
 
-  // In Node (main process, unit test) i moduli di cui abbiamo bisogno si
-  // caricano da soli; in una pagina filo:// `require` non esiste e li include
-  // l'HTML prima di questo file.
+  // In Node i moduli si caricano da soli; in una pagina li include l'HTML prima di questo.
   if (typeof require === 'function') {
     try {
       if (!global.SN_CONST) require('./constants.js');
@@ -65,35 +29,22 @@
     'resolvedAt',        // data di chiusura (ISO)
     'clientIdTag',       // impronta di QUESTA scheda per chi l'ha segnalata (vedi sotto)
     'userNote',          // la frase per chi ha segnalato (l'unico dei due testi in chiaro)
-    // I crediti che spettano a chi ha mandato questo feedback. Stanno qui
-    // perché l'annuncio della ricompensa gira sul computer di chi ha segnalato,
-    // che dei feedback veri non legge più niente: senza questo numero ogni
-    // ricompensa scenderebbe in silenzio alla fascia più bassa (50 invece di
-    // 300), e non si rimedia dopo, perché un feedback premiato resta premiato.
-    // È la CIFRA, non la priorità: quanto contava la segnalazione resta un
-    // giudizio interno e fuori dalla scheda.
+    // L'annuncio della ricompensa gira sulla macchina di chi ha segnalato, che dei feedback
+    // veri non legge nulla: qui va la CIFRA, non la priorità, che resta un giudizio interno.
     'reward',
     'publishedAt',       // quando questa scheda è stata scritta (diagnostica)
   ]);
 
-  // I campi della scheda che NON scrive il publisher: li scrivono gli utenti
-  // (un voto, una riapertura) con le regole chiave==uid. Il publisher scrive
-  // sempre con una maschera sui soli CARD_FIELDS, o il primo aggiornamento di
-  // una scheda cancellerebbe i voti di tutti.
+  // Li scrivono gli utenti (voto, riapertura) con le regole chiave == uid.
+  // Il publisher scrive sempre con la maschera sui CARD_FIELDS, o li cancellerebbe tutti.
   const USER_FIELDS = Object.freeze(['votes', 'reopenRequests']);
 
-  // Stati CHIUSI che meritano una scheda. `done` è il fix uscito (o in attesa
-  // della sua versione: il gate DB3 lo applica la bacheca); `archived` serve al
-  // popup delle ricompense, che premia anche ciò che l'owner ha chiuso
-  // archiviandolo. Gli stati terminali della sicurezza (attack_confirmed,
-  // spam_confirmed) NON sono qui, e non basta: il guard sotto li rifiuta anche
-  // se qualcuno li aggiungesse.
+  // `archived` c'è perché il popup ricompense premia anche ciò che l'owner ha archiviato.
+  // Gli stati terminali della sicurezza non sono qui, e il guard sotto li rifiuta comunque.
   const PUBLISHABLE_STATUSES = Object.freeze(['done', 'archived']);
 
-  // Classi di verdetto che segnalano un rischio. Uno solo basta per non
-  // pubblicare: il panel può aver deciso "aligned" a maggioranza mentre un
-  // giudice gridava "attacco", e la bacheca non è il posto dove scoprire chi
-  // aveva ragione.
+  // Una sola basta per non pubblicare: il panel può aver deciso «aligned» a maggioranza
+  // mentre un giudice gridava «attacco», e la bacheca non è dove scoprire chi aveva ragione.
   const RISK_VERDICTS = Object.freeze(['attack', 'spam', 'design']);
 
   function FS() {
@@ -112,13 +63,8 @@
     return m;
   }
 
-  /**
-   * I crediti che spettano a chi ha segnalato, dalla fascia di priorità. PURA.
-   * La tabella è una sola (`SN_CONST.CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY`),
-   * la stessa che il portafoglio usa per accreditarli: qui la si legge per
-   * scriverla sulla scheda, perché la macchina di chi ha segnalato la priorità
-   * non la vede.
-   */
+  // I crediti che spettano a chi ha segnalato, dalla fascia di priorità.
+  // La tabella è una sola, la stessa con cui il portafoglio li accredita.
   function rewardFor(priority) {
     const C = global.SN_CONST && global.SN_CONST.CREDIT;
     const table = (C && C.FEEDBACK_RESOLVE_BY_PRIORITY) || null;
@@ -138,33 +84,25 @@
     return n > max ? max : n;
   }
 
-  /**
-   * Questo feedback è passato dalle mani della sicurezza (o non si riesce a
-   * dirlo)? PURA. In dubbio torna `true`: niente scheda.
-   */
+  // È passato dalle mani della sicurezza, o non si sa? In dubbio `true`: niente scheda.
   function isFlagged(fb) {
     if (!fb || typeof fb !== 'object') return true;
     const mr = MR();
 
-    // Status illeggibile (ciphertext, chiave assente): non sappiamo cosa
-    // stiamo pubblicando. Non si pubblica.
+    // Status illeggibile (ciphertext, chiave assente): non sappiamo cosa pubblicheremmo.
     if (mr.statusUnreadable(fb)) return true;
 
-    // Bocciatura di sicurezza sul fix, blocco strutturato, conferma di un
-    // attacco: tutti motivi per cui questo feedback non esiste per la bacheca.
+    // Bocciatura, blocco strutturato, attacco confermato: per la bacheca non esiste.
     const { status, statusReason } = mr.normalizeStatus(fb);
     if (statusReason === 'secaudit') return true;
     if (String(fb.blockReason || '').trim()) return true;
     if (String(status).endsWith('_confirmed')) return true;
 
-    // La classificazione storica (attacco/spam/design/loop/non filtrato) vale
-    // anche sui chiusi: un `done` con un blocco nel pipeline resta segnalato.
+    // Vale anche sui chiusi: un `done` con un blocco nel pipeline resta segnalato.
     if (mr.classifyLegacyBlock(fb)) return true;
 
-    // L'owner ha CONFERMATO il blocco a mano ('rejected'): mai in bacheca.
-    // (Il campo viaggia cifrato: qui arriva decifrato dal main, e se è ancora
-    // un ciphertext non combacia con 'rejected' — ma lo status illeggibile
-    // avrebbe già fermato tutto.)
+    // Blocco CONFERMATO a mano dall'owner: mai in bacheca.
+    // Il campo arriva decifrato dal main; un ciphertext lo fermerebbe già lo status.
     if (String(fb.reviewDecision || '').trim() === 'rejected') return true;
 
     const p = fb.pipeline;
@@ -175,21 +113,14 @@
       const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
       if (verdicts.some((v) => v && RISK_VERDICTS.includes(v.class))) return true;
     } else if (typeof p === 'string' && p) {
-      // `pipeline` cifrato e non decifrato: non sappiamo cosa dice. Non si pubblica.
+      // `pipeline` cifrato e non decifrato: non sappiamo cosa dice, non si pubblica.
       return true;
     }
 
     return false;
   }
 
-  /**
-   * La scheda pubblica di un feedback, o `null` se non ne deve avere una.
-   * PURA: nessuna rete, nessuna chiave — chi chiama passa il feedback già
-   * decifrato.
-   *
-   * @param {object} fb feedback completo (campi decifrati)
-   * @returns {object|null}
-   */
+  // Null se non deve averne una. Chi chiama passa il feedback già decifrato.
   function cardFor(fb) {
     if (isFlagged(fb)) return null;
     // #908: il lavoro locale dell'owner è una pratica interna, non un fix da mostrare (decisione owner); un utente approvato no (#913).
@@ -207,37 +138,18 @@
       resolvedInVersion: str(fb.resolvedInVersion, 40),
       createdAt: str(fb.createdAt, 40),
       resolvedAt: str(fb.resolvedAt, 40),
-      // L'impronta è di QUESTA scheda, non dell'installazione: la stessa
-      // persona ne ha una diversa su ogni fix, quindi chi legge la bacheca non
-      // può raggruppare i suoi. Chi l'ha segnalato la ricalcola lo stesso (sa
-      // l'id della scheda e l'impronta del proprio clientId) ed è così che il
-      // popup delle ricompense riconosce i propri.
+      // Impronta di QUESTA scheda, non dell'installazione: vedi feedbackClientIdHash.js.
       clientIdTag: CIH().cardTagSync(fb._id, fb.clientIdHash),
       userNote: str(fb.userNote, 500),
       reward: rewardFor(fb.priority),
     };
-    // Un titolo che è rimasto cifrato (chiave assente su quel campo) non si
-    // pubblica: meglio una scheda senza nome che un blob in bacheca.
+    // Un titolo rimasto cifrato non si pubblica: meglio senza nome che un blob in bacheca.
     if (MR().valueUnreadable && MR().valueUnreadable(card.name)) card.name = '';
     return card;
   }
 
-  /**
-   * I voti e le riaperture che stanno ancora sul DOCUMENTO e che la scheda non
-   * ha. PURA.
-   *
-   * Serve una volta sola, al passaggio: prima di questa vista i voti della
-   * bacheca e il segnale «ancora rotto» si scrivevano sul feedback, e la
-   * bacheca li leggeva da lì. Adesso li legge dalla scheda — e senza portarli
-   * dentro, il giorno in cui le regole vanno in produzione ogni conteggio
-   * riparte da zero e un fix già segnalato come rotto torna in bacheca
-   * riapribile una seconda volta, cioè il doppione che quel segnale doveva
-   * impedire.
-   *
-   * Si portano solo le chiavi che la scheda NON ha: chi ha votato dopo il
-   * passaggio ha ragione lui, e una ripubblicazione non gli cancella il voto.
-   * Quando non c'è più niente da portare torna `{}`, e il travaso smette da sé.
-   */
+  // I voti e le riaperture rimasti sul DOCUMENTO: senza portarli dentro ogni conteggio
+  // riparte da zero e un fix già segnalato come rotto torna riapribile una seconda volta.
   function carryUserFields(fb, before) {
     const out = {};
     for (const f of USER_FIELDS) {
@@ -251,7 +163,7 @@
     return out;
   }
 
-  /** Le due schede dicono la stessa cosa? PURA (confronto campo per campo). */
+  /** Le due schede dicono la stessa cosa? PURA, confronto campo per campo. */
   function sameCard(a, b) {
     if (!a || !b) return false;
     for (const f of CARD_FIELDS) {
@@ -263,19 +175,8 @@
     return true;
   }
 
-  /**
-   * Cosa va scritto e cosa tolto per far combaciare la vista con la realtà.
-   * PURA.
-   *
-   * @param {Array<object>} published schede già in `feedback-public` (con `_id`)
-   * @param {Array<object>} feedbacks feedback veri, decifrati (con `_id`)
-   * @param {{complete?: boolean}} [opts] `complete`: i feedback passati sono
-   *   TUTTI quelli che esistono (il caricamento non ha toccato il tetto). Solo
-   *   allora una scheda senza feedback è un orfano da togliere — altrimenti
-   *   sarebbe un feedback più vecchio del tetto, e toglierlo svuoterebbe la
-   *   bacheca a ogni giro.
-   * @returns {{ upsert: Array<{id:string, card:object}>, remove: string[] }}
-   */
+  // Cosa scrivere e cosa togliere per far combaciare la vista con la realtà.
+  // `opts.complete`: solo con TUTTI i feedback una scheda senza feedback è un orfano.
   function planSync(published, feedbacks, opts) {
     const complete = !!(opts && opts.complete);
     const now = new Map();
@@ -291,22 +192,15 @@
       if (!card) continue;
       wanted.add(id);
       const before = now.get(id);
-      // I voti e le riaperture rimasti sul documento vanno portati nella
-      // scheda: è l'unico posto da cui la bacheca li legge (vedi
-      // carryUserFields). Sono un motivo per riscrivere la scheda anche quando
-      // i campi della scheda non sono cambiati.
+      // Il travaso è un motivo per riscrivere la scheda anche se i suoi campi non cambiano.
       const carry = carryUserFields(fb, before);
       const daPortare = Object.keys(carry).length > 0;
       if (!before || !sameCard(before, card) || daPortare) {
         upsert.push({ id, card: daPortare ? { ...card, ...carry } : card });
       }
     }
-    // Una scheda che non deve più esserci si TOGLIE: un fix riaperto o
-    // riclassificato non resta in bacheca perché nessuno l'ha cancellato.
-    // Attenzione: si tolgono solo le schede dei feedback che abbiamo davvero
-    // guardato — un caricamento parziale (tetto della pagina) non deve
-    // svuotare la bacheca dei feedback più vecchi. Con `complete` si toglie
-    // anche una scheda rimasta senza il suo feedback (cancellato).
+    // Una scheda che non deve più esserci si TOGLIE, ma solo fra i feedback davvero guardati:
+    // un caricamento parziale non deve svuotare la bacheca dei più vecchi.
     const seen = new Set(
       (Array.isArray(feedbacks) ? feedbacks : [])
         .map((f) => (f && f._id ? String(f._id) : ''))
@@ -320,19 +214,8 @@
     return { upsert, remove };
   }
 
-  /**
-   * Riunisce ai feedback i campi che vivono sulla SCHEDA: i voti e le
-   * riaperture, che oggi si scrivono lì perché è l'unico documento che chi
-   * vota può aprire. PURA.
-   *
-   * Chi fa i conti dal lato dell'owner (la dashboard, l'archiviazione a
-   * punteggio) continua così a leggere `fb.votes` come ha sempre fatto. Quello
-   * che sta solo sul documento — i voti dati prima del passaggio — non si
-   * perde: la scheda vince chiave per chiave, non cancella il resto.
-   *
-   * @param {Array<object>} rows feedback (con `_id`)
-   * @param {Array<object>} cards schede pubbliche (con `_id`)
-   */
+  // Voti e riaperture vivono sulla SCHEDA, l'unico documento che chi vota può aprire.
+  // La scheda vince chiave per chiave: chi fa i conti continua a leggere `fb.votes`.
   function mergeUserFields(rows, cards) {
     if (!Array.isArray(rows) || rows.length === 0) return Array.isArray(rows) ? rows : [];
     const byId = new Map();

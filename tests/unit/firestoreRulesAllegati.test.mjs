@@ -41,7 +41,7 @@ test('l\'indirizzo che produce l\'app è accettato dalle regole', async () => {
     assert.ok(re.test(u), `le regole rifiuterebbero un allegato caricato dall'app: ${u}`);
   }
   // L'esploratore (tests/agent/feedback.mjs): etichetta agent_ davanti al nome.
-  const nome = FB.attachmentPath('image/png', 'agent');
+  const nome = FB.attachmentPath('agent');
   const u = `https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/${encodeURIComponent(nome)}?alt=media&token=${randomUUID()}`;
   assert.ok(re.test(u), u);
 });

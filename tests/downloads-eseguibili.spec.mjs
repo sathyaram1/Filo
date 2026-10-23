@@ -16,7 +16,8 @@
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
-import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
@@ -839,6 +840,51 @@ test('nelle domande del pannello il nome scelto dal sito sta nel suo riquadro, f
     expect(dopo).toContain('Aprirlo vuol dire eseguirlo');
     expect(dopo, 'il nome del sito parla con la voce di Filo').not.toContain(FINTO);
     expect(await app.evaluate(() => globalThis.__aperti.slice())).toEqual([]);
+  } finally {
+    await new Promise((r) => { try { srv.closeAllConnections?.(); } catch (_) {} srv.close(r); });
+  }
+});
+
+// #1510 — anche uno scaricamento da link arriva col nome vero (niente caratteri che capovolgono la lettura) e porta
+// la marca d'origine del sistema, senza contare su quella che Electron mette o non mette.
+test('uno scaricamento da link arriva col nome vero e marcato come arrivato da Internet', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const srv = createServer((req, res) => {
+    const p = String(req.url || '').split('?')[0];
+    if (p === '/p.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><html><body style="padding:40px"><a id="l" href="/doc">la fattura</a></body></html>'); return; }
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': PDF.length, 'Content-Disposition': "attachment; filename*=UTF-8''fattura%E2%80%AEfdp.pdf" });
+    res.end(PDF);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const dir = await cartellaDownload(app);
+    const page = await openTab(`${base}/p.html`);
+    await page.locator('#l').click();
+    const arrivato = async () => {
+      const r = await elenco(shell);
+      const v = ((r && r.items) || []).find((it) => it.url === `${base}/doc`);
+      return v && v.state === 'completed' ? v : null;
+    };
+    await expect.poll(arrivato, { timeout: 20000 }).not.toBeNull();
+    const v = await arrivato();
+    const BIDI = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/;
+    expect(v.filename).not.toMatch(BIDI);
+    expect(v.filename).toMatch(/\.pdf$/);
+    expect(v.savePath).toBe(join(dir, v.filename));
+    expect(existsSync(v.savePath)).toBe(true);
+    expect(contenuto(dir).filter((n) => BIDI.test(n))).toEqual([]);
+
+    if (process.platform === 'win32') {
+      const marca = readFileSync(`${v.savePath}:Zone.Identifier`, 'utf8');
+      expect(marca).toContain('ZoneId=3');
+      expect(marca).toContain(`HostUrl=${base}/doc`);
+      expect(marca).toContain(`ReferrerUrl=${base}/p.html`);
+    } else if (process.platform === 'darwin') {
+      expect(execFileSync('/usr/bin/xattr', ['-p', 'com.apple.quarantine', v.savePath], { encoding: 'utf8' })).toMatch(/^0081;[0-9a-f]+;Filo;/);
+    } else {
+      expect(contenuto(dir).filter((n) => n.includes('Zone.Identifier'))).toEqual([]);
+    }
   } finally {
     await new Promise((r) => { try { srv.closeAllConnections?.(); } catch (_) {} srv.close(r); });
   }

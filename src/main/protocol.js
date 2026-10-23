@@ -1,16 +1,6 @@
-// Protocollo filo:// — serve pagine interne e asset.
-//
-// URL schema:
-//   filo://shell/<file>          → src/renderer/<file>   (chrome del browser)
-//   filo://newtab/                → src/pages/dashboard/dashboard.html
-//   filo://<page>/<file?>         → src/pages/<page>/<file or page.html>
-//   filo://asset/<path>           → assets/<path>
-//   filo://style/<file>           → src/styles/<file>
-//   filo://shared/<file>          → src/shared/<file>
-//   filo://icone/<nome>           → <cartella dati>/icone/<nome> (src/main/services/copieIcone.js)
-//
-// Privilegi: il protocollo è registrato come "standard, secure, supportsFetchAPI"
-// così la fetch() funziona e le politiche CORS sono ragionevoli.
+// Protocollo filo://: serve pagine interne e asset dal disco (la tabella
+// host → cartella sta in filoHandler). Registrato standard+secure+fetch, quindi
+// non deve MAI servire un file fuori dalla root del progetto (filo://icone: dalla cartella dati).
 
 const { protocol, net } = require('electron');
 const path = require('node:path');
@@ -114,7 +104,10 @@ async function filoHandler(request) {
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
     } else if (host === 'newtab') {
-      fsPath = path.join(SRC, 'pages', 'dashboard', rel || 'dashboard.html');
+      // La home sta nella cartella dashboard: «newtab.html» è il nome che la regola <host>/<host>.html delle altre
+      // pagine fa scrivere, e deve aprire la home invece di un file che non c'è (#830.4).
+      const home = !rel || rel.toLowerCase() === 'newtab.html';
+      fsPath = path.join(SRC, 'pages', 'dashboard', home ? 'dashboard.html' : rel);
     } else if (host === 'asset') {
       fsPath = path.join(ASSETS, rel);
     } else if (host === 'style') {
@@ -122,19 +115,16 @@ async function filoHandler(request) {
     } else if (host === 'shared') {
       fsPath = path.join(SRC, 'shared', rel);
     } else if (host === 'src') {
-      // Passthrough per i casi legacy in cui il codice estensione
-      // chiama chrome.runtime.getURL('src/pages/X/Y.html'): lo shim
-      // costruisce filo://src/pages/X/Y.html e atterriamo qui.
+      // Il codice portato chiama chrome.runtime.getURL('src/...') e lo shim
+      // costruisce filo://src/..., che atterra qui.
       fsPath = path.join(SRC, rel);
     } else {
       // filo://<page>/<file?> → src/pages/<page>/<file or page.html>
       fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
     }
 
-    // Sicurezza: non lasciare uscire dalla root del progetto. Il confine deve
-    // includere il separatore: senza, una cartella sorella il cui path inizia
-    // con la stringa ROOT (es. "Filo-altro" accanto a "Filo") passerebbe il
-    // check. Consentiamo ROOT esatta o un percorso sotto ROOT + separatore.
+    // Il confine include il separatore: senza, una cartella sorella che inizia
+    // con la stessa stringa ("Filo-altro" accanto a "Filo") passerebbe.
     const resolved = path.resolve(fsPath);
     if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) {
       return new Response('Forbidden', { status: 403 });
@@ -170,16 +160,13 @@ async function registerFiloProtocol() {
   protocol.handle('filo', filoHandler);
 }
 
-// Registra filo:// su una sessione specifica. protocol.handle() globale copre
-// solo la sessione di default; le finestre incognito usano una partizione
-// effimera propria (session.fromPartition senza 'persist:'), e senza questa
-// registrazione le pagine interne filo:// non caricherebbero lì.
+// protocol.handle() globale copre solo la sessione di default: senza questa,
+// nella partizione effimera dell'incognito le pagine filo:// non caricano.
 function registerFiloProtocolForSession(sess) {
   try {
     sess.protocol.handle('filo', filoHandler);
   } catch (err) {
-    // handle() lancia se 'filo' è già registrato su quella sessione: ok,
-    // significa che è già servito (es. doppia init).
+    // Lancia se 'filo' è già registrato su quella sessione: allora è già servito.
     console.warn('[Filo protocol] per-session register:', err.message || err);
   }
 }

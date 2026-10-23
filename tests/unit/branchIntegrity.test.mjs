@@ -347,7 +347,7 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
   // alla base e parcheggia il lavoro su discarded/ — è quello che è successo a
   // #502 (8 commit, 828 righe) e a #495.
   function scenaConsegna() {
-    const { work } = makeRepo();
+    const { work, origin } = makeRepo();
     const id = 'feed507';
     const branch = 'worker/feed507-x';
     // Come nel repo vero: i marcatori di sessione sono esclusi da git (senza,
@@ -361,7 +361,7 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     // Il lavoro: commit + push (l'hook di salvataggio pusha sempre).
     const consegna = commit(work, 'lavoro.txt', 'fatto\n');
     git(work, ['push', '-q', 'origin', branch]);
-    return { work, id, branch, base, consegna };
+    return { work, origin, id, branch, base, consegna };
   }
 
   test('senza sigillo il posizionamento successivo SCARTA la consegna (il guasto)', () => {
@@ -419,6 +419,85 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     const r = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
     assert.equal(r.ok, true, r.message);
     assert.equal(r.head, pulizia, 'la pulizia del verificatore non è un moncone da scartare');
+    assert.equal(r.discarded, null);
+  });
+
+  test('l’interruzione riporta indietro anche origin: il punto fermo è antenato della punta pubblicata', () => {
+    const { work, origin, branch, base } = scenaConsegna();
+    const r = prepareBranch({ root: work, branch, checkpoint: base });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.rewritten, null, 'un moncone spedito dall’hook non è una riscrittura');
+    assert.equal(git(origin, ['rev-parse', `refs/heads/${branch}`]), base, 'origin torna al punto fermo come il ramo locale');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('D — il ramo riscritto altrove (#1486): si riparte dalla punta pubblicata', () => {
+  // Un riallineamento rifà il ramo su main e lo spinge forzando: il punto fermo di questa macchina è della storia
+  // di prima. Ripartire da lì toglieva il riallineamento e i giri dopo, e la critica non si registrava più.
+  function scenaRiscritta() {
+    const { work, origin } = makeRepo();
+    const branch = 'worker/riscritto';
+    git(work, ['checkout', '-q', '-b', branch]);
+    const vecchio = commit(work, 'lavoro.txt', 'giro 0\n');
+    git(work, ['push', '-q', 'origin', branch]);
+    const altrove = resolve(dirname(work), 'altrove');
+    mkdirSync(altrove);
+    git(altrove, ['clone', '-q', origin, '.']);
+    commit(altrove, 'main-avanti.txt', 'main è andata avanti\n');
+    git(altrove, ['push', '-q', 'origin', 'main']);
+    git(altrove, ['checkout', '-q', '-b', branch, `origin/${branch}`]);
+    git(altrove, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'main']);
+    const nuovo = commit(altrove, 'giro1.txt', 'correzioni del giro 1\n');
+    git(altrove, ['push', '-q', '--force', 'origin', branch]);
+    assert.throws(() => git(work, ['merge-base', '--is-ancestor', vecchio, nuovo]), 'la scena deve essere una riscrittura');
+    return { work, origin, branch, vecchio, nuovo };
+  }
+
+  test('ramo locale ancora sulla storia vecchia: si atterra sulla punta pubblicata', () => {
+    const { work, origin, branch, vecchio, nuovo } = scenaRiscritta();
+    const r = prepareBranch({ root: work, branch, checkpoint: vecchio });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, nuovo, 'il punto fermo locale è della storia di prima del riallineamento');
+    assert.equal(r.rewritten, vecchio, 'la riscrittura si dice, con lo sha lasciato');
+    assert.equal(existsSync(resolve(work, 'giro1.txt')), true, 'i commit dopo il riallineamento ci sono');
+    assert.equal(existsSync(resolve(work, 'main-avanti.txt')), true, 'e c’è la base nuova');
+    assert.equal(git(origin, ['rev-parse', `refs/heads/${branch}`]), nuovo, 'origin resta dov’era');
+  });
+
+  test('senza ramo locale (resta solo l’oggetto vecchio): origin NON viene riportato indietro', () => {
+    const { work, origin, branch, vecchio, nuovo } = scenaRiscritta();
+    git(work, ['checkout', '-q', 'main']);
+    git(work, ['branch', '-q', '-D', branch]);
+    assert.equal(git(work, ['cat-file', '-t', vecchio]), 'commit', 'l’oggetto vecchio deve esserci ancora');
+    const r = prepareBranch({ root: work, branch, checkpoint: vecchio });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, nuovo);
+    assert.equal(git(work, ['ls-remote', 'origin', `refs/heads/${branch}`]).split(/\s+/)[0], nuovo,
+      'forzare origin al commit di prima del riallineamento annulla il lavoro di chi ha riallineato');
+  });
+
+  test('i commit locali sopra il punto vecchio non si perdono: restano parcheggiati', () => {
+    const { work, branch, vecchio, nuovo } = scenaRiscritta();
+    const monco = commit(work, 'meta.txt', 'lavoro a metà sulla storia vecchia\n');
+    const r = prepareBranch({ root: work, branch, checkpoint: vecchio });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, nuovo);
+    assert.ok(r.discarded, 'parcheggiati, non cancellati');
+    assert.equal(git(work, ['rev-parse', r.discarded]), monco);
+  });
+
+  test('un punto fermo PIÙ AVANTI della punta pubblicata (spedizione fallita) resta il bersaglio', () => {
+    const { work } = makeRepo();
+    const branch = 'worker/non-spedito';
+    git(work, ['checkout', '-q', '-b', branch]);
+    commit(work, 'a.txt', 'spedito\n');
+    git(work, ['push', '-q', 'origin', branch]);
+    const sigillato = commit(work, 'b.txt', 'sigillato ma non spedito\n');
+    const r = prepareBranch({ root: work, branch, checkpoint: sigillato });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, sigillato, 'origin indietro non è una riscrittura: il lavoro sigillato non si scarta');
+    assert.equal(r.rewritten, null);
     assert.equal(r.discarded, null);
   });
 });

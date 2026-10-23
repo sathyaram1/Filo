@@ -375,6 +375,8 @@ html, body {
   margin-left: 8px;
   color: var(--sn-error);
   font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
 }
 
 /* Quota di testo in ingresso riusata da una richiesta precedente: dato di servizio, discreto accanto
@@ -582,7 +584,8 @@ html, body {
   margin-top: 12px;
 }
 .sn-spell-add-row:has(#newDictWord),
-section:has(#dictList) .sn-spell-add-row {
+section:has(#dictList) .sn-spell-add-row,
+section:has(#rifiutateList) .sn-spell-add-row {
   grid-template-columns: 1fr auto;
 }
 

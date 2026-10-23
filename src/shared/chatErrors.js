@@ -34,7 +34,7 @@
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
 //
-//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | ''
+//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | 'voce' | ''
 //     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
 //     collegamento al «Riprova» (che su questi codici non porta da nessuna
 //     parte finché non si cambia qualcosa).
@@ -50,21 +50,15 @@
 (function (global) {
   'use strict';
 
-  // Guasti di rete passeggeri: nessuna risposta HTTP è mai arrivata, quindi
-  // ritentare la stessa chiamata ha senso (a differenza di un 400, che
-  // ritornerebbe identico).
-  // Nota: "failed to fetch" (con TO) è la forma che lancia il `fetch` del
-  // renderer Chromium quando non c'è rete (le pagine filo://). Il `fetch` di
-  // Node/undici nel main dice invece "fetch failed": qui matchiamo entrambe, così
-  // un guasto di rete è classificato come tale a prescindere dal processo.
+  // Nessuna risposta HTTP è arrivata, quindi ritentare ha senso: un 400 tornerebbe uguale.
+  // Due forme: «failed to fetch» nel renderer, «fetch failed» nel main. Stessa classifica.
   const TRANSIENT_NETWORK_RE =
     /fetch failed|failed to fetch|load failed|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed|timed out|timeout/i;
 
   function messageOf(e) {
     if (!e) return '';
     if (typeof e === 'string') return e;
-    // Un errore di rete di undici/Node porta spesso il vero motivo nella
-    // `cause` ("fetch failed" ← "ENOTFOUND"): guardiamo anche lì.
+    // Il vero motivo sta spesso nella `cause`: «fetch failed» ← «ENOTFOUND».
     const own = String(e.message || '');
     const causeMsg = e.cause ? String(e.cause.message || e.cause.code || e.cause) : '';
     return causeMsg ? `${own} ${causeMsg}` : own;
@@ -72,11 +66,11 @@
 
   function isTransientNetwork(e) {
     if (!e) return false;
-    // Annullato da noi (l'utente ha cambiato pagina, nuovo invio): non è un
-    // guasto, e ritentare sarebbe sbagliato.
+    // Annullato da noi (cambio pagina, reinvio): non è un guasto, e ritentare sarebbe
+    // sbagliato.
     if (e.name === 'AbortError' || e.code === 'ABORT_ERR') return false;
-    // Un errore con status HTTP è una RISPOSTA del server: non è un guasto di
-    // rete, ritentarlo alla cieca non serve.
+    // Un errore con status HTTP è una RISPOSTA del server, non un guasto di rete:
+    // ritentarlo alla cieca non serve.
     if (Number(e.status) > 0) return false;
     const code = String(e.code || (e.cause && e.cause.code) || '');
     if (code && TRANSIENT_NETWORK_RE.test(code)) return true;
@@ -103,6 +97,10 @@
     'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
+  // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
+  // gestisce Filo non ce l'ha (#1344.1).
+  const DOVE_ALTRO_MODELLO = 'in Opzioni → Modelli per azione';
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
@@ -112,8 +110,17 @@
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     NO_ALLOWED_HOST: 'opzioni',
     LIMIT_REACHED: 'opzioni',
+    // Errori la cui cura è un altro modello: la frase dice DOVE_ALTRO_MODELLO, il tasto porta lì.
+    NO_TOOL_HOST: 'opzioni',
+    MODEL_UNAVAILABLE: 'opzioni',
+    DATA_POLICY: 'opzioni',
+    NO_PROVIDER_ALLOWED: 'opzioni',
+    ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
+    // Il modello di lettura vuole il nome di una voce, o non conosce quello scritto: si scrive in Preferenze.
+    TTS_VOICE_REQUIRED: 'voce',
+    TTS_VOICE_UNKNOWN: 'voce',
   };
   // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
   // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
@@ -137,6 +144,7 @@
     crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti', title: 'Controlla o togli la chiave OpenRouter' },
     opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni', title: 'Scegli il modello per questa funzione' },
     preferenze: { url: 'filo://preferences/preferences.html#sec-lunghezza', label: 'Apri Preferenze', title: 'Cambia quanto può essere lunga una risposta' },
+    voce: { url: 'filo://preferences/preferences.html#sec-lettura', label: 'Apri Preferenze', title: 'Scegli o scrivi la voce di lettura' },
   };
   function rimedioPagina(x) {
     const dove = rimedio(x);
@@ -264,10 +272,8 @@
       return 'problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.';
     }
 
-    // Errore del SERVIZIO AI (il modello): riconosciuto dal marcatore
-    // strutturato che i provider attaccano ai loro errori HTTP (err.provider)
-    // o — rete di sicurezza per errori non marcati — dalla forma del messaggio
-    // ("OpenRouter 400: …", "Gemini 503: …").
+    // Errore del SERVIZIO AI, riconosciuto dal marcatore `err.provider` o, per quelli non
+    // marcati, dalla forma del messaggio.
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
@@ -275,14 +281,14 @@
       // Con la chiave dell'utente la rimedia lui; con quella di Filo resta solo un altro modello.
       if ((e && e.code === 'DATA_POLICY') || (st === 404 && /data policy/i.test(raw))) {
         return e && e.keySource === 'own'
-          ? 'nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello in Modelli predefiniti.'
-          : 'nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello in Modelli predefiniti.';
+          ? `nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
+          : `nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
       if (e && e.code === 'NO_PROVIDER_ALLOWED') {
         return e.keySource === 'own'
-          ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
-          : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
+          ? `nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
+          : `nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #1097.3: fra gli host ammessi nessuno regge il tetto di lunghezza della risposta di questa funzione.
       if (e && e.code === 'TETTO_RISPOSTA') {
@@ -291,26 +297,26 @@
         // Testo più tetto oltre la memoria del modello: il testo da solo ci stava.
         const f = Number(e.finestra);
         if (Number.isFinite(f) && f > 0) {
-          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria in Modelli predefiniti.`;
+          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
         }
-        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
+        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
-        return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
+        return `il modello scelto non è più disponibile sul servizio AI: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
       if (e && e.code === 'NO_TOOL_HOST') {
         const n = Number(e.maxTokens);
         if (Number.isFinite(n) && n > 0) {
-          return `per il modello scelto nessun fornitore ammesso regge insieme gli strumenti della chat (cercare, leggere, impostare) e risposte lunghe quanto il tetto di ${n.toLocaleString('it-IT', { useGrouping: true })} token: abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
+          return `per il modello scelto nessun fornitore ammesso regge insieme gli strumenti della chat (cercare, leggere, impostare) e risposte lunghe quanto il tetto di ${n.toLocaleString('it-IT', { useGrouping: true })} token: abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
         }
-        return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+        return `per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // Il router non ha trovato un host che accetti gli strumenti (tool
       // calling) per il modello scelto: la chat della home non funziona senza.
       // Non è un guasto passeggero, è una scelta di modello da cambiare.
       if (/tool/i.test(raw) && (st === 404 || st === 400)) {
-        return 'il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+        return `il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // Chiave rifiutata (#629): se c'era un portafoglio, il ripiego sui
       // crediti di Filo è già scattato prima di arrivare qui; se l'errore
@@ -321,7 +327,7 @@
       // verifica del ramo: dava la colpa alla chiave, che era a posto).
       const W = globalThis.SN_WALLET;
       if (st === 403 && W && W.isModerationBlock(raw)) {
-        return 'OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione in Modelli predefiniti.';
+        return `OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione ${DOVE_ALTRO_MODELLO}.`;
       }
       if (st === 401 || st === 403) {
         return 'il servizio AI ha rifiutato la tua chiave API: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
@@ -356,8 +362,8 @@
       return 'il servizio AI non è riuscito a rispondere: potrebbe esserci un problema con il modello scelto nelle Impostazioni. Riprova, o prova con un altro modello.';
     }
 
-    // Errore HTTP "nudo" (nessun marcatore di provider AI): se la chat
-    // interroga anche un archivio esterno, è (quasi sempre) lui.
+    // Errore HTTP nudo, senza marcatore di provider AI: se la chat interroga anche un archivio
+    // esterno, quasi sempre è lui.
     const status = Number(e && e.status);
     if (Number.isFinite(status) && status > 0) {
       const src = String(o.dataSource || '').trim();
@@ -371,13 +377,10 @@
         : 'la richiesta non è stata accettata. Riprova riformulandola con parole diverse.';
     }
 
-    // Qualsiasi altro errore è tecnico e non aiuterebbe l'utente: frase
-    // generica in chat, dettaglio nei log.
+    // Ogni altro errore è tecnico e non aiuterebbe: frase generica in chat, dettaglio nei log.
     return 'qualcosa è andato storto. Riprova.';
   }
 
-  // Frase a sé stante: la proposizione con l'iniziale maiuscola. Per chi mostra
-  // l'errore da solo nella bolla (chat della home) invece di incastonarlo.
   function sentence(e, opts) {
     const s = friendly(e, opts);
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -460,7 +463,7 @@
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
-    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti,
+    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

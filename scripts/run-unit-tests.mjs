@@ -367,6 +367,8 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
  * - Se dopo una chiusura non finisce più nessun file per un altro tetto, è ferma la corsa (il disco pieno, #717), o
  *   chiudere non è servito: ma solo se il fermo è un chiuso o è partito qualcosa dopo. Altrimenti la corsa sta finendo
  *   e il fermo è un altro appeso di prima, che si chiude da solo: chiusa la corsa, gli esiti dietro di lui sparivano (#1235).
+ * - `.sospetti()`: i chiusi dopo i quali nessun file è finito da sé. Chiusa la corsa senza file in corso, sono loro
+ *   che la tenevano ferma, e l'avviso li nomina (#1573).
  */
 export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   const partenza = new Map();
@@ -377,7 +379,8 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   let ultimaFine = null;
   let chiusiSenzaFine = false;
   let partitiAllaChiusura = 0;
-  return (righe, ora) => {
+  let sospetti = [];
+  const giudica = (righe, ora) => {
     for (const r of righe) {
       if (r.via) { if (!partenza.has(r.via)) partenza.set(r.via, ora); }
       else if (r.fine) {
@@ -394,10 +397,13 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
     const muta = ultimaFine === null || ora - ultimaFine >= tetto;
     const file = muta ? inCorso.filter((f) => f === primo || ora - partenza.get(f) >= tetto) : [primo];
     for (const f of file) chiusi.add(f);
+    sospetti = chiusiSenzaFine ? [...sospetti, ...file] : file;
     chiusiSenzaFine = true;
     partitiAllaChiusura = partenza.size;
     return { file };
   };
+  giudica.sospetti = () => (chiusiSenzaFine ? [...sospetti] : []);
+  return giudica;
 }
 
 /** Un lavoro fisso per il processore: quanto ci mette dice quanto la macchina è carica adesso. */
@@ -570,7 +576,8 @@ export const lanciaSorvegliato = (args, { env, avanzamento = null, tetto = TETTO
     }
     if (!giudizio && !tutto) return;
     clearInterval(guardia);
-    fermo = fileInCorso(leggiRighe(avanzamento));
+    const inCorso = fileInCorso(leggiRighe(avanzamento));
+    fermo = inCorso.length ? inCorso : fileFermo.sospetti();
     chiudiAlbero(c);
   }, controlloPer(tetto));
   const fine = (esito) => { if (guardia) clearInterval(guardia); ok({ ...esito, chiusi: chiusi.filter((f) => !(fermo || []).includes(f)), ...raccolto() }); };
@@ -609,6 +616,16 @@ async function main() {
       console.error('[test:unit] togli la virgola o i due punti fra le graffe dal nome: mi fermo.');
       process.exitCode = 1;
       return;
+    }
+  }
+
+  // Una libreria nuova del lock arriva prima delle prove che la usano (#1572); le prove del lanciatore stesso no.
+  if (!process.env.FILO_UNIT_DIR) {
+    try {
+      const { allineaPerLeProve } = await import('./lib/pacchetti.mjs');
+      allineaPerLeProve(REPO_ROOT, { prefisso: '[test:unit]' });
+    } catch (e) {
+      console.log(`[test:unit] controllo dei pacchetti saltato: ${e && e.message ? e.message : e}`);
     }
   }
 

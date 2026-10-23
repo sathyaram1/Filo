@@ -16,7 +16,7 @@
 
 'use strict';
 
-// --- CRC32 (tabella standard, polinomio 0xEDB88320) -------------------------
+// CRC32, tabella standard (polinomio 0xEDB88320).
 let CRC_TABLE = null;
 function crcTable() {
   if (CRC_TABLE) return CRC_TABLE;
@@ -36,8 +36,7 @@ function crc32(buf) {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
-// --- ZIP writer (STORE) -----------------------------------------------------
-// entries: [{ name: string, buffer: Buffer }]
+// entries: [{ name: string, buffer: Buffer }].
 function zipStore(entries) {
   const chunks = [];
   const central = [];
@@ -100,11 +99,8 @@ function zipStore(entries) {
   return Buffer.concat([...chunks, centralBuf, end]);
 }
 
-// --- estrazione immagini dai data-URL ---------------------------------------
 const DATA_URL_RE = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i;
 
-// Cammina ricorsivamente l'oggetto e sostituisce ogni stringa data-URL immagine
-// con un percorso relativo, raccogliendo i buffer delle immagini.
 function extractImages(node, images) {
   const replaceStr = (s) => {
     const m = DATA_URL_RE.exec(s);
@@ -223,16 +219,8 @@ function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } =
   return zipStore(entries);
 }
 
-// ============================================================================
-// IMPORTAZIONE — l'inverso esatto di buildExportZip.
-//
-// Un backup che non si può ripristinare non è un backup: qui viviamo la metà
-// mancante. Leggiamo lo zip prodotto da buildExportZip (o una sua versione
-// ri-compressa da un qualsiasi gestore di archivi: accettiamo anche DEFLATE, e
-// il file dentro una cartella, perché l'utente ha tutto il diritto di
-// scompattare, guardare e ri-comprimere), rimettiamo le immagini al loro posto
-// come data-URL e fondiamo il risultato con i dati già presenti.
-// ============================================================================
+// IMPORTAZIONE, l'inverso esatto dell'export: un backup che non si può ripristinare non è
+// un backup. Si accetta anche DEFLATE e data.json in una cartella: l'utente ricomprime.
 
 const zlib = require('node:zlib');
 
@@ -336,9 +324,8 @@ function unzip(buf) {
   return { voci, saltate, mancanti };
 }
 
-// Estensione file → mime. buildExportZip deriva l'estensione dal mime
-// togliendo i caratteri non alfanumerici (image/svg+xml → "svgxml"), quindi qui
-// facciamo il cammino inverso sui casi reali e ricadiamo su image/<ext>.
+// L'export deriva l'estensione dal mime togliendo i non alfanumerici (image/svg+xml →
+// «svgxml»): qui il cammino inverso sui casi reali, con ripiego su image/<ext>.
 const EXT_TO_MIME = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
   webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif', tiff: 'image/tiff',
@@ -389,8 +376,7 @@ function inlineImages(node, files, prefix, stats, perse) {
 function readExportZip(zipBuffer) {
   const { voci: files, saltate, mancanti } = unzip(zipBuffer);
 
-  // data.json può stare in radice o dentro una cartella (utente che ha
-  // scompattato e ri-compresso): prendiamo quello meno profondo.
+  // data.json può stare in radice o in una cartella (zip rifatto): vince il meno profondo.
   let dataName = null;
   for (const name of [...files.keys(), ...saltate.map((s) => s.nome)]) {
     if (!/(^|\/)data\.json$/.test(name)) continue;
@@ -444,11 +430,8 @@ function readExportZip(zipBuffer) {
   };
 }
 
-// --- fusione con i dati già presenti ----------------------------------------
-// Identità di un elemento di lista: l'id quando c'è (le liste di Filo — pagine
-// salvate, cronologia, schede archiviate — sono tutte oggetti con id), altrimenti
-// il contenuto serializzato. Serve a non duplicare le voci già presenti quando si
-// ripristina un backup sopra dati vivi.
+// Identità di una voce: l'id se c'è, altrimenti il contenuto serializzato. Serve a non
+// duplicare ciò che c'è già quando si ripristina un backup sopra dati vivi.
 function itemKey(item) {
   if (item && typeof item === 'object' && !Array.isArray(item)) {
     for (const k of ['id', 'uuid', 'key']) {
@@ -462,8 +445,7 @@ function isPlainObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
-// Unione di due liste: si tengono TUTTE le voci locali (non si perde nulla di
-// ciò che c'è ora) e si accodano quelle del backup non ancora presenti.
+// Nulla di ciò che c'è ora va perso: si accodano solo le voci del backup non presenti.
 function mergeLists(local, imported) {
   const seen = new Set(local.map(itemKey));
   const out = local.slice();
@@ -569,6 +551,9 @@ const REGOLE_IMPORT = {
   CLIPBOARD_HISTORY: 'appunti',
   PERSONAL_DICT: 'contenuto',
   AUTOCORRECT: 'contenuto',
+  CORRETTORE_IMPARATO: 'contenuto',
+  // Un elenco di siti con un conto: dice dove si è scritto, come i cookie.
+  CORRETTORE_STILI: 'stato',
   ICON_LAYOUT: 'contenuto',
   OPEN_TABS: 'stato',
   FILO_RAW_LOG: 'stato',
@@ -609,6 +594,7 @@ const REGOLE_ALTRE_CHIAVI = {
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  walletUsageLog: 'stato',
   // I contatori di questa copia di Filo (#969): portati su un'altra, la stessa copia conterebbe due volte.
   contatoriGiornalieri: 'stato',
   // Il diario dei crediti spesi su questa copia: lo tiene in memoria chi avvisa, e il backup non lo riavvolge.

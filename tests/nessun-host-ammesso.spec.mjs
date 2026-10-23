@@ -5,19 +5,32 @@
 import { test, expect } from './fixtures/electron.mjs';
 
 const GEMINI = 'google/gemini-2.5-flash';
+// Pesi aperti: i crediti di Filo lo pagano (#830), e nel catalogo finto lo servono gli stessi host esclusi di Gemini.
+const GEMMA = 'google/gemma-4-31b-it';
 // Qui paga la chiave propria con l'interruttore dei fornitori esclusi spento: la frase indica anche quella strada (#962).
-const SPIEGAZIONE = 'non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione. Visto che paghi con la tua chiave, puoi anche accendere «Con la mia chiave, usa anche i fornitori esclusi» in Opzioni.';
+const CHIAVE_PROPRIA = 'Visto che paghi con la tua chiave, puoi anche accendere «Con la mia chiave, usa anche i fornitori esclusi» in Opzioni.';
+const SPIEGAZIONE = `non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione. ${CHIAVE_PROPRIA}`;
 
-// Il router finto nel main: il catalogo dice che Gemini lo servono solo host di Google, e la richiesta, che li esclude,
-// riceve il 404 del router; ogni altro modello risponde.
-async function preparaRouter(app, modelli) {
-  await app.evaluate(async (_e, { GEMINI, modelli }) => {
+// Il router finto nel main: il catalogo dice che Gemini e Gemma li servono solo host di Google, e la richiesta, che li
+// esclude, riceve il 404 del router; ogni altro modello risponde. `crediti`: niente chiave propria, paga il portafoglio.
+async function preparaRouter(app, modelli, { crediti = false } = {}) {
+  await app.evaluate(async (_e, { GEMINI, GEMMA, modelli, crediti }) => {
     const C = globalThis.SN_CONST;
+    if (crediti) {
+      const Module = process.getBuiltinModule('module');
+      const path = process.getBuiltinModule('path');
+      const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+      req('./auth/wallet-store').save({ key: 'sk-or-v1-personal-718', pseudonym: 'prova718' });
+    }
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       openWeightsOnly: false,
-      apiKeys: { openrouter: 'k-test' },
-      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry, 'gemini-x': { provider: 'openrouter', model: GEMINI } },
+      apiKeys: { openrouter: crediti ? '' : 'k-test' },
+      modelRegistry: {
+        ...globalThis.SN_TEST_MODELS.registry,
+        'gemini-x': { provider: 'openrouter', model: GEMINI },
+        'gemma-x': { provider: 'openrouter', model: GEMMA },
+      },
       models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.FILO_CHAT]: modelli, [C.ACTIONS.EXPLAIN]: modelli },
     });
     globalThis.SN_PROVIDER_OPENROUTER.forgetModelHosts();
@@ -35,15 +48,15 @@ async function preparaRouter(app, modelli) {
       }
       if (!u.includes('openrouter.ai/api/v1/chat/completions')) return globalThis.__fetchVero(url, init);
       const body = JSON.parse(init.body);
-      globalThis.__corpi.push({ model: body.model, ignore: (body.provider && body.provider.ignore) || [] });
-      if (body.model === GEMINI) return json({ error: { code: 404, message: 'No allowed providers are available for the selected model.' } }, 404);
+      globalThis.__corpi.push({ model: body.model, ignore: (body.provider && body.provider.ignore) || [], key: String((init.headers && init.headers.Authorization) || '').replace('Bearer ', '') });
+      if (body.model === GEMINI || body.model === GEMMA) return json({ error: { code: 404, message: 'No allowed providers are available for the selected model.' } }, 404);
       if (body.stream) {
         const sse = `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [{ delta: { content: 'Ecco fatto.' } }] })}\n\ndata: [DONE]\n\n`;
         return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
       }
       return json({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' } }], usage: {} });
     };
-  }, { GEMINI, modelli });
+  }, { GEMINI, GEMMA, modelli, crediti });
 }
 
 async function newtabPage(app) {
@@ -111,6 +124,35 @@ test('«Spiega» riceve la stessa frase, col suo nome', async ({ app, shell }) =
   expect(r.ok).toBe(false);
   expect(r.code).toBe('NO_ALLOWED_HOST');
   expect(r.error).toBe(`La funzione «Spiega (inline)» ${SPIEGAZIONE}`);
+});
+
+// #718.2: l'interruttore c'è solo con la chiave propria, e la frase non lo propone a chi paga coi crediti di Filo.
+test('coi crediti di Filo chat e «Spiega» non propongono l’interruttore della chiave propria', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await preparaRouter(app, 'gemma-x', { crediti: true });
+  const crediti = 'non può usare «google/gemma-4-31b-it» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione.';
+
+  await page.locator('#input').fill('che tempo fa domani a Roma?');
+  await page.locator('#sendBtn').click();
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'nessun fornitore ammesso lo ospita' });
+  await expect(bolla).toBeVisible({ timeout: 15_000 });
+  expect(await fraseDellaBolla(bolla)).toBe(`La funzione «Home — chat con Filo» ${crediti}`);
+  await expect(bolla.getByRole('button', { name: 'Apri Opzioni' })).toBeVisible();
+
+  const r = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: globalThis.SN_MSG.MSG.AI_REQUEST, action: globalThis.SN_CONST.ACTIONS.EXPLAIN, payload: { selection: 'neve', sentence: 'nevica in montagna' } },
+    { url: 'filo://newtab/newtab.html' },
+  ).then((x) => x, (e) => ({ ok: false, error: e.message, code: e.code })));
+  expect(r.code).toBe('NO_ALLOWED_HOST');
+  expect(r.error).toBe(`La funzione «Spiega (inline)» ${crediti}`);
+
+  const corpi = await app.evaluate(() => globalThis.__corpi);
+  expect(corpi.length).toBeGreaterThan(0);
+  expect(corpi.every((b) => b.model === GEMMA && b.key === 'sk-or-v1-personal-718' && b.ignore.includes('Google'))).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/718-crediti-nessun-host-ammesso.png' });
 });
 
 test('il «Prova» di una riga delle Opzioni su quel modello mostra la stessa spiegazione', async ({ app, openTab }) => {

@@ -32,7 +32,7 @@
 //     traccia di chi gira in questa directory.
 //   - STATO PER BRANCH (verdetti, contatore bocciature, esito sicurezza): lo
 //     tiene il SERVER. Il file locale <stateDir>/<id>.json è un ripiego che si
-//     riallinea a ogni busta ricevuta.
+//     riallinea a ogni busta ricevuta: il ramo dalla busta, i punti fermi dal posizionamento.
 //   - INTERRUTTORE MASTER (`config/routines.enabled`): lo guarda il preflight
 //     (prima del setup) e lo applica il server (niente biglietti nuovi da
 //     spento). Un biglietto già emesso si porta a termine: il feedback in
@@ -79,6 +79,7 @@ import {
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
+  lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
@@ -90,7 +91,7 @@ import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
-  leggiBigliettoAMano,
+  leggiBigliettoAMano, leggiMarcatoreBiglietto, bigliettoFinito,
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
@@ -1761,6 +1762,8 @@ export function usageText() {
     '',
     'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
     '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
+    '      5 lavoro vivo nella cartella (--ticket, --linea-principale): un altro worker lavora ancora qui,',
+    '        e niente è stato toccato; il messaggio dice chi (biglietto, processi, ultimo commit)',
   ].join('\n');
 }
 
@@ -1769,10 +1772,11 @@ export function usageText() {
  * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
  * il giro senza travestirlo da giornata tranquilla.
  */
-function emitHalt(kind, message) {
-  process.stderr.write(`[dispatch] GUASTO (${kind}): ${message}\n`);
-  emit({ role: 'halt', kind, message }, {});
-  return { exit: 3 };
+// `vivo`: un altro lavora nella cartella, e i suoi marcatori (ruolo compreso) non si toccano (#1480).
+function emitHalt(kind, message, { vivo = false } = {}) {
+  process.stderr.write(`[dispatch] ${vivo ? 'LAVORO VIVO' : `GUASTO (${kind})`}: ${message}\n`);
+  emit({ role: 'halt', kind, message, ...(vivo ? { lavoroVivo: true } : {}) }, {});
+  return { exit: vivo ? USCITA_LAVORO_VIVO : 3 };
 }
 
 /** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
@@ -1885,6 +1889,8 @@ export function tornaAllaLineaPrincipale() {
   if (process.env.FILO_ROUTINE !== '1') {
     return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
   }
+  const vivo = lavoroVivo(ROOT);
+  if (vivo.vivo) return { ok: false, vivo: true, message: testoLavoroVivo(vivo, `riportato la cartella su ${MAIN_BRANCH}`) };
   clearExpectation(ROOT);
   tryGit(['fetch', 'origin', MAIN_BRANCH]);
   const rif = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok ? `origin/${MAIN_BRANCH}` : MAIN_BRANCH;
@@ -1911,6 +1917,9 @@ function positionOnBranch(bucket) {
   // giro passato ignorando quello assegnato dal server (#507, seconda porta).
   const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
+  // Il resto l'ha guardato il giro prima di scrivere i marcatori; qui resta un battito acceso nel frattempo da un altro.
+  const vivo = lavoroVivo(ROOT, { mio: readRoutineTicket(ROOT), cosa: ['battito'] });
+  if (vivo.vivo) return { ok: false, kind: 'transient', vivo: true, message: testoLavoroVivo(vivo, `posizionato la cartella su ${branch}`) };
 
   // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
   // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
@@ -1928,16 +1937,18 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
-  if (res.discarded) {
+  if (res.rewritten) {
+    process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${res.discarded ? `; i commit locali restano su ${res.discarded}` : ''}\n`);
+  } else if (res.discarded) {
     process.stderr.write(`[dispatch] ${branch}: lavoro di un'istanza interrotta riportato all'ultimo punto fermo; i commit scartati restano su ${res.discarded}\n`);
   }
 
   // Identità attesa del contenuto: è il valore che le transizioni (C) e il
-  // ripristino (D) confronteranno.
-  const state = withCheckpoint(
-    { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch },
-    res.head, `${bucket.role}:checkout`,
-  );
+  // ripristino (D) confronteranno. I punti fermi di un'altra storia (un altro ramo, o questo prima di una
+  // riscrittura) se ne vanno: la pulizia dopo un «pass» li consulterebbe ancora (#1486).
+  const base = { ...defaultState(bucket.id, branch), ...(prev || {}), id: bucket.id, branch };
+  if (prev?.branch !== branch || res.rewritten) base.checkpoints = [];
+  const state = withCheckpoint(base, res.head, `${bucket.role}:checkout`);
   writeState(state);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
   writeExpectation(ROOT, { branch, id: bucket.id });
@@ -2101,7 +2112,7 @@ async function finalizeBucket(bucket, fromServer) {
         // facendo — con il giro che esce dicendo che è andato tutto bene.
         return emitHalt('permanent', pos.message);
       }
-      return emitHalt('transient', pos.message);
+      return emitHalt('transient', pos.message, { vivo: !!pos.vivo });
     }
   }
 
@@ -2155,7 +2166,7 @@ export function emit(bucket, ctx) {
   // quello del giro precedente sopravviverebbe a un giro che non ha lavorato e
   // finirebbe nella provenienza di un feedback altrui.
   const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
-  if (bucket.role === 'halt') clearRole(ROOT);
+  if (bucket.role === 'halt') { if (!bucket.lavoroVivo) clearRole(ROOT); }
   else writeRole(ROOT, bucket.role, { dal: ambito.scope === 'riallineamento' ? ctx?.perimetro?.shaVerificato : '' });
   const pieno = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
@@ -2444,6 +2455,10 @@ if (isMainModule) {
       }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
     } else if (flag === '--linea-principale') {
       const r = tornaAllaLineaPrincipale();
+      if (r.vivo) {
+        console.error(`[dispatch] LAVORO VIVO: ${r.message}\nChiudi il giro senza rilasciare niente: chi lavora qui consegna e rilascia da sé.`);
+        process.exit(USCITA_LAVORO_VIVO);
+      }
       if (!r.ok) {
         console.error(`[dispatch] ${r.uso ? '' : 'GUASTO (transient): '}${r.message}`);
         process.exit(r.uso ? 1 : 3);
@@ -2486,6 +2501,14 @@ if (isMainModule) {
       // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       giroDelBiglietto = true;
+      // Prima di ogni marcatore: biglietto, battito e ruolo di chi lavora ancora qui restano i suoi (#1480).
+      // Chi rilancia dispatch col biglietto che la cartella ha già è lo stesso worker: i processi lì sono i suoi.
+      const marcatore = ticket ? leggiMarcatoreBiglietto(ROOT) : null;
+      const giaSua = !!(marcatore && String(marcatore.ticket || '') === ticket && !bigliettoFinito(marcatore));
+      if (ticket && !giaSua) {
+        const vivo = lavoroVivo(ROOT, { mio: ticket });
+        if (vivo.vivo) process.exit(emitHalt('transient', testoLavoroVivo(vivo, 'preso la cartella per il tuo lavoro'), { vivo: true }).exit);
+      }
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e

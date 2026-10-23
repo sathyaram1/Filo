@@ -5,11 +5,8 @@
 
   const { STORAGE_KEYS, DEFAULT_SETTINGS } = global.SN_CONST;
 
-  // Chiavi il cui valore va SOSTITUITO interamente invece di fuso ricorsivamente.
-  // Servono per oggetti-mappa il cui contratto è "questa è la lista completa,
-  // chi manca è stato rimosso" (es. modelRegistry: rimuovere un nickname dalla
-  // UI deve cancellarlo dallo storage, non lasciarlo lì in vita perché era in
-  // target).
+  // Chiavi da SOSTITUIRE invece di fondere: il loro contratto è «questa è la lista completa,
+  // chi manca è stato rimosso»: togliere un nickname dalla UI deve cancellarlo davvero.
   const REPLACE_KEYS = new Set(['modelRegistry', 'themeTokens']);
 
   function deepMerge(target, source, path = '') {
@@ -43,9 +40,8 @@
       const seed = (global.SN_TEST_MODELS && global.SN_TEST_MODELS.registry) || global.SN_CONST.DEFAULT_MODEL_REGISTRY;
       stored.modelRegistry = { ...seed };
     }
-    // Stesso seme per le catene delle funzioni: nell'app restano vuote (una
-    // funzione senza modello si ferma e lo dice), nei test partono dal registro
-    // di prova.
+    // Stesso seme per le catene delle funzioni: vuote nell'app (una funzione senza
+    // modello si ferma e lo dice), dal registro di prova nei test.
     if (!stored.models && global.SN_TEST_MODELS && global.SN_TEST_MODELS.models) {
       stored.models = { ...global.SN_TEST_MODELS.models };
     }

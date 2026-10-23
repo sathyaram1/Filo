@@ -91,6 +91,27 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
   to { text-decoration-color: transparent; }
 }
 
+/* La parola corretta da sé (#1447): un lampo caldo che sfuma in circa un secondo, sopra la parola e fuori dallo
+   specchio (lì ogni sfondo è spento). Colore e durata sono i token correttore.lampo.*. */
+.sn-spell-lampo {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--sn-spell-lampo, #f0b05a66);
+  animation: sn-spell-lampo calc(var(--sn-spell-lampo-durata, 1000ms) * var(--sn-motion, 1)) ease-out both;
+}
+.sn-spell-lampo[data-sn-theme="dark"] {
+  background: var(--sn-spell-lampo, #e2ad4d4d);
+}
+@keyframes sn-spell-lampo {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
 
 .sn-spell-popup {
@@ -206,4 +227,97 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 
 .sn-spell-popup-btn-secondary:hover {
   background: var(--sn-hover, rgba(0, 0, 0, 0.05));
+}
+
+/* I segnaposti (#1448): il valore trovato sta in piccolo SOPRA le x, così si legge senza tasto destro e il testo del
+   campo non si sposta; un clic lo mette. Ha lo strato suo, che riceve il mouse: lo specchio no, e taglia ai bordi. */
+.sn-spell-valori {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+.sn-spell-valori .sn-spell-valore {
+  all: initial;
+  --sn-segno: var(--sn-spell-suggerimento, #b07a14);
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 1px));
+  box-sizing: border-box;
+  padding: 0 4px;
+  min-width: 1.6em;
+  text-align: center;
+  font-family: var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: max(10px, calc(var(--sn-valore-corpo, 16px) * var(--sn-spell-valore-scala, 0.62)));
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: var(--sn-segno);
+  background: #fffaf1;
+  border: 1px solid color-mix(in srgb, var(--sn-segno) 40%, transparent);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(60, 40, 10, calc(0.14 * var(--sn-ombra, 1)));
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+  animation: sn-valore-arriva calc(160ms * var(--sn-motion, 1)) ease-out;
+  transition: background-color calc(120ms * var(--sn-motion, 1)), transform calc(120ms * var(--sn-motion, 1));
+}
+.sn-spell-valori[data-sn-theme="dark"] .sn-spell-valore {
+  --sn-segno: var(--sn-spell-suggerimento, #e2ad4d);
+  background: #2b2520;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, calc(0.4 * var(--sn-ombra, 1)));
+}
+.sn-spell-valori .sn-spell-valore:hover {
+  background: color-mix(in srgb, var(--sn-segno) 20%, #fffaf1);
+  transform: translate(-50%, calc(-100% - 3px));
+}
+.sn-spell-valori[data-sn-theme="dark"] .sn-spell-valore:hover {
+  background: color-mix(in srgb, var(--sn-segno) 24%, #2b2520);
+}
+.sn-spell-valori .sn-spell-valore:active {
+  transform: translate(-50%, calc(-100% - 1px)) scale(0.96);
+}
+/* Sopra le parole della riga prima il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
+.sn-spell-valori .sn-spell-valore.sn-sopra-testo:not(.sn-sveglio) {
+  pointer-events: none;
+  opacity: var(--sn-spell-valore-velato, 0.45);
+  box-shadow: none;
+  transition: opacity calc(120ms * var(--sn-motion, 1));
+}
+/* Mentre Filo cerca il dato: tre puntini che respirano al posto del valore. */
+.sn-spell-valori .sn-spell-valore.sn-cercando {
+  cursor: progress;
+}
+.sn-spell-valori .sn-spell-valore.sn-cercando::after {
+  content: '•••';
+  letter-spacing: 1px;
+  animation: sn-valore-cerca calc(1100ms * var(--sn-motion, 1)) ease-in-out infinite;
+}
+@keyframes sn-valore-arriva {
+  from { opacity: 0; transform: translate(-50%, calc(-100% + 2px)); }
+  to { opacity: 1; transform: translate(-50%, calc(-100% - 1px)); }
+}
+@keyframes sn-valore-cerca {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+/* Il lampo sul valore appena messo: dice dove il testo è cambiato, e sfuma. */
+.sn-spell-valori .sn-spell-lampo {
+  all: initial;
+  position: fixed;
+  border-radius: 3px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--sn-spell-suggerimento, #b07a14) 42%, transparent);
+  animation: sn-spell-lampo calc(900ms * var(--sn-motion, 1)) ease-out forwards;
+}
+.sn-spell-valori[data-sn-theme="dark"] .sn-spell-lampo {
+  background: color-mix(in srgb, var(--sn-spell-suggerimento, #e2ad4d) 45%, transparent);
+}
+@keyframes sn-spell-lampo {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

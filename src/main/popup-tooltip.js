@@ -1,12 +1,6 @@
-// Tooltip custom su BrowserWindow secondaria. La shell è alta 88px e non può
-// far apparire il tooltip oltre il suo viewport (sotto ci sono le WebContentsView
-// delle tab che coprono qualunque elemento DOM). Per i nav-btn / tab / win-btn
-// usiamo una mini-window trasparente sempre sopra, come per il popup-menu, così
-// l'hover mostra un riquadro Filo invece del title nativo bianco squadrato.
-//
-// La window è creata una sola volta on-demand e riusata: showTooltip() la
-// riposiziona e ricarica il testo, hideTooltip() la nasconde con hide() (non
-// close, per evitare il costo di reload ad ogni hover).
+// Tooltip su BrowserWindow trasparente: la shell è alta 88px e le
+// WebContentsView delle tab coprono qualunque tooltip DOM che sborda.
+// La window si crea una volta e si riusa (hide, non close: il reload a ogni hover si vede).
 
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
@@ -115,8 +109,7 @@ function ensureWin(parentWin) {
 function doShow(parentWin, text, x, y) {
   if (!tipWin || tipWin.isDestroyed()) return;
   const cb = parentWin.getContentBounds();
-  // Posizione provvisoria: la window verrà ridimensionata dopo che il renderer
-  // riporta la dimensione del testo (handler 'size' più sopra).
+  // Dimensione provvisoria: la corregge l'handler 'size' quando il renderer misura il testo.
   const px = cb.x + Math.round(x);
   const py = cb.y + Math.round(y);
   tipWin.setBounds({ x: px, y: py, width: 200, height: 30 });

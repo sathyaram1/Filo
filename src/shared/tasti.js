@@ -43,18 +43,15 @@
 (function (global) {
   'use strict';
 
-  // Da dove si sa su che sistema stiamo. Questo file gira in quattro posti
-  // diversi (main, preload, pagina interna di Filo, pagina web) e ognuno ha una
-  // sola di queste fonti: le proviamo tutte, in ordine di attendibilità.
+  // Questo file gira in quattro posti (main, preload, pagina interna, pagina web) e ognuno ha
+  // una sola di queste fonti: si provano tutte, in ordine di attendibilità.
   function piattaforma(esplicita) {
     if (esplicita) return esplicita;
     // main process, preload e content script (sandbox spento: `process` c'è).
     try {
       if (typeof process !== 'undefined' && process && process.platform) return process.platform;
     } catch (_) {}
-    // Pagina interna filo:// → internal-preload.js espone window.filo.sistema.
     try { if (global.filo && global.filo.sistema) return global.filo.sistema; } catch (_) {}
-    // Shell della finestra → shell-preload.js espone window.filoShell.sistema.
     try { if (global.filoShell && global.filoShell.sistema) return global.filoShell.sistema; } catch (_) {}
     // Ultima spiaggia: quello che dice il browser.
     try {
@@ -104,7 +101,6 @@
   const ALT = /^(alt|option|opt|opzione|\u2325)$/;
   const SHIFT = /^(shift|maiusc|maiuscolo|maiuscole|\u21e7)$/;
 
-  // L'etichetta da MOSTRARE per un acceleratore scritto in forma Windows.
   // Su Windows e Linux torna identica: la forma canonica è quella.
   function etichetta(accel, esplicita) { return nomeSulMac(accel, esplicita, false); }
 
@@ -117,7 +113,7 @@
     if (!testo || !suMac(esplicita)) return testo;
 
     const parti = pezzi(testo);
-    // Il nome del modificatore da solo ("Ctrl", in una frase che lo cita).
+    // Il nome del modificatore da solo, per una frase che lo cita.
     if (parti.length === 1) return CTRL.test(parti[0].toLowerCase()) ? 'Cmd' : testo;
 
     const tastoFinale = parti[parti.length - 1];
@@ -155,8 +151,7 @@
     return out.join('+');
   }
 
-  // Comodità per i testi che intrecciano l'etichetta in una frase:
-  // `frase('Grassetto', 'Ctrl+B')` → "Grassetto (Ctrl+B)" / "Grassetto (Cmd+B)".
+  // `frase('Grassetto', 'Ctrl+B')` → «Grassetto (Ctrl+B)» / «Grassetto (Cmd+B)».
   function frase(testo, accel, esplicita) {
     return `${testo} (${etichetta(accel, esplicita)})`;
   }
@@ -209,9 +204,8 @@
       : (alt && !ctrl && !meta);
     if (!giusto) return null;
 
-    // La cifra si legge dal tasto FISICO (Digit0–9: regge qualunque layout, e
-    // su Mac Opzione trasformerebbe comunque il carattere); `key` è il ripiego
-    // per gli eventi sintetici dei test.
+    // La cifra si legge dal tasto FISICO (Digit0–9: regge qualunque layout, e su Mac Opzione
+    // trasformerebbe il carattere); `key` è il ripiego per gli eventi sintetici dei test.
     const m = /^Digit([0-9])$/.exec(String(ev.code || ''));
     const cifra = m ? m[1] : (/^[0-9]$/.test(String(ev.key || '')) ? String(ev.key) : null);
     if (cifra == null) return null;
@@ -219,8 +213,8 @@
     if (suMac(esplicita)) {
       // Lo zero è dello zoom: qui non è un salto.
       if (cifra === '0') return null;
-      // Il nove è "l'ultima scheda": con meno di nove schede aperte porta
-      // comunque all'ultima, non nel vuoto.
+      // Il nove è «l'ultima scheda»: con meno di nove schede aperte porta comunque all'ultima,
+      // non nel vuoto.
       if (cifra === '9') {
         const n = Number(quante);
         return Number.isFinite(n) && n > 0 ? n - 1 : 8;
@@ -230,18 +224,32 @@
     return cifra === '0' ? 9 : Number(cifra) - 1;
   }
 
-  // Come si chiama, quel salto, per chi lo legge in un elenco.
   function etichettaSaltoScheda(esplicita) {
     return etichetta('Alt+1', esplicita).replace(/1$/, 'cifra');
   }
 
-  // Cosa fa, quel salto, per chi lo legge in un elenco. Sta accanto al nome e
-  // al comportamento perché le tre cose devono cambiare insieme: è dividerle
-  // che ha fatto promettere su Mac una decima scheda irraggiungibile.
   function descrizioneSaltoScheda(esplicita) {
     return suMac(esplicita)
       ? 'Vai alla scheda in quella posizione (9 = l’ultima; Cmd+0 è lo zoom al 100%)'
       : 'Vai alla scheda in quella posizione (0 = la decima)';
+  }
+
+  // ── La scheda dopo e quella prima ──────────────────────────────────────────
+  // Ctrl+Tab e Ctrl+Shift+Tab di ogni browser, su Mac col Control vero (Cmd+Tab è il cambio di app del
+  // sistema): l'etichetta resta «Ctrl+Tab» anche lì. Gira in tondo. Torna l'indice (0-based) o null.
+  function indiceSchedaVicina(ev, attiva, quante) {
+    if (!ev || !(String(ev.code || '') === 'Tab' || String(ev.key || '') === 'Tab')) return null;
+    if (!modificatore(ev, 'ctrl') || modificatore(ev, 'alt') || modificatore(ev, 'meta')) return null;
+    const n = Number(quante);
+    if (!Number.isInteger(n) || n < 1) return null;
+    const indietro = modificatore(ev, 'shift');
+    const i = Number(attiva);
+    if (!Number.isInteger(i) || i < 0 || i >= n) return indietro ? n - 1 : 0;
+    return (i + (indietro ? n - 1 : 1)) % n;
+  }
+
+  function etichettaSchedaVicina(verso) {
+    return verso === 'prima' ? 'Ctrl+Shift+Tab' : 'Ctrl+Tab';
   }
 
   // ── Indietro e avanti ──────────────────────────────────────────────────────
@@ -338,8 +346,7 @@
   // sono le stesse di `src/main/menu.js`: una sentinella negli unit test
   // confronta le due liste e diventa rossa se divergono.
 
-  // Forma confrontabile di un acceleratore: modificatori normalizzati + tasto
-  // finale. "Cmd+Shift+Z", "ctrl + shift + z" e "Control+Shift+Z" coincidono
+  // Forma confrontabile: «Cmd+Shift+Z», «ctrl + shift + z» e «Control+Shift+Z» coincidono
   // (Cmd e Ctrl sono lo stesso tasto logico nelle scorciatoie di Filo).
   const SINONIMI_TASTO = {
     '=': '+', plus: '+', minus: '-', esc: 'escape',
@@ -375,8 +382,8 @@
     return SINONIMI_TASTO[n] || n;
   }
   function forma(accel) {
-    // Un "+" in ultima posizione è il TASTO più, non un separatore: "Ctrl++"
-    // si spezzerebbe in ["Ctrl"] e sparirebbe dalla lista.
+    // Un «+» in ultima posizione è il TASTO più, non un separatore: «Ctrl++» si spezzerebbe
+    // in [«Ctrl»] e sparirebbe dalla lista.
     const testo = String(accel || '').trim().replace(/\+\s*\+$/, '+Plus');
     const parti = pezzi(testo);
     // Un tasto funzione da solo è una combinazione intera: F11 è lo schermo intero.
@@ -432,6 +439,8 @@
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
     lista.push([etichettaSchermoIntero(esplicita), 'mette e toglie lo schermo intero']);
+    lista.push([etichettaSchedaVicina('dopo'), 'porta alla scheda successiva']);
+    lista.push([etichettaSchedaVicina('prima'), 'porta alla scheda precedente']);
     if (!senzaFilo) {
       for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
@@ -450,7 +459,6 @@
     return preso ? preso[1] : '';
   }
 
-  // La combinazione arriva mai a una pagina su questo sistema?
   function riservato(accel, esplicita) {
     return !!chiLaPrende(accel, esplicita);
   }
@@ -1023,7 +1031,7 @@
 
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
-    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
+    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,

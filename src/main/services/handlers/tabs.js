@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, sitoDaConfermare } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, contattabilePrimaDelClic } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
@@ -107,11 +107,8 @@ module.exports = function register(on, ctx) {
     return { ok: false, reordered: false };
   }));
 
-  // #376 — porta in primo piano una scheda già aperta. La usa il riferimento in
-  // chat quando Filo ha aperto qualcosa in secondo piano (un brano da
-  // ascoltare): cliccarlo deve PORTARCI, non aprire un doppione.
-  // Confine d'origine come su nav.js: solo le pagine interne filo:// possono
-  // spostare il primo piano — per un sito esterno non è mai legittimo.
+  // Porta in primo piano una scheda già aperta, invece di aprire un doppione.
+  // Solo pagine filo://: spostare il primo piano non è mai legittimo per un sito esterno.
   on(MSG.FOCUS_TAB, async (msg, sender, origin) => {
     if (!String(origin || '').startsWith('filo://')) return { ok: false };
     const win = winOf(sender);
@@ -197,8 +194,9 @@ module.exports = function register(on, ctx) {
     }
     const voci = async () => [...await globalThis.SN_SAVED_PAGES.list(), ...await ArchivedTabs.list()];
     const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
-    // Un indirizzo che al clic chiede l'OK (#848): né il suggerimento né la sua icona contattano il sito prima dell'OK.
-    const soloCopie = (msg && msg.soloCopie === true) || !!(sitoDaConfermare && sitoDaConfermare(msg && msg.url));
+    // Un indirizzo che al clic chiede l'OK (#848, #1505): né il suggerimento né la sua icona contattano il sito prima.
+    const url = msg && msg.url;
+    const soloCopie = (msg && msg.soloCopie === true) || !(await contattabilePrimaDelClic(url, { daFilo: true, proposta: !!(msg && msg.proposta === true) }));
     const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito, soloCopie });
     return { ok: true, dato };
   }));

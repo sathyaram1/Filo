@@ -15,9 +15,8 @@
   let categories = [];
   let useCategoryView = false;
   let currentCategoryId = null; // null = vista categorie; '' = "non categorizzate"; id = vista categoria
-  // Scheda da evidenziare al primo render (#252): la conferma cliccabile di
-  // "Salva per dopo" apre questa pagina con ?highlight=<id> per far vedere subito
-  // dove è finita la scheda appena salvata. La consumiamo dopo averla mostrata.
+  // Scheda da evidenziare al primo render: la conferma di «Salva per dopo» apre la pagina
+  // con ?highlight=<id> per mostrare dove è finita. Si consuma dopo averla mostrata.
   let highlightId = null;
   // Un doppio clic manda due richieste prima che la prima risponda: una scheda si apre, o si toglie, una volta.
   const inCorso = new Set();
@@ -43,9 +42,8 @@
 
     await leggiElenco();
 
-    // Se dobbiamo evidenziare una scheda e la vista è per categoria, apriamoci
-    // direttamente DENTRO la categoria (o "non categorizzate") dove vive la
-    // scheda: nella vista a tile la card non sarebbe visibile.
+    // Nella vista a tile la card non sarebbe visibile: con una scheda da evidenziare si apre
+    // direttamente dentro la sua categoria.
     highlightId = readHighlightId();
     if (highlightId && useCategoryView) {
       const target = allPages.find((p) => p.id === highlightId);
@@ -116,7 +114,6 @@
     $('back').hidden = true;
     $('search').hidden = true;
 
-    // Filtra categorie effettivamente popolate, ordinate per recenza della pagina più recente.
     const counts = new Map();
     const lastSavedAt = new Map();
     const lastThumb = new Map();
@@ -142,7 +139,6 @@
         recency: lastSavedAt.get(c.id) || '',
       });
     }
-    // Tile "Non categorizzate" se ci sono pagine senza categoria
     const uncatCount = counts.get('') || 0;
     if (uncatCount) {
       tiles.push({
@@ -157,7 +153,7 @@
     tiles.sort((a, b) => (b.recency || '').localeCompare(a.recency || ''));
 
     if (!tiles.length) {
-      // Reset del testo: potremmo arrivare qui dopo un "nessun risultato".
+      // Reset del testo: si può arrivare qui dopo un «nessun risultato».
       $('empty').textContent = I18n.t('home_empty');
       $('empty').hidden = false;
       return;
@@ -222,8 +218,8 @@
       : pages;
 
     if (!filtered.length) {
-      // "Nessun risultato" solo se il vuoto dipende dalla ricerca: il testo di
-      // vuoto assoluto durante un filtro sembra una lista cancellata.
+      // «Nessun risultato» solo se il vuoto dipende dalla ricerca: il testo di vuoto assoluto
+      // durante un filtro sembra una lista cancellata.
       $('empty').textContent = q && pages.length
         ? I18n.t('home_no_results')
         : I18n.t('home_empty');
@@ -245,10 +241,8 @@
     card.setAttribute('role', 'group');
     card.setAttribute('aria-label', page.title || page.url || '');
 
-    // Evidenziazione una tantum della scheda appena salvata (#252): pulsazione
-    // morbida che sfuma da sola, e la portiamo in vista. Consumiamo l'id così
-    // ricerche/re-render successivi non la ri-evidenziano. Il marcatore
-    // data-highlighted resta (traccia stabile) anche dopo che l'animazione sfuma.
+    // Evidenziazione una tantum: l'id si consuma, così ricerche e re-render non la ripetono;
+    // data-highlighted resta come traccia dopo l'animazione.
     if (highlightId && page.id === highlightId) {
       highlightId = null;
       card.dataset.highlighted = '1';

@@ -36,8 +36,20 @@ const MISURE_VECCHIE = /~100 spec|~25 min|~465 volte|~11 min/;
 test('nessun documento del repo cita più le misure vecchie della suite', () => {
   for (const f of DOCUMENTI) {
     const m = leggi(f).match(MISURE_VECCHIE);
-    assert.equal(m, null, `${f} cita ancora «${m && m[0]}»: la suite è ~350 spec, ~1.450 casi, quasi sette ore in locale`);
+    assert.equal(m, null, `${f} cita ancora «${m && m[0]}»: la misura vera della suite sta in CLAUDE.md, § Run / test`);
   }
+});
+
+// Il numero vero lo tiene allineato la sentinella di proveDeiGiri, ma solo in CLAUDE.md e README.md:
+// ridetto altrove resta indietro senza che nulla diventi rosso (#1589.3, «~350 spec» con la suite a 590).
+test('fuori da CLAUDE.md e README.md nessun documento ridice quante spec ha la suite', () => {
+  // ROUTINE-BRANCH-INTEGRITY.md racconta la misura di una data: è cronaca, non dichiarazione.
+  const ESCLUSI = new Set(['CLAUDE.md', 'README.md', 'ROUTINE-BRANCH-INTEGRITY.md']);
+  const ripetuti = [];
+  for (const f of DOCUMENTI.filter((d) => !ESCLUSI.has(d))) {
+    for (const m of leggi(f).matchAll(/~\s*[\d.]+\s+(spec|casi)\b/g)) ripetuti.push(`${f}: «${m[0]}»`);
+  }
+  assert.deepEqual(ripetuti, [], 'la misura della suite si scrive solo in CLAUDE.md e README.md: qui si rimanda a CLAUDE.md, § Run / test');
 });
 
 test('README e CLAUDE.md dichiarano la stessa misura della suite', () => {

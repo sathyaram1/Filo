@@ -91,11 +91,7 @@
       .filter(Boolean);
   }
 
-  // ------------------------ Estrazione output LLM --------------------------
-
-  // L'intent-guess produce una sola riga di testo. La ripuliamo con la pulizia
-  // condivisa (una riga, niente marcature, tetto ai caratteri) e in più
-  // riconosciamo la risposta "intento non chiaro", che significa: non salvare.
+  // Oltre alla pulizia condivisa si riconosce «intento non chiaro»: vuol dire non salvare.
   function cleanGuessedIntent(text) {
     const s = Safety._internal.sanitizeIntent(typeof text === 'string' ? text : '');
     if (!s) return null;
@@ -117,40 +113,20 @@
     }
   }
 
-  // ------------------------ La coda che stacca l'orologio --------------------
-  //
-  // Perché esista, vedi la testata. Qui i numeri e le regole:
-  //
-  // - RITARDO: un percorso esce fra mezz'ora e ventiquattr'ore dopo, sorteggiato
-  //   per ciascuno a parte. Due percorsi della stessa sessione finiscono quasi
-  //   sempre a ore di distanza, e l'ordine in cui escono non è quello in cui
-  //   sono stati percorsi.
-  // - UNO ALLA VOLTA: ogni giro manda fuori un solo percorso, anche se ne sono
-  //   maturati dieci. Serve per il caso "app chiusa per una settimana", dove
-  //   svuotare tutto insieme rimetterebbe i percorsi in fila nell'ordine della
-  //   sessione, a millisecondi l'uno dall'altro: la ricucitura di prima.
-  // - PAUSA fra un giro e l'altro: fra due e venti minuti, sorteggiata.
-  // - Se l'invio fallisce (niente rete, server giù) il percorso resta in coda e
-  //   si riprova al giro dopo. Dopo trenta giorni si rinuncia: un percorso
-  //   vecchio di un mese non serve più a nessuno.
+  // La coda che stacca l'orologio: ogni percorso esce fra mezz'ora e un giorno dopo, uno per
+  // giro, con pausa sorteggiata. Invio fallito: resta in coda; dopo un mese si rinuncia.
 
   const CHIAVE_CODA = (global.SN_CONST && global.SN_CONST.STORAGE_KEYS
     && global.SN_CONST.STORAGE_KEYS.PATHS_OUTBOX) || 'pathsOutbox';
 
-  const RITARDO_MIN_MS = 30 * 60 * 1000;          // mezz'ora
-  const RITARDO_MAX_MS = 24 * 60 * 60 * 1000;     // un giorno
-  const PAUSA_MIN_MS = 2 * 60 * 1000;             // due minuti
-  const PAUSA_MAX_MS = 20 * 60 * 1000;            // venti minuti
-  // Quanti percorsi può tenere la coda. Era cento, e il centunesimo faceva
-  // sparire il più vecchio senza dire niente: cioè proprio quello più vicino a
-  // partire, dopo che aveva già aspettato ore (#584, quarto giro). Adesso il
-  // tetto è dimensionato sul caso peggiore vero — chi usa l'Aiuto molte volte
-  // al giorno e tiene Filo chiuso per giorni, mentre la coda ne manda fuori uno
-  // ogni due-venti minuti e dopo trenta giorni un percorso scade da sé — e
-  // quando è pieno a restare fuori è quello NUOVO, con un motivo scritto nei
-  // log. Quello che è già in coda non si butta: è già stato accettato.
+  const RITARDO_MIN_MS = 30 * 60 * 1000;
+  const RITARDO_MAX_MS = 24 * 60 * 60 * 1000;
+  const PAUSA_MIN_MS = 2 * 60 * 1000;
+  const PAUSA_MAX_MS = 20 * 60 * 1000;
+  // Quando la coda è piena a restare fuori è il percorso NUOVO, con un motivo nei log: quello
+  // già in coda è stato accettato e ha aspettato ore; farlo sparire in silenzio era il guasto.
   const MAX_IN_CODA = 500;
-  const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;    // un mese
+  const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;
 
   let coda = [];
   let sulDisco = 0;         // voci lette dal disco, anche quelle scartate
@@ -159,9 +135,8 @@
   let auto = true;          // spegnibile nei test
   let timer = null;
   let sorteggio = Math.random;
-  // Come si chiede un token fresco al momento dell'invio. Non si può tenere
-  // quello di quando il percorso è stato raccolto: fra allora e la partenza
-  // passano ore, e un token scaduto è una richiesta senza mittente.
+  // Il token si chiede fresco all'invio: fra raccolta e partenza passano ore, e uno
+  // scaduto è una richiesta senza mittente.
   let ottieniIdToken = async () => '';
 
   function sorteggia(min, max) {
@@ -175,11 +150,8 @@
     catch (e) { console.warn('[Filo] coda percorsi: salvataggio fallito', e?.message || e); }
   }
 
-  // Una sola lettura del disco, e chi arriva mentre è in corso ASPETTA QUELLA.
-  // Con un semplice "già fatta?" chi accodava un percorso nei millisecondi fra
-  // l'avvio e la fine della lettura scriveva sulla coda ancora vuota, e poi la
-  // lettura gli passava sopra: la coda di prima spariva dal disco senza dire
-  // niente (#584, terzo giro).
+  // Una sola lettura del disco, e chi arriva mentre è in corso ASPETTA QUELLA: con un «già
+  // fatta?» chi accodava durante la lettura si vedeva passare sopra la coda, in silenzio.
   function carica() {
     if (caricamento) return caricamento;
     caricamento = leggiDaDisco();
@@ -243,7 +215,6 @@
   }
 
   // Un giro: butta via gli scaduti, manda fuori UN percorso maturo, ripianifica.
-  // Torna il numero di percorsi rimasti in coda.
   async function flush({ now = Date.now() } = {}) {
     if (!accesa) { await buttaLaCoda(); return 0; }
     if (sto) return coda.length;
@@ -251,17 +222,14 @@
     try {
       await carica();
       const prima = coda.length;
-      // La scadenza butta il percorso e lo DICE. Finché la funzione del server
-      // che li riceve non esiste, ogni invio fallisce e la coda si svuota solo
-      // così: senza una riga, la raccolta si fermerebbe e non se ne
-      // accorgerebbe nessuno (#584, sesto giro).
+      // La scadenza butta il percorso e lo DICE: se gli invii falliscono tutti la coda si svuota
+      // solo così, e senza una riga nei log la raccolta si fermerebbe senza che nessuno lo sappia.
       const scaduti = coda.filter((v) => now - v.accodatoIl > MAX_ETA_MS);
       if (scaduti.length) {
         console.warn(`[Filo] coda percorsi: ${scaduti.length} percorso/i scaduto/i dopo trenta giorni senza riuscire a partire, buttati`);
       }
       coda = coda.filter((v) => now - v.accodatoIl <= MAX_ETA_MS);
-      // Fra i maturi si sceglie A CASO, non il più vecchio: l'ordine di uscita
-      // non deve rifare l'ordine della sessione.
+      // Fra i maturi si sceglie A CASO: l'ordine di uscita non deve rifare quello della sessione.
       const maturi = coda.filter((v) => v.nonPrimaDi <= now);
       let inviato = false;
       if (maturi.length) {
@@ -350,20 +318,14 @@
     return { ok: true };
   }
 
-  // ------------------------ Orchestratore --------------------------
-  //
-  // Ritorna { saved: bool, reason: string }. Non lancia: i fallimenti sono
-  // reportati come reason testuale così il chiamante può loggare senza che
-  // l'utente veda errori (è una pipeline best-effort di telemetria).
+  // Non lancia: i fallimenti tornano come `reason` testuale, così il chiamante logga senza che
+  // l'utente veda errori.
   async function collectAndSave({ session, invokeAI }) {
     if (!session || typeof session !== 'object') {
       return { saved: false, reason: 'session vuota' };
     }
-    // Un sito che non è di nessuno non si condivide, e si scopre PRIMA dei due
-    // modelli: chiederglielo costerebbe due chiamate per un percorso che verrà
-    // buttato comunque. È la stessa domanda che si fa il riquadrino prima di
-    // comparire — una porta sola, o le due risposte divergono (vedi
-    // `raccoglibile` qui sopra).
+    // Si scopre PRIMA dei due modelli: chiederglielo costerebbe due chiamate per un percorso da
+    // buttare. È la stessa porta del riquadrino, o le due risposte divergono.
     const porta = await raccoglibile(session.rawUrl);
     if (!porta.ok) return { saved: false, reason: porta.reason };
     const domain = Safety._internal.domainOf(session.rawUrl);
@@ -387,10 +349,8 @@
     }
     if (!guessedIntent) return { saved: false, reason: 'intento non chiaro' };
 
-    // 2. judge: intento proposto + messaggi raw + QUELLO CHE VERREBBE
-    // PUBBLICATO (nome del sito, indirizzo di partenza e nomi degli elementi,
-    // già ripuliti). Output: solo 1 bit. Vedi la testata per il perché delle
-    // ultime tre.
+    // 2. judge: intento proposto, messaggi raw e QUELLO CHE VERREBBE PUBBLICATO, già ripulito.
+    // Output: un bit solo.
     let ok = false;
     try {
       const r = await invokeAI({
@@ -432,9 +392,7 @@
     init,
     flush,
     inCoda,
-    // Esposti per test/debug e per riuso in altri moduli. La pulizia
-    // deterministica è quella condivisa col server: qui è solo ri-esportata,
-    // non riscritta.
+    // La pulizia deterministica è quella condivisa col server: qui solo ri-esportata.
     _internal: {
       sanitizeUserMessages, cleanGuessedIntent, parseJudgeOutput,
       accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS, MAX_IN_CODA, RACCOLTA_ACCESA,
@@ -444,7 +402,7 @@
       normalizedPath: Safety._internal.normalizedPath,
       redigiPercorso: Safety._internal.redigiPercorso,
     },
-    // ---- helper per i test (nessun effetto in produzione) ----
+    // Helper per i test: nessun effetto in produzione.
     _peek: () => coda.map((v) => ({ ...v })),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     // I test della pipeline girano a raccolta accesa; `_reset` torna a quella del codice.
