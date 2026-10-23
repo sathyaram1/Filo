@@ -17,24 +17,27 @@ const campoFile = (t) => !!t && t.localName === 'input' && String(t.type || '').
 // Una casella o un editor: il rilascio arriva alla pagina comunque, e solo al drop si vede se lo voleva (preventDefault).
 const scrivibile = (t) => !!t && (!!t.isContentEditable || t.localName === 'input' || t.localName === 'textarea');
 
-// `pronta()`: c'è una chat che lo prende; `consegna(files)`: le dà tutti i file lasciati, e lei dice cosa non entra.
-// La pagina decide sul dragover, come per il browser: l'ultimo ascolto in bolla di window vede se l'ha voluto lei.
-module.exports = function osservaRilascio(win, { pronta, consegna }) {
+// `pronta()`: c'è una chat che lo prende; `consegna(files)`: le dà tutti i file lasciati, e lei dice cosa non entra;
+// `pannello(t)`: il nodo sta nel pannello di Filo, e quello che gli si dà non passa dalla pagina.
+// Chi decide è il drop, non il dragover: una pagina può accettare il passaggio del file e poi non prenderlo.
+module.exports = function osservaRilascio(win, { pronta, consegna, pannello = () => false }) {
   // '' non è nostro, 'subito' lo prende Filo prima della pagina, 'dopo' solo se la pagina al drop non lo vuole.
   let nostro = '';
   let inAttesa = null;
+  const delPannello = (e) => { try { return !!pannello(bersaglio(e)); } catch (_) { return false; } };
+  // Nessuno ha accettato il passaggio: lo accetta Filo, e fuori da una casella lo prende prima della pagina.
   const dopoLaPagina = (e) => {
-    const t = bersaglio(e);
-    if (e.defaultPrevented || campoFile(t)) return;
-    try { if (!pronta()) return; } catch (_) { return; }
+    if (!nostro || e.defaultPrevented) return;
     e.preventDefault();
     try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
-    nostro = scrivibile(t) ? 'dopo' : 'subito';
+    nostro = scrivibile(bersaglio(e)) ? 'dopo' : 'subito';
   };
   // Aggiunto mentre l'evento scende, l'ascolto in bolla arriva dopo quelli della pagina.
   const sopra = (e) => {
     nostro = '';
-    if (!e.isTrusted || !conImmagini(e.dataTransfer)) return;
+    if (!e.isTrusted || !conImmagini(e.dataTransfer) || campoFile(bersaglio(e))) return;
+    try { if (!pronta()) return; } catch (_) { return; }
+    nostro = 'dopo';
     win.addEventListener(e.type, dopoLaPagina, { once: true });
   };
   win.addEventListener('dragenter', sopra, true);
@@ -54,7 +57,13 @@ module.exports = function osservaRilascio(win, { pronta, consegna }) {
     const mio = nostro;
     nostro = '';
     inAttesa = null;
-    if (!mio || !e.isTrusted) return;
+    if (!e.isTrusted) return;
+    if (delPannello(e)) {
+      e.stopImmediatePropagation();
+      prendi(e);
+      return;
+    }
+    if (!mio) return;
     if (mio === 'dopo') {
       inAttesa = e;
       win.addEventListener('drop', seLaPaginaNonLoVuole, { once: true });
@@ -62,5 +71,18 @@ module.exports = function osservaRilascio(win, { pronta, consegna }) {
     }
     e.stopImmediatePropagation();
     prendi(e);
+  }, true);
+  // Un'immagine incollata nel pannello è per Filo: la pagina non la vede passare.
+  win.addEventListener('paste', (e) => {
+    if (!e.isTrusted || !delPannello(e)) return;
+    let files = [];
+    try {
+      files = Array.from((e.clipboardData && e.clipboardData.items) || [])
+        .filter((it) => it.kind === 'file' && /^image\//i.test(it.type || '')).map((it) => it.getAsFile()).filter(Boolean);
+    } catch (_) { files = []; }
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    try { consegna(files); } catch (_) {}
   }, true);
 };

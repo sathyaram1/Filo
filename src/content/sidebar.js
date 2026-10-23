@@ -532,7 +532,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   async function allega(files) {
     const tutti = Array.from(files || []).filter(Boolean);
     const lista = tutti.filter((f) => /^image\//i.test(f.type || ''));
-    if (!lista.length) return false;
+    if (!tutti.length) return false;
     const pronto = pannelloPerAllegati();
     if (!pronto) return pronto === null;
     const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
