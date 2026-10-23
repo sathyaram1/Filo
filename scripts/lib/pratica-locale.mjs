@@ -86,9 +86,8 @@ export function avvisoDaCampi(fields, ora = Date.now()) {
 const NUMERO_RIGHE_MAX = 200;
 
 /**
- * Il riferimento risolto all'id Firestore, in rete. Un numero con più documenti
- * (i vecchi #N.k) prende quello col subSeq chiesto, 0 se non detto; due documenti
- * con lo stesso #N.k (#1517) non si scelgono: si rifiuta con gli id.
+ * Il riferimento risolto all'id Firestore, in rete: di #N.k prende il subSeq chiesto, 0 se non detto.
+ * Due documenti con lo stesso #N.k (#1517) non si scelgono: si rifiuta con gli id.
  * @returns {Promise<{ ok: true, id: string, seq: number|null } | { ok: false, motivo: string, doppi?: string[] }>}
  */
 export async function risolviFeedback(raw, { bearer, base, fetchImpl = fetch } = {}) {
