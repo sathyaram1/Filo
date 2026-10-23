@@ -3909,6 +3909,7 @@ class TabManager {
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
         nata.paginaDal = pagine[i] || null;
+        if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
         nate.push(nata);
         return nata;
       });
