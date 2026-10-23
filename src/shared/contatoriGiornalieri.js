@@ -977,7 +977,7 @@
   }
 
   function idDocumento(doc) {
-    return doc && doc.v === VERSIONE_GIORNO ? `${doc.pseudonimo}_${doc.giorno}` : `${doc.pseudonimo}_${doc.giorno}_${doc.ora}`;
+    return oggetto(doc) && has(doc, 'ora') ? `${doc.pseudonimo}_${doc.giorno}_${doc.ora}` : `${doc.pseudonimo}_${doc.giorno}`;
   }
 
   // ── Il contrario, per chi legge i documenti ───────────────────────────────
