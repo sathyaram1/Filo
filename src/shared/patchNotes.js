@@ -33,7 +33,6 @@
         'Quando Filo scarica da solo un\'immagine di un altro sito, per descriverla, copiarla, salvarla o leggerla nell\'Aiuto, a quel sito manda solo i cookie che manderebbe la pagina. Prima mandava anche quelli del tuo accesso, che il sito tiene per quando lo apri tu. Vale anche per l\'icona delle schede.',
         'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
         'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
-        'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
       ],
     },
     {
