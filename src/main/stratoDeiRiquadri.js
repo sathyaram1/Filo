@@ -350,7 +350,11 @@ class StratoDeiRiquadri {
       for (const r of s.coda.splice(0)) this._consegna(s, r);
       this.posa();
     });
-    v.on('zoom-changed', () => { try { v.setZoomFactor(1); } catch (_) {} });
+    // Ctrl+rotella sopra un riquadro zooma la pagina sotto, come quando il riquadro stava nel suo documento.
+    v.on('zoom-changed', (_e, dir) => {
+      try { v.setZoomFactor(1); } catch (_) {}
+      if (vivo(s.wc)) rotellaZoom(s.wc, dir);
+    });
     v.on('render-process-gone', () => this._butta(s));
     // Carica FUORI dalla finestra (ci entra alla prima posa): dentro si prenderebbe la tastiera di chi scrive.
     // L'ancora dice di quale pagina è: con più schede gli strati sono uguali.
