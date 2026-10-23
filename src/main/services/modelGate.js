@@ -301,7 +301,7 @@
     }
 
     // Chi ha servito e quanto è costato, chiesti a posteriori: best-effort e fuori dal cammino della risposta.
-    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy }) {
+    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, m = MUTO }) {
       const P = providerOf(provider);
       if (!P || typeof P.lookupServedBy !== 'function') return;
       let i = 0;
