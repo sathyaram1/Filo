@@ -66,20 +66,30 @@
       passiDaSolo: 0,
       passiCliccati: 0,
       nonTrovati: 0,
+      // I documenti davvero cercati: `documentiCount` conta anche le ricerche rifiutate, per il tetto.
+      documentiLetti: 0,
+      // Chiusa con la × mentre una risposta arrivava: finita prima, qualunque cosa dica poi la risposta.
+      chiusaPrima: false,
+      id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
       contata: false,
     };
   }
-  // Una sessione si conta una volta, quando finisce: chiusa, o portata via dalla pagina che se ne va.
+  const datiSessione = (s) => ({
+    esito: s.chiusaPrima ? 'chiusa_prima' : s.esito || 'chiusa_prima', passiDaSolo: s.passiDaSolo,
+    passiCliccati: s.passiCliccati, nonTrovati: s.nonTrovati, documenti: s.documentiLetti, id: s.id,
+  });
+  // Una sessione si conta una volta, quando finisce: chiusa, o portata via dalla pagina che se ne va. Finché è aperta il
+  // main ne tiene l'ultimo stato, e la conta lui se la scheda si chiude (chiudere non dà alla pagina nessun evento).
   function contaSessione() {
     const s = session;
     if (!s || s.contata) return;
     s.contata = true;
-    try {
-      Popup?.conta?.({
-        misura: 'aiuto', esito: s.esito || 'chiusa_prima', passiDaSolo: s.passiDaSolo, passiCliccati: s.passiCliccati,
-        nonTrovati: s.nonTrovati, documenti: s.documentiCount,
-      });
-    } catch (_) {}
+    try { Popup?.conta?.({ misura: 'aiuto', ...datiSessione(s) }); } catch (_) {}
+  }
+  function segnaSessione() {
+    const s = session;
+    if (!s || s.contata) return;
+    try { Popup?.conta?.({ misura: 'in-corso', cosa: 'aiuto', ...datiSessione(s) }); } catch (_) {}
   }
   try { window.addEventListener('pagehide', () => { if (isOpen()) contaSessione(); }); } catch (_) {}
   // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
