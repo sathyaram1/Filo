@@ -2927,6 +2927,7 @@ async function eseguiAzioneFilo(action, {
           const settings = await getEffectiveSettings();
           const tavilyKey = settings.apiKeys?.tavily || '';
           const r = await WS.search({ query, tavilyKey, maxResults: 5 });
+          try { globalThis.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da: 'chat', ...globalThis.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
           const results = Array.isArray(r?.results) ? r.results : [];
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {
