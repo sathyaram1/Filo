@@ -2,9 +2,6 @@
 // webhook, la password di una riga di comando, la lista dei codici di recupero) arrivano al modello.
 import { test, expect } from '../../fixtures/electron.mjs';
 
-// Composto a pezzi: scritto intero, la protezione dei push di GitHub lo scambia per un webhook vero.
-const WEBHOOK = ['https://hooks.slack', 'com/services/T0A1B2C3D/B4E5F6G7H/a1B2c3D4e5F6g7H8i9J0k1L2'].join('.');
-
 async function leggiInChat({ app, openTab, testServer }, titolo, corpo, domanda) {
   const h = await openTab('filo://newtab/');
   const url = testServer.html(`<!doctype html><html><head><title>${titolo}</title></head><body><main>${corpo}</main></body></html>`, { pubblico: true });
