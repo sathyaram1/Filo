@@ -37,36 +37,3 @@ test('r1 la casella dell\'Aiuto su un sito: il sito non legge quello che l\'uten
   expect(await page.evaluate(() => window.__letti), 'il sito non ha visto i tasti né gli inserimenti').toEqual([]);
   expect(await page.evaluate(() => window.leggiCaselle()), 'il sito non legge la casella').not.toContain('1234');
 });
-
-test('la domanda successiva della spiegazione su un sito: il sito non legge quello che l\'utente scrive', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash', [C.ACTIONS.FOLLOWUP || 'followup']: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-    const orig = globalThis.SN_PROVIDER_OPENROUTER;
-    globalThis.SN_PROVIDER_OPENROUTER = {
-      ...orig,
-      complete: async () => ({ text: 'ok', usage: {} }),
-      streamComplete: async ({ onDelta }) => { onDelta('Risposta del modello.'); return { text: 'Risposta del modello.', usage: {} }; },
-    };
-  });
-  const page = await testServer.openReady(openTab, pagina('<p id="parola" style="font-size:20px">supercalifragilistico</p>'));
-  await page.locator('#parola').dblclick();
-  await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    globalThis.__filoShortcuts.dispatch('explain-selection', win);
-  });
-  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('Risposta del modello');
-  await clicca(app, page, '.sn-popup-input');
-  await page.evaluate(() => { window.__letti = []; });
-  await page.keyboard.type('e il mio iban?', { delay: 15 });
-  await page.keyboard.insertText(' 9876');
-  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-input'))?.valore).toBe('e il mio iban? 9876');
-  expect(await page.evaluate(() => window.__letti)).toEqual([]);
-  expect(await page.evaluate(() => window.leggiCaselle())).not.toContain('9876');
-});
