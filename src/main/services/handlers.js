@@ -4340,10 +4340,13 @@ function pageReadsForPrompt(actions) {
     const da = Number(out.da) || 0;
     const fino = Number(out.fino) || 0;
     if (!out.testo) {
+      const inParte = out.lettaInParte || out.scaricataInParte;
       if (totale > 0 && da >= totale) {
-        blocks.push(out.lettaInParte || out.scaricataInParte
+        blocks.push(inParte
           ? avvisoLettaInParte(out, { indirizzo, oltre: true })
           : `[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+      } else if (inParte) {
+        blocks.push(avvisoLettaInParte(out, { indirizzo, vuota: true }));
       } else if (out.fonte === 'scheda') {
         blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
           + 'dillo all\'utente e non inventare il contenuto.]');
