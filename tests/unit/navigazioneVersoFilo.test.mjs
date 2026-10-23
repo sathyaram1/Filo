@@ -92,6 +92,8 @@ test('un sito apre una pagina di Filo dai canali solo col clic dell’utente', (
   assert.equal(filoNegatoAllaPagina('filo://newtab/', sito(false), 'https://sito.example/'), false);
   assert.equal(filoNegatoAllaPagina(undefined, sito(false), 'https://sito.example/'), false);
   assert.equal(filoNegatoAllaPagina('https://altro.example/', sito(false), 'https://sito.example/'), false);
+  const dopoIlServer = { ...sito(false), wc: { _filoGestoAlle: Date.now() - 10_000 } };
+  assert.equal(filoNegatoAllaPagina('filo://redteam/redteam.html?attempt=x', dopoIlServer, 'https://sito.example/'), false);
   const vecchio = { ...sito(false), wc: { _filoGestoAlle: Date.now() - 60_000 } };
   assert.equal(filoNegatoAllaPagina('filo://options/', vecchio, 'https://sito.example/'), true);
   const home = { tab: { url: 'filo://newtab/' }, url: 'filo://newtab/', interna: true, wc: {} };
