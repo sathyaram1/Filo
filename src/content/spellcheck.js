@@ -2015,6 +2015,28 @@
     }
   }
 
+  // Sopra le x di una riga che non è la prima, il valore cadrebbe sulle parole della riga prima: lì resta velato e lascia
+  // passare il mouse al testo, e si sveglia (pieno, cliccabile) col puntatore sulle x finché resta su x o valore (#1448).
+  function copreIlTesto(state, b, da) {
+    const q = b.getBoundingClientRect();
+    if (!q.width) return false;
+    return rettangoliDi(state, Math.max(0, da - 1000), da)
+      .some((r) => r.bottom > q.top + 1 && r.top < q.bottom - 1 && r.right > q.left && r.left < q.right);
+  }
+
+  function svegliaValori(e) {
+    const state = activeEl && monitored.get(activeEl);
+    if (!state || !state.valori) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    const dentro = (r, m) => r && x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
+    for (const b of state.badge.values()) {
+      if (!b.classList.contains('sn-sopra-testo')) continue;
+      const sveglio = dentro(b._snX, 2) || (b.classList.contains('sn-sveglio') && (dentro(b._snX, 4) || dentro(b.getBoundingClientRect(), 4)));
+      b.classList.toggle('sn-sveglio', sveglio);
+    }
+  }
+
   // Il valore sotto il tasto destro: il menu è quello del suo segnaposto.
   function valoreSotto(target) {
     const b = target && target.closest && target.closest('.sn-spell-valore');
