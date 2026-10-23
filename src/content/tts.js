@@ -192,7 +192,24 @@
     return false;
   }
 
+  // Una lettura si conta una volta, quando finisce o si ferma (#1467): con che voce, perché il ripiego, fin dove.
+  // Escono il codice del guasto e la quota letta, mai il testo.
+  function contaLettura(s, finita) {
+    if (!s || s.contata || !s.totale) return;
+    s.contata = true;
+    const r = s.ripiego && s.ripiego.res;
+    try {
+      Popup.conta({
+        misura: 'lettura', voce: !s.ripiego ? 'modello' : s.pezziModello > 0 ? 'mista' : 'browser', ripiego: !!s.ripiego,
+        codice: String((r && r.errorCode) || ''), chiaveRifiutata: !!(r && r.keyRefused), senzaModello: !!(r && r.error === 'no_tts_model'),
+        quota: Math.min(1, (s.letti || 0) / s.totale), finita: finita === true,
+      });
+    } catch (_) {}
+  }
+  try { window.addEventListener('pagehide', () => { if (session && !session.cancelled) contaLettura(session, false); }); } catch (_) {}
+
   function stopReading() {
+    if (session && !session.cancelled) contaLettura(session, false);
     if (session) session.cancelled = true;
     if (ttsAudio) {
       const a = ttsAudio;
