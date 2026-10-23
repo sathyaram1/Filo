@@ -11,6 +11,8 @@ const require = createRequire(import.meta.url);
 const DNS = {
   'cdn.example': ['93.184.216.34'],
   'pagina.example': ['93.184.216.35'],
+  'img.pagina.example': ['93.184.216.36'],
+  'riquadro.example': ['93.184.216.37'],
   'interno.example': ['192.168.1.20'],
 };
 let chiestiAlDns = [];
@@ -79,10 +81,50 @@ test('un\'immagine si chiede dalla sessione della scheda, col suo user agent e l
   assert.equal(passi.length, 1);
   assert.equal(passi[0].ses, DIRETTA);
   assert.equal(passi[0].credenziali, 'include');
+  assert.equal(passi[0].iniziatore, 'null', 'il CDN è un altro sito: solo i cookie che concede a tutti');
   assert.equal(passi[0].headers.Referer, 'https://pagina.example/');
   assert.equal(passi[0].headers['User-Agent'], 'Mozilla/5.0 (Filo)');
   // Senza Referer la politica dichiarata è no-referrer, con: quella che dà lo stesso valore.
   assert.equal(passi[0].referrerPolicy, 'strict-origin');
+});
+
+// #1272.4: l'iniziatore fa scegliere a Chromium i cookie come per la pagina; a un altro sito solo i SameSite=None.
+test('i cookie di un file li sceglie la pagina: il suo sito ha l\'origine della pagina, un altro sito un\'origine opaca', async () => {
+  const chiedi = async (s, url, opz = { credenziali: 'include' }) => {
+    passi = [];
+    await P.perContoDellaScheda(s, url, opz);
+    return passi.map((p) => p.iniziatore);
+  };
+  const pagina = scheda('https://pagina.example/profilo?id=42');
+  assert.deepEqual(await chiedi(pagina, 'https://cdn.example/foto.jpg'), ['null']);
+  assert.deepEqual(await chiedi(pagina, 'https://img.pagina.example/foto.jpg'), ['https://pagina.example']);
+  assert.deepEqual(await chiedi(pagina, 'http://pagina.example/foto.jpg'), ['null'], 'da https a http è un altro sito');
+  // Anteprime e llms.txt partono senza cookie: niente iniziatore.
+  assert.deepEqual(await chiedi(pagina, 'https://cdn.example/foto.jpg', {}), ['']);
+  // Ogni passo di un rimando si giudica da sé: il file del sito che rimanda a un altro sito perde i cookie stretti.
+  rotte['https://pagina.example/r.jpg'] = { redirect: 'https://cdn.example/foto.jpg' };
+  assert.deepEqual(await chiedi(pagina, 'https://pagina.example/r.jpg'), ['https://pagina.example', 'null']);
+});
+
+test('in un riquadro conta il riquadro, e un antenato di un altro sito toglie il sito dei cookie a tutta la catena', async () => {
+  const chiedi = async (s, url) => { passi = []; await P.perContoDellaScheda(s, url, { credenziali: 'include' }); return passi[0].iniziatore; };
+  const cima = { origin: 'https://pagina.example', parent: null };
+  const conRiquadro = (frame) => ({ ...scheda('https://pagina.example/'), frame });
+  // Un riquadro dello stesso sito della scheda: vale la sua origine.
+  const vicino = conRiquadro({ origin: 'https://www.pagina.example', parent: cima });
+  assert.equal(await chiedi(vicino, 'https://img.pagina.example/f.jpg'), 'https://www.pagina.example');
+  // Il riquadro di un altro sito non manda i cookie stretti nemmeno al proprio sito.
+  const estraneo = conRiquadro({ origin: 'https://riquadro.example', parent: cima });
+  assert.equal(await chiedi(estraneo, 'https://riquadro.example/f.jpg'), 'null');
+  // Né lo fa uno del sito della scheda annidato dentro un altro sito.
+  const annidato = conRiquadro({ origin: 'https://pagina.example', parent: { origin: 'https://riquadro.example', parent: cima } });
+  assert.equal(await chiedi(annidato, 'https://pagina.example/f.jpg'), 'null');
+  // Un riquadro sandbox ha un'origine opaca; un riquadro già chiuso non si legge: in entrambi i casi nessun cookie stretto.
+  assert.equal(await chiedi(conRiquadro({ origin: 'null', url: 'https://pagina.example/x', parent: cima }), 'https://pagina.example/f.jpg'), 'null');
+  const chiuso = conRiquadro({ get origin() { throw new Error('Render frame was disposed'); } });
+  assert.equal(await chiedi(chiuso, 'https://pagina.example/f.jpg'), 'null');
+  // Una pagina fuori dal web (filo://, file:) non ha un sito dei cookie.
+  assert.equal(await chiedi(scheda('filo://newtab/'), 'https://pagina.example/f.jpg'), 'null');
 });
 
 test('in un riquadro il Referer è l\'origine del riquadro; la politica dell\'intestazione del riquadro lo toglie', async () => {

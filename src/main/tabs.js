@@ -1736,9 +1736,10 @@ class TabManager {
     const giro = (tab._giroIcona || 0) + 1;
     tab._giroIcona = giro;
     const vivo = () => tab._giroIcona === giro && !!tab.view && tab.view.webContents === wc && !wc.isDestroyed();
-    let interna = false;
-    try { interna = /^filo:/i.test(wc.getURL() || ''); } catch (_) {}
-    IconaScheda.iconaPer(wc.session, lista, { interna, vivo }).then(({ url, dato }) => {
+    let pagina = '';
+    try { pagina = wc.getURL() || ''; } catch (_) {}
+    const interna = /^filo:/i.test(pagina);
+    IconaScheda.iconaPer(wc.session, lista, { interna, vivo, pagina }).then(({ url, dato }) => {
       if (!vivo()) return;
       if (url) tab.faviconUrl = url;
       try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
