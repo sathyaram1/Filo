@@ -268,7 +268,7 @@ test('i giorni contati prima dell’invio ogni ora partono come allora, e non si
   const [vecchio, nuovo] = b.inviati;
   assert.equal(vecchio.url, `${BASE}/${C.COLLEZIONE}?documentId=99999999999999999901_2026-10-14&key=K`);
   assert.deepEqual(vecchio.doc, { v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-14', mese: '2026-10', app: '0.2.240', os: 'mac', uso: { help: '2;0,2,0,0,0,0,0' }, errori: {} });
-  assert.equal(nuovo.doc.v, 2);
+  assert.equal(nuovo.doc.v, C.VERSIONE);
   assert.equal(nuovo.doc.pseudonimo, vecchio.doc.pseudonimo);
   assert.deepEqual(b.disco.get(Servizio.CHIAVE).giorni, {});
 });
