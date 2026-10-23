@@ -9,8 +9,6 @@
   // due punti: nell'indirizzo REST di Firestore i due punti aprono un metodo.
   const CAMPI = Object.freeze({ tetto: 'judgeBudgetUsd', caratteri: 'judgeMaxChars' });
   const DOC_SPESA = 'identities/spesa-giudici';
-  // Il motivo che il server scrive su un feedback non fidato che i giudici non hanno visto, e che aspetta l'owner.
-  const MOTIVI = Object.freeze({ tetto: 'budget_giudici', lunghezza: 'lunghezza_giudici' });
 
   // Oltre 130.000 caratteri il numero non dice niente: il server non accetta più di 10.000 di testo e 120.000 di
   // documenti. Sotto i 1.000 nessun feedback con un allegato arriverebbe più ai giudici.
