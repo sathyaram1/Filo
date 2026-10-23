@@ -430,13 +430,23 @@ test('una scheda aperta che non risponde in tempo lo dice al modello, con la cop
   const url = testServer.html(`<!doctype html><html><head><title>Ordini</title></head><body><main><h1>Ordini</h1>
 <p>Il tuo ordine 4471 è partito martedì da Bologna e arriva a Verona giovedì 29 ottobre entro le 13.</p></main></body></html>`);
   await apriInSecondoPiano(app, url);
-  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scadenzaScheda = 1; });
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scadenzaScheda = 1500; });
+  // La pagina resta occupata a fare altro più a lungo della scadenza, come un sito pesante su una macchina lenta.
+  const occupa = () => app.evaluate(({ BrowserWindow }, url) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      for (const t of (w._filoTabs ? w._filoTabs.tabs : [])) {
+        if (t.view.webContents.getURL() !== url) continue;
+        t.view.webContents.executeJavaScript('setTimeout(() => { const f = Date.now() + 6000; while (Date.now() < f); }, 0); 1').catch(() => {});
+      }
+    }
+  }, url);
 
   await reteDiProva(app);
   await stubModello(app, [
     { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
     { finale: { cerca: '(non ha risposto in tempo)', testo: 'RISPOSTA: la scheda $1.' } },
   ]);
+  await occupa();
   await chiedi(page, 'quando arriva il mio ordine? è nella pagina che ho aperto');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: la scheda non ha risposto in tempo.' })).toBeVisible({ timeout: 30_000 });
   const copia = esitiDi((await chiamate(app))[1]).join('\n');
