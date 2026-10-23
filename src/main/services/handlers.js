@@ -5,6 +5,7 @@ const { BrowserWindow } = require('electron');
 const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const PageRead = require('./pageRead');
+const { storiaAiuto } = require('./storiaAiuto');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
