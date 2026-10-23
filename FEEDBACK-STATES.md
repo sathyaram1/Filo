@@ -440,7 +440,11 @@ alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
 di fusione in attesa; conflitto → riallineamento). Non serve una transizione
-nuova: è `design` → `todo` con attore owner, e da lì il cancello.
+nuova: è `design` → `todo` con attore owner, e da lì il cancello. Il salto vale
+solo per la versione letta da verifica e audit (#1040.1): se la punta del ramo
+non è più quella, o il giro non dice quale fosse, il server non salta, non fonde
+e non apre richieste (esiti `mosso`, `senza_controllo`), la pratica resta dov'è
+e il pentagono propone di rimandarla in lavorazione.
 
 **Le attese con la loro domanda (#1358, SPEC-DOMANDE §3.8).** Ogni fermata dei casi (2),
 (2b), (3), (5), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
