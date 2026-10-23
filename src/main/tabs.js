@@ -495,6 +495,10 @@ class TabManager {
       },
       sopraA: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return (t && t.view) || null; },
       scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url, title: t.title } : null; },
+      tastoDellaScheda: (wc, input) => {
+        const t = this.tabs.find((x) => x.view && x.view.webContents === wc);
+        return !!t && (this.barra.tasto(input) || this.tastoDelBrowser(input, t));
+      },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
