@@ -278,14 +278,27 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         tolti += r.tolti;
       }
       if (tolti) incognito.eventi = E().compatta(incognito.eventi);
+      annunciaPagine(scritti, true);
       return { scritti, tolti };
     }
     const nuovi = daScrivere.filter((ev) => !normale.stato.ids.has(ev.id));
     if (!nuovi.length) return { scritti: [], tolti: 0 };
     await scriviInCoda(nuovi.map(E().riga).join(''));
     for (const ev of nuovi) tolti += E().applica(normale.stato, ev).tolti;
+    annunciaPagine(nuovi, false);
     if (tolti) await compattaFile();
     return { scritti: nuovi, tolti };
+  }
+
+  // Ogni pagina che entra, cambia titolo o se ne va passa di qui, e da qui lo sanno le home aperte: una visita si scrive
+  // a pagina caricata, spesso con la home già davanti (#1307.4). Si annuncia a stato già piegato: chi rilegge la vede.
+  const sullePagine = new Set();
+  function suPagine(fn) { if (typeof fn === 'function') sullePagine.add(fn); }
+  function annunciaPagine(scritti, incog) {
+    const T = E().TIPI;
+    const tocca = (ev) => ev.tipo === T.NAVIGAZIONE || ev.tipo === T.TITOLO_PAGINA || (ev.tipo === T.CANCELLAZIONE && ev.chat == null);
+    if (!scritti.some(tocca)) return;
+    for (const fn of sullePagine) { try { fn({ incognito: incog }); } catch (_) {} }
   }
 
   // Leggere, decidere e scrivere senza che un'altra scrittura passi in mezzo: due schede che chattano insieme non
