@@ -1930,7 +1930,7 @@
           <p>Prezzo: ${esc(price)}</p>
           <p data-prints>${prints != null
             ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}`
-            : (fallite ? 'Ristampe: Scryfall non ha risposto, riprovo quando torni sulla pagina' : 'Ristampe: …')}</p>
+            : (fallite ? 'Ristampe: Scryfall non ha risposto' : 'Ristampe: …')}</p>
           <p data-legal="${card.legalCommander ? 1 : 0}">${card.legalCommander
             ? '✓ Legale in Commander' : '✗ Non legale in Commander'}</p>`;
         if (prints == null && !fallite) fetchPrints(card);
