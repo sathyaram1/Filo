@@ -70,6 +70,7 @@ test('di fabbrica 2 $ e 40.000 caratteri, la spesa di oggi accanto al tetto, e u
   await expect(page.locator('#mgJudgeSpesaNota')).toBeHidden();
   await expect(page.locator('#mgJudgeSpesa')).toHaveAttribute('title', /Il contatore riparte da zero alle \d{2}:\d{2}\./);
   await page.locator('#mgJudgeBudgetBlock').screenshot({ path: 'tests/.shots/1515-tetto-giudici.png' });
+  await page.locator('#mgJudgeCharsBlock').screenshot({ path: 'tests/.shots/1515-lunghezza.png' });
 
   // Invio salva il tetto; la riga della spesa segue il tetto nuovo.
   await page.locator('#mgJudgeBudget').fill('3.5');
