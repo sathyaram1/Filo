@@ -45,12 +45,10 @@ function toFsValue(v) {
 }
 
 // Il nome NON è libero: storage.rules concede la creazione solo su
-// `<etichetta_>?<millisecondi>_<uuid>.<estensione>` (l'uuid è ciò che rende il
-// percorso non indovinabile, #582). La forma canonica è
-// `SN_FEEDBACK.attachmentPath`; qui è ricopiata perché questo file è un
-// utensile a sé, e la sentinella tests/unit/storageRulesAllegati.test.mjs prova
-// anche la variante con etichetta.
-async function uploadImage(buffer, mime = 'image/png') {
+// `<etichetta_>?<millisecondi>_<uuid>.octetstream` (l'uuid è ciò che rende il
+// percorso non indovinabile, #582; estensione e tipo fissi, #1518). La sentinella
+// tests/unit/storageRulesAllegati.test.mjs prova questo caricamento.
+async function uploadImage(buffer) {
   // Cifratura obbligatoria, come nell'app (#602): se non si può cifrare non si
   // carica. Chi chiama (`pushIssue`) tratta l'errore come «niente immagine» e
   // la segnalazione parte lo stesso, senza lo screenshot.
