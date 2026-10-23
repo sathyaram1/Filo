@@ -355,8 +355,8 @@ test('#896 — invio dal pannello col server già in pausa: la frase resta scrit
   await expect.poll(stato).toBe('');
 });
 
-// #1506 — da un sito una pagina di Filo si apre solo entro il gesto: la pagina del tentativo la apre il main con la
-// risposta, così un server lento (oltre la finestra del clic) non la perde.
+// #1506 — da un sito una pagina di Filo si apre solo dopo il clic dell'utente: il clic su «Invia» vale anche quando la
+// risposta del server arriva dopo qualche secondo.
 test('invio dal tasto destro su un sito con il server lento: la pagina del tentativo si apre lo stesso', async ({ app, openTab, testServer }) => {
   await preparaMain(app);
   redteamDoc = { openToAll: true };

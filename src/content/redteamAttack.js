@@ -199,7 +199,7 @@
       let res;
       try {
         res = await chrome.runtime.sendMessage({
-          type: MSG.REDTEAM_SUBMIT, attackText, description, apri: true,
+          type: MSG.REDTEAM_SUBMIT, attackText, description,
         });
       } catch (_) {
         res = { status: 'error' };
@@ -208,7 +208,9 @@
       if (msg.ok && res && res.attemptId) {
         clearDraft();
         setStatus(msg.text, 'ok');
-        // La pagina del tentativo, dove parte la rivelazione live, la apre il main con la risposta (apri: true).
+        // Naviga alla pagina red-team sul tentativo: lì parte la rivelazione live.
+        const url = 'filo://redteam/redteam.html?attempt=' + encodeURIComponent(String(res.attemptId));
+        try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url }); } catch (_) {}
         close();
         return;
       }
