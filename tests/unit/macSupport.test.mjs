@@ -449,7 +449,10 @@ test('Ctrl+Tab e Ctrl+Shift+Tab: la scheda dopo e quella prima, in tondo, su Mac
   assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 0, 1), 0);
   assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), -1, 0), null);
 
-  // Il nome è lo stesso su ogni sistema: su Mac «Ctrl» è il tasto Control, non Cmd.
+  // Su Mac «Ctrl» nelle etichette è il tasto Control: riscriverlo in Cmd+Tab nominerebbe il cambio di app.
+  assert.equal(T.etichettaSchedaVicina('dopo'), 'Ctrl+Tab');
+  assert.equal(T.etichettaSchedaVicina('prima'), 'Ctrl+Shift+Tab');
+  // Chi sceglie una scorciatoia se lo vede rifiutare: Filo lo prende prima della pagina.
   for (const p of ['win32', 'darwin', 'linux']) {
     assert.ok(T.riservato('Ctrl+Tab', p) || T.delSistema('Ctrl+Tab', p), `Ctrl+Tab resta libero da scegliere su ${p}`);
   }
