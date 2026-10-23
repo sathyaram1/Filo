@@ -28,7 +28,7 @@ const RESTA = Object.freeze({
 // parte (identity.bin.<etichetta>…). Senza, i crediti sul server non si raggiungono più.
 const IDENTITA = Object.freeze(['identity.bin', 'wallet.bin', 'wallet-stato.bin']);
 // Le righe del registro d'uso non ancora scritte sul server appartengono ai crediti: se l'identità resta, restano.
-const CHIAVI_IDENTITA = Object.freeze(['walletUsageQueue']);
+const CHIAVI_IDENTITA = Object.freeze(['walletUsageQueue', 'walletUsageLog']);
 const TENTATIVI_MASSIMI = 3;
 
 const dellIdentita = (nome) => IDENTITA.some((f) => nome === f || nome.startsWith(`${f}.`));
