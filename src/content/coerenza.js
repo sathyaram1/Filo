@@ -293,6 +293,7 @@
       const coda = suffisso && suffisso !== '.' ? comeScritto(suffisso, suffissoInglese(altra.getDate())) : (suffisso || '');
       segno.correzioni.push(testo.slice(0, nPos) + nuovo + coda + testo.slice(fine));
     }
+    if (anche) segno.correzioni.push(conGiorno(anche));
     return segno;
   }
 
