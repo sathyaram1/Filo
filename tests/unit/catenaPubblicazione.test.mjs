@@ -154,7 +154,7 @@ describe('le prove girano dove non ci sono chiavi né permessi di scrittura', ()
     assert.equal(proveScoperte(wf(SCRIVE, '')).length, 1, 'la scrittura ereditata dal workflow');
     assert.equal(proveScoperte(wf('', '')).length, 1, 'senza permessi dichiarati vale il predefinito del repo');
     assert.deepEqual(proveScoperte(wf(SCRIVE, '    permissions:\n      contents: read\n')), [], 'i permessi del job valgono su quelli del workflow');
-    assert.deepEqual(proveScoperte(wf('', '    permissions: write-all\n')).length, 1);
+    assert.equal(proveScoperte(wf('', '    permissions: write-all\n')).length, 1);
     assert.equal(proveScoperte(wf('permissions:\n  contents: read\n', '    env:\n      K: ${{ secrets.FILO_BUILD_PASSPHRASE }}\n')).length, 1, 'un segreto nel job');
     assert.deepEqual(proveScoperte(wf('permissions:\n  contents: read\n', '')), []);
   });
