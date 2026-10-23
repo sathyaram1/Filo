@@ -231,6 +231,22 @@ await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogn
   vero(C.validaChiamate(piene).ok, C.validaChiamate(piene).motivo);
   return assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${C.idDocumento(piene)}`), piene));
 });
+await prova('un anonimo crea le attività della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), ATTIVITA)));
+await prova('ma non le riscrive', () => assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), ATTIVITA)));
+await prova('l’admin legge le attività', () => assertSucceeds(getDoc(doc(owner, `${COLL_ATTIVITA}/${idBuono}`))));
+await prova('le attività più cariche che l’app costruisce (ogni combinazione di ogni misura, ai tetti) passano', () => {
+  const dati = C.oraVuota();
+  const combinazioni = (forma) => forma
+    .reduce((acc, d) => acc.flatMap((p) => (d === C.TIPO_SUGGERIMENTO ? C.tipiSuggerimento() : d).map((x) => [...p, x])), [[]])
+    .map((p) => p.join('|'));
+  for (const m of C.MISURE_ATTIVITA) {
+    const tutte = C.DIMENSIONI_ATTIVITA[m].flatMap(combinazioni).sort((a, b) => b.length - a.length);
+    dati[m] = Object.fromEntries([...tutte.map((k) => [k, 999999999]), ['altro', 999999999]]);
+  }
+  const piene = C.documentoAttivita({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
+  vero(C.validaAttivita(piene).ok, C.validaAttivita(piene).motivo);
+  return assertSucceeds(setDoc(doc(anon, `${COLL_ATTIVITA}/${C.idDocumento(piene)}`), piene));
+});
 await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
 await prova('l’ora più carica che l’app costruisce (ogni funzione, azione, impostazione e scelta, ai tetti) passa', () => {
   const dati = C.oraVuota();
