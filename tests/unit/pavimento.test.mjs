@@ -227,3 +227,37 @@ test('vicino alla parola «password» restano i nomi di prodotto, gli utenti, gl
 test('una password che è una parola si toglie intera, non dentro le altre parole', () => {
   assert.equal(P.oscura('Password del wifi: casa\nLa casalinga ha le chiavi di casa.'), `Password del wifi: ${S}\nLa casalinga ha le chiavi di ${S}.`);
 });
+
+// Nei file di configurazione il posto del valore è dopo la chiave che si chiama password, anche dentro un nome composto.
+test('una password come valore in JSON, .env, YAML e XML non esce; le espressioni e i segnaposti di tipo restano', () => {
+  for (const [t, segreto] of [
+    ['{ "username": "mario", "password": "Girasole2024" }', 'Girasole2024'],
+    ['{"user":"mario","password":"Girasole2024"}', 'Girasole2024'],
+    ['DB_HOST=db\nDB_PASSWORD=Ponte9Grigio', 'Ponte9Grigio'],
+    ['POSTGRES_PASSWORD: Faro7Blu', 'Faro7Blu'],
+    ['admin_password = "Girasole2024"', 'Girasole2024'],
+    ['smtp_pass=Girasole2024', 'Girasole2024'],
+    ['"adminPassword": "Lupo#88x"', 'Lupo#88x'],
+    ['<utente>mario</utente>\n<password>Nuvola2023x</password>', 'Nuvola2023x'],
+  ]) assert.ok(!P.oscura(t).includes(segreto), t);
+  for (const t of [
+    'DB_PASSWORD=${DB_PASSWORD}',
+    '"password": "string"',
+    'bypass=Girasole2024',
+    'if (password == "x") {}',
+    'password: process.env.DB_PASSWORD',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
+test('dopo «Password:» resta la frase che dice dove trovarla o come sceglierla; la password con gli spazi no', () => {
+  for (const t of [
+    'Password Wi-Fi: disponibile alla reception',
+    'Password del portale ospiti: sul retro della chiave magnetica',
+    'Password: vedi email precedente',
+    'Password: quella di sempre',
+    'Password: deve avere almeno otto caratteri',
+    'Password: min. 8 caratteri',
+    'Password: 8-20 caratteri',
+  ]) assert.equal(P.oscura(t), t, t);
+  assert.equal(P.oscura('Password: casa mia al mare 2019'), `Password: ${S}`);
+});
