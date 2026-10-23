@@ -2063,6 +2063,13 @@
     hoverTimer = setTimeout(() => { hoverTimer = 0; showPreview(cardId); }, delay);
   }
 
+  // Sull'anteprima si va per usarla («Aggiorna», il tasto per Crediti o Opzioni): resta aperta finché il puntatore è
+  // lì, e il linger riparte quando esce.
+  function holdPreview() {
+    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
+    if (lingerTimer) { clearTimeout(lingerTimer); lingerTimer = 0; }
+  }
+
   function hoverLeave() {
     if (detailState === 'carousel') return;
     if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
