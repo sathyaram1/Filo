@@ -647,6 +647,19 @@
     return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(cifre(n)) };
   }
 
+  // Il minimo è un secondo: un numero sotto 100 senza unità sono secondi («mettilo a 5»).
+  function msAvvisoSchermoPieno(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 100)) n *= 1000;
+    n = Math.round(n);
+    const [min, max] = global.SN_CONST.AVVISO_SCHERMO_PIENO_LIMITI.durataMs;
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+    return { partial: { avvisoSchermoPieno: { durataMs: n } }, label: `Avviso del sito a schermo intero → ${cifre(n)} ms` };
+  }
+
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
   const RIGORE_COOKIE = { manual: 0, default: 1, privacy: 2 };
   const RIGORE_IMPRONTA = { off: 0, default: 1, privacy: 2 };
@@ -826,6 +839,14 @@
         if (b === null) return null;
         return { partial: { barraLaterale: { striscia: b } }, label: `Striscia della barra laterale → ${b ? 'visibile' : 'nascosta'}` };
       },
+    },
+    {
+      scrive: ['avvisoSchermoPieno.durataMs'],
+      costo: 1,
+      aiuto: 'millisecondi 1000-10000 (quanto resta l\'avviso col nome del sito quando una pagina va a schermo intero; non si spegne)',
+      keys: ['avviso_schermo_pieno', 'avviso schermo pieno', 'avviso schermo intero', 'avviso a schermo intero',
+        'durata avviso schermo intero', 'avviso del sito a schermo intero', 'esc per uscire'],
+      build(v) { return msAvvisoSchermoPieno(v); },
     },
     {
       scrive: ['terminal.enabled'],

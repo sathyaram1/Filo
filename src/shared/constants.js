@@ -2674,6 +2674,9 @@
     // Barra laterale (#871): apertura spingendo sul bordo, attesa sul bordo, quanto resta aperta dopo
     // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
     barraLaterale: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true },
+    // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
+    // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
+    avvisoSchermoPieno: { durataMs: 3000 },
     // Ora, batteria, rete, Bluetooth e volume nella colonna destra della home (#873, #874): ognuna si toglie da sé
     // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
     homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true, volume: true },
@@ -2983,6 +2986,16 @@
     };
   }
 
+  // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
+  const AVVISO_SCHERMO_PIENO_LIMITI = Object.freeze({ durataMs: Object.freeze([1000, 10000]) });
+  function opzioniAvvisoSchermoPieno(v) {
+    const o = v && typeof v === 'object' ? v : {};
+    const n = Math.round(Number(o.durataMs));
+    const [min, max] = AVVISO_SCHERMO_PIENO_LIMITI.durataMs;
+    const buono = Number.isFinite(n) && o.durataMs !== null && o.durataMs !== '' && typeof o.durataMs !== 'boolean';
+    return { durataMs: buono ? Math.max(min, Math.min(max, n)) : DEFAULT_SETTINGS.avvisoSchermoPieno.durataMs };
+  }
+
   // Tetto di una lezione, contato come lo stile: una regola su come comportarsi
   // ci sta larga, un testo che nessuno rilegge nel popup no (#592).
   const LESSON_MAX = 800;
@@ -3223,6 +3236,8 @@
     BARRA_LATERALE_LIMITI,
     AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
+    AVVISO_SCHERMO_PIENO_LIMITI,
+    opzioniAvvisoSchermoPieno,
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,

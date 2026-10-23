@@ -1,0 +1,53 @@
+/* La pillola dello schermo pieno (#1526): sta su qualunque pagina, quindi fondo pieno del tema e ombra per staccarsi.
+   La vista è grande quanto la pillola più il margine dell'ombra (schermo-pieno.js, MARGINE). */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--sn-font);
+}
+
+#pillola {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: var(--max, 640px);
+  padding: 8px 18px;
+  border: 1px solid var(--sn-border);
+  /* Metà dell'altezza di una riga: pillola su una riga, rettangolo arrotondato se un host lungo va a capo. */
+  border-radius: 18px;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  box-shadow: var(--sn-shadow);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  /* Un host lungo va a capo intero: tagliarlo nasconderebbe proprio la parte che dice chi è. */
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  user-select: none;
+  animation: entra calc(0.18s * var(--sn-motion, 1)) ease-out;
+  transition: background-color calc(0.12s * var(--sn-motion, 1)) ease, border-color calc(0.12s * var(--sn-motion, 1)) ease;
+}
+#pillola[hidden] { display: none; }
+#pillola:hover { background: var(--sn-hover); border-color: var(--sn-accent); }
+
+#pillola .sito { font-weight: 600; }
+
+#pillola kbd {
+  font: inherit;
+  font-weight: 600;
+  padding: 0 6px;
+  border: 1px solid var(--sn-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--sn-bg);
+}
+
+@keyframes entra {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}

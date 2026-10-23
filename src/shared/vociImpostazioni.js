@@ -52,6 +52,7 @@
         barraStriscia: 'barraLaterale.striscia',
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
+        avvisoSchermoPienoDurata: 'avvisoSchermoPieno.durataMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
         propostaEmailAttiva: 'propostaEmail.attiva',

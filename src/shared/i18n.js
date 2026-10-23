@@ -1005,6 +1005,17 @@
     spell_page_dict_conflict: '"%s" è già nel dizionario.',
     toast_added_to_dict: 'Aggiunta al dizionario',
     toast_autocorrect_saved: 'Correzione automatica attiva',
+
+    // La pillola sopra una pagina che si è presa lo schermo pieno (#1526): %s è l'host, mai il titolo della pagina.
+    schermo_pieno_sito: '%s è a schermo intero',
+    schermo_pieno_riquadro: '%s, dentro %s, è a schermo intero',
+    schermo_pieno_esci: '%s per uscire',
+    // Al posto dell'host quando l'indirizzo non ne ha uno.
+    schermo_pieno_file: 'un file del computer',
+    schermo_pieno_senza_indirizzo: 'una pagina senza indirizzo',
+    schermo_pieno_filo: 'una pagina di Filo',
+    schermo_pieno_menu_esci: 'Esci dallo schermo intero',
+    schermo_pieno_menu_regola: 'Quanto resta questo avviso…',
   };
 
   function t(key, ...args) {
