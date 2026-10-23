@@ -93,7 +93,7 @@
     rifiutata: ['rifiutato dal server', 'rifiutati dal server'],
     altra_identita: ['di un portafoglio di prima', 'di un portafoglio di prima'],
     ricomincia: ['tolto ricominciando con un nuovo invito', 'tolti ricominciando con un nuovo invito'],
-    coda_piena: ['perso perché ne aspettavano troppi', 'persi perché ne aspettavano troppi'],
+    coda_piena: ['perso perché ce n\'erano troppi in attesa', 'persi perché ce n\'erano troppi in attesa'],
   });
   function registroScartateTesto(perMotivo) {
     const voci = Object.keys(SCARTATE_MOTIVI)
