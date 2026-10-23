@@ -1022,7 +1022,7 @@
     fermataDetta = true;
     setTimeout(() => submit({
       userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
-      preActionUrl: location.href,
+      preActionUrl: urlPrimaDelPasso(),
     }), 50);
   }
 
@@ -1604,7 +1604,7 @@
       if (!gestoVero(e) || btn.disabled) return;
       btn.disabled = true;
       if (continuaAperto === btn) continuaAperto = null;
-      submit({ userAction: 'l\'utente ha chiesto di proseguire da dove ti eri fermato', preActionUrl: location.href, daGesto: true, dopoDocumenti });
+      submit({ userAction: 'l\'utente ha chiesto di proseguire da dove ti eri fermato', preActionUrl: urlPrimaDelPasso(), daGesto: true, dopoDocumenti });
     });
     riga.append(`mi sono fermato dopo ${MAX_PASSI_DA_SOLO} passi fatti da solo `, btn);
     continuaAperto = btn;
@@ -1707,7 +1707,7 @@
           appendActionLog('ricerca web: limite raggiunto, ignorata');
           setTimeout(() => submit({
             userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
-            preActionUrl: location.href,
+            preActionUrl: urlPrimaDelPasso(),
           }), 50);
           return;
         }
@@ -1752,7 +1752,7 @@
         setTimeout(() => submit({
           userAction: note,
           esterno: ricercaWeb ? { ricercaWeb } : null,
-          preActionUrl: location.href,
+          preActionUrl: urlPrimaDelPasso(),
         }), 50);
         return;
       }
@@ -1770,7 +1770,7 @@
           appendActionLog('ricerca fra i documenti: limite raggiunto, ignorata');
           setTimeout(() => submit({
             userAction: 'limite di ricerche fra i documenti raggiunto per questa conversazione. Rispondi ora con il JSON normale usando solo ciò che già sai',
-            preActionUrl: location.href,
+            preActionUrl: urlPrimaDelPasso(),
           }), 50);
           return;
         }
@@ -1798,7 +1798,7 @@
           cartellaMancante: r.cartellaMancante || '',
           cartellaDiRete: r.cartellaDiRete || '',
         };
-        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: location.href, dopoDocumenti: true }), 50);
+        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: urlPrimaDelPasso(), dopoDocumenti: true }), 50);
         return;
       }
 
@@ -1827,7 +1827,7 @@
         // prosegue solo su status «continue» e solo se la pagina non è cambiata.
         if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
           const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
+          setTimeout(() => submit({ userAction: note, preActionUrl: urlPrimaDelPasso() }), 200);
         } else {
           expand({ ai: true });
         }
@@ -1858,7 +1858,7 @@
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
         if (parsed.status === 'continue' && ok && !PAGE_ACTIONS[parsed.page.op].chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
+          setTimeout(() => submit({ userAction: note, preActionUrl: urlPrimaDelPasso() }), 200);
         } else {
           expand({ ai: true });
         }
@@ -1930,7 +1930,7 @@
               setTimeout(() => submit({
                 userAction: aiNote,
                 esterno: { elementoPagina: { etichetta: targetLabel, selettore: parsed.highlight.selector } },
-                preActionUrl: location.href,
+                preActionUrl: urlPrimaDelPasso(),
               }), 150);
             }
           } else {
@@ -1941,7 +1941,7 @@
               : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
             appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
             if (parsed.status === 'continue') {
-              setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 50);
+              setTimeout(() => submit({ userAction: aiNote, preActionUrl: urlPrimaDelPasso() }), 50);
             }
           }
         } else {
