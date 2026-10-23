@@ -65,13 +65,31 @@ test('esplora: schermo intero, riquadro di un altro sito in cima, puntatore al b
 
 test('esplora: un\'icona messa in «Altro…» e riportata in vista: cambi del filo', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, SITO);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const iniziale = (await statoBarra(app));
   const prima = (await registro(app)).length;
-  const r1 = await app.evaluate(async () => globalThis.SN_LAYOUT_ICONE.posa({ id: 'share', target: 'secondary', beforeId: null, via: 'interfaccia', dove: 'barra' }));
-  console.log('POSA', JSON.stringify(r1));
-  await pausa(500);
-  const reg = await registro(app);
-  console.log('REG nuovi', JSON.stringify(reg.slice(prima).map((e) => ({ tipo: e.tipo, via: e.via, label: e.label || e.etichetta, dove: e.dove }))));
-  console.log('STATO', JSON.stringify(await statoBarra(app)));
+  const cassetto = await barra.locator('#nav [data-altro]').boundingBox();
+  const b = await barra.locator('#nav .ico[data-id="share"]').boundingBox();
+  await barra.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(b.x + b.width / 2 + 2, b.y + b.height / 2 - 6, { steps: 3 });
+  await barra.mouse.move(b.x + b.width / 2, cassetto.y + cassetto.height - 3, { steps: 8 });
+  await barra.mouse.up();
+  await pausa(800);
+  let reg = await registro(app);
+  console.log('REG dopo cassetto', JSON.stringify(reg.slice(prima)));
+  console.log('STATO', JSON.stringify((await statoBarra(app)).secondary));
+  const ultimo = reg.filter((e) => e.tipo === 'icone').pop();
+  if (ultimo) {
+    const r = await app.evaluate(async (_e, id) => globalThis.SN_REGISTRO_CAMBI.annulla(id, { via: 'chat' }), ultimo.id);
+    console.log('ANNULLA', JSON.stringify(r));
+    await pausa(800);
+    const dopo = await statoBarra(app);
+    console.log('RIMESSO bar uguale', JSON.stringify(dopo.bar) === JSON.stringify(iniziale.bar), 'sec uguale', JSON.stringify(dopo.secondary) === JSON.stringify(iniziale.secondary));
+    console.log('DOM', JSON.stringify(await barra.$$eval('#nav .ico[data-id]', (els) => els.map((e) => e.dataset.id))));
+  }
 });
 
 test('esplora: Condividi e QR sulla home di Filo', async ({ app }) => {
