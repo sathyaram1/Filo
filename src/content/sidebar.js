@@ -16,6 +16,44 @@
   const Esterno = global.SN_ESTERNO;
   const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
+  // Tre posti. Nello strato sopra un sito il pannello è qui e la pagina sotto: la si legge e la si tocca chiedendo al
+  // suo frame principale (src/content/aiutoPagina.js). Nel documento di un sito c'è solo la facciata, che apre lo
+  // strato e tiene lo stato per la barra e il menu. Sulle pagine di Filo, o senza strato, pannello e pagina stanno qui.
+  const nelloStrato = !!global.SN_FILO_UI?.nelloStrato;
+  const PaginaQui = {
+    leggi: async (a) => global.SN_AIUTO_PAGINA.leggi(a),
+    azione: async (page) => global.SN_AIUTO_PAGINA.azione(page),
+    evidenzia: async (h) => global.SN_AIUTO_PAGINA.evidenzia(h, (ev) => suAzioneUtente(ev)),
+    auto: async (a) => global.SN_AIUTO_PAGINA.auto(a),
+    pulisci: async (a) => global.SN_AIUTO_PAGINA.pulisci(a),
+  };
+  async function chiediSotto(op, args) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.AIUTO_ALLA_PAGINA, op, args });
+      return r && r.ok ? r.esito : null;
+    } catch (_) { return null; }
+  }
+  const PaginaSotto = {
+    leggi: (a) => chiediSotto('leggi', a),
+    azione: (page) => chiediSotto('azione', { page }),
+    evidenzia: (h) => chiediSotto('evidenzia', h),
+    auto: (a) => chiediSotto('auto', a),
+    pulisci: (a) => chiediSotto('pulisci', a),
+  };
+  const Pagina = nelloStrato ? PaginaSotto : PaginaQui;
+  const azioniDiPagina = () => (global.SN_AIUTO_PAGINA && global.SN_AIUTO_PAGINA.AZIONI) || {};
+  // La pagina su cui si lavora come l'ha vista l'ultima lettura: nello strato non è `location`.
+  let paginaNota = { url: '', titolo: '' };
+  function paginaOra() {
+    if (!nelloStrato) return { url: location.href, titolo: document.title };
+    if (!paginaNota.url && global.SN_PAGINA_SOTTO) {
+      paginaNota = { url: String(global.SN_PAGINA_SOTTO.url || ''), titolo: String(global.SN_PAGINA_SOTTO.titolo || '') };
+    }
+    return paginaNota;
+  }
+  // L'indirizzo da cui aspettare la pagina dopo un passo: nello strato lo prende la pagina stessa, quando legge.
+  const urlPrimaDelPasso = () => (nelloStrato ? '' : location.href);
+
   let root = null;
   let stackEntry = null;
   // history per l'AI: { role, content, kind } — kind ∈ 'real'|'action'|null
