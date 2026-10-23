@@ -1310,6 +1310,27 @@
     return out;
   }
 
+  // Quanti documenti si leggono per un numero: il padre e i suoi figli stanno larghi qui dentro. Pieno vuol dire
+  // che oltre ce ne possono essere altri, e allora non si sceglie.
+  const NUMERO_RIGHE_MAX = 200;
+
+  /**
+   * Il solo documento #seq.sub fra le righe lette per quel `seq`. Due o più (un numero doppio, #1517) o una lettura
+   * piena: lancia con gli id, invece di legare il primo che capita. → id | null. PURA.
+   */
+  function unicoDelNumero(rows, seq, sub, limite = NUMERO_RIGHE_MAX) {
+    const righe = Array.isArray(rows) ? rows : [];
+    const etichetta = `#${seq}${sub ? `.${sub}` : ''}`;
+    const trovati = righe.filter((r) => r && (Number(r.subSeq) || 0) === sub).map((r) => String(r._id));
+    if (trovati.length > 1) {
+      throw Object.assign(new Error(`${etichetta} è il numero di ${trovati.length} feedback (${trovati.join(', ')}): non scelgo io quale`), { numeroDoppio: trovati });
+    }
+    if (righe.length >= limite) {
+      throw Object.assign(new Error(`${etichetta}: più di ${limite - 1} feedback col numero ${seq}, non so dire se è uno solo`), { numeroDoppio: trovati });
+    }
+    return trovati[0] || null;
+  }
+
   // L'id del feedback col numero dato («676», «#676.1»): il registro dei
   // worker porta il numero, il giro vuole l'id (#676.1). Si legge chi ha quel
   // `seq` (il padre e i suoi figli), non la lista.
@@ -1322,10 +1343,9 @@
       from: [{ collectionId: COLLECTION }],
       where: { fieldFilter: { field: { fieldPath: 'seq' }, op: 'EQUAL', value: { integerValue: String(seq) } } },
       select: selectFields(['seq', 'subSeq']),
-      limit: 200,
+      limit: NUMERO_RIGHE_MAX,
     }, { timeoutMs, idToken, what: 'numero' });
-    const trovato = rows.find((r) => (Number(r && r.subSeq) || 0) === sub);
-    return trovato ? String(trovato._id) : null;
+    return unicoDelNumero(rows, seq, sub);
   }
 
   // Quanti invii in tutto: il contatore avanza PRIMA che il documento sia
