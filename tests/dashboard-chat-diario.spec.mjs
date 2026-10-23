@@ -96,6 +96,16 @@ const restore = (app, slot = '__fake') => app.evaluate((_electron, s) => {
   try { globalThis[`${s}_restore`]?.(); } catch (_) {}
 }, slot);
 
+// Il calendario del computer si finge: conta il file che Filo gli consegna, e in locale non si apre quello vero.
+// `esito` è la risposta di shell.openPath: vuota se un programma l'ha aperto, il motivo se nessuno.
+async function calendarioFinto(app, esito = '') {
+  await app.evaluate(({ shell: sh }, e) => {
+    globalThis.__calAperti = [];
+    sh.openPath = async (p) => { globalThis.__calAperti.push(p); return e; };
+  }, esito);
+}
+const consegnati = (app) => app.evaluate(() => globalThis.__calAperti || []);
+
 test('A — appunto e lezione hanno la loro riga nel diario, e il riassunto le conta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
