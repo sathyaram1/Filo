@@ -713,11 +713,18 @@
     Carte.setSuggerimenti(suggestions, { pronti });
   }
 
-  async function onSuggestionClick(s, vicino = null) {
+  // `posizione`: il posto del suggerimento nella carta, da 1. Si conta col tipo dell'azione e l'età dei suggerimenti
+  // (#1467), mai il testo né l'indirizzo.
+  async function onSuggestionClick(s, vicino = null, posizione = null) {
     if (s.fermata) { notaFermata(String(s.fermata), vicino); return; }
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
+    const del = Date.parse(suggerimentiDel || '');
+    Promise.resolve(send({
+      type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione,
+      etaMs: Number.isFinite(del) ? Math.max(0, Date.now() - del) : null,
+    })).catch(() => {});
     if (type === 'PULISCI_TAB') {
       // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
       // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
