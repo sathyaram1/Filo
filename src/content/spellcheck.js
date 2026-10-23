@@ -877,6 +877,7 @@
     }
     state.attivo = true;
     state.entrato = false;
+    state.intorno = null;
     activeEl = el;
     ensureOverlay(state);
     seguiIlTesto(state);
