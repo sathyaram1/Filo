@@ -38,7 +38,7 @@ const CONDIVISE = (() => {
   assert.ok(a >= 0 && b > a, 'le funzioni condivise dei contatori stanno prima del blocco delle ore');
   return senzaCommenti(RULES.slice(a, b));
 })();
-const TUTTO = [CONDIVISE, B, BC].join('\n');
+const TUTTO = [CONDIVISE, B, BC, BA].join('\n');
 
 function corpo(nome) {
   const m = new RegExp(`function ${nome}\\([^)]*\\)\\s*\\{\\s*((?:let [^;]+;\\s*)*)return([\\s\\S]*?);\\s*\\}`).exec(TUTTO);
