@@ -103,15 +103,15 @@ function parteFingerprint(seed) {
   function noisyCopy(src, F) {
     var ctx = R(wmGet, ctxOf, [src]);
     if (!ctx || !F) return null;
-    var W = src.width | 0, H = src.height | 0;
+    var W = R(F.w, src, []) | 0, H = R(F.h, src, []) | 0;
     if (W <= 0 || H <= 0 || (W * H) > MAXPX) return null;
     var img = null, cs;
-    try { img = R(F.get, ctx, [0, 0, W, H]); cs = img.colorSpace; }
+    try { img = R(F.get, ctx, [0, 0, W, H]); cs = idCS ? R(idCS, img, []) : undefined; }
     catch (e) { img = null; try { cs = ctx.drawingBufferColorSpace; } catch (e2) {} }
     var tmp = F.make(W, H);
     var t = R(F.getCtx, tmp, ['2d', { __proto__: null, colorSpace: cs || 'srgb', willReadFrequently: true }]);
     if (!img) { R(F.draw, t, [src, 0, 0]); img = R(F.get, t, [0, 0, W, H]); }
-    perturb(img.data, W, H, 0, 0);
+    perturb(R(idData, img, []), W, H, 0, 0);
     R(F.put, t, [img, 0, 0]);
     return tmp;
   }
