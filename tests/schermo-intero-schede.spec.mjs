@@ -2,7 +2,7 @@
 // pagina, con le attese della barra laterale; non per uno sfioramento, non nello schermo pieno di un video, e si spengono.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, menuAperto, statoBarra } from './helpers/barra.mjs';
+import { barraPage, comandaBarra, menuAperto, statoBarra } from './helpers/barra.mjs';
 
 const PAGINA = `<!doctype html><html><body style="margin:0;padding:40px;font:16px sans-serif;height:1400px">
   <h1>Schermo intero</h1><p id="p">Pagina di prova.</p></body></html>`;
@@ -257,4 +257,18 @@ test('la barra laterale aperta dalla linguetta nella fila resta ferma sotto il p
     [x, y + (prima.bounds.y - dopo.bounds.y)]);
   expect(dopo.aperta).toBe(true);
   expect(sotto, 'sotto il puntatore fermo c\'è ancora Home').toBe('home');
+});
+
+test('la barra laterale aperta sotto le schede scoperte resta ferma quando le schede se ne vanno (#1343)', async ({ app, openTab, testServer }) => {
+  await scopri(app, openTab, testServer);
+  await comandaBarra(app, 'spinta');
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
+  const prima = await stato(app);
+  expect(prima.barraY, 'aperta sotto la fila').toBe(prima.fila);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.schedeInAlto.nascondi());
+  const dopo = await stato(app);
+  expect(dopo.visibili).toBe(false);
+  expect(dopo.barraY, 'la barra aperta non sale sotto il puntatore').toBe(prima.barraY);
+  await comandaBarra(app, 'chiudi');
+  await expect.poll(async () => (await stato(app)).barraY, { message: 'chiusa, torna in cima' }).toBe(0);
 });

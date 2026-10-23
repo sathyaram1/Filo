@@ -98,6 +98,14 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   della barra. Sulla fila il puntatore la tiene giù. Codice: `src/main/schedeInAlto.js`.
 - Solo nello schermo intero di Filo: in quello chiesto da un sito (un video) in
   alto c'è l'avviso col nome del sito, e le schede non scendono.
+- **Il bordo alto è quello dello schermo, da ogni strada.** In cima alla pagina
+  può esserci un riquadro di un altro sito, che il riquadro principale non vede:
+  i movimenti passano anche dai riquadri, e un trascinamento, quando la pagina
+  smette di parlarne, si segue sul puntatore del sistema. Il bordo alto di un
+  riquadro a metà pagina non conta. Tre giri di #1343 sono rientrati da qui.
+- **Quello che l'utente sta usando non si muove sotto il puntatore quando la
+  fila risale**: i menu e le finestrelle aperte dalla fila la tengono giù, e la
+  barra laterale aperta sotto la fila resta dov'è finché non si chiude.
 - Si spegne con `barraLaterale.schede` (Preferenze, chat). Nelle prove il mouse
   va mosso con `page.mouse`: quello di `sendInputEvent` arriva col tasto sinistro
   premuto, e conta come una selezione (`tests/schermo-intero-schede.spec.mjs`).
