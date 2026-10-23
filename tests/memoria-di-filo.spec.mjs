@@ -90,6 +90,26 @@ test('in chat una lezione proposta dal modello aspetta l’OK sul testo esatto',
   await restore(app);
 });
 
+test('#1307.2 — dopo l’OK a una lezione la chat risponde ancora al messaggio dopo', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  await fakeProvider(app, [salva('L’utente sviluppa Filo.'), { text: 'Segnato.' }, { text: 'Seconda risposta arrivata.' }]);
+  await page.locator('#input').fill('ricordati che sviluppo Filo');
+  await page.locator('#sendBtn').click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => lezioni(app), { timeout: 5_000 }).toEqual(['L’utente sviluppa Filo.']);
+
+  await page.locator('#input').fill('e adesso dimmi una cosa');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Seconda risposta arrivata.' })).toBeVisible({ timeout: 15_000 });
+  await restore(app);
+});
+
 test('dall’Aiuto una lezione passa dallo stesso popup', async ({ app, openTab }) => {
   await livelloAutonomia(app, 'conservativo');
   const page = await openTab('filo://newtab/');
