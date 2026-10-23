@@ -127,15 +127,9 @@ for (const caso of [
     await expect(bolla).toContainText('visti: ALFA');
     await expect(bolla).not.toContainText('GAMMA');
     // L'avviso è nella bolla, coi siti, e dice che si possono rileggere.
-    await expect(bolla).toContainText('Per stare nella memoria del modello');
+    await expect(bolla).toContainText('Il modello non riusciva a leggere tutto insieme');
     await expect(bolla).toContainText(/chiedimi di rileggerl[ae]/);
     await expect(bolla).toContainText('127.0.0.1');
-    if (process.env.FILO_FOTO_1596) {
-      for (const tema of ['light', 'dark']) {
-        await page.emulateMedia({ colorScheme: tema });
-        await page.screenshot({ path: `tests/.shots/1596-${caso.listino ? 'listino' : 'rifiuto'}-${tema}.png` });
-      }
-    }
     caso.rifiuti(await app.evaluate(() => globalThis.__rifiutate));
 
     // Al modello le pagine tolte arrivano come rimando: titolo e indirizzo, nessun testo inventabile.
@@ -166,9 +160,9 @@ test('le pagine lasciate fuori si rileggono chiedendolo, e la pagina riletta arr
   await chiedi(page, 'rileggi la guida GAMMA che hai lasciato fuori');
   const riletta = page.locator('.dash-bubble-filo', { hasText: 'RILETTA' });
   await expect(riletta).toBeVisible({ timeout: 40_000 });
-  await expect(riletta).toContainText('GAMMA');
+  await expect(riletta).toContainText(/visti: [^)]*GAMMA/);
   // Riletta, la pagina è davanti al modello per intero: niente avviso su di lei.
-  await expect(riletta).not.toContainText('Per stare nella memoria del modello');
+  await expect(riletta).not.toContainText('non riusciva a leggere');
 });
 
 test('se il fornitore rifiuta anche dopo aver accorciato tutto, l\'errore dice cosa fare e non manda a cambiare modello', async ({ app, openTab, testServer }) => {
