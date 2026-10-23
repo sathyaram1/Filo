@@ -79,29 +79,28 @@
   }
 
   // La zona dove c'è qualcosa (#1509.3): fuori dalla sua cornice la pagina riceve i gesti veri, trascinamenti e file
-  // compresi, che il vuoto non sa rigirare. Solo pannello e risposte hanno una scatola sicura; con qualunque altro
-  // pezzo (un modale, il menu, una conferma) la zona è la scheda intera (null). Il margine tiene dentro l'ombra.
-  const SCATOLE = '.sn-sidebar, .sn-popup';
+  // compresi, che il vuoto non sa rigirare. È l'unione delle scatole dei pezzi in cima al documento; un pezzo senza
+  // scatola sua (il menu, nell'ombra) si posa dove vuole, e allora la zona è la scheda intera (null). Il margine tiene
+  // dentro l'ombra dei riquadri.
   const MARGINE = 32;
   const IGNORATI = /^(HEAD|BODY|SCRIPT|STYLE|LINK|META|TEMPLATE)$/;
-  function sparito(el) {
-    const cs = getComputedStyle(el);
-    if (cs.display === 'none') return true;
-    if (cs.display === 'contents') return !el.firstChild && !global.SN_FILO_UI?.ombraDi?.(el);
-    return !aSchermo(el);
-  }
   function zona() {
     let u = null;
-    for (const el of [...document.documentElement.children, ...(document.body ? document.body.children : [])]) {
-      if (IGNORATI.test(el.tagName)) continue;
-      if (!el.matches(SCATOLE)) {
-        if (sparito(el)) continue;
-        return null;
-      }
-      if (!visibile(el)) continue;
-      const r = el.getBoundingClientRect();
+    const aggiungi = (r) => {
+      if (!(r.width > 0 && r.height > 0)) return;
       u = u ? { l: Math.min(u.l, r.left), t: Math.min(u.t, r.top), r: Math.max(u.r, r.right), b: Math.max(u.b, r.bottom) }
         : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    };
+    for (const el of [...document.documentElement.children, ...(document.body ? document.body.children : [])]) {
+      if (IGNORATI.test(el.tagName)) continue;
+      const display = getComputedStyle(el).display;
+      if (display === 'none') continue;
+      if (display === 'contents') {
+        if (el.firstChild || global.SN_FILO_UI?.ombraDi?.(el)) return null;
+        continue;
+      }
+      if (visibile(el)) { aggiungi(el.getBoundingClientRect()); continue; }
+      for (const c of el.querySelectorAll('*')) if (visibile(c)) aggiungi(c.getBoundingClientRect());
     }
     if (!u) return null;
     const x = Math.max(0, Math.floor(u.l - MARGINE));

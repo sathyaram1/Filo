@@ -473,6 +473,7 @@ class TabManager {
       },
       // L'Aiuto nello strato (#1509.3) sale sopra la pila degli avvisi della barra come nella pagina.
       pronta: (v, wc) => this.avvisi.nelloStrato(v, wc),
+      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,

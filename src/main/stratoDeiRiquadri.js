@@ -71,14 +71,16 @@ class StratoDeiRiquadri {
   // area(wc): dove sta la pagina nella finestra, null se non si vede o se qualcosa la copre; sopraA(wc): la vista sopra
   // cui posarlo (null: in cima alla finestra); scheda(wc): { id, url, title } della pagina, null se non è sua;
   // tastoDellaScheda(wc, input): i tasti che la scheda prende prima della pagina, true se preso; pronta(v, wc): lo
-  // strato `v` della pagina `wc` ha appena caricato (chi scrive nella scheda scrive anche lì, come l'angolo degli avvisi).
-  constructor(win, { area = () => null, sopraA = () => null, scheda = () => null, tastoDellaScheda = () => false, pronta = () => {} } = {}) {
+  // strato `v` della pagina `wc` ha appena caricato (chi scrive nella scheda scrive anche lì, come l'angolo degli avvisi);
+  // input(wc, input): un input vero sullo strato, che per chi guarda la scheda vale come sulla pagina `wc`.
+  constructor(win, { area = () => null, sopraA = () => null, scheda = () => null, tastoDellaScheda = () => false, pronta = () => {}, input = () => {} } = {}) {
     this.win = win;
     this.area = area;
     this.sopraA = sopraA;
     this.scheda = scheda;
     this.tastoDellaScheda = tastoDellaScheda;
     this.suPronta = pronta;
+    this.suInput = input;
     this.strati = new Map(); // wc della pagina → { wc, vista, pronta, coda, aperti, riquadri, modale, inPagina }
     this.seguite = new WeakSet();
     this.seq = 0;
@@ -274,6 +276,27 @@ class StratoDeiRiquadri {
     const c = { x: area.x + x, y: area.y + y, width: Math.max(1, w), height: Math.max(1, h) };
     s.cornice.setBounds(c);
     s.vista.setBounds({ x: area.x - c.x, y: area.y - c.y, width: area.width, height: area.height });
+    if (this._tagliata(s) && !s.ritaglioAttaccato && this._inFinestra(s)) this._riattacca(s);
+  }
+
+  // Chromium ritaglia anche i trascinamenti alla cornice solo se la vista ci è stata attaccata già tagliata: senza, i
+  // file e gli elementi trascinati sulla pagina cadrebbero sullo strato. Si riattacca alla prima volta che la cornice
+  // la taglia, e dopo ogni volta che la cornice rientra nella finestra.
+  _tagliata(s) {
+    const c = s.cornice.getBounds();
+    const v = s.vista.getBounds();
+    return v.x < 0 || v.y < 0 || v.x + v.width > c.width || v.y + v.height > c.height;
+  }
+
+  _inFinestra(s) {
+    try { return (this.win.contentView.children || []).includes(s.cornice); } catch (_) { return false; }
+  }
+
+  _riattacca(s) {
+    const aveva = this._haTastiera(s);
+    try { s.cornice.removeChildView(s.vista); s.cornice.addChildView(s.vista); } catch (_) {}
+    s.ritaglioAttaccato = true;
+    if (aveva) { try { s.vista.webContents.focus(); } catch (_) {} }
   }
 
   // I bordi della vista nella finestra (quelli di setBounds sono nella cornice): per chi rigira i gesti del suo vuoto.
@@ -295,12 +318,15 @@ class StratoDeiRiquadri {
     const figli = () => cv.children || [];
     const i = sotto ? figli().indexOf(sotto) : -1;
     const mia = figli().indexOf(s.cornice);
+    let rientrata = false;
     if (i < 0) {
-      if (mia !== figli().length - 1) cv.addChildView(s.cornice);
+      if (mia !== figli().length - 1) { cv.addChildView(s.cornice); rientrata = true; }
     } else if (mia !== i + 1) {
       if (mia >= 0) cv.removeChildView(s.cornice);
       cv.addChildView(s.cornice, figli().indexOf(sotto) + 1);
+      rientrata = true;
     }
+    if (rientrata) s.ritaglioAttaccato = this._tagliata(s);
   }
 
   _nascondi(s) {
@@ -425,7 +451,7 @@ class StratoDeiRiquadri {
     cornice.addChildView(vista);
     const s = {
       wc, vista, cornice, pronta: false, coda: [], aperti: 0, riquadri: 0, modale: false, visibile: false,
-      vuoleTastiera: false, inPagina: new Map(), aiuto: false, attese: new Map(), zona: null,
+      vuoleTastiera: false, inPagina: new Map(), aiuto: false, attese: new Map(), zona: null, ritaglioAttaccato: false,
     };
     // Chi rigira i gesti di un vuoto allo strato conta in px della finestra, non della cornice.
     s.perIlVuoto = { webContents: vista.webContents, getBounds: () => this._bordiVista(s) };
@@ -452,6 +478,7 @@ class StratoDeiRiquadri {
     // Un gesto sui riquadri è dell'interfaccia di Filo: vale per ciò che Filo fa (appunti, il suo menu), mai per il sito.
     v.on('input-event', (_e, input) => {
       try { require('./services/permessiPagine').gestoNelloStrato(s.wc, input); } catch (_) {}
+      try { if (vivo(s.wc)) this.suInput(s.wc, input); } catch (_) {}
     });
     v.on('ipc-message', (_e, canale, dati) => {
       if (/^riquadri:(stato|in-pagina|vuoto)$/.test(canale)) this._dalloStrato(s, canale, dati);

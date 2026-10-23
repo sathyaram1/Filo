@@ -184,7 +184,10 @@ class BarraLaterale {
   // sito quando copre la scheda, sennò la scheda), la stessa regola del vuoto (#871 giro 6).
   inputDa(wc, input) {
     const sotto = this.tabs.vistaSottoIlVuoto();
-    if (wc && sotto && sotto.webContents === wc) this.inputAltrove(input);
+    // Anche la pagina sotto i riquadri di Filo (#1509.3): fuori dalla loro cornice i gesti arrivano a lei.
+    const t = this._attiva();
+    const pagina = !!t && t.view && t.view.webContents === wc && this.tabs.paginaScoperta(t);
+    if (wc && ((sotto && sotto.webContents === wc) || pagina)) this.inputAltrove(input);
   }
 
   inputAltrove(input) {
@@ -429,7 +432,7 @@ class BarraLaterale {
     return {
       scheda: !!t,
       // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano la conferma (regola del vuoto).
-      pagina: !!t && this.tabs.vistaSottoIlVuoto() === t.view,
+      pagina: !!t && this.tabs.paginaScoperta(t),
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
@@ -443,7 +446,7 @@ class BarraLaterale {
   _aiuto(t) {
     if (!t) return { spenta: 'pagina' };
     const a = t.aiuto;
-    if (this.tabs.vistaSottoIlVuoto() !== t.view) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
+    if (!this.tabs.paginaScoperta(t)) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
     // Nessuna notizia dalla pagina: si sta ancora caricando, o Filo lì dentro non c'è (il visore PDF).
     if (!a) return t.loading ? { pannello: 'chiuso' } : { spenta: 'pagina' };
     if (a.spento) return { spenta: a.spento };
@@ -626,7 +629,7 @@ class BarraLaterale {
     const a = this._aiuto(attiva);
     if (a.spenta) return;
     const daTastiera = this.motivo === 'tasto';
-    if (this.tabs.vistaSottoIlVuoto() !== attiva.view) {
+    if (!this.tabs.paginaScoperta(attiva)) {
       require('./services/interruttoreAiuto').seAcceso(this.win, () => this.tabs._sbScelta(attiva, 'chiedi'));
       if (daTastiera) this.chiudi();
       return;
