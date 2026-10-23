@@ -24,6 +24,7 @@ function pagina({ chrome = {}, esito = () => Promise.resolve(null), permesso = t
   ctx.window = ctx;
   if (chrome !== null) ctx.chrome = chrome;
   vm.createContext(ctx);
+  ctx.Function = vm.runInContext('Function', ctx);
   if (credenziali) {
     vm.runInContext(`
       function CredentialsContainer() {}

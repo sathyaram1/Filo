@@ -29,12 +29,16 @@ async function serviHttps(app, pagine) {
     const risposta = (req) => {
       const u = new URL(req.url);
       const html = pg[u.hostname + u.pathname];
+      globalThis.__dalGestore = globalThis.__dalGestore || {};
+      globalThis.__dalGestore[u.hostname + u.pathname] = Object.fromEntries(req.headers);
       if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
       return net.fetch(req, { bypassCustomProtocolHandlers: true });
     };
     try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
     session.defaultSession.protocol.handle('https', risposta);
-    session.defaultSession.webRequest.onSendHeaders({ urls: ['https://*/*'] }, (d) => {
+    session.defaultSession.webRequest.onSendHeaders((d) => {
+      globalThis.__tutte = globalThis.__tutte || [];
+      globalThis.__tutte.push([d.resourceType, d.url]);
       if (d.resourceType === 'mainFrame') globalThis.__intestazioniPartite[new URL(d.url).hostname] = { ...d.requestHeaders };
     });
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
@@ -97,6 +101,9 @@ test('la pagina di accesso di un provider noto non riceve il GPC, né header né
   await serviHttps(app, { 'accounts.google.com/signin/v2/identifier': HTML, 'sito-qualunque.test/pagina': HTML });
   const normale = await openTab('https://sito-qualunque.test/pagina');
   const accesso = await openTab('https://accounts.google.com/signin/v2/identifier');
+  await normale.waitForTimeout(2000);
+  console.log('DIAG', JSON.stringify(await app.evaluate(() => ({ gestore: globalThis.__dalGestore, tutte: globalThis.__tutte, partite: globalThis.__intestazioniPartite })), null, 1));
+  console.log('DIAG url', normale.url(), accesso.url());
   await expect.poll(async () => Object.keys(await partite(app)).length, { timeout: 8_000 }).toBe(2);
   const viste = await partite(app);
   const qualunque = minuscole(viste['sito-qualunque.test']);
