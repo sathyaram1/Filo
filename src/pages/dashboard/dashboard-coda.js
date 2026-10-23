@@ -161,6 +161,7 @@
       a.append(el('span', 'dash-pagina-titolo', String(p.titolo || '').trim() || sito(p.url)), el('span', 'dash-pagina-sito', `${sito(p.url)} · ${ora(p.ts)}`));
       if (p.altrove) a.append(el('span', 'dash-pagina-sito', 'da un altro dispositivo'));
       a.addEventListener('click', (e) => { e.preventDefault(); riapri(p).catch(() => {}); });
+      a.addEventListener('auxclick', (e) => { if (e.button !== 1) return; e.preventDefault(); riapri(p).catch(() => {}); });
       return a;
     }));
   }
