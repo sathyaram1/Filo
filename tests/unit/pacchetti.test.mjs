@@ -10,7 +10,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
-  ammesso, vociRichieste, baseDeiPacchetti, pacchettiDaInstallare, descrivi, electronInUso, allineaPacchetti,
+  ammesso, vociRichieste, baseDeiPacchetti, pacchettiDaInstallare, descrivi, electronInUso, allineaPacchetti, fileBlocco,
+  TETTO_INSTALLAZIONE_MS,
 } from '../../scripts/lib/pacchetti.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
