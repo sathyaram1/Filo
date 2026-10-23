@@ -197,6 +197,34 @@ test('A2 — un byte nullo nell\'etichetta non arriva nel diario, e il colore ti
   await restore(app, '__fakeA2');
 });
 
+test('A3 — l\'impostazione applicata subito si legge col nome delle Preferenze, e il riassunto la conta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  await fakeProvider(app, [
+    { text: 'Testo più grande.', toolCalls: [{ id: 'a3', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"dimensione_testo","valore":"grande"}' }] },
+  ], '__fakeA3');
+  await page.locator('#input').fill('fammi il testo più grande');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Testo più grande.' })).toBeVisible({ timeout: 10_000 });
+
+  const activity = page.locator('.dash-activity');
+  await expect(activity.locator('.dash-activity-label')).toContainText('cambiato un\'impostazione');
+  await activity.locator('.dash-activity-head').click();
+  const riga = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Impostato' });
+  await expect(riga).toHaveCount(1);
+  await expect(riga).toContainText(/dimensione del testo/i);
+  await expect(riga).toContainText('110%');
+  await expect(riga).not.toContainText('dimensione_testo');
+  await expect(riga).not.toContainText('=');
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).textScale)).toBe(1.1);
+
+  await restore(app, '__fakeA3');
+});
+
 test('B — una lettura fallita lo dice, e un link non ammesso non lascia un bottone morto', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
