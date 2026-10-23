@@ -1690,6 +1690,22 @@ class TabManager {
     }
   }
 
+  // Una pulizia partita da sola senza il giudizio del modello lo dice (#1618): l'avviso resta finché non lo si chiude,
+  // perché il giro dell'inattività parte quando l'utente non c'è, e torna solo se cambia il motivo.
+  _dichiaraGiudizio(mancato, errore, trigger) {
+    if (!mancato) { this._giudizioMancatoDetto = null; return; }
+    let perche = '';
+    try {
+      const CE = globalThis.SN_CHAT_ERRORS;
+      perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
+    } catch (_) {}
+    console.warn(`[Filo] pulizia delle schede (${trigger}) senza giudizio del modello:`, errore ? (errore.message || errore) : 'nessuna funzione di giudizio');
+    if (this._giudizioMancatoDetto === perche) return;
+    this._giudizioMancatoDetto = perche;
+    const testo = `La pulizia automatica non è riuscita a valutare le schede.${perche ? ` ${perche}` : ''}`;
+    try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata' } }); } catch (_) {}
+  }
+
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
   // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
   // `cands` è l'elenco indicizzato passato all'LLM.
