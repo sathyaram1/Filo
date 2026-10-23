@@ -632,10 +632,17 @@
       punti++;
       let h = null;
       try { h = q.elementFromPoint(x, y); } catch (_) { h = null; }
-      if (!h || contiene(el, h) || contiene(h, el) || (UI && UI.inside(h))) return;
+      if (!h || contiene(el, h) || contiene(h, el) || (UI && UI.inside(h))) {
+        const velo = veli.find((w) => x >= w.l && x < w.r && y >= w.t && y < w.b);
+        if (velo) dubbi.push({ x, y, velo });
+        return;
+      }
       const c = stratoDi(h, el).getBoundingClientRect();
       if (c.width > 0 && c.height > 0) coperti.push({ l: c.left, t: c.top, r: c.right, b: c.bottom });
     };
+    const veli = veliDipinti().map((e) => { const c = e.getBoundingClientRect(); return { e, l: c.left, t: c.top, r: c.right, b: c.bottom }; })
+      .filter((w) => w.r > v.l && w.l < v.r && w.b > v.t && w.t < v.b);
+    const dubbi = [];
     for (const s of state.overlay.querySelectorAll('.sn-errore, .sn-suggerimento')) {
       for (const r of s.getClientRects()) {
         if (!r.width || r.right <= v.l || r.left >= v.r || r.bottom <= v.t || r.top >= v.b) continue;
@@ -645,7 +652,65 @@
         }
       }
     }
+    if (dubbi.length) for (const w of sopraIlCampo(state, dubbi)) coperti.push(w);
     return coperti;
+  }
+
+  // Un velo fissato che lascia passare il mouse (un'intestazione con pointer-events:none) non risponde a elementFromPoint:
+  // quelli dipinti si cercano a parte, nel tempo libero e al più ogni VELI_MS. Uno trasparente (il contenitore degli
+  // avvisi di un sito) non copre niente e non si conta.
+  const VELI_MS = 1500;
+  let veliVisti = { t: 0, v: [], inCorso: false };
+  function veliDipinti() {
+    if (!veliVisti.inCorso && Date.now() - veliVisti.t >= VELI_MS) {
+      veliVisti.inCorso = true;
+      const cerca = () => {
+        const v = [];
+        try {
+          const UI = global.SN_FILO_UI;
+          const tutti = document.body ? document.body.getElementsByTagName('*') : [];
+          for (let i = 0; i < tutti.length; i++) {
+            const e = tutti[i];
+            // Solo chi è fissato ha offsetParent null (con chi non è disegnato): la lettura costosa resta a pochi.
+            if (e.offsetParent !== null || (UI && UI.inside(e))) continue;
+            const cs = window.getComputedStyle(e);
+            if (cs.position !== 'fixed' || cs.pointerEvents !== 'none' || cs.visibility === 'hidden') continue;
+            const fondo = /^rgba?\(([^)]+)\)$/.exec(cs.backgroundColor);
+            const alfa = fondo ? Number((fondo[1].split(/[,\s/]+/)[3] ?? '1')) : 0;
+            if (alfa >= 0.5 || cs.backgroundImage !== 'none') v.push(e);
+          }
+        } catch (_) {}
+        veliVisti = { t: Date.now(), v, inCorso: false };
+      };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(cerca, { timeout: 1000 }); else setTimeout(cerca, 0);
+    }
+    return veliVisti.v.filter((e) => e.isConnected);
+  }
+
+  // I punti dei segni sotto un velo: si chiede alla pagina, per un attimo senza veli, cosa sta sopra al campo.
+  const SENZA_VELI = typeof CSSStyleSheet === 'function' ? (() => {
+    try { const s = new CSSStyleSheet(); s.replaceSync('*:not(.sn-spell-overlay):not(.sn-spell-overlay *) { pointer-events: auto !important; }'); return s; } catch (_) { return null; }
+  })() : null;
+  function sopraIlCampo(state, dubbi) {
+    const out = [];
+    if (!SENZA_VELI) return out;
+    const el = state.el;
+    const prima = document.adoptedStyleSheets;
+    try {
+      document.adoptedStyleSheets = [...prima, SENZA_VELI];
+      for (const { x, y, velo } of dubbi) {
+        if (out.some((c) => x >= c.l && x < c.r && y >= c.t && y < c.b)) continue;
+        for (const h of document.elementsFromPoint(x, y)) {
+          if (h === state.overlay || state.overlay.contains(h)) continue;
+          if (contiene(el, h) || contiene(h, el)) break;
+          if (contiene(velo.e, h)) { out.push({ l: velo.l, t: velo.t, r: velo.r, b: velo.b }); break; }
+        }
+      }
+    } catch (_) {
+    } finally {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== SENZA_VELI);
+    }
+    return out;
   }
 
   // Lo strato di chi copre: il primo antenato fissato o posato sopra la pagina (l'intestazione intera, non il suo logo),
