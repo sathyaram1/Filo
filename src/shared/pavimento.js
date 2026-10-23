@@ -87,7 +87,7 @@
   // `password" id="pwd1"` quello che segue è di un altro campo.
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
   const ACCANTO_LUNGO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,90}?';
-  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gi');
+  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+(?:è|e'|is|was|era)[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
@@ -213,8 +213,8 @@
   // una chiave fra virgolette o composta, un uguale o un valore fra virgolette: «Password: deve…» è testo, e lo guardano
   // le regole sopra. Un'espressione, una variabile o un percorso («process.env.X», «${X}», «PWD=/home») non sono valori.
   const PAROLA_CHIAVE = /^(?:password|passwd|pwd|pass|passphrase|passcode)$/i;
-  const CHIAVE = /(?<![\w$.-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,128})"|'([^'\n]{1,128})'|([^\s,;"'`<>(){}[\]]{1,128}))/g;
-  const ELEMENTO = /<([A-Za-z_][\w.:-]{0,60})>([^<\n]{1,128})<\/\1>/g;
+  const CHIAVE = /(?<![\w$.-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,128})"|'([^'\n]{1,128})'|([^\s,;"'`<>(){}[\]]{1,128}))/gd;
+  const ELEMENTO = /<([A-Za-z_][\w.:-]{0,60})>([^<\n]{1,128})<\/\1>/gd;
   const SEGNAPOSTO_DI_TIPO = /^(?:string|text|null|none|nil|undefined|true|false|required|optional|secret|changeit|\*+|x+|\.+|<[^>]*>)$/i;
   const nomeDaPassword = (nome) => nome.split(/[_.:-]+|(?<=[a-z0-9])(?=[A-Z])/).some((p) => PAROLA_CHIAVE.test(p));
   function valoreDiChiave(grezzo) {
@@ -228,12 +228,13 @@
       if (!nomeDaPassword(nome)) continue;
       const composta = nome !== nome.replace(/[_.-]|(?<=[a-z0-9])(?=[A-Z])/g, '');
       if (!virgolette && !composta && sep === ':' && nudo !== undefined) continue;
-      const v = valoreDiChiave(dq ?? sq ?? nudo);
-      if (v) out.push({ valore: v, regola: 'password' });
+      const g = dq !== undefined ? 4 : sq !== undefined ? 5 : 6;
+      const v = valoreDiChiave(m[g]);
+      if (v) out.push(alPosto(v, m.indices[g][0], m[g]));
     }
     for (const m of s.matchAll(ELEMENTO)) {
       const v = nomeDaPassword(m[1]) ? valoreDiChiave(m[2]) : '';
-      if (v) out.push({ valore: v, regola: 'password' });
+      if (v) out.push(alPosto(v, m.indices[2][0], m[2]));
     }
   }
 
@@ -251,7 +252,7 @@
         v = MISURA.test(pezzi[1] || '') ? '' : valorePassword(pezzi[0], { forma: pezzi.length > 1 });
       } else if (/^[-–—→]$/.test(m[1])) v = valorePassword(m[2].trim().split(/\s+/)[0], { forma: true });
       else v = valorePassword(m[2]);
-      if (v) out.push({ valore: v, regola: 'password' });
+      if (v) out.push(alPosto(v, m.indices[2][0], m[2]));
     }
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
       for (const m of s.matchAll(re)) {
@@ -263,10 +264,15 @@
       const v = valorePassword(m[1].replace(/[?!.,;:]+$/, ''));
       if (v && FORMA_FORTE(v)) out.push({ valore: v, regola: 'password' });
     }
-    // La colonna «Password» di una tabella, a barre o a tabulazioni: le celle sotto l'intestazione.
+    // La colonna «Password» di una tabella, a barre o a tabulazioni: le celle sotto l'intestazione. Una riga di due celle
+    // con «Password» in testa è una coppia nome-valore («Password | x», poi «Server | imap…»): il valore lo toglie la regola
+    // della cella, e le righe sotto sono altri campi.
     let col = -1;
     let sep = '';
+    let o = 0;
     for (const riga of s.split('\n')) {
+      const inizioRiga = o;
+      o += riga.length + 1;
       const barre = /^\s*\|/.test(riga);
       const tab = !barre && riga.includes('\t');
       const celle = barre ? riga.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
@@ -275,11 +281,16 @@
       if (col >= 0) {
         if (celle.every((c) => !c || /^:?-{2,}:?$/.test(c))) continue;
         const v = valorePassword(celle[col]);
-        if (v) out.push({ valore: v, regola: 'password' });
+        if (v) {
+          const parti = riga.split(sep);
+          const k = barre ? col + 1 : col;
+          const prima = parti.slice(0, k).reduce((n, p) => n + p.length + 1, 0);
+          out.push(alPosto(v, inizioRiga + prima, parti[k]));
+        }
         continue;
       }
       const i = celle.findIndex((c) => INTESTAZIONE.test(c));
-      if (i >= 0 && celle.length > 1) { col = i; sep = barre ? '|' : '\t'; }
+      if (i >= 0 && celle.length > 1 && !(i === 0 && celle.filter(Boolean).length === 2)) { col = i; sep = barre ? '|' : '\t'; }
     }
   }
 
@@ -313,8 +324,19 @@
     const s = testo(valore);
     const trovati = trova(s);
     if (!trovati.length) return valore;
+    const alSuoPosto = (x) => x.regola === 'password' && Number.isInteger(x.inizio) && SENZA_FORMA(String(x.valore));
+    const ovunque = new Set(trovati.filter((x) => !alSuoPosto(x)).map((x) => String(x.valore)));
+    const posti = trovati.filter((x) => alSuoPosto(x) && !ovunque.has(String(x.valore)))
+      .sort((a, b) => b.inizio - a.inizio);
     let t = s;
-    const valori = [...new Set(trovati.map((x) => String(x.valore)))].sort((a, b) => b.length - a.length);
+    let fine = Infinity;
+    for (const x of posti) {
+      const v = String(x.valore);
+      if (x.inizio + v.length > fine || s.slice(x.inizio, x.inizio + v.length) !== v) continue;
+      t = t.slice(0, x.inizio) + SEGNAPOSTO + t.slice(x.inizio + v.length);
+      fine = x.inizio;
+    }
+    const valori = [...ovunque].sort((a, b) => b.length - a.length);
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga».
