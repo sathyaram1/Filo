@@ -256,7 +256,7 @@ test('la voce paga dopo: il costo arriva al contatore come spesa tardiva, anche 
 });
 
 test('i classificatori: una misura per richiesta servita, col tentativo della catena', async () => {
-  globalThis.SN_CODA_ADATTIVA = globalThis.SN_CODA_ADATTIVA || require(join(ROOT, 'src', 'shared', 'codaAdattiva.js')) || globalThis.SN_CODA_ADATTIVA;
+  require(join(ROOT, 'src', 'shared', 'codaAdattiva.js'));
   const P = {
     decisions: async ({ model }) => {
       if (model === 'a/uno') throw Object.assign(new Error('giù'), { status: 400 });
