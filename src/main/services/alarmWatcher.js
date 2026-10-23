@@ -97,11 +97,7 @@ function rientraDaTuttoSchermo(incognito) {
 // Il click sulla notifica deve portare dove la suoneria si ferma, cioè in una
 // finestra NORMALE: altrimenti l'unica cosa che l'utente vede non porta da nessuna parte.
 function mostraFinestra() {
-  const { assicuraFinestraNormale, revealWindow } = require('../window');
-  const win = assicuraFinestraNormale();
-  if (!win || win.isDestroyed()) return;
-  if (win.isMinimized()) win.restore();
-  revealWindow(win);
+  require('../window').mostraFinestraNormale();
 }
 
 function start() {
