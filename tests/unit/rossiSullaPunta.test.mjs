@@ -1,6 +1,6 @@
 // #1185: il cancello di pubblicazione prova l'ultimo commit di main con la suite verde, a volte giorni indietro. Un
-// rosso già verde sulla punta di main non apre un feedback; ogni dubbio lo apre come prima. Il passo di release.yml
-// si ESEGUE qui, su un repo vero con una punta finta.
+// rosso già verde sulla punta di main non apre un feedback; ogni dubbio lo apre come prima. I passi di release.yml
+// si ESEGUONO qui, su un repo vero con una punta finta.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,9 +10,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fileDaRifare, tuttiGiaVerdi, rifaiSullaPunta } from '../../scripts/rossi-sulla-punta.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { leggiWorkflow } from '../helpers/workflowInVigore.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const YML = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+const YML = leggiWorkflow('release.yml');
 
 // Le righe del cancello come le ha scritte il runner Windows nell'allarme di #1185.
 const REGISTRO_1185 = [
@@ -123,8 +124,8 @@ function scriptDelPasso(nome) {
 
 const haBash = spawnSync('bash', ['-c', 'true']).status === 0;
 
-// Il commit provato ha l'allarme (finto: scrive i suoi argomenti); la punta di main in più ha il controllo dei rossi
-// (finto: risponde come gli dice la prova). Si lavora su un clone fermo al commit provato, come il runner.
+// Il commit provato ha l'allarme (finto: scrive i suoi argomenti ed esce come gli dice la prova); la punta di main in
+// più ha il controllo dei rossi (finto: risponde come gli dice la prova). Si lavora su un clone fermo al commit provato.
 function scena({ sullaPunta = false } = {}) {
   const base = cartellaTemporanea('filo-rossi-punta-');
   const origine = join(base, 'origine');
@@ -135,8 +136,12 @@ function scena({ sullaPunta = false } = {}) {
   g(origine, 'config', 'user.email', 't@t');
   g(origine, 'config', 'user.name', 't');
   g(origine, 'config', 'commit.gpgsign', 'false');
-  writeFileSync(join(origine, 'scripts', 'build-alarm.mjs'),
-    "import { writeFileSync } from 'node:fs';\nwriteFileSync(process.env.FINTO_ALLARME, JSON.stringify(process.argv.slice(2)));\n");
+  writeFileSync(join(origine, 'scripts', 'build-alarm.mjs'), [
+    "import { writeFileSync } from 'node:fs';",
+    'writeFileSync(process.env.FINTO_ALLARME, JSON.stringify(process.argv.slice(2)));',
+    'process.exitCode = Number(process.env.FINTO_INVIO || 0);',
+    '',
+  ].join('\n'));
   g(origine, 'add', '.');
   g(origine, 'commit', '-q', '-m', 'provato');
   const provato = g(origine, 'rev-parse', 'HEAD');
@@ -153,44 +158,49 @@ function scena({ sullaPunta = false } = {}) {
   g(base, 'clone', '-q', origine, lavoro);
   if (!sullaPunta) g(lavoro, 'checkout', '-q', '--detach', provato);
   writeFileSync(join(lavoro, 'unit.log'), REGISTRO_1185);
-  return { base, origine, lavoro, g, provato: provato.slice(0, 7) };
+  return { base, origine, lavoro, g, provato: provato.slice(0, 7), punta: g(origine, 'rev-parse', '--short', 'HEAD') };
 }
 
-function eseguiPasso(s, { esito, verdi = '' }) {
+/** Il passo del cancello, poi (se `avviso`) quello dell'avviso; `prima` gira fra i due, come il viaggio del registro. */
+function eseguiPassi(s, { esito, verdi = '', invio = 0, prima = () => {}, punta = true } = {}) {
   const riepilogo = join(s.base, 'riepilogo.md');
   const allarme = join(s.base, 'allarme.json');
   const lanciata = join(s.base, 'punta.txt');
   writeFileSync(riepilogo, '');
-  const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', scriptDelPasso()], {
-    cwd: s.lavoro,
-    encoding: 'utf8',
-    env: {
-      ...process.env, GITHUB_STEP_SUMMARY: riepilogo, FINTO_ALLARME: allarme, FINTO_PUNTA: lanciata,
-      FINTO_ESITO: String(esito), FINTO_VERDI: verdi,
-    },
-  });
+  const env = {
+    ...process.env, GITHUB_STEP_SUMMARY: riepilogo, FINTO_ALLARME: allarme, FINTO_PUNTA: lanciata,
+    FINTO_ESITO: String(esito), FINTO_VERDI: verdi, FINTO_INVIO: String(invio),
+  };
+  const bash = (script) => spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', script], { cwd: s.lavoro, encoding: 'utf8', env });
+  const a = punta ? bash(scriptDelPasso(PASSO_PUNTA)) : { status: 0, stdout: '', stderr: '' };
+  const copiaRimasta = existsSync(join(s.lavoro, '.punta-main'));
+  const copieGit = s.g(s.lavoro, 'worktree', 'list').split('\n').length;
+  prima();
+  const b = bash(scriptDelPasso(PASSO_AVVISO));
   return {
-    status: r.status,
-    out: r.stdout + r.stderr,
+    statoCancello: a.status,
+    status: b.status,
+    out: a.stdout + a.stderr + b.stdout + b.stderr,
     riepilogo: readFileSync(riepilogo, 'utf8'),
     allarme: existsSync(allarme) ? JSON.parse(readFileSync(allarme, 'utf8')) : null,
     puntaLanciata: existsSync(lanciata) ? readFileSync(lanciata, 'utf8') : null,
-    copiaRimasta: existsSync(join(s.lavoro, '.punta-main')),
-    copieGit: s.g(s.lavoro, 'worktree', 'list').split('\n').length,
+    copiaRimasta,
+    copieGit,
   };
 }
 
-describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'serve bash' }, () => {
-  test('ogni rosso già verde sulla punta: niente feedback, la corsa resta rossa e il riepilogo lo dice', () => {
+describe('i passi del cancello rosso in release.yml: i rossi sulla punta e il feedback', { skip: !haBash && 'serve bash' }, () => {
+  test('ogni rosso già verde sulla punta: niente feedback, e il riepilogo lo dice', () => {
     const s = scena();
     try {
-      const r = eseguiPasso(s, { esito: 0, verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
-      assert.equal(r.status, 1, 'il commit provato è rosso: non si pubblica');
+      const r = eseguiPassi(s, { esito: 0, verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
+      assert.equal(r.statoCancello, 0, r.out);
+      assert.equal(r.status, 0, r.out);
       assert.equal(r.allarme, null, 'aperto un feedback per un rosso già corretto su main');
       assert.equal(r.puntaLanciata, 'unit.log', 'il controllo della punta deve leggere il registro del cancello');
       assert.match(r.out, /::warning::.*gia' verdi sulla punta di main/);
       assert.match(r.riepilogo, /Rossi gia' corretti su main/);
-      assert.match(r.riepilogo, new RegExp(`Rossi su ${s.provato}`));
+      assert.match(r.riepilogo, new RegExp(`Rossi su ${s.provato}, verdi sulla punta ${s.punta}`));
       assert.match(r.riepilogo, /- tests\/unit\/aggiornamentiAutomatici\.test\.mjs/);
       assert.equal(r.copiaRimasta, false, 'la copia della punta è rimasta nel repo');
       assert.equal(r.copieGit, 1);
@@ -200,12 +210,12 @@ describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'se
   test('un rosso ancora rosso sulla punta: il feedback si apre, col commit provato e i file già verdi da non correggere', () => {
     const s = scena();
     try {
-      const r = eseguiPasso(s, { esito: 1, verdi: 'tests/unit/altro.test.mjs\n' });
-      assert.equal(r.status, 1);
+      const r = eseguiPassi(s, { esito: 1, verdi: 'tests/unit/altro.test.mjs\n' });
+      assert.equal(r.status, 0, r.out);
       assert.ok(r.allarme, 'il feedback non si è aperto');
       const [titolo, testo, ...resto] = r.allarme;
       assert.equal(titolo, 'Controlli automatici rossi: nessuna versione pubblicata');
-      assert.deepEqual(resto, ['--chiavi-unit', 'unit.log']);
+      assert.deepEqual(resto, ['--chiavi-unit', 'esiti-cancello/unit.log']);
       assert.match(testo, new RegExp(`Commit provato: ${s.provato}, l'ultimo di main con la suite verde\\.`));
       assert.match(testo, /Gia' verdi sulla punta di main, da non correggere: tests\/unit\/altro\.test\.mjs/);
       assert.match(testo, /aggiornamentiAutomatici\.test\.mjs:116:1/);
@@ -217,8 +227,7 @@ describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'se
   test('main fermo al commit provato: niente da rifare, il feedback si apre', () => {
     const s = scena({ sullaPunta: true });
     try {
-      const r = eseguiPasso(s, { esito: 0, verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
-      assert.equal(r.status, 1);
+      const r = eseguiPassi(s, { esito: 0, verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
       assert.equal(r.puntaLanciata, null, 'rifatto sulla punta lo stesso commit appena provato');
       assert.ok(r.allarme, 'il feedback non si è aperto');
       assert.doesNotMatch(r.allarme[1], /Gia' verdi/);
@@ -229,8 +238,7 @@ describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'se
     const s = scena();
     try {
       s.g(s.lavoro, 'remote', 'set-url', 'origin', join(s.base, 'non-esiste'));
-      const r = eseguiPasso(s, { esito: 0, verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
-      assert.equal(r.status, 1);
+      const r = eseguiPassi(s, { esito: 0, verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
       assert.equal(r.puntaLanciata, null);
       assert.ok(r.allarme, 'senza la punta l\'allarme è sparito');
     } finally { togliCartella(s.base); }
@@ -239,10 +247,44 @@ describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'se
   test('il controllo della punta che si rompe: il feedback si apre', () => {
     const s = scena();
     try {
-      const r = eseguiPasso(s, { esito: 'rotto', verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
-      assert.equal(r.status, 1);
+      const r = eseguiPassi(s, { esito: 'rotto', verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
       assert.ok(r.allarme, 'un controllo rotto ha spento l\'allarme');
       assert.equal(r.copiaRimasta, false);
+    } finally { togliCartella(s.base); }
+  });
+
+  test('il registro non arriva all\'avviso: il feedback si apre lo stesso, senza rossi elencati', () => {
+    const s = scena();
+    try {
+      const r = eseguiPassi(s, { esito: 1, punta: false });
+      assert.ok(r.allarme, 'senza registro il cancello rosso tacerebbe');
+      assert.match(r.allarme[1], /nessuna riga not ok: guarda la coda/);
+      assert.match(r.allarme[1], /\(nessun output\)/);
+    } finally { togliCartella(s.base); }
+  });
+
+  test('un feedback che non parte lascia rosso l\'avviso', () => {
+    const s = scena();
+    try {
+      const r = eseguiPassi(s, { esito: 1, invio: 1 });
+      assert.ok(r.allarme, 'l\'allarme non è stato nemmeno chiamato');
+      assert.equal(r.status, 1);
+      assert.match(r.out, /::error::Allarme del cancello non consegnato/);
+    } finally { togliCartella(s.base); }
+  });
+
+  // L'esito della punta viene dalla macchina delle prove: per l'avviso è un dato, e lo sha finisce in un'annotazione.
+  test('dal cancello lo sha della punta passa solo come esadecimale', () => {
+    const s = scena();
+    try {
+      const r = eseguiPassi(s, {
+        esito: 0,
+        verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n',
+        prima: () => writeFileSync(join(s.lavoro, 'esiti-cancello', 'punta'), 'abc123\n::error::finto\n'),
+      });
+      const avviso = r.out.split('\n').find((x) => x.startsWith('::warning::'));
+      assert.match(avviso, /sulla punta di main \(abc123\)/);
+      assert.doesNotMatch(r.out, /::error::finto/);
     } finally { togliCartella(s.base); }
   });
 });
