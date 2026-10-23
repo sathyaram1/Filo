@@ -619,10 +619,14 @@
     const fuori = lista.filter((p) => !p.parziale);
     const meta = lista.filter((p) => p.parziale);
     const parti = [];
-    if (fuori.length) parti.push(`ho lasciato fuori ${fuori.length === 1 ? 'una pagina letta' : `${fuori.length} pagine lette`}${elencoSiti(fuori)}`);
-    if (meta.length) parti.push(`${meta.length === 1 ? 'di una pagina' : `di ${meta.length} pagine`}${elencoSiti(meta)} ho tenuto solo l'inizio`);
+    if (fuori.length) parti.push(`ho lasciato fuori ${fuori.length === 1 ? 'una pagina' : `${fuori.length} pagine`}${elencoSiti(fuori)}`);
+    if (meta.length) {
+      const quali = meta.length === 1 ? (fuori.length ? 'un\'altra' : 'una pagina') : (fuori.length ? `altre ${meta.length}` : `${meta.length} pagine`);
+      parti.push(`di ${quali}${elencoSiti(meta)} ho tenuto solo l'inizio`);
+    }
     const piu = lista.length > 1;
-    return `Per stare nella memoria del modello ${parti.join(' e ')}: se ${piu ? 'ti servono, chiedimi di rileggerle' : 'ti serve, chiedimi di rileggerla'}.`;
+    return `Il modello non riusciva a leggere tutto insieme, così ${parti.join(' e ')}. `
+      + `Se ${piu ? 'ti servono, chiedimi di rileggerle' : 'ti serve, chiedimi di rileggerla'}.`;
   }
 
   // Quello che il modello ha già davanti dall'archivio: i pezzi ripescati nei turni prima e le conversazioni rilette
