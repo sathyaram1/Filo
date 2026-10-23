@@ -3325,6 +3325,7 @@ async function eseguiAzioneFilo(action, {
           await FiloMem.svuotaQuaderno();
           // E le interviste di benvenuto conservate: sono quello che l'utente gli ha raccontato di sé (#1297).
           if (Onboarding) await saveOnboarding(Onboarding.dimentica(await FiloMem.getOnboarding()));
+          try { globalThis.SN_CONTATORI_MAIN?.memoriaCorretta('chat', 'svuota', null); } catch (_) {}
           broadcastLiveUpdate();
           return { executed: true, kept: false };
         } catch (e) {
