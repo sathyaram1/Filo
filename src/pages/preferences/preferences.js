@@ -167,6 +167,7 @@
     const nomi = tutti && Tokens ? Tokens.names() : [...tokenDaSalvare];
     tokenDaSalvare.clear();
     tokenAzzeraTutti = false;
+    if (!nomi.length) return;
     const giro = ++giriToken;
     const modifica = {};
     for (const name of nomi) {
