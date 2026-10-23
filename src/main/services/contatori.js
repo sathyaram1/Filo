@@ -454,6 +454,16 @@ function crea(dip = {}) {
     } catch (_) { return false; }
   }
 
+  // Una riga di memoria corretta dalla persona: `riga` è quella di SN_FILO_MEMORY.descriviRiga, col modulo e la data.
+  function memoriaCorretta(via, operazione, riga) {
+    if (!riga && operazione !== 'svuota') return false;
+    const nata = riga && riga.nata ? Date.parse(riga.nata) : NaN;
+    return attivita('memoria', {
+      via, operazione, riga: operazione === 'svuota' ? 'tutte' : C.rigaMemoria(riga),
+      etaMs: Number.isFinite(nata) ? Math.max(0, adesso() - nata) : null,
+    });
+  }
+
   // La chat che cambia la richiesta per stare nella finestra del modello (#1464): `tipo` dall'elenco chiuso.
   function adattamento(action, modello, tipo) {
     const f = C.funzioneDi(action);
