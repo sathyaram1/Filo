@@ -103,10 +103,18 @@
     // Un sito che ospita la chat non accende il microfono di Filo con un clic fabbricato.
     try { global.SN_FILO_UI && global.SN_FILO_UI.soloGestiVeri(b); } catch (_) {}
 
+    // `perche`: come la persona ha preso in mano il testo mentre si parlava; `inAttesa`: la sessione il cui invio
+    // aspetta l'attimo per annullare. Servono ai contatori (#1467), che contano l'invio una volta per sessione.
     const c = {
       campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, preso: false, lasciato: '',
-      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0,
+      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0, perche: '', inAttesa: null,
     };
+    const contaFine = (esito, invio) => { try { global.SN_ASCOLTO.contaSessione(esito, invio); } catch (_) {} };
+    function esitoDellAttesa(invio) {
+      const e = c.inAttesa;
+      c.inAttesa = null;
+      if (e) contaFine(e, invio);
+    }
 
     function imposta(stato) {
       c.stato = stato;
