@@ -12,7 +12,7 @@
       version: '0.2.248', date: '2026-10-23',
       features: [
         'Ctrl+Tab porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima scheda si riparte dalla prima. Su Mac si premono col tasto Control.',
-        'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home, e quelle con del testo che non hai ancora inviato restano aperte finché non insisti.',
+        'Nella home puoi chiedere a Filo di chiudere le schede: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail». Le pagine chiuse restano nel filo della home. Una scheda con del testo che non hai ancora inviato resta aperta, a meno che tu non insista.',
       ],
       fixes: [
         'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
