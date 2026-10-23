@@ -208,23 +208,63 @@ test('sito: una foto oltre i 4 MB lasciata sulla fila delle schede entra nell’
   expect((await statoAiuto(app, page)).allegati[0].byte).toBeLessThan(4 * 1024 * 1024 * 4 / 3);
 });
 
-test('sito: un’immagine lasciata sopra una casella di testo va all’Aiuto; se la casella il rilascio lo vuole, resta suo', async ({ app, openTab, testServer }) => {
+test('sito: un’immagine lasciata sopra una casella di testo o un editor va all’Aiuto e il sito non la vede; se la casella il file lo accetta, resta suo', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
     <body style="margin:0;height:100vh"><input id="q" type="search" placeholder="Cerca" style="position:fixed;left:50px;top:50px;width:500px;height:60px">
+    <div id="ed" contenteditable="true" style="position:fixed;left:50px;top:140px;width:500px;height:40px">scrivi</div>
     <textarea id="t" style="position:fixed;left:50px;top:200px;width:500px;height:120px"></textarea>
     <script>
       window.ricevuti = [];
+      window.visti = [];
+      // Ascolta i rilasci senza accettarli: in ogni browser non ne riceverebbe nessuno (#1623 giro 5).
+      window.addEventListener('drop', (e) => { for (const f of e.dataTransfer.files) window.visti.push(f.name); }, true);
+      t.addEventListener('dragover', (e) => e.preventDefault());
       t.addEventListener('drop', (e) => { e.preventDefault(); window.ricevuti.push(...[...e.dataTransfer.files].map((f) => f.name)); });
     </script></body></html>`);
-  const [foto, altra] = immaginiSulDisco(2);
+  const [foto, sulEditor, altra] = immaginiSulDisco(3);
   await lascia(page, [foto], { x: 200, y: 80 });
   await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }] });
   expect(await page.locator('#q').inputValue()).toBe('');
-  // Una casella che il rilascio lo gestisce al drop (senza dirlo al dragover) se lo tiene: l'Aiuto non cambia.
+  await lascia(page, [sulEditor], { x: 200, y: 160 });
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome), { timeout: 8_000 }).toEqual(['foto 1.png', 'foto 2.png']);
+  expect(await page.evaluate(() => window.visti)).toEqual([]);
+  // La casella che il passaggio del file l'ha accettato il rilascio lo riceve: l'Aiuto non cambia.
   await lascia(page, [altra], { x: 200, y: 260 });
-  await expect.poll(() => page.evaluate(() => window.ricevuti), { timeout: 8_000 }).toEqual(['foto 2.png']);
+  await expect.poll(() => page.evaluate(() => window.ricevuti), { timeout: 8_000 }).toEqual(['foto 3.png']);
   await page.waitForTimeout(300);
-  expect((await statoAiuto(app, page)).allegati.map((a) => a.nome)).toEqual(['foto 1.png']);
+  expect((await statoAiuto(app, page)).allegati.map((a) => a.nome)).toEqual(['foto 1.png', 'foto 2.png']);
+});
+
+test('riquadro incorporato: l’immagine lasciata sulla sua casella va all’Aiuto e il riquadro non la vede', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html(`<!doctype html><html><body style="margin:0;height:100vh"><input style="width:300px;height:80px">
+    <script>window.visti = []; window.addEventListener('drop', (e) => { for (const f of e.dataTransfer.files) window.visti.push(f.name); }, true);</script></body></html>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><iframe src="${dentro}" style="position:fixed;left:0;top:0;width:400px;height:300px;border:0"></iframe></body></html>`);
+  await expect.poll(() => page.frames().some((f) => f.url() === dentro && f !== page.mainFrame())).toBe(true);
+  const fr = page.frames().find((f) => f.url() === dentro);
+  await fr.waitForLoadState('domcontentloaded');
+  const [foto] = immaginiSulDisco(1);
+  await lascia(page, [foto], { x: 100, y: 30 });
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome), { timeout: 8_000 }).toEqual(['foto 1.png']);
+  expect(await fr.evaluate(() => window.visti)).toEqual([]);
+});
+
+test('un file immagine rovinato non entra come anteprima rotta: nell’Aiuto e nella home lo dice un avviso', async ({ app, shell, openTab, testServer }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const casa = await home(app);
+  const rovinata = () => immaginiSulDisco(1, { byte: Buffer.from('questo non è un png'), nome: () => 'rovinata.png' });
+  await casa.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(['questo non è un png'], 'image.png', { type: 'image/png' }));
+    document.getElementById('inputForm').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await expect(casa.locator('.sn-toast')).toContainText('non si è aperta', { timeout: 5_000 });
+  await expect(casa.locator('#imgPreviews .dash-img-preview img')).toHaveCount(0);
+
+  const page = await testServer.openReady(openTab, SITO);
+  await lascia(page, rovinata());
+  await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 8_000 }).toContain('non si è aperta');
+  expect((await statoAiuto(app, page)).allegati).toEqual([]);
 });
 
 test('sito che accetta il passaggio del file ovunque ma lo prende solo in una zona: fuori dalla zona va all’Aiuto', async ({ app, openTab, testServer }) => {

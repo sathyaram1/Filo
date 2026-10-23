@@ -76,8 +76,8 @@
     if (!im) return '';
     try {
       if (blob.size <= tetto) {
-        const com_e = await comeDataUrl(blob);
-        if (LETTA.test(com_e)) return com_e;
+        const originale = await comeDataUrl(blob);
+        if (LETTA.test(originale)) return originale;
         const png = disegna(im, Math.min(lato, Math.max(im.w, im.h)), 'image/png');
         if (LETTA.test(png) && byteDi(png) <= tetto) return png;
       }
