@@ -653,14 +653,16 @@ function crea(dip = {}) {
         delete mappa[k];
         continue;
       }
-      const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
+      const chiamate = giorno ? null : documentoAccanto(k, C.documentoChiamate({ ...base, chiave: k }), C.senzaChiamate, C.validaChiamate);
+      const attivita = giorno ? null : documentoAccanto(k, C.documentoAttivita({ ...base, chiave: k }), C.senzaAttivita, C.validaAttivita);
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
-      // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
-      // allora l'ora rispedita risponde 409.
+      // L'ora è arrivata: il suo segno di primo documento vale anche se i documenti accanto partono al giro dopo, e
+      // allora l'ora (e quello già arrivato accanto) rispedita risponde 409.
       if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
-      if (r.ok && chiamate) {
-        r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
+      for (const [accanto, collezione] of [[chiamate, C.COLLEZIONE_CHIAMATE], [attivita, C.COLLEZIONE_ATTIVITA]]) {
+        if (!r.ok || !accanto) continue;
+        r = await spedisci(accanto, collezione);
         if (mia !== generazione) return 'spenti';
       }
       if (!r.ok && r.soloQuesto) {
