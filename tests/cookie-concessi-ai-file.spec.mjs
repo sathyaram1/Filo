@@ -120,7 +120,7 @@ test('la foto del sito della pagina, su un\'altra origine, porta tutti i cookie 
     const dallaPagina = await cookieDellaPagina(page, sito, '/foto.png?la-pagina');
     expect(dallaPagina).toEqual(['libero', 'medio', 'nondetto', 'stretto']);
 
-    const letta = await nelMondoDiFilo(app, paginaHost,
+    const letta = await nelMondoDiFilo(app, new URL(page.url()).hostname,
       `SN_ACTIONS.scaricaImmagine(${JSON.stringify(src + '?per-filo')}, document.getElementById('foto')).then((d) => d.slice(0, 22), (e) => 'errore: ' + e.message)`);
     expect(letta).toBe('data:image/png;base64,');
     const letture = sito.dalMain('/foto.png?per-filo');
