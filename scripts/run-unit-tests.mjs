@@ -576,7 +576,8 @@ export const lanciaSorvegliato = (args, { env, avanzamento = null, tetto = TETTO
     }
     if (!giudizio && !tutto) return;
     clearInterval(guardia);
-    fermo = fileInCorso(leggiRighe(avanzamento));
+    const inCorso = fileInCorso(leggiRighe(avanzamento));
+    fermo = inCorso.length ? inCorso : fileFermo.sospetti();
     chiudiAlbero(c);
   }, controlloPer(tetto));
   const fine = (esito) => { if (guardia) clearInterval(guardia); ok({ ...esito, chiusi: chiusi.filter((f) => !(fermo || []).includes(f)), ...raccolto() }); };
