@@ -7,6 +7,8 @@ import { test, expect } from './fixtures/electron.mjs';
 const NEWTAB = 'filo://newtab/';
 const URL_RE = 'http://127\\.0\\.0\\.1:\\d+/\\d+';
 const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
+// Una finestra dove la chat sta con una pagina e mezza: il resto lo prendono istruzioni, strumenti e tetto della risposta.
+const FINESTRA = 72000;
 
 // Una pagina da circa 60.000 token: il marchio sta in cima, dentro il primo pezzo che Filo legge.
 function paginaEnorme(nome) {
@@ -18,12 +20,12 @@ ${corpo}
 </article></main></body></html>`;
 }
 
-// `limite`: oltre questi caratteri di messaggi il fornitore rifiuta, con le misure (o senza, `misure: false`).
-// `finestra`: quella che il listino di OpenRouter dice per il modello (null: il listino non risponde).
+// Il fornitore finto conta come OpenRouter: messaggi e strumenti, più il tetto della risposta. Oltre `finestra` token
+// rifiuta, con le misure (o senza, `misure: false`). `listino`: il listino di OpenRouter dice la stessa finestra.
 // `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
 // (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti.
-async function modello(app, { limite, finestra = null, misure = true, piani }) {
-  await app.evaluate(async (_e, { limite, finestra, misure, piani }) => {
+async function modello(app, { finestra, listino = false, misure = true, piani }) {
+  await app.evaluate(async (_e, { finestra, listino, misure, piani }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -36,7 +38,7 @@ async function modello(app, { limite, finestra = null, misure = true, piani }) {
     globalThis.fetch = async (input, init) => {
       const url = String((input && input.url) || input);
       if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
-        if (!finestra) return new Response('giù', { status: 503 });
+        if (!listino) return new Response('giù', { status: 503 });
         const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: finestra, pricing: { prompt: '0.0000001', completion: '0.0000002' } }];
         return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
@@ -44,19 +46,18 @@ async function modello(app, { limite, finestra = null, misure = true, piani }) {
     };
     globalThis.__rifiutate = 0;
     globalThis.__accettate = [];
-    globalThis.__misure = [];
     const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
-      const n = testi.reduce((s, t) => s + t.length, 0);
-      globalThis.__misure.push({ n, strumenti: tools ? JSON.stringify(tools).length : 0, esiti: messages.filter((m) => m.role === 'tool').map((m) => String(m.content).length) });
-      if (n > limite) {
+      const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / 3.5);
+      const uscita = Number(attempts[0].maxTokens) || 16384;
+      if (ingresso + uscita > finestra) {
         globalThis.__rifiutate++;
         const detto = misure
-          ? `This endpoint's maximum context length is 32768 tokens. However, you requested about ${Math.ceil(n / 3.35)} tokens. Please reduce the length of the messages.`
+          ? `This endpoint's maximum context length is ${finestra} tokens. However, you requested about ${ingresso + uscita} tokens (${ingresso} of text input, ${uscita} of output). Please reduce the length of either one.`
           : 'Prompt is too long for this model.';
         const e = new Error(`OpenRouter 400: {"error":{"message":"${detto}","code":400}}`);
         e.status = 400;
@@ -82,7 +83,7 @@ async function modello(app, { limite, finestra = null, misure = true, piani }) {
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       return { ...base, text: '', toolCalls, finishReason: 'tool_calls' };
     };
-  }, { limite, finestra, misure, piani });
+  }, { finestra, listino, misure, piani });
 }
 
 async function preparaPagine(app, testServer) {
@@ -108,14 +109,15 @@ async function chiedi(page, testo) {
 }
 
 for (const caso of [
-  { nome: 'senza la finestra nota, il rifiuto del fornitore', finestra: null, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
-  { nome: 'con la finestra nota dal listino, prima di mandare', finestra: 40000, rifiuti: (n) => expect(n).toBe(0) },
+  { nome: 'senza la finestra nota, il rifiuto del fornitore', listino: false, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
+  { nome: 'senza le misure nel rifiuto, a metà per volta', listino: false, misure: false, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
+  { nome: 'con la finestra nota dal listino, prima di mandare', listino: true, rifiuti: (n) => expect(n).toBe(0) },
 ]) {
   test(`tre pagine enormi nello stesso turno (${caso.nome}): la risposta arriva con la prima pagina e in chat c'è l'avviso delle altre`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120_000);
     const page = await openTab(NEWTAB);
     const urls = await preparaPagine(app, testServer);
-    await modello(app, { limite: 110000, finestra: caso.finestra, piani: RICERCA_E_TRE_PAGINE });
+    await modello(app, { finestra: FINESTRA, listino: caso.listino, misure: caso.misure !== false, piani: RICERCA_E_TRE_PAGINE });
 
     await chiedi(page, 'confronta le tre guide che trovi');
 
@@ -128,7 +130,12 @@ for (const caso of [
     await expect(bolla).toContainText('Per stare nella memoria del modello');
     await expect(bolla).toContainText(/chiedimi di rileggerl[ae]/);
     await expect(bolla).toContainText('127.0.0.1');
-    console.log('MISURE', JSON.stringify(await app.evaluate(() => globalThis.__misure)));
+    if (process.env.FILO_FOTO_1596) {
+      for (const tema of ['light', 'dark']) {
+        await page.emulateMedia({ colorScheme: tema });
+        await page.screenshot({ path: `tests/.shots/1596-${caso.listino ? 'listino' : 'rifiuto'}-${tema}.png` });
+      }
+    }
     caso.rifiuti(await app.evaluate(() => globalThis.__rifiutate));
 
     // Al modello le pagine tolte arrivano come rimando: titolo e indirizzo, nessun testo inventabile.
@@ -145,7 +152,7 @@ test('le pagine lasciate fuori si rileggono chiedendolo, e la pagina riletta arr
   const page = await openTab(NEWTAB);
   await preparaPagine(app, testServer);
   await modello(app, {
-    limite: 110000,
+    finestra: FINESTRA,
     piani: [
       ...RICERCA_E_TRE_PAGINE,
       // Turno dopo: l'indirizzo lo prende dal rimando che ha davanti, come farebbe il modello.
@@ -169,7 +176,7 @@ test('se il fornitore rifiuta anche dopo aver accorciato tutto, l\'errore dice c
   const page = await openTab(NEWTAB);
   await preparaPagine(app, testServer);
   // Nessuna richiesta ci sta, nemmeno la prima.
-  await modello(app, { limite: 10, piani: RICERCA_E_TRE_PAGINE });
+  await modello(app, { finestra: 20000, piani: RICERCA_E_TRE_PAGINE });
   await chiedi(page, 'confronta le tre guide che trovi');
   const errore = page.locator('.dash-bubble-filo', { hasText: 'meno pagine' });
   await expect(errore).toBeVisible({ timeout: 40_000 });
