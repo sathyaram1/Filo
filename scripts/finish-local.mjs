@@ -365,7 +365,7 @@ export function specsForChangedFiles(changed, tracked) {
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
     if (n) {
       aggiungi(n[1]);
-      for (const decisa of AREE_DECISE_DA[n[1].toLowerCase()] || []) aggiungi(decisa);
+      for (const decisa of AREE_DECISE_DA.get(n[1].toLowerCase()) || []) aggiungi(decisa);
     }
     // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
     // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
