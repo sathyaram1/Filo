@@ -43,6 +43,15 @@ function numero(v) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+// La parte dello strato che ha qualcosa sopra, in px della vista: { x, y, width, height }, null per la scheda intera.
+function zonaValida(z) {
+  if (!z || typeof z !== 'object') return null;
+  const n = ['x', 'y', 'width', 'height'].map((k) => numero(z[k]));
+  if (n.some((v) => v === undefined) || n[2] <= 0 || n[3] <= 0) return null;
+  const [x, y, width, height] = n.map((v) => Math.round(Math.max(-100000, Math.min(100000, v))));
+  return { x, y, width, height };
+}
+
 function principaleDi(sender) {
   try { return !!sender && !sender.frame?.parent; } catch (_) { return false; }
 }
