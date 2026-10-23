@@ -426,7 +426,10 @@
         e.preventDefault();
         if (!gestoVero(e) || accetta.disabled) return;
         accetta.disabled = true;
-        chiediSotto('accetta', { id: h.id }).then((r) => { if (!(r && r.ok) && accetta.isConnected) accetta.disabled = false; });
+        chiediSotto('accetta', { id: h.id }).then((r) => {
+          if (r && r.ok) { if (notaPasso && notaPasso.id === h.id) togliNotaPasso(); return; }
+          if (accetta.isConnected) accetta.disabled = false;
+        });
       });
       tip.append(valore, accetta);
     }

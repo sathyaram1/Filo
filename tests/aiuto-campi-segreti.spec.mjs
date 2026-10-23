@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
@@ -35,14 +36,17 @@ async function modelloFinto(app, risposte) {
   }, risposte);
 }
 
-async function apriAiuto(shell, page) {
+// Su un sito il pannello sta nello strato sopra la scheda (#1509.3): la Page dove guardarlo e scriverci.
+async function apriAiuto(app, shell, page) {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return aiuto;
 }
 
-async function scriviAllAiuto(page, testo) {
+async function scriviAllAiuto(aiuto, testo) {
   await page.fill('.sn-sidebar-input textarea', testo);
   await page.press('.sn-sidebar-input textarea', 'Enter');
 }
@@ -99,9 +103,9 @@ for (const caso of SEGRETI) {
     await expect(page.locator('#c')).toHaveValue(caso.valore);
     await preparaModelli(app);
     await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-    await apriAiuto(shell, page);
-    await scriviAllAiuto(page, 'aiutami a entrare');
-    await expect(page.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'aiutami a entrare');
+    await expect(aiuto.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
 
     const testo = await arrivato(app, page);
     expect(testo, 'quello che l’utente ha scritto nel campo è arrivato al modello').not.toContain(caso.valore);
@@ -118,9 +122,9 @@ test('un campo qualunque senza nome continua a farsi riconoscere da quello che c
   await expect(page.locator('#c')).toHaveValue('biciclette rosse');
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'aiutami a cercare');
-  await expect(page.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a cercare');
+  await expect(aiuto.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
   expect(rigaDelCampo(await arrivato(app, page))).toContain('"biciclette rosse"');
 });
 
@@ -135,14 +139,14 @@ test('il clic sul campo della password indicato dall’assistente lo racconta co
     ['cliccato', JSON.stringify({ text: 'Ora premi «Accedi».', status: 'done' })],
     ['', JSON.stringify({ text: 'Controlla la password.', highlight: { selector: '#c', action: 'click', note: 'qui' }, status: 'continue' })],
   ]);
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'aiutami a entrare');
-  await expect(page.locator('.sn-sidebar', { hasText: 'Controlla la password.' })).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a entrare');
+  await expect(aiuto.locator('.sn-sidebar', { hasText: 'Controlla la password.' })).toBeVisible({ timeout: 20_000 });
   await page.click('#c');
-  await expect(page.locator('.sn-sidebar', { hasText: 'Ora premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+  await expect(aiuto.locator('.sn-sidebar', { hasText: 'Ora premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
 
-  await expect(page.locator('.sn-sidebar-log', { hasText: 'click su Password' })).toBeVisible();
-  await expect(page.locator('.sn-sidebar')).not.toContainText('Gatto.Rosso.77');
+  await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'click su Password' })).toBeVisible();
+  await expect(aiuto.locator('.sn-sidebar')).not.toContainText('Gatto.Rosso.77');
   expect(await arrivato(app, page)).not.toContain('Gatto.Rosso.77');
 });
 
@@ -175,12 +179,12 @@ test('nell’immagine della pagina che va al modello il numero della carta è co
   await superaAvviso(app);
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-  await apriAiuto(shell, page);
+  const aiuto = await apriAiuto(app, shell, page);
 
   const immagini = [];
   for (const [i, valore] of ['4111 1111 1111 1111', '5500 0000 0000 0004'].entries()) {
     await page.fill('#c', valore);
-    await scriviAllAiuto(page, 'aiutami a pagare');
+    await scriviAllAiuto(aiuto, 'aiutami a pagare');
     await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
     immagini.push(await app.evaluate(() => {
       const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
@@ -239,11 +243,11 @@ async function pixelDiversi(page, [a, b], r) {
 async function immaginiConDueCarte(app, shell, page, scrivi) {
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-  await apriAiuto(shell, page);
+  const aiuto = await apriAiuto(app, shell, page);
   const immagini = [];
   for (const [i, valore] of ['4111 1111 1111 1111', '5500 0000 0000 0004'].entries()) {
     await scrivi(valore);
-    await scriviAllAiuto(page, 'aiutami a pagare');
+    await scriviAllAiuto(aiuto, 'aiutami a pagare');
     await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
     immagini.push(await app.evaluate(() => {
       const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
@@ -345,9 +349,9 @@ test('il codice monouso diviso in sei caselle non arriva al modello', async ({ a
   for (const [i, c] of [...'739146'].entries()) await page.fill(`#o${i + 1}`, c);
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'aiutami a entrare');
-  await expect(page.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a entrare');
+  await expect(aiuto.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
   const righe = (await arrivato(app, page)).split('\\n').filter((r) => /:: #o[1-6]/.test(r));
   expect(righe).toHaveLength(6);
   expect(righe.join('\n'), 'le cifre del codice sono arrivate al modello').not.toMatch(/input \\"\d\\"/);
@@ -429,7 +433,7 @@ test('la password resa visibile dal sito non arriva al modello, né nella descri
   await superaAvvisoSeCe(app);
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-  await apriAiuto(shell, page);
+  const aiuto = await apriAiuto(app, shell, page);
   const immagini = [];
   for (const [i, valore] of ['Gatto.Rosso.77', 'Mela.Verde.42'].entries()) {
     if (i) await page.click('#occhio');
@@ -437,7 +441,7 @@ test('la password resa visibile dal sito non arriva al modello, né nella descri
     await page.fill('#c', valore);
     await page.click('#occhio');
     await expect(page.locator('#c')).toHaveAttribute('type', 'text');
-    await scriviAllAiuto(page, 'non riesco ad entrare');
+    await scriviAllAiuto(aiuto, 'non riesco ad entrare');
     await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
     immagini.push(await app.evaluate(() => {
       const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
@@ -464,9 +468,9 @@ test('il codice monouso in un campo solo arriva al modello col testo che lo prec
   await page.fill('#c', '739146');
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'non funziona');
-  await expect(page.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'non funziona');
+  await expect(aiuto.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
   const testo = await arrivato(app, page);
   expect(testo, 'il codice è arrivato al modello').not.toContain('739146');
   expect(rigaDelCampo(testo)).toContain('"Inserisci il codice che ti abbiamo mandato via SMS"');
@@ -483,7 +487,7 @@ test('su una pagina grande senza componenti chiusi la foto per l’assistente no
     <script>document.write('<div><p>testo <b>uno</b> <i>due</i></p><ul><li>a</li><li>b</li></ul></div>'.repeat(13000));</script>
     ${riquadri.map((u) => `<iframe src="${u}" width="200" height="100"></iframe>`).join('')}</body></html>`);
   await expect.poll(() => page.frames().length, { timeout: 30_000 }).toBeGreaterThan(15);
-  await apriAiuto(shell, page);
+  const aiuto = await apriAiuto(app, shell, page);
   const percorso = new URL(page.url()).pathname;
 
   const esito = await app.evaluate(async ({ webContents }, percorso) => {
