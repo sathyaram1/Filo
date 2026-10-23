@@ -773,9 +773,8 @@
     }, resto + 20);
   }
 
-  // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
-  // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
-  // Anche quello che lo copre si muove da sé (un'intestazione che scende): il ritaglio si rifà ogni RITAGLIO_OGNI.
+  // La pagina sposta il campo senza scorrere (un avviso che compare sopra) o gli fa scendere sopra un'intestazione: finché
+  // il campo ha segni, a ogni fotogramma il riquadro si confronta con l'ultimo disegno, e ogni RITAGLIO_OGNI si ritaglia.
   let seguendo = false;
   function seguiIlCampo() {
     if (seguendo) return;
