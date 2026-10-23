@@ -4669,6 +4669,12 @@ function esitoChiusuraPerModello(action, o) {
   return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
 }
 
+// L'esito di UNA azione, come risposta allo strumento che il modello ha
+// chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
+// riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
+// conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
+// esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
+// e un modello che la ritenta lo farebbe comparire due volte.
 function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
