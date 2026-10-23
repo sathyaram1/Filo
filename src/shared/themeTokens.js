@@ -535,6 +535,7 @@
     scrollBehavior,
     FACTOR_MAX,
     sanitize,
+    conModifica,
     defaultValue,
     effectiveValue,
     toRgbTriplet,
