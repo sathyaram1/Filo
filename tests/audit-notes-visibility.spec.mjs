@@ -1,28 +1,9 @@
-// Appunti di Filo, ora DENTRO l'editor (#379.3 — fine dell'archivio separato).
-//
-// Quando l'utente dice "prendi nota che…", Filo NON riempie più un elenco a
-// parte: scrive l'appunto come testo in un file dell'editor. Questo spec
-// asserisce il SUCCESSO della feature (non l'assenza di errori):
-//   1) un appunto scritto da Filo compare COME TESTO in un file dell'editor, e
-//      un editor già aperto lo mostra da solo (ricarica live);
-//   2) restando sullo stesso argomento i due appunti finiscono nello STESSO
-//      file; cambiando argomento si apre un file NUOVO.
-//
-// Senza il fix (appunto nell'archivio separato) il testo non comparirebbe in
-// nessun file dell'editor → rosso.
-//
-// #379.12 chiude il cerchio lato UI: l'accesso agli appunti passa SOLO
-// dall'editor (niente più pannello/icona "Appunti" nella home) e l'editor porta
-// proprio l'icona degli appunti, ovunque compaia. Gli ultimi tre test qui sotto
-// asseriscono quell'invariante:
-//   3) i controlli in alto a destra nella home sono ESATTAMENTE quelli del
-//      browser — nessuna voce che apra un elenco appunti separato;
-//   4) la voce Editor del menu App e l'icona Editor del menu tasto destro
-//      disegnano il foglio degli appunti (stesso SVG), non più la penna;
-//   5) da lì l'editor si apre davvero.
+// #379.3, #379.12 — gli appunti di Filo stanno DENTRO l'editor: «prendi nota che…» scrive testo in un file (stesso
+// argomento, stesso file), un editor aperto lo mostra da solo, nessun'altra porta agli appunti nella home, e l'Editor
+// porta l'icona degli appunti ovunque compaia (menu App, barra laterale) e da lì si apre.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
 
@@ -191,7 +172,7 @@ test('nella home i controlli sono solo quelli del browser: nessuna porta agli ap
   await page.screenshot({ path: 'tests/.shots/379-12-home-controlli.png' }).catch(() => {});
 });
 
-test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto destro', async ({ shell, app, openTab, testServer }) => {
+test('l’Editor porta l’icona degli appunti nel menu App e nella barra laterale', async ({ shell, app, openTab, testServer }) => {
   // 1) Menu App (launcher della shell) — registro icone di popup-menu.js.
   const popup = await openLauncherPopup(shell, app);
   const item = popup.locator('.item', { hasText: 'Editor' }).first();
@@ -200,20 +181,16 @@ test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto des
   expect(launcherSvg, 'la voce Editor del menu App non disegna il foglio appunti').toContain(NOTE_PATH);
   await popup.keyboard.press('Escape').catch(() => {});
 
-  // 2) Menu tasto destro su una pagina esterna — registro src/shared/icons.js.
-  const page = await testServer.openReady(openTab, PAGE_HTML);
-  await page.locator('p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  const overflow = menu.locator('.sn-menu-row-overflow').first();
-  await expect(overflow).toBeVisible();
-  await overflow.hover();
-  const grid = menuDi(page).locator('.sn-menu-icon-grid');
-  await expect(grid).toBeVisible({ timeout: 2_000 });
-  const btn = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="editorApp"]');
+  // 2) Barra laterale, in «Altro…» — registro src/shared/icons.js.
+  await testServer.openReady(openTab, PAGE_HTML);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav [data-altro]').click();
+  const btn = barra.locator('#nav .ico[data-id="editorApp"]');
   await expect(btn).toBeVisible();
   const menuSvg = await btn.locator('svg').first().innerHTML();
-  expect(menuSvg, 'l’icona Editor del menu tasto destro non disegna il foglio appunti').toContain(NOTE_PATH);
+  expect(menuSvg, 'l’icona Editor della barra laterale non disegna il foglio appunti').toContain(NOTE_PATH);
 
   // Le due superfici devono disegnare la STESSA icona (registri diversi, un
   // solo significato): niente editor "penna" da una parte e "foglio" dall'altra.

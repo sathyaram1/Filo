@@ -1,12 +1,9 @@
-// #858 — da tastiera si entra a schermo intero: F11 su Windows e Linux (Ctrl+Cmd+F su Mac, nelle unit),
-// da una pagina web, da una pagina di Filo col fuoco nel campo dell'indirizzo, dalla barra in alto e dalla
-// barra laterale; premuto di nuovo esce, ed Esc esce come prima. Il video a schermo pieno col suo pulsante
-// si tiene il tasto, e il nome del tasto si legge dove si legge la voce. I tasti passano da sendInputEvent:
-// quelli di Playwright non toccano before-input-event, dove Filo li ascolta.
+// #858 — F11 (Ctrl+Cmd+F su Mac, nelle unit) mette e toglie lo schermo intero da una pagina web, da una di Filo col fuoco
+// nell'indirizzo, dalla barra in alto e dalla laterale; Esc esce, il video a pieno schermo si tiene il tasto, e il nome
+// del tasto si legge dove si legge la voce. Tasti da sendInputEvent: quelli di Playwright non passano da before-input-event.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, mettiNelMenu } from './helpers/barra.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from './helpers/barra.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -160,18 +157,4 @@ test('il nome del tasto si legge nel suggerimento della barra laterale e fra le 
 
   const altro = await openTab('filo://options/altro.html');
   await expect(altro.locator('#shortcutsList')).toContainText('F11 — Metti e togli lo schermo intero');
-});
-
-test('rimessa nel menu del tasto destro, l\'icona dello schermo intero nomina il tasto passandoci sopra', async ({ app, openTab, testServer }) => {
-  await mettiNelMenu(app, ['fullscreen']);
-  const page = await testServer.openReady(openTab, '<!doctype html><title>Sito</title><body style="margin:0"><p id="t">parola dentro una frase</p></body>');
-  await page.locator('#t').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const voce = menuDi(page).locator('[data-sn-icon-id="fullscreen"]').first();
-  if (await voce.count() === 0) await menuDi(page).locator('.sn-menu-row-overflow').first().click();
-  await expect(voce).toBeVisible({ timeout: 8000 });
-  await expect(voce).toHaveAttribute('aria-label', 'Schermo intero');
-  await voce.hover();
-  await expect(menuDi(page).etichetta).toHaveText('Schermo intero (F11)', { timeout: 4000 });
-  await page.screenshot({ path: 'tests/.shots/858-menu-schermo-intero.png' });
 });
