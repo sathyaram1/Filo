@@ -1692,11 +1692,16 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
     if (userMessage) {
       fermataDetta = false;
-      appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
+      immaginiNellaBolla(appendChatMessage('user', scritto), immagini);
+      // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
+      history.push({
+        role: 'user', content: userMessage, kind: 'real',
+        ...(daScelta ? { daScelta: true } : {}),
+        ...(immagini.length ? { immagini: immagini.map((im) => im.dataUrl) } : {}),
+      });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
-      if (session) session.rawUserMessages.push(userMessage);
+      if (session && scritto) session.rawUserMessages.push(scritto);
     }
 
     const thinking = appendThinking();
