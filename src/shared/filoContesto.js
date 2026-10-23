@@ -583,11 +583,19 @@
   // paga e porta le misure; un margine largo toglierebbe al modello pagine che ci stavano.
   const MARGINE_PAGINE = 0.95;
 
-  // Dopo un rifiuto per finestra, i caratteri da togliere: in proporzione con le due misure, dalla stima con la sola
-  // finestra; null se il rifiuto non dice abbastanza (chi taglia dimezza).
-  function eccessoDopoRifiuto({ max = null, chiesti = null, caratteri = 0, risposta = 0 } = {}) {
+  // Dopo un rifiuto per finestra, i caratteri da togliere: in proporzione con le misure, dalla stima con la sola
+  // finestra; null se il rifiuto non dice abbastanza (chi taglia dimezza). Il tetto della risposta occupa la finestra
+  // ma non si accorcia togliendo caratteri: va fuori dalla proporzione, o le pagine si tagliano molto oltre (#1596).
+  // Margine stretto come prima di mandare: un taglio corto costa un altro rifiuto, con misure nuove.
+  function eccessoDopoRifiuto({ max = null, chiesti = null, ingresso = null, caratteri = 0, risposta = 0 } = {}) {
     const c = Math.max(0, Number(caratteri) || 0);
-    if (max && chiesti && chiesti > max && c > 0) return Math.ceil(c - c * (max / chiesti) * MARGINE_FINESTRA);
+    if (max && chiesti && chiesti > max && c > 0) {
+      const dentro = ingresso && ingresso < chiesti ? ingresso : chiesti;
+      const fuori = dentro < chiesti ? chiesti - dentro : Math.min(Math.max(0, Number(risposta) || 0), max / 2);
+      const posto = max - fuori;
+      if (posto > 0) return Math.max(1, Math.ceil(c - c * (posto / dentro) * MARGINE_PAGINE));
+      return null;
+    }
     const stimato = max ? eccessoNellaFinestra({ finestra: max, caratteri: c, risposta }) : 0;
     return stimato > 0 ? stimato : null;
   }
