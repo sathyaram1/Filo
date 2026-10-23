@@ -146,9 +146,12 @@ class StratoDeiRiquadri {
       s.aperti = Math.max(0, Math.min(1000, Number(d && d.aperti) || 0));
       s.riquadri = Math.max(0, Math.min(1000, Number(d && d.riquadri) || 0));
       s.modale = !!(d && d.modale);
+      // Un Aiuto chiuso mentre Filo risponde non si vede ma c'è: la sua risposta resta da aprire (#1432).
+      s.aiuto = !!(d && d.aiuto);
       if (!s.aperti && prima) this._restituisci(s);
       clearTimeout(s.timerVuoto);
-      if (!s.aperti) s.timerVuoto = setTimeout(() => { if (!s.aperti && this.strati.get(s.wc) === s) this._butta(s); }, VUOTO_MS);
+      const vuoto = () => !s.aperti && !s.aiuto;
+      if (vuoto()) s.timerVuoto = setTimeout(() => { if (vuoto() && this.strati.get(s.wc) === s) this._butta(s); }, VUOTO_MS);
       this.posa();
       return;
     }
