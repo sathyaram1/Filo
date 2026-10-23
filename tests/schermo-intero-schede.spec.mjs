@@ -177,6 +177,35 @@ test('a tasto giù sulla pagina le schede restano: un clic dato subito su un col
   await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(false);
 });
 
+test('un collegamento trascinato contro il bordo alto fa arrivare le schede; una selezione di testo no (#1343)', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:20px sans-serif;height:1400px">
+    <p id="testo" style="margin:200px 0 0 300px">Un paragrafo da selezionare col mouse.</p>
+    <a id="link" href="https://example.org/" style="display:inline-block;margin:100px 0 0 300px">collegamento da portare</a></body></html>`);
+  await page.evaluate(() => document.addEventListener('dragstart', () => { window.__trascina = true; }));
+  await schermoIntero(app, true);
+  await expect.poll(async () => (await stato(app)).alto).toBe(0);
+  await pausa(400);
+
+  const t = await page.locator('#testo').boundingBox();
+  await page.mouse.move(t.x + 5, t.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(t.x + 5, 0, { steps: 8 });
+  await pausa(1000);
+  expect((await stato(app)).visibili, 'chi seleziona arrivando in alto non chiede le schede').toBe(false);
+  await page.mouse.up();
+  await pausa(300);
+
+  const l = await page.locator('#link').boundingBox();
+  await page.mouse.move(l.x + 20, l.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(l.x + 30, l.y + 4, { steps: 3 });
+  await page.mouse.move(l.x + 30, 0, { steps: 8 });
+  // Fermo contro il bordo: Chromium ripete il passaggio sopra la pagina finché il tasto resta giù.
+  await expect.poll(async () => { await page.mouse.move(l.x + 30, 0); return (await stato(app)).visibili; }, { timeout: 4000 }).toBe(true);
+  expect(await page.evaluate(() => !!window.__trascina), 'era un trascinamento').toBe(true);
+  await page.mouse.up();
+});
+
 test('il quadrato fra le schede scoperte dice «Esci da schermo intero» e ne esce; fuori torna «Massimizza» (#1343)', async ({ app, shell, openTab, testServer }) => {
   await scopri(app, openTab, testServer);
   const max = shell.locator('#win-max');

@@ -18,6 +18,8 @@ class SchedeInAlto {
     this.visibili = false;
     this.scese = 0;
     this.premuto = false;
+    // Un trascinamento fermo contro il bordo (lo dice la pagina): i movimenti a tasto giù non fermano la sua spinta.
+    this.trascinaSulBordo = false;
     // I movimenti visti dal riquadro principale: uno che arriva solo da un altro riquadro non li fa crescere.
     this.mossePagina = 0;
     // Dove comincia la pagina sullo schermo (per scheda), e la domanda in volo: un movimento lontano dal bordo la annulla.
@@ -42,7 +44,7 @@ class SchedeInAlto {
     if (!input || !wc) return;
     const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
     if (!sotto || sotto.webContents !== wc) return;
-    if (input.type === 'mouseLeave') { this._ferma('spinta'); return; }
+    if (input.type === 'mouseLeave') { this._lasciaSpinta(); return; }
     if (input.type === 'mouseDown' || input.type === 'mouseUp') { this._tasto(input.type === 'mouseDown'); return; }
     if (input.type !== 'mouseMove') return;
     this.mossePagina += 1;
@@ -60,8 +62,22 @@ class SchedeInAlto {
         this.timer.spinta = setTimeout(() => { this.timer.spinta = null; this.mostra(); }, this._opzioni().attesaMs);
       }
     } else {
-      this._ferma('spinta');
+      this._lasciaSpinta();
     }
+  }
+
+  // Chi porta un collegamento o un'immagine contro il bordo cerca una scheda su cui lasciarlo: a tasto giù il main non
+  // lo distingue da una selezione, la pagina sì (src/preload/trascina-bordo.js). Le schede restano fino al rilascio.
+  dalTrascinamento(wc, sulBordo) {
+    const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
+    if (!sotto || sotto.webContents !== wc) return;
+    this.trascinaSulBordo = !!sulBordo && this._attivo() && !this.visibili;
+    if (this.trascinaSulBordo) this._sulBordo(0);
+    else this._ferma('spinta');
+  }
+
+  _lasciaSpinta() {
+    if (!this.trascinaSulBordo) this._ferma('spinta');
   }
 
   // `input-event` vede solo il riquadro principale: sopra un riquadro di un altro sito in cima alla pagina il bordo non
@@ -82,7 +98,7 @@ class SchedeInAlto {
         return;
       }
       const gy = Number(input.globalY);
-      if (tastoPremuto(input) || !Number.isFinite(gy)) { this._ferma('spinta'); return; }
+      if (tastoPremuto(input) || !Number.isFinite(gy)) { this._lasciaSpinta(); return; }
       if (this.cimaSulloSchermo && this.cimaSulloSchermo.wc === wc) { this._sulBordo(gy - this.cimaSulloSchermo.y); return; }
       if (this.sondaCima) return;
       const sonda = this._cimaDellaPagina(wc).then((y) => {
@@ -121,6 +137,7 @@ class SchedeInAlto {
   }
 
   mostra() {
+    this.trascinaSulBordo = false;
     if (this.visibili || !this._attivo()) return;
     this.visibili = true;
     this.scese = Date.now();
@@ -133,6 +150,7 @@ class SchedeInAlto {
     this._ferma('uscita');
     this.visibili = false;
     this.premuto = false;
+    this.trascinaSulBordo = false;
     this.cimaSulloSchermo = null;
   }
 

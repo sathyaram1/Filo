@@ -321,6 +321,14 @@ function registerIpcHandlers() {
     }
   });
 
+  // #1343 — un trascinamento sulla pagina contro il bordo alto, o via da lì: a schermo intero chiama le schede.
+  ipcMain.on('filo:trascina-bordo', (event, sulBordo) => {
+    if (!event.senderFrame || event.senderFrame !== event.sender.mainFrame) return;
+    for (const w of BrowserWindow.getAllWindows()) {
+      try { w._filoTabs?.schedeInAlto?.dalTrascinamento(event.sender, sulBordo === true); } catch (_) {}
+    }
+  });
+
   // È la chiave a essere stata rifiutata (credito finito compreso, moderazione
   // no)? Lo decide SN_WALLET, una volta sola; qui viaggia con l'errore perché
   // chi lo mostra possa offrire la pagina Crediti invece del solo «Riprova».
