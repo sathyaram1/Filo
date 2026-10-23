@@ -16,7 +16,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,10 +24,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const INDICE = join(ROOT, 'PATTERNS.md');
 const CARTELLA = join(ROOT, 'patterns');
 
-// Tetto largo: l'indice oggi sta sotto i 20 KB con 56 pattern, e una riga
-// costa ~250 byte. 60 KB lascia spazio a oltre duecento pattern; se lo si
-// supera davvero, il file è tornato a contenere i racconti.
-const TETTO_INDICE = 60 * 1024;
+// I racconti tornati nell'indice sono testo fuori dalle voci, o una voce lunga quanto un racconto: i tetti stanno lì.
+// Un tetto sul file intero fermava il pattern nuovo a 146 voci da ~420 byte (#1623), che è un indice sano.
+const TETTO_FUORI_DALLE_VOCI = 6 * 1024;
+const TETTO_VOCE = 1500;
 
 const testo = readFileSync(INDICE, 'utf8');
 
@@ -239,12 +239,16 @@ describe('PATTERNS.md ↔ patterns/', () => {
   });
 
   test('l\'indice resta un indice', () => {
-    const byte = statSync(INDICE).size;
+    const righe = testo.split(/\r?\n/);
+    const voce = (r) => /^- \*\*\[/.test(r);
+    const fuori = Buffer.byteLength(righe.filter((r) => !voce(r)).join('\n'));
     assert.ok(
-      byte <= TETTO_INDICE,
-      `PATTERNS.md è ${Math.round(byte / 1024)} KB (tetto ${TETTO_INDICE / 1024} KB): ` +
-        'se è cresciuto così, i racconti sono tornati dentro l\'indice — spostali in patterns/<slug>.md'
+      fuori <= TETTO_FUORI_DALLE_VOCI,
+      `PATTERNS.md ha ${Math.round(fuori / 1024)} KB fuori dalle voci (tetto ${TETTO_FUORI_DALLE_VOCI / 1024} KB): ` +
+        'i racconti sono tornati dentro l\'indice — spostali in patterns/<slug>.md'
     );
+    const lunghe = righe.filter((r) => voce(r) && Buffer.byteLength(r) > TETTO_VOCE).map((r) => r.slice(0, 80));
+    assert.deepEqual(lunghe, [], `voci oltre ${TETTO_VOCE} byte: la regola sta in una frase, il racconto nel suo file`);
     // I racconti stanno nei file: nell'indice non ci sono sezioni di secondo
     // livello (le uniche intestazioni sono il titolo del documento).
     const sezioni = testo.split(/\r?\n/).filter((riga) => /^#{2,6} /.test(riga));

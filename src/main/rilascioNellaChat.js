@@ -51,6 +51,17 @@ async function prepara(voci, { casa }) {
 async function consegna(win, voci) {
   const tabs = win && win._filoTabs;
   const tab = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
+  return allaScheda(tab, voci);
+}
+
+// Da un riquadro incorporato in un sito, al pannello della sua pagina: solo immagini già lette, mai un percorso,
+// che il main andrebbe a leggere per conto di un sito.
+function dalRiquadro(tab, voci) {
+  const lette = (Array.isArray(voci) ? voci : []).map((v) => ({ nome: v && v.nome, dataUrl: v && v.dataUrl }));
+  return allaScheda(tab, lette);
+}
+
+async function allaScheda(tab, voci) {
   const wc = tab && tab.view && tab.view.webContents;
   if (!wc || wc.isDestroyed()) return false;
   let url = tab.url || '';
@@ -65,4 +76,4 @@ async function consegna(win, voci) {
   return true;
 }
 
-module.exports = { consegna, prepara };
+module.exports = { consegna, dalRiquadro, prepara };
