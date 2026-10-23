@@ -34,6 +34,8 @@
   let suggestions = [];
   // Quando sono stati scritti i suggerimenti a schermo: l'età che i contatori leggono a un clic (#1467).
   let suggerimentiDel = null;
+  // Scritti da un modello: senza, la carta mostra le pagine salvate e la strada per sceglierne uno, che non si contano.
+  let suggerimentiDelModello = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
   // a scrivere la conversazione su disco, turno per turno, così una chat
@@ -293,7 +295,7 @@
         && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
     },
     // Arrivano col messaggio appena scritto: la loro età parte da adesso.
-    setSuggestions: (list) => { suggestions = list; suggerimentiDel = new Date().toISOString(); renderSuggestions(); },
+    setSuggestions: (list) => { suggestions = list; suggerimentiDel = new Date().toISOString(); suggerimentiDelModello = true; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
@@ -726,10 +728,12 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     const del = Date.parse(suggerimentiDel || '');
-    Promise.resolve(send({
-      type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione: Number(posizione) || null,
-      etaMs: Number.isFinite(del) ? Math.max(0, Date.now() - del) : null,
-    })).catch(() => {});
+    if (suggerimentiDelModello) {
+      Promise.resolve(send({
+        type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione: Number(posizione) || null,
+        etaMs: Number.isFinite(del) ? Math.max(0, Date.now() - del) : null,
+      })).catch(() => {});
+    }
     if (type === 'PULISCI_TAB') {
       // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
       // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
@@ -806,6 +810,7 @@
     if (!force && spinteDashboard) { renderSuggestions(); return; }
     suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
     suggerimentiDel = r?.ok ? r.ts || null : null;
+    suggerimentiDelModello = Boolean(r?.ok && !r.senzaChiave);
     renderSuggestions();
   }
 
@@ -819,6 +824,7 @@
     if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
     suggestions = nuovi;
     suggerimentiDel = r.ts || null;
+    suggerimentiDelModello = !r.senzaChiave;
     renderSuggestions();
   }
 
@@ -2043,6 +2049,7 @@
       mostraSenzaModello(msg.message || '');
       suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
       suggerimentiDel = msg.ts || null;
+      suggerimentiDelModello = !(msg.senzaChiave || msg.message);
       renderSuggestions();
       // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
       // che lo aspettava parte qui, non alla prossima scheda.

@@ -111,7 +111,9 @@
       daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0, perche: '', inviata: false, inAttesa: null, dettate: [],
     };
     const contaFine = (esito, invio) => { try { global.SN_ASCOLTO.contaSessione(esito, invio); } catch (_) {} };
-    const segnaLasciata = (esito) => { try { global.SN_ASCOLTO.segnaSessione(esito, 'tenuta'); } catch (_) {} };
+    // Se la chat se ne va adesso: il testo lasciato nella casella è «tenuta», quello che si stava dicendo o che aspettava
+    // l'invio da solo è «annullata», come in `scollega`.
+    const segnaLasciata = (esito, invio = 'tenuta') => { try { global.SN_ASCOLTO.segnaSessione(esito, invio); } catch (_) {} };
     function esitoDellAttesa(invio) {
       const e = c.inAttesa;
       c.inAttesa = null;
@@ -196,7 +198,7 @@
       if (giro !== c.giro) return;
       const sessione = await Ascolto.avvia({
         fineDaSola: { silenceMs: tempi.silenceSec * 1000, waitMs: MUTO_MS },
-        invioSeLasciata: 'tenuta',
+        invioSeLasciata: 'annullata',
         suLivello: (v) => {
           if (giro !== c.giro) return;
           // La chat è sparita (l'Aiuto chiuso, il modulo tolto): il microfono non resta acceso per nessuno.
@@ -226,7 +228,7 @@
       c.sessione = null;
       const parte = esito.frasi > 0 && !esito.errore && ['utente', 'finito', 'tempo'].includes(esito.motivo)
         && c.daSolo && !c.toccato && campo.isConnected && campo.value.trim();
-      if (parte) { c.inAttesa = esito; segnaLasciata(esito); attendi(); return; }
+      if (parte) { c.inAttesa = esito; segnaLasciata(esito, 'annullata'); attendi(); return; }
       imposta('pronto');
       if (!(esito.frasi > 0)) contaFine(esito, 'nessuno');
       else if (c.inviata) contaFine(esito, c.perche === 'cambiata' ? 'cambiata' : 'a_mano');
@@ -374,7 +376,7 @@
       smetti();
       esitoDellAttesa('annullata');
       chiudiDettate('tenuta');
-      if (c.sessione) { c.sessione.ferma('altro'); c.sessione = null; }
+      if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
       campo.removeEventListener('input', suInput);
       document.removeEventListener('click', suClic, true);
       doveTasti.removeEventListener('keydown', suTasto);

@@ -234,18 +234,28 @@
       if (r && typeof r.catch === 'function') r.catch(() => {});
     } catch (_) {}
   }
+  // Le sessioni non ancora contate, per id, con quello che conterebbero adesso: una pagina che se ne va nella stessa scheda
+  // (ricaricata, un'altra pagina) non distrugge la scheda, e allora le conta lei, come il main a scheda chiusa.
+  const inSospeso = new Map();
+  const contate = new Set();
   // Una sessione si conta una volta (#1467), da chi sa che fine ha fatto il testo: `invio` dall'elenco dei contatori
   // (SN_CONTATORI.INVII_DETTATURA). Escono il motivo, quante frasi e l'invio, mai le parole.
   function contaSessione(esito, invio) {
-    if (!esito || esito.contata) return;
+    if (!esito || esito.contata || (esito.id && contate.has(esito.id))) return;
     esito.contata = true;
+    if (esito.id) { inSospeso.delete(esito.id); contate.add(esito.id); }
     mandaConto(esito, invio, 'dettatura');
   }
   // Quello che si conterebbe se la pagina se ne andasse adesso, col testo ancora da mandare.
   function segnaSessione(esito, invio) {
-    if (!esito || esito.contata || !esito.id) return;
+    if (!esito || esito.contata || !esito.id || contate.has(esito.id)) return;
+    inSospeso.set(esito.id, { esito, invio });
     mandaConto(esito, invio, 'in-corso');
   }
+  function congeda() {
+    for (const { esito, invio } of [...inSospeso.values()]) contaSessione(esito, invio);
+  }
+  try { if (typeof global.addEventListener === 'function') global.addEventListener('pagehide', congeda); } catch (_) {}
 
   global.SN_ASCOLTO = {
     avvia, supportato, fraseMicrofono, fraseTrascrizione, contaSessione, segnaSessione,

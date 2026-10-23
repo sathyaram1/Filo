@@ -247,6 +247,38 @@ test('col «manda da solo» spento, la trascrizione corretta a mano e poi inviat
   await expect.poll(async () => Object.keys(await misura(app, 'dettatura')), { timeout: 5_000 }).toEqual([expect.stringMatching(/\|cambiata\|no$/)]);
 });
 
+// Una pagina che se ne va nella stessa scheda (ricaricata, un'altra pagina) non chiude la scheda: la dettatura rimasta
+// a metà la conta lei, subito e una volta. Il testo lasciato nella casella è «tenuta», quello che aspettava l'invio è «annullata».
+test('una dettatura rimasta a metà si conta quando la pagina se ne va, anche ricaricata, una volta sola', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await vocePronta(app, { autoSend: false });
+  const url = 'filo://newtab/?prova=dettatura-ricarica';
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await microfonoFinto(page);
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await parla(page, mic);
+  await expect(page.locator('#input')).toHaveValue(DETTO, { timeout: 15_000 });
+  await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
+  expect(await misura(app, 'dettatura')).toEqual({});
+  await page.reload();
+  await expect.poll(async () => Object.keys(await misura(app, 'dettatura')), { timeout: 8_000 }).toEqual([expect.stringMatching(/\|tenuta\|no$/)]);
+
+  // Col «manda da solo» acceso, la scheda chiusa mentre aspetta l'invio: il testo non parte, «annullata».
+  await vocePronta(app, { autoSend: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await microfonoFinto(page);
+  await mic.click();
+  await parla(page, mic);
+  await expect(mic).toHaveAttribute('data-stato', 'attesa', { timeout: 10_000 });
+  await chiudiScheda(app, url);
+  await expect.poll(async () => Object.values(await misura(app, 'dettatura')).reduce((a, n) => a + n, 0), { timeout: 8_000 }).toBe(2);
+  expect(Object.keys(await misura(app, 'dettatura')).filter((k) => /\|annullata\|no$/.test(k))).toHaveLength(1);
+  await new Promise((r) => setTimeout(r, 500));
+  expect(Object.values(await misura(app, 'dettatura')).reduce((a, n) => a + n, 0)).toBe(2);
+});
+
 // ── La lettura ad alta voce ──────────────────────────────────────────────
 test('una lettura fermata conta la voce, il perché del ripiego e fin dove è arrivata', async ({ app, openTab }) => {
   test.setTimeout(60_000);
@@ -406,20 +438,27 @@ test('la scheda chiusa si conta fra le riaperte da ogni strada: il clic sulla su
 });
 
 // ── La home senza un modello e il suggerimento usato ─────────────────────
-test('la home senza un modello conta il suo motivo all’apertura, e il suggerimento usato il posto, il tipo e l’età', async ({ app, openTab }) => {
+test('la home senza un modello conta il suo motivo all’apertura; le pagine salvate che mostra al posto dei suggerimenti non sono suggerimenti usati', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' }, useDefaultModels: true });
     await globalThis.SN_SAVED_PAGES.save({ url: 'https://salvata.test/ricetta', title: 'La ricetta salvata' });
   });
-  const prima = (await misura(app, 'home')).senza_ai_chiave || 0;
-  const home = await openTab('filo://newtab/');
+  // La home dell'avvio può contare la sua apertura dopo: si parte da un conto fermo da un secondo.
+  let prima = -1;
+  await expect.poll(async () => {
+    const ora = (await misura(app, 'home')).senza_ai_chiave || 0;
+    const fermo = ora === prima;
+    prima = ora;
+    return fermo;
+  }, { timeout: 10_000, intervals: [1000] }).toBe(true);
+  const home = await openTab('filo://newtab/?prova=home-senza-chiave');
   await expect.poll(async () => (await misura(app, 'home')).senza_ai_chiave || 0, { timeout: 8_000 }).toBe(prima + 1);
   const voce = home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'La ricetta salvata' });
   await expect(voce).toBeVisible({ timeout: 10_000 });
   await voce.click();
-  await expect.poll(() => misura(app, 'suggerimenti'), { timeout: 5_000 }).toEqual({ 'NAVIGA|1|ora': 1 });
-  expect(await tutteLeChiavi(app)).not.toMatch(/ricetta|salvata\.test/i);
+  await new Promise((r) => setTimeout(r, 800));
+  expect(await misura(app, 'suggerimenti')).toEqual({});
 });
 
 test('la home senza un modello suo (la chat ne ha uno) conta il motivo; con i suggerimenti di un modello, ogni apertura conta «generata»', async ({ app, openTab }) => {
@@ -455,6 +494,13 @@ test('la home senza un modello suo (la chat ne ha uno) conta il motivo; con i su
   });
   const generate = (await misura(app, 'home')).generata || 0;
   await openTab('filo://newtab/?prova=home-1');
-  await openTab('filo://newtab/?prova=home-2');
+  const home = await openTab('filo://newtab/?prova=home-2');
   await expect.poll(async () => (await misura(app, 'home')).generata || 0, { timeout: 8_000 }).toBe(generate + 2);
+
+  // Il suggerimento del modello usato: il posto, il tipo e l'età, mai il testo né l'indirizzo.
+  const voce = home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'Le notizie' });
+  await expect(voce).toBeVisible({ timeout: 10_000 });
+  await voce.click();
+  await expect.poll(() => misura(app, 'suggerimenti'), { timeout: 5_000 }).toEqual({ 'NAVIGA|1|ora': 1 });
+  expect(await tutteLeChiavi(app)).not.toMatch(/notizie/i);
 });

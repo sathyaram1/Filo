@@ -132,6 +132,8 @@
     nascosto = false;
     ridottoDallUtente = false;
     nonLetta = false;
+    // La chat se ne va: la dettatura ancora in corso o in attesa d'invio è annullata, il testo lasciato nella casella tenuto.
+    try { voce?.scollega(); } catch (_) {}
     voce = null;
     statoVoce = 'pronto';
     cambiato();
