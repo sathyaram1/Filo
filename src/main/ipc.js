@@ -99,7 +99,7 @@ function provenienzaDi(info) {
   if (info && info.isShell) return { via: 'interfaccia', dove: 'shell' };
   let u = null;
   try { u = new URL(String((info && info.url) || '')); } catch (_) { u = null; }
-  if (u && u.protocol === 'filo:') {
+  if (u && u.protocol === 'filo:' && info.interna !== false) {
     const dove = u.hostname === 'options' && /altro/.test(u.pathname) ? 'altro' : u.hostname;
     return { via: 'interfaccia', dove };
   }
