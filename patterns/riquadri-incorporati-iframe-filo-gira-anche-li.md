@@ -55,6 +55,10 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   (`MSG.COOKIES_FRAME_BANNER`), e il main passa alla pagina l'indirizzo del suo
   riquadro figlio da nascondere (`MSG.COOKIES_HIDE_FRAME`): solo se sta in un
   velo fisso, perché un riquadro nel flusso della pagina è contenuto.
+  Nelle prove lo stesso ritardo: Filo compare nel riquadro dopo il primo tocco,
+  e chi ci guarda dentro aspetta che ci sia. Lo fa `nelMondoDiFilo`
+  (`tests/helpers/riquadri.mjs`); una ricerca del mondo isolato che guarda una
+  volta sola è rossa solo sotto carico, e sembra un difetto dell'app (#775.2).
 - **Frame vs pagina.** Ciò che riguarda l'ELEMENTO cliccato funziona identico nel
   riquadro. Ciò che riguarda la PAGINA no: colore della scheda, segnali di
   attività, avviso del sito pericoloso, avvisi di sistema, e le azioni globali
