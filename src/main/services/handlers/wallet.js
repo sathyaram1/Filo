@@ -874,7 +874,7 @@ module.exports = function register(on, ctx) {
     if (res.ok) return { ok: true };
     const testo = await res.text().catch(() => '');
     const motivo = `wallet-usage commit ${res.status}: ${testo.slice(0, 200)}`;
-    if (rifiutoDellaRiga(res.status, testo)) return { ok: false, motivo };
+    if (W.rifiutoDellaRigaUso(res.status, testo)) return { ok: false, motivo };
     throw new Error(motivo);
   }
 
