@@ -61,8 +61,10 @@ test('E3 home: trascinamento annullato, il campo si spegne?', async ({ app, shel
   const [foto] = suDisco(['foto.png']);
   await lascia(page, [foto], { x: 120, y: 120, fasi: ['dragEnter', 'dragOver'] });
   await expect(page.locator('#inputForm')).toHaveClass(/dash-input-bersaglio/);
+  await page.evaluate(() => { window.__lv = []; document.addEventListener('dragleave', (e) => window.__lv.push([e.target.id || e.target.tagName, e.relatedTarget ? (e.relatedTarget.id || e.relatedTarget.tagName) : null]), true); });
   await lascia(page, [foto], { x: 120, y: 120, fasi: ['dragCancel'] });
   await page.waitForTimeout(800);
+  console.log('E3 leave', JSON.stringify(await page.evaluate(() => window.__lv)));
   console.log('E3 dopo annullo', await page.locator('#inputForm').getAttribute('class'));
 });
 
@@ -121,4 +123,65 @@ test('E8 sito: immagine lasciata su un link o una foto della pagina', async ({ a
   await lascia(page, [foto], { x: 150, y: 150 });
   await page.waitForTimeout(1500);
   console.log('E8', JSON.stringify(await statoAiuto(app, page)), page.url());
+});
+
+test('E9 sito: una foto della pagina trascinata e lasciata più in là sulla stessa pagina', async ({ app, openTab, testServer }) => {
+  const b64 = PNG.toString('base64');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><img id="f" src="data:image/png;base64,${b64}" style="position:fixed;left:20px;top:20px;width:200px;height:200px"></body></html>`);
+  await page.evaluate(() => { window.__tipi = []; document.addEventListener('dragover', (e) => { window.__tipi = [...e.dataTransfer.types]; window.__items = [...e.dataTransfer.items].map((i) => i.kind + ':' + i.type); }); });
+  await page.mouse.move(100, 100);
+  await page.mouse.down();
+  await page.mouse.move(150, 150, { steps: 5 });
+  await page.mouse.move(600, 400, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(1500);
+  console.log('E9', JSON.stringify(await page.evaluate(() => [window.__tipi, window.__items])), JSON.stringify(await statoAiuto(app, page)));
+});
+
+test('E10 home: un’immagine trascinata da un sito (indirizzo e html, niente file) lasciata fuori dal campo e sul campo', async ({ app, shell, testServer }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await home(app);
+  const src = testServer.html('x');
+  const data = { items: [{ mimeType: 'text/uri-list', data: src }, { mimeType: 'text/html', data: `<img src="${src}">` }], dragOperationsMask: 1 };
+  const s = await page.context().newCDPSession(page);
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: 120, y: 120, data });
+  await page.waitForTimeout(800);
+  const fuori = { prev: await page.locator('#imgPreviews .dash-img-preview img').count(), chip: await page.locator('#imgPreviews .dash-file-chip').count(), testo: await page.locator('#input').inputValue() };
+  const box = await page.locator('#input').boundingBox();
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: box.x + 20, y: box.y + box.height / 2, data });
+  await page.waitForTimeout(800);
+  const sopra = { prev: await page.locator('#imgPreviews .dash-img-preview img').count(), testo: await page.locator('#input').inputValue() };
+  console.log('E10', JSON.stringify({ fuori, sopra }));
+});
+
+test('E11 home: immagine lasciata su vari punti della home', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await home(app);
+  const [foto] = suDisco(['foto.png']);
+  const esiti = [];
+  for (const [x, y, dove] of [[1100, 120, 'scheda destra'], [560, 37, 'cerca nel filo'], [640, 300, 'filo'], [1035, 670, 'orologio'], [120, 60, 'crediti'], [1100, 545, 'icone altro'], [620, 640, 'messaggio']]) {
+    const prima = await page.locator('#imgPreviews .dash-img-preview img').count();
+    await lascia(page, [foto], { x, y });
+    await page.waitForTimeout(700);
+    const dopo = await page.locator('#imgPreviews .dash-img-preview img').count();
+    esiti.push([dove, dopo - prima, page.url().slice(0, 30)]);
+  }
+  console.log('E11', JSON.stringify(esiti));
+});
+
+test('E12 sito: una foto della pagina trascinata sull’Aiuto aperto', async ({ app, openTab, testServer }) => {
+  const b64 = PNG.toString('base64');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><img id="f" src="data:image/png;base64,${b64}" style="position:fixed;left:20px;top:20px;width:200px;height:200px"></body></html>`);
+  await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
+  await page.waitForTimeout(800);
+  const vp = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+  await page.mouse.move(100, 100);
+  await page.mouse.down();
+  await page.mouse.move(150, 150, { steps: 5 });
+  await page.mouse.move(vp.w - 60, vp.h - 60, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(1500);
+  console.log('E12', JSON.stringify(await statoAiuto(app, page)));
 });
