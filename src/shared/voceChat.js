@@ -258,15 +258,16 @@
     }
     // Un Esc o un Invio finché la sessione non ha consegnato tutto (anche mentre trascrive l'ultima frase):
     // quello che arriva ancora resta nella casella e non parte da solo.
-    function tieni() {
+    function tieni(perche) {
       if (!c.sessione) return false;
       c.toccato = true;
+      if (perche && !c.perche) c.perche = perche;
       c.sessione.ferma('utente');
       return true;
     }
     // Esc tiene quello che è stato detto e non invia.
     function esc() {
-      if (tieni()) return true;
+      if (tieni('tenuta')) return true;
       if (c.stato === 'attesa') { annullaInvio(); return true; }
       return false;
     }
