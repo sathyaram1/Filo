@@ -41,7 +41,8 @@ function crea(dip = {}) {
   }
   contatori.primaDiOgniScrittura(fotografa);
 
-  const scrivi = (fn, incognito = false) => contatori.finestra((ora) => fn(ora), { incognito });
+  // `incognito` vero salta; altrimenti decide il contesto della chiamata, come per ogni altro conto.
+  const scrivi = (fn, incognito = false) => contatori.finestra((ora) => fn(ora), { incognito: incognito ? true : null });
 
   // `_broadcast` scatta di continuo: si scrive solo quando l'ora cambia o il massimo cresce.
   let visto = { ora: '', schede: 0, finestre: 0 };
