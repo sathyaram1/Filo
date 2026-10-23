@@ -1769,14 +1769,7 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
-    // Un file trovato da Filo in chat, trascinato qui: entra come quelli trascinati dal disco.
-    const daChat = e.dataTransfer?.getData('application/x-filo-file') || '';
-    if (daChat) { addPendingFile(daChat); inputEl.focus(); return; }
-    const files = e.dataTransfer?.files;
-    if (files && files.length) {
-      for (const f of files) handleDroppedFile(f);
-      return;
-    }
+    if (fileNelCampo(e.dataTransfer)) return;
     const testo = e.dataTransfer?.getData('text/plain') || '';
     if (!testo) return;
     testoDaFuori = true;
