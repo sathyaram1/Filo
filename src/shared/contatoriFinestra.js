@@ -45,7 +45,7 @@
     'aiuto_spento', 'pagine_salvate_tetto', 'download_finito', 'download_nome_dato', 'download_senza_nome', 'nome_rimesso',
     'resta_connesso_proposta', 'resta_connesso_rientro', 'resta_connesso_scelta', 'permessi_azzerati', 'aperta_da_paese',
     'indirizzo_fermato', 'riordino_schede', 'scheda_ponte_chiusa', 'sito_bloccato', 'popup_bloccato', 'aggiornamento',
-    'proposta_email_spenta', 'dati_avviso', 'filo_illeggibile', 'filo_pesante', 'cancella_tutto',
+    'proposta_email_spenta', 'dati_avviso', 'filo_illeggibile', 'filo_pesante', 'cancella_tutto', 'riordino_mancato',
   ]);
   // «sostituita»: una gemella con la stessa chiave ha preso il suo posto; «ritirata»: Filo l'ha tolta perché il suo
   // stato è cambiato; «chiuse_tutte»: il «Chiudi tutti» della pila. «azione_2» vale anche per le azioni dopo la terza.

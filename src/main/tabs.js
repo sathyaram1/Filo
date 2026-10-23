@@ -1721,7 +1721,7 @@ class TabManager {
     this._giudizioMancatoDetto = perche;
     const testo = `La pulizia automatica non è riuscita a valutare le schede.${perche ? ` ${perche}` : ''}`;
     const actions = pagina ? [{ label: pagina.label, openUrl: pagina.url }] : [];
-    try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata', actions } }); } catch (_) {}
+    try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata', tipo: 'riordino_mancato', actions } }); } catch (_) {}
   }
 
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
@@ -3959,6 +3959,7 @@ class TabManager {
       try { contatori?.sessione({ esito: 'niente' }); } catch (_) {}
       return false;
     }
+    ContatoriFinestra.misura('sessione', this, nate);
     try {
       const misura = contatori?.sessione({ esito: 'ripristinata', schede: nate.length, t0 });
       if (misura) {
@@ -3966,7 +3967,6 @@ class TabManager {
         this.codaRiapertura.finita().then(() => misura.coda(), () => misura.coda());
       }
     } catch (_) {}
-    ContatoriFinestra.misura('sessione', this, nate);
     this._persistSession();
     // §2.1 decisione utente: a ogni riapertura Filo riordina/archivia le tab, a pagine
     // caricate (forniscono l'estratto all'LLM). No-op se la pref è disattivata o manca la chiave.
