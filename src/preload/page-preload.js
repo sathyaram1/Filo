@@ -578,6 +578,7 @@ try {
   } : {
     pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
     consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+    pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
   });
 } catch (e) { console.error('[Filo CS] rilascio', e); }
 

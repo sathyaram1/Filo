@@ -54,6 +54,13 @@ test('#1298: oltre il tetto un’immagine non sparisce in silenzio, la frase dic
   assert.match(ALLEGATI_CHAT.fraseNonImmaginiAiuto(2), /^2 file non sono immagini/);
 });
 
+test('nel filo un messaggio dell’Aiuto con immagini dice quante erano, anche senza testo', () => {
+  assert.equal(ALLEGATI_CHAT.testoNelFilo('ciao', 0), 'ciao');
+  assert.equal(ALLEGATI_CHAT.testoNelFilo('', 1), '(un’immagine allegata)');
+  assert.equal(ALLEGATI_CHAT.testoNelFilo('  ', 3), '(3 immagini allegate)');
+  assert.equal(ALLEGATI_CHAT.testoNelFilo('cos’è?', 2), 'cos’è?\n(2 immagini allegate)');
+});
+
 test('dalla fila delle schede: il main legge solo immagini dal disco; oltre il tetto la home ha il percorso e l’Aiuto l’immagine da rimpicciolire; gli altri file non spariscono', async () => {
   const dir = cartellaTemporanea('filo-allegati-');
   try {
