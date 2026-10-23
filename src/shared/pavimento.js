@@ -55,6 +55,8 @@
             // A coppie («48-29-13») somiglia a una data: conta solo dove la frase parla di entrare.
             if (/^\d\d-/.test(v) && !forte) continue;
             if (!nome && !(m[1] || m[3] || INTRODOTTO.test(z.slice(0, m.index)))) continue;
+            // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice.
+            if (/(?:\+|\d)[ .]?$/.test(z.slice(0, m.index)) || /^[ .]\d/.test(z.slice(m.index + m[0].length))) continue;
             out.push({ valore: v, regola: 'codice' });
           }
         }
