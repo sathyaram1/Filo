@@ -2488,6 +2488,11 @@
       try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
       return;
     }
+    // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
+    if (msg?.type === MSG.CHAT_ALLEGA) {
+      if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Sidebar?.allegaDaFuori?.(msg); } catch (_) {} }
+      return;
+    }
     if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
       rispondiEtichetteBarra(msg.ids);
       return;
