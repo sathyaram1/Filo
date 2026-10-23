@@ -4264,8 +4264,9 @@
     void el.offsetWidth;
     el.classList.add('show');
     syncEdToastOverflow();
-    // Con un'azione lascio più tempo per cliccarla.
-    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(hasAction ? 7000 : 3400), () => removeEdToast(el));
+    // Con un'azione lascio più tempo per cliccarla; col tasto per un'altra pagina ancora di più, come sulle pagine web.
+    const base = hasAction ? Math.max(7000, Number(action.durata) || 0) : 3400;
+    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(base), () => removeEdToast(el));
     return el;
   }
 
