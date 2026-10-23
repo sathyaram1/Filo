@@ -258,18 +258,29 @@
       return segno;
     }
     let anno = scrittoAnno;
+    let anche = null;
     if (!anno) {
       if (annoIntorno(parti.intero, inizio, inizio + testo.length)) return null;
+      const vale = (a) => n <= giorniNelMese(a, mese) && new Date(a, mese, n).getDay() === g.indice;
+      const detti = anniVicini(parti.detti, inizio, inizio + testo.length, parti.intero.length);
+      if (detti.some((d) => vale(d.anno))) return null;
       const letture = lettureSenzaAnno(n, mese, oggi);
-      if (!letture.length) return null; // il 29 febbraio senza anno, lontano da un bisestile: non si sa quale
-      anno = letture[0].a;
-      if (letture[0].dist > VICINA_GIORNI * GIORNO_MS && letture.some((l) => new Date(l.a, mese, n).getDay() === g.indice)) return null;
+      if (letture.length && (vale(letture[0].a) || (letture[0].dist > VICINA_GIORNI * GIORNO_MS && letture.some((l) => vale(l.a))))) return null;
+      const vicino = detti.find((d) => d.dist <= ANNO_VICINO && n <= giorniNelMese(d.anno, mese));
+      // Il 29 febbraio senza anno, lontano da un bisestile e senza un anno detto vicino: non si sa quale.
+      anno = vicino ? vicino.anno : (letture.length ? letture[0].a : null);
+      if (!anno) return null;
+      if (letture.length && letture[0].a !== anno) anche = new Date(letture[0].a, mese, n);
     }
     const data = new Date(anno, mese, n);
     if (data.getDay() === g.indice) return null;
-    segno.spiegazione = t('spell_ocra_data', dataDetta(data), nomeGiorno(data.getDay()));
+    if (anche && anche.getDay() === data.getDay()) anche = null;
+    segno.spiegazione = anche
+      ? t('spell_ocra_data_anni', dataDetta(data), nomeGiorno(data.getDay()), dataInMezzo(anche), nomeGiorno(anche.getDay()))
+      : t('spell_ocra_data', dataDetta(data), nomeGiorno(data.getDay()));
     const [gTesto, gPos] = parti.giorno;
-    segno.correzioni.push(testo.slice(0, gPos) + giornoNellaForma(motore, gTesto, g, data.getDay()) + testo.slice(gPos + gTesto.length));
+    const conGiorno = (d) => testo.slice(0, gPos) + giornoNellaForma(motore, gTesto, g, d.getDay()) + testo.slice(gPos + gTesto.length);
+    segno.correzioni.push(conGiorno(data));
     // L'altra lettura: il giorno della settimana era giusto e il numero no. Si propone il più vicino, se resta nel mese.
     let delta = (g.indice - data.getDay() + 7) % 7;
     if (delta > 3) delta -= 7;
