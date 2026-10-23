@@ -523,9 +523,11 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.activate(id);
     return { ok: true };
   });
+  // Ctrl+Tab col fuoco sulla barra delle schede: le pagine hanno il loro tasto nel main, quindi qui parla solo la barra.
   ipcMain.handle('tabs:accanto', (event, { verso } = {}) => {
-    const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.attivaAccanto(verso === -1 ? -1 : 1);
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false, error: 'forbidden' };
+    win._filoTabs.attivaAccanto(verso === -1 ? -1 : 1);
     return { ok: true };
   });
   ipcMain.handle('tabs:navigate', (event, { id, url }) => {
