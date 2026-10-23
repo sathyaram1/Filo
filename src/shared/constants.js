@@ -2674,6 +2674,9 @@
     // Barra laterale (#871): apertura spingendo sul bordo, attesa sul bordo, quanto resta aperta dopo
     // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
     barraLaterale: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true },
+    // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
+    // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
+    avvisoSchermoPieno: { durataMs: 3000 },
     // Ora, batteria, rete, Bluetooth e volume nella colonna destra della home (#873, #874): ognuna si toglie da sé
     // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
     homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true, volume: true },
