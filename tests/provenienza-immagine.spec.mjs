@@ -158,6 +158,37 @@ test('un’etichetta senza firma si presenta come dichiarazione del file, non co
   await expect(riga).toHaveClass(/sn-menu-origine-debole/);
 });
 
+// #946.1 — le immagini di ChatGPT, Firefly e Bing di prima del programma ufficiale arrivano a un'autorità che sta
+// solo nell'elenco provvisorio del C2PA: Filo lo scarica col resto e dice chi le ha fatte, e da quale elenco.
+const RADICE_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'RootCA', ca: true, da: new Date('2021-12-09'), a: new Date('2036-12-05') });
+const INTERMEDIA_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'WebClaimSigningCA', ca: true, emittente: RADICE_PROVV, da: new Date('2022-01-01'), a: new Date('2032-01-01') });
+const daChatGpt = () => pngFirmato({
+  cert: certificato({ organizzazione: 'OpenAI', nomeComune: 'Truepic Lens CLI in DALL·E', emittente: INTERMEDIA_PROVV, da: new Date('2025-06-01') }),
+  catena: [INTERMEDIA_PROVV],
+});
+const FRASE_PROVV = 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate. Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.';
+
+async function scaricaConProvvisorio(app, testServer) {
+  const url = testServer.asset(elencoPem(RADICE), 'text/plain');
+  const urlProvvisorio = testServer.asset(elencoPem(RADICE_PROVV), 'text/plain');
+  const esito = await app.evaluate((_e, a) => globalThis.__filoFirmatariC2pa.aggiorna({ forza: true, ...a }), { url, urlProvvisorio });
+  expect(esito.ok).toBe(true);
+}
+
+test('un’immagine di ChatGPT firmata prima del congelamento dice che la dichiara OpenAI, e da quale elenco', async ({ app, openTab, testServer }) => {
+  await scaricaConProvvisorio(app, testServer);
+  const src = testServer.asset(daChatGpt(), 'image/png');
+  const page = await testServer.openReady(openTab, pagina(src));
+  const menu = await apriMenuSullaFoto(page);
+
+  const riga = menu.locator(RIGA);
+  await expect(riga).toHaveAttribute('aria-label', FRASE_PROVV, { timeout: 10000 });
+  await expect(riga).toHaveAttribute('title', /elenco provvisorio, poi congelato/);
+  await expect(riga).toBeVisible();
+  await expect(riga).not.toHaveClass(/sn-menu-origine-debole/);
+  await page.screenshot({ path: 'tests/.shots/provenienza-immagine-provvisorio.png' }).catch(() => {});
+});
+
 // ── La stessa domanda fatta in chat (o a voce) ──────────────────────────────
 // «questa foto è fatta con l'AI?» deve ottenere la stessa lettura del menu: il
 // controllo si fa sui byte dell'immagine allegata e il suo esito entra nel
@@ -205,6 +236,13 @@ test('in chat, un’immagine con credenziali firmate porta al modello lo stesso 
   // Dentro la recinzione: il nome lo scrive il file, non Filo.
   const dentro = prompt.split('<<<ETICHETTA_FILE>>>')[1] || '';
   expect(dentro.split('<<<FINE_ETICHETTA_FILE>>>')[0]).toContain('OpenAI');
+});
+
+test('in chat, l’immagine di ChatGPT riconosciuta dall’elenco provvisorio porta al modello la stessa frase del menu', async ({ app, testServer }) => {
+  await configuraModello(app);
+  await scaricaConProvvisorio(app, testServer);
+  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(daChatGpt()));
+  expect(prompt).toContain(FRASE_PROVV);
 });
 
 test('in chat, senza elenco la risposta dice lo stesso «non verificato» del menu', async ({ app }) => {
@@ -279,6 +317,16 @@ test('lo stesso JPEG cambiato dopo la firma lo dice', async ({ openTab, testServ
 test('generata con l’AI e poi ritagliata con le credenziali: la riga lo dice ancora', async ({ openTab, testServer }) => {
   const { riga } = await rigaSu(testServer, openTab, fixture('c2pa-ufficiale-ritagliata.jpg'), 'image/jpeg');
   await expect(riga).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
+});
+
+// #946.1: un file vero di ChatGPT del 2025, con la radice Truepic dell'elenco provvisorio vero: generata, non modificata.
+test('un’immagine vera di ChatGPT si dice generata con l’AI da OpenAI, riconosciuta dall’elenco provvisorio', async ({ app, openTab, testServer }) => {
+  const url = testServer.asset(elencoPem(RADICE), 'text/plain');
+  const urlProvvisorio = testServer.asset(fixture('elenco-provvisorio-truepic.pem'), 'text/plain');
+  const esito = await app.evaluate((_e, a) => globalThis.__filoFirmatariC2pa.aggiorna({ forza: true, ...a }), { url, urlProvvisorio });
+  expect(esito.ok).toBe(true);
+  const { riga } = await rigaSu(testServer, openTab, fixture('chatgpt-2025-vera.png'), 'image/png');
+  await expect(riga).toHaveAttribute('aria-label', /^Generata con l’AI secondo OpenAI.*elenco provvisorio del C2PA\.$/, { timeout: 15000 });
 });
 
 // La prova di #946: la STESSA immagine firmata, ricompressa come fa un salvataggio

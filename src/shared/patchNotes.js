@@ -54,7 +54,9 @@
     },
     {
       version: '0.2.245', date: '2026-10-22',
-      features: [],
+      features: [
+        'Col tasto destro su un\'immagine fatta con ChatGPT, Firefly o Bing prima del 2026, Filo ora ti dice che è generata con l\'AI e chi lo dichiara, per esempio OpenAI. Prima diceva solo che chi l\'aveva firmata non era riconosciuto. Lo stesso se lo chiedi in chat.',
+      ],
       fixes: [
         'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
         'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',

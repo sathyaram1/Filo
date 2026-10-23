@@ -288,7 +288,7 @@
     },
     {
       id: 'firmatari-c2pa', nome: 'L’elenco dei firmatari C2PA, su GitHub',
-      base: ['https://raw.githubusercontent.com/c2pa-org/conformance-public/'],
+      base: ['https://raw.githubusercontent.com/c2pa-org/conformance-public/', 'https://raw.githubusercontent.com/contentauth/verify-site/'],
       quando: 'avvio',
       occasione: 'in sottofondo, una volta al giorno, e quando controlli l’origine di un’immagine con l’elenco vecchio',
       riceve: 'niente di tuo: il confronto con l’immagine avviene sul computer',
