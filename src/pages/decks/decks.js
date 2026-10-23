@@ -2276,6 +2276,14 @@
     };
     $('previewModule').addEventListener('click', onModuleClick);
     $('carouselModule').addEventListener('click', onModuleClick);
+    // Chi torna da Crediti o dalle Opzioni ha di solito tolto l'ostacolo: i pareri mancati si richiedono, una volta,
+    // quando la carta si ridisegna.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !opinionErrors.size) return;
+      opinionErrors.clear();
+      const cur = currentDetailCard();
+      if (cur && layout.module === 'opinion') renderDetailModule(cur);
+    });
   }
 
   // Switcher (§8.2): popup ancorato sotto l'header, stesse classi dei menu di Filo.
