@@ -1450,7 +1450,10 @@
     oraVuota, registraUso, registraAzione, registraErrore, registraImpostazione, registraRicerca, registraProposta,
     registraConferma, registraAnnullato, registraAnticipo, registraChiesto, registraErroreVisto, registraIntervista,
     registraPrimaVolta, registraChiamata, registraSpesa, registraAdattamento, registraChiamate,
-    documento, documentoGiorno, documentoChiamate, senzaChiamate, idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
+    tipiSuggerimento, tipoSuggerimento, combinazioneValida, chiaveAttivita, registraAttivita, esitoRicerca, motivoLettura,
+    finoLettura, chiusaDa, rigaMemoria, esitoHome,
+    documento, documentoGiorno, documentoChiamate, senzaChiamate, documentoAttivita, senzaAttivita, validaAttivita,
+    idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
     giornoDi, oraDi, giornoPrima, meseDi, oreDaInviare, daInviare, potaOre, potaGiorni, pseudonimoDelMese,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
