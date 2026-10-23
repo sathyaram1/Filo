@@ -1190,15 +1190,6 @@ class TabManager {
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
-    this.tabs.splice(idx, 1);
-    if (this.activeId === id) {
-      // Si torna alla PENULTIMA scheda guardata, non a quella a sinistra: è quella che l'utente
-      // si aspetta. Se nessuna è mai stata attivata vale l'adiacente.
-      const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
-      if (next) this.activate(next.id);
-      else this.openTab('filo://newtab/'); // niente tab → nuovo newtab
-    }
-    this._broadcast();
   }
 
   // Contatore crescente invece di Date.now(): due attivazioni possono cadere
