@@ -310,8 +310,12 @@
       audio.onerror = () => finish(false);
       audio.addEventListener('timeupdate', () => {
         const d = audio.duration;
-        if (sessionAlive(s) && d && isFinite(d)) s.letti = Math.max(s.letti || 0, chunk.start + (chunk.end - chunk.start) * (audio.currentTime / d));
+        if (!sessionAlive(s) || !d || !isFinite(d)) return;
+        s.letti = Math.max(s.letti || 0, chunk.start + (chunk.end - chunk.start) * (audio.currentTime / d));
+        segnaLettura(s);
       });
+      // La voce del modello conta da quando si sente, non da quando l'audio è arrivato.
+      audio.addEventListener('playing', () => { if (!chunk.sentito && sessionAlive(s)) { chunk.sentito = true; s.pezziModello += 1; } });
       // Se l'utente ferma (stopReading mette in pausa), sblocca la pipeline.
       audio.onpause = () => { if (!sessionAlive(s)) finish(true); };
       if (chunk.from >= 0 && readTokens.length) {
