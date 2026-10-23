@@ -350,6 +350,150 @@
     root.dataset.spostata = '1';
   }
 
+  // ---------- Allegati (#1623) ----------
+
+  // Le immagini date all'Aiuto: lasciate sulla pagina o sul pannello, incollate. Il pannello sta nel documento del
+  // sito: anteprime e nomi in uno Shadow DOM chiuso, i percorsi solo qui.
+  const Allegati = global.SN_CONST.ALLEGATI_CHAT;
+  let allegati = { immagini: [], grandi: [] };
+  // Da content.js: 'sito' dove Filo è spento (il rilascio resta alla pagina), 'aiuto' con l'Aiuto spento, '' altrimenti.
+  let chiusoPerche = () => 'sito';
+  const chiuso = () => { try { return String(chiusoPerche() || ''); } catch (_) { return 'sito'; } };
+  const ombre = new WeakMap();
+  function ombraDi(el, css) {
+    let o = ombre.get(el);
+    if (!o) {
+      o = el.attachShadow({ mode: 'closed' });
+      const stile = document.createElement('style');
+      stile.textContent = css;
+      o.appendChild(stile);
+      ombre.set(el, o);
+    }
+    return o;
+  }
+  const CSS_ALLEGATI = `
+:host { display: block; }
+.riga { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 10px 2px; }
+.voce { position: relative; display: inline-flex; }
+img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display: block; }
+.file {
+  display: inline-flex; align-items: center; max-width: 220px; height: 48px; box-sizing: border-box; padding: 0 12px;
+  border: 1px solid var(--sn-border); border-radius: 8px; color: var(--sn-fg); font-size: 12px;
+}
+.file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.togli {
+  all: unset; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1;
+  background: var(--sn-fg); color: var(--sn-bg);
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease, background calc(120ms * var(--sn-motion, 1)) ease;
+}
+.togli:hover, .togli:focus-visible { transform: scale(1.12); background: var(--sn-accent); color: #fff; }
+.bolla { display: flex; flex-wrap: wrap; gap: 6px; }
+.bolla img { width: auto; height: auto; max-width: 100%; max-height: 160px; }
+`;
+
+  function nAllegati(a = allegati) { return a.immagini.length + a.grandi.length; }
+
+  function disegnaAllegati() {
+    const host = root && root.querySelector('.sn-sidebar-allegati');
+    if (!host) return;
+    host.hidden = !nAllegati();
+    const o = ombraDi(host, CSS_ALLEGATI);
+    for (const n of Array.from(o.childNodes)) if (n.localName !== 'style') n.remove();
+    const riga = document.createElement('div');
+    riga.className = 'riga';
+    const togli = (lista, voce) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'togli';
+      b.textContent = '×';
+      b.title = 'Togli';
+      b.setAttribute('aria-label', 'Togli dal messaggio');
+      b.addEventListener('click', (e) => {
+        if (!gestoVero(e)) return;
+        allegati[lista] = allegati[lista].filter((x) => x !== voce);
+        disegnaAllegati();
+        root?.querySelector('.sn-sidebar-input textarea')?.focus();
+      });
+      return b;
+    };
+    for (const im of allegati.immagini) {
+      const v = document.createElement('div');
+      v.className = 'voce';
+      if (im.nome) v.title = im.nome;
+      const img = document.createElement('img');
+      img.src = im.dataUrl;
+      img.alt = im.nome || 'Immagine allegata';
+      v.append(img, togli('immagini', im));
+      riga.appendChild(v);
+    }
+    for (const g of allegati.grandi) {
+      const v = document.createElement('div');
+      v.className = 'voce file';
+      v.title = 'Oltre i 4 MB: Filo non la vede';
+      const nome = document.createElement('span');
+      nome.textContent = g.nome || 'Immagine';
+      v.append(nome, togli('grandi', g));
+      riga.appendChild(v);
+    }
+    o.appendChild(riga);
+  }
+
+  const leggiImmagine = (f) => new Promise((ok) => {
+    try {
+      const r = new FileReader();
+      r.onload = () => ok(typeof r.result === 'string' && /^data:image\//i.test(r.result) ? r.result : null);
+      r.onerror = () => ok(null);
+      r.readAsDataURL(f);
+    } catch (_) { ok(null); }
+  });
+
+  // `percorso(file)`: dov'è sul disco ('' se non viene da lì). Sopra il tetto entra col nome, se ha un percorso; senza,
+  // non entra e lo si dice. Torna se l'Aiuto l'ha prese.
+  async function allega(files, { percorso = () => '' } = {}) {
+    const lista = Array.from(files || []).filter((f) => f && /^image\//i.test(f.type || ''));
+    if (!lista.length) return false;
+    const perche = chiuso();
+    if (perche === 'sito') return false;
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return false; }
+    if (!isOpen() || nascosto) open();
+    else if (collapsed) expand({ ai: false });
+    let fuori = 0;
+    for (const f of lista) {
+      if (f.size > Allegati.tettoImmagineByte) {
+        let p = '';
+        try { p = percorso(f) || ''; } catch (_) { p = ''; }
+        if (p) allegati.grandi.push({ nome: f.name || '', percorso: p });
+        else fuori += 1;
+        continue;
+      }
+      const dataUrl = await leggiImmagine(f);
+      if (dataUrl) allegati.immagini.push({ dataUrl, nome: f.name || '' });
+      else fuori += 1;
+    }
+    disegnaAllegati();
+    if (fuori) Popup?.showToast?.(Allegati.fraseTroppoGrandi(fuori));
+    try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+    return true;
+  }
+
+  function immaginiNellaBolla(msg, immagini) {
+    if (!msg || !immagini.length) return;
+    const box = document.createElement('div');
+    box.className = 'sn-sidebar-msg-immagini';
+    const o = ombraDi(box, CSS_ALLEGATI);
+    const bolla = document.createElement('div');
+    bolla.className = 'bolla';
+    for (const im of immagini) {
+      const img = document.createElement('img');
+      img.src = im.dataUrl;
+      img.alt = im.nome || 'Immagine allegata';
+      bolla.appendChild(img);
+    }
+    o.appendChild(bolla);
+    msg.prepend(box);
+  }
+
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
