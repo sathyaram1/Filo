@@ -369,7 +369,11 @@
     // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
     stopReading();
     const s = newSession();
-    Object.assign(s, { totale: full.length, letti: 0, pezziModello: 0, ripiego: null, contata: false });
+    Object.assign(s, {
+      totale: full.length, letti: 0, pezziModello: 0, ripiego: null, contata: false,
+      idConto: `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+    });
+    segnaLettura(s, true);
     reportReadingState(true);
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
