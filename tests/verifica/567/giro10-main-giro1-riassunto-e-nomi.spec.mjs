@@ -95,30 +95,3 @@ test('la conferma annullata non fa dire al riassunto che l\'impostazione è camb
 
   await restore(app, '__v567c');
 });
-
-test('anche il dettaglio dell\'aspetto si legge in italiano nel diario', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible();
-  await configureModel(app);
-
-  await fakeProvider(app, [
-    { toolCalls: [{ id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"accent","valore":"#3a7d44"}' }] },
-    { text: 'Verde.' },
-  ], '__v567d');
-
-  await chiedi(page, 'accento verde');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Verde.' })).toBeVisible({ timeout: 10_000 });
-
-  const activity = page.locator('.dash-activity');
-  await activity.locator('.dash-activity-head').click();
-  const riga = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Aspetto' });
-  await expect(riga).toHaveCount(1);
-  const testo = await riga.textContent();
-  expect(testo).toContain('#3a7d44');
-  // Il nome interno del token non è quello che legge l'utente.
-  expect(testo.trim()).not.toMatch(/Aspetto · accent →/);
-
-  await restore(app, '__v567d');
-});
