@@ -93,11 +93,13 @@ test('un documento per ora, con la forma giusta e niente altro; un giorno senza 
   assert.ok(!opt.headers.Authorization, 'si spedisce senza login, come i feedback');
   assert.equal(url, `${BASE}/${C.COLLEZIONE}?documentId=99999999999999999901_2026-10-15_09&key=K`);
   assert.deepEqual(doc, {
-    v: 2, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac', primo: 'mese',
+    v: 3, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac', primo: 'mese',
     uso: { 'filo-chat': '2;1,0,1,0,0,0,0;1,0,1,0,0,0,0;1', explain: '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0' },
     errori: { explain: 'deepseek/deepseek-v4-pro|DeepInfra|crediti|1' },
     ...vuoti,
     primeVolte: ['filo-chat', 'explain'],
+    // Ogni uso qui è una chiamata sola.
+    chiamate: { 'filo-chat': '2,0,0,0,0', explain: '1,0,0,0,0' },
   });
   assert.equal(C.valida(doc).ok, true);
 
