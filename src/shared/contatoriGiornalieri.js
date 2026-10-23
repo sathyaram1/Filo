@@ -90,8 +90,9 @@
   const FORNITORI_RICERCA = Object.freeze(['tavily', 'duckduckgo', 'nessuno']);
   // I motivi con cui SN_ASCOLTO chiude una sessione del microfono.
   const MOTIVI_DETTATURA = Object.freeze(['utente', 'finito', 'muto', 'tempo', 'errore', 'altro', 'annulla']);
-  // «a_mano»: inviata dalla persona senza cambiarla; «nessuno»: niente da inviare (nessuna frase, o la dettatura in un
-  // campo di una pagina, che non ha un invio).
+  // Che fine ha fatto il testo, saputo quando parte: «da_sola» l'invio automatico, «a_mano» mandato com'era, «cambiata»
+  // corretto prima, «tenuta» lasciato nella casella e mai mandato, «annullata» cancellato o perso con la chat;
+  // «nessuno»: niente da inviare (nessuna frase, o la dettatura in un campo di una pagina, che non ha un invio).
   const INVII_DETTATURA = Object.freeze(['da_sola', 'cambiata', 'tenuta', 'annullata', 'a_mano', 'nessuno']);
   const VOCI_LETTURA = Object.freeze(['modello', 'browser', 'mista']);
   // Perché la lettura è passata alla voce del browser: i codici che l'avviso spiega, la chiave rifiutata, nessun modello.
