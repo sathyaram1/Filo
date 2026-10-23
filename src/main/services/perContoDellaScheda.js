@@ -96,8 +96,8 @@ function origineDellaPagina(sender) {
   try { return new URL(origini[0]).origin; } catch (_) { return ''; }
 }
 
-// Con un iniziatore Chromium sceglie i cookie come per la pagina (SameSite): a un altro sito vanno solo quelli che lui
-// concede alle richieste altrui. Per un file di un altro sito l'iniziatore è opaco, come dentro un riquadro sandbox.
+// Con un iniziatore Chromium sceglie i cookie come per la pagina (SameSite): a un altro sito solo quelli che concede alle
+// richieste altrui. Lì l'iniziatore è opaco: stessi cookie, e nessun blocco Cross-Origin-Resource-Policy in più.
 function iniziatorePer(origine, url) {
   return origine && stessoSitoWeb(origine, url) ? origine : 'null';
 }
