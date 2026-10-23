@@ -38,7 +38,8 @@ async function leggiInChat({ app, openTab, testServer }, titolo, corpo, domanda)
   return (await app.evaluate(() => globalThis.__chiamate)).join('\n');
 }
 
-test('r1 un file .env mostrato in una pagina: le chiavi e le password per nome non arrivano al modello', async (fx) => {
+test('r1 un file .env mostrato in una pagina: le chiavi e le password per nome non arrivano al modello', async ({ app, openTab, testServer }) => {
+  const fx = { app, openTab, testServer };
   test.setTimeout(90_000);
   const mandato = await leggiInChat(fx, 'Configurazione del progetto', `<h1>Configurazione del progetto</h1>
     <pre>APP_NAME=gestionale
@@ -52,7 +53,8 @@ client_secret=GOCSPX-1a2B3c4D5e6F7g8H9i0J</pre>`, 'dalla pagina Configurazione d
     '8f14e45fceea167a5a36dedd4bea2543', 'GOCSPX-1a2B3c4D5e6F7g8H9i0J']) expect(mandato, s).not.toContain(s);
 });
 
-test('r1 la pagina di un servizio con «Chiave API»: la chiave non arriva al modello', async (fx) => {
+test('r1 la pagina di un servizio con «Chiave API»: la chiave non arriva al modello', async ({ app, openTab, testServer }) => {
+  const fx = { app, openTab, testServer };
   test.setTimeout(90_000);
   const mandato = await leggiInChat(fx, 'Il tuo account meteo', `<h1>Il tuo account meteo</h1>
     <p>Piano: gratuito</p><p>Chiave API: 8f14e45fceea167a5a36dedd4bea2543</p><button>Copia</button>`,
