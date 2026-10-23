@@ -64,6 +64,13 @@ class SchedeInAlto {
     this.tabs.layout();
   }
 
+  // La modalità è cambiata: lo stato riparte da capo, e il layout lo rifà chi l'ha cambiata.
+  azzera() {
+    this._ferma('spinta');
+    this._ferma('uscita');
+    this.visibili = false;
+  }
+
   nascondi() {
     this._ferma('spinta');
     this._ferma('uscita');

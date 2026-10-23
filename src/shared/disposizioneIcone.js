@@ -117,9 +117,11 @@
   function applicaPosa(layout, { id, target, beforeId = null } = {}) {
     if (!noto(id) || !ZONE.includes(target)) return null;
     const out = migra(layout).layout;
+    // Davanti a sé stessa, nella zona dove già sta: resta dov'è.
+    if (beforeId === id && out[target].includes(id)) return out;
     for (const z of ZONE) out[z] = out[z].filter((x) => x !== id);
     const zona = out[target];
-    const i = beforeId && beforeId !== id ? zona.indexOf(beforeId) : -1;
+    const i = beforeId ? zona.indexOf(beforeId) : -1;
     if (i >= 0) zona.splice(i, 0, id);
     else zona.push(id);
     return out;

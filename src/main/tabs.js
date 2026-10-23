@@ -40,6 +40,7 @@ const { collegaScorciatoie, staRegistrandoTasti } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
+const { SchedeInAlto } = require('./schedeInAlto');
 const RisposteInAttesa = require('./risposteInAttesa');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
@@ -434,6 +435,7 @@ class TabManager {
       sottoIlVuoto: () => this.vistaSottoIlVuoto(),
     });
     this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
+    this.schedeInAlto = new SchedeInAlto(window, this);
     // L'email dell'account sotto il campo di accesso della scheda davanti (#1124): sopra gli avvisi, sotto la conferma.
     this.propostaEmail = new PropostaEmail(window, {
       area: (wc) => {
@@ -464,7 +466,10 @@ class TabManager {
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       inCima: () => { if (this.barra) this.barra._inCima(); },
       cambiata: () => { if (this.barra) this.barra.aggiornaNav(); },
-      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
+      input: (wc, input) => {
+        if (this.barra) this.barra.inputDa(wc, input);
+        if (this.schedeInAlto) this.schedeInAlto.dallaPagina(wc, input);
+      },
     });
     // #1526 — chi si è preso lo schermo pieno: sopra la scheda e l'avviso del sito, sotto conferme, barra e menu.
     this.schermoPieno = new AvvisoSchermoPieno(window, {
@@ -605,7 +610,7 @@ class TabManager {
   // Quanta shell resta scoperta dalla vista attiva. Serve a ritagliare lo
   // scatto della barra quando si annota tutta l'app col disegno.
   topChromeHeight() {
-    if (this.contentFullscreen) return 0;
+    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
     return this.chromeCompact ? this.tabRowHeight : this.shellHeight;
   }
 
@@ -625,6 +630,7 @@ class TabManager {
     this.azzeraRivendicazioniEsc();
     if (this.contentFullscreen === on) return on;
     this.contentFullscreen = on;
+    this.schedeInAlto.azzera();
     this.strato.nascondi();
     this.layout();
     try {
@@ -2311,11 +2317,11 @@ class TabManager {
   }
 
 
-  // Altezza di chrome riservata in alto: 0 a tutto schermo, solo la fila di tab
+  // Altezza di chrome riservata in alto: 0 a tutto schermo (salvo le schede scese dal bordo alto), solo la fila di tab
   // se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
   // A questo si somma l'eventuale topInset dei dropdown.
   _altezzaCornice() {
-    if (this.contentFullscreen) return 0;
+    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
     return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
   }
 
@@ -2490,6 +2496,8 @@ class TabManager {
     wc.on('enter-html-full-screen', () => {
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
+      // Dentro lo schermo intero di Filo un video si prende tutto lo schermo: le schede scese tornano su.
+      this.schedeInAlto.nascondi();
       this.setContentFullscreen(true);
       this._schermoPienoChiesto(tab);
       // Davanti può già esserci la scheda che la pagina ha aperto con lo stesso clic: la pillola è per chi si vede.
@@ -2879,6 +2887,7 @@ class TabManager {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
       this.barra.inputDa(wc, input);
+      this.schedeInAlto.dallaPagina(wc, input);
       if (this.pageFullscreen && tab.id === this.activeId && this.schermoPieno.sulBordoAlto(input)) this._ricompariSchermoPieno(tab);
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
