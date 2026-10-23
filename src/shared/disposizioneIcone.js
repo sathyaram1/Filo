@@ -13,7 +13,7 @@
 
   // `tipo`: chi esegue. 'finestra' la fa il main, 'pagina' il content script della scheda, 'aiuto' il pannello
   // Aiuto della scheda, con l'aspetto che dice cosa farà il clic (aspettoAiuto).
-  // Le etichette sono quelle del menu (menuIcons.js): la sentinella le tiene uguali.
+  // Le etichette sono quelle del registro della pagina (menuIcons.js): la sentinella le tiene uguali.
   const ICONE = Object.freeze({
     help: { icona: 'help', etichetta: 'menu_help', tipo: 'aiuto' },
     translate: { icona: 'translate', etichetta: 'menu_global_translate', tipo: 'pagina' },
