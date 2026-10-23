@@ -39,7 +39,7 @@
 
   function cifra(n, decimali) {
     try {
-      return new Intl.NumberFormat('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali }).format(n);
+      return new Intl.NumberFormat('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali, useGrouping: true }).format(n);
     } catch (_) { return n.toFixed(decimali); }
   }
 
