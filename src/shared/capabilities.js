@@ -90,9 +90,9 @@
     },
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
-      desc: 'Nasconde la barra delle schede così la pagina occupa tutta la finestra.',
-      invoke: 'F11 (su Mac Ctrl+Cmd+F), che premuto di nuovo lo toglie, da qualunque pagina e anche mentre scrivi; barra laterale → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc; a schermo intero la barra laterale si apre come sempre dal bordo sinistro.',
-      doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
+      desc: 'Nasconde la barra delle schede così la pagina occupa tutta la finestra. Quando è un sito a prendersi lo schermo intero (il pulsante di un video), in alto al centro compare per qualche secondo il nome vero del sito che l’ha chiesto, e di quello che lo contiene se è un riquadro, con «Esc per uscire»: la pagina non può coprirlo né imitarlo. Ricompare portando il mouse sul bordo alto; un clic sull’avviso esce dallo schermo intero, e il tasto destro ha «Esci dallo schermo intero» e la durata.',
+      invoke: 'F11 (su Mac Ctrl+Cmd+F), che premuto di nuovo lo toglie, da qualunque pagina e anche mentre scrivi; barra laterale → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc; a schermo intero la barra laterale si apre come sempre dal bordo sinistro. Quanto resta l’avviso col nome del sito (da 1 a 10 secondi, 3 di serie) lo cambi in Preferenze → Impostazioni avanzate → «Schermo intero», o chiedendolo a Filo («lascia l’avviso dello schermo intero per 5 secondi»).',
+      doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina. L’avviso col nome del sito non si spegne: è l’unico segno che quello che vedi non è più Filo.',
     },
     {
       id: 'sidebar', title: 'Barra laterale', category: 'navigation',
