@@ -1,10 +1,13 @@
 // Preload della shell: espone window.filoShell (tab, download, finestra, account).
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('filoShell', {
   // Alla barra serve per nominare il tasto giusto: regola in CLAUDE.md § Mac.
   sistema: process.platform,
+  // #1623 — le immagini lasciate sulla fila delle schede vanno alla chat della scheda davanti.
+  percorsoDelFile: (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } },
+  rilascioNellaChat: (voci) => ipcRenderer.send('shell:rilascio-nella-chat', Array.isArray(voci) ? voci : []),
   // Dove sta il puntatore quando è fuori dal documento della barra (#428).
   puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {
