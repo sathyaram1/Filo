@@ -211,6 +211,11 @@
   const TETTO_CARATTERI_CONTO = 9;
   const TETTO_CARATTERI_ANTICIPO = 19;
   const TETTO_CARATTERI_INTERVISTA = 45 * SCELTE_INTERVISTA.length;
+  // Una funzione sola può avere tutte le voci col modello dell'ora, più una riga «altro» per resto.
+  const lungo = (campo) => Math.max(...RESTI[campo].map((r) => r.length));
+  const TETTI_CARATTERI_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c,
+    TETTO_MODELLI_ORA * (120 + lungo(c) + 13) + RESTI[c].length * (ALTRO.length + lungo(c) + 13)])));
+  const TETTO_CARATTERI_CHIAMATE = 49;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
