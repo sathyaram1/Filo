@@ -523,7 +523,7 @@ describe('release.yml: si pubblica il commit più nuovo di main con la suite ver
   });
 
   test('«codice nuovo dopo il tag» si conta come nel lavoro Windows', () => {
-    assert.match(release(), /git rev-list --count --invert-grep --grep='\^release: v\[0-9\]' "\$\{LAST_TAG\}\.\.HEAD"/,
+    assert.match(cancello(), /git rev-list --count --invert-grep --grep='\^release: v\[0-9\]' "\$\{LAST_TAG\}\.\.HEAD"/,
       'senza escludere il commit del server ogni corsa rilascerebbe di nuovo');
     assert.ok(SCEGLI_JS.includes("'--invert-grep', '--grep=^release: v[0-9]'"),
       'la guardia della pubblicazione ferma conterebbe come codice nuovo il commit del numero di versione');
