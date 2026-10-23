@@ -316,7 +316,7 @@ async function leggiDallaScheda(wc) {
     // La scadenza si fissa qui, non nella pagina: conta anche l'attesa di una pagina ancora occupata a fare altro.
     const opz = { scadenza: Date.now() + tempi.scheda, minimo: MAX_TEXT_CHARS * 2 };
     const codice = `(${serializzaVisibile.toString()})(${JSON.stringify(opz)})`;
-    return conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), SCADENZA_SCHEDA_MS);
+    return conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), tempi.scadenzaScheda);
   });
   return r && typeof r.html === 'string' ? r : null;
 }
