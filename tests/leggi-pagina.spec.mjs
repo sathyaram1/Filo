@@ -399,6 +399,64 @@ test('una scheda che non si finisce di leggere in tempo consegna il suo primo pe
   expect(await app.evaluate(() => globalThis.__scaricati.length), 'la rete non sostituisce la scheda in ritardo').toBe(0);
 });
 
+// #1307.3: chiesto il seguito oltre l'ultimo pezzo di una scheda letta in parte, il modello sentiva «la pagina finisce qui»
+// e rispondeva che il dato non c'era.
+test('oltre l\'ultimo pezzo di una scheda letta in parte, al modello non arriva «la pagina finisce»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  const righe = Array.from({ length: 4000 }, (_, i) => `<p>Spedizione ${i + 1} partita da Bologna e consegnata a Verona.</p>`).join('');
+  const url = testServer.html(`<!doctype html><html><head><title>Spedizioni</title></head><body><main><h1>Spedizioni</h1>${righe}
+<p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scheda = -1; });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url, da: 10_000_000 } }] },
+    { finale: { cerca: '(prima parte)', testo: 'RISPOSTA: letta la $1.' } },
+  ]);
+  await chiedi(page, 'quando è stata consegnata l\'ultima spedizione della pagina che ho aperto?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: letta la prima parte.' })).toBeVisible({ timeout: 30_000 });
+  const letto = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(letto).toContain('Filo ha solo la prima parte');
+  expect(letto).toContain('ma la pagina continua');
+  expect(letto).not.toMatch(/finisce al carattere \d+: non c'è altro da leggere/);
+});
+
+// #1307.3: la scheda che non risponde in tempo non lascia al modello una copia scaricata a parte spacciata per la pagina
+// che l'utente ha davanti, né il consiglio di aprirla in una scheda quando la copia non arriva.
+test('una scheda aperta che non risponde in tempo lo dice al modello, con la copia scaricata o senza', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Ordini</title></head><body><main><h1>Ordini</h1>
+<p>Il tuo ordine 4471 è partito martedì da Bologna e arriva a Verona giovedì 29 ottobre entro le 13.</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scadenzaScheda = 1; });
+
+  await reteDiProva(app);
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(non ha risposto in tempo)', testo: 'RISPOSTA: la scheda $1.' } },
+  ]);
+  await chiedi(page, 'quando arriva il mio ordine? è nella pagina che ho aperto');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: la scheda non ha risposto in tempo.' })).toBeVisible({ timeout: 30_000 });
+  const copia = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(copia).toContain('scaricata');
+  expect(copia).toContain('giovedì 29 ottobre');
+  expect(copia).toContain('può non essere quello che vede l\'utente');
+  expect(await app.evaluate(() => globalThis.__scaricati.length), 'senza risposta dalla scheda la copia arriva dalla rete').toBe(1);
+
+  await reteDiProva(app, { vietata: true });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(non ha risposto in tempo)', testo: 'RISPOSTA BIS: la scheda $1.' } },
+  ]);
+  await chiedi(page, 'riprova a leggerla');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA BIS: la scheda non ha risposto in tempo.' })).toBeVisible({ timeout: 30_000 });
+  const niente = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(niente).toContain('non letta');
+  expect(niente).not.toContain('NAVIGA');
+});
+
 test('aperta in una scheda come consiglia Filo, la pagina che rimanda si rilegge dalla scheda con l\'indirizzo di partenza', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await openTab(NEWTAB);
