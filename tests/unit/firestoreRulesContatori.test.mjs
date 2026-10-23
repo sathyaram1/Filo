@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461): la collezione è a sola creazione, letta solo dall'admin,
-// e la forma che accetta è la stessa che l'app costruisce, per le ore (v2) e per i giorni rimasti da prima (v1). Il
-// motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica, in millisecondi.
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464): la collezione è a sola creazione, letta solo
+// dall'admin, e la forma che accetta è quella che l'app costruisce (v3), più le ore delle copie vecchie (v2) e i giorni
+// di prima (v1). Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
