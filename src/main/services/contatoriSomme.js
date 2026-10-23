@@ -13,7 +13,7 @@ const ATTESA_RETE_MS = 30000;
 // Le ore nuove arrivano ogni ora: una lettura vale dieci minuti per la stessa richiesta, «Rileggi» la rifà subito.
 const VALE_MS = 10 * 60 * 1000;
 const RICHIESTE_TENUTE = 4;
-// Tre anni: i contatori orari esistono dal 2026, e oltre una colonna al mese non si legge più.
+// Tre anni, detto col numero a chi chiede di più: oltre, anche una colonna al mese non si legge più.
 const TETTO_GIORNI = 1100;
 const GIORNI_PER_GIORNO = 62;
 const GIORNI_PER_SETTIMANA = 548;
@@ -539,7 +539,6 @@ function crea(dip = {}) {
   const fetchFn = dip.fetch || ((...a) => fetch(...a));
   const rest = dip.rest || (() => (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest) || {});
   const adesso = dip.adesso || (() => Date.now());
-  const oggi = dip.oggi || (() => giornoDa(new Date(adesso())));
   const log = dip.log || ((...a) => console.log('[contatori/somme]', ...a));
   const letture = new Map();
 
