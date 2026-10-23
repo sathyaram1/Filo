@@ -247,6 +247,7 @@ module.exports = function register(on, ctx) {
   }
   async function leggiStato(piuNuova = () => true) {
     const own = await ownKey();
+    await loadQueue().catch(() => {});
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
       usingOwnKey: Boolean(own), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
