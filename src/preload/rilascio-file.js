@@ -14,23 +14,22 @@ const bersaglio = (e) => {
 };
 // Il campo file prende il rilascio da sé, senza che la pagina lo dica: lì Filo non si mette in mezzo.
 const campoFile = (t) => !!t && t.localName === 'input' && String(t.type || '').toLowerCase() === 'file';
-// Una casella o un editor: il rilascio arriva alla pagina comunque, e solo al drop si vede se lo voleva (preventDefault).
-const scrivibile = (t) => !!t && (!!t.isContentEditable || t.localName === 'input' || t.localName === 'textarea');
 
 // `pronta()`: c'è una chat che lo prende; `consegna(files)`: le dà tutti i file lasciati, e lei dice cosa non entra;
 // `pannello(t)`: il nodo sta nel pannello di Filo, e quello che gli si dà non passa dalla pagina.
-// Chi decide è il drop, non il dragover: una pagina può accettare il passaggio del file e poi non prenderlo.
+// Il drop arriva alla pagina solo se lei ha accettato il passaggio, come in ogni browser (anche sopra una casella:
+// un file non è testo); poi decide il drop, perché una pagina può accettare il passaggio e non prenderlo.
 module.exports = function osservaRilascio(win, { pronta, consegna, pannello = () => false }) {
   // '' non è nostro, 'subito' lo prende Filo prima della pagina, 'dopo' solo se la pagina al drop non lo vuole.
   let nostro = '';
   let inAttesa = null;
   const delPannello = (e) => { try { return !!pannello(bersaglio(e)); } catch (_) { return false; } };
-  // Nessuno ha accettato il passaggio: lo accetta Filo, e fuori da una casella lo prende prima della pagina.
+  // Nessuno ha accettato il passaggio: lo accetta Filo, e il drop la pagina non lo vede.
   const dopoLaPagina = (e) => {
     if (!nostro || e.defaultPrevented) return;
     e.preventDefault();
     try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
-    nostro = scrivibile(bersaglio(e)) ? 'dopo' : 'subito';
+    nostro = 'subito';
   };
   // Aggiunto mentre l'evento scende, l'ascolto in bolla arriva dopo quelli della pagina.
   const sopra = (e) => {
