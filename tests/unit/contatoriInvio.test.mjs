@@ -233,6 +233,70 @@ test('le chiamate che il server non accetta ancora (#1464) si riprovano il giorn
   assert.equal(b.inviati[1].doc.primo, '', 'il segno del primo documento è già dell’ora arrivata');
 });
 
+// ── Le attività (#1467) ─────────────────────────────────────────────────
+test('le attività di un’ora partono accanto all’ora, con lo stesso id; un’ora senza attività non ha il terzo documento', async () => {
+  const b = banco({ finestra: false });
+  assert.equal(b.s.attivita('aiuto', { esito: 'fatto', passiDaSolo: 3, passiCliccati: 1, nonTrovati: 0, documenti: 0 }), true);
+  assert.equal(b.s.attivita('ricercaWeb', { da: 'chat', fornitore: 'duckduckgo', ripiego: true, risultati: 5 }), true);
+  assert.equal(b.s.attivita('pulizia', { trigger: 'idle', candidate: 8, archiviate: 2, duplicati: 1, giudizioMancato: false }), true);
+  assert.equal(b.s.memoriaCorretta('quaderno', 'togli', { modulo: 'PROFILO', lezione: false, nata: new Date(b.t - 3 * GIORNO).toISOString() }), true);
+  assert.equal(b.s.memoriaCorretta('chat', 'svuota', null), true);
+  assert.equal(b.s.memoriaCorretta('chat', 'togli', null), false, 'una riga che non si sa cos’era non si conta');
+  assert.equal(b.s.attivita('aiuto', { esito: 'cerca il volo per Roma' }), false, 'un esito fuori elenco non entra');
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.inviati.length, 1);
+  assert.equal(b.chiamate.length, 0, 'senza chiamate ai modelli non parte il loro documento');
+  assert.equal(b.attivita.length, 1);
+  assert.equal(b.attivita[0].url, `${BASE}/${C.COLLEZIONE_ATTIVITA}?documentId=99999999999999999901_2026-10-15_09&key=K`);
+  assert.deepEqual(b.attivita[0].doc, {
+    v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac',
+    aiuto: { 'fatto|p2_5|p1|n0|n0': '1' }, ricercaWeb: { 'chat|duckduckgo|si|r3_5': '1' }, dettatura: {}, lettura: {}, lezioni: {},
+    compattazioni: {}, memoria: { 'quaderno|togli|profilo|settimana': '1', 'chat|svuota|tutte|nd': '1' },
+    pulizia: { 'idle|s6_20|s1|s1|no': '1' }, riaperte: {}, home: {}, suggerimenti: {},
+  });
+  assert.equal(C.validaAttivita(b.attivita[0].doc).ok, true);
+  // Un'ora con un solo uso e nessuna attività: niente terzo documento.
+  await usa(b, A.EXPLAIN);
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.inviati.length, 2);
+  assert.equal(b.attivita.length, 1);
+});
+
+test('le attività in incognito e a contatori spenti non si contano', async () => {
+  const b = banco({ incognito: true, finestra: false });
+  assert.equal(b.s.attivita('home', { esito: 'generata' }), false);
+  b.incognito = false;
+  assert.equal(b.s.attivita('riaperte', { chiusaDa: 'pulizia', etaMs: 1000 }, { incognito: true }), false, 'una finestra in incognito lo dice da sé');
+  b.accesi = false;
+  b.s.attivita('home', { esito: 'generata' });
+  await attendi();
+  b.accesi = true;
+  b.t += ORA;
+  await b.s.controlla();
+  assert.equal(b.inviati.length + b.attivita.length, 0);
+});
+
+test('le attività che il server non accetta ancora (#1467) si riprovano il giorno dopo, e l’ora già arrivata non si riscrive', async () => {
+  const b = banco({ finestra: false });
+  b.risposta = (doc) => ('aiuto' in doc ? 403 : 200);
+  b.s.attivita('home', { esito: 'senza_ai_chiave' });
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito');
+  assert.equal(b.inviati.length, 1, 'l’ora è partita');
+  assert.equal(b.attivita.length, 1, 'le sue attività sono state rifiutate');
+  assert.equal(Object.keys((await b.s.letto()).ore).length, 1, 'l’ora resta per le sue attività');
+  b.risposta = (doc) => ('primo' in doc ? 409 : 200);
+  b.t += 24 * ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.attivita.length, 2);
+  assert.deepEqual(b.attivita[1].doc.home, { senza_ai_chiave: '1' });
+  assert.deepEqual(Object.keys((await b.s.letto()).ore), []);
+});
+
 test('in incognito non si conta niente e non parte nessun documento', async () => {
   const b = banco({ incognito: true, finestra: false });
   await usa(b, A.FILO_CHAT, { attesa: 900 });
