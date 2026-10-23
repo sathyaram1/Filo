@@ -1044,8 +1044,6 @@
       chiedi: [funzioni(), CONTO_RE, TETTO_CARATTERI_CONTO],
       erroriVisti: [re(ERRORE_VISTO_FORMA), CONTO_RE, TETTO_CARATTERI_CONTO],
       intervista: [re(PASSO_FORMA), INTERVISTA_RE, TETTO_CARATTERI_INTERVISTA],
-      ...Object.fromEntries(MISURE_MODELLI.map((c) => [c, [funzioni(), MODELLI_RE[c], TETTI_CARATTERI_MODELLI[c]]])),
-      chiamate: [funzioni(), CHIAMATE_RE, TETTO_CARATTERI_CHIAMATE],
     };
     for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
       const m = doc[campo];
