@@ -140,10 +140,11 @@ test('una pagina sola più grande della finestra: la risposta arriva, e dice che
   test.setTimeout(120_000);
   const page = await openTab(NEWTAB);
   const url = testServer.html(paginaGrande('A'));
-  await stub(app, [{ strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] }, { finale: 'RISPOSTA_UNO' }], { margine: 15000 });
+  await stub(app, [{ strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] }, { finale: 'RISPOSTA_UNO' }], { margine: 30000 });
   await chiedi(page, `leggimi ${url}`);
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA_UNO' });
   await expect(bolla).toBeVisible({ timeout: 40_000 });
+  console.log('MISURE', JSON.stringify(await app.evaluate(() => ({ base: globalThis.__g.base, car: globalThis.__g.chiamate.map((c) => c.car) }))));
   await expect(bolla).toContainText('viste=MARCA_A_DENTRO');
   await expect(bolla).toContainText('ho tenuto solo l\'inizio');
 });
