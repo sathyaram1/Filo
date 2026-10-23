@@ -356,6 +356,15 @@ function gestoDiFilo(wc) {
   wc._filoGestoUiAlle = Date.now();
 }
 
+// Un gesto sui riquadri di Filo sopra la pagina (src/main/stratoDeiRiquadri.js) è dell'interfaccia di Filo: vale per
+// ciò che Filo fa da lì (gli appunti, il suo menu), mai per le finestre e i permessi del sito sotto.
+function gestoNelloStrato(wc, input) {
+  const type = (input && input.type) || '';
+  if (!wc || !GESTI.has(type) || !AVVII_DI_UN_GESTO.has(type)) return;
+  gestoDiFilo(wc);
+  if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
+}
+
 // Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
 // pagina ha già speso il gesto per la sua pubblicità (#737.1 giro 6). Lo segna il preload su un input vero, prima
 // che la pagina apra: vale per quell'indirizzo, una volta, subito.
@@ -851,7 +860,7 @@ function siDato(ses, url, parte) {
 module.exports = {
   installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
+  gestoDiFilo, gestoNelloStrato, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },

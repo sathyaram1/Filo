@@ -13,8 +13,25 @@
   // La pagina sotto, per il feedback e le bozze: la manda il main con ogni apertura.
   global.SN_PAGINA_SOTTO = S.pagina || null;
 
+  // Le misure arrivano al documento un attimo dopo che il main le ha date alla vista: il riquadro le aspetta.
+  function misure(m) {
+    return new Promise((fatto) => {
+      if (!m) { fatto(); return; }
+      const fine = Date.now() + 1000;
+      const guarda = () => {
+        if ((innerWidth === m.w && innerHeight === m.h) || Date.now() > fine) fatto();
+        else requestAnimationFrame(guarda);
+      };
+      guarda();
+    });
+  }
+
   S.onApri((d) => {
     if (!d || typeof d !== 'object') return;
+    misure(d.misura).then(() => apri(d));
+  });
+
+  function apri(d) {
     if (d.pagina) global.SN_PAGINA_SOTTO = d.pagina;
     const dati = d.dati || {};
     if (d.tipo === 'feedback') global.SN_FEEDBACK_UI?.open({ testo: String(dati.testo || '') });
@@ -29,7 +46,7 @@
       });
     }
     riferisci();
-  });
+  }
 
   // Esc premuto sulla pagina: si chiude il riquadro più in alto, come se il tasto fosse arrivato qui.
   S.onEsc(() => {
