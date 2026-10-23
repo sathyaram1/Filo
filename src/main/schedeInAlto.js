@@ -164,12 +164,7 @@ class SchedeInAlto {
 
   _programmaUscita() {
     if (this.timer.uscita) return;
-    // La barra laterale aperta sotto le schede salirebbe sotto il puntatore: le schede aspettano che si chiuda.
-    this.timer.uscita = setTimeout(() => { this.timer.uscita = null; if (!this.premuto && !this._barraAperta()) this.nascondi(); }, this._opzioni().uscitaMs);
-  }
-
-  _barraAperta() {
-    return !!(this.tabs.barra && this.tabs.barra.aperta);
+    this.timer.uscita = setTimeout(() => { this.timer.uscita = null; if (!this.premuto) this.nascondi(); }, this._opzioni().uscitaMs);
   }
 
   _ferma(nome) {
