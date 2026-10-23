@@ -144,6 +144,8 @@
     let lastErr = null;
     // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
     const broken = [];
+    // La risposta ricominciata a metà: un tentativo aveva già scritto, o si è rotto dopo essere partito (#1464).
+    let ricominciata = false;
     const noteBroken = (err, a, aModel) => {
       if (err && err.generationId) {
         broken.push({ provider: a.provider, model: aModel, generationId: err.generationId, apiKey: err.keyUsed || a.apiKey, keySource: err.keySource || '' });
