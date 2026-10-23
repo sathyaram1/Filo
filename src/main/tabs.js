@@ -3487,11 +3487,12 @@ class TabManager {
 
   // La chat che ha chiesto l'apertura di `id`, con l'id dell'azione: dopo l'attesa di esitoApertura,
   // un blocco che la pagina provoca da sé le arriva lo stesso. `assistente`: l'assistente sulla pagina,
-  // che ascolta coi content script invece che sul canale della home.
-  seguiApertura(id, { wc, callId, assistente = false } = {}) {
+  // che ascolta coi content script invece che sul canale della home. `verso`: dove ascolta, se non è `wc` (l'Aiuto
+  // nello strato sopra il sito, #1509.3); il permesso di «Apri comunque» resta della pagina `wc`.
+  seguiApertura(id, { wc, verso = wc, callId, assistente = false } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !wc || !callId) return;
-    tab._aperturaChat = { wc, callId, assistente: !!assistente, da: Date.now() };
+    tab._aperturaChat = { wc, verso: verso || wc, callId, assistente: !!assistente, da: Date.now() };
   }
 
   // «Apri comunque» dell'assistente sulla pagina: una pagina web lo può chiedere solo per un
