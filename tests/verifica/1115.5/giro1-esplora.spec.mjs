@@ -20,8 +20,11 @@ async function configura(app, giri, tema = null) {
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
-      ...(t ? { theme: t } : {}),
     });
+    if (t) {
+      await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } },
+        { url: 'filo://preferences/preferences.html' });
+    }
     let n = 0;
     globalThis.__chiamate = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
