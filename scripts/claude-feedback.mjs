@@ -103,7 +103,9 @@ export function mimeDiAllegato(nome) {
   // `typeof === 'string'` e non `|| ''`: da qui esce il tipo che finisce nel
   // `data:` dell'allegato e poi nella richiesta al deposito. Quello che non è
   // una stringa non è un tipo, ed è un allegato da rifiutare.
-  return typeof tipo === 'string' ? tipo : '';
+  if (typeof tipo !== 'string') return '';
+  const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
+  return ATTACH && ATTACH.classify({ name: String(nome || ''), type: tipo }) ? tipo : '';
 }
 
 /**
