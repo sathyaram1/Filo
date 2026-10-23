@@ -611,6 +611,96 @@
     return true;
   }
 
+  // ── Le chiamate ai modelli (#1464) ──────────────────────────────────────
+  const numero = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) || Number(v) < 0 ? null : Number(v));
+  function fasciaIn(fasce, v) {
+    const n = numero(v);
+    return n == null ? '' : fasce.find(([, fino]) => n <= fino)[0];
+  }
+  function fasciaCache(letti, ingresso, detta) {
+    if (!detta) return ND;
+    const q = (numero(letti) || 0) / ingresso;
+    if (!(q > 0)) return 'zero';
+    return q <= 0.25 ? 'q25' : q <= 0.5 ? 'q50' : q <= 0.75 ? 'q75' : 'q100';
+  }
+  function fineDi(f) {
+    const s = String(f == null ? '' : f).toLowerCase();
+    if (s === 'content_filter') return 'filtro';
+    return ['stop', 'length', 'tool_calls'].includes(s) ? s : ALTRO;
+  }
+  function tentativoDi(t) {
+    const n = Number(t);
+    if (!Number.isInteger(n) || n < 1) return '';
+    return n >= 4 ? 't4_oltre' : `t${n}`;
+  }
+
+  function voceSpecifiche(mappa) {
+    let n = 0;
+    for (const per of Object.values(mappa)) if (oggetto(per)) for (const k of Object.keys(per)) if (!k.startsWith(`${ALTRO}|`)) n++;
+    return n;
+  }
+
+  // `quanto` è 1 per un conto; per la spesa, i centomillesimi con la virgola: si arrotonda quando il documento parte.
+  function piuModello(ora, campo, funzione, modello, resto, quanto = 1) {
+    if (!RESTI[campo].includes(resto)) return false;
+    const mappa = normale(ora)[campo];
+    const per = oggetto(mappa[funzione]) ? mappa[funzione] : {};
+    let m = modelloPulito(modello);
+    if (m !== ALTRO && !has(per, `${m}|${resto}`) && voceSpecifiche(mappa) >= TETTO_MODELLI_ORA) m = ALTRO;
+    const k = `${m}|${resto}`;
+    const prima = Number(per[k]);
+    per[k] = Math.min(MAX_CONTO, (Number.isFinite(prima) && prima > 0 ? prima : 0) + quanto);
+    mappa[funzione] = per;
+    return true;
+  }
+
+  function registraSpesa(ora, funzione, modello, origine, usd) {
+    const u = numero(usd);
+    if (!funzioni().includes(funzione) || !ORIGINI_SPESA.includes(origine) || !(u > 0)) return false;
+    return piuModello(ora, 'spesa', funzione, modello, origine, u * CENTOMILLESIMI);
+  }
+
+  function registraAdattamento(ora, funzione, modello, tipo) {
+    if (!funzioni().includes(funzione) || !ADATTAMENTI.includes(tipo)) return false;
+    return piuModello(ora, 'adattamenti', funzione, modello, tipo);
+  }
+
+  // Una chiamata servita: ogni misura entra solo se la risposta porta il suo dato. `ingresso`, `cacheLetti`, `uscita`
+  // e `ragionamento` sono token; `cacheDetta` e `ragionamento` null dicono che l'host non li ha dati; `fine` c'è solo
+  // per le risposte di testo; `tentativo` (da 1) solo per le catene di ripiego.
+  function registraChiamata(ora, funzione, c = {}) {
+    if (!funzioni().includes(funzione) || !oggetto(c)) return false;
+    const m = c.modello;
+    const ingresso = numero(c.ingresso);
+    if (ingresso > 0) {
+      piuModello(ora, 'contesto', funzione, m, fasciaIn(FASCE_CONTESTO, ingresso));
+      if (c.cacheDetta !== undefined) piuModello(ora, 'cache', funzione, m, fasciaCache(c.cacheLetti, ingresso, c.cacheDetta));
+    }
+    if (c.ragionamento !== undefined) {
+      const r = numero(c.ragionamento);
+      piuModello(ora, 'ragionamento', funzione, m, r == null ? ND : fasciaIn(FASCE_RAGIONAMENTO, r));
+    }
+    if (c.fine !== undefined && numero(c.uscita) != null) {
+      piuModello(ora, 'uscita', funzione, m, `${fasciaIn(FASCE_USCITA, c.uscita)}|${fineDi(c.fine)}`);
+    }
+    const t = tentativoDi(c.tentativo);
+    if (t) piuModello(ora, 'ripieghi', funzione, m, `${t}|${c.ricominciata ? 'si' : 'no'}`);
+    if (c.ragionamentoTolto) piuModello(ora, 'adattamenti', funzione, m, 'ragionamento_tolto');
+    if (oggetto(c.spesa)) registraSpesa(ora, funzione, m, c.spesa.origine, c.spesa.usd);
+    return true;
+  }
+
+  // Le chiamate al modello di un uso: un messaggio di chat coi suoi giri di strumenti ne fa più d'una.
+  function registraChiamate(ora, funzione, n) {
+    const f = Number.isInteger(n) && n >= 1 ? fasciaIn(FASCE_CHIAMATE, n) : '';
+    if (!funzioni().includes(funzione) || !f) return false;
+    const g = normale(ora);
+    const per = oggetto(g.chiamate[funzione]) ? g.chiamate[funzione] : {};
+    piuUno(per, f);
+    g.chiamate[funzione] = per;
+    return true;
+  }
+
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
