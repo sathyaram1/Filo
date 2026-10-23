@@ -634,15 +634,13 @@ class BarraLaterale {
     const attiva = this._attiva();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
-      if (!attiva || !this._nav().pagina) return;
+      const nav = this._nav();
+      if (!attiva || !nav.pagina || this._motivoAzione(id, nav)) return;
       this.chiudi();
       this._restituisciTastiera();
-      const wc = attiva.view.webContents;
-      // Un gesto sull'interfaccia di Filo, come la voce di un menu: vale per gli appunti di Filo, non apre niente alla pagina.
-      try { require('./services/permessiPagine').gestoDiFilo(wc); } catch (_) {}
-      const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
       const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
-      try { wc.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true, ...(scelto ? { colore: scelto } : {}) }); } catch (_) {}
+      this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+      this._consegnaInAttesa();
       return;
     }
     const daTastiera = this.motivo === 'tasto';
