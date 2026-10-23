@@ -243,7 +243,7 @@
   }
 
   // Una data scritta con il suo giorno della settimana: torna il segno se non tornano, altrimenti null.
-  // `parti`: { inizio, testo, intero (il testo del campo), giorno: [testo, posizione], numero: [testo, posizione, suffisso], mese, anno, oggi, motore }
+  // `parti`: { inizio, testo, intero (il testo del campo), detti (anniDetti), giorno: [testo, posizione], numero: [testo, posizione, suffisso], mese, anno, oggi, motore }
   function verifica(parti) {
     const { motore, testo, inizio, oggi } = parti;
     const g = valeLaParola(motore, parti.giorno[0], motore.giorni);
