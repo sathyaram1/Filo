@@ -903,7 +903,7 @@
         nota: (p) => isInDictionary(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]) : [];
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
+    const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date(), intornoDelCampo(state)).map(segnoDaData) : [];
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date];
     state.codice = d.riporta(state.codiceT2);
