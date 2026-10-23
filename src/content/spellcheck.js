@@ -749,6 +749,7 @@
     state.inVista = segniInVista(state);
     disegnaSpecchio(state);
     allineaScorrimento(state);
+    ritaglia(state);
     seguiIlCampo();
     passaggiInCorso(state);
   }
