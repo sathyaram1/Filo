@@ -430,31 +430,23 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     } catch (_) { ok(null); }
   });
 
-  // `percorso(file)`: dov'è sul disco ('' se non viene da lì). Sopra il tetto entra col nome, se ha un percorso; senza,
-  // non entra e lo si dice. Torna se l'Aiuto l'ha prese.
-  async function allega(files, { percorso = () => '' } = {}) {
+  // Torna se l'Aiuto le ha prese (anche solo per dire che erano troppo grandi).
+  async function allega(files) {
     const lista = Array.from(files || []).filter((f) => f && /^image\//i.test(f.type || ''));
     if (!lista.length) return false;
     const perche = chiuso();
     if (perche === 'sito') return false;
-    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return false; }
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return true; }
     if (!isOpen() || nascosto) open();
     else if (collapsed) expand({ ai: false });
     let fuori = 0;
     for (const f of lista) {
-      if (f.size > Allegati.tettoImmagineByte) {
-        let p = '';
-        try { p = percorso(f) || ''; } catch (_) { p = ''; }
-        if (p) allegati.grandi.push({ nome: f.name || '', percorso: p });
-        else fuori += 1;
-        continue;
-      }
-      const dataUrl = await leggiImmagine(f);
-      if (dataUrl) allegati.immagini.push({ dataUrl, nome: f.name || '' });
+      const dataUrl = f.size > Allegati.tettoImmagineByte ? null : await leggiImmagine(f);
+      if (dataUrl && root) allegati.immagini.push({ dataUrl, nome: f.name || '' });
       else fuori += 1;
     }
     disegnaAllegati();
-    if (fuori) Popup?.showToast?.(Allegati.fraseTroppoGrandi(fuori));
+    if (fuori) Popup?.showToast?.(Allegati.fraseTroppoGrandiAiuto(fuori));
     try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
     return true;
   }
