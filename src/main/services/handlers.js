@@ -7127,7 +7127,7 @@ require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
 async function handleMessage(msg, sender = {}) {
-  const origin = sender?.tab?.url || sender?.url || '';
+  const origin = origineDi(sender);
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
