@@ -128,4 +128,4 @@ async function carica(lingue) {
   };
 }
 
-module.exports = { carica, testiDi, decodifica, LINGUE };
+module.exports = { carica, testiDi, decodifica, LINGUE, RICHIESTA_MAX };
