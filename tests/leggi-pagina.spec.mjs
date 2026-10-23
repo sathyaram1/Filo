@@ -422,6 +422,27 @@ test('oltre l\'ultimo pezzo di una scheda letta in parte, al modello non arriva 
   expect(letto).not.toMatch(/finisce al carattere \d+: non c'è altro da leggere/);
 });
 
+// #1307.3: la prima parte letta di una scheda troppo grande può non avere testo (una griglia enorme di celle vuote prima del
+// contenuto): al modello non arriva «la scheda non mostra testo», che gli fa rispondere che nella pagina non c'è niente.
+test('una scheda letta in parte con la prima parte senza testo lo dichiara al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Tabellone</title></head><body><main>${'<i></i>'.repeat(160000)}
+<p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(prima parte)', testo: 'RISPOSTA: letta la $1.' } },
+  ]);
+  await chiedi(page, 'quando è stata consegnata l\'ultima spedizione nella pagina che ho aperto?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: letta la prima parte.' })).toBeVisible({ timeout: 60_000 });
+  const letto = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(letto).toContain('Filo ha solo la prima parte');
+  expect(letto).toContain('non contiene testo, ma la pagina continua');
+  expect(letto).not.toContain('non mostra testo da leggere');
+});
+
 // #1307.3: la scheda che non risponde in tempo non lascia al modello una copia scaricata a parte spacciata per la pagina
 // che l'utente ha davanti, né il consiglio di aprirla in una scheda quando la copia non arriva.
 test('una scheda aperta che non risponde in tempo lo dice al modello, con la copia scaricata o senza', async ({ app, openTab, testServer }) => {
