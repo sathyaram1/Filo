@@ -3864,6 +3864,7 @@ class TabManager {
     let colors = [];
     const aperte = [];
     const pagine = [];
+    const usate = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
@@ -3873,12 +3874,14 @@ class TabManager {
         const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
         const savedAperte = Array.isArray(saved.aperte) ? saved.aperte : [];
         const savedPagine = Array.isArray(saved.pagine) ? saved.pagine : [];
+        const savedUsate = Array.isArray(saved.usate) ? saved.usate : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
             colors.push(savedColors[i] || null);
             aperte.push(aperturaValida(savedAperte[i]));
             pagine.push(aperturaValida(savedPagine[i]));
+            usate.push(aperturaValida(savedUsate[i]));
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
