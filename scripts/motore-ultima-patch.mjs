@@ -74,9 +74,9 @@ export function allarme({ major, attuale, ultima }) {
       + 'di sicurezza di Chromium arrivano nelle patch di Electron, e ogni versione di Filo esce col motore del lockfile '
       + 'finché qualcuno non lo alza.',
     '',
-    'Da fare, sullo stesso ramo:',
+    'Da fare:',
     `1. Portare il lockfile all'ultima ${major}.x stabile del momento (\`npm view electron@${major} version --json\`; `
-      + `oggi la ${ultima}): \`npm install --save-dev electron@${ultima}\`. In cloud il binario arriva con `
+      + `all'allarme era la ${ultima}): \`npm install --save-dev electron@${ultima}\`. In cloud il binario arriva con `
       + '`node scripts/ensure-electron.mjs`.',
     '2. Leggere i cambi fra le due versioni e lanciare gli spec delle aree che toccano, come dice '
       + '`patterns/il-motore-si-tiene-fra-le-ultime-tre-major-di-electron.md` (sezione «Le patch della stessa major»).',
