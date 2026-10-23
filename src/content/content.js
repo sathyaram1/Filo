@@ -381,17 +381,20 @@
     }
 
     function send(extra) {
-      const payload = { type: MSG.TAB_ACTIVITY, lastInteractionAt: Date.now(), ...extra };
+      const payload = { type: MSG.TAB_ACTIVITY, ...extra };
       try {
         Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {});
       } catch (_) {}
-      lastSend = performance.now();
     }
 
-    function onInteract() {
-      const since = performance.now() - lastSend;
-      if (since < 2000) return;
-      send({});
+    // Solo un gesto vero è un uso: il primo campione e lo scorrimento fatto dalla pagina (o dal ripristino della
+    // posizione) facevano sembrare appena usata ogni scheda riaperta, e la pulizia le teneva tutte (#349).
+    function onInteract(e) {
+      if (e && e.isTrusted === false) return;
+      const now = performance.now();
+      if (now - lastSend < 2000) return;
+      lastSend = now;
+      send({ lastInteractionAt: Date.now() });
     }
 
     function onScroll() {
