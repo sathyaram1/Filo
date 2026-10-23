@@ -141,8 +141,8 @@
 
   function nascondi() {
     nascosto = true;
-    Highlight.clear();
-    try { Highlight.clearForceHover?.(); } catch (_) {}
+    Pagina.pulisci({ hover: true }).catch(() => {});
+    evidenziato = null;
     try { voce?.ferma(); } catch (_) {}
     root.classList.add('sn-sidebar-nascosta');
     cambiato();
