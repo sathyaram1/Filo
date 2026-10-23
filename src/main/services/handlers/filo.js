@@ -361,17 +361,24 @@ module.exports = function register(on, ctx) {
     const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
     const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') }, { cosa: 'la correzione' });
     if (l.rifiuto) return { ok: false, error: `${l.rifiuto[0].toUpperCase()}${l.rifiuto.slice(1)}. Accorciala per salvarla.`, rifiuto: true };
+    const com = await FiloMem.descriviRiga(msg.via);
     if (!l.testo) {
       const id = await FiloMem.hideLine(msg.via, { fonti });
+      if (id) contatori()?.memoriaCorretta('quaderno', 'togli', com);
       return { ok: true, tolta: !!id, id: id || null };
     }
-    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo, { fonti }), testo: l.testo };
+    const corretta = await FiloMem.editLine(msg.via, l.testo, { fonti });
+    if (corretta) contatori()?.memoriaCorretta('quaderno', 'correggi', com);
+    return { ok: true, corretta, testo: l.testo };
   });
 
   on(MSG.FILO_MEMORY_RESTORE, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
     if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
-    return { ok: true, rimessa: await FiloMem.restoreHidden(msg.id) };
+    const com = await FiloMem.descriviNascosta(msg.id);
+    const rimessa = await FiloMem.restoreHidden(msg.id);
+    if (rimessa) contatori()?.memoriaCorretta('quaderno', 'ripristina', com);
+    return { ok: true, rimessa };
   });
 
   on(MSG.FILO_MEMORY_FOREVER, async (msg, sender, origin) => {
