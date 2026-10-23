@@ -3870,6 +3870,8 @@ class TabManager {
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
         if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
+        // Riaperta parte dall'inizio della pagina: «scroll 0%» direbbe al riordino «letta a metà», e la terrebbe.
+        nata._scrollIgnoto = true;
         nata.paginaDal = pagine[i] || null;
         nate.push(nata);
         return nata;
