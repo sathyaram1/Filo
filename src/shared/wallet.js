@@ -551,7 +551,7 @@
     // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
     { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
     // Il tetto per chi dà inviti (#1519): un tester che riscatta i suoi codici da identità nuove e reti diverse si ferma qui.
-    { chiave: 'redeemsPerInviter', etichetta: 'Ingressi coi codici della stessa persona', min: 0, max: 1000, aiuto: 'Quante persone possono entrare coi codici di una stessa persona, nelle ore scritte sotto, da qualunque connessione. I tuoi codici non contano. A zero nessun limite.' },
+    { chiave: 'redeemsPerInviter', etichetta: 'Ingressi coi codici della stessa persona', min: 0, max: 1000, aiuto: 'Quante persone possono entrare coi codici di una stessa persona, da qualunque connessione, nelle ore di «Ore in cui si contano». I tuoi codici non contano. A zero nessun limite.' },
     { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione e coi codici della stessa persona: passata, chi era entrato non conta più.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
@@ -817,7 +817,7 @@
     };
   }
 
-  // «3 in 2 ore»: quanti, e fra il primo e l'ultimo ingresso. Senza due date leggibili resta il numero.
+  // «3 in 2 ore»: quanti, e quanto tempo fra il primo e l'ultimo ingresso. Senza due date leggibili resta il numero.
   function invitatiTesto(inv) {
     const n = Math.max(0, Math.floor(Number(inv && inv.n) || 0));
     if (!n) return '';
