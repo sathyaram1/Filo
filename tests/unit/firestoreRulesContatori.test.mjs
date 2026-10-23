@@ -68,11 +68,16 @@ const FUNZIONI_REGOLE = elencoDopo(TUTTO, 'function funzioniContate\\(\\)');
 const unite = (forma) => `^(${forma.slice(1, -1)}(#${forma.slice(1, -1)})*)?$`;
 
 // Le misure dell'ora come le controllano le regole: chiuse(d.x, elenco, tetto, valori) o aForma(d.x, chiavi, tettoChiavi, tetto, valori).
-function misureDelleRegole() {
+// Nelle chiamate l'elenco delle funzioni sta in `f`, legato una volta sola a funzioniContate().
+function misureChiuse(testo) {
   const out = {};
-  for (const m of ORA.matchAll(/chiuse\(d\.(\w+), (funzioniContate\(\)|\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
-    out[m[1]] = { chiavi: m[2] === 'funzioniContate()' ? FUNZIONI_REGOLE : stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  for (const m of testo.matchAll(/chiuse\(d\.(\w+), (funzioniContate\(\)|f|\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    out[m[1]] = { chiavi: ['funzioniContate()', 'f'].includes(m[2]) ? FUNZIONI_REGOLE : stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
   }
+  return out;
+}
+function misureDelleRegole() {
+  const out = misureChiuse(ORA);
   for (const m of ORA.matchAll(/aForma\(d\.(\w+), '([^']+)', (\d+), (\d+), '([^']+)'\)/g)) {
     out[m[1]] = { formaChiavi: m[2], tettoChiavi: Number(m[3]), tetto: Number(m[4]), valori: m[5] };
   }
