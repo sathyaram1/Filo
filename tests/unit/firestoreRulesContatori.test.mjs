@@ -254,6 +254,11 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   assert.notEqual(manomesso('primeVolte', ['explain', 'appunti di mario']), '');
   assert.notEqual(manomesso('chiedi', { explain: { n: 3, nota: 'ciao' } }), '', 'una mappa al posto della stringa non si unisce: rifiutata');
   assert.notEqual(manomesso('annullati', { NAVIGA: '1 volta' }), '');
+  assert.notEqual(manomesso('contesto', { 'filo-chat': 'deepseek/v4|t2k|1;come stai oggi|t2k|1' }), '');
+  assert.notEqual(manomesso('uscita', { 'filo-chat': 'deepseek/v4|o1k|finito bene|1' }), '');
+  assert.notEqual(manomesso('spesa', { 'filo-chat': 'deepseek/v4|regalo|1' }), '');
+  assert.notEqual(manomesso('cache', { 'appunti di mario': 'deepseek/v4|q25|1' }), '', 'una chiave fuori dalle funzioni');
+  assert.notEqual(manomesso('chiamate', { 'filo-chat': '1,2,3' }), '');
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
