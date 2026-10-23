@@ -382,6 +382,7 @@ test('Conservativo, dopo una pagina web letta in chat: «dimentica» chiede e di
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
+    expect(testo, 'una riga sola: il popup parla al singolare (#592.23)').toContain('Non entrerà più nelle conversazioni. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.');
     await clickConfirm(page, 'cancel');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
     expect(await nascoste(app)).toBe(0);
