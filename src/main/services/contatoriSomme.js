@@ -32,7 +32,8 @@ const ESITI_CONFERMA_CHIAVE = Object.freeze({
 // porta due. Per la soglia vale il mese con più copie, che non conta mai una copia due volte.
 function conto() { return { n: 0, mesi: new Map() }; }
 
-function aggiungi(c, doc, k = 1) {
+// `k` sempre esplicito: un numero mancante dal documento non vale uno.
+function aggiungi(c, doc, k) {
   const n = Number(k);
   if (!Number.isFinite(n) || n <= 0) return;
   c.n += n;
@@ -235,7 +236,7 @@ function righe() {
   };
 }
 
-function principale(r, doc, periodo, k = 1) {
+function principale(r, doc, periodo, k) {
   aggiungi(r.principale, doc, k);
   if (Number(k) > 0) {
     let c = r.periodi.get(periodo);
@@ -285,13 +286,13 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
     const per = periodoDi(doc.g, passo);
     const d = doc.dati;
     // Le copie attive: ogni documento è un'ora (o un giorno, d'allora) con Filo aperto.
-    aggiungi(copie.totale, doc);
+    aggiungi(copie.totale, doc, 1);
     if (!copie.periodi.has(per)) copie.periodi.set(per, conto());
-    aggiungi(copie.periodi.get(per), doc);
+    aggiungi(copie.periodi.get(per), doc, 1);
     if (doc.h != null) {
-      aggiungi(copie.ore[doc.h], doc);
+      aggiungi(copie.ore[doc.h], doc, 1);
       if (!copie.orePer.has(per)) copie.orePer.set(per, Array.from({ length: 24 }, () => conto()));
-      aggiungi(copie.orePer.get(per)[doc.h], doc);
+      aggiungi(copie.orePer.get(per)[doc.h], doc, 1);
     }
 
     const misure = (m, prefisso) => {
@@ -424,6 +425,7 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
   for (const k of [...C.chiaviImpostazioni(), 'altro']) impostazioni.riga(k, () => ({ cambi: conto(), valori: new Map(), vie: new Map() }));
   for (const p of C.passiIntervista()) intervista.riga(p, () => ({ scelte: new Map() }));
   for (const id of new Set([...K.funzioni(), ...K.azioni()])) primeVolte.riga(id, () => ({}));
+  for (const f of K.funzioni()) { chiedi.riga(f, () => ({})); anticipi.riga(f, () => ({ preparati: conto(), aperti: conto() })); }
   for (const tp of C.TIPI_PROPOSTA) correttore.riga(tp, () => ({ tipo: tp, modello: '', esiti: [conto(), conto(), conto(), conto()] }));
 
   const lista = (r) => [...r.m.values()];

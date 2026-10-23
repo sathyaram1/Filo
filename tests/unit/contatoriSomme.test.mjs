@@ -48,8 +48,8 @@ test('cinque copie si contano; quattro dicono «meno di 5», e lo zero lo dice u
   const s = somma(docs);
   const nuova = riga(s.attese, 'a:new-tab');
   assert.deepEqual(nuova.principale, { n: 10, copie: 5 });
-  assert.equal(nuova.etichetta, 'Nuova scheda');
-  assert.deepEqual(nuova.celle.visto.map((c) => c.n ?? 'x'), [5, 'x', 'x', 'x', 'x', 'x', 'x'].map((v, i) => (i === 1 ? 'x' : v)));
+  assert.equal(nuova.etichetta, 'Apri una nuova scheda');
+  assert.deepEqual(nuova.celle.visto.slice(0, 3), [{ n: 5, copie: 5 }, { n: 5, copie: 5 }, { sotto: true }]);
   assert.deepEqual(nuova.celle.fine[2], { n: 10, copie: 5 });
   assert.deepEqual(nuova.celle.rifatteQuota, { quota: 0.5 });
   assert.equal(nuova.periodi.length, 7);
@@ -78,7 +78,8 @@ test('nessuno pseudonimo esce dalla somma, e nemmeno quanti documenti ci sono', 
   const s = somma(docs);
   const testo = JSON.stringify(s);
   for (let i = 0; i < 6; i++) assert.ok(!testo.includes(pseudo(i)), 'uno pseudonimo è uscito');
-  assert.ok(!/documenti|pseudonim/.test(testo));
+  assert.ok(!/[0-9a-f]{20}/.test(testo), 'niente che somigli a uno pseudonimo');
+  assert.ok(!/"(documenti|letti|pseudonimo)"/.test(testo), 'niente conto dei documenti letti');
   assert.deepEqual(riga(s.erroriVisti, 'crash:scheda:oom').principale, { n: 6, copie: 6 });
   assert.equal(riga(s.erroriVisti, 'crash:scheda:oom').etichetta, 'Scheda caduta: memoria finita');
 });
@@ -153,7 +154,7 @@ test('impostazioni, conferme, intervista e prime volte contano le copie, nel ver
       C.registraImpostazione(o, 'theme', 'dark', 'chat');
       C.registraConferma(o, 'NAVIGA', { livello: 'default', stato: 'pulito', costo: '1', perimetro: 'dentro', origine: 'chat', risposta: 'si', esito: 'automatica' });
       C.registraAnnullato(o, 'NAVIGA');
-      C.registraIntervista(o, 'chi', 'spuntata');
+      C.registraIntervista(o, 'profilo', 'spuntata');
       C.registraPrimaVolta(o, 'explain');
     }));
   }
@@ -172,7 +173,7 @@ test('impostazioni, conferme, intervista e prime volte contano le copie, nel ver
   assert.ok(riga(s.conferme, 'correzione').celle.soloPagina);
   const passi = s.intervista.map((r) => r.id);
   assert.deepEqual(passi, C.passiIntervista(), 'i passi dell’intervista nell’ordine in cui si fanno');
-  assert.deepEqual(riga(s.intervista, 'chi').celle.scelte[0], { scelta: 'spuntata', copie: { n: 7, copie: 7 }, n: { n: 7, copie: 7 } });
+  assert.deepEqual(riga(s.intervista, 'profilo').celle.scelte[0], { scelta: 'spuntata', copie: { n: 7, copie: 7 }, n: { n: 7, copie: 7 } });
   assert.deepEqual(riga(s.primeVolte, 'explain').principale, { n: 7, copie: 7 });
 });
 
@@ -201,7 +202,7 @@ function servizio(pagine, { stato = 200 } = {}) {
       const body = JSON.parse(init.body);
       chieste.push({ url, auth: init.headers.Authorization, q: body.structuredQuery });
       if (stato !== 200) return { ok: false, status: stato, json: async () => [{ error: { status: 'PERMISSION_DENIED' } }] };
-      const i = chieste.filter((c) => c.url === url).length - 1;
+      const i = body.structuredQuery.startAt ? 1 : 0;
       const righe = (pagine[i] || []).map((doc) => ({
         document: { name: `${BASE}/contatori-giornalieri/${C.idDocumento(doc)}`, fields: Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, valoreFs(v)])) },
       }));
