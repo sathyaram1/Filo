@@ -4,7 +4,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { builtinModules } from 'node:module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -67,11 +67,11 @@ describe('quali pacchetti mancano', () => {
     } finally { togliCartella(dir); }
   });
 
-  test('un clone appena fatto, senza node_modules: manca tutto', () => {
+  test('un clone appena fatto, senza node_modules: manca tutto', (t) => {
     const dir = progetto(LOCK_FILO, {}, { nodeModules: false });
     try {
-      // La temporanea di sistema non ha un node_modules sopra di sé: se l'avesse, il conto sarebbe suo.
-      if (baseDeiPacchetti(dir) === null) assert.equal(pacchettiDaInstallare(dir).length, 2);
+      if (baseDeiPacchetti(dir) !== null) return t.skip('la temporanea di sistema ha un node_modules sopra di sé');
+      assert.equal(pacchettiDaInstallare(dir).length, 2);
     } finally { togliCartella(dir); }
   });
 
@@ -198,7 +198,7 @@ describe('il pre-avvio', () => {
     assert.equal(scripts.predev, 'node scripts/prestart.mjs');
   });
 
-  test('davvero: il pacchetto tolto da node_modules torna, il lock resta com\'è, e l\'avvio esce 0', () => {
+  test('davvero: il pacchetto tolto da node_modules torna e il lock resta com\'è; l\'avvio esce sempre 0', () => {
     const dir = cartellaTemporanea('filo-prestart-');
     const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', npm_config_update_notifier: 'false', npm_config_audit: 'false', npm_config_fund: 'false' };
     const npm = (args, cwd) => spawnSync('npm', args, { cwd, env, encoding: 'utf8', shell: process.platform === 'win32' });
@@ -227,18 +227,17 @@ describe('il pre-avvio', () => {
       assert.equal(JSON.parse(readFileSync(join(app, 'node_modules', 'piccolo', 'package.json'), 'utf8')).version, '1.0.0');
       assert.equal(readFileSync(join(app, 'package-lock.json'), 'utf8'), lock);
 
-      rmSync(join(app, 'node_modules', 'piccolo'), { recursive: true, force: true });
-      rmSync(join(app, 'piccolo-1.0.0.tgz'));
-      const rotto = spawnSync(process.execPath, [join(app, 'scripts', 'prestart.mjs')], { cwd: app, env, encoding: 'utf8' });
-      assert.equal(rotto.status, 0, 'npm che fallisce non ferma npm start');
-      assert.match(rotto.stdout, /Installazione non riuscita/);
+      rmSync(join(app, 'scripts', 'lib', 'pacchetti.mjs'));
+      const senza = spawnSync(process.execPath, [join(app, 'scripts', 'prestart.mjs')], { cwd: app, env, encoding: 'utf8' });
+      assert.equal(senza.status, 0, 'un controllo che non si carica non ferma npm start');
+      assert.match(senza.stdout, /controllo dei pacchetti saltato/);
     } finally { togliCartella(dir); }
   });
 });
 
 describe('il pacchetto installato porta le librerie di src/', () => {
-  // electron-builder mette nel pacchetto solo `dependencies`: una libreria richiesta da src/ e scritta altrove manca
-  // all'app installata, come hash-wasm mancava a chi avviava dai sorgenti.
+  // electron-builder mette nel pacchetto solo `dependencies`: una libreria che src/ richiede e che sta altrove
+  // mancherebbe all'app installata, come hash-wasm mancava a chi avviava dai sorgenti.
   const NODE = new Set(builtinModules);
   const RICHIESTA = /\brequire(?:\.resolve)?\(\s*['"]([^'"]+)['"]\s*[,)]|\bimport\(\s*['"]([^'"]+)['"]\s*\)|\bfrom\s+['"]([^'"]+)['"]/g;
 
@@ -274,6 +273,5 @@ describe('il pacchetto installato porta le librerie di src/', () => {
     assert.deepEqual(fuori, [], 'richieste da src/ ma assenti da dependencies: l\'app installata non le avrebbe');
     const soloDev = [...usati.keys()].filter((n) => lock.packages[`node_modules/${n}`]?.dev);
     assert.deepEqual(soloDev, [], 'nel lock risultano di solo sviluppo');
-    assert.ok(existsSync(join(ROOT, 'node_modules', 'hash-wasm', 'package.json')) || true);
   });
 });
