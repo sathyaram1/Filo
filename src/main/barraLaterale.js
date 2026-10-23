@@ -12,6 +12,7 @@ const AzioniContate = require('./services/azioniContate');
 const { tastoPremuto } = require('./tastoDelMouse');
 const RisposteInAttesa = require('./risposteInAttesa');
 const RilascioNellaChat = require('./rilascioNellaChat');
+const { BordoDestro } = require('./bordoDestro');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -89,6 +90,8 @@ class BarraLaterale {
     this.comandoInAttesa = null;
     this.ultimaPagina = '';
     this.strisciaPx = STRISCIA;
+    // Il bordo destro delle pagine di Filo col pannello (#1433): stessi gesti, gli stessi feed della pagina e della shell.
+    this.destro = new BordoDestro(this);
     this.vuoto = new VuotoDellaVista({
       vista: () => (this.vista && !this.vista.webContents.isDestroyed() ? this.vista : null),
       scheda: () => this.tabs.vistaSottoIlVuoto(),
@@ -111,7 +114,9 @@ class BarraLaterale {
     Layout.leggi({ incognito: this._incognito() }).then((l) => this.disposizione(l)).catch(() => {});
     try {
       const letta = globalThis.SN_STORAGE?.getSettings?.();
-      if (letta && typeof letta.then === 'function') letta.then((st) => this.impostazioni(st && st.barraLaterale)).catch(() => {});
+      if (letta && typeof letta.then === 'function') {
+        letta.then((st) => { this.impostazioni(st && st.barraLaterale); this.destro.impostazioni(st && st.pannelloDestro); }).catch(() => {});
+      }
     } catch (_) {}
   }
 
@@ -226,6 +231,7 @@ class BarraLaterale {
       if (!input.isAutoRepeat) this.commuta('tasto');
       return true;
     }
+    if (this.destro.tasto(input)) return true;
     if (this.aperta && String(input.key || '') === 'Escape') {
       this.chiudi();
       return true;
@@ -243,6 +249,7 @@ class BarraLaterale {
   inputAltrove(input) {
     if (!input) return;
     this._tasti('scheda', input);
+    this.destro.input(input);
     if (!this.aperta) {
       // Uscendo dalla pagina il puntatore può andare dove la pagina non lo vede più (la fascia del sistema,
       // fuori dalla finestra): da lì lo guarda il main, anche arrivando di corsa.
@@ -338,6 +345,7 @@ class BarraLaterale {
       this.tasti[chi] = false;
       this.puntoFermo = this._punto();
       this._guarda();
+      this.destro.rilascio();
     } else if (t === 'mouseMove') {
       this.tasti[chi] = Boolean(tastoPremuto(input));
     }
@@ -348,6 +356,7 @@ class BarraLaterale {
     this._tasti('shell', input);
     // Dalla fila delle schede il puntatore scende lungo il bordo senza passare dalla pagina.
     if (input.type === 'mouseMove' || input.type === 'mouseLeave') this._guarda();
+    this.destro.inputDellaShell(input);
   }
 
   _punto() {
@@ -464,6 +473,7 @@ class BarraLaterale {
 
   // La scheda è cambiata (navigazione, caricamento, schermo intero): si ridice solo se cambia qualcosa.
   aggiornaNav() {
+    this.destro.aggiorna();
     const t = this._attiva();
     const dove = t ? `${t.id}|${t.url || ''}` : '';
     const cambiataPagina = dove !== this.ultimaPagina;

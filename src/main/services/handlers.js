@@ -1148,6 +1148,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
         w._filoTabs.setSecurity(merged.security || {});
       }
       try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale); } catch (_) {}
+      try { w._filoTabs?.barra?.destro?.impostazioni(merged.pannelloDestro); } catch (_) {}
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
