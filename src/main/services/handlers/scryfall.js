@@ -457,6 +457,8 @@ module.exports = function register(on, ctx) {
               broken: !!sr.broken, why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
             });
             if (note) reply = [reply, note].filter(Boolean).join('\n');
+            const dove = fr.error ? rimedioDi(fr.error) : null;
+            if (dove && globalThis.SN_CHAT_ERRORS && globalThis.SN_CHAT_ERRORS.rimedioPagina(dove)) rimedio = dove;
             // In cache vanno le carte che si mostrano, non le centinaia della rete larga.
             Scry.remember(cardIds.map((id) => cards[id]).filter(Boolean)).catch(() => {});
             cards = Object.fromEntries(cardIds.filter((id) => cards[id]).map((id) => [id, cards[id]]));
