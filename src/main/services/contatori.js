@@ -213,6 +213,7 @@ function crea(dip = {}) {
     const ora = oraCorrente();
     stato.presenza = C.giornoDi(adesso());
     raccogli();
+    for (const fn of primaDiScrivere) { try { fn(ora); } catch (_) {} }
     const fatto = scrivi(ora);
     salvaPresto();
     return fatto !== false;
