@@ -3881,6 +3881,7 @@ class TabManager {
       // Il riordino legge il contenuto delle pagine: parte quando la coda della riapertura le ha caricate tutte.
       await this.codaRiapertura.finita();
       await Promise.all([new Promise((r) => setTimeout(r, TRIAGE_DOPO_CODA_MS)), this._coloriPronti()]);
+      if (!this.win || this.win.isDestroyed()) return;
       await this.runAutoTriage({ trigger: 'reopen' });
     } catch (e) {
       console.warn('[Filo] riordino delle schede alla riapertura:', e?.message || e);
