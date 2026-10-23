@@ -9,7 +9,7 @@ import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const { buildSource } = require('../../src/preload/passkey-diagnosi.js');
 
-function pagina({ hybrid, esito }) {
+function pagina({ hybrid, cond = false, esito }) {
   const logs = [];
   const ricevute = [];
   const ctx = {
@@ -21,12 +21,12 @@ function pagina({ hybrid, esito }) {
         create(opts) { ricevute.push(opts); return esito(); },
       },
     },
-    Object, Array, JSON, Promise, Error, Uint8Array,
+    Object, Array, JSON, Promise, Error, Uint8Array, DOMException,
   };
   ctx.window = ctx;
   vm.createContext(ctx);
   ctx.Function = vm.runInContext('Function', ctx);
-  vm.runInContext(buildSource({ hybrid }), ctx);
+  vm.runInContext(buildSource({ hybrid, cond }), ctx);
   return { ctx, logs, ricevute };
 }
 
@@ -84,6 +84,24 @@ test('la funzione avvolta si presenta come l\'originale', () => {
   assert.ok(String(get).includes('ricevute.push'), 'toString mostra il testo dell\'originale');
   assert.ok(!String(get).includes('riassunto'));
   assert.ok(!String(ctx.Function.prototype.toString).includes('originali'), 'anche toString si maschera');
+});
+
+test('a interruttore la richiesta condizionale resta in sospeso e si annulla col segnale', async () => {
+  const { ctx, logs, ricevute } = pagina({ hybrid: false, cond: true, esito: () => Promise.reject(new Error('non doveva arrivare')) });
+  let abort = null;
+  const signal = { aborted: false, reason: undefined, addEventListener: (_, fn) => { abort = fn; } };
+  const p = ctx.navigator.credentials.get({ mediation: 'conditional', signal, publicKey: { rpId: 'google.com', challenge: new Uint8Array(32) } });
+  let risolta = false;
+  p.then(() => { risolta = true; }, () => { risolta = true; });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(risolta, false, 'resta in sospeso');
+  assert.equal(ricevute.length, 0, 'l\'originale non viene chiamata');
+  assert.ok(logs.some((l) => l.includes('lasciata in sospeso')));
+  abort();
+  await assert.rejects(p, (e) => e.name === 'AbortError');
+  const b = pagina({ hybrid: false, cond: false, esito: () => Promise.reject(Object.assign(new Error('no'), { name: 'NotAllowedError' })) });
+  await assert.rejects(b.ctx.navigator.credentials.get({ mediation: 'conditional', publicKey: { rpId: 'google.com', challenge: new Uint8Array(32) } }));
+  assert.equal(b.ricevute.length, 1, 'senza interruttore passa all\'originale');
 });
 
 test('senza publicKey (password, federated) non registra e non tocca', async () => {

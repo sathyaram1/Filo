@@ -2,13 +2,14 @@
 // forma della richiesta (mai gli id né le risposte) e, a interruttore, completare con «hybrid» i trasporti delle
 // credenziali ammesse. Si accende solo con FILO_PASSKEY_DIAGNOSI nell'ambiente del main (ipc.js, filo:passkey-diagnosi).
 
-function buildSource({ hybrid = false } = {}) {
+function buildSource({ hybrid = false, cond = false } = {}) {
   return `(function(){
   'use strict';
   try {
     if (!navigator.credentials || window.__filoPasskeyDiag) return;
     Object.defineProperty(window, '__filoPasskeyDiag', { value: true, enumerable: false, configurable: true });
     var HYBRID = ${hybrid ? 'true' : 'false'};
+    var COND = ${cond ? 'true' : 'false'};
     function lung(x) {
       try {
         if (!x) return 0;
@@ -72,6 +73,16 @@ function buildSource({ hybrid = false } = {}) {
         var usa = opts;
         if (r && nome === 'get' && HYBRID) {
           try { var c = conHybrid(opts); usa = c.opts; r.hybridAggiunto = c.n; } catch (e) { log('hybrid fallito ' + e); }
+        }
+        // Chrome tiene in sospeso la richiesta condizionale finché l'utente non sceglie dall'autocompletamento;
+        // Electron la respinge subito. In sospeso anche qui, con l'annullamento del sito rispettato.
+        if (r && nome === 'get' && COND && opts && opts.mediation === 'conditional') {
+          log('richiesta ' + JSON.stringify(r) + ' lasciata in sospeso');
+          return new Promise(function (_, rej) {
+            var sig = opts.signal;
+            var abort = function () { rej((sig && sig.reason) || new DOMException('The operation was aborted.', 'AbortError')); };
+            if (sig && typeof sig.addEventListener === 'function') { if (sig.aborted) abort(); else sig.addEventListener('abort', abort); }
+          });
         }
         if (r) log('richiesta ' + JSON.stringify(r));
         var p;

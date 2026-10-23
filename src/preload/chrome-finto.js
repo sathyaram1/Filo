@@ -1,4 +1,4 @@
-// Diagnosi dell'accesso Google (#1609), mondo della pagina: `window.chrome` come in Chrome e client hints col marchio
+// Diagnosi dell'accesso Google (#1616), mondo della pagina: `window.chrome` come in Chrome e client hints col marchio
 // «Google Chrome», con le funzioni mascherate da native. Acceso solo dagli interruttori di services/diagGoogle.js.
 
 function buildSource({ chrome = false, brands = false, versione = '0.0.0.0' } = {}) {
@@ -7,15 +7,17 @@ function buildSource({ chrome = false, brands = false, versione = '0.0.0.0' } = 
   'use strict';
   try {
     var FP = Function.prototype, prev = FP.toString, originali = new WeakMap();
-    function toString() { var o = originali.get(this); return prev.apply(o || this, arguments); }
+    function toString() { var o = originali.get(this); if (typeof o === 'string') return o; return prev.apply(o || this, arguments); }
     originali.set(toString, prev);
     FP.toString = toString;
     function nativa(fn, nome) {
       try { Object.defineProperty(fn, 'name', { value: nome, configurable: true }); } catch (e) {}
-      originali.set(fn, Function.prototype.call.bind(Function.prototype.call) && (function(){}).bind());
+      originali.set(fn, 'function ' + nome + '() { [native code] }');
       return fn;
     }
-    if (${chrome ? 'true' : 'false'} && !window.chrome) {
+    // Electron, come Chrome headless, ha un window.chrome vuoto: si riempie quello, non se ne crea un altro.
+    if (${chrome ? 'true' : 'false'} && !(window.chrome && window.chrome.runtime)) {
+      var base = (window.chrome && typeof window.chrome === 'object') ? window.chrome : null;
       var chrome = {
         app: {
           isInstalled: false,
@@ -44,7 +46,8 @@ function buildSource({ chrome = false, brands = false, versione = '0.0.0.0' } = 
             wasAlternateProtocolAvailable: false, wasFetchedViaSpdy: true, wasNpnNegotiated: true };
         }, 'loadTimes')
       };
-      Object.defineProperty(window, 'chrome', { value: chrome, writable: true, enumerable: true, configurable: false });
+      if (base) { for (var k in chrome) { try { Object.defineProperty(base, k, { value: chrome[k], writable: true, enumerable: true, configurable: true }); } catch (e) {} } }
+      else Object.defineProperty(window, 'chrome', { value: chrome, writable: true, enumerable: true, configurable: false });
     }
     if (${brands ? 'true' : 'false'} && navigator.userAgentData && window.NavigatorUAData) {
       var P = NavigatorUAData.prototype;

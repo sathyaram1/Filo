@@ -1,6 +1,7 @@
-// Diagnosi dell'accesso Google respinto in un profilo nuovo (#1609): interruttori dall'ambiente, FILO_DIAG_GOOGLE =
+// Diagnosi dell'accesso Google respinto in un profilo nuovo (#1616): interruttori dall'ambiente, FILO_DIAG_GOOGLE =
 // elenco separato da virgole fra gpc (niente Sec-GPC né navigator.globalPrivacyControl), brands (client hints da Chrome),
-// chrome (window.chrome finto) e cond (richiesta passkey condizionale lasciata in sospeso come in Chrome).
+// hints (gli stessi header, marchio onesto «Chromium»), chrome (window.chrome finto) e cond (richiesta passkey
+// condizionale lasciata in sospeso come in Chrome).
 
 'use strict';
 
@@ -12,15 +13,28 @@ function elenco() { return [...FLAGS]; }
 // La versione di Chromium è quella vera: cambia solo il marchio, come fa Chrome.
 function versioneChromium() { return String(process.versions.chrome || '0.0.0.0'); }
 
-function marchiChrome(headers) {
+// Chrome manda sempre i tre hint a bassa entropia; Electron con la UA riscritta non ne manda nessuno. Si aggiungono
+// se mancano e si riscrivono se ci sono, col marchio «Google Chrome» accanto a «Chromium».
+function piattaforma() {
+  return process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+}
+function marchiChrome(headers, conChrome = true) {
   const piena = versioneChromium();
   const maggiore = piena.split('.')[0];
+  const google = conChrome ? ', "Google Chrome";v="' + maggiore + '"' : '';
+  const googlePieno = conChrome ? ', "Google Chrome";v="' + piena + '"' : '';
   const out = { ...headers };
-  for (const k of Object.keys(out)) {
-    const kl = k.toLowerCase();
-    if (kl === 'sec-ch-ua') out[k] = `"Not?A_Brand";v="24", "Chromium";v="${maggiore}", "Google Chrome";v="${maggiore}"`;
-    else if (kl === 'sec-ch-ua-full-version-list') out[k] = `"Not?A_Brand";v="24.0.0.0", "Chromium";v="${piena}", "Google Chrome";v="${piena}"`;
-  }
+  const chiavi = Object.keys(out);
+  const trova = (nome) => chiavi.find((k) => k.toLowerCase() === nome) || null;
+  const metti = (nome, valore, soloSePresente) => {
+    const k = trova(nome.toLowerCase());
+    if (k) out[k] = valore;
+    else if (!soloSePresente) out[nome] = valore;
+  };
+  metti('Sec-CH-UA', `"Not?A_Brand";v="24", "Chromium";v="${maggiore}"${google}`, false);
+  metti('Sec-CH-UA-Mobile', '?0', false);
+  metti('Sec-CH-UA-Platform', `"${piattaforma()}"`, false);
+  metti('Sec-CH-UA-Full-Version-List', `"Not?A_Brand";v="24.0.0.0", "Chromium";v="${piena}"${googlePieno}`, true);
   return out;
 }
 
