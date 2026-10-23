@@ -1999,6 +1999,8 @@
       b.title = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
       b.style.left = `${r.left + r.width / 2}px`;
       b.style.top = `${r.top}px`;
+      b._snX = r;
+      b.classList.toggle('sn-sopra-testo', copreIlTesto(state, b, tr.a));
     }
     for (const [k, b] of state.badge) if (!usati.has(k)) { b.remove(); state.badge.delete(k); }
     for (const l of v.querySelectorAll('.sn-spell-lampo')) l.remove();
