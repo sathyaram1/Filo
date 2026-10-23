@@ -301,7 +301,7 @@ module.exports = function register(on, ctx) {
   // del registro firmata con lo pseudonimo locale la regola la rifiuta, e la pagina Crediti lo dice.
   function chiaveStaccata({ hasPersonalKey, pseudonym, server }) {
     if (!hasPersonalKey || !server) return '';
-    if (!server.hasWallet) return 'senza_portafoglio';
+    if (!server.hasWallet) return server.configured === false ? '' : 'senza_portafoglio';
     return server.pseudonym && pseudonym && server.pseudonym !== pseudonym ? 'altro_pseudonimo' : '';
   }
 
