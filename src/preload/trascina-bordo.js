@@ -13,9 +13,9 @@ module.exports = function ascoltaTrascinaBordo(win, ipcRenderer) {
   const dallaCima = (e) => (principale ? Number(e.clientY) : Number(e.screenY) - Number(win.screenY));
   let ultimo = null;
   let quando = 0;
-  const manda = (sulBordo) => {
+  const manda = (sulBordo, sempre = false) => {
     const ora = Date.now();
-    if (ultimo === sulBordo && ora - quando < RIPETI_MS) return;
+    if (!sempre && ultimo === sulBordo && ora - quando < RIPETI_MS) return;
     ultimo = sulBordo;
     quando = ora;
     try { ipcRenderer.send('filo:trascina-bordo', sulBordo); } catch (_) {}
@@ -26,6 +26,6 @@ module.exports = function ascoltaTrascinaBordo(win, ipcRenderer) {
     manda(Number.isFinite(y) && y <= BORDO_PX);
   }, { capture: true, passive: true });
   for (const fine of ['drop', 'dragend']) {
-    win.addEventListener(fine, (e) => { if (e.isTrusted) { manda(false); ultimo = null; } }, { capture: true, passive: true });
+    win.addEventListener(fine, (e) => { if (e.isTrusted) { manda(false, true); ultimo = null; } }, { capture: true, passive: true });
   }
 };

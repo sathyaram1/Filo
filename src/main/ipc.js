@@ -323,7 +323,8 @@ function registerIpcHandlers() {
 
   // #1343 — un trascinamento sulla pagina contro il bordo alto, o via da lì: a schermo intero chiama le schede.
   ipcMain.on('filo:trascina-bordo', (event, sulBordo) => {
-    if (!event.senderFrame || event.senderFrame !== event.sender.mainFrame) return;
+    // Anche da un riquadro: in cima alla pagina può esserci quello di un altro sito. Il bordo lo misura il preload.
+    if (!event.senderFrame) return;
     for (const w of BrowserWindow.getAllWindows()) {
       try { w._filoTabs?.schedeInAlto?.dalTrascinamento(event.sender, sulBordo === true); } catch (_) {}
     }
