@@ -2849,7 +2849,7 @@ class TabManager {
       // (un <script> iniettato verrebbe bloccato dalla CSP di molti siti). Spenta
       // in modalità manuale. È un segnale "future-proof": oggi pochi siti UE lo
       // rispettano, il lavoro vero lo fa il rifiuto del banner CMP.
-      if (this.cookieMode !== Cookies.MODES.MANUAL && !require('./services/diagGoogle').ha('gpc')) {
+      if (this.cookieMode !== Cookies.MODES.MANUAL && !require('./services/diagGoogle').gpcSpento(current)) {
         try {
           wc.executeJavaScript(
             'try{Object.defineProperty(navigator,"globalPrivacyControl",{get:function(){return true;},configurable:true});}catch(e){}',

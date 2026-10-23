@@ -228,7 +228,7 @@ function ensureHeaderHook(ses) {
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
       let headers = details.requestHeaders;
-      if (s && s.enabled && !Diag.ha('gpc')) headers = { ...headers, 'Sec-GPC': '1' };
+      if (s && s.enabled && !Diag.gpcSpento(details.url)) headers = { ...headers, 'Sec-GPC': '1' };
       if (Diag.ha('brands') || Diag.ha('hints')) headers = Diag.marchiChrome(headers, Diag.ha('brands'));
       callback({ requestHeaders: headers });
     });

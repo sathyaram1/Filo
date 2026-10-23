@@ -8,6 +8,16 @@
 const FLAGS = new Set(String(process.env.FILO_DIAG_GOOGLE || '').split(',').map((s) => s.trim()).filter(Boolean));
 
 function ha(flag) { return FLAGS.has(flag); }
+
+// gpcauth: GPC spento solo sulle superfici di accesso dei provider noti (stessa lista dell'esenzione anti-fingerprint).
+function hostIdentita(href) {
+  try {
+    require('../../shared/authPopup');
+    const A = globalThis.SN_AUTH_POPUP;
+    return !!(A && typeof A.isIdentityAuthSurface === 'function' && A.isIdentityAuthSurface(String(href || '')));
+  } catch (_) { return false; }
+}
+function gpcSpento(href) { return ha('gpc') || (ha('gpcauth') && hostIdentita(href)); }
 function elenco() { return [...FLAGS]; }
 
 // La versione di Chromium è quella vera: cambia solo il marchio, come fa Chrome.
@@ -38,4 +48,4 @@ function marchiChrome(headers, conChrome = true) {
   return out;
 }
 
-module.exports = { ha, elenco, marchiChrome, versioneChromium };
+module.exports = { ha, elenco, marchiChrome, versioneChromium, hostIdentita, gpcSpento };
