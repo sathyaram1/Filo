@@ -119,11 +119,29 @@ service firebase.storage {
       return request.resource.size <= 4 * 1024 * 1024 + 64 * 1024;
     }
 
-    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.<estensione>.
+    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.octetstream.
     // L'uuid è la parte che non si indovina; l'etichetta facoltativa distingue
     // la provenienza (`agent_` per i ritrovamenti dell'agente esploratore).
+    // L'estensione è fissa: libera, il link diventava `fattura.exe`.
     function nomeConEntropia(file) {
-      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.[A-Za-z0-9]{1,12}$');
+      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.octetstream$');
+    }
+
+    // Nessun metadato scelto da chi carica (#1518): il nome con cui il file si scarica, la
+    // codifica, la cache, la lingua e le chiavi personalizzate (un segno «già sistemato»
+    // compreso). Il codice di scarico lo aggiunge Firebase e qui non si vede: provato
+    // sull'emulatore (tests/rules/storage-allegati-motore-vero.mjs), come le due forme del
+    // Content-Disposition che Firebase scrive da sé, ammesse perché il nome lo fissa lui.
+    // `in` regge un campo che il motore non passa: l'emulatore non passa cacheControl né
+    // contentLanguage, e leggerli senza guardia negava ogni caricamento.
+    function senzaMetadatiScelti(r, file) {
+      return (r.metadata == null || r.metadata.size() == 0)
+        && (r.contentDisposition == null || r.contentDisposition == ''
+          || r.contentDisposition == 'inline'
+          || r.contentDisposition == "inline; filename*=utf-8''" + file)
+        && (r.contentEncoding == null || r.contentEncoding == '')
+        && (!('cacheControl' in r) || r.cacheControl == null || r.cacheControl == '')
+        && (!('contentLanguage' in r) || r.contentLanguage == null || r.contentLanguage == '');
     }
 
     match /feedback/{file} {
