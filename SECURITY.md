@@ -623,5 +623,5 @@ chi usa Filo. È uno dei punti deboli descritti in `transparency/security.md`.
 
 ---
 
-*Ultimo aggiornamento: 2026-10-21. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-10-23. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*
