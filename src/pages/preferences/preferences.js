@@ -927,6 +927,7 @@
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
