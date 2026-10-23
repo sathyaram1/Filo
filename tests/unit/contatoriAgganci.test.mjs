@@ -77,6 +77,27 @@ test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri'
   }
 });
 
+// Le attività contate nelle pagine (#1467) portano numeri e nomi: nessun campo per un selettore, una query, un testo.
+test('le attività contate nelle pagine mandano solo i campi della loro misura', () => {
+  const campi = {
+    aiuto: ['esito', 'passiDaSolo', 'passiCliccati', 'nonTrovati', 'documenti'],
+    dettatura: ['motivo', 'frasi', 'invio', 'provvisorie'],
+    lettura: ['voce', 'ripiego', 'codice', 'chiaveRifiutata', 'senzaModello', 'quota', 'finita'],
+    suggerimento: ['tipo', 'posizione', 'etaMs'],
+  };
+  const fonti = {
+    aiuto: leggi('src', 'content', 'sidebar.js'), dettatura: leggi('src', 'shared', 'ascolto.js'),
+    lettura: leggi('src', 'content', 'tts.js'), suggerimento: leggi('src', 'pages', 'dashboard', 'dashboard.js'),
+  };
+  for (const [misura, s] of Object.entries(fonti)) {
+    const viste = [...s.matchAll(new RegExp(`misura: '${misura}',([^}]*)\\}`, 'g'))];
+    assert.equal(viste.length, 1, `${misura}: un solo punto che la manda`);
+    const chiavi = [...viste[0][1].replace(/\([^()]*\)/g, '').matchAll(/(?:^|[,{\s])(\w+):/g)].map((m) => m[1]).filter((k) => k !== 'type');
+    assert.deepEqual(chiavi.sort(), [...campi[misura]].sort(), `${misura}: ${chiavi}`);
+  }
+  assert.match(leggi('src', 'content', 'sidebar.js'), /misura: 'ricerca-web-tetto' \}/, 'il tetto delle ricerche dell’Aiuto non porta la query');
+});
+
 // Gli avvisi d'errore che non nascono in una pagina web (quelli che il main manda a tutte le schede, quelli delle
 // pagine di Filo) si contano anche loro, per chiave dell'elenco chiuso.
 test('gli avvisi d’errore del main e delle pagine di Filo si contano, con una chiave dell’elenco chiuso', () => {
