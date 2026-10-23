@@ -12,6 +12,7 @@ export const strumentiNelPannello = (page) => page.evaluate(() => [...document.q
 // Aperto col tasto resta aperto finché non si clicca fuori: aperto col clic si chiude al primo passaggio del puntatore
 // sul foglio, anche quello di un riquadro che si chiude sotto il cursore fermo.
 export async function apriPannello(page) {
+  await page.waitForSelector('.pd-pannello', { state: 'attached' });
   if (!(await pannelloAperto(page))) await page.keyboard.press('Control+Backslash');
   await expect.poll(() => pannelloAperto(page)).toBe(true);
 }
