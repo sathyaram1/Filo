@@ -1,5 +1,5 @@
 // #871 — il tasto destro sulla barra laterale: le voci in fondo, l'ora, la striscia e la linguetta nella fila
-// delle schede hanno le loro scelte; e un'azione della pagina portata nella barra ha il nome che ha sulla pagina.
+// delle schede hanno le loro scelte; e un'azione della pagina nella barra ha il nome che ha sulla pagina.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, menuAperto, vociDelMenu, scegliNelMenu } from './helpers/barra.mjs';
@@ -109,12 +109,11 @@ async function traduzioneFinta(app) {
   });
 }
 
-test('«Traduci» nella barra: a pagina tradotta si chiama «Mostra originale», come nel menu, e riporta l\'originale', async ({ app, openTab, testServer }) => {
+test('«Traduci» nella barra: a pagina tradotta si chiama «Mostra originale», e riporta l\'originale', async ({ app, openTab, testServer }) => {
   const p = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await traduzioneFinta(app);
-  const r = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'translate', target: 'bar' }, {}));
-  expect(r.ok).toBe(true);
+  expect((await statoBarra(app)).bar).toContain('translate');
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   const icona = barra.locator('#nav .ico[data-id="translate"]');

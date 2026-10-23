@@ -1,28 +1,6 @@
-// Feedback #500: il menu del tasto destro NON ha un'altezza definitiva quando
-// viene posato. Il riquadro della spiegazione (la sezione AI su un collegamento,
-// su un'immagine, su una selezione) nasce a una riga e diventa di tre quando la
-// risposta arriva: il menu cresce verso il basso DOPO essere stato piazzato,
-// l'ultima voce finisce oltre il bordo della finestra — tagliata a metà e non
-// cliccabile — e il menu non si risposta né si può scorrere.
-//
-// Questi spec asseriscono il SUCCESSO dal punto di vista di chi usa Filo:
-// l'ULTIMA voce del menu (Invia feedback / Invia attacco, in fondo a QUALSIASI
-// menu) resta dentro la finestra e si può puntare e cliccare davvero. Senza il
-// fix — misura unica all'apertura — il menu resta dov'è, l'ultima voce sfora e
-// Playwright non riesce nemmeno a portarci sopra il puntatore: rosso.
-//
-// Un menu che si muove porta con sé due conseguenze, provate in fondo al file:
-// quando è così alto da doversi scorrere, lo scorrimento deve fermarsi dentro
-// al menu (se passa alla pagina, la pagina scorre e il menu sparisce proprio a
-// chi stava leggendo fino in fondo); e il pannello ancorato a una sua voce
-// (la griglia "Altro…") deve muoversi insieme a lui, o chiudersi quando la
-// voce a cui è appeso scorre via.
-//
-// Lo stesso difetto ha un secondo verso, in fondo al file: non è il menu ad
-// allungarsi ma la FINESTRA ad accorciarsi sotto di lui. Il fondo esce dal
-// bordo esattamente allo stesso modo, e il conto va rifatto uguale. Con lui
-// viaggia l'etichetta che spiega un'icona: se il menu le scivola via da sotto,
-// l'etichetta parla di un bottone che non è più lì e va tolta.
+// #500 — il menu del tasto destro non ha un'altezza definitiva quando è posato: la spiegazione cresce, o la finestra si
+// accorcia, e l'ultima voce deve restare dentro e cliccabile (il menu rientra o scorre). Lo scorrimento si ferma nel
+// menu, e il sottomenu appeso a una sua voce lo segue, o si chiude quando la voce esce dal bordo.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -43,7 +21,7 @@ function paginaLink() {
 // qualunque sia l'altezza del menu e della finestra.
 async function cresciOltreIlBordo(page, sfora) {
   return menuDi(page).valuta((s) => {
-    const menu = document.querySelector('.sn-menu');
+    const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
     const box = menu && menu.querySelector('.sn-menu-inline');
     if (!box) return { error: 'nessun riquadro di spiegazione nel menu' };
     const bottom = menu.getBoundingClientRect().bottom;
@@ -67,7 +45,7 @@ function paginaLunga() {
 // Geometria del menu e della sua ultima voce.
 async function geometria(page) {
   return menuDi(page).valuta(() => {
-    const menu = document.querySelector('.sn-menu');
+    const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
     if (!menu) return { error: 'menu chiuso' };
     const voci = menu.querySelectorAll('.sn-menu-item');
     const ultima = voci[voci.length - 1];
@@ -148,7 +126,7 @@ test('#500 se la spiegazione supera la finestra intera il menu diventa scorrevol
 
   // Nessuna posa può farlo stare: l'unica via d'uscita è lo scorrimento (#405).
   await menuDi(page).valuta(() => {
-    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    const box = document.querySelector('.sn-menu:not(.sn-menu-sub) .sn-menu-inline');
     box.style.minHeight = `${window.innerHeight + 400}px`;
   });
 
@@ -165,7 +143,7 @@ test('#500 se la spiegazione poi si accorcia il menu torna intero, senza barra',
   const menu = await apriMenuSu(page, '#link');
 
   await menuDi(page).valuta(() => {
-    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    const box = document.querySelector('.sn-menu:not(.sn-menu-sub) .sn-menu-inline');
     box.style.minHeight = `${window.innerHeight + 400}px`;
   });
   await expect.poll(async () => (await geometria(page)).scorrevole, { timeout: 5000 }).toBe(true);
@@ -173,7 +151,7 @@ test('#500 se la spiegazione poi si accorcia il menu torna intero, senza barra',
   // La spiegazione sparisce (succede davvero: "NESSUNA SPIEGAZIONE" toglie il
   // riquadro). Il tetto messo prima non deve restare addosso a un menu corto.
   await menuDi(page).valuta(() => {
-    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    const box = document.querySelector('.sn-menu:not(.sn-menu-sub) .sn-menu-inline');
     box.style.minHeight = '';
   });
   await expect.poll(async () => (await geometria(page)).scorrevole, { timeout: 5000 }).toBe(false);
@@ -189,7 +167,7 @@ test('#500 se la spiegazione poi si accorcia il menu torna intero, senza barra',
 // menu, quindi diventa scorrevole.
 async function rendiScorrevole(page) {
   await menuDi(page).valuta(() => {
-    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    const box = document.querySelector('.sn-menu:not(.sn-menu-sub) .sn-menu-inline');
     box.style.minHeight = `${window.innerHeight + 600}px`;
   });
   await expect.poll(async () => (await geometria(page)).scorrevole, { timeout: 5000 }).toBe(true);
@@ -198,7 +176,7 @@ async function rendiScorrevole(page) {
 // Porta il puntatore sul menu e gira la rotella `giri` volte.
 async function rotellaSulMenu(page, giri, passo = 200) {
   const c = await menuDi(page).valuta(() => {
-    const m = document.querySelector('.sn-menu').getBoundingClientRect();
+    const m = document.querySelector('.sn-menu:not(.sn-menu-sub)').getBoundingClientRect();
     return { x: Math.round(m.left + m.width / 2), y: Math.round(m.top + m.height / 2) };
   });
   await page.mouse.move(c.x, c.y);
@@ -207,7 +185,7 @@ async function rotellaSulMenu(page, giri, passo = 200) {
 
 async function statoScorrimento(page) {
   const menu = await menuDi(page).valuta(() => {
-    const m = document.querySelector('.sn-menu');
+    const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
     return {
       menuAperto: !!m,
       menuScrollTop: m ? Math.round(m.scrollTop) : -1,
@@ -246,27 +224,30 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
   await expect(menu).toHaveCount(0);
 });
 
-// --- il pannello delle altre icone segue il menu ---------------------------
+// --- il sottomenu appeso a una voce segue il menu ---------------------------
 
-// Apre la griglia "Altro…" dalla freccetta in cima al menu.
-async function apriPannelloIcone(page, menu) {
-  const freccetta = menu.locator('.sn-menu-row-overflow');
+// Su un sito col suo menu del tasto destro, in cima a quello di Filo c'è «Menu di <sito>», con la freccetta che apre
+// un sottomenu appeso a lei (#975): il pannello che deve muoversi col menu.
+const conMenuDelSito = (html) => html.replace('<body ', '<body oncontextmenu="return false" ');
+
+async function apriSottomenu(page, menu) {
+  const freccetta = menu.locator('.sn-menu-split-arrow').first();
   await expect(freccetta).toBeVisible();
   await freccetta.click();
-  await expect(menuDi(page).locator('.sn-menu-icon-grid')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-sub')).toBeVisible();
 }
 
 // Dove sta la freccetta e dove sta il pannello che le è appeso.
 async function ancoraEPannello(page) {
   return menuDi(page).valuta(() => {
     const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
-    const freccetta = menu && menu.querySelector('.sn-menu-row-overflow');
-    const grid = document.querySelector('.sn-menu-icon-grid');
+    const freccetta = menu && menu.querySelector('.sn-menu-split-arrow');
+    const sub = document.querySelector('.sn-menu-sub');
     return {
       menuTop: menu ? Math.round(menu.getBoundingClientRect().top) : null,
       ancoraTop: freccetta ? Math.round(freccetta.getBoundingClientRect().top) : null,
-      pannelloTop: grid ? Math.round(grid.getBoundingClientRect().top) : null,
-      pannelloAperto: !!grid,
+      pannelloTop: sub ? Math.round(sub.getBoundingClientRect().top) : null,
+      pannelloAperto: !!sub,
     };
   });
 }
@@ -280,10 +261,10 @@ function restaAttaccato(prima, dopo) {
   expect(Math.abs(deriva)).toBeLessThanOrEqual(2);
 }
 
-test('#500 la spiegazione fa scivolare il menu: il pannello delle altre icone scivola con lui', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, paginaLink());
+test('#500 la spiegazione fa scivolare il menu: il sottomenu appeso a una voce scivola con lui', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, conMenuDelSito(paginaLink()));
   const menu = await apriMenuSu(page, '#link');
-  await apriPannelloIcone(page, menu);
+  await apriSottomenu(page, menu);
 
   const prima = await ancoraEPannello(page);
   expect(prima.pannelloAperto).toBe(true);
@@ -300,11 +281,11 @@ test('#500 la spiegazione fa scivolare il menu: il pannello delle altre icone sc
   expect(dopo.pannelloTop).toBeLessThan(prima.pannelloTop);
 });
 
-test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e sparisce con lei', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, paginaLunga());
+test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e sparisce con lei', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, conMenuDelSito(paginaLunga()));
   const menu = await apriMenuSu(page, '#link');
   await rendiScorrevole(page);
-  await apriPannelloIcone(page, menu);
+  await apriSottomenu(page, menu);
 
   const prima = await ancoraEPannello(page);
 
@@ -321,7 +302,7 @@ test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e spari
   // Scorrimento lungo: la freccetta esce oltre il bordo alto. Il pannello non ha
   // più niente a cui stare appeso e si chiude, invece di galleggiare da solo.
   await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); m.scrollTop = m.scrollHeight; });
-  await expect(menuDi(page).locator('.sn-menu-icon-grid')).toHaveCount(0, { timeout: 3000 });
+  await expect(menuDi(page).locator('.sn-menu-sub')).toHaveCount(0, { timeout: 3000 });
   await expect(menu).toBeVisible();
 });
 
@@ -422,7 +403,7 @@ test('#500 la finestra scende sotto l\'altezza del menu: il menu diventa scorrev
   // Una spiegazione lunga: il menu arriva a riempire quasi tutta la finestra,
   // ma ci sta ancora — niente tetto, niente barra.
   await menuDi(page).valuta(() => {
-    const menu = document.querySelector('.sn-menu');
+    const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
     const box = menu.querySelector('.sn-menu-inline');
     const cresci = window.innerHeight - 60 - Math.round(menu.getBoundingClientRect().height);
     if (cresci > 0) box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) + cresci}px`;
@@ -441,81 +422,4 @@ test('#500 la finestra scende sotto l\'altezza del menu: il menu diventa scorrev
   } finally {
     await ripristina();
   }
-});
-
-// --- l'etichetta di un'icona non resta appesa a mezz'aria ------------------
-
-// Porta il puntatore su un'icona della fila in cima e aspetta l'etichetta.
-// Ritorna dove sta l'etichetta e dove sta l'icona di cui parla.
-async function mostraEtichetta(page, menu) {
-  const icona = menu.locator('.sn-menu-row-btn:not(.sn-menu-row-overflow):not(.sn-menu-row-empty)').first();
-  await expect(icona).toBeVisible();
-  const box = await icona.boundingBox();
-  await page.mouse.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
-  const etichetta = menuDi(page).etichetta;
-  await expect(etichetta).toBeVisible({ timeout: 3000 });
-  return { icona, etichetta };
-}
-
-// Fa crescere la spiegazione quel tanto che serve a far scivolare il menu di
-// POCHI pixel: l'icona resta sotto al puntatore, quindi il browser non manda
-// nessun mouseleave e la sparizione dell'etichetta deve deciderla Filo. È
-// esattamente il caso raccontato — l'etichetta ferma dov'era mentre l'icona di
-// cui parla se n'è andata — misurato in piccolo perché sia riproducibile.
-async function scivolaDiPoco(page, px) {
-  return menuDi(page).valuta((slide) => {
-    const menu = document.querySelector('.sn-menu');
-    const box = menu.querySelector('.sn-menu-inline');
-    const cs = getComputedStyle(box);
-    // `min-height` morde il box del CSS: in content-box bordo e imbottitura
-    // restano fuori dal conto e la crescita vera sarebbe più alta di quella
-    // chiesta.
-    const extra = cs.boxSizing === 'border-box' ? 0
-      : parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-        + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
-    const bottom = menu.getBoundingClientRect().bottom;
-    const cresci = Math.round(window.innerHeight - bottom) + slide;
-    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) - extra + cresci}px`;
-  }, px);
-}
-
-test('#500 il menu scivola sotto al puntatore: l\'etichetta dell\'icona sparisce invece di restare appesa', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, paginaLink());
-  const menu = await apriMenuSu(page, '#link');
-  const { icona, etichetta } = await mostraEtichetta(page, menu);
-
-  const menuPrima = (await geometria(page)).menuTop;
-  const iconaPrima = (await icona.boundingBox()).y;
-
-  // Arriva la spiegazione: il menu scivola in su e si porta dietro l'icona.
-  await scivolaDiPoco(page, 6);
-  await attendiRientro(page);
-
-  const menuDopo = (await geometria(page)).menuTop;
-  expect(menuDopo, 'il menu non si è mosso: il test non prova niente').toBeLessThan(menuPrima);
-  expect((await icona.boundingBox()).y, 'l\'icona non si è mossa col menu').toBeLessThan(iconaPrima);
-
-  await expect(etichetta).toBeHidden({ timeout: 3000 });
-});
-
-test('#500 il menu cresce senza muoversi: l\'etichetta resta, non sparisce sotto il naso', async ({ openTab, testServer }) => {
-  // Bersaglio in ALTO: il menu ha spazio sotto, cresce e resta dov'è. Qui
-  // togliere l'etichetta sarebbe un dispetto, non una correzione.
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
-    <a id="link" href="${LINK}" style="display:inline-block;padding:8px">un collegamento in cima</a>
-    <div style="height:80vh"></div>
-  </body></html>`);
-  const menu = await apriMenuSu(page, '#link');
-  const { etichetta } = await mostraEtichetta(page, menu);
-
-  const prima = await geometria(page);
-  await menuDi(page).valuta(() => {
-    const box = document.querySelector('.sn-menu .sn-menu-inline');
-    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) + 40}px`;
-  });
-  await page.waitForTimeout(400);
-
-  const dopo = await geometria(page);
-  expect(Math.abs(dopo.menuTop - prima.menuTop), 'il menu si è mosso: scenario sbagliato').toBeLessThanOrEqual(2);
-  await expect(etichetta).toBeVisible();
 });
