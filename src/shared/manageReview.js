@@ -1533,6 +1533,36 @@
     return !!num && num === numeroOf(fb);
   }
 
+  // La classe del mittente detta accanto a un numero: al singolare, corta.
+  const CLASSE_BREVE = {
+    owner: 'owner', utente: 'utente', filo_per_utente: 'Filo per un utente', sessione_locale: 'sessione locale',
+    routine: 'routine', server: 'allarme del server', test: 'collaudo',
+  };
+
+  /**
+   * Cosa dire accanto al numero di una pratica nominata da una richiesta di fusione o da una domanda (#1517): stato e
+   * classe del mittente del documento con QUELL'id, e un avviso se il numero è di più documenti. `fb` = il documento
+   * in pagina o null; `riserva` = { stato, mittenteClasse } mandati dal server quando il documento non c'è;
+   * `doppi` = quanti documenti in pagina portano quel numero. → { testo, doppi } o null. PURA.
+   */
+  function descriviRiferimento(fb, riserva, doppi) {
+    const n = Number(doppi) || 0;
+    const r = riserva && typeof riserva === 'object' ? riserva : {};
+    let stato = '';
+    let classe = '';
+    if (fb) {
+      stato = statusUnreadable(fb) ? publicStateLabel(fb) : ((FS().STATUSES[normalizeStatus(fb).status] || {}).label || '');
+      const MT = global.SN_MITTENTI;
+      const m = MT && MT.mittenteDi ? MT.mittenteDi(fb) : null;
+      classe = (m && CLASSE_BREVE[m.classe]) || '';
+    } else {
+      stato = (FS().STATUSES[String(r.stato || '')] || {}).label || '';
+      classe = CLASSE_BREVE[String(r.mittenteClasse || '')] || '';
+    }
+    const testo = [stato, classe].filter(Boolean).join(' · ');
+    return testo || n > 1 ? { testo, doppi: n } : null;
+  }
+
   // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
   // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
   const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
