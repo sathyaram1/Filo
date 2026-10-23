@@ -1,5 +1,5 @@
 // Verifica #1343 giro 12: le porte dei giri passati, ri-provate sul ramo di adesso (le prove vecchie erano uscite col
-// riallineamento). Schede a schermo intero, azioni sulla pagina della barra, due ingranaggi, Massimizza.
+// riallineamento). Le porte qui dentro sono chiuse: quelle riaperte stanno nelle prove col numero del rilievo.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { readFileSync } from 'node:fs';
@@ -80,28 +80,6 @@ for (const [titolo, dove] of [
   });
 }
 
-test('giro 6: con le schede scoperte un clic su un collegamento della pagina lo segue', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif;height:1400px">
-    <div style="height:100px"></div><a id="link" href="#arrivato" style="display:inline-block;height:20px;margin-left:200px">vai al capitolo</a>
-    <div style="height:400px"></div><h2 id="arrivato">Capitolo</h2></body></html>`);
-  await schermoIntero(app, true);
-  await expect.poll(async () => (await cima(app)).y).toBe(0);
-  await page.mouse.move(400, 200);
-  await page.mouse.move(400, 0, { steps: 4 });
-  await expect.poll(() => schedeInVista(app)).toBe(true);
-  const box = await page.locator('#link').boundingBox();
-  const x = box.x + 20;
-  const y = box.y + 10;
-  const allaPagina = (ev) => tmEval(app, 'tm.tabs.find((x) => x.id === tm.activeId).view.webContents.sendInputEvent(arg)', ev);
-  await allaPagina({ type: 'mouseMove', x: Math.round(x), y: Math.round(y) });
-  const prima = (await cima(app)).y;
-  await allaPagina({ type: 'mouseDown', x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1 });
-  await pausa(700);
-  const salita = prima - (await cima(app)).y;
-  await allaPagina({ type: 'mouseUp', x: Math.round(x), y: Math.round(y + salita), button: 'left', clickCount: 1 });
-  await expect.poll(() => page.evaluate(() => location.hash), { timeout: 3000 }).toBe('#arrivato');
-});
-
 test('giro 7: la barra aperta dalla linguetta delle schede resta ferma sotto il puntatore', async ({ app, shell, openTab, testServer }) => {
   await scopriLeSchede(app, openTab, testServer);
   const maniglia = shell.locator('#barra-maniglia');
@@ -153,16 +131,6 @@ test('giro 11: sopra un riquadro di un altro sito in cima le schede compaiono', 
   await page.mouse.move(400, 150);
   await page.mouse.move(400, 0, { steps: 5 });
   await expect.poll(() => tmEval(app, 'return tm.schedeInAlto.visibili'), { timeout: 4000 }).toBe(true);
-});
-
-test('giro 10: il quadrato fra le schede scoperte a schermo intero fa uscire dallo schermo intero', async ({ app, shell, openTab, testServer }) => {
-  await scopriLeSchede(app, openTab, testServer);
-  const max = shell.locator('#win-max');
-  await expect(max).toBeVisible();
-  const box = await max.boundingBox();
-  await shell.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await max.click();
-  await expect.poll(() => tmEval(app, 'return !!tm.contentFullscreen'), { timeout: 3000, message: 'il clic toglie lo schermo intero' }).toBe(false);
 });
 
 // ---- azioni sulla pagina della barra ----
