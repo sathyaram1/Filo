@@ -811,6 +811,7 @@
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
     COPY_TEXT_TO_CLIPBOARD: 'copy_text_to_clipboard', // { text } → { ok }: appunti di sistema e cronologia, dal «Copia» delle risposte (#846); cancello di PUSH
+    COPY_IMAGE_TO_CLIPBOARD: 'copy_image_to_clipboard', // { dataUrl png } → { ok }: solo appunti di sistema, la pagina può non avere il fuoco (#1343); cancello di PUSH
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',

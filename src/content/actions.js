@@ -1526,6 +1526,22 @@
     apriInSchedaNuova(url);
   }
 
+  // Come copyToClipboard: prima il main, che non chiede il fuoco alla pagina; se dice no, la pagina. `blobPng()` → Blob.
+  async function immagineNegliAppunti(dataUrl, blobPng) {
+    if (/^data:image\/png;base64,/.test(String(dataUrl || ''))) {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.COPY_IMAGE_TO_CLIPBOARD, dataUrl });
+        if (r && r.ok) return true;
+      } catch (_) {}
+    }
+    try {
+      const pngBlob = await blobPng();
+      if (!pngBlob || !navigator.clipboard?.write) return false;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+      return true;
+    } catch (_) { return false; }
+  }
+
   async function takeScreenshot() {
     try {
       const cap = await captureVisibleTab();
@@ -1533,14 +1549,7 @@
         Popup.toastErrore('err_provider_failed');
         return;
       }
-      let copied = false;
-      try {
-        const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
-        if (pngBlob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      const copied = await immagineNegliAppunti(cap.dataUrl, () => dataUrlToPngBlob(cap.dataUrl));
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
@@ -1709,13 +1718,7 @@
       const region = await selectScreenRegion();
       if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       const { dataUrl, blob } = region;
-      let copied = false;
-      try {
-        if (blob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      const copied = await immagineNegliAppunti(dataUrl, async () => blob);
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
       try {
