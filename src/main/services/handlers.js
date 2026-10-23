@@ -4302,13 +4302,14 @@ function consiglioPaginaNonLetta(out) {
   }
 }
 
-// Una lettura fermata prima della fine della pagina lo dice in ogni pezzo, anche in quello vuoto oltre l'ultimo: se no il
-// modello crede di avere la pagina intera e risponde che il dato non c'è (#1307.3).
-function avvisoLettaInParte(out, { indirizzo = '', oltre = false } = {}) {
+// Una lettura fermata prima della fine della pagina lo dice in ogni pezzo, anche in quello vuoto oltre l'ultimo o in una
+// prima parte senza testo: se no il modello crede di avere la pagina intera e risponde che il dato non c'è (#1307.3).
+function avvisoLettaInParte(out, { indirizzo = '', oltre = false, vuota = false } = {}) {
   const perche = out.lettaInParte ? 'la scheda aperta è troppo grande per leggerla tutta' : 'la pagina supera i 5 MB';
   const fine = Number(out.totale) || 0;
   const dove = oltre ? `finisce al carattere ${fine} e oltre non c'è altro da leggere, ma la pagina continua`
-    : (out.troncata ? `finisce al carattere ${fine}` : 'finisce qui sopra');
+    : vuota ? 'non contiene testo, ma la pagina continua'
+      : (out.troncata ? `finisce al carattere ${fine}` : 'finisce qui sopra');
   return `[Della pagina${indirizzo ? ` "${indirizzo}"` : ''} Filo ha solo la prima parte, perché ${perche}: la parte letta ${dove}. `
     + `Se il dato non c'è${out.troncata && !oltre ? ' nemmeno nei pezzi che seguono' : ''}, dillo all'utente invece di `
     + 'concludere che la pagina non lo contiene.]';
