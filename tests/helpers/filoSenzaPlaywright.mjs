@@ -86,41 +86,16 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
   };
   const scadenza = (ms, cosa) => new Promise((_, ko) => { const t = setTimeout(() => ko(new Error(`${cosa}\n${uscita()}`)), ms); t.unref?.(); });
 
-  let sock;
+  let ispettore;
   try {
     const url = await Promise.race([indirizzo, morto.then(() => { throw new Error(`Filo è uscito prima di aprire l'ispettore\n${uscita()}`); }),
       scadenza(PARTENZA_MS, 'l\'ispettore del main non è comparso')]);
-    sock = new WebSocket(url);
-    await new Promise((ok, ko) => { sock.onopen = ok; sock.onerror = () => ko(new Error(`ispettore irraggiungibile\n${uscita()}`)); });
+    ispettore = await collegaIspettore(url, uscita);
   } catch (e) {
     ammazza();
     throw e;
   }
-
-  let n = 0;
-  const attese = new Map();
-  sock.onmessage = (e) => {
-    const m = JSON.parse(String(e.data));
-    const a = m.id && attese.get(m.id);
-    if (!a) return;
-    attese.delete(m.id);
-    if (m.error) a.ko(new Error(m.error.message));
-    else a.ok(m.result);
-  };
-  const manda = (method, params) => new Promise((ok, ko) => {
-    const id = ++n;
-    attese.set(id, { ok, ko });
-    sock.send(JSON.stringify({ id, method, params }));
-  });
-
-  async function grezzo(expression) {
-    const r = await manda('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-    if (r.exceptionDetails) {
-      const d = r.exceptionDetails;
-      throw new Error(`nel main: ${(d.exception && d.exception.description) || d.text}`);
-    }
-    return r.result.value;
-  }
+  const grezzo = ispettore.valuta;
 
   const evaluate = (fn, arg) => grezzo(`(async () => (${fn.toString()})(process.mainModule.require('electron'), ${JSON.stringify(arg ?? null)}))()`);
 
