@@ -6205,9 +6205,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (!altre) return;
     const finestra = await finestraNota();
     if (!finestra) return;
-    let caratteri = 0;
-    try { caratteri = globalThis.SN_FILO_CONTESTO.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) { return; }
     const FC = globalThis.SN_FILO_CONTESTO;
+    let caratteri = 0;
+    try { caratteri = FC.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) { return; }
     const eccesso = FC.eccessoNellaFinestra({ finestra, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat, margine: FC.MARGINE_PAGINE });
     if (eccesso > 0 && eccesso <= altre) lasciaFuoriPagine(eccesso);
   };
