@@ -127,6 +127,25 @@ for (const [nome, velo] of [
   });
 }
 
+// Un velo decorativo sopra tutta la pagina che lascia passare il mouse e lascia leggere la parola (la grana leggera, una
+// vignettatura trasparente al centro, un velo in fusione): i segni restano, anche dopo che il velo è stato cercato.
+for (const [nome, velo] of [
+  ['la grana leggera', 'opacity:0.05;background-image:linear-gradient(45deg,#000 25%,transparent 25%)'],
+  ['una vignettatura ai bordi', 'background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.4))'],
+  ['un velo in fusione', `background:${SFONDO};mix-blend-mode:multiply`],
+]) {
+  test(`${nome} fissata sopra la pagina: i segni sul campo si vedono`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;font:16px sans-serif">
+    <div style="position:fixed;inset:0;z-index:9999;pointer-events:none;${velo}"></div><main style="padding:40px 20px">${TA}</main></body>`;
+    const page = await apri(app, openTab, testServer, html);
+    await page.waitForTimeout(2000);
+    await page.keyboard.type(' ');
+    await page.waitForTimeout(800);
+    expect(await caldi(app, page, await riga(page))).toBeGreaterThan(20);
+  });
+}
+
 for (const [nome, campo] of [['casella di testo', TA], ['campo modificabile', CE]]) {
   test(`${nome} sotto un'intestazione fissa: i segni restano sotto con la parola`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
