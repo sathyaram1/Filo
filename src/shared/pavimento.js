@@ -127,15 +127,12 @@
     return v;
   }
 
-  // La regola che non dipende dalla disposizione: vicino a un'etichetta (il resto della sua riga e, se la riga è corta
-  // come un'etichetta, la prima riga piena sotto) ogni pezzo con la forma di una password si toglie, qualunque cosa ci
-  // sia in mezzo: un bottone «Copia», altre parole, un altro separatore. Una parola qualunque resta: toglierla la
-  // toglierebbe da tutto il messaggio.
-  const QUALSIASI_ETICHETTA = new RegExp(`${ETICHETTA}|${ETICHETTA_CORTA}`, 'gi');
   const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
+  // Un'espressione di codice («form.password.value», «process.env.DB_PASSWORD») sta al posto di un valore ma non lo è.
+  const CODICE_SORGENTE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?$/;
   function formaVicina(pezzo) {
     const v = pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '').replace(/[.,;:!?)»"'”’\]]+$/, '');
-    if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || /:\/\/|^www\./i.test(v) || EMAIL.test(v)) return '';
+    if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || /:\/\/|^www\./i.test(v) || EMAIL.test(v) || CODICE_SORGENTE.test(v)) return '';
     return FORMA_FORTE(v) ? v : '';
   }
   // La prima riga piena sotto un'etichetta, saltando le righe vuote e quelle dei soli bottoni o puntini («Mostra»,
