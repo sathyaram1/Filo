@@ -43,7 +43,9 @@ lì non c'è codice di altri.
 - **Sostituisci torna alla pagina:** il campo e la selezione della Modifica restano nel content script che l'ha chiesta;
   dallo strato torna solo il testo scelto (`RIQUADRO_SOSTITUISCI`), col fuoco già rimesso alla scheda.
 - **Vita:** lo strato se ne va con la pagina (navigazione, chiusura, renderer morto); vuoto resta pronto un minuto, poi
-  libera il suo processo. Anche la finestrella di accesso ha il suo, grande quanto la finestra.
+  libera il suo processo, e il suo vuoto smette di seguire il puntatore della pagina: un ascoltatore rimasto a cercare
+  la vista buttata era un errore del processo principale, cioè Filo bloccato. Anche la finestrella di accesso ha il suo,
+  grande quanto la finestra.
 - **Test:** `tests/riquadri-fuori-dal-sito.spec.mjs` (la lamentela: il sito non legge niente, nemmeno cercando), e gli
   spec che guardano i riquadri con `tests/helpers/riquadri.mjs`, che li trova nella scheda o nello strato
   (`nelloStrato`, `paginaDelloStrato`) e ci clicca col mouse dello strato. Nessuno l'ha provato su un Mac o su un Linux
