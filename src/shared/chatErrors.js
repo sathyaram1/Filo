@@ -97,6 +97,10 @@
     'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
+  // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
+  // gestisce Filo non ce l'ha (#1344.1).
+  const DOVE_ALTRO_MODELLO = 'in Opzioni → Modelli per azione';
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
