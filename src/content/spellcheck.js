@@ -685,6 +685,32 @@
     return veliVisti.v.filter((e) => e.isConnected);
   }
 
+  // Quanto un velo nasconde quello che sta sotto, da 0 a 1. La grana leggera, una vignettatura trasparente al centro o
+  // un velo in fusione lasciano leggere la parola: non coprono i segni (#1115.2).
+  const alfaDi = (c) => {
+    if (c === 'transparent') return 0;
+    const m = /^rgba?\(([^)]+)\)$/.exec(c);
+    return m ? Number(m[1].split(/[,\s/]+/)[3] ?? '1') : 0;
+  };
+  function coperturaDelVelo(e, cs) {
+    if (cs.mixBlendMode && cs.mixBlendMode !== 'normal') return 0;
+    let opacita = 1;
+    for (let x = e; x && x.nodeType === 1; x = x.parentElement) {
+      opacita *= Number((x === e ? cs : window.getComputedStyle(x)).opacity);
+      if (!(opacita > 0)) return 0;
+    }
+    let immagine = 0;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') {
+      // Un'immagine non si legge: copre. Un gradiente copre ovunque solo se nessuna sua tappa è trasparente.
+      if (/url\(/.test(cs.backgroundImage)) immagine = 1;
+      else {
+        const tappe = cs.backgroundImage.match(/rgba?\([^)]*\)|transparent/g) || [];
+        immagine = tappe.length ? Math.min(...tappe.map(alfaDi)) : 1;
+      }
+    }
+    return opacita * Math.max(alfaDi(cs.backgroundColor), immagine);
+  }
+
   // I punti dei segni sotto un velo: si chiede alla pagina, per un attimo senza veli, cosa sta sopra al campo.
   const SENZA_VELI = typeof CSSStyleSheet === 'function' ? (() => {
     try { const s = new CSSStyleSheet(); s.replaceSync('*:not(.sn-spell-overlay):not(.sn-spell-overlay *) { pointer-events: auto !important; }'); return s; } catch (_) { return null; }
