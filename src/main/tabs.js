@@ -3243,6 +3243,7 @@ class TabManager {
       scheda: (wc) => (wc === pwc && !pwc.isDestroyed() ? { id: `finestrella-${pwc.id}`, url: pwc.getURL(), title: pwc.getTitle() } : null),
     });
     win._filoRiquadri = riquadri;
+    riquadri.segui(pwc);
     win.on('resize', () => riquadri.posa());
     pwc.on('before-input-event', (e, input) => { if (riquadri.tasto(pwc, input)) e.preventDefault(); });
     const strato = new StratoDelMenu(win, {
