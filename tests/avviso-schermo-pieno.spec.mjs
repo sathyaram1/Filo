@@ -117,7 +117,7 @@ test('la pillola resta quanto dice la durata in Preferenze', async ({ app, openT
 
 test('un riquadro di un altro sito che chiede lo schermo: la pillola nomina lui e la pagina', async ({ app, openTab, testServer }) => {
   const dentro = testServer.html(RIQUADRO, { pubblico: true });
-  await testServer.openReady(openTab, `<html><body style="margin:0"><iframe src="${dentro}" allowfullscreen style="position:fixed;left:40px;top:40px;width:300px;height:200px;border:0"></iframe></body></html>`);
+  const page = await testServer.openReady(openTab, `<html><body style="margin:0"><iframe src="${dentro}" allowfullscreen style="position:fixed;left:40px;top:40px;width:300px;height:200px;border:0"></iframe></body></html>`);
   await expect.poll(() => app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     const tm = win._filoTabs;
@@ -125,9 +125,27 @@ test('un riquadro di un altro sito che chiede lo schermo: la pillola nomina lui 
     const f = wc.mainFrame.framesInSubtree.find((x) => x.url.includes('sito-pubblico.test'));
     return f ? f.executeJavaScript('!!document.getElementById("vai")').catch(() => false) : false;
   }), { timeout: 8000 }).toBe(true);
-  await clicca(app, 120, 80);
+  // Il riquadro di un altro sito vive in un processo suo: il clic gli arriva dal router dell'input, come quello vero.
+  await page.frameLocator('iframe').locator('#vai').click();
   await expect.poll(() => visibile(app), { timeout: 8000 }).toBe(true);
   expect((await stato(app)).testo).toBe('sito-pubblico.test, dentro 127.0.0.1, è a schermo intero · Esc per uscire');
+});
+
+test('una scheda che la pagina apre con lo stesso clic sta a schermo pieno: la pillola nomina lei', async ({ app, openTab, testServer }) => {
+  const altrove = testServer.html('<html><body style="margin:0;background:#400"><h1>Accedi al tuo conto</h1></body></html>', { pubblico: true });
+  const page = await testServer.openReady(openTab, `<html><body style="margin:0"><button id="vai" style="position:fixed;left:40px;top:40px;width:240px;height:90px">Video</button>
+<script>document.getElementById('vai').addEventListener('click', () => { document.documentElement.requestFullscreen().catch(() => {}); window.open(${JSON.stringify(altrove)}, '_blank'); });</script></body></html>`);
+  const prima = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
+  await clicca(app, 120, 80);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const t = tm.tabs.find((x) => x.id === tm.activeId);
+    return { aperta: t.url.includes('sito-pubblico.test'), pieno: tm.contentFullscreen && tm.pageFullscreen };
+  }), { timeout: 8000 }).toEqual({ aperta: true, pieno: true });
+  await expect.poll(async () => (await stato(app)).testo, { timeout: 8000 }).toBe('sito-pubblico.test è a schermo intero · Esc per uscire');
+  // Tornando sulla pagina che l'ha chiesto, la pillola nomina di nuovo lei.
+  await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(id), prima);
+  await expect.poll(async () => (await stato(app)).testo, { timeout: 8000 }).toBe('127.0.0.1 è a schermo intero · Esc per uscire');
 });
 
 test('con la pillola a schermo l\'Esc della tastiera arriva alla scheda e fa uscire', async ({ app, openTab, testServer }) => {
@@ -231,6 +249,50 @@ test('il clic accanto alla pillola va alla pagina; quello sulla pillola esce, e 
     v.sendInputEvent({ type: 'mouseUp', x: c.x, y: c.y, button: 'left', clickCount: 1 });
   }, { x: Math.round(b.width / 2), y: Math.round(b.height / 2) - 6 });
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(false);
+});
+
+test('dal tasto destro della pillola si arriva alla durata in Preferenze, e lì si cambia', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGINA);
+  await durata(app, 10000);
+  await aSchermoPieno(app);
+  const b = (await stato(app)).bounds;
+  await app.evaluate(({ BrowserWindow }, c) => {
+    const v = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.schermoPieno.vista.webContents;
+    v.sendInputEvent({ type: 'mouseMove', x: c.x, y: c.y });
+    v.sendInputEvent({ type: 'mouseDown', x: c.x, y: c.y, button: 'right', clickCount: 1 });
+    v.sendInputEvent({ type: 'mouseUp', x: c.x, y: c.y, button: 'right', clickCount: 1 });
+  }, { x: Math.round(b.width / 2), y: Math.round(b.height / 2) - 6 });
+  let menu = null;
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      if (!w.url().startsWith('data:text/html')) continue;
+      const t = await w.locator('.menu').innerText().catch(() => '');
+      if (t.includes('Quanto resta questo avviso')) { menu = w; return true; }
+    }
+    return false;
+  }, { timeout: 5000 }).toBe(true);
+  await menu.getByText('Quanto resta questo avviso').click();
+  await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(false);
+  let prefs = null;
+  await expect.poll(() => {
+    prefs = app.windows().find((w) => w.url().startsWith('filo://preferences/preferences.html#sec-schermo-pieno')) || null;
+    return !!prefs;
+  }, { timeout: 8000 }).toBe(true);
+  const campo = prefs.locator('#avvisoSchermoPienoDurata');
+  await expect(campo).toBeVisible();
+  await expect(campo).toHaveValue('10000');
+  await campo.fill('4500');
+  await campo.dispatchEvent('change');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).avvisoSchermoPieno), { timeout: 5000 })
+    .toEqual({ durataMs: 4500 });
+  // Fuori dai limiti il campo torna dentro, a vista, e si salva il valore in uso.
+  await campo.fill('50000');
+  await campo.dispatchEvent('change');
+  await campo.blur();
+  await expect(campo).toHaveValue('10000');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).avvisoSchermoPieno), { timeout: 5000 })
+    .toEqual({ durataMs: 10000 });
+  await prefs.screenshot({ path: 'tests/.shots/1526-preferenze-schermo-intero.png' }).catch(() => {});
 });
 
 test('la pillola nel tema chiaro e scuro', async ({ app, openTab, testServer }) => {

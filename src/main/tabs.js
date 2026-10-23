@@ -105,6 +105,8 @@ function tabDiWebContents(wc) {
   return null;
 }
 
+const tastoEsc = () => (globalThis.SN_TASTI ? globalThis.SN_TASTI.etichetta('Esc') : 'Esc');
+
 // #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo: chi chiede lo schermo pieno dentro il
 // proprio gestore dell'Esc lo otteneva senza un clic, e un evento di uscita non può essere il permesso per entrare.
 // Microfono, fotocamera, appunti e posizione li decide l'utente (#591.1): regole in services/permessiPagine.js.
@@ -1831,28 +1833,52 @@ class TabManager {
     if (tab._rinviata && !this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
-    // Tornando sulla pagina che tiene lo schermo pieno si rivede di chi è; su un'altra scheda la pillola non vale.
-    if (cambiata) this._avvisaSchermoPieno(tab);
+    if (cambiata) this._avvisaSchermoPieno();
     this._broadcast();
   }
 
-  // #1526 — la pillola nomina il frame che ha chiesto lo schermo (letto dal gestore dei permessi), mai il titolo.
-  // `nuovo`: lo schermo pieno è appena stato chiesto, e chi l'ha chiesto si legge adesso.
-  _avvisaSchermoPieno(tab, { nuovo = false } = {}) {
-    if (!tab || !this.pageFullscreen || this.pageFullscreenTabId !== tab.id || tab.id !== this.activeId) {
-      this.schermoPieno.nascondi();
-      return;
-    }
-    if (nuovo || !tab._schermoPienoParti) {
-      let pagina = '';
-      try { pagina = tab.view.webContents.getURL(); } catch (_) { pagina = ''; }
-      const da = tab._schermoPienoDa;
-      tab._schermoPienoDa = null;
-      const chiede = da && Date.now() - da.alle < 10_000 ? da.url : '';
-      const esc = globalThis.SN_TASTI ? globalThis.SN_TASTI.etichetta('Esc') : 'Esc';
-      tab._schermoPienoParti = partiDellAvviso(pagina || tab.url, chiede, esc);
-    }
-    this.schermoPieno.mostra(tab._schermoPienoParti);
+  // #1526 — chi si è preso lo schermo pieno lo dice la pillola: il frame che l'ha chiesto, letto adesso dal gestore
+  // dei permessi, mai il titolo.
+  _schermoPienoChiesto(tab) {
+    let pagina = '';
+    try { pagina = tab.view.webContents.getURL(); } catch (_) { pagina = ''; }
+    const da = tab._schermoPienoDa;
+    tab._schermoPienoDa = null;
+    const chiede = da && Date.now() - da.alle < 10_000 ? da.url : '';
+    tab._schermoPienoParti = partiDellAvviso(pagina || tab.url, chiede, tastoEsc());
+  }
+
+  // La frase per la scheda davanti finché lo schermo pieno l'ha chiesto un sito, o null. Un'altra scheda (anche una
+  // che la pagina ha aperto col suo clic) sta a schermo pieno senza averlo chiesto: si nomina da sé, Filo escluso.
+  _partiSchermoPieno(tab) {
+    if (!tab || !this.pageFullscreen || !this.contentFullscreen || tab.id !== this.activeId) return null;
+    if (tab.id === this.pageFullscreenTabId) return tab._schermoPienoParti || null;
+    let url = '';
+    try { url = tab.view.webContents.getURL(); } catch (_) { url = ''; }
+    url = url || tab.url || '';
+    if (/^filo:/i.test(url)) return null;
+    tab._schermoPienoParti = partiDellAvviso(url, '', tastoEsc());
+    return tab._schermoPienoParti;
+  }
+
+  _avvisaSchermoPieno() {
+    const parti = this._partiSchermoPieno(this.tabs.find((t) => t.id === this.activeId));
+    if (parti) this.schermoPieno.mostra(parti);
+    else this.schermoPieno.nascondi();
+  }
+
+  // Col puntatore sul bordo alto la pillola torna, o se è già lì riparte il suo tempo.
+  _ricompariSchermoPieno(tab) {
+    const parti = this._partiSchermoPieno(tab);
+    if (parti) this.schermoPieno.ricompari(parti);
+  }
+
+  // La scheda davanti che non l'ha chiesto va altrove (quella aperta dalla pagina nasce vuota e poi carica il suo
+  // sito): se cambia chi si nomina, la pillola lo dice.
+  _schermoPienoNavigata(tab) {
+    const prima = JSON.stringify(tab._schermoPienoParti || null);
+    const parti = this._partiSchermoPieno(tab);
+    if (parti && JSON.stringify(parti) !== prima) this.schermoPieno.mostra(parti);
   }
 
   // La scheda davanti prende la tastiera se questa era su una scheda che non si
@@ -2242,6 +2268,7 @@ class TabManager {
     this._attivaNascosta = !visible;
     if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
     this.avvisoSito.nascondi(!visible);
+    this.schermoPieno.posa();
     this.propostaEmail.posa();
     this.strato.posa();
   }
@@ -2430,7 +2457,9 @@ class TabManager {
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
       this.setContentFullscreen(true);
-      this._avvisaSchermoPieno(tab, { nuovo: true });
+      this._schermoPienoChiesto(tab);
+      // Davanti può già esserci la scheda che la pagina ha aperto con lo stesso clic: la pillola è per chi si vede.
+      this._avvisaSchermoPieno();
     });
     wc.on('leave-html-full-screen', () => {
       // Solo la scheda che l'aveva chiesto spegne la modalità: l'uscita di una pagina appena
@@ -2708,6 +2737,7 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      if (this.pageFullscreen && tab.id !== this.pageFullscreenTabId && tab.view && tab.view.webContents === wc) this._schermoPienoNavigata(tab);
       // Documento nuovo: il pannello Aiuto e le risposte da leggere erano di quello vecchio (#1432).
       if (tab.view && tab.view.webContents === wc) { tab.aiuto = null; RisposteInAttesa.dimentica(tab); }
       segnaPagina(tab, url);
@@ -2814,7 +2844,7 @@ class TabManager {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
       this.barra.inputDa(wc, input);
-      if (this.pageFullscreenTabId === tab.id && tab.id === this.activeId && this.schermoPieno.sulBordoAlto(input)) this.schermoPieno.ricompari(tab._schermoPienoParti);
+      if (this.pageFullscreen && tab.id === this.activeId && this.schermoPieno.sulBordoAlto(input)) this._ricompariSchermoPieno(tab);
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
       // #514 — qui passa l'input VERO, che la pagina non può fabbricare: è il
