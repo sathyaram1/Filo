@@ -711,11 +711,11 @@
         if (!righe.length) return 'Dimenticare una cosa';
         const per = a && a.per_sempre === true;
         const una = righe.length === 1;
+        const dove = per ? ', e il testo sparisce anche dal quaderno delle memorie.'
+          : (una ? '. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.'
+            : '. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.');
         return [`Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${una ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
-          elenco(righe), `\n\n${una ? 'Non entrerà' : 'Non entreranno'} più nelle conversazioni`, per
-            ? ', e il testo sparisce anche dal quaderno delle memorie.'
-            : (una ? '. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.'
-              : '. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.')];
+          elenco(righe), `\n\n${una ? 'Non entrerà' : 'Non entreranno'} più nelle conversazioni${dove}`];
       },
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
