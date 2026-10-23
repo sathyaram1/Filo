@@ -63,10 +63,11 @@ test('un’icona del tasto destro si conta una volta sola: o nella pagina, o nel
 
 test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri', () => {
   const tutto = contenuti.map(([, s]) => s).join('\n')
-    + leggi('src', 'pages', 'dashboard', 'dashboard-cerca.js') + leggi('src', 'pages', 'editor', 'editor.js') + leggi('src', 'shared', 'comboBox.js');
+    + leggi('src', 'pages', 'dashboard', 'dashboard-cerca.js') + leggi('src', 'pages', 'editor', 'editor.js') + leggi('src', 'shared', 'comboBox.js')
+    + leggi('src', 'shared', 'ascolto.js') + leggi('src', 'pages', 'dashboard', 'dashboard.js');
   for (const m of tutto.matchAll(/misura: '([a-z-]+)'/g)) {
     assert.ok(['azione', 'icona', 'ricerca', 'proposta', 'annullato', 'chiesto', 'avviso', 'errore-modello', 'intervista',
-      'tasto-annulla', 'anticipo-aperto', 'conferma'].includes(m[1]), m[1]);
+      'tasto-annulla', 'anticipo-aperto', 'conferma', 'aiuto', 'ricerca-web-tetto', 'dettatura', 'lettura', 'suggerimento'].includes(m[1]), m[1]);
     assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), new RegExp(`case '${m[1]}':`), `il main riceve «${m[1]}»`);
   }
   for (const m of tutto.matchAll(/pannello: '([a-z-]+)'/g)) assert.ok(C.PANNELLI.includes(m[1]), m[1]);
