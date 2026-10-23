@@ -135,6 +135,50 @@ test('un messaggio di chat coi suoi giri è un uso solo, e la risposta arriva co
   expect(quante(u.visto)).toBe(prima + 1);
 });
 
+// #1464 — dalla risposta del router fino all'ora che parte: i numeri della chiamata, mai il testo.
+test('una risposta della chat porta nell’ora contesto, cache, ragionamento, uscita, ripiego, spesa e chiamate per uso', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await homeDi(app);
+  await expect(home.locator('#input')).toBeVisible();
+  await routerFinto(app);
+  await app.evaluate(() => {
+    globalThis.__usoRouter = {
+      prompt_tokens: 9000, completion_tokens: 700, cost: 0.0042,
+      prompt_tokens_details: { cached_tokens: 6000 }, completion_tokens_details: { reasoning_tokens: 300 },
+    };
+  });
+  await home.locator('#input').fill('quanto fa due più due? scrivilo a mario.rossi@example.com');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ecco fatto.' })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => Object.keys((await oggi(app))?.chiamate?.['filo-chat'] || {}).length, { timeout: 5_000 }).toBe(1);
+  const o = await oggi(app);
+  const resti = (campo) => Object.entries(o[campo]['filo-chat']).map(([k, n]) => [k.split('|').slice(1).join('|'), n]);
+  const modelli = new Set(['contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa'].flatMap((c) => Object.keys(o[c]['filo-chat']).map((k) => k.split('|')[0])));
+  expect([...modelli], 'un modello solo, col suo nome del router').toHaveLength(1);
+  expect([...modelli][0]).toMatch(/^[a-z0-9-]+\/[a-z0-9.:-]+$/);
+  const n = o.uso['filo-chat'].n;
+  expect(resti('contesto')).toEqual([['t16k', n]]);
+  expect(resti('cache'), 'seimila su novemila: fra metà e tre quarti').toEqual([['q75', n]]);
+  expect(resti('ragionamento')).toEqual([['r1k', n]]);
+  expect(resti('uscita')).toEqual([['o1k|stop', n]]);
+  expect(resti('ripieghi'), 'ha risposto il primo della catena, senza ricominciare').toEqual([['t1|no', n]]);
+  expect(resti('spesa')[0][0]).toBe('router');
+  expect(Math.round(resti('spesa')[0][1])).toBe(420 * n);
+  expect(o.chiamate['filo-chat']).toEqual({ c1: n });
+
+  // Il documento dell'ora passa la validazione, e non porta niente di quello che si è scritto.
+  const esito = await app.evaluate(async () => {
+    const C = globalThis.SN_CONTATORI;
+    const s = await globalThis.SN_CONTATORI_MAIN.letto();
+    const k = C.oraDi(Date.now());
+    const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: k, app: '0.2.249', os: 'win', dati: s.ore[k] });
+    return { valida: C.valida(doc), testo: JSON.stringify(doc) };
+  });
+  expect(esito.valida.ok, esito.valida.motivo).toBe(true);
+  expect(esito.testo).not.toMatch(/mario|due più due|Ecco fatto/);
+});
+
 test('Preferenze: i contatori sono accesi di serie, spenti buttano quello che aspettava e non contano più', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await routerFinto(app);
