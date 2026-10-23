@@ -18,7 +18,13 @@ if (!pull || pull.status !== 0) {
   console.log('[prestart] git pull saltato (offline o conflitto) — avvio con codice locale');
 }
 
-// Dopo il pull, e anche quando non riesce: il lock di adesso è quello che il codice di adesso si aspetta.
-allineaPacchetti(ROOT, { prefisso: '[prestart]' });
+// Dopo il pull, e anche quando non riesce: il lock di adesso è quello che il codice di adesso si aspetta. Import
+// dinamico perché un modulo che non si carica non deve fermare `npm start`.
+try {
+  const { allineaPacchetti } = await import('./lib/pacchetti.mjs');
+  allineaPacchetti(ROOT, { prefisso: '[prestart]' });
+} catch (e) {
+  console.log(`[prestart] controllo dei pacchetti saltato: ${e && e.message ? e.message : e}`);
+}
 
 process.exit(0);
