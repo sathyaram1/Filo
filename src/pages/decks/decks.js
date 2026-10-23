@@ -136,7 +136,7 @@
       current = res.deck;
       // Cambio di mazzo o schermata: il pannello destro riparte dal riposo e la cache dei
       // pareri si svuota, perché i pareri sono per-mazzo (§6.2).
-      if (prevId !== current.id) opinionsByCard.clear();
+      if (prevId !== current.id) { opinionsByCard.clear(); opinionErrors.clear(); }
       carousel = null;
       setDetailState('stats');
       show('builder');
