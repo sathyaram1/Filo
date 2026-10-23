@@ -2101,7 +2101,8 @@ class TabManager {
         }
       }
       // Ctrl+Tab e Ctrl+Shift+Tab (#590.14). Un'azione di Filo che l'utente ci aveva messo prima resta sua.
-      const vicina = globalThis.SN_TASTI.azioneFiloDaTasto(input) ? null : indiceSchedaVicina(input, this.tabs.indexOf(tab), this.tabs.length);
+      const vicina = globalThis.SN_TASTI.azioneFiloDaTasto(input)
+        ? null : indiceSchedaVicina(input, this.tabs.indexOf(tab), this.tabs.length);
       if (vicina != null) {
         if (this.tabs[vicina] && this.tabs[vicina] !== tab) this.activate(this.tabs[vicina].id);
         return true;
