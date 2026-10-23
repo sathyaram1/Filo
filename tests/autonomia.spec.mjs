@@ -342,6 +342,7 @@ test('chat a Normale, dopo una ricerca: «dimentica per sempre» vuole la parola
     expect((await confirmState(page)).hasInput, 'dopo una lettura il «per sempre» vuole la parola, non un OK').toBe(true);
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
+    expect(testo).toContain('Non entrerà più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
 
