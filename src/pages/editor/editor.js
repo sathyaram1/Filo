@@ -992,7 +992,8 @@
     const via = auto ? 'automatico' : 'rigenerato';
     const esito = (e) => contaRiquadro('editor_titolo', { via, esito: e });
     try {
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
+      // Rifatto a mano chiede una risposta nuova: la stessa domanda tornerebbe uguale dalla cache.
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? {} : { rigenera: true });
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
       const ok = applyGeneratedTitle(id, rawText, via);
@@ -1075,7 +1076,7 @@
       { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento);
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true } : {});
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { if (manuale) avvisoNonGenerato('il riassunto', r); return false; }
       const ok = applyGeneratedSummary(id, rawText);

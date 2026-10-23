@@ -284,7 +284,9 @@ module.exports = function register(on, ctx) {
     const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
     const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
     // Il correttore ripete una volta la domanda la cui risposta era illeggibile (#1580): la cache la ridarebbe uguale.
-    const noCache = Boolean(msg && msg.riprova === true && DEL_CORRETTORE.has(msg.action));
+    // «Rigenera titolo» e «Rigenera riassunto» dell'Editor vogliono una risposta nuova anche a documento uguale (#1433).
+    const rigenera = msg && msg.rigenera === true && [SN_CONST.ACTIONS.EDITOR_TITLE, SN_CONST.ACTIONS.EDITOR_SUMMARY].includes(msg.action);
+    const noCache = Boolean(msg && ((msg.riprova === true && DEL_CORRETTORE.has(msg.action)) || rigenera));
     const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
     const chiedi = daSola
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))

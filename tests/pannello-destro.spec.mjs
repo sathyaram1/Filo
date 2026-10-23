@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITOR = 'filo://editor/editor.html';
@@ -236,6 +237,17 @@ test('la chat è l\'Aiuto: vede il documento e una richiesta ne cambia la format
   expect(pan.x + pan.width).toBeLessThanOrEqual(aiuto.x + 1);
   mkdirSync(SHOTS, { recursive: true });
   await ed.screenshot({ path: `${SHOTS}/pannello-destro-con-aiuto.png` });
+});
+
+test('l\'Aiuto dell\'Editor si apre anche dal tasto destro sul foglio', async ({ openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+  await ed.click('#doc');
+  await ed.keyboard.type('una riga');
+  await ed.locator('#doc').click({ button: 'right' });
+  await menuDi(ed).voce('Aiuto').first().click();
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  await expect(ed.locator('.sn-sidebar-input textarea')).toHaveAttribute('placeholder', 'Chiedi al documento…');
 });
 
 test('a parole: Filo apre il pannello, ci mette e toglie uno strumento, lo blocca', async ({ app, openTab }) => {

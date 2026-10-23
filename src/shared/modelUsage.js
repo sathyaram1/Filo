@@ -94,7 +94,6 @@
 
     user('editor-title', 'Editor — titolo del documento', 'Editor', A.EDITOR_TITLE),
     user('editor-summary', 'Editor — riassunto del documento', 'Editor', A.EDITOR_SUMMARY),
-    user('editor-chat', 'Editor — chat col documento', 'Editor', A.EDITOR_CHAT),
 
     // File dell'utente
     user('file-name', 'Nome sensato a un file', 'File', A.FILE_NAME,

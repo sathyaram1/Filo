@@ -162,7 +162,6 @@
     [A.FEEDBACK_TITLE]: 'deepseek-flash',
     [A.EDITOR_TITLE]: 'deepseek-flash, gemma-lite',
     [A.EDITOR_SUMMARY]: 'deepseek-flash, gemma-lite',
-    [A.EDITOR_CHAT]: 'deepseek, gemma',
     [A.MANAGE_SEARCH]: 'deepseek-flash, gemma-lite',
     [A.ARCHIVE_EMBED]: 'qwen-embed',
     [A.PROVIDER_TEST]: 'deepseek-flash, gemma-lite',

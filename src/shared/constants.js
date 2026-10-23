@@ -265,8 +265,6 @@
     EDITOR_TITLE: 'editor_title',
     // Riassunto automatico di un documento dell'editor.
     EDITOR_SUMMARY: 'editor_summary',
-    // Chat agganciata a un documento dell'editor.
-    EDITOR_CHAT: 'editor_chat',
     // Ricerca «a senso» fra i feedback nella dashboard di gestione.
     MANAGE_SEARCH: 'manage_search',
     // Il classificatore della stessa ricerca: legge i feedback in parallelo e dice quali corrispondono (#1118).
@@ -402,7 +400,6 @@
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
     [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
-    [ACTIONS.EDITOR_CHAT]: 'Editor — chat col documento',
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
     [ACTIONS.MANAGE_SEARCH_CLASSIFY]: 'Gestione — classificatore della ricerca',
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
@@ -455,7 +452,6 @@
     [ACTIONS.FEEDBACK_TITLE]: '',
     [ACTIONS.EDITOR_TITLE]: '',
     [ACTIONS.EDITOR_SUMMARY]: '',
-    [ACTIONS.EDITOR_CHAT]: '',
     [ACTIONS.MANAGE_SEARCH]: '',
     [ACTIONS.MANAGE_SEARCH_CLASSIFY]: '',
     [ACTIONS.ARCHIVE_EMBED]: '',
@@ -3055,7 +3051,6 @@
     // Resta elencato perché il comportamento non cambi sotto i piedi a chi lo usa già.
     ACTIONS.EDITOR_TITLE,
     ACTIONS.EDITOR_SUMMARY,
-    ACTIONS.EDITOR_CHAT,
   ];
 
   // «NESSUNA SPIEGAZIONE» è la rinuncia di «Spiega», ma lo stesso prompt chiede

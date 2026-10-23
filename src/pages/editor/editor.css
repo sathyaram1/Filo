@@ -345,7 +345,7 @@ html, body {
   max-height: calc(100vh - 18px - max(18px, var(--filo-avvisi-barra, 0px)));
   overflow-y: auto; overflow-x: hidden;
   scrollbar-width: thin;
-  pointer-events: none; z-index: 2147482400;
+  pointer-events: none; z-index: 2147482600;
 }
 /* Col pannello aperto gli avvisi stanno alla sua sinistra: l'«Annulla» resta da cliccare. */
 html.pd-aperto .ed-toasts { right: calc(18px + var(--pd-destra, 0px) + var(--pd-larghezza, 272px)); }

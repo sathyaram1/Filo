@@ -65,7 +65,9 @@ async function chatDellEditor(app, openTab, titolo, domanda) {
   await editor.locator('.ed-doc-item-input').fill(titolo);
   await editor.locator('.ed-doc-item-input').press('Enter');
   await expect(editor.locator('#docTitle')).toHaveText(titolo);
-  await editor.keyboard.press('Escape');
+  // Il menu dei documenti si richiude dal suo bottone, come l'ha aperto.
+  await editor.click('#docSwitch');
+  await expect(editor.locator('#docPop')).toBeHidden();
   await apriAiuto(app, editor);
   await chiediAllAiuto(editor, domanda);
   await expect(editor.locator('.sn-sidebar-msg-assistant', { hasText: 'licheni va accorciato' })).toBeVisible({ timeout: 10_000 });
