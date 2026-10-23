@@ -193,3 +193,7 @@ export async function tastieraDi(app, page) {
   if (page.url().startsWith('filo://')) return page;
   return paginaDelloStrato(app, page);
 }
+
+// La Page dove sta il pannello Aiuto della scheda (#1509.3): lo strato sopra un sito, la scheda su una pagina di Filo.
+// I suoi locator, i suoi clic e i suoi tasti arrivano al pannello.
+export const paginaDellAiuto = tastieraDi;
