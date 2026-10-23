@@ -36,13 +36,16 @@
     });
   }
 
+  // Nel deposito entrano solo blob cifrati (#602), e storage.rules ammette solo questo tipo con
+  // questa estensione (#1518): il tipo vero del file sta nel documento del feedback, non qui.
+  const ATTACHMENT_CONTENT_TYPE = 'application/octet-stream';
+  const ATTACHMENT_EXT = 'octetstream';
+
   // FONTE UNICA della forma del nome di un allegato: storage.rules concede la creazione SOLO
   // su un nome fatto così. Cambiarla qui e non là = dal deploy nessun allegato si carica.
-  function attachmentPath(mimeOrExt, label) {
-    const raw = String(mimeOrExt || '');
-    const ext = (raw.includes('/') ? raw.split('/')[1] : raw).replace(/[^a-z0-9]/gi, '').slice(0, 12) || 'bin';
+  function attachmentPath(label) {
     const et = String(label || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
-    return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
+    return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ATTACHMENT_EXT}`;
   }
 
   // Host → inizi ammessi, NOME DEL DEPOSITO compreso: REST di Firebase e diretto di Storage.
