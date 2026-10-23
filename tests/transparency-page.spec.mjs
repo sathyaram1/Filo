@@ -144,7 +144,7 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
     session.defaultSession.protocol.handle(schema, (req) => (new URL(req.url).hostname === host
       ? new Response('<!doctype html><meta charset="utf-8"><title>Fonte</title><h1>Fonte</h1>', { headers: { 'content-type': 'text/html; charset=utf-8' } })
       : net.fetch(req, { bypassCustomProtocolHandlers: true })));
-  }, { schema: new URL(href).protocol.slice(0, -1), host: new URL(href).hostname });
+  }, { schema: new globalThis.URL(href).protocol.slice(0, -1), host: new globalThis.URL(href).hostname });
 
   await link.click();
 
