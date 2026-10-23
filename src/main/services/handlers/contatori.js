@@ -6,6 +6,7 @@ const { soloFilo } = require('./origine');
 const auth = require('../../auth/google-auth');
 const Servizio = require('../contatori');
 const Finestra = require('../contatoriFinestra');
+const Somme = require('../contatoriSomme');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
 
