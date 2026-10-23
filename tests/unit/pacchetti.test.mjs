@@ -162,15 +162,54 @@ describe('installare senza rompere niente', () => {
   test('npm che fallisce, o finisce senza installare, non ferma l\'avvio e lo dice', () => {
     const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
     try {
+      const comune = { cartellaBlocchi: dir, attendi: () => { throw new Error('il blocco di prima non è stato tolto'); } };
       for (const risposta of [{ codice: 1, errore: '' }, { codice: 0, errore: '' }, undefined]) {
         const righe = [];
-        const r = allineaPacchetti(dir, { installa: () => risposta, log: (s) => righe.push(s) });
+        const r = allineaPacchetti(dir, { ...comune, installa: () => risposta, log: (s) => righe.push(s) });
         assert.equal(r.esito, 'non riuscita');
         assert.deepEqual(r.mancanti.map((v) => v.nome), ['hash-wasm']);
         assert.match(righe.at(-1), /mancano ancora: hash-wasm 4\.12\.0\. Filo parte lo stesso/);
       }
-      const r = allineaPacchetti(dir, { installa: () => { throw new Error('spawn npm ENOENT'); }, log: () => {} });
+      const r = allineaPacchetti(dir, { ...comune, installa: () => { throw new Error('spawn npm ENOENT'); }, log: () => {} });
       assert.equal(r.esito, 'non riuscita');
+      assert.deepEqual(readdirSync(dir).filter((n) => n.endsWith('.lock')), [], 'il blocco se ne va anche quando npm cade');
+    } finally { togliCartella(dir); }
+  });
+
+  test('il doppio clic: il secondo avvio aspetta l\'installazione del primo invece di farne un\'altra insieme', () => {
+    const dir = progetto(LOCK_FILO, { 'node_modules/electron': '44.7.0' });
+    try {
+      const primo = installatoreFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      const secondo = installatoreFinto(dir, {});
+      let attese = 0;
+      let righe = [];
+      const r = allineaPacchetti(dir, {
+        cartellaBlocchi: dir, log: () => {},
+        installa: (x) => {
+          // Mentre il primo installa, parte il secondo.
+          const r2 = allineaPacchetti(dir, {
+            cartellaBlocchi: dir, installa: secondo.installa, log: (s) => righe.push(s),
+            attendi: () => { attese++; if (attese === 1) primo.installa(x); rmSync(join(dir, readdirSync(dir).find((n) => n.endsWith('.lock')))); },
+          });
+          assert.equal(r2.esito, 'allineati', 'finito il primo, al secondo non resta niente');
+          return { codice: 0, errore: '' };
+        },
+      });
+      assert.equal(r.esito, 'installati');
+      assert.equal(primo.chiamate.length, 1);
+      assert.deepEqual(secondo.chiamate, [], 'npm non è partito due volte insieme');
+      assert.match(righe.join('\n'), /Un altro avvio sta installando/);
+
+      // Un blocco rimasto da un avvio morto a metà non ferma per sempre: oltre il tetto si riprende.
+      rmSync(join(dir, 'node_modules', 'hash-wasm'), { recursive: true });
+      const vecchio = join(dir, 'vecchio');
+      mkdirSync(vecchio);
+      const terzo = installatoreFinto(dir, { 'node_modules/hash-wasm': '4.12.0' });
+      allineaPacchetti(dir, { cartellaBlocchi: vecchio, installa: () => { writeFileSync(join(vecchio, readdirSync(vecchio)[0]), ''); throw new Error('morto'); }, log: () => {} });
+      writeFileSync(join(vecchio, 'filo-pacchetti-finto.lock'), '');
+      const lontano = () => Date.now() + 16 * 60_000;
+      const r3 = allineaPacchetti(dir, { cartellaBlocchi: vecchio, installa: terzo.installa, log: () => {}, ora: lontano, attendi: () => { throw new Error('non doveva aspettare'); } });
+      assert.equal(r3.esito, 'installati');
     } finally { togliCartella(dir); }
   });
 
