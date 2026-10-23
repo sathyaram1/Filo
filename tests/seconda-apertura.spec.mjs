@@ -2,7 +2,7 @@
 // Riaprirlo (collegamento, o un link d'invito da fuori) deve rifare la finestra con le sue schede, non andare in errore.
 // Regola: mostraFinestraNormale in src/main/window.js; la logica è provata anche in tests/unit/secondaApertura.test.mjs.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 
 // La pagina di accesso la serve Filo stesso: niente rete, e i verdetti sui siti restano fuori.
 async function servi(app, pagine) {
@@ -38,8 +38,8 @@ const stato = (app) => app.evaluate(({ BrowserWindow }) => {
 // I passi della segnalazione fino a Filo acceso senza finestra principale: la finestrella di accesso lo tiene in vita.
 async function chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer) {
   await servi(app, { 'accounts.google.com/o/oauth2/v2/auth': '<title>Accedi - Account Google</title><h1>Passkey</h1>' });
-  const negozio = testServer.html(NEGOZIO);
-  const page = await testServer.openReady(openTab, NEGOZIO.length ? negozio : '');
+  const page = await testServer.openReady(openTab, NEGOZIO);
+  const negozio = page.url();
   await page.click('#b');
   await expect.poll(async () => (await stato(app)).accesso, { message: 'la finestrella di accesso non si è aperta', timeout: 10000 }).toBe(1);
   await shell.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
@@ -71,13 +71,12 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, ['filo.exe', 'filo://invito/ABCD'], process.cwd()); });
   await expect.poll(async () => (await stato(app)).normale?.schede || [], { message: 'l\'invito non ha aperto Crediti', timeout: 15000 })
     .toContainEqual(expect.stringMatching(/^filo:\/\/credits\//));
-  const crediti = await expect.poll(() => app.windows().find((w) => w.url().startsWith('filo://credits/')) || null, { timeout: 15000 }).not.toBeNull()
-    .then(() => app.windows().find((w) => w.url().startsWith('filo://credits/')));
+  const crediti = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/'), 'la pagina Crediti non è nata');
   await expect(crediti.locator('#walletNote')).toContainText('otto caratteri', { timeout: 15000 });
 
   // Mac: la finestra si chiude e Filo resta acceso; il link arriva con open-url, e fa lo stesso.
-  const fineste = app.windows().find((w) => w.url().startsWith('filo://shell/shell.html'));
-  await fineste.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
+  const barra = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/shell.html'), 'la barra della finestra rifatta non c\'è');
+  await barra.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(async () => (await stato(app)).normale, { timeout: 10000 }).toBeNull();
   await app.evaluate(({ app: a }) => { a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCD'); });
   await expect.poll(async () => (await stato(app)).normale?.schede || [], { message: 'su Mac l\'invito non ha aperto Crediti', timeout: 15000 })
