@@ -1,15 +1,6 @@
-// Le chiavi di default "baked" devono raggiungere gli utenti.
-//
-// default-keys.js è il modulo del main che fornisce le chiavi predefinite. In
-// produzione le chiavi NON stanno nel repo: la CI le scrive in
-// src/main/config/default-keys.generated.json (gitignorato, bundlato nel build).
-// Questo test verifica la PRECEDENZA che fa funzionare la propagazione:
-//   file generato  >  env FILO_DEFAULT_*  >  vuoto
-//
-// Pre-condizione che senza il fix fallirebbe: prima default-keys leggeva SOLO
-// process.env, quindi le chiavi baked nel file generato non venivano mai usate
-// a runtime sulla macchina utente (l'env è vuoto lì) → ogni utente restava
-// senza chiavi. Ora il file generato vince e le chiavi arrivano davvero.
+// Le chiavi di default incastonate dal bake raggiungono gli utenti: precedenza file generato > env FILO_DEFAULT_* > vuoto.
+// Eccezione: OpenRouter si legge solo dall'env, perché è uscita dall'installer pubblico (#598) e una copia nel file non deve arrivare a nessuno.
+// Quali chiavi possono stare nel file lo decide tests/unit/chiaviNelPacchettoPubblico.test.mjs.
 
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
@@ -49,21 +40,23 @@ test.afterEach(() => {
 });
 
 test('default-keys: il file generato ha la precedenza su env', () => {
+  writeFileSync(GEN_PATH, JSON.stringify({ apiKeys: { tavily: 'tav-baked' } }), 'utf8');
+  expect(loadKeys({ FILO_DEFAULT_TAVILY_KEY: 'tav-env' }).tavily).toBe('tav-baked');
+
+  // Per la chiave vuota nel file si ricade sull'env.
+  writeFileSync(GEN_PATH, JSON.stringify({ apiKeys: { tavily: '' } }), 'utf8');
+  expect(loadKeys({ FILO_DEFAULT_TAVILY_KEY: 'tav-env' }).tavily).toBe('tav-env');
+});
+
+test('default-keys: OpenRouter non si legge dal file generato, solo dall’env', () => {
   writeFileSync(
     GEN_PATH,
-    JSON.stringify({ apiKeys: { openrouter: 'or-baked', tavily: '' } }),
+    JSON.stringify({ apiKeys: { openrouter: 'or-baked', tavily: 'tav-baked' } }),
     'utf8'
   );
-
-  const keys = loadKeys({
-    FILO_DEFAULT_OPENROUTER_KEY: 'or-env',
-    FILO_DEFAULT_TAVILY_KEY: 'tav-env',
-  });
-
-  // File generato vince dove ha un valore...
-  expect(keys.openrouter).toBe('or-baked');
-  // ...ma per la chiave vuota nel file si ricade sull'env.
-  expect(keys.tavily).toBe('tav-env');
+  expect(loadKeys({ FILO_DEFAULT_OPENROUTER_KEY: '', FILO_DEFAULT_TAVILY_KEY: '' }))
+    .toEqual({ openrouter: '', tavily: 'tav-baked' });
+  expect(loadKeys({ FILO_DEFAULT_OPENROUTER_KEY: 'or-env' }).openrouter).toBe('or-env');
 });
 
 test('default-keys: senza file generato usa le env (dev locale)', () => {
