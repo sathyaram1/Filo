@@ -2364,7 +2364,7 @@ async function eseguiAzioneFilo(action, {
   }
 
   // CHIUDI_SCHEDE (#413): le schede le sceglie il main dai numeri che il modello aveva davanti, prima del gate, così il
-  // popup le nomina; all'OK si chiudono quelle mostrate (bersagliMostrati). La scheda della chat non si chiude mai.
+  // popup le nomina; all'OK si chiudono quelle mostrate (bersagliMostrati). La scheda della chat solo se nominata.
   if (type === 'CHIUDI_SCHEDE') {
     const tm = winOf(sender)?._filoTabs;
     if (!tm) return { executed: false, kept: false, output: { error: 'nessuna finestra con schede' } };
@@ -2373,7 +2373,7 @@ async function eseguiAzioneFilo(action, {
     if (confirmed) {
       const visti = bersagliMostrati(sender, action);
       const ids = visti && Array.isArray(visti.targetIds) ? visti.targetIds : [];
-      scelta = { chiudere: tm.tabs.filter((t) => ids.includes(t.id) && t.id !== chat), restano: [] };
+      scelta = { chiudere: tm.tabs.filter((t) => ids.includes(t.id)), restano: [] };
     } else {
       const viste = Array.isArray(schedeViste) ? schedeViste
         : (await FiloState.listTabs({ windowId: winOf(sender)?.id ?? null })).map((t) => t.id);
@@ -2384,7 +2384,7 @@ async function eseguiAzioneFilo(action, {
       if (scelta.errore) return { executed: false, kept: false, output: { error: scelta.errore } };
     }
     const nome = await nomeDellaScheda();
-    action._targets = scelta.chiudere.map(nome);
+    action._targets = scelta.chiudere.map((t) => (t.id === chat ? 'questa scheda, con la conversazione' : nome(t)));
     action._targetIds = scelta.chiudere.map((t) => t.id);
     action._restano = scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
     action._inIncognito = !!tm.incognito;
@@ -4648,7 +4648,6 @@ const LEGACY_CONTINUE_NUDGE =
 // e un modello che la ritenta lo farebbe comparire due volte.
 // I nomi delle schede li scrivono i siti: tornano recintati, coi perché di Filo fuori dal recinto.
 const PERCHE_RESTA_APERTA = {
-  chat: 'Non chiusa perché è la scheda di questa conversazione (se vuole, la chiude l\'utente)',
   testo: 'Lasciate aperte perché hanno del testo scritto e non ancora inviato',
   sempre: 'Lasciate aperte perché sono di siti che l\'utente tiene sempre aperti',
   chiusa: 'Non c\'erano più',

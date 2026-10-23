@@ -1,5 +1,5 @@
 // #413 — quali schede chiude CHIUDI_SCHEDE: i numeri dell'elenco che il modello aveva davanti, un sito, o tutte tranne
-// alcune; la scheda della chat resta sempre, e un «tutte» lascia il testo non inviato e i siti tenuti sempre aperti.
+// alcune; la scheda della chat solo se nominata, e un «tutte» lascia il testo non inviato e i siti tenuti sempre aperti.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -51,11 +51,11 @@ test('per sito: tutte le sue schede, sottodomini compresi, col nome o col domini
   assert.equal(nessuna.sito, 'netflix.com');
 });
 
-test('la scheda della chat non si chiude mai, e se era stata nominata lo si dice', () => {
-  const r = risolvi({ schede: [1, 2] }, base);
-  assert.deepEqual(ids(r), [2]);
-  assert.deepEqual(r.restano.map((x) => [x.tab.id, x.perche]), [[1, 'chat']]);
+test('la scheda della chat si chiude solo nominata col suo numero, mai con «tutte» o col sito', () => {
+  assert.deepEqual(ids(risolvi({ schede: [1, 2] }, base)), [1, 2]);
   assert.deepEqual(risolvi({ tutte: true }, base).restano, [], 'in un «tutte» la chat resta in silenzio');
+  assert.ok(!ids(risolvi({ tutte: true }, base)).includes(1));
+  assert.ok(!ids(risolvi({ sito: 'newtab' }, base)).includes(1));
 });
 
 test('in blocco restano il testo non inviato e, a «tutte», i siti sempre aperti; per numero si chiudono', () => {

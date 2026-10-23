@@ -53,7 +53,7 @@
       id: 'close-tab', title: 'Chiudi le schede', category: 'navigation',
       desc: 'Chiude la scheda corrente, o chiedendolo a Filo le schede che dici tu: alcune, quelle di un sito, tutte tranne qualcuna. Le pagine chiuse restano nel filo della home, da cui le riapri.',
       invoke: 'Pulsante di chiusura sulla scheda, la barra laterale → "Chiudi pagina", oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito. Per più schede insieme chiedilo a Filo nella home: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail».',
-      doesNot: 'Le finestre in incognito e le pagine interne di Filo non restano nel filo. Filo non chiude la scheda in cui gli stai scrivendo. Chiudendo tutte le schede o quelle di un sito lascia aperte quelle con del testo scritto e non ancora inviato, e a «chiudile tutte» anche quelle dei siti che tieni sempre aperti: te le nomina, e le chiude se glielo chiedi. L’Aiuto sopra un sito non chiude schede: lo fa la chat della home.',
+      doesNot: 'Le finestre in incognito e le pagine interne di Filo non restano nel filo. La scheda in cui gli stai scrivendo la chiude solo se glielo chiedi proprio per lei. Chiudendo tutte le schede o quelle di un sito lascia aperte quelle con del testo scritto e non ancora inviato, e a «chiudile tutte» anche quelle dei siti che tieni sempre aperti: te le nomina, e le chiude se glielo chiedi. L’Aiuto sopra un sito non chiude schede: lo fa la chat della home.',
     },
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',

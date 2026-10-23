@@ -656,9 +656,8 @@
         return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
       },
     },
-    // Le schede le sceglie il main dai numeri che il modello aveva davanti (`_targets` i nomi, `_targetIds` su cui
-    // agire all'OK), mai l'LLM (#413). Una scheda chiusa si riapre dal filo della home: costo 1; più d'una insieme
-    // è il freno di CANCELLA_SVEGLIA, così dopo una pagina letta «chiudile tutte» chiede.
+    // Le schede (`_targets`, `_targetIds`) le sceglie il main, mai l'LLM (#413). Una si riapre dal filo della home:
+    // costo 1; più d'una insieme è il freno di CANCELLA_SVEGLIA, così dopo una pagina letta «chiudile tutte» chiede.
     CHIUDI_SCHEDE: {
       costo: (a) => (targetCount(a) === 1 ? 1 : 2),
       campo: null,

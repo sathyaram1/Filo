@@ -404,7 +404,7 @@
     CHIUDI_SCHEDE: {
       description: 'CHIUDE le schede che l\'utente indica, in questa finestra, come il pulsante di chiusura: "chiudi tutte le schede tranne questa", "chiudi YouTube", "chiudi la 3 e la 5", "chiudi tutto tranne Gmail". Le pagine chiuse restano nel filo della home, da dove l\'utente le riapre. '
         + 'Le schede si indicano col numero che hanno in TAB APERTE (`schede`), oppure con `sito` (tutte quelle di un sito, anche oltre l\'elenco), oppure con `tutte`; `tranne` sono i numeri da lasciare aperti. '
-        + 'La scheda [QUESTA CHAT] non la chiudi mai: "tranne questa" detto qui è lei, quindi basta `tutte`. '
+        + '"Questa" detto qui è [QUESTA CHAT]: con `tutte` o `sito` resta sempre aperta, quindi per "tutte tranne questa" basta `tutte`; la chiudi solo se l\'utente chiede proprio lei ("chiudi questa scheda", "anche questa"), col suo numero in `schede`. '
         + 'Con `tutte` o `sito` restano aperte anche le schede con del testo scritto e non inviato, e con `tutte` quelle dei siti tenuti sempre aperti: l\'esito te le nomina, e se l\'utente insiste le chiudi col loro numero. '
         + 'Per riordinare lasciando a Filo la scelta di cosa non serve più c\'è PULISCI_TAB.',
       properties: {

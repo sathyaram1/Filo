@@ -33,10 +33,10 @@ function richiesta(action) {
 }
 
 // `schede`: quelle della finestra ({ id, url }). `viste`: gli id nell'ordine dell'elenco che il modello aveva davanti
-// (anche oltre i numerati); `numerate`: quanti ne mostrava col numero. `chat`: la scheda della conversazione, che non si
-// chiude. `resta(tab, modo)`: perché una scheda presa in blocco ('tutte' o 'sito') resta aperta, o ''.
-// Torna { errore } oppure { chiudere: [tab], restano: [{ tab, numero?, perche }] }; `perche` fra chat, chiusa, nuova
-// e quelli di `resta`.
+// (anche oltre i numerati); `numerate`: quanti ne mostrava col numero. `chat`: la scheda della conversazione, che si
+// chiude solo nominata col suo numero. `resta(tab, modo)`: perché una scheda presa in blocco ('tutte' o 'sito') resta
+// aperta, o ''. Torna { errore } oppure { chiudere: [tab], restano: [{ tab, numero?, perche }] }; `perche` fra chiusa,
+// nuova e quelli di `resta`.
 function risolvi(action, { schede = [], viste = [], numerate = 12, chat = null, resta = () => '' } = {}) {
   const r = richiesta(action);
   if (r.schede === null || r.tranne === null) {
@@ -64,10 +64,7 @@ function risolvi(action, { schede = [], viste = [], numerate = 12, chat = null, 
     if (prese.has(tab.id)) return;
     prese.add(tab.id);
     if (tenute.has(tab.id)) return;
-    if (tab.id === chat) {
-      if (modo === 'numero') restano.push({ tab, perche: 'chat' });
-      return;
-    }
+    if (tab.id === chat && modo !== 'numero') return;
     // Una scheda che il modello non aveva davanti (aperta in questo turno) non la prende un «tutte».
     const perche = modo === 'numero' ? '' : (inElenco.has(tab.id) ? resta(tab, modo) : 'nuova');
     if (perche) restano.push({ tab, perche });
