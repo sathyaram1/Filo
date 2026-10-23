@@ -2605,6 +2605,9 @@
     // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
     // `schede`: a schermo intero la fila delle schede scende col mouse sul bordo alto, con le stesse attese (#1246).
     barraLaterale: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schede: true },
+    // Il pannello di destra delle app di Filo (#1433): lo stesso meccanismo della barra laterale, sul bordo destro delle
+    // pagine filo:// che ne hanno uno. `bloccato`: resta aperto e spinge il contenuto invece di coprirlo.
+    pannelloDestro: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, bloccato: false },
     // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
     // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     avvisoSchermoPieno: { durataMs: 3000 },
@@ -2945,6 +2948,24 @@
     };
   }
 
+  // Il pannello di destra delle app: stessi limiti e stessa lettura della barra, più il lucchetto.
+  function opzioniPannelloDestro(v) {
+    const o = v && typeof v === 'object' ? v : {};
+    const d = DEFAULT_SETTINGS.pannelloDestro;
+    const ms = (k) => {
+      const n = Math.round(Number(o[k]));
+      const [min, max] = BARRA_LATERALE_LIMITI[k];
+      return Number.isFinite(n) && o[k] !== null && o[k] !== '' ? Math.max(min, Math.min(max, n)) : d[k];
+    };
+    return {
+      spinta: o.spinta !== false,
+      attesaMs: ms('attesaMs'),
+      uscitaMs: ms('uscitaMs'),
+      striscia: o.striscia !== false,
+      bloccato: o.bloccato === true,
+    };
+  }
+
   // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
   const AVVISO_SCHERMO_PIENO_LIMITI = Object.freeze({ durataMs: Object.freeze([1000, 10000]) });
   function opzioniAvvisoSchermoPieno(v) {
@@ -3198,6 +3219,7 @@
     ALLEGATI_CHAT,
     AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
+    opzioniPannelloDestro,
     AVVISO_SCHERMO_PIENO_LIMITI,
     opzioniAvvisoSchermoPieno,
     testoLeggibile,
