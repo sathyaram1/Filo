@@ -203,13 +203,14 @@
     if (!Tokens) return;
     const salvati = mappa || {};
     const nomi = new Set([...Object.keys(currentOverrides), ...Object.keys(salvati)]);
+    const mio = (name) => tokenInCorso.has(name) || tokenDaSalvare.has(name) || tokenInViaggio.has(name);
     for (const name of nomi) {
-      if (tokenInCorso.has(name) || tokenDaSalvare.has(name)) continue;
+      if (mio(name)) continue;
       if (Object.prototype.hasOwnProperty.call(salvati, name)) currentOverrides[name] = salvati[name];
       else delete currentOverrides[name];
     }
     for (const name of Tokens.names()) {
-      if (!tokenInCorso.has(name) && !tokenDaSalvare.has(name)) renderTokenRow(name);
+      if (!mio(name)) renderTokenRow(name);
     }
   }
 
