@@ -102,6 +102,15 @@ class AvvisiSopraPagina {
   _riserva(px) {
     const wc = this._wcAttiva();
     if (wc) this._scriviRiserva(wc, px);
+    // Anche lo strato dei riquadri sopra la scheda (#1509.3): l'Aiuto di un sito sta lì.
+    let strato = null;
+    try { strato = wc ? require('./stratoDeiRiquadri').stratoDellaPagina(wc) : null; } catch (_) { strato = null; }
+    if (strato) this._scriviRiserva(strato, px);
+  }
+
+  // Uno strato nato dopo gli avvisi: si mette subito al passo con la sua scheda, se è quella davanti.
+  nelloStrato(v, wc) {
+    if (v && wc && this._wcAttiva() === wc) this._scriviRiserva(v, this.altezza);
   }
 
   // Un foglio inserito mentre la scheda carica può finire nel documento nuovo senza che se ne tenga la chiave, e
