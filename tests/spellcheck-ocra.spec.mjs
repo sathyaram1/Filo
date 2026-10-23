@@ -276,11 +276,13 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
     const v = await dove(parola);
     expect({ parola, dx: Math.abs(b.x - v.x) < 3, dy: Math.abs(b.y - v.y) < 3 }).toEqual({ parola, dx: true, dy: true });
   }
-  const copia = await page.locator('.sn-spell-overlay div').first().evaluate((el) => {
+  // Lo strato si ridisegna (fine di un passaggio, un controllo che torna): un nodo già sostituito ha lo stile vuoto, e
+  // si rilegge.
+  const copia = () => page.locator('.sn-spell-overlay div').first().evaluate((el) => {
     const cs = getComputedStyle(el);
     return { colore: cs.color, bordo: cs.borderTopColor };
   });
-  expect(copia).toEqual({ colore: 'rgba(0, 0, 0, 0)', bordo: 'rgba(0, 0, 0, 0)' });
+  await expect.poll(copia, { timeout: 3000 }).toEqual({ colore: 'rgba(0, 0, 0, 0)', bordo: 'rgba(0, 0, 0, 0)' });
   await page.screenshot({ path: 'tests/.shots/1115-ocra-righe.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
 });
 
