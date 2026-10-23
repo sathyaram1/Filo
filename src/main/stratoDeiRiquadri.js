@@ -190,9 +190,8 @@ class StratoDeiRiquadri {
 
   // AIUTO_ESITO dal frame principale della pagina.
   esitoDallaPagina(sender, d) {
-    const s = sender && this.strati.get(sender.wc);
-    let principale = false;
-    try { principale = !sender.frame || !sender.frame.parent; } catch (_) { principale = false; }
+    const s = sender && !sender.strato ? this.strati.get(sender.wc) : null;
+    const principale = principaleDi(sender);
     const rid = String((d && d.rid) || '');
     if (!s || !principale || !rid || rid.length > ID_MAX || !s.attese.has(rid)) return { ok: false };
     if (pesa(d.esito) > DATI_MAX_BYTE) { s.attese.get(rid)({ ok: false, error: 'troppo', limite: DATI_MAX_BYTE }); return { ok: false }; }
