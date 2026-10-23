@@ -30,6 +30,7 @@
         'Quando Filo scarica da solo un\'immagine di un altro sito, per descriverla, copiarla, salvarla o leggerla nell\'Aiuto, a quel sito manda solo i cookie che manderebbe la pagina. Prima mandava anche quelli del tuo accesso, che il sito tiene per quando lo apri tu. Vale anche per l\'icona delle schede.',
         'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
         'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
+        'La pulizia automatica delle schede archivia davvero quelle che non tocchi da ore. Prima una pagina che si ricaricava o scorreva da sola, come una chat, faceva sembrare Filo sempre in uso, e alla riapertura ogni scheda risultava appena usata. Se la pulizia non riesce a valutare le schede, per esempio coi crediti finiti, un avviso ti dice perché.',
       ],
     },
     {
