@@ -34,7 +34,7 @@
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
 //
-//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | ''
+//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | 'voce' | ''
 //     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
 //     collegamento al «Riprova» (che su questi codici non porta da nessuna
 //     parte finché non si cambia qualcosa).
