@@ -21,10 +21,23 @@ scrivi l'elenco dei test rossi dopo il rebase.
 
 <!-- includi: _cornice-feedback.md -->
 
-1. `git fetch origin main && git rebase origin/main`. In ogni conflitto tieni
-   **tutte e due le intenzioni**: quella del lavoro e quella arrivata su
-   `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
-   punto, non indovinarla.
+1. Due comandi, ognuno da solo nella sua chiamata, così come sono scritti:
+
+   ```bash
+   git fetch origin main
+   git rebase origin/main
+   ```
+
+   In ogni conflitto tieni **tutte e due le intenzioni**: quella del lavoro e
+   quella arrivata su `main`. Per capire la seconda leggi il commit di `main`
+   che ha toccato quel punto, non indovinarla. Risolto un file, `git add
+   <file>`; risolti tutti, `git rebase --continue`. Il push forzato non tocca a
+   te: lo fa il salvataggio automatico.
+
+   Niente `&&`, niente `cd … &&` davanti, niente `git -C`: un comando
+   composto o scritto in un'altra forma il controllo dei permessi lo giudica
+   da capo. Se ti ferma, è un guasto (gruppo `guasto: permessi git`): niente
+   `git merge` né altre strade al posto del rebase.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
    conflitto è codice che nessuno ha verificato.
 3. Lancia `npm run test:unit` e gli spec delle aree in conflitto. Un rosso nato
