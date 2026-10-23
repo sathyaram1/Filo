@@ -46,9 +46,11 @@ export async function aggiungiStrumento(page, id) {
 // Dove si fa il tasto destro su uno strumento: sui campi di testo resta il menu del testo.
 const BERSAGLIO = { 'search-replace': '[data-sr="all"]', font: '.ed-font-button' };
 
-// Le regolazioni di uno strumento: dall'ingranaggio, che li elenca tutti, o dal tasto destro sullo strumento nel pannello.
-export async function apriImpostazioni(page, id, { via = 'ingranaggio' } = {}) {
+// Le regolazioni di uno strumento: dall'ingranaggio, che li elenca tutti, o dal tasto destro sullo strumento nel
+// pannello. Senza `via`, l'ingranaggio se c'è.
+export async function apriImpostazioni(page, id, { via } = {}) {
   await apriPannello(page);
+  if (!via) via = (await strumento(page, 'settings').count()) ? 'ingranaggio' : 'menu';
   if (via === 'menu') {
     await strumento(page, id).locator(BERSAGLIO[id] || '.pd-contenuto').first().click({ button: 'right' });
     await page.locator('.pd-menu .sn-select-option', { hasText: 'Impostazioni di' }).click();
