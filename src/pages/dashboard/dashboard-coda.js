@@ -498,9 +498,8 @@
     else if (v.k === 'msg' && v.spontaneo && n.classList.contains('dash-bubble')) d.setBubbleText(n, v.text);
   }
 
-  // Pagine entrate, rititolate o tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che
-  // il filo ha adesso, e quelle nuove entrano al loro posto. Un gruppo si chiama come la sua prima pagina: tolta quella,
-  // è un'altra riga, e la vecchia se ne va.
+  // Pagine entrate, rititolate o tolte da qualunque strada: le righe si rifanno su quelle che il filo ha adesso, le nuove
+  // entrano al loro posto. Un gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga e la vecchia va.
   // `importate`: un backup ha messo nel tratto già disegnato anche chat e pagine sue, che compaiono al loro posto (#1256).
   const stessoGruppo = (g, v) => !!g && g.ts === v.ts && JSON.stringify(g.pagine) === JSON.stringify(v.pagine);
   function ripassaPagine({ importate = false } = {}) {
