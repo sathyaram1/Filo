@@ -5,12 +5,14 @@
 (function (global) {
   'use strict';
 
-  // Un documento per pseudonimo e ora (#1461); la v3 aggiunge le misure delle chiamate ai modelli (#1464). Le copie
-  // vecchie mandano ancora la v2 e i giorni rimasti da prima la v1: le regole le tengono tutte e due.
-  const VERSIONE = 3;
-  const VERSIONE_V2 = 2;
+  // Un documento per pseudonimo e ora (#1461). I giorni rimasti in attesa da prima partono nella forma di allora.
+  const VERSIONE = 2;
   const VERSIONE_GIORNO = 1;
   const COLLEZIONE = 'contatori-giornalieri';
+  // Le misure delle chiamate ai modelli (#1464) partono in un documento a parte, con lo stesso id dell'ora: le regole
+  // dell'ora sono già vicine al tetto di mille espressioni che Firestore valuta per scrittura.
+  const VERSIONE_CHIAMATE = 1;
+  const COLLEZIONE_CHIAMATE = 'contatori-chiamate';
 
   // Il tipo di guasto di una chiamata: l'elenco chiuso della decisione dell'owner (#969).
   const ERRORI = Object.freeze(['rete', 'tempo', 'crediti', 'chiave', 'nessun_host', 'fornitore']);
