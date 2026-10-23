@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+await import(join(ROOT, 'src', 'shared', 'chatErrors.js'));
 
 test('fuori da popup.js nessun content script scrive la frase d\'errore senza il suo tasto', () => {
   const dir = join(ROOT, 'src', 'content');
