@@ -468,9 +468,9 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS fallito:', e.message || e);
         }
       }
-      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code);
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code, lastErr);
     } catch (e) {
-      return ttsFallback(e?.message || String(e));
+      return ttsFallback(e?.message || String(e), '', e);
     }
   }
 
