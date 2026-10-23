@@ -6,6 +6,9 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, menuAperto, scegliNelMenu } from './helpers/barra.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaInCasa } from './helpers/percorsi.mjs';
 
 const SHOTS = 'tests/.shots';
 
