@@ -1169,7 +1169,7 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, cacheDetta, reasoningTokensOf, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
