@@ -3519,7 +3519,8 @@ class TabManager {
       if (c.wc.isDestroyed()) return;
       if (c.assistente) {
         this.ricordaApribile(c.wc, dati.url);
-        c.wc.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
+        const verso = c.verso && !c.verso.isDestroyed() ? c.verso : c.wc;
+        verso.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
       } else {
         c.wc.send('filo:apertura-fermata', dati);
       }
