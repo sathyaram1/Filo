@@ -251,7 +251,7 @@ function registerIpcHandlers() {
   });
 
   // #1585 — il dizionario del correttore (dizionarioDiFilo.js). La pagina chiede sincrona (decide i segni mentre li
-  // disegna) e aspetta il thread del dizionario, il principale no. `null` finché non è pronto: la pagina chiede al browser.
+  // disegna) e aspetta il thread del dizionario, il principale no. `null` finché non è pronto: risponde il browser.
   const dalDizionario = (event, chiedi) => {
     let p = null;
     try { p = chiedi(require('./services/dizionarioDiFilo')); } catch (_) {}
