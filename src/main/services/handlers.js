@@ -6754,7 +6754,8 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
   const { provider: usedProvider, model: concreteModel } = result;
 
   const parsed = extractJson(result.text) || {};
-  const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
+  // Senza elenco la risposta non è «tieni tutto»: null, e chi chiama la conta come giudizio mancato (#1618).
+  const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : null;
   return { decisions, model: concreteModel, provider: usedProvider };
 }
 
