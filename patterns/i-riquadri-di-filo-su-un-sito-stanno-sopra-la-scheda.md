@@ -35,7 +35,8 @@ lì non c'è codice di altri.
   un riquadro che copre la pagina (feedback, Modifica, red-team) è tutto suo. Un gesto sullo strato è dell'interfaccia di Filo (`gestoNelloStrato`): vale per gli appunti e
   il menu di Filo, mai per finestre e permessi del sito.
 - **Tastiera ed Esc:** chi apre un riquadro ci scrive, quindi lo strato prende la tastiera; quando non ha più niente la
-  rende alla pagina. Esc premuto sulla pagina chiude il riquadro più in alto prima di ogni modalità; la scorciatoia che
+  rende alla pagina; un riquadro che copre la pagina e torna a vedersi (cambio di scheda, lo scatto del feedback) se la
+  riprende. Esc premuto sulla pagina chiude il riquadro più in alto prima di ogni modalità; la scorciatoia che
   lavora sulla selezione va nello strato se la tastiera è lì. I tasti che la scheda prende prima della pagina (chiudi,
   apri, indietro, salto di scheda, barra laterale) valgono anche scrivendo nello strato, per la scheda sotto
   (`tastoDellaScheda`). Così lo zoom: Ctrl +/-/0 e Ctrl+rotella sopra un riquadro vanno alla pagina
