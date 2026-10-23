@@ -868,9 +868,14 @@ module.exports = function register(on, ctx) {
     scarta(prima - queue.length, 'altra_identita');
   }
 
-  async function loadQueue() {
-    if (queueLoaded) return;
-    queueLoaded = true;
+  // Chi arriva mentre la lettura è in corso la aspetta: la pagina Crediti non deve vedere coda e conto ancora vuoti.
+  function loadQueue() {
+    if (!caricamentoCoda) caricamentoCoda = caricaCoda();
+    return caricamentoCoda;
+  }
+
+  async function caricaCoda() {
+    await leggiScarti();
     try {
       const saved = await globalThis.SN_STORAGE.getRaw(QUEUE_KEY, null);
       if (Array.isArray(saved) && saved.length) {
