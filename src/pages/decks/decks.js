@@ -1960,11 +1960,23 @@
         }
         host.innerHTML = `<p class="dk-module-title">Parere di Filo</p>${body}`;
         // L'hover con questo modulo attivo È il trigger (§6.1): cache-first, e uno stantio non si
-        // ricalcola mai da solo (§6.2).
-        if (!op && !pending) requestOpinions([card.id]).catch(() => {});
+        // ricalcola mai da solo (§6.2), come uno mancato.
+        if (!op && !pending && !errore) requestOpinions([card.id]).catch(() => {});
       },
     },
   };
+
+  // Il motivo prima, poi il tasto che toglie l'ostacolo (Crediti, Opzioni, Preferenze) e, accanto, quello per
+  // riprovare: finché l'ostacolo resta, riprovare rimanda la stessa richiesta allo stesso muro (#663, #828.1).
+  function erroreParereHtml(id, errore, apertura, riprova) {
+    const frase = String(errore.frase || '');
+    const pagina = window.SN_CHAT_ERRORS?.rimedioPagina?.(errore) || null;
+    const via = pagina
+      ? `<button class="dk-mod-btn dk-rimedio" data-op-rimedio="${esc(id)}" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>`
+      : '';
+    return `<p class="dk-mod-note dk-op-errore" role="status">${esc(apertura)} ${esc(frase.charAt(0).toUpperCase() + frase.slice(1))}</p>
+      <div class="dk-mod-actions">${via}<button class="dk-mod-btn" data-op-retry="${esc(id)}">${esc(riprova)}</button></div>`;
+  }
 
   // Stesso slot per preview e carosello: il modulo scelto si disegna nello stato attivo.
   function renderDetailModule(card, hostId) {
