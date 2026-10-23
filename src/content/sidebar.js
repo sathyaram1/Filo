@@ -415,7 +415,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 }
 .togli:hover, .togli:focus-visible { transform: scale(1.12); background: var(--sn-accent); color: #fff; }
 .bolla { display: flex; flex-wrap: wrap; gap: 6px; }
-:host(:not(:last-child)) .bolla { margin-bottom: 6px; }
+:host(.con-testo) .bolla { margin-bottom: 6px; }
 .bolla img { width: auto; height: auto; max-width: 100%; max-height: 160px; }
 `;
 
