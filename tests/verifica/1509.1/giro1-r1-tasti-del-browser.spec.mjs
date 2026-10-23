@@ -34,6 +34,8 @@ const aFuoco = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
 const premi = (app, keyCode, modifiers) => app.evaluate(async ({ BrowserWindow, webContents }, { k, m }) => {
   const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
   const f = webContents.getFocusedWebContents();
+  // Lo strato se ne va con la scheda chiusa o la pagina cambiata: l'indirizzo si legge prima del tasto.
+  const dove = f.getURL();
   f.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: m });
   f.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: m });
   await new Promise((ok) => setTimeout(ok, 800));
