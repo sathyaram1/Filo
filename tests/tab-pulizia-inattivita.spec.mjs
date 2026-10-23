@@ -104,7 +104,7 @@ test('una pagina che si ricarica o scorre da sola non azzera l’inattività: do
   expect(await giroInattivita(app), 'il giro è partito dopo la rotella').toBe(1);
 });
 
-test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei log, una volta per motivo (#1618)', async ({ app, shell, openTab, testServer }) => {
+test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei log, una volta per motivo (#1618)', async ({ app, openTab, testServer, avvisi }) => {
   await testServer.openReady(openTab, pagina('Vecchia'));
   await testServer.openReady(openTab, pagina('Davanti'));
   await app.evaluate(() => {
