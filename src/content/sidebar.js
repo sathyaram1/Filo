@@ -1655,21 +1655,18 @@
             }
           }
         } else {
-          const onAct = parsed.status === 'continue'
-            ? () => onUserAction(parsed.highlight)
-            : null;
           // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
           const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
           if (fermo) {
             fermata(fermo);
             parsed.highlight = null;
           } else {
-            Highlight.show(parsed.highlight.selector, {
-              note: parsed.highlight.note || '',
-              action: parsed.highlight.action,
-              value: parsed.highlight.value,
-              onAction: onAct,
-            });
+            // Il gesto dell'utente sul passo torna con il suo id: uno vecchio, dopo un passo nuovo, non conta.
+            const h = { ...parsed.highlight, id: ++passiIndicati, segui: parsed.status === 'continue' };
+            evidenziato = h.segui ? h : null;
+            await Pagina.evidenzia({
+              id: h.id, selector: h.selector, note: h.note || '', action: h.action, value: h.value, segui: h.segui,
+            }).catch(() => null);
           }
         }
       }
