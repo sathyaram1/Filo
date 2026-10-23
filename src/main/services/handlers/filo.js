@@ -319,7 +319,8 @@ module.exports = function register(on, ctx) {
     const via = lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga };
     const com = await FiloMem.descriviRiga(via);
     const id = await FiloMem.hideLine(via);
-    if (id) contatori()?.memoriaCorretta('quaderno', 'togli', com);
+    // L'Annulla sotto «Mi ricorderò» della chat (#1467) dice da dove viene; di serie è il quaderno.
+    if (id) contatori()?.memoriaCorretta(msg.da === 'chat' ? 'chat' : 'quaderno', 'togli', com);
     return { ok: true, tolta: !!id, id: id || null };
   });
 
