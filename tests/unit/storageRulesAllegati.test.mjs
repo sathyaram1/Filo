@@ -345,7 +345,7 @@ const CARICATORI = {
 
 test('ogni punto che carica nel deposito produce il tipo e il nome che le regole ammettono', async () => {
   const re = regexDelNome();
-  const tipo = /request\.resource\.contentType\s*==\s*'([^']+)'/.exec(espandi(CREATE().cond))[1];
+  const tipo = /\.contentType\s*==\s*'([^']+)'/.exec(espandi(CREATE().cond))[1];
   for (const punto of PUNTI_DI_CARICAMENTO) {
     const carica = CARICATORI[punto];
     assert.ok(carica, `${punto} carica nel deposito e questa prova non sa farlo caricare: aggiungilo a CARICATORI`);
