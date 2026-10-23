@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     open: (url) => ipcRenderer.invoke('tabs:open', { url }),
     close: (id) => ipcRenderer.invoke('tabs:close', { id }),
     activate: (id) => ipcRenderer.invoke('tabs:activate', { id }),
+    accanto: (verso) => ipcRenderer.invoke('tabs:accanto', { verso }),
     navigate: (id, url) => ipcRenderer.invoke('tabs:navigate', { id, url }),
     move: (id, toIndex) => ipcRenderer.invoke('tabs:move', { id, toIndex }),
     reserveTop: (px) => ipcRenderer.invoke('tabs:reserve-top', { px }),
