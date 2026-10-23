@@ -356,15 +356,23 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  const ttsFallback = (error, errorCode) => {
+  const ttsFallback = (error, errorCode, err = null) => {
+    // Chiave rifiutata o crediti finiti (#1344.1): l'avviso dice perché e porta alla pagina Crediti, non «non disponibile ora».
+    const W = globalThis.SN_WALLET;
+    const keyRefused = Boolean(err && W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(err));
     // I guasti tecnici hanno testi che cambiano a ogni frase: contano come un motivo solo.
-    const motivo = errorCode ? `${errorCode}|${error}` : 'guasto';
+    const motivo = errorCode ? `${errorCode}|${error}` : (keyRefused ? 'chiave' : 'guasto');
     const firstFallback = ttsFallbackAnnounced !== motivo;
     ttsFallbackAnnounced = motivo;
     // `errorCode` distingue i guasti tecnici (che il content script traduce in
     // una frase generica) dagli errori di CONFIGURAZIONE dei modelli, il cui
     // messaggio è già scritto per l'utente e va mostrato tale e quale.
-    return { ok: false, error, errorCode: errorCode || '', firstFallback };
+    return {
+      ok: false, error, errorCode: errorCode || '', firstFallback,
+      ...(keyRefused ? { keyRefused: true, status: Number(err.status) || 0, provider: err.provider || '' } : {}),
+      ...(err && typeof err.userMessage === 'string' && err.userMessage ? { userMessage: err.userMessage } : {}),
+      ...(err && err.reason === 'crediti' ? { reason: 'crediti' } : {}),
+    };
   };
 
   // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
