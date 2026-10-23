@@ -2124,10 +2124,12 @@
     encryptionBlockedMessage,
     isEncryptionError,
     sealForUpload,
-    // #582 — il confine degli allegati: la forma del nome (che storage.rules
+    // #582 — il confine degli allegati: la forma del nome e il tipo (che storage.rules
     // pretende), il riconoscimento di un URL del bucket e le intestazioni con
     // cui l'owner lo scarica. Pure, e usate anche dal main.
     attachmentPath,
+    ATTACHMENT_CONTENT_TYPE,
+    ATTACHMENT_EXT,
     isAttachmentUrl,
     attachmentFetchHeaders,
     // La scritta di un collegamento che arriva da fuori: dice dove si va (#582).
