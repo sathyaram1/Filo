@@ -12,6 +12,9 @@
       version: '0.2.249', date: '2026-10-23',
       features: [
         'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
+        'Le icone che stavano in cima al menu del tasto destro (Traduci, Screenshot, Condividi, Salva per dopo, QR code e Nuova scheda) ora sono nella barra laterale a sinistra, e agiscono sulla scheda che hai davanti. Le altre aspettano in «Altro…», in fondo alla barra. Le riordini trascinandole, e una lasciata sulla freccia di «Altro…» va messa da parte.',
+        'Se sposti un\'icona della barra laterale e poi scrivi a Filo «rimetti come prima», l\'icona torna dov\'era e il resto non cambia.',
+        'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
       ],
       fixes: [],
     },

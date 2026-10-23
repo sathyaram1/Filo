@@ -59,20 +59,6 @@
     chiedi('esegui', { n, args: D.descrivi(args, op) });
   }, { n });
 
-  // Il contagocce chiede un gesto vero, e la pagina sotto non ce l'ha: lo apre lo strato, e alla voce va il colore.
-  // Lo strato resta a schermo, vuoto, finché l'utente non sceglie un punto o rinuncia.
-  const contagocce = (fn) => () => {
-    if (!m || typeof window.EyeDropper !== 'function') { fn(); return; }
-    chiusoOra = false;
-    const s = seq;
-    new window.EyeDropper().open().then((r) => r && r.sRGBHex, () => null).then((hex) => {
-      if (!m || seq !== s) return;
-      if (!hex) { api.fuori(s); return; }
-      chiusoOra = true;
-      chiedi('esegui', { n: fn.n, args: [String(hex)], contagocce: true });
-    });
-  };
-
   // ── quello che arriva dalla scheda non diventa codice qui ───────────────
   const SVG_VIETATI = new Set(['script', 'foreignobject', 'use', 'image', 'a', 'iframe', 'style', 'animate', 'set', 'animatemotion', 'animatetransform']);
   function pulisciIcona(s) {
@@ -143,7 +129,6 @@
       if (k === 'icon') v[k] = pulisciIcona(v[k]);
       else if (v[k] && typeof v[k] === 'object') v[k] = voce(v[k]);
     }
-    if (v.nelloStrato === 'contagocce' && typeof v.onClick === 'function' && Number.isInteger(v.onClick.n)) v.onClick = contagocce(v.onClick);
     return v;
   }
 

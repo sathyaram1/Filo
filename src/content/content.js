@@ -2343,7 +2343,7 @@
     Sidebar.open(context);
   }
 
-  // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
+  // L'icona Aiuto della barra laterale: apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.passo();

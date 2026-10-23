@@ -1,21 +1,10 @@
-// "Salva per dopo" dal menu del tasto destro NON deve perdersi in silenzio se
-// la pagina cambia (redirect / reload) subito dopo il click (#334).
-//
-// Prima del fix: savePage attendeva ~120ms la cattura della miniatura PRIMA di
-// inviare il messaggio di salvataggio. Se in quella finestra la pagina navigava,
-// il contesto del content script veniva distrutto e SAVE_PAGE non partiva mai:
-// nessuna scheda in "Aperti per dopo", nessun avviso.
-//
-// Assert di SUCCESSO (non assenza d'errore): dopo aver cliccato "Salva per dopo"
-// e aver fatto navigare via la pagina immediatamente, la scheda DEVE comparire
-// in "Aperti per dopo" con l'URL originale. Senza il fix questo test è rosso
-// (nessuna pagina salvata); col fix è verde (il salvataggio parte al click,
-// prima di ogni attesa, e la miniatura è best-effort).
+// #334 — «Salva per dopo» non si perde in silenzio se la pagina cambia (redirect, ricarica) subito dopo il clic:
+// il salvataggio parte al clic, prima di attendere la miniatura, che è best-effort. Il clic è nella barra laterale.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
-test('Salva per dopo resiste al redirect immediato dopo il click', async ({ openTab, testServer }) => {
+test('Salva per dopo resiste al redirect immediato dopo il click', async ({ app, openTab, testServer }) => {
   const urlA = testServer.html(
     `<!doctype html><html><head><title>Pagina da salvare</title></head>
      <body style="margin:0;height:100vh;background:#fff"></body></html>`,
@@ -32,11 +21,7 @@ test('Salva per dopo resiste al redirect immediato dopo il click', async ({ open
     { timeout: 8000 },
   );
 
-  // Apre il menu tasto destro e clicca l'icona "Salva per dopo".
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(btn).toBeVisible();
-  await btn.click();
+  await premiNellaBarra(app, 'saveForLater');
 
   // Redirect IMMEDIATO: simula un sito che si ricarica / reindirizza nel decimo
   // di secondo subito dopo il click, dentro la finestra della cattura miniatura.

@@ -1,11 +1,6 @@
-// #839 — «Salva per dopo» dà lo stesso risultato dal menu e da Alt+S: miniatura
-// piccola (JPEG ~320 px, sotto 60 KB), conferma cliccabile, scheda che si chiude.
-// Le miniature grandi già salvate si rimpiccioliscono una volta, senza perdere
-// voci, date o categorie; lo Screenshot resta a piena risoluzione.
-//
-// Senza il fix: dal menu la miniatura era la schermata intera in PNG (centinaia
-// di KB), da Alt+S un PNG largo 320 e nessuna conferma; i dati vecchi restavano
-// com'erano.
+// #839 — «Salva per dopo» dà lo stesso risultato dalla barra laterale e da Alt+S: miniatura piccola (JPEG ~320 px, sotto
+// 60 KB), conferma cliccabile, scheda che si chiude. Le miniature grandi già salvate si rimpiccioliscono una volta,
+// senza perdere voci, date o categorie; lo Screenshot resta a piena risoluzione.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
@@ -16,7 +11,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOGLIA = 60 * 1024;
@@ -69,20 +64,17 @@ async function attendiHome(app) {
   return home;
 }
 
-test('dal menu la miniatura salvata è piccola, e lo Screenshot resta a piena risoluzione', async ({ app, openTab, testServer }) => {
-  const url = testServer.html(PAGINA_RICCA('Dal menu'));
+test('dalla barra laterale la miniatura salvata è piccola, e lo Screenshot resta a piena risoluzione', async ({ app, openTab, testServer }) => {
+  const url = testServer.html(PAGINA_RICCA('Dalla barra'));
   const page = await openTab(url);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
 
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(btn).toBeVisible();
-  await btn.click();
+  await premiNellaBarra(app, 'saveForLater');
   await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
 
-  controllaPiccola(await attendiMiniatura(app, url), 'menu');
+  controllaPiccola(await attendiMiniatura(app, url), 'barra');
 
-  // La stessa cattura che usa lo Screenshot del menu: piena risoluzione, PNG.
+  // La stessa cattura che usa lo Screenshot: piena risoluzione, PNG.
   const home = await openTab('filo://home/home.html');
   await home.waitForLoadState('domcontentloaded');
   const cap = await home.evaluate(async () => {
@@ -96,7 +88,7 @@ test('dal menu la miniatura salvata è piccola, e lo Screenshot resta a piena ri
   expect(cap.w).toBeGreaterThan(320);
 });
 
-test('Alt+S fa quello che fa il menu: conferma cliccabile, miniatura piccola, lista con la voce evidenziata', async ({ app, openTab, testServer }) => {
+test('Alt+S fa quello che fa la barra laterale: conferma cliccabile, miniatura piccola, lista con la voce evidenziata', async ({ app, openTab, testServer }) => {
   const url = testServer.html(PAGINA_RICCA('Da Alt+S'));
   const page = await openTab(url);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
@@ -400,7 +392,7 @@ test('unica scheda bloccata: nella nuova scheda la conferma compare una volta so
   expect(await contaComparse(nuova, 11000)).toBe(1);
 });
 
-// Dalla pagina d'errore di Filo si mette da parte il sito che non si è caricato, dal menu come da Alt+S.
+// Dalla pagina d'errore di Filo si mette da parte il sito che non si è caricato, dalla barra come da Alt+S.
 test('Alt+S su una pagina che non si carica salva l\'indirizzo del sito, non quello della pagina d\'errore', async ({ app, shell }) => {
   const url = 'http://127.0.0.1:9/sito-giu';
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);

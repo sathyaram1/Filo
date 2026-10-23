@@ -27,8 +27,6 @@ const AGGIORNA_MAX_BYTE = 4 * 1024 * 1024;
 const ID_MAX = 80;
 // Quanto un menu aspetta lo strato che finisce di caricare, appena aperta la finestra.
 const PRONTA_MS = 5000;
-// Il contagocce aspetta che l'utente scelga un punto dello schermo: il clic che lo chiude non arriva allo strato.
-const CONTAGOCCE_MS = 120000;
 
 const msg = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {};
 
@@ -235,8 +233,7 @@ class StratoDelMenu {
     const a = this.aperto;
     if (!m || !m.pronto || !a || !d || Number(d.seq) !== a.seq || d.id !== m.id) return;
     const ora = Date.now();
-    const contagocce = canale === 'strato:esegui' && d.contagocce === true && ora - this.clicAlle <= CONTAGOCCE_MS;
-    if (ora - this.gestoAlle > GESTO_MS && !contagocce) return;
+    if (ora - this.gestoAlle > GESTO_MS) return;
     const unClic = ora - this.clicAlle <= GESTO_MS;
     const M = msg();
     if (canale === 'strato:tastiera') {
@@ -264,8 +261,8 @@ class StratoDelMenu {
       const esegui = { type: M.STRATO_MENU_ESEGUI, id: m.id, n: d.n, args, chiude };
       if (!chiude) { this._alContent(m, esegui); return; }
       // Alla pagina non si regala il gesto (patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md): la voce
-      // parte col fuoco rimesso alla scheda, e quello che chiede un gesto vero lo fa lo strato (il contagocce).
-      if (!unClic && !contagocce) return;
+      // parte col fuoco rimesso alla scheda.
+      if (!unClic) return;
       this.nascondi({ dopo: () => this._alContent(m, esegui) });
       return;
     }
