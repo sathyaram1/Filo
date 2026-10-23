@@ -1876,12 +1876,13 @@
             fermata(fermo);
             parsed.highlight = null;
           } else {
-            Highlight.show(parsed.highlight.selector, {
+            const mostrato = Highlight.show(parsed.highlight.selector, {
               note: parsed.highlight.note || '',
               action: parsed.highlight.action,
               value: parsed.highlight.value,
               onAction: onAct,
             });
+            if (mostrato === false && session) session.nonTrovati += 1;
           }
         }
       }
