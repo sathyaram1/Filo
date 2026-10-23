@@ -779,7 +779,7 @@ saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
 richiesta aperta, `conflitto`, `ramo assente`). Prima di tutto questo confronta
 la punta del ramo col commit verificato e con quello esaminato dall'audit,
-scritti nello stato del giro, come la riapertura dal quadrato (#1040.1): se la
+scritti nello stato del giro (#1040.1): se la
 punta è un'altra risponde `mosso`, se il giro non li ha `senza_controllo`, e in
 tutti e due i casi non scrive il salto, non lancia L5 e non apre richieste: un
 commit arrivato dopo i controlli non entra in main senza che nessuno l'abbia
