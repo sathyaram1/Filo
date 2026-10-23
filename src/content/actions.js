@@ -443,25 +443,31 @@
       }).catch(() => {});
       return null;
     }
+    // La descrizione si chiede una volta sola: una richiesta andata male lascerebbe la voce in cronologia su
+    // «Descrizione…» per sempre (crediti finiti, rete, risposta vuota: #1344.1). Le si dice la verità.
+    const nonArrivera = (chiave) => {
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t(chiave),
+      }).catch(() => {});
+    };
     if (!res?.ok) {
       // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
       if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
         warnModelConfigOnce(res.error, res);
-        // La voce in cronologia incolla resterebbe su «Descrizione…» per
-        // sempre: dille la verità invece di far finta che stia arrivando.
-        chrome.runtime.sendMessage({
-          type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
-          dataUrl,
-          description: I18n.t('clipboard_image_no_model'),
-        }).catch(() => {});
+        nonArrivera('clipboard_image_no_model');
+      } else {
+        nonArrivera('clipboard_image_non_descritta');
       }
       console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
     imageDescNoModel = false;
-    if (!res.text) {
+    if (!res.text || !res.text.replace(/\s+/g, ' ').trim()) {
       console.warn('[SN] descrizione immagine: risposta vuota');
+      nonArrivera('clipboard_image_non_descritta');
       return null;
     }
     const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);
