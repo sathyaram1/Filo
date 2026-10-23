@@ -127,7 +127,7 @@
 
   function valorePassword(grezzo, { forma = false } = {}) {
     const v = testo(grezzo).trim().replace(/^[«"'(]+/, '').replace(/[.,;:)»"']+$/, '');
-    if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0]) || CODICE_SORGENTE.test(v)) return '';
+    if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0]) || CODICE_SORGENTE.test(v) || NOME_DI_TIPO.test(v)) return '';
     if (forma && !(/[0-9]/.test(v) || /[^A-Za-zÀ-ÿ]/.test(v) || /[a-zà-ÿ][A-Z]/.test(v))) return '';
     return v;
   }
