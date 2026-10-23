@@ -6313,6 +6313,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           round--;
           continue;
         }
+        // #1596 — più niente da accorciare: la frase dice cosa può fare l'utente, non «cambia modello».
+        if (e && e.code !== 'TETTO_RISPOSTA' && globalThis.SN_FILO_CONTESTO.troppoLungo(e)) {
+          try { e.code = 'CONTESTO_PIENO'; } catch (_) {}
+        }
         throw e;
       }
       conto.giro();
