@@ -249,6 +249,11 @@ function registerIpcHandlers() {
       if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
     } catch (_) {}
   });
+  // #1623 — le immagini lasciate sulla fila delle schede: solo dalla barra di una finestra, mai da una pagina.
+  ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
+  });
 
   // #1054 — il menu del tasto destro di questa scheda, o della finestrella di accesso, si disegna nello strato sopra?
   ipcMain.on('filo:strato-menu', (event) => {
