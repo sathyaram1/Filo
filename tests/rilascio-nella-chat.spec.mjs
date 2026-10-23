@@ -166,6 +166,67 @@ test('sito: un’immagine lasciata sopra una casella di testo va all’Aiuto; se
   expect((await statoAiuto(app, page)).allegati.map((a) => a.nome)).toEqual(['foto 1.png']);
 });
 
+test('sito che accetta il passaggio del file ovunque ma lo prende solo in una zona: fuori dalla zona va all’Aiuto', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><div id="zona" style="position:fixed;left:0;top:0;width:100px;height:100px">Carica qui</div>
+    <script>
+      window.ricevuti = [];
+      document.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); }, true);
+      zona.addEventListener('drop', (e) => { e.preventDefault(); window.ricevuti.push(...[...e.dataTransfer.files].map((f) => f.name)); });
+    </script></body></html>`);
+  const [foto, altra] = immaginiSulDisco(2);
+  await lascia(page, [foto], { x: 400, y: 400 });
+  await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }] });
+  await lascia(page, [altra], { x: 50, y: 50 });
+  await expect.poll(() => page.evaluate(() => window.ricevuti), { timeout: 8_000 }).toEqual(['foto 2.png']);
+  expect((await statoAiuto(app, page)).allegati.map((a) => a.nome)).toEqual(['foto 1.png']);
+});
+
+test('quello che si dà al pannello dell’Aiuto, lasciato o incollato, il sito non lo vede', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;height:100vh">x
+    <script>
+      window.visti = [];
+      for (const t of ['drop', 'paste', 'filo:paste-image']) {
+        window.addEventListener(t, (e) => {
+          const f = [...(e.dataTransfer?.files || []), ...[...(e.clipboardData?.items || [])].map((it) => it.getAsFile()).filter(Boolean)];
+          if (f.length || e.detail?.blob) window.visti.push(t);
+        }, true);
+      }
+    </script></body></html>`);
+  await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
+  await page.waitForSelector('.sn-sidebar-input textarea');
+  const sul = await nelMondoDiFilo(app, page, () => {
+    const b = document.querySelector('.sn-sidebar').getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 3 };
+  });
+  const [foto] = immaginiSulDisco(1);
+  const [pdf] = immaginiSulDisco(1, { byte: Buffer.from('%PDF-1.4'), nome: () => 'contratto.pdf' });
+  await lascia(page, [foto, pdf], sul);
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome), { timeout: 8_000 }).toEqual(['foto 1.png']);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 5_000 }).toContain('non è un’immagine');
+
+  await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
+  }, PNG.toString('base64'));
+  const t = await nelMondoDiFilo(app, page, () => {
+    const b = document.querySelector('.sn-sidebar-input textarea').getBoundingClientRect();
+    return { x: b.x + 20, y: b.y + 10 };
+  });
+  await page.mouse.click(t.x, t.y);
+  await page.keyboard.press('Control+V');
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(2);
+  // «Incolla» del tasto destro e della cronologia degli appunti.
+  await nelMondoDiFilo(app, page, (b64) => {
+    const blob = new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: 'image/png' });
+    const ev = globalThis.SN_FILO_UI.nostro(new CustomEvent('filo:paste-image', { bubbles: true, cancelable: true, detail: { blob } }));
+    document.querySelector('.sn-sidebar-input textarea').dispatchEvent(ev);
+    return 1;
+  }, PNG.toString('base64'));
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(3);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.visti)).toEqual([]);
+});
+
 test('un file che non è un’immagine, lasciato insieme a una: nell’Aiuto lo dice un avviso, nella home entra col percorso', async ({ app, shell, openTab, testServer }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const casa = await home(app);
