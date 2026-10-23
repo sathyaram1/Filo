@@ -806,6 +806,7 @@
     const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
     if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
     suggestions = nuovi;
+    suggerimentiDel = r.ts || null;
     renderSuggestions();
   }
 
