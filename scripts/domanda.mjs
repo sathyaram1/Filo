@@ -99,6 +99,20 @@ export function messaggioErrore(status, body) {
   return visibile(msg);
 }
 
+/**
+ * Cosa ha applicato il server a una risposta, detto a chi l'ha mandata. Senza scelta le parole non applicano niente
+ * (SPEC-DOMANDE §3.4): un'azione partita lo stesso è il difetto di #1598, e si dice forte. PURA.
+ */
+export function esitoRisposta(esito, riferimenti = {}, { conScelta = false } = {}) {
+  const e = esito && typeof esito === 'object' ? esito : {};
+  if (!e.azione) return { riga: 'risposta a parole, nessuna azione applicata', avviso: '' };
+  const azione = D.etichettaAzione(e.azione, riferimenti) || `l'azione «${visibile(e.azione.tipo || '?')}»`;
+  if (e.ok === false) return { riga: `non applicata: ${azione}${e.errore ? ` (${visibile(e.errore)})` : ''}`, avviso: '' };
+  const avviso = conScelta ? ''
+    : `ATTENZIONE: non hai scelto un'opzione, eppure il server ha applicato ${azione}. Le parole da sole non dovrebbero applicare niente: segnalalo.`;
+  return { riga: `applicata: ${azione}`, avviso };
+}
+
 function dataOra(ms) {
   const n = Number(ms);
   return Number.isFinite(n) && n > 0 ? new Date(n).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '?';
