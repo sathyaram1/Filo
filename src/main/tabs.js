@@ -489,6 +489,7 @@ class TabManager {
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
     this._identityColorCache = new Map();
+    this._attesaColori = [];
     // §2.1 — l'auto-archiviazione misura l'inattività dell'APP INTERA da qui.
     this._lastAppInteractionAt = Date.now();
     this._triageRunning = false;
