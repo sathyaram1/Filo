@@ -126,18 +126,18 @@ test('sito: più immagini entrano tutte nell’Aiuto, oltre i 4 MB lo dice, e un
 });
 
 // Il modello finto risponde subito e tiene da parte quello che l'Aiuto gli manda.
-const AGENTE = `(() => {
+const AGENTE = () => {
   globalThis.__richieste = [];
   const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
   chrome.runtime.sendMessage = (m, ...r) => {
-    if (m && m.type === SN_MSG.MSG.AI_REQUEST && m.action === SN_CONST.ACTIONS.HELP) {
+    if (m && m.type === globalThis.SN_MSG.MSG.AI_REQUEST && m.action === globalThis.SN_CONST.ACTIONS.HELP) {
       globalThis.__richieste.push(m.payload);
       return Promise.resolve({ ok: true, text: '{"text":"È un quadratino rosso.","status":"done"}' });
     }
     return orig(m, ...r);
   };
   return 1;
-})()`;
+};
 
 test('Aiuto: l’immagine allegata parte col messaggio, si vede nella bolla, e la × la toglie prima dell’invio', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
@@ -169,7 +169,9 @@ test('Aiuto: Ctrl+V di un’immagine nella casella la allega, e le sole immagini
   await nelMondoDiFilo(app, page, AGENTE);
   await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return 1; });
   await page.waitForSelector('.sn-sidebar-input textarea');
-  await app.evaluate(({ clipboard, nativeImage }, b64) => clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(b64, 'base64'))), PNG.toString('base64'));
+  await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
+  }, PNG.toString('base64'));
   await page.click('.sn-sidebar-input textarea');
   await page.keyboard.press('Control+V');
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(1);
