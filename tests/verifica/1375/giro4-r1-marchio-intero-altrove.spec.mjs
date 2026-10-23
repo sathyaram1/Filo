@@ -1,4 +1,4 @@
-// #1375 giro 3 — il nome intero di un marchio noto messo dove non è suo (su un altro suffisso, come sito di una
+// #1375 giri 3 e 4: il nome intero di un marchio noto messo dove non è suo (su un altro suffisso, come sito di una
 // piattaforma, davanti a un altro dominio, con un numero o «my») e i refusi a una lettera devono dare l'avviso,
 // all'apertura e nel menu del link: le regole di prima li prendevano tutti.
 import { test, expect } from '@playwright/test';
