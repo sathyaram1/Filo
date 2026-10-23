@@ -264,7 +264,7 @@ describe('il pre-avvio', () => {
       // Un repo suo: il pull del pre-avvio non deve mai arrivare al repo dentro cui gira la prova.
       assert.equal(spawnSync('git', ['init', '-q'], { cwd: app }).status, 0);
       const lock = readFileSync(join(app, 'package-lock.json'), 'utf8');
-      rmSync(join(app, 'node_modules', 'piccolo'), { recursive: true, force: true });
+      assert.ok(togliCartella(join(app, 'node_modules', 'piccolo')));
 
       const r = spawnSync(process.execPath, [join(app, 'scripts', 'prestart.mjs')], { cwd: app, env, encoding: 'utf8' });
       assert.equal(r.status, 0, r.stderr);
