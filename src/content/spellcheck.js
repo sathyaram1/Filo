@@ -561,7 +561,12 @@
     return false;
   }
 
+  // Un DOM che non risponde come ci si aspetta lascia lo strato com'era: il ritaglio non deve fermare il disegno.
   function ritaglia(state) {
+    try { ritagliaOra(state); } catch (e) { console.warn('[SN] correttore, ritaglio dei segni:', e); }
+  }
+
+  function ritagliaOra(state) {
     const o = state.overlay;
     const el = state.el;
     const u = state.riquadro;
