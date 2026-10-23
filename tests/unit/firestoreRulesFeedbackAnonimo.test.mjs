@@ -44,7 +44,7 @@ test('create anonima: il sotto-numero è assente o 0', () => {
 
 test('create anonima: l\'id del documento ha la forma degli id casuali, 20-128 caratteri', () => {
   const c = createAnonimaDiFeedback();
-  assert.match(c, /^\s*doc\.matches\('\^\[A-Za-z0-9_-\]\{20,128\}\$'\)\s*&&/, 'la prima condizione è la forma dell\'id');
+  assert.match(c, /^\s*if\s+doc\.matches\('\^\[A-Za-z0-9_-\]\{20,128\}\$'\)\s*&&/, 'la prima condizione è la forma dell\'id');
 });
 
 test('il client scrive come le regole chiedono: commit con exists false e le date di Firestore', () => {
