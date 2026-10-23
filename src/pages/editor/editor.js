@@ -4252,7 +4252,7 @@
       removeEdToast(el);
     });
     edToastTempi.segui(el);
-    window.SN_AVVISI.chiudibile(el, () => removeEdToast(el));
+    window.SN_AVVISI.chiudibile(el, () => removeEdToast(el), hasAction ? [{ label: action.label, fn: esegui }] : undefined);
     const host = edToastHostEl();
     host.appendChild(el);
     edToastTempi.ripulisci();
