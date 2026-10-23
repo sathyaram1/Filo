@@ -1909,6 +1909,24 @@ class TabManager {
   vistaSottoIlVuoto() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab) return null;
+    return this._copertaDa(tab) || (this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null) || tab.view || null;
+  }
+
+  // La vista che nasconde la pagina all'utente (la conferma aperta, l'avviso del sito pericoloso), o null. I riquadri di
+  // Filo sopra la pagina non la nascondono: la pagina resta lei, con i suoi comandi e il suo Aiuto (#1509.3).
+  _copertaDa(tab) {
+    const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
+    const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
+    return domanda || avviso || null;
+  }
+
+  paginaScoperta(tab) {
+    return !!tab && !this._copertaDa(tab);
+  }
+
+  _vecchiaVistaSottoIlVuoto() {
+    const tab = this.tabs.find((t) => t.id === this.activeId);
+    if (!tab) return null;
     const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
     const riquadri = this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null;
