@@ -170,13 +170,45 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
   assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: [] }), [false], 'lo schermo senza un gesto sulla pagina: no, senza domanda');
 });
 
-test('i font del computer, che Electron non fa chiedere, passano solo subito dopo un gesto sulla pagina', () => {
+// L'elenco dei font installati è uguale in ogni sito e in ogni sessione: un clic su un banner non lo consegna (#1524).
+test('i font del computer, che Electron non fa chiedere, non passano nemmeno dopo un gesto sulla pagina', () => {
   const ses = sessioneFinta();
   const wc = wcFinto('https://grafica.example/');
   Permessi.seguiGesti(wc);
   assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), false);
   wc.emetti('input-event', {}, { type: 'mouseDown' });
-  assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', {}), true);
+  assert.equal(ses.controllo(wc, 'local-fonts', 'https://grafica.example', { requestingUrl: 'https://grafica.example/' }), false);
+});
+
+// I nomi di microfoni, fotocamere e uscite audio Chromium li dà a chi il controllo con securityOrigin dice sì; il controllo
+// senza securityOrigin è permissions.query, che resta «da chiedere» (#1524).
+test('l\'elenco dei dispositivi ha i nomi solo dopo un sì vero, parte per parte; permissions.query resta com\'era', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/stanza');
+  const elenco = (mediaType, o = 'https://riunione.example/') => ({ isMainFrame: true, mediaType, requestingUrl: 'https://riunione.example/stanza', securityOrigin: o });
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('audio')), false, 'mai deciso: niente nomi');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('video')), false);
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('unknown')), false);
+  assert.equal(ses.controllo(wc, 'speaker-selection', 'https://riunione.example/stanza', {}), false, 'le uscite non passano da sé');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', { mediaType: 'audio', requestingUrl: 'https://riunione.example/stanza' }), true,
+    'permissions.query: «posso chiedere?»');
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'], securityOrigin: 'https://riunione.example/' });
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('audio')), true, 'dopo Consenti');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('video')), false, 'la fotocamera resta senza nomi');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('audio', 'https://incorporato.example/')), true,
+    'il riquadro a cui la pagina delega il microfono ha il sì della pagina, come in Chrome');
+  const altro = wcFinto('https://altro.example/');
+  assert.equal(ses.controllo(altro, 'media', 'https://altro.example/', { mediaType: 'audio', securityOrigin: 'https://altro.example/' }), false, 'un altro sito');
+  const home = wcFinto('filo://newtab/');
+  assert.equal(ses.controllo(home, 'media', 'filo://newtab/', { mediaType: 'audio', requestingUrl: 'filo://newtab/', securityOrigin: 'https://mappa.example/' }), false,
+    'un riquadro web in una pagina di Filo risponde per sé');
+  assert.equal(ses.controllo(home, 'media', 'filo://newtab/', { mediaType: 'audio', requestingUrl: 'filo://newtab/', securityOrigin: 'filo://newtab/' }), true, 'Filo stesso');
+
+  chiedi(ses, wc, 'media', { mediaTypes: ['video'] });
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, false);
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', elenco('video')), false, 'dopo il no');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example/stanza', { mediaType: 'video' }), false, 'e permissions.query lo dice');
 });
 
 // Filo sono solo le sue pagine: un blob porta l'origine del sito che l'ha creato (#591, giro 20).
