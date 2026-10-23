@@ -763,6 +763,72 @@
     return { attivi7, attivi30, ultimo, spesoUsd: nessuno ? null : spesoUsd, spesoIgnoti };
   }
 
+  // Chi è entrato coi codici di una persona sta sotto di lei (#1519), a ogni livello «più recente prima». Chi è
+  // invitato da qualcuno che non è in elenco, o da sé, sta al primo livello; un giro chiuso non fa sparire nessuno.
+  function personeInAlbero(users) {
+    const tutte = (Array.isArray(users) ? users : []).filter((u) => u && typeof u.pseudonym === 'string');
+    const perNome = new Map();
+    for (const u of tutte) if (!perNome.has(u.pseudonym)) perNome.set(u.pseudonym, u);
+    const figli = new Map();
+    for (const u of tutte) {
+      const da = typeof u.invitedBy === 'string' ? u.invitedBy : '';
+      const sopra = da && da !== 'owner' && da !== u.pseudonym ? perNome.get(da) : null;
+      if (!sopra || sopra === u) continue;
+      if (!figli.has(sopra)) figli.set(sopra, []);
+      figli.get(sopra).push(u);
+    }
+    const recentiPrima = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    const sotto = new Set([].concat(...figli.values()));
+    const visti = new Set();
+    const fuori = [];
+    const scendi = (radice) => {
+      const pila = [{ u: radice, livello: 0 }];
+      while (pila.length) {
+        const { u, livello } = pila.pop();
+        if (visti.has(u)) continue;
+        visti.add(u);
+        const loro = (figli.get(u) || []).slice().sort(recentiPrima);
+        fuori.push({ u, livello, invitati: loro.length ? invitatiDi(loro) : null });
+        for (let i = loro.length - 1; i >= 0; i--) pila.push({ u: loro[i], livello: livello + 1 });
+      }
+    };
+    const ordinate = tutte.slice().sort(recentiPrima);
+    for (const u of ordinate) if (!sotto.has(u)) scendi(u);
+    for (const u of ordinate) if (!visti.has(u)) scendi(u);
+    return fuori;
+  }
+
+  function invitatiDi(loro) {
+    let primo = Infinity;
+    let ultimo = -Infinity;
+    for (const u of loro) {
+      const t = Date.parse(String(u.createdAt || ''));
+      if (!Number.isFinite(t)) continue;
+      if (t < primo) primo = t;
+      if (t > ultimo) ultimo = t;
+    }
+    const date = Number.isFinite(primo);
+    return {
+      n: loro.length,
+      pseudonimi: loro.map((u) => u.pseudonym),
+      primo: date ? new Date(primo).toISOString() : null,
+      ultimo: date ? new Date(ultimo).toISOString() : null,
+      spanMs: date && loro.length > 1 ? ultimo - primo : null,
+    };
+  }
+
+  // «3 in 2 ore»: quanti, e fra il primo e l'ultimo ingresso. Senza due date leggibili resta il numero.
+  function invitatiTesto(inv) {
+    const n = Math.max(0, Math.floor(Number(inv && inv.n) || 0));
+    if (!n) return '';
+    const span = inv.spanMs;
+    if (span == null || !Number.isFinite(Number(span))) return fmtInt(n);
+    if (span < 60 * 60 * 1000) return `${fmtInt(n)} in meno di un’ora`;
+    const ore = Math.round(span / (60 * 60 * 1000));
+    if (ore < 48) return `${fmtInt(n)} in ${fmtInt(ore)} ${ore === 1 ? 'ora' : 'ore'}`;
+    return `${fmtInt(n)} in ${fmtInt(Math.round(span / GIORNO_MS))} giorni`;
+  }
+
   function usd2(n) {
     return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
   }
