@@ -136,7 +136,10 @@ module.exports = function register(on, ctx) {
         ok = contatori.attivita('dettatura', { motivo: testo(m.motivo), frasi: numero(m.frasi), invio: testo(m.invio), provvisorie: m.provvisorie === true });
         break;
       case 'lettura': {
-        const motivo = C.motivoLettura({ ripiego: m.ripiego === true, codice: testo(m.codice), chiaveRifiutata: m.chiaveRifiutata === true, errore: testo(m.errore) });
+        const motivo = C.motivoLettura({
+          ripiego: m.ripiego === true, codice: testo(m.codice), chiaveRifiutata: m.chiaveRifiutata === true,
+          errore: m.senzaModello === true ? 'no_tts_model' : '',
+        });
         ok = contatori.attivita('lettura', { voce: testo(m.voce), motivo, fino: C.finoLettura(numero(m.quota), m.finita === true) });
         break;
       }
