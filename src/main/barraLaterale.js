@@ -69,6 +69,7 @@ class BarraLaterale {
     this.vista = null;
     this.pronta = false;
     this.aperta = false;
+    this.cimaAperta = null;
     this.motivo = null;
     this.dentro = false;
     this.layout = null;
