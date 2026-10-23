@@ -252,16 +252,6 @@
     return 0;
   }
 
-  // L'indice della scheda accanto ad `attuale` fra `quante`, in giro (dopo l'ultima la prima), o null se il tasto non
-  // è questo. Un'attuale che non si trova vale «prima della prima».
-  function indiceSchedaAccanto(ev, attuale, quante) {
-    const verso = versoSchedaAccanto(ev);
-    const n = Math.floor(Number(quante));
-    if (!verso || !(n > 0)) return null;
-    const da = Number.isInteger(attuale) && attuale >= 0 && attuale < n ? attuale : (verso > 0 ? -1 : 0);
-    return (da + verso + n) % n;
-  }
-
   function etichettaSchedaSuccessiva() { return ACCEL_SCHEDA_SUCCESSIVA; }
   function etichettaSchedaPrecedente() { return ACCEL_SCHEDA_PRECEDENTE; }
   // Tutti i nomi di un verso, per chi li elenca: «Ctrl+Tab, Ctrl+PagGiù».
