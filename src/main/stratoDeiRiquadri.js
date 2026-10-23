@@ -210,12 +210,14 @@ class StratoDeiRiquadri {
     try { return WebContents.getFocusedWebContents() === s.vista.webContents; } catch (_) { return false; }
   }
 
-  // Lo strato prende la tastiera se ce l'aveva la sua pagina (o nessuno): chi scriveva nella barra la tiene.
+  // Chi apre un riquadro ci scrive: lo strato prende la tastiera, anche da un menu o dalla barra laterale. Solo chi
+  // scriveva nella barra in alto la tiene.
   _tastiera(s) {
     if (!this.win.isFocused() || !s.visibile) return;
     let col = null;
     try { col = WebContents.getFocusedWebContents(); } catch (_) { col = null; }
-    if (col && col !== s.wc && col !== s.vista.webContents && col !== this.win.webContents) return;
+    const shell = this.win._filoShell && this.win._filoShell.webContents;
+    if (col && (col === this.win.webContents || col === shell)) return;
     try { s.vista.webContents.focus(); } catch (_) {}
   }
 
