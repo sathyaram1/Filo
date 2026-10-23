@@ -238,7 +238,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   }
   // La v2 delle copie vecchie passa ancora: è la v3 senza le misure delle chiamate.
   const v2 = Object.fromEntries(C.CAMPI_V2.map((k2) => [k2, doc[k2]]));
-  assert.equal(passa({ ...v2, v: C.VERSIONE_V2 }), '');
+  assert.equal(passa({ ...v2, v: C.VERSIONE_V2 }, C.MISURE_V2), '');
   const totale = Object.values(M).reduce((a, r) => a + r.tetto + (r.tettoChiavi || 0), 0);
   assert.ok(totale <= 1000000, `i tetti delle regole sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
   assert.ok(JSON.stringify(doc).length < 1000000);
