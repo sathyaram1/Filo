@@ -38,7 +38,7 @@ test('esplora: schede scoperte poi barra dal bordo sinistro', async ({ app, open
   await expect.poll(() => tmEval(app, 'return !!tm.schedeInAlto.visibili'), { timeout: 4000 }).toBe(true);
   await pausa(300);
   // Giù verso sinistra, fino al bordo.
-  await mossa([cb.x + 600, cb.y], [cb.x, cb.y + 200], 12, 25);
+  await mossa([cb.x + 600, cb.y], [cb.x, cb.y + 200], 4, 15);
   await pausa(100);
   xdo('mousemove', cb.x, cb.y + 200);
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 4000 }).toBe(true);
