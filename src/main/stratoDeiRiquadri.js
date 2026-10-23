@@ -110,8 +110,8 @@ class StratoDeiRiquadri {
     if (tipo === 'modifica') return { testo: testo(dati.testo) };
     if (tipo === 'redteam') return {};
     if (tipo === 'aiuto') {
-      const c = dati.contesto && typeof dati.contesto === 'object' ? dati.contesto : null;
-      return { contesto: c ? { source: testo(c.source), title: testo(c.title), url: testo(c.url) } : null };
+      const c = dati.invocazione && typeof dati.invocazione === 'object' ? dati.invocazione : null;
+      return { invocazione: c ? { source: testo(c.source), title: testo(c.title), url: testo(c.url) } : null };
     }
     let zoom = 1;
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
