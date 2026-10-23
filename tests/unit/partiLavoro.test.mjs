@@ -1,6 +1,5 @@
 // Un lavoro locale con app e server (#915): la pratica si chiude quando tutte le parti sono su main. Qui le regole
-// lato sessione: parte tardiva, parte del server che manca, cosa legge chi lancia finish, forma nelle regole Firestore
-// (il ramo anche delle routine).
+// lato sessione: parte tardiva, parte del server che manca, cosa legge chi lancia finish, forma nelle regole Firestore.
 // La metà del server (ownerMerge, localWork) ha la sua prova in filo-security, test/lavori-locali-parti-915.test.js.
 
 import { test } from 'node:test';
