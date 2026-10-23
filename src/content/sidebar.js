@@ -91,6 +91,7 @@
     root = null;
     convFilo = '';
     history = [];
+    allegati = { immagini: [] };
     documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
