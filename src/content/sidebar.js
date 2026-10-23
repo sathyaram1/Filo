@@ -1728,6 +1728,7 @@
           diciRipiego();
           return;
         }
+        if (session) session.documentiLetti += 1;
         documenti = { cercato: r.cercato, candidati: Array.isArray(r.candidati) ? r.candidati : [] };
         // Il main rimette i candidati interi; questi, senza chiavi, sono quelli che la cronologia ricorda.
         const perCronologia = {
