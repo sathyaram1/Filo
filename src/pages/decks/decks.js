@@ -1434,6 +1434,8 @@
       }
       if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
       if (r.retryable) bot.retryable = true;
+      // Una parte del turno non è partita per un ostacolo che si toglie altrove (il controllo delle carte, #1344.1).
+      if (r.rimedio && window.SN_CHAT_ERRORS?.rimedioPagina?.(r.rimedio)) bot.rimedio = r.rimedio;
       // Import via chat (§11.2): quantità reali per riga (basics tipo
       // "37 Forest") + eventuale commander candidato, per il bottone
       // "Aggiungi tutte" e per il toggle per riga.
