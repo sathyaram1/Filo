@@ -1091,7 +1091,9 @@ module.exports = function register(on, ctx) {
     rileggiCodaPerTest: async () => {
       if (process.env.NODE_ENV !== 'test') return;
       queue.length = 0;
-      queueLoaded = false;
+      Object.assign(log, { discardedBy: {}, lastDiscardReason: '', lastDiscardAt: null });
+      scartiLetti = false;
+      caricamentoCoda = null;
       await loadQueue();
     },
   };
