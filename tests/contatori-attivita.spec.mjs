@@ -98,7 +98,7 @@ test('l’Aiuto in una finestra in incognito non conta sessioni né ricerche', a
   test.setTimeout(90_000);
   await ricercheFinte(app);
   await shell.evaluate(() => window.filoShell.openIncognito());
-  const incog = await trovaPagina(app, (u) => u.includes('incognito=1'), 15_000);
+  const incog = await trovaPagina(app, (u) => u.startsWith('filo://newtab') && u.includes('incognito'), 15_000);
   await incog.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 10_000 });
   await aiutoFinto(incog);
   await incog.evaluate(() => window.SN_SIDEBAR.open());
