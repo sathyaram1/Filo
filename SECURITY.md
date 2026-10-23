@@ -604,13 +604,17 @@ quando c'è una versione nuova, che si installa solo quando premi «Installa».
 
 ## Come segnalare un problema di sicurezza
 
+Della sicurezza di Filo si occupa il maintainer del progetto, **Sathyaram
+Pontillo**. Le segnalazioni arrivano a lui.
+
 Se pensi di aver trovato una vulnerabilità, **non scriverla in pubblico**, per
 esempio in una issue o in un commento su GitHub. Questi canali restano privati:
 
+- l'**email** a Sathyaram Pontillo,
+  [hello@filo.red](mailto:hello@filo.red);
 - la **segnalazione privata di GitHub**, dalla scheda Security del repository
   («Report a vulnerability»):
   [github.com/sathyaram1/Filo/security/advisories/new](https://github.com/sathyaram1/Filo/security/advisories/new);
-- l'**email** a [hello@filo.red](mailto:hello@filo.red);
 - dall'app, il **canale dei feedback**: il testo parte cifrato (§6).
 
 Scrivi cosa hai trovato, come si riproduce e su quale versione di Filo.
@@ -620,5 +624,5 @@ chi usa Filo. È uno dei punti deboli descritti in `transparency/security.md`.
 
 ---
 
-*Ultimo aggiornamento: 2026-10-21. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-10-23. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*
