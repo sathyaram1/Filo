@@ -37,5 +37,4 @@ module.exports = function osservaRilascio(win, { pronta, consegna }) {
     const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []).filter((f) => /^image\//i.test(f.type || ''));
     if (files.length) { try { consegna(files); } catch (_) {} }
   }, true);
-  win.addEventListener('dragleave', (e) => { if (e.isTrusted && !e.relatedTarget) nostro = false; }, true);
 };
