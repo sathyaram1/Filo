@@ -787,6 +787,110 @@
     return true;
   }
 
+  // ── Le attività (#1467) ──────────────────────────────────────────────────
+  // Il tipo d'azione di un suggerimento della home: quelli del registro, la domanda in chat, e «altro».
+  function tiposSuggerimento() { return [...tipiAzione(), 'CHAT', ALTRO]; }
+  function tipoSuggerimento(t) {
+    const s = String(t || '').toUpperCase();
+    return s !== 'ALTRO' && tiposSuggerimento().includes(s) ? s : ALTRO;
+  }
+  const elencoParte = (d) => (d === TIPO_SUGGERIMENTO ? tiposSuggerimento() : d);
+
+  function combinazioneValida(misura, k) {
+    const forme = has(DIMENSIONI_ATTIVITA, misura) ? DIMENSIONI_ATTIVITA[misura] : null;
+    if (!forme || typeof k !== 'string') return false;
+    if (k === ALTRO) return true;
+    const parti = k.split('|');
+    return forme.some((f) => f.length === parti.length && f.every((d, i) => elencoParte(d).includes(parti[i])));
+  }
+
+  const quanti = (n) => { const v = numero(n); return v == null ? 0 : Math.floor(v); };
+  const fasciaEta = (fasce, ms) => (numero(ms) == null ? ND_ETA : fasciaIn(fasce, ms));
+  const siNo = (b) => (b === true ? 'si' : 'no');
+  function posizioneSuggerimento(i) {
+    const v = Number(i);
+    return Number.isInteger(v) && v >= 1 ? fasciaIn(POSIZIONI_SUGGERIMENTO, v) : '';
+  }
+
+  // Le parti della combinazione di un'attività, dai suoi dati: numeri e nomi, che qui diventano fasce ed elenchi.
+  function partiAttivita(misura, x) {
+    const o = oggetto(x) ? x : {};
+    switch (misura) {
+      case 'aiuto': return [o.esito, fasciaIn(FASCE_PASSI, quanti(o.passiDaSolo)), fasciaIn(FASCE_PASSI, quanti(o.passiCliccati)),
+        fasciaIn(FASCE_TROVATI, quanti(o.nonTrovati)), fasciaIn(FASCE_TROVATI, quanti(o.documenti))];
+      case 'ricercaWeb': return o.alTetto === true ? ['aiuto', 'al_tetto']
+        : [o.da, o.fornitore, siNo(o.ripiego), fasciaIn(FASCE_RISULTATI, quanti(o.risultati))];
+      case 'dettatura': return [o.motivo, fasciaIn(FASCE_FRASI, quanti(o.frasi)), o.invio, siNo(o.provvisorie)];
+      case 'lettura': return [o.voce, o.motivo, o.fino];
+      case 'lezioni': return o.nulla === true ? ['nulla']
+        : [fasciaIn(FASCE_LEZIONI, quanti(o.scritte)), fasciaIn(FASCE_LEZIONI, quanti(o.scartate))];
+      case 'compattazioni': return [o.esito, fasciaIn(FASCE_NON_RIMESSE, quanti(o.nonRimesse))];
+      case 'memoria': return [o.via, o.operazione, o.riga, fasciaEta(ETA_RIGA, o.etaMs)];
+      case 'pulizia': return [o.trigger, fasciaIn(FASCE_SCHEDE, quanti(o.candidate)), fasciaIn(FASCE_SCHEDE, quanti(o.archiviate)),
+        fasciaIn(FASCE_SCHEDE, quanti(o.duplicati)), siNo(o.giudizioMancato)];
+      case 'riaperte': return [o.chiusaDa, fasciaIn(ETA_RIAPERTA, o.etaMs)];
+      case 'home': return [o.esito];
+      case 'suggerimenti': return [tipoSuggerimento(o.tipo), posizioneSuggerimento(o.posizione), fasciaEta(ETA_HOME, o.etaMs)];
+      default: return null;
+    }
+  }
+
+  // La chiave che l'attività scrive nell'ora, o '' se una parte non sta nel suo elenco.
+  function chiaveAttivita(misura, x) {
+    const p = partiAttivita(misura, x);
+    if (!p || p.some((v) => typeof v !== 'string' || !v)) return '';
+    const k = p.join('|');
+    return k !== ALTRO && combinazioneValida(misura, k) ? k : '';
+  }
+
+  function registraAttivita(ora, misura, x) {
+    const k = chiaveAttivita(misura, x);
+    if (!k) return false;
+    const mappa = normale(ora)[misura];
+    const piene = Object.keys(mappa).filter((c) => c !== ALTRO).length;
+    piuUno(mappa, has(mappa, k) || piene < TETTO_VOCI_ATTIVITA ? k : ALTRO);
+    return true;
+  }
+
+  // Chi ha risposto a una ricerca web (SN_WEB_SEARCH.search), se è il ripiego di Tavily, e quanti risultati.
+  function esitoRicerca(r) {
+    const ok = !!(r && r.ok);
+    const fornitore = ok && ['tavily', 'duckduckgo'].includes(r.provider) ? r.provider : 'nessuno';
+    return { fornitore, ripiego: !!(r && r.ripiego === true), risultati: ok && Array.isArray(r.results) ? r.results.length : 0 };
+  }
+
+  // Perché una lettura è passata alla voce del browser, dalla risposta che non ha portato l'audio.
+  function motivoLettura({ ripiego = false, codice = '', chiaveRifiutata = false, errore = '' } = {}) {
+    if (!ripiego) return 'nessuno';
+    if (CODICI_LETTURA.includes(codice)) return codice.toLowerCase();
+    if (chiaveRifiutata === true) return 'chiave_rifiutata';
+    return errore === 'no_tts_model' ? 'no_tts_model' : ALTRO;
+  }
+
+  // Fin dove è arrivata una lettura: `quota` da 0 a 1 di quello che c'era da leggere.
+  function finoLettura(quota, finita = false) {
+    if (finita === true) return 'fine';
+    const q = numero(quota);
+    if (q == null) return '';
+    return q <= 0.25 ? 'q25' : q <= 0.5 ? 'q50' : q <= 0.75 ? 'q75' : 'q100';
+  }
+
+  // Chi aveva chiuso la scheda che si riapre dall'archivio: «manual» è la persona, il resto il giro di pulizia.
+  function chiusaDa(reason) {
+    const r = String(reason || 'manual');
+    return r === 'manual' ? 'persona' : r === 'duplicato' ? 'duplicato' : 'pulizia';
+  }
+
+  function rigaMemoria({ modulo = '', lezione = false } = {}) {
+    if (lezione === true) return 'lezione';
+    return modulo === 'PROFILO' ? 'profilo' : modulo === 'PREFERENZE' ? 'preferenze' : 'espansioni';
+  }
+
+  // La home servita senza un modello, col motivo di SN_CONST.whyCannotServe.
+  function esitoHome(motivo) {
+    return { chiave: 'senza_ai_chiave', 'pesi-aperti': 'senza_ai_pesi_aperti', modelli: 'senza_ai_modelli' }[motivo] || '';
+  }
+
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
