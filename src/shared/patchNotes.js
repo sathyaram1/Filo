@@ -14,7 +14,7 @@
         'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
         'Le icone che stavano in cima al menu del tasto destro (Traduci, Screenshot, Condividi, Salva per dopo, QR code e Nuova scheda) ora sono nella barra laterale a sinistra, e agiscono sulla scheda che hai davanti. Le altre aspettano in «Altro…», in fondo alla barra. Le riordini trascinandole, e una lasciata sulla freccia di «Altro…» va messa da parte.',
         'Se sposti un\'icona della barra laterale e poi scrivi a Filo «rimetti come prima», l\'icona torna dov\'era e il resto non cambia.',
-        'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
+        'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Arrivano anche mentre trascini un collegamento o un\'immagine. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
       ],
       fixes: [
         'Sulla pagina di un sito che non risponde, Condividi, QR code e Salva per dopo usano l\'indirizzo del sito e non quello interno della pagina d\'errore. Su un PDF Condividi e Screenshot funzionano.',
