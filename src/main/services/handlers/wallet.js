@@ -430,7 +430,7 @@ module.exports = function register(on, ctx) {
     let r = null;
     for (const code of daProvare) {
       try {
-        r = await callable('walletRedeem', { code, localCredits });
+        r = await callable('walletRedeem', { code });
       } catch (e) {
         return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
       }
