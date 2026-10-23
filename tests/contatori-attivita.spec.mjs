@@ -94,11 +94,14 @@ test('l’Aiuto chiuso conta la sessione: com’è finita e i passi da solo; le 
   await expect.poll(() => misura(app, 'aiuto'), { timeout: 5_000 }).toEqual({ 'fatto|p2_5|p0|n0|n0': 1, 'chiusa_prima|p0|p0|n0|n0': 1 });
 });
 
-test('l’Aiuto in una finestra in incognito non conta sessioni né ricerche', async ({ app, shell }) => {
+test('l’Aiuto in una finestra in incognito non conta sessioni né ricerche', async ({ app, shell, testServer }) => {
   test.setTimeout(90_000);
   await ricercheFinte(app);
   await shell.evaluate(() => window.filoShell.openIncognito());
-  const incog = await trovaPagina(app, (u) => u.startsWith('filo://newtab') && u.includes('incognito'), 15_000);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
+  const url = testServer.html('<p>Abbonamento: pagina di prova in incognito.</p>', { pubblico: true });
+  await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(u), url);
+  const incog = await trovaPagina(app, (u) => u === url, 15_000);
   await incog.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 10_000 });
   await aiutoFinto(incog);
   await incog.evaluate(() => window.SN_SIDEBAR.open());
