@@ -20,7 +20,8 @@ const USO = [
   '  chiedi <file.json | ->                apre una domanda (JSON da file o da stdin)',
   '  mostra D-n                            la domanda intera, con le note per gli agenti',
   '  elenco [--tutte]                      le domande aperte e in lavorazione (--tutte: anche chiuse)',
-  '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   N è il numero dell\'opzione come lo stampa «mostra»',
+  '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   --scelta applica l\'opzione N, numerata come in «mostra»;',
+  '                                        il testo da solo resta parole e non applica niente',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
   '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
 ].join('\n');
