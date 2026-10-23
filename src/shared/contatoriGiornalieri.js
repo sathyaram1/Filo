@@ -98,7 +98,7 @@
   const CODICI_LETTURA = Object.freeze(['NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
     'NO_ALLOWED_HOST', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN']);
   const MOTIVI_LETTURA = Object.freeze(['nessuno', ...CODICI_LETTURA.map((c) => c.toLowerCase()), 'chiave_rifiutata',
-    'no_tts_model', ALTRO_ATTIVITA()]);
+    'no_tts_model', 'altro']);
   // «q100»: fermata nell'ultimo quarto; «fine»: letta fino in fondo.
   const FINO_LETTURA = Object.freeze(['q25', 'q50', 'q75', 'q100', 'fine']);
   const ESITI_COMPATTAZIONE = Object.freeze(['nessuna', 'applicata', 'rimandata']);
