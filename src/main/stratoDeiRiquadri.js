@@ -69,7 +69,7 @@ class StratoDeiRiquadri {
     this.sopraA = sopraA;
     this.scheda = scheda;
     this.tastoDellaScheda = tastoDellaScheda;
-    this.pronta = pronta;
+    this.suPronta = pronta;
     this.strati = new Map(); // wc della pagina → { wc, vista, pronta, coda, aperti, riquadri, modale, inPagina }
     this.seguite = new WeakSet();
     this.seq = 0;
