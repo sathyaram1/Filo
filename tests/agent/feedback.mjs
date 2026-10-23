@@ -3,7 +3,6 @@
 // quindi senza credenziale non parte niente. Testo, indirizzo e mittente viaggiano cifrati come dall'app (#602).
 
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
