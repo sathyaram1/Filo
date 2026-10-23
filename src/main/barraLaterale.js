@@ -449,6 +449,8 @@ class BarraLaterale {
       scheda: !!t,
       // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano la conferma (regola del vuoto).
       pagina: !!t && this.tabs.vistaSottoIlVuoto() === t.view,
+      azioniFerme: this._azioniFerme(t),
+      interna: !!t && /^filo:\/\//i.test(t.url || '') && !/^filo:\/\/error\//i.test(t.url || ''),
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
