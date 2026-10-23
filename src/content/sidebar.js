@@ -2119,8 +2119,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   }
 
   global.SN_SIDEBAR = {
-    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
+    // Un'immagine lasciata dove la pagina non la vuole è dell'Aiuto, salvo dove Filo è spento.
+    accoglieRilascio: () => chiuso() !== 'sito',
+    suChiusura: (fn) => { if (typeof fn === 'function') chiusoPerche = fn; },
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
