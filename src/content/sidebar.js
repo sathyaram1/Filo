@@ -483,7 +483,7 @@
     if (!convFilo || !String(text || '').trim()) return;
     try {
       chrome.runtime.sendMessage({
-        type: MSG.FILO_CONVERSAZIONE_APP, app: 'aiuto', rif: convFilo, soggetto: document.title,
+        type: MSG.FILO_CONVERSAZIONE_APP, app: 'aiuto', rif: convFilo, soggetto: paginaOra().titolo,
         messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text) }],
       }).catch(() => {});
     } catch (_) {}
