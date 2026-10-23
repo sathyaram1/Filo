@@ -798,10 +798,6 @@ module.exports = function register(on, ctx) {
   const queue = [];
   const QUEUE_CAP = 2000;
   const QUEUE_KEY = 'walletUsageQueue';
-  // La regola o il contenuto rifiutano la riga: ritentarla non la fa mai passare (#1601). Una chiave API
-  // ruotata o bloccata risponde con gli stessi codici ma vale per tutte, e si ritenta come un guasto.
-  const rifiutoDellaRiga = (status, testo) => (status === 403 && /insufficient permissions/i.test(testo))
-    || (status === 400 && !/api.?key/i.test(testo));
   let flushTimer = null;
   let flushing = false;
   let queueLoaded = false;
