@@ -353,9 +353,10 @@
   // ---------- Allegati (#1623) ----------
 
   // Le immagini date all'Aiuto: lasciate sulla pagina o sul pannello, incollate. Il pannello sta nel documento del
-  // sito: anteprime e nomi in uno Shadow DOM chiuso, i percorsi solo qui.
+  // sito: anteprime e nomi in uno Shadow DOM chiuso. Oltre il tetto non entrano: l'Aiuto non apre file dal disco, e un
+  // percorso lo leggerebbe il sito.
   const Allegati = global.SN_CONST.ALLEGATI_CHAT;
-  let allegati = { immagini: [], grandi: [] };
+  let allegati = { immagini: [] };
   // Da content.js: 'sito' dove Filo è spento (il rilascio resta alla pagina), 'aiuto' con l'Aiuto spento, '' altrimenti.
   let chiusoPerche = () => 'sito';
   const chiuso = () => { try { return String(chiusoPerche() || ''); } catch (_) { return 'sito'; } };
