@@ -18,14 +18,13 @@ rules_version = '2';
 //
 // Il confine ora:
 // - Upload: chiunque manda un feedback, anche senza login — l'invio anonimo è
-//   voluto, e resta — fino a 4 MB, SOLO tipi passivi in allowlist esplicita,
-//   SOLO in creazione e SOLO su un nome che non si indovina (sotto, in
-//   dettaglio).
-//   ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-//   attivi (`text/html` con script, `image/svg+xml`). Il gate deterministico
-//   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
-//   i feedback con allegati fuori allowlist: questa regola è la cintura,
-//   quello le bretelle.
+//   voluto, e resta — fino a 4 MB, SOLO in creazione, SOLO un blob cifrato
+//   dall'app (tipo opaco, estensione fissa, nessun metadato scelto da chi
+//   carica: #1518) e SOLO su un nome che non si indovina (sotto, in dettaglio).
+//   Il tipo VERO del file lo decide il client prima di cifrare
+//   (src/shared/feedbackAttachTypes.js) e lo ricontrolla il gate L0 del server
+//   (filo-security, fileGate) sul documento del feedback: qui non c'è più una
+//   lista di tipi, perché da #602 nessun caricatore manda byte in chiaro.
 // - List: NEGATO (#583). Un elenco è una cosa diversa da un file: chiedendolo,
 //   chiunque si portava via il nome di ogni allegato mai caricato e poi il
 //   contenuto, senza sapere niente di nessun feedback. Il resto dell'audit ha
