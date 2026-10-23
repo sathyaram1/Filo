@@ -220,6 +220,10 @@ function template(piattaforma) {
       { label: 'Indietro', accelerator: tasto('Alt+\u2190'), click: indietro, ...SOLO_SCRITTA },
       { label: 'Avanti', accelerator: tasto('Alt+\u2192'), click: avanti, ...SOLO_SCRITTA },
       { type: 'separator' },
+      // Control anche su Mac, come in ogni browser: \u00abCtrl\u00bb in un acceleratore di Electron l\u00ec \u00e8 Control, non Cmd.
+      { label: 'Scheda successiva', accelerator: globalThis.SN_TASTI.etichettaSchedaSuccessiva(), click: () => schedaAccanto(1), ...SOLO_SCRITTA },
+      { label: 'Scheda precedente', accelerator: globalThis.SN_TASTI.etichettaSchedaPrecedente(), click: () => schedaAccanto(-1), ...SOLO_SCRITTA },
+      { type: 'separator' },
       { label: 'Vai a un indirizzo', accelerator: 'CommandOrControl+L', click: vaiAScrivereUnIndirizzo, ...SOLO_SCRITTA },
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },
       { label: 'Quaderno delle memorie', click: () => apriPagina('filo://quaderno/quaderno.html') },
