@@ -447,7 +447,7 @@
       // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
       if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
-        warnModelConfigOnce(res.error);
+        warnModelConfigOnce(res.error, res);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
         // sempre: dille la verità invece di far finta che stia arrivando.
         chrome.runtime.sendMessage({
