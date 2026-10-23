@@ -2783,6 +2783,12 @@ class TabManager {
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
       // accorciatore o un redirect aperto porta a un sito della lista.
       if (event.isMainFrame === false) return;
+      // La home nuda, l'unica pagina di Filo concessa a un rinvio (#1506), arriva in una vista di Filo come da un collegamento.
+      if (this._crossesTrustBoundary(tab, url)) {
+        event.preventDefault();
+        this._recreateView(tab, url, { nuova: true });
+        return;
+      }
       const fermata = this._fermaSaltoDellaScheda(tab, url);
       if (!fermata) return;
       event.preventDefault();
@@ -3420,7 +3426,7 @@ class TabManager {
     pwc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc: pwc }));
     // Una pagina di Filo qui girerebbe col preload delle pagine web (#1506).
     pwc.on('will-navigate', (event, url) => {
-      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url)) {
+      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url, { finestrella: true })) {
         event.preventDefault();
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
@@ -3430,7 +3436,7 @@ class TabManager {
     // SICUREZZA (#309) — come per le schede: will-navigate non copre i redirect
     // lato server, e un fornitore d'identità ostile potrebbe rimbalzare qui.
     pwc.on('will-redirect', (event, url) => {
-      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url)) {
+      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url, { finestrella: true })) {
         event.preventDefault();
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
@@ -3439,7 +3445,7 @@ class TabManager {
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
     pwc.setWindowOpenHandler(({ url, referrer, features }) => {
-      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url)) {
+      if (isWebUnsafeNav(url) || navigazioneVersoFilo(url, { finestrella: true })) {
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
