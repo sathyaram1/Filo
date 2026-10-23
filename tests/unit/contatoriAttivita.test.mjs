@@ -159,11 +159,10 @@ test('i motivi della dettatura, i suoi invii e i codici della lettura sono quell
   const motivi = new Set([...`${ascolto}\n${voce}\n${tts}`.matchAll(/\.ferma\('([a-z_]+)'\)/g)].map((m) => m[1]));
   for (const m of motivi) assert.ok(C.MOTIVI_DETTATURA.includes(m), `ferma('${m}') non è in MOTIVI_DETTATURA`);
   for (const m of ['utente', 'finito', 'muto', 'tempo', 'errore', 'altro', 'annulla']) assert.ok(C.MOTIVI_DETTATURA.includes(m), m);
-  // Le righe che decidono l'invio, e il corpo della funzione che lo decide senza attesa: ogni nome lì è un invio.
-  const corpoSenzaAttesa = /function invioSenzaAttesa\(esito\) \{([\s\S]*?)\n {4}\}/.exec(voce);
-  assert.ok(corpoSenzaAttesa, 'manca la decisione dell’invio senza attesa');
-  const righe = `${voce}\n${tts}`.split('\n').filter((r) => /esitoDellAttesa\(|contaFine\(|perche = |tieni\('|annullaInvio\('|contaSessione\(esito,/.test(r));
-  const invii = [...[...righe, corpoSenzaAttesa[1]].join('\n').replace(/[!=]== '[a-z_]+'|imposta\('[a-z_]+'\)/g, '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  // Le righe che decidono l'invio: ogni nome lì è un invio.
+  const righe = `${voce}\n${tts}\n${ascolto}`.split('\n')
+    .filter((r) => /esitoDellAttesa\(|contaFine\(|chiudiDettate\(|contaSessione\(esito,|segnaSessione\(esito,|invioSeLasciata/.test(r));
+  const invii = [...righe.join('\n').replace(/[!=]== '[a-z_]+'|imposta\('[a-z_]+'\)|motivo: '[a-z_]+'/g, '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   assert.ok(new Set(invii).size >= 6, 'gli invii della dettatura si contano davvero');
   for (const i of invii) assert.ok(C.INVII_DETTATURA.includes(i), `«${i}» non è in INVII_DETTATURA`);
   const scritti = globalThis.SN_CHAT_ERRORS.CODICI_GIA_SCRITTI.filter((c) => c !== 'FEEDBACK_READ_DENIED');
