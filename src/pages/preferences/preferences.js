@@ -1091,6 +1091,7 @@
     if (vuole('barraLaterale.striscia')) $('barraStriscia').checked = barra.striscia;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
+    if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
