@@ -3,24 +3,7 @@
 // dall'Editor, o già di un altro strumento si rifiuta dicendo perché; una valida, premuta, fa quello che fa il clic.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { EDITOR, apriImpostazioni, apriPannello, aspettaStrumenti, pannelloAperto, seminaStrumenti, strumentiSalvati, strumento } from './helpers/strumentiEditor.mjs';
-
-// Un documento che dice «ciao mondo», con nel pannello gli strumenti scelti e le loro regolazioni.
-async function apriDocConStrumenti(app, page, elementi, config = {}) {
-  await seminaStrumenti(app, elementi, config);
-  await page.evaluate(() => {
-    const now = new Date().toISOString();
-    const raw = {
-      id: 'file-tasti', meta: { title: 'Tasti', created: now, modified: now, version: 1 },
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ciao mondo' }] }] },
-      comments: [],
-    };
-    localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
-  });
-  await page.reload();
-  await aspettaStrumenti(page);
-  await expect(page.locator('#doc')).toBeVisible();
-}
+import { EDITOR, apriDocConStrumenti, apriImpostazioni, apriPannello, pannelloAperto, strumentiSalvati, strumento } from './helpers/strumentiEditor.mjs';
 
 async function apriEditor(openTab) {
   const page = await openTab(EDITOR);

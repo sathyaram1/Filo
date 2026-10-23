@@ -1,16 +1,18 @@
 // #974 — Le conversazioni dell'Editor, dei Mazzi e dell'Aiuto entrano nel filo come righe ripiegate: nella home
 // compare la riga col numero di messaggi e il nome, aperta mostra lo scambio, e la chat della home la trova cercando
 // (al modello arriva la riga, non lo scambio). Senza il #974 nessuna di queste conversazioni arrivava al filo.
+// La chat dell'Editor è l'Aiuto aperto sul documento (#1433): la sua riga resta dell'Editor, col nome del documento.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiamateAlModello, chiedi } from './helpers/chatFinta.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 
 const SHOTS = 'tests/.shots';
 
-// Modelli finti per le tre app (non in streaming, tranne i Mazzi che passano dal ragionamento): niente rete.
+// Modelli finti per le app (non in streaming, tranne i Mazzi che passano dal ragionamento): niente rete.
 async function prepara(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
@@ -18,7 +20,7 @@ async function prepara(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: {
-        [C.ACTIONS.EDITOR_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash',
+        [C.ACTIONS.HELP]: 'deepseek-flash',
         [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
@@ -31,9 +33,11 @@ async function prepara(app) {
       const ultimo = String((messages[messages.length - 1] || {}).content || '');
       if (tutto.includes('preparare la dashboard')) return fatto('{"message":"","suggestions":[]}');
       if (/CARTE CANDIDATE/.test(ultimo)) return fatto(JSON.stringify({ keep: (ultimo.match(/^\d+(?=\. )/gm) || []).map(Number) }));
-      if (sistema.includes('# Protocollo di risposta')) return fatto(JSON.stringify({ text: 'Il pulsante Iscriviti è in alto a destra.', status: 'done' }));
+      if (sistema.includes('# Protocollo di risposta')) {
+        const nellEditor = sistema.includes('Il documento aperto nell\'Editor');
+        return fatto(JSON.stringify({ text: nellEditor ? 'Il capitolo sui licheni va accorciato di metà.' : 'Il pulsante Iscriviti è in alto a destra.', status: 'done' }));
+      }
       if (sistema.includes('deck builder per Magic')) return fatto(JSON.stringify({ reply: 'Per questo mazzo servono più pescate.' }));
-      if (sistema.includes('assistente di scrittura dentro un editor')) return fatto('Il capitolo sui licheni va accorciato di metà.');
       return fatto('{}');
     };
     P.completeWithFallback = async (o) => risposta(o);
@@ -53,7 +57,7 @@ async function attiva(shell, prefisso) {
   }, prefisso);
 }
 
-async function chatDellEditor(openTab, titolo, domanda) {
+async function chatDellEditor(app, openTab, titolo, domanda) {
   const editor = await openTab('filo://editor/editor.html');
   await editor.waitForSelector('#doc');
   await editor.click('#docSwitch');
@@ -62,21 +66,19 @@ async function chatDellEditor(openTab, titolo, domanda) {
   await editor.locator('.ed-doc-item-input').press('Enter');
   await expect(editor.locator('#docTitle')).toHaveText(titolo);
   await editor.keyboard.press('Escape');
-  await editor.locator('.ed-switch-icon').nth(1).click();
-  const chat = editor.locator('.ed-module[data-type="chat"]');
-  await chat.locator('[data-chat="input"]').fill(domanda);
-  await chat.locator('[data-chat="send"]').click();
-  await expect(chat.locator('.ed-chat-msg.assistant', { hasText: 'licheni va accorciato' })).toBeVisible({ timeout: 10_000 });
+  await apriAiuto(app, editor);
+  await chiediAllAiuto(editor, domanda);
+  await expect(editor.locator('.sn-sidebar-msg-assistant', { hasText: 'licheni va accorciato' })).toBeVisible({ timeout: 10_000 });
   return editor;
 }
 
 const righeFilo = (app) => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).filter((c) => c.app));
 
-test('un messaggio nella chat dell’Editor: nella home la riga ripiegata col numero e il documento, aperta mostra lo scambio', async ({ app, shell, openTab }) => {
+test('un messaggio all’Aiuto dell’Editor: nella home la riga ripiegata col numero e il documento, aperta mostra lo scambio', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
-  await chatDellEditor(openTab, 'tesi', 'Cosa ne pensi del capitolo sui licheni?');
+  await chatDellEditor(app, openTab, 'tesi', 'Cosa ne pensi del capitolo sui licheni?');
   await attiva(shell, 'filo://newtab');
 
   const riga = casa.locator('#bubbles .dash-riga-app');
@@ -183,7 +185,7 @@ test('con modello finto la chat della home ha davanti la riga, non lo scambio, e
   test.setTimeout(120_000);
   await prepara(app);
   const casa = await home(app);
-  await chatDellEditor(openTab, 'tesi', 'Il capitolo sui licheni crostosi è troppo lungo?');
+  await chatDellEditor(app, openTab, 'tesi', 'Il capitolo sui licheni crostosi è troppo lungo?');
   await attiva(shell, 'filo://newtab');
   const [conv] = await righeFilo(app);
   await modelloFinto(app, [
@@ -219,7 +221,7 @@ test('la riga si toglie dal filo col tasto destro, e la ricerca del filo la trov
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
-  await chatDellEditor(openTab, 'appunti', 'Mi riassumi i licheni?');
+  await chatDellEditor(app, openTab, 'appunti', 'Mi riassumi i licheni?');
 
   await attiva(shell, 'filo://newtab');
   // La ricerca del filo la trova dal testo dello scambio (la Cronologia, che lo faceva, non c'è più: #872).
@@ -270,7 +272,7 @@ test('con una conversazione della home aperta, la riga di un’app nata adesso a
   await chiedi(casa, 'ciao Filo');
   await expect(casa.locator('.dash-bubble-filo', { hasText: 'Ciao, dimmi.' })).toBeVisible({ timeout: 15_000 });
   await prepara(app);
-  await chatDellEditor(openTab, 'tesi', 'E il capitolo sui licheni?');
+  await chatDellEditor(app, openTab, 'tesi', 'E il capitolo sui licheni?');
   await attiva(shell, 'filo://newtab');
   const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga.locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi", { timeout: 10_000 });
@@ -284,7 +286,7 @@ test('rinominato dopo la chat, il documento o il mazzo: la riga e la ricerca dic
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
-  const editor = await chatDellEditor(openTab, 'bozza', 'Cosa ne pensi del capitolo sui licheni?');
+  const editor = await chatDellEditor(app, openTab, 'bozza', 'Cosa ne pensi del capitolo sui licheni?');
   await editor.click('#docSwitch');
   await editor.locator('.ed-doc-item').first().locator('.ed-doc-rename').click();
   await editor.locator('.ed-doc-item-input').fill('tesi definitiva');
