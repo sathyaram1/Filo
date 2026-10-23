@@ -325,6 +325,9 @@ test('Aiuto: Ctrl+V di un’immagine nella casella la allega, e le sole immagini
   const [p] = await nelMondoDiFilo(app, page, () => globalThis.__richieste);
   expect(p.userMessage).toContain('senza scrivere niente');
   expect(p.history[p.history.length - 1].content.some((c) => c.type === 'image_url')).toBe(true);
+  // Nel filo della home la domanda c'è, e dice quante immagini aveva.
+  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__nelFilo), { timeout: 5_000 })
+    .toEqual([{ role: 'user', text: '(2 immagini allegate)' }, { role: 'filo', text: 'È un quadratino rosso.' }]);
 });
 
 test('fila delle schede: l’immagine lasciata lì va alla chat della scheda davanti, la home o l’Aiuto del sito', async ({ app, shell, openTab, testServer }) => {
