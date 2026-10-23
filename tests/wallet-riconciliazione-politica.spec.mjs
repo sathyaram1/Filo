@@ -44,9 +44,10 @@ const PERSONE = [
   persona(ECCESSO, { flagged: true, driftUsd: -1, reasons: ['excess_rows'] }),
   persona(PULITO, { flagged: false, driftUsd: 0 }),
 ];
+// Il consumo per modello e fornitore che il server legge dal router: arriva in disordine, la scheda lo ordina per spesa.
 const ROUTER = {
-  [FUORI]: { rows: [{ model: 'deepseek/deepseek-v4-pro', provider: 'DeepInfra', usd: 0.0031, requests: 1 }, USO_FUORI] },
-  [ECCESSO]: { error: 'il router non ha risposto (HTTP 503)' },
+  [FUORI]:{ rows: [{ model: 'deepseek/deepseek-v4-pro', provider: 'DeepInfra', usd: 0.0031, requests: 1 }, USO_FUORI] },
+  [ECCESSO]: { error: 'HTTP 503' },
 };
 
 test.beforeAll(async () => {
@@ -202,7 +203,7 @@ test('un router che non ha risposto si dice, e senza consumo letto né usi segna
   const eccesso = schedaDi(page, ECCESSO);
   await expect(eccesso).toBeVisible({ timeout: 15_000 });
   await expect(eccesso.locator('.sn-wallet-scheda-blocco', { hasText: 'Secondo il router' }))
-    .toContainText('Il router non ha risposto: il router non ha risposto (HTTP 503)');
+    .toContainText('Il router non ha risposto: HTTP 503');
 
   await riga(page, SCARTO).click();
   const scarto = schedaDi(page, SCARTO);
