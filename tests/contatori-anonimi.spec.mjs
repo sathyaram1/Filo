@@ -70,11 +70,14 @@ async function routerFinto(app) {
         }
         await new Promise((r) => setTimeout(r, 30));
         const body = JSON.parse(init.body);
+        // I numeri che il router dichiara (#1464): in coda allo streaming, come fa lui.
+        const usage = globalThis.__usoRouter || null;
         if (body.stream) {
-          const sse = `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [{ delta: { content: 'Ecco fatto.' } }] })}\n\ndata: [DONE]\n\n`;
+          const fine = usage ? `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [], usage })}\n\n` : '';
+          const sse = `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [{ delta: { content: 'Ecco fatto.' }, ...(usage ? { finish_reason: 'stop' } : {}) }] })}\n\n${fine}data: [DONE]\n\n`;
           return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
         }
-        return new Response(JSON.stringify({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' } }], usage: {} }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' }, finish_reason: 'stop' }], usage: usage || {} }), { status: 200, headers: { 'content-type': 'application/json' } });
       };
     }
   });
