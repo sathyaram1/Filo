@@ -1715,8 +1715,10 @@
   }
   // Oltre il tetto e senza un percorso l'immagine non entra, e lo si dice una volta per gesto (#1298).
   let troppoGrandi = 0;
-  function avvisaTroppoGrandi() {
-    if (troppoGrandi++) return;
+  function avvisaTroppoGrandi(n = 1) {
+    const prima = troppoGrandi;
+    troppoGrandi += n;
+    if (prima) return;
     setTimeout(() => {
       const n = troppoGrandi;
       troppoGrandi = 0;
