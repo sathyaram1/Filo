@@ -953,7 +953,7 @@
   }
 
   function idDocumento(doc) {
-    return doc && doc.v === VERSIONE ? `${doc.pseudonimo}_${doc.giorno}_${doc.ora}` : `${doc.pseudonimo}_${doc.giorno}`;
+    return doc && doc.v === VERSIONE_GIORNO ? `${doc.pseudonimo}_${doc.giorno}` : `${doc.pseudonimo}_${doc.giorno}_${doc.ora}`;
   }
 
   // ── Il contrario, per chi legge i documenti ───────────────────────────────
