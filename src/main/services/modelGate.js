@@ -317,6 +317,7 @@
         if (r && !costDone && Number.isFinite(r.costUsd) && r.costUsd > 0) {
           costDone = true;
           await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
+          m.tardiva(model, r.costUsd);
         }
         if (!r || !r.servedBy) { schedule(); return; }
         const seen = noteServed(s, action, { servedBy: r.servedBy, model, keySource: keySource || '' });
