@@ -424,12 +424,14 @@
         state: oscura(r && r.state), questions: oscura(r && r.questions),
       }));
       let ultimo = null;
-      for (const a of usable) {
+      for (const [indice, a] of usable.entries()) {
         const P = providerOf(a.provider);
         const somma = { promptTokens: 0, completionTokens: 0, costUsd: 0, keySource: '' };
         let risposte = 0;
         let inVolo = 0;
         let servedBy = null;
+        // I numeri di ogni richiesta servita, per i contatori: partono insieme alla fine del giro.
+        const servite = [];
         const fai = async (req) => {
           inVolo++;
           let r;
@@ -440,6 +442,7 @@
             })) || {};
           } finally { inVolo--; }
           risposte++;
+          servite.push(chiamataDi(r, r.model || a.model, { tentativo: indice + 1, spesa: spesaDi(s, a.model, r.usage) }));
           const u = r.usage || {};
           somma.promptTokens += Number(u.promptTokens) || 0;
           somma.completionTokens += Number(u.completionTokens) || 0;
