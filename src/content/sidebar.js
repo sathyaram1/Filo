@@ -295,26 +295,117 @@
 
   // ---------- Lo stato per la barra laterale (#1432) ----------
 
+  const CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false });
+  // Nel documento di un sito: il pannello sta nello strato, e qui c'è lo stato che lui manda.
+  const facciata = { attiva: false, vivo: false, stato: CHIUSO };
+  const inFacciata = () => !nelloStrato && !root && facciata.attiva;
+
   function stato() {
-    const visibile = isOpen() && !nascosto;
+    if (inFacciata()) return { ...facciata.stato };
+    const visibile = apertoQui() && !nascosto;
     return {
       pannello: !visibile ? 'chiuso' : collapsed ? 'ridotto' : 'aperto',
       voce: visibile ? statoVoce : 'pronto',
-      nonLetta: isOpen() && nonLetta,
+      nonLetta: apertoQui() && nonLetta,
     };
   }
 
+  // Nello strato lo stato va anche alla pagina sotto: è lei che lo dice alla barra laterale e al suo menu.
+  let statoDetto = '';
   function cambiato() {
+    if (nelloStrato) {
+      const s = { ...stato(), vivo: apertoQui() };
+      const firma = JSON.stringify(s);
+      if (firma !== statoDetto) { statoDetto = firma; chiediSotto('stato', s); }
+    }
     if (typeof ascoltaCambi !== 'function') return;
     try { ascoltaCambi(stato()); } catch (_) {}
+  }
+
+  // Lo stato del pannello nello strato, arrivato alla pagina. true se preso.
+  function dalloStrato(s) {
+    if (nelloStrato || root || !s || typeof s !== 'object') return false;
+    facciata.stato = {
+      pannello: ['chiuso', 'ridotto', 'aperto'].includes(s.pannello) ? s.pannello : 'chiuso',
+      voce: typeof s.voce === 'string' && s.voce.length <= 40 ? s.voce : 'pronto',
+      nonLetta: !!s.nonLetta,
+    };
+    facciata.vivo = !!s.vivo;
+    if (facciata.vivo) facciata.attiva = true;
+    cambiato();
+    return true;
+  }
+
+  function comandoAlloStrato(d) {
+    try { return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AIUTO_ALLO_STRATO, ...d })).catch(() => null); } catch (_) { return Promise.resolve(null); }
+  }
+
+  // Lo strato non c'è più (andato via con il suo processo): la facciata torna a dire chiuso.
+  function lasciaFacciata() {
+    facciata.attiva = false;
+    facciata.vivo = false;
+    facciata.stato = CHIUSO;
+    cambiato();
   }
 
   // L'icona Aiuto (barra, riga del tasto destro): il clic fa quello che l'icona mostra, decisi dalla stessa regola.
   function passo(context) {
     const aspetto = global.SN_DISPOSIZIONE_ICONE?.aspettoAiuto?.(stato());
-    const detta = aspetto ? aspetto.icona === 'mic' : (isOpen() && !nascosto && !collapsed);
+    const detta = aspetto ? aspetto.icona === 'mic' : (stato().pannello === 'aperto');
+    if (detta && inFacciata()) {
+      comandoAlloStrato({ comando: 'passo' }).then((r) => { if (!(r && r.ok)) { lasciaFacciata(); open(context); } });
+      return;
+    }
     if (detta && voce) { voce.premi(); return; }
     open(context);
+  }
+
+  // Su un sito l'Aiuto si apre nello strato sopra la scheda, mai nel suo documento (#1509.3). Se lo strato non si può
+  // fare si apre qui, come prima.
+  function open(context) {
+    if (nelloStrato || root) { apri(context); return; }
+    const invocazione = context && typeof context === 'object'
+      ? { source: String(context.source || ''), title: String(context.title || ''), url: String(context.url || '') }
+      : null;
+    if (global.SN_RIQUADRI_SOPRA?.apri('aiuto', { invocazione }, () => apri(context))) { facciata.attiva = true; return; }
+    apri(context);
+  }
+
+  function isOpen() { return apertoQui() || (inFacciata() && facciata.vivo); }
+
+  // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
+  function chiudi(opts) {
+    if (inFacciata()) { comandoAlloStrato({ comando: 'chiudi', davvero: !!(opts && opts.davvero) }); return; }
+    close(opts);
+  }
+
+  // La cornice del passo si muove con la pagina: il pannello nello strato le si sposta di lato, una volta per fotogramma.
+  let evitaDetto = '';
+  let evitaInCoda = null;
+  function evita(rect) {
+    if (!inFacciata()) { ensureNotOverTarget(rect); return; }
+    if (!rect) return;
+    const r = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+    const prima = evitaInCoda;
+    evitaInCoda = r;
+    if (prima) return;
+    requestAnimationFrame(() => {
+      const x = evitaInCoda;
+      evitaInCoda = null;
+      const firma = JSON.stringify(x);
+      if (!x || firma === evitaDetto) return;
+      evitaDetto = firma;
+      comandoAlloStrato({ comando: 'evita', rect: x });
+    });
+  }
+
+  // Nello strato: quello che la pagina sotto chiede al pannello.
+  function dallaPagina(d) {
+    if (!nelloStrato || !d || typeof d !== 'object') return;
+    if (d.comando === 'passo') passo();
+    else if (d.comando === 'chiudi') close({ davvero: !!d.davvero });
+    else if (d.comando === 'evita') ensureNotOverTarget(d.rect);
+    else if (d.comando === 'azione') suAzioneUtente(d);
   }
 
   // ---------- Drag header ----------
