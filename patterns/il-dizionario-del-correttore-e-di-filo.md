@@ -2,10 +2,15 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-Quali parole sono sbagliate lo dice il dizionario di Filo (Hunspell in WebAssembly nel processo principale,
-`src/main/services/dizionarioDiFilo.js`), mai `webFrame.isWordMisspelled` né `getWordSuggestions`. Le pagine lo
-chiedono con `SN_DIZIONARIO` (`src/preload/dizionario.js`), e il browser risponde solo finché quello di Filo non è
-pronto.
+Quali parole sono sbagliate lo dice il dizionario di Filo (Hunspell in WebAssembly, `src/main/services/dizionarioDiFilo.js`),
+mai `webFrame.isWordMisspelled` né `getWordSuggestions`. Le pagine lo chiedono con `SN_DIZIONARIO`
+(`src/preload/dizionario.js`), e il browser risponde solo finché quello di Filo non è pronto.
+
+Il motore (`dizionarioMotore.js`) gira in un thread del processo principale, mai nel processo stesso: caricare
+italiano e inglese tiene la CPU per oltre un decimo di secondo, e una domanda di ventimila parole altrettanto. Fermo il
+processo principale, si fermano anche i clic e i tasti di tutte le schede (#1612, l'ha visto la prova dei 5.000 link
+di `tests/safebrowse-link-prima-del-clic.spec.mjs`). La pagina chiede sincrona e aspetta il thread; il principale
+risponde quando il thread ha risposto. Se il thread non parte, il motore si carica nel processo, come ripiego.
 
 Il perché (#1585). Su Windows Chromium controlla l'ortografia in due posti: le lingue che il sistema ha installate le
 controlla il correttore di Windows, nel processo del browser; le altre Hunspell, nella pagina. `isWordMisspelled`
