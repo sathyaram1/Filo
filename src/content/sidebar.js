@@ -177,6 +177,7 @@
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
     session.initialUrl = location.href;
+    segnaSessione();
     // Aperta dal tasto destro su una scheda: una riga di storia non mostrata in chat dice
     // all'agente che la richiesta parte da lì.
     if (context && context.source === 'tab') {
