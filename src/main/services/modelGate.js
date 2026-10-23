@@ -284,12 +284,12 @@
           onFallback, onReset, onTentativoFallito: m.errore,
         });
       } catch (e) {
-        auditBroken(s, action, e && e.brokenAttempts);
+        auditBroken(s, action, e && e.brokenAttempts, m);
         throw conLaFunzione(e, s, action);
       }
       const { brokenAttempts, ...rest } = r || {};
-      auditBroken(s, action, brokenAttempts);
-      return settleChain(s, action, chain, rest);
+      auditBroken(s, action, brokenAttempts, m);
+      return settleChain(s, action, chain, rest, m);
     }
 
     // Chi chiede solo il testo lo legge come dati (un'etichetta, un giudizio, un JSON): un pezzo tagliato è un errore.
