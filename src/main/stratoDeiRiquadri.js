@@ -57,13 +57,15 @@ function ancoraNellaVista(ancora, zoom) {
 class StratoDeiRiquadri {
   // area(wc): dove sta la pagina nella finestra, null se non si vede o se qualcosa la copre; sopraA(wc): la vista sopra
   // cui posarlo (null: in cima alla finestra); scheda(wc): { id, url, title } della pagina, null se non è sua;
-  // tastoDellaScheda(wc, input): i tasti che la scheda prende prima della pagina, true se preso.
-  constructor(win, { area = () => null, sopraA = () => null, scheda = () => null, tastoDellaScheda = () => false } = {}) {
+  // tastoDellaScheda(wc, input): i tasti che la scheda prende prima della pagina, true se preso; pronta(v, wc): lo
+  // strato `v` della pagina `wc` ha appena caricato (chi scrive nella scheda scrive anche lì, come l'angolo degli avvisi).
+  constructor(win, { area = () => null, sopraA = () => null, scheda = () => null, tastoDellaScheda = () => false, pronta = () => {} } = {}) {
     this.win = win;
     this.area = area;
     this.sopraA = sopraA;
     this.scheda = scheda;
     this.tastoDellaScheda = tastoDellaScheda;
+    this.pronta = pronta;
     this.strati = new Map(); // wc della pagina → { wc, vista, pronta, coda, aperti, riquadri, modale, inPagina }
     this.seguite = new WeakSet();
     this.seq = 0;
