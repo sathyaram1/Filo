@@ -370,14 +370,26 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+
+  // #1446.2 — i passi dell'utente: visto il ✓ in chat scrive subito, e sotto il secondo messaggio arriva la risposta
+  // a lui, non un pezzo del turno della lezione.
+  await expect(page.locator('.dash-bubble-filo', { hasText: '✓ Ricordato' })).toBeVisible({ timeout: 5_000 });
+  await page.locator('#input').fill('puoi non chiedere conferma per cosa tu debba ricordarti?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 15_000 });
+  const bolle = await page.locator('.dash-bubble').evaluateAll((els) => els.map((b) => ({
+    utente: b.classList.contains('dash-bubble-user'), testo: b.textContent,
+  })));
+  const ultimaUtente = bolle.map((b) => b.utente).lastIndexOf(true);
+  expect(bolle[ultimaUtente].testo).toContain('puoi non chiedere conferma');
+  const sottoLaSeconda = bolle.slice(ultimaUtente + 1).map((b) => b.testo).join('\n');
+  expect(sottoLaSeconda).toContain('Va bene.');
+  expect(sottoLaSeconda).not.toContain('Me lo segno');
+  expect(sottoLaSeconda).not.toContain('Ricordato');
   await expect.poll(() => app.evaluate(async () => {
     const M = globalThis.SN_FILO_MEMORY;
     return JSON.stringify({ memoria: await M.getMemory(), lezioni: (await M.getLessonsBuffer()).map((l) => l.text) });
   }), { timeout: 5_000 }).toContain('sviluppatore di Filo');
-
-  await page.locator('#input').fill('puoi non chiedere conferma per cosa tu debba ricordarti?');
-  await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 15_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
   expect(calls).toHaveLength(rivedeEsito ? 3 : 2);
