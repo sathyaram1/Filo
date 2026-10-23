@@ -238,6 +238,7 @@ async function perContoDellaScheda(sender, url, {
   const ses = wc.session;
   const pagina = paginaDi(sender);
   const dette = [politicaDocumento(wc.id, pagina), ...[].concat(politiche || [])];
+  const origine = credenziali === 'include' ? origineDellaPagina(sender) : '';
   let ua = '';
   try { ua = typeof wc.getUserAgent === 'function' ? wc.getUserAgent() : ''; } catch (_) { ua = ''; }
   let paginaDiCasa = null;
