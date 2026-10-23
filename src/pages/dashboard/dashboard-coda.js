@@ -498,16 +498,24 @@
     else if (v.k === 'msg' && v.spontaneo && n.classList.contains('dash-bubble')) d.setBubbleText(n, v.text);
   }
 
-  // Pagine tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che il filo ha adesso. Un
-  // gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga, e la vecchia se ne va.
+  // Pagine entrate, rititolate o tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che
+  // il filo ha adesso, e quelle nuove entrano al loro posto. Un gruppo si chiama come la sua prima pagina: tolta quella,
+  // è un'altra riga, e la vecchia se ne va.
   // `importate`: un backup ha messo nel tratto già disegnato anche chat e pagine sue, che compaiono al loro posto (#1256).
+  const stessoGruppo = (g, v) => !!g && g.ts === v.ts && JSON.stringify(g.pagine) === JSON.stringify(v.pagine);
   function ripassaPagine({ importate = false } = {}) {
     if (!d) return Promise.resolve();
-    // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
-    if (!primo) return importate && ultimo != null && !d.occupata() ? carica().then(() => {}) : Promise.resolve();
     const fai = async () => {
+      // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
+      if (!primo) {
+        if (ultimo == null || d.occupata()) return;
+        await (importate ? caricaOra() : allineaOra(false));
+        return;
+      }
       const res = await d.send({ type: MSG.FILO_CODA, fino: primo });
       if (!res || !res.ok || !primo) return;
+      const giu = inFondo();
+      let messi = 0;
       const da = ms(primo);
       const gruppi = new Map((res.elementi || []).filter((v) => v.k === 'pagine' && ms(v.ts) >= da).map((v) => [v.key, v]));
       const perPagina = new Map();
@@ -520,18 +528,21 @@
         gruppi.delete(v.key);
         r.dataset.key = v.key;
         r.dataset.ts = v.ts;
-        disegnaGruppo(r, v);
+        // Ripassa a ogni visita: un gruppo che non è cambiato non si ridisegna, così non perde il fuoco né il passaggio.
+        if (!stessoGruppo(r._gruppo, v)) disegnaGruppo(r, v);
       }
-      for (const v of gruppi.values()) metti(v, { scorri: false });
+      for (const v of gruppi.values()) { metti(v, { scorri: false }); messi++; }
       if (importate) {
         const qui = d.chatId();
         for (const v of res.elementi || []) {
           if (v.k === 'pagine' || ms(v.ts) < da || conChiave(v.key)) continue;
           if (v.k === 'msg' && v.chat === qui) { riconosci(v); continue; }
           metti(v, { scorri: false });
+          messi++;
         }
       }
       segnaGiorni();
+      if (messi) seguiNuove(giu);
     };
     const p = coda.then(fai, fai);
     coda = p.then(() => {}, () => {});
