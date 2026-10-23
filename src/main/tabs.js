@@ -4036,10 +4036,11 @@ function segnaPagina(tab, url) {
   tab.paginaDal = new Date().toISOString();
 }
 
-// Una pulizia senza giudizio che Filo sa spiegare da sé: la frase va all'utente così com'è.
-function erroreDiPulizia(frase) {
+// Una pulizia senza giudizio che Filo sa spiegare da sé: la frase va all'utente così com'è, il codice dice dove si rimedia.
+function erroreDiPulizia(frase, code = '') {
   const e = new Error(frase);
   e.userMessage = frase;
+  if (code) e.code = code;
   return e;
 }
 
