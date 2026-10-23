@@ -1154,6 +1154,10 @@
     if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
+    // La frase nomina la pagina dove si rimedia: il tasto per andarci viene prima di «Riprova», che finché
+    // l'ostacolo resta rimanda la stessa domanda allo stesso muro (#663, #828.1). Come «Riprova», sull'ultima bolla.
+    const pagina = isLast && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
+    const via = pagina ? `<button class="dk-retry dk-rimedio" data-rimedio="1" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>` : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
     if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
     if (m.error) {
