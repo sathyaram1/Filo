@@ -271,8 +271,9 @@ class StratoDeiRiquadri {
     try { if (vivo(s.vista.webContents)) s.vista.webContents.send(canale, dati); } catch (_) {}
   }
 
-  // Una pagina nuova, chiusa o morta si porta via i suoi riquadri, come quando stavano nel suo documento.
-  _segui(wc) {
+  // Una pagina nuova, chiusa o morta si porta via i suoi riquadri, come quando stavano nel suo documento. Si segue da
+  // quando la pagina nasce: il primo riquadro chiesto da un riquadro incorporato ha già bisogno dell'ultimo puntatore.
+  segui(wc) {
     if (this.seguite.has(wc)) return;
     this.seguite.add(wc);
     const via = () => { const s = this.strati.get(wc); if (s) this._butta(s); };
