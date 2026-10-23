@@ -79,7 +79,7 @@ function giornoValido(g, C) { return C.GIORNO_RE.test(String(g || '')) && giorno
 
 function giorniFra(dal, al) {
   const out = [];
-  for (let g = dal; g <= al && out.length < 40000; g = giornoDopo(g)) out.push(g);
+  for (let g = dal; g <= al && out.length <= TETTO_GIORNI; g = giornoDopo(g)) out.push(g);
   return out;
 }
 
