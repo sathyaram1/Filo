@@ -38,7 +38,8 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
   suo percorso; senza percorso si rimpicciolisce come nell'Aiuto (#1298). Tetti e frasi stanno in `ALLEGATI_CHAT`
   (`src/shared/constants.js`).
 - **Al modello solo formati che legge tutti.** PNG, JPEG, WebP e GIF passano come sono; SVG, BMP, AVIF e gli altri si
-  ridisegnano in PNG, prima di entrare, in ogni strada della home e dell'Aiuto (`src/shared/immaginiChat.js`). Una
+  ridisegnano in PNG, prima di entrare, in ogni strada della home e dell'Aiuto (`src/shared/immaginiChat.js`). Ogni
+  immagine si apre prima di entrare: un file rovinato non diventa un'anteprima rotta, lo dice un avviso. Una
   richiesta rifiutata dal fornitore toglie le immagini dalla cronologia dell'Aiuto, e lo dice: restando, ogni domanda
   dopo fallirebbe uguale (#1623, giro 4).
 - **Nessun file sparisce in silenzio.** Alla chat arrivano tutti i file lasciati insieme a un'immagine: la home prende
