@@ -194,17 +194,27 @@
 
   // Una lettura si conta una volta, quando finisce o si ferma (#1467): con che voce, perché il ripiego, fin dove.
   // Escono il codice del guasto e la quota letta, mai il testo.
+  // Finché legge, il main ne tiene l'ultimo stato e la conta lui se la scheda si chiude (chiudere non dà eventi).
+  function datiLettura(s, finita) {
+    const r = s.ripiego && s.ripiego.res;
+    return {
+      misura: 'lettura', voce: !s.ripiego ? 'modello' : s.pezziModello > 0 ? 'mista' : 'browser', ripiego: !!s.ripiego,
+      codice: String((r && r.errorCode) || ''), chiaveRifiutata: !!(r && r.keyRefused), senzaModello: !!(r && r.error === 'no_tts_model'),
+      // Finita senza che si sia sentito niente (l'audio rifiutato) non è letta fino in fondo.
+      quota: Math.min(1, (s.letti || 0) / s.totale), finita: finita === true && (s.letti || 0) > 0, id: s.idConto,
+    };
+  }
   function contaLettura(s, finita) {
     if (!s || s.contata || !s.totale) return;
     s.contata = true;
-    const r = s.ripiego && s.ripiego.res;
-    try {
-      Popup.conta({
-        misura: 'lettura', voce: !s.ripiego ? 'modello' : s.pezziModello > 0 ? 'mista' : 'browser', ripiego: !!s.ripiego,
-        codice: String((r && r.errorCode) || ''), chiaveRifiutata: !!(r && r.keyRefused), senzaModello: !!(r && r.error === 'no_tts_model'),
-        quota: Math.min(1, (s.letti || 0) / s.totale), finita: finita === true,
-      });
-    } catch (_) {}
+    try { Popup.conta(datiLettura(s, finita)); } catch (_) {}
+  }
+  function segnaLettura(s, subito = false) {
+    if (!s || s.contata || !s.totale) return;
+    const ora = Date.now();
+    if (!subito && ora - (s.segnata || 0) < 1000) return;
+    s.segnata = ora;
+    try { Popup.conta({ ...datiLettura(s, false), misura: 'in-corso', cosa: 'lettura' }); } catch (_) {}
   }
   try { window.addEventListener('pagehide', () => { if (session && !session.cancelled) contaLettura(session, false); }); } catch (_) {}
 
