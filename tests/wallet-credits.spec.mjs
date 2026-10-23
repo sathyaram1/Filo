@@ -96,7 +96,8 @@ test.beforeAll(async () => {
       if (url === '/walletRedeem') {
         const code = String((body.data && body.data.code) || '');
         seen.redeems.push(code);
-        seen.localCredits.push(Number(body.data && body.data.localCredits));
+        // #1519 — il campo non parte nemmeno: il server lo ignora, e un PC che lo scrive sarebbe un PC alterato.
+        seen.localCredits.push(Boolean(body.data && Object.prototype.hasOwnProperty.call(body.data, 'localCredits')));
         if (code.replace(/[^A-Z0-9]/gi, '').toUpperCase() !== 'ABCDEFGH') {
           return json(res, 200, { result: { status: 'invalid_code' } });
         }
@@ -253,7 +254,7 @@ test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i
   await page.click('#redeemBtn');
   const frase = 'Invito riscattato: hai 5.000 crediti d’ingresso.';
   await expect(page.locator('#redeemMsg')).toHaveText(frase, { timeout: 10000 });
-  expect(seen.localCredits).toEqual([0]);
+  expect(seen.localCredits).toEqual([false]);
   await page.waitForTimeout(1200);
   await expect(page.locator('#walletNote')).toHaveText(frase);
   await expect(page.locator('#hero')).toBeHidden();
@@ -283,7 +284,7 @@ test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i
   const again = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_redeem', code: 'ABCD-EFGH' }, { tab: { id: 9, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' }));
   expect(again.ok).toBe(true);
   expect(again.message).toBe(frase);
-  expect(seen.localCredits).toEqual([0, 0]);
+  expect(seen.localCredits).toEqual([false, false]);
 
   // La chiave personale sparisce da questo computer (deposito perso): la
   // pagina offre «Richiedi una nuova chiave» e, premuto, CONFERMA. Nel ramo
