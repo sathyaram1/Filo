@@ -2268,8 +2268,8 @@
       if (!btn) return;
       const id = btn.dataset.opRefresh || btn.dataset.opRetry;
       btn.disabled = true;
-      // «Riprova» su una carta senza parere chiede solo lei; con un parere vecchio sotto è un «Aggiorna».
-      requestOpinions([id], { refresh: !!btn.dataset.opRefresh || opinionsByCard.has(id) }).catch(() => {});
+      // Esplicito come «Aggiorna»: passa sopra al parere mancato, e su una carta senza parere chiede solo lei.
+      requestOpinions([id], { refresh: true }).catch(() => {});
       const cur = currentDetailCard();
       if (cur && cur.id === id) renderDetailModule(cur); // mostra "sta pensando"
     };
