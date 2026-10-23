@@ -2892,7 +2892,7 @@ async function eseguiAzioneFilo(action, {
             }
             // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
             // la chat della home o l'assistente sulla pagina.
-            const seguibile = assistente || String((sender && sender.url) || '').startsWith('filo://');
+            const seguibile = assistente || daFilo(origineDi(sender), sender);
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
               tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
