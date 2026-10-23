@@ -1,6 +1,6 @@
 // Sidebar Aiuto: agente vision multi-turn. Espansa mostra la conversazione, collassata la
 // sola barra d'input; il click fuori collassa, il fuoco riapre, l'AI può chiedere collapse.
-// Le azioni dell'utente diventano una riga di log, non un finto messaggio suo.
+// Su un sito sta nello strato sopra la scheda (#1509.3): patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 (function (global) {
   'use strict';
@@ -8,8 +8,6 @@
   const { ACTIONS, PROMPTS } = global.SN_CONST;
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
-  const Highlight = global.SN_HIGHLIGHT;
-  const Extract = global.SN_EXTRACT;
   const Popup = global.SN_POPUP;
   // #593 — la porta unica del contenuto esterno. Qui serve per due cose: la
   // nota di sistema resta una frase di Filo su una riga, e quello che viene
