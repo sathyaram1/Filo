@@ -194,7 +194,7 @@ test('la privacy dice dove sta ogni parte del server', () => {
   const { T } = loadModules();
   const t = T.get('privacy').text;
   const sezione = t.slice(t.indexOf('\nIl server di Filo\n'), t.indexOf('\nI feedback\n'));
-  const dove = { 'Il codice': /Belgio/, 'Il database': /Stati Uniti|Europa/, 'Gli allegati dei feedback': /Stati Uniti.*us-east1/, 'Le identità': /Stati Uniti/ };
+  const dove = { 'Il codice': /Belgio/, 'Il database': /Stati Uniti|Europa/, 'Gli allegati dei feedback': /Stati Uniti.*Carolina del Sud.*us-east1/, 'Le identità': /Stati Uniti/ };
   for (const [parte, posto] of Object.entries(dove)) {
     const voce = sezione.split('\n').find((r) => r.startsWith(`- ${parte} `));
     assert.ok(voce, `la sezione sul server non ha la voce «${parte}»`);
