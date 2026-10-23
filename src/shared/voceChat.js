@@ -293,8 +293,8 @@
       // Invio a mano (la chat l'ha già preso): manda da sé quello che c'è, l'attesa finisce, e quello che si
       // stava ancora dicendo resta nella casella invece di partire dopo come un secondo messaggio.
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target === campo) {
-        if (c.stato === 'attesa') { smetti(); imposta('pronto'); }
-        tieni();
+        if (c.stato === 'attesa') { smetti(); imposta('pronto'); esitoDellAttesa('a_mano'); }
+        tieni('a_mano');
         return;
       }
       if (e.defaultPrevented) return;
