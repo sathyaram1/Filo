@@ -161,14 +161,15 @@
   // `conversazioni`: i messaggi del filo, per chi non li ha già davanti (vedi conversazioniRecenti).
   // `soloSiti`: delle schede aperte arriva il nome del sito, non il titolo che scrive la pagina (#1297, benvenuto).
   // `creditiFreschi`: la chiede un turno di chat, che non aspetta il saldo ma ne fa rileggere uno vecchio (#1353).
-  async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null, soloSiti = false } = {}) {
+  // `finestra` e `schedaChat` (#413): le schede elencate sono quelle della finestra della chat, e la sua è segnata.
+  async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null, soloSiti = false, finestra = null, schedaChat = null } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
     // Le due letture che possono far aspettare un turno (computer e saldo): i loro tempi vanno nella cronologia (#1097.1).
     const attese = {};
     const cronometra = (nome, p) => { const t = Date.now(); return p.finally(() => { attese[nome] = Date.now() - t; }); };
-    const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia, sempreAperte] = await Promise.all([
-      listTabs(),
+    const [tabsLette, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia, sempreAperte] = await Promise.all([
+      listTabs({ windowId: finestra }),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
