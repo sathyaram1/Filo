@@ -372,7 +372,8 @@ class StratoDeiRiquadri {
     return {
       pronta: s.pronta, aperti: s.aperti, riquadri: s.riquadri, modale: s.modale, visibile: !!s.visibile,
       vista: vivo(s.vista.webContents) ? s.vista.webContents.id : null,
-      bounds: s.vista.getBounds(),
+      bounds: this._bordiVista(s),
+      cornice: s.cornice.getBounds(),
       tastiera: this._haTastiera(s),
     };
   }
