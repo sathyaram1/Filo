@@ -252,14 +252,35 @@ class StratoDeiRiquadri {
     for (const s of this.strati.values()) {
       const b = s.pronta && s.aperti > 0 ? this._area(s.wc) : null;
       if (!b) { this._nascondi(s); continue; }
-      s.vista.setBounds(b);
+      this._bordi(s, b);
       this._inCima(s);
       if (!s.visibile) {
         s.visibile = true;
+        s.cornice.setVisible(true);
         s.vista.setVisible(true);
       }
       if (s.vuoleTastiera) { s.vuoleTastiera = false; this._tastiera(s); }
     }
+  }
+
+  // La vista è grande quanto la scheda, così i riquadri si posano come nella pagina; la cornice la ritaglia alla zona
+  // dove c'è qualcosa, e fuori la pagina riceve i suoi gesti veri: trascinamenti, file dal computer, dita.
+  _bordi(s, area) {
+    const z = s.zona;
+    const x = z ? Math.max(0, z.x) : 0;
+    const y = z ? Math.max(0, z.y) : 0;
+    const w = z ? Math.min(area.width, z.x + z.width) - x : area.width;
+    const h = z ? Math.min(area.height, z.y + z.height) - y : area.height;
+    const c = { x: area.x + x, y: area.y + y, width: Math.max(1, w), height: Math.max(1, h) };
+    s.cornice.setBounds(c);
+    s.vista.setBounds({ x: area.x - c.x, y: area.y - c.y, width: area.width, height: area.height });
+  }
+
+  // I bordi della vista nella finestra (quelli di setBounds sono nella cornice): per chi rigira i gesti del suo vuoto.
+  _bordiVista(s) {
+    const c = s.cornice.getBounds();
+    const v = s.vista.getBounds();
+    return { x: c.x + v.x, y: c.y + v.y, width: v.width, height: v.height };
   }
 
   inCima() {
@@ -273,12 +294,12 @@ class StratoDeiRiquadri {
     try { sotto = this.sopraA(s.wc); } catch (_) { sotto = null; }
     const figli = () => cv.children || [];
     const i = sotto ? figli().indexOf(sotto) : -1;
-    const mia = figli().indexOf(s.vista);
+    const mia = figli().indexOf(s.cornice);
     if (i < 0) {
-      if (mia !== figli().length - 1) cv.addChildView(s.vista);
+      if (mia !== figli().length - 1) cv.addChildView(s.cornice);
     } else if (mia !== i + 1) {
-      if (mia >= 0) cv.removeChildView(s.vista);
-      cv.addChildView(s.vista, figli().indexOf(sotto) + 1);
+      if (mia >= 0) cv.removeChildView(s.cornice);
+      cv.addChildView(s.cornice, figli().indexOf(sotto) + 1);
     }
   }
 
@@ -286,6 +307,7 @@ class StratoDeiRiquadri {
     if (!s.visibile) return;
     s.visibile = false;
     const aveva = this._haTastiera(s);
+    try { s.cornice.setVisible(false); } catch (_) {}
     try { s.vista.setVisible(false); } catch (_) {}
     if (aveva) this._restituisci(s, { forza: true });
   }
