@@ -34,9 +34,10 @@ function daFs(v) {
 
 function banco({ accesi = true, incognito = false, finestra = true, risposta = 200, disco = new Map() } = {}) {
   const inviati = [];
-  // Le chiamate ai modelli di un'ora (#1464) partono nella loro collezione: si contano a parte.
+  // Le chiamate ai modelli (#1464) e le attività (#1467) di un'ora partono nella loro collezione: si contano a parte.
   const chiamate = [];
-  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, n: 0 };
+  const attivita = [];
+  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, attivita, n: 0 };
   b.s = Servizio.crea({
     contatori: C,
     storage: {
