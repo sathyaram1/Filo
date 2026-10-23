@@ -1673,7 +1673,7 @@ class TabManager {
           clearTimeout(tetto);
         }
       }
-      if (trigger !== 'manual') this._dichiaraGiudizio(giudizioMancato, errore, trigger);
+      this._dichiaraGiudizio(giudizioMancato, errore, trigger);
 
       // I duplicati vincono sempre su un "tieni" dell'LLM.
       const byIndex = new Map();
