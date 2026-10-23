@@ -58,7 +58,7 @@
   const inCorso = new Set();
   let conferma = null;
   const ascoltatori = [];
-  const dip = { apriFeedback: null, apriScheda: null, soloNonFidate: null, impostaSoloNonFidate: null };
+  const dip = { apriFeedback: null, descriviFeedback: null, apriScheda: null, soloNonFidate: null, impostaSoloNonFidate: null };
   let firmaLista = '';
   let firmaDettaglio = '';
 
@@ -307,7 +307,8 @@
     return r && typeof r.num === 'string' ? r : null;
   }
 
-  // Origine e collegamenti: un feedback noto al server si apre in Gestione, una domanda nel dettaglio.
+  // Origine e collegamenti: un feedback noto al server si apre in Gestione, una domanda nel dettaglio. Il feedback si
+  // apre per id, e accanto al numero stanno stato e mittente di quel documento: un numero può essere di più (#1517).
   function legame(tipo, id) {
     if (tipo === 'feedback') {
       const r = rif(id);
@@ -315,8 +316,23 @@
       const a = el('button', 'mg-dq-legame', r.num);
       a.type = 'button';
       a.dataset.feedback = r.num;
+      a.dataset.feedbackId = String(id);
       a.title = `Apri ${r.num} nei Feedback`;
-      return a;
+      const info = dip.descriviFeedback ? dip.descriviFeedback(String(id), r.num, r) : null;
+      if (!info) return a;
+      const box = el('span', 'mg-dq-legame-fb');
+      box.appendChild(a);
+      if (info.testo) {
+        const t = el('span', 'mg-dq-legame-info', info.testo);
+        t.title = `Stato e mittente di ${r.num}, letti dal documento.`;
+        box.appendChild(t);
+      }
+      if (info.doppi > 1) {
+        const w = el('span', 'mg-dq-legame-doppio', 'numero doppio');
+        w.title = `${r.num} è il numero di ${info.doppi} segnalazioni: il collegamento apre quella di questa domanda.`;
+        box.appendChild(w);
+      }
+      return box;
     }
     if (tipo === 'domanda' && D.numeroDi(id) !== null) {
       const a = el('button', 'mg-dq-legame', id);
@@ -326,6 +342,16 @@
       return a;
     }
     return el('span', 'mg-dq-legame mg-dq-legame--muto', tipo === 'ramo' ? `ramo ${id}` : String(id || tipo));
+  }
+
+  // Stato e mittente dei feedback nominati cambiano con la lista dei Feedback, non con la domanda: anche loro ridisegnano.
+  function firmaLegami(d) {
+    if (!dip.descriviFeedback) return [];
+    const legati = [d.origine, ...(Array.isArray(d.collegamenti) ? d.collegamenti : [])].filter((c) => c && c.tipo === 'feedback');
+    return legati.map((c) => {
+      const r = rif(c.id);
+      return r ? dip.descriviFeedback(String(c.id), r.num, r) : null;
+    });
   }
 
   function testata(d) {
@@ -657,7 +683,7 @@
     if (!box) return;
     const ds = aperta ? aperta.ids.map(trova).filter(Boolean) : [];
     const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.esito, d.titolo, d.illeggibile,
-      ...(d.opzioni || []).map((o) => etichettaDi(o))]), [...inCorso], [...avvisi], stato.lette,
+      ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d)]), [...inCorso], [...avvisi], stato.lette,
       [...allegati].map(([k, v]) => [k, v.map((a) => a.url)]), [...caricando]]);
     if (firma === firmaDettaglio) return;
     firmaDettaglio = firma;
@@ -1028,7 +1054,7 @@
     });
     det.addEventListener('click', (e) => {
       const fb = e.target.closest('[data-feedback]');
-      if (fb) { if (dip.apriFeedback) dip.apriFeedback(fb.dataset.feedback); return; }
+      if (fb) { if (dip.apriFeedback) dip.apriFeedback(fb.dataset.feedbackId, fb.dataset.feedback); return; }
       const dom = e.target.closest('[data-domanda]');
       if (dom) { apriDomanda(dom.dataset.domanda); return; }
       const b = e.target.closest('button[data-scelta], button[data-fai]');

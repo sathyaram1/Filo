@@ -1710,12 +1710,37 @@
     aggiornaTestoQuadrato();
   }
 
-  // Dal numero sull'etichetta al feedback vero: la scheda è già in questa dashboard, quindi
-  // «guarda cosa era stato chiesto» è un click, non una ricerca. Se non è in lista, nulla.
-  function openFeedbackByNum(num) {
-    const cerca = String(num || '').trim();
-    if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
-    apriFeedback(allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca));
+  // Dall'etichetta al feedback vero: la scheda è già in questa dashboard, quindi «guarda cosa era stato chiesto» è un
+  // click, non una ricerca. Per id quando c'è: un numero può essere di più documenti (#1517), e il sì dell'owner vale
+  // per l'id. Senza id vale il numero, solo se è di uno. Se non è in lista, nulla.
+  function feedbacksColNumero(num) {
+    const cerca = String(num || '').trim().replace(/^#+/, '');
+    if (!cerca || !FB || typeof FB.formatNum !== 'function') return [];
+    return allFeedbacks.filter((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
+  }
+  function feedbackDelRiferimento(id, num) {
+    if (id) return allFeedbacks.find((f) => f._id === String(id)) || null;
+    const conNumero = feedbacksColNumero(num);
+    return conNumero.length === 1 ? conNumero[0] : null;
+  }
+  function descriviFeedbackDi(id, num, riserva) {
+    if (!MR || typeof MR.descriviRiferimento !== 'function') return null;
+    const fb = feedbackDelRiferimento(id, num);
+    const numero = String(num || '').trim() || (fb && FB ? FB.formatNum(fb.seq, fb.subSeq) : '');
+    return MR.descriviRiferimento(fb, riserva, feedbacksColNumero(numero).length);
+  }
+  // Stato e mittente accanto ai feedback nominati dalle domande vengono da questa lista: cambiata lei, si ridisegnano.
+  function domandeRileggonoLista() {
+    if (DOMANDE && typeof DOMANDE.ridisegna === 'function') DOMANDE.ridisegna();
+  }
+  function apriFeedbackDi(id, num) {
+    const fb = feedbackDelRiferimento(id, num);
+    if (!fb) {
+      const quanti = id ? 0 : feedbacksColNumero(num).length;
+      if (quanti > 1) toast(`#${String(num).replace(/^#+/, '')} è il numero di ${quanti} segnalazioni: non so quale aprire.`, 'err');
+      return false;
+    }
+    return apriFeedback(fb);
   }
 
   // Un feedback nominato da un'altra scheda (Domande, Compiti) si apre nella sua.
@@ -1743,7 +1768,8 @@
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
       onApprove: (req) => approvaUnaVolta(req, null),
       onDiscard: (req) => decidiFusione(MERGE_APPROVAL_DISCARD, req),
-      onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
+      onFeedback: (req) => apriFeedbackDi(req.feedbackId, UI ? UI.feedbackNum(req) : ''),
+      descriviFeedback: (req) => descriviFeedbackDi(req.feedbackId, UI ? UI.feedbackNum(req) : ''),
     }, extra || {});
   }
 
@@ -1843,7 +1869,8 @@
       UI.renderPreapproved(mgMergeApprovalsPreapproved, {
         preapproved: r.preapproved || [],
         preapprovedTotal: r.preapprovedTotal,
-        onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
+        onFeedback: (req) => apriFeedbackDi(req.feedbackId, UI.feedbackNum(req)),
+        descriviFeedback: (req) => descriviFeedbackDi(req.feedbackId, UI.feedbackNum(req)),
       });
     }
     aggiornaSezioneFusioni(true);
@@ -1937,7 +1964,8 @@
     DOMANDE.alCambio(() => updateSezioniCounts());
     // Un feedback nominato da una domanda si apre nella sua scheda, come dall'avviso di una fusione.
     DOMANDE.collega({
-      apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
+      apriFeedback: (id, num) => apriFeedbackDi(id, num),
+      descriviFeedback: (id, num, riserva) => descriviFeedbackDi(id, num, riserva),
       apriScheda: (tab) => selectTab(tab),
       soloNonFidate: () => soloNonFidate,
       impostaSoloNonFidate: (v) => impostaSoloNonFidate(v),
@@ -5756,6 +5784,7 @@
     if (testDataInjected) return;
 
     reindexByClient();
+    domandeRileggonoLista();
     renderList();
     aggiornaSeguiti();
     live.segnaRiuscito();
@@ -5806,7 +5835,7 @@
     pronta: () => dataLoaded,
     carica: () => loadData(),
     righe: () => allFeedbacks,
-    sostituisci: (lista) => { allFeedbacks = lista; reindexByClient(); },
+    sostituisci: (lista) => { allFeedbacks = lista; reindexByClient(); domandeRileggonoLista(); },
     decifra: () => isAdmin,
     sezioneDi: (fb) => sezioneDi(fb),
     ridisegna: ({ ids, righe, removed }) => {
@@ -6022,6 +6051,7 @@
       dataLoaded = true;
       loadFailed = false;
       reindexByClient();
+      domandeRileggonoLista();
       renderList();
       if (opts && opts.dalVivo) {
         live.segnaRiuscito();

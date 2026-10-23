@@ -335,6 +335,13 @@
     .mg-dq-legame:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; border-radius: 3px; }
     .mg-dq-legame--muto { cursor: default; color: var(--sn-muted); }
     .mg-dq-legame--muto:hover { text-decoration: none; }
+    /* Stato e mittente accanto al numero (#1517): sottotono; il numero doppio invece si deve vedere. */
+    .mg-dq-legame-fb { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+    .mg-dq-legame-info { color: var(--sn-muted); }
+    .mg-dq-legame-info::before { content: '('; }
+    .mg-dq-legame-info::after { content: ')'; }
+    .mg-dq-legame-doppio { padding: 0 6px; border-radius: 999px; cursor: help; font-weight: 600; color: var(--sn-error);
+      border: 1px solid color-mix(in srgb, var(--sn-error) 55%, transparent); }
     /* Più specifico di `.sn-page h2` (pages.css): il titolo della domanda sta sotto la sua riga, senza filetto. */
     .sn-page .mg-dq-titolo { margin: 6px 0 12px; padding: 0; border: 0; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
     .mg-dq-sez { margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; }
