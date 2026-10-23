@@ -40,6 +40,7 @@ const DIFFERENZE = {
 // Lo strato dei riquadri sopra un sito (#1509.1) carica l'elenco delle pagine interne, tranne ciò che descrive la scheda,
 // e in coda chi lo comanda.
 const FUORI_DALLO_STRATO = {
+  'src/shared/tabColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
   'src/content/pageColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
   'src/content/translatePage.js': 'la traduzione della pagina intera: lo strato non è la pagina',
   'tests/fixtures/testModels.js': 'modelli di prova delle pagine interne',

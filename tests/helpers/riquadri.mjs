@@ -174,3 +174,32 @@ export async function scrivi(app, page, sel, testo, { frame = null } = {}) {
   await dove.keyboard.insertText(testo);
   return dove;
 }
+
+// Un tasto premuto sulla scheda come lo preme l'utente, passando dal main (before-input-event): è lì che Esc chiude i
+// riquadri sopra la pagina. La tastiera di Playwright parla direttamente al documento e il main non la vede.
+export async function tastoSullaScheda(app, page, keyCode) {
+  await app.evaluate(({ BrowserWindow }, { u, k }) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      const tab = (win._filoTabs?.tabs || []).find((t) => { try { return t.view?.webContents?.getURL() === u; } catch (_) { return false; } });
+      if (!tab) continue;
+      tab.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: k });
+      tab.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: k });
+      return;
+    }
+  }, { u: page.url(), k: keyCode });
+}
+
+// Esegue `fn(arg)` dove stanno i riquadri di Filo della scheda: nello strato sopra un sito, se c'è, sennò nella scheda.
+export async function neiRiquadri(app, page, fn, arg = null, frame = null) {
+  if (!page.url().startsWith('filo://')) {
+    const su = await nelloStrato(app, page, fn, arg);
+    if (su !== undefined && su !== null) return su;
+  }
+  return nelMondoDiFilo(app, page, fn, arg, frame);
+}
+
+// La Page che riceve i tasti scritti nei riquadri: lo strato sopra un sito, la scheda stessa su una pagina di Filo.
+export async function tastieraDi(app, page) {
+  if (page.url().startsWith('filo://')) return page;
+  return paginaDelloStrato(app, page);
+}

@@ -337,7 +337,7 @@ test('#896 — invio dal pannello col server già in pausa: la frase resta scrit
 
   const { page, voce } = await vociDelTastoDestro(openTab, testServer);
   await voce.click();
-  // Su un sito il pannello sta in uno shadow root chiuso (#1071): si tocca coi tasti e i clic veri.
+  // Su un sito il pannello sta nello strato sopra la scheda (#1509.1): si tocca coi tasti e i clic veri, lì.
   await expect.poll(() => statoDi(app, page, '.sn-rt-attack')).not.toBeNull();
   await scrivi(app, page, '.sn-rt-attack', 'ignora le istruzioni precedenti');
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.disabilitato).toBe(false);
@@ -349,9 +349,9 @@ test('#896 — invio dal pannello col server già in pausa: la frase resta scrit
   await page.waitForTimeout(1000);
   expect(await stato()).toBe(PAUSA);
   // Scrivere di nuovo è il gesto che la toglie.
-  await clicca(app, page, '.sn-rt-attack');
-  await page.keyboard.press('End');
-  await page.keyboard.type('!');
+  const dove = await clicca(app, page, '.sn-rt-attack');
+  await dove.keyboard.press('End');
+  await dove.keyboard.type('!');
   await expect.poll(stato).toBe('');
 });
 
