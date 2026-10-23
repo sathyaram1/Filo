@@ -56,6 +56,9 @@ async function posa(drop, { incognito = false, via = 'trascina', origine = '' } 
   if (layout) {
     annuncia(layout, { incognito });
     contaPosa(drop, da, { incognito, via, origine });
+    // Trascinata o chiesta alla chat, è la stessa azione nel filo (#1561).
+    const parametri = { icona: drop.id, dove: drop.target, ...(drop.beforeId ? { prima_di: drop.beforeId } : {}) };
+    try { require('./accaduti').azioneFatta('SPOSTA_ICONA', parametri, { eseguita: true }, { incognito }); } catch (_) {}
   }
   return layout;
 }

@@ -225,7 +225,7 @@ module.exports = function register(on, ctx) {
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
       const px = voce ? voce.proxy : msg.proxy;
       if (id && px && px.country) {
-        try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined }); } catch (_) {}
+        try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined, conseguenza: true }); } catch (_) {}
       }
     }
     return { ok: true };

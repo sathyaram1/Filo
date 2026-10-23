@@ -23,6 +23,7 @@ function pulisci(stato) {
       testo: testo(c.testo),
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
       chiusa: c.chiusa === true,
+      indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
   const aperta = !!(stato && stato.aperta === true);
@@ -65,12 +66,27 @@ class AvvisiSopraPagina {
 
   aggiorna(stato) {
     this.stato = pulisci(stato);
+    this._nelFilo(this.stato.carte);
     if (!this.stato.carte.length) {
       if (this.vista) { this._invia(); this.posa(); }
       return;
     }
     if (!this._vista()) return;
     this._invia();
+  }
+
+  // Ogni carta che la cornice mette a schermo, o il cui testo cambia, è un avviso visto: entra nel filo da qui, chiunque
+  // l'abbia mandato (#1561). Una rinnovata con lo stesso testo no.
+  _nelFilo(carte) {
+    const prima = this.viste || new Map();
+    const ora = new Map();
+    for (const c of carte) {
+      if (c.chiusa) continue;
+      ora.set(c.id, c.testo);
+      if (prima.get(c.id) === c.testo) continue;
+      try { require('./services/accaduti').avvisoInCornice(c.testo, { incognito: !!(this.win && this.win._filoIncognito), url: c.indirizzo }); } catch (_) {}
+    }
+    this.viste = ora;
   }
 
   // Chiamata dal layout delle schede (ridimensionamenti, schede nuove, schermo intero).

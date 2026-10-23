@@ -409,7 +409,20 @@ async function sposta(da, a) {
 
 // `nome` è scritto da una persona o da un modello e passa dalla pulizia; con `esatto` (rimettere il nome di
 // prima, che il disco ha già accettato) si usa com'è, purché resti un nome nella stessa cartella.
-async function rinomina(percorso, nome, { esatto = false } = {}) {
+// Ogni nome cambiato entra nel filo da qui, com'è andata, chiunque l'abbia chiesto (#1561): la pagina degli scaricamenti,
+// «Annulla», Filo da sé (`daSola`). Dalla chat lo scrive la sua azione, coi file tutti insieme.
+async function rinomina(percorso, nome, { esatto = false, daSola } = {}) {
+  let url = '';
+  try { url = require('./accaduti').indirizzoDelFile({ percorso: String(percorso || '') }); } catch (_) {}
+  const r = await rinominaFile(percorso, nome, { esatto });
+  if (!r.invariato) {
+    const parametri = { file: path.basename(String(r.da || percorso || '')), nome: String(r.ok ? r.nome : (nome || '')) };
+    const esito = r.ok ? { eseguita: true, fatto: `«${parametri.file}» ora si chiama «${r.nome}»` } : { eseguita: false, errore: r.frase || r.errore || 'non riuscito' };
+    try { require('./accaduti').azioneDalPunto('RINOMINA_FILE', parametri, esito, { daSola, url }); } catch (_) {}
+  }
+  return r;
+}
+async function rinominaFile(percorso, nome, { esatto = false } = {}) {
   const da = path.resolve(String(percorso || ''));
   const s = await statFile(da);
   if (s.errore) return { ok: false, errore: s.errore, frase: frase(s.errore) };

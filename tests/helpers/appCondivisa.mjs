@@ -79,7 +79,10 @@ async function fotografaNelMain() {
   }
   await globalThis.__filoStorage.whenSettled();
   const storage = JSON.stringify(await globalThis.chrome.storage.local.get(null));
-  globalThis.__filoAppCondivisa = { globali, oggetti, storage };
+  // Il filo ha un file suo (chat, cambi, schede…): torna anche lui com'era.
+  await globalThis.SN_REGISTRO_CAMBI?.attesa?.();
+  const filo = (await globalThis.SN_IL_FILO.esporta()).toString('utf8');
+  globalThis.__filoAppCondivisa = { globali, oggetti, storage, filo };
 }
 
 // Nel main: rimette le funzioni rattoppate e toglie i globali `__x` delle prove (l'app ne crea solo coi nomi __filo*).
@@ -116,12 +119,14 @@ async function chiudiSchedeNelMain({ BrowserWindow }, tetto) {
   return vecchie.filter((wc) => !wc.isDestroyed()).map((wc) => wc.getURL());
 }
 
-// Nel main: lo storage com'era a lancio fermo (archivi, cronologia e segnalazioni compresi), e le impostazioni rimesse
-// ai servizi che le tengono in memoria. Fuori dal registro dei cambi, come una migrazione.
+// Nel main: lo storage e il filo com'erano a lancio fermo (archivi, cronologia e segnalazioni compresi), e le impostazioni
+// rimesse ai servizi che le tengono in memoria. Fuori dal registro dei cambi, come una migrazione.
 async function azzeraStorageNelMain() {
   const s = globalThis.__filoAppCondivisa;
   await globalThis.__filoStorage.whenSettled();
+  await globalThis.SN_REGISTRO_CAMBI.attesa();
   await globalThis.SN_IL_FILO?.quandoFermo?.();
+  await globalThis.SN_IL_FILO.ricomincia(s.filo);
   await globalThis.SN_REGISTRO_CAMBI.con({ via: 'migrazione' }, async () => {
     await globalThis.chrome.storage.local.clear();
     await globalThis.chrome.storage.local.set(JSON.parse(s.storage));

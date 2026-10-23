@@ -25,6 +25,7 @@ Prima di ogni prova, dalla seconda in poi:
   in più e la barra laterale, e alla fine c'è una home nuova, nata dopo l'azzeramento dello storage;
 - **storage**: torna com'era a lancio fermo, con l'archivio delle schede, la cronologia e le segnalazioni. Non passa
   dal registro dei cambi, e le impostazioni si rimandano ai servizi che le tengono in memoria (`applySettingsUpdate`);
+- **filo**: torna com'era a lancio fermo (chat, cambi, schede, azioni), riletto dal suo file (`ricomincia`, solo nelle prove);
 - **rattoppi del main**: tornano le funzioni globali e i metodi degli oggetti `SN_*` e `__filo*` cambiati da una
   prova, e spariscono i globali `__x` che le prove aggiungono (l'app ne crea solo coi nomi `__filo*`);
 - **contesto di Playwright**: si tolgono gli script di `app.context().addInitScript` e le `route`;

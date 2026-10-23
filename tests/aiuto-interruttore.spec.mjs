@@ -188,7 +188,7 @@ test.describe('un file di dati di prima, con l\'Aiuto spento perché era il valo
     const s = await impostazioni(app);
     expect(s.featureFlags.help).toBe(true);
     expect(s.theme).toBe('dark');
-    const registro = await app.evaluate(async () => (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi || []);
+    const registro = await app.evaluate(async () => globalThis.SN_REGISTRO_CAMBI.lista());
     expect(JSON.stringify(registro)).not.toContain('featureFlags.help');
   });
 });

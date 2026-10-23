@@ -217,12 +217,20 @@ function messaggioPerDestinazione(message, url, pagina, dove = {}) {
   return { ...message, settings: impostazioniPerWeb(message.settings, [url, pagina]) };
 }
 
+// L'avviso breve che Filo manda alle pagine entra nel filo una volta, per quante schede lo ricevano (#1561).
+function avvisoNelFilo(message) {
+  const M = globalThis.SN_MSG && globalThis.SN_MSG.MSG;
+  if (!message || !M || message.type !== M.SHOW_TOAST) return;
+  try { require('./accaduti').avviso(message.text, 'pagina', { messaggio: message }); } catch (_) {}
+}
+
 // Una spinta a una scheda, frame per frame (#405: i content script girano anche nei
 // riquadri), ognuno col messaggio ritagliato sul suo indirizzo e su `inVista` (la
 // scheda in primo piano della finestra). Ogni spinta a più schede passa da qui.
 // `soloFrame(url)` restringe la spinta ai frame che lo meritano (un dato di un sito solo ai suoi).
 function spingiAllaScheda(wc, message, { inVista = false, soloFrame = null } = {}) {
   if (!wc || wc.isDestroyed?.()) return;
+  avvisoNelFilo(message);
   let pagina = '';
   try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
   let frames = null;
@@ -244,6 +252,7 @@ function spingiAllaScheda(wc, message, { inVista = false, soloFrame = null } = {
 // Una finestra riceve solo nel frame principale: la shell, oppure una finestra
 // aperta da un sito (i popup di accesso), che vale come sito.
 function spingiAllaFinestra(win, message) {
+  avvisoNelFilo(message);
   try {
     const wc = win && win.webContents;
     if (!wc || wc.isDestroyed?.()) return;

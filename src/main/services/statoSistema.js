@@ -662,6 +662,8 @@ function componi(parti, online) {
 
 let stato = null;
 let firma = null;
+// L'ultima lettura con cui il filo confronta la prossima: le prove che cambiano computer la azzerano.
+let ultimoPerFilo = null;
 let ultimaRichiesta = 0;
 let vegliaMs = VEGLIA_MS;
 // Le pagine che seguono il sistema: quando una torna davanti, il lettore riparte senza aspettare il suo richiamo.
@@ -704,15 +706,68 @@ function annuncia() {
 }
 
 // `letto` è l'ora della lettura vera: una riga di prima del sonno ridisegnata non la rinfresca.
+// Rete caduta o tornata, batteria sotto una soglia, Bluetooth collegato entrano nel filo da qui (#1561): ogni lettura
+// passa di qui, chiunque l'abbia chiesta. Senza una lettura prima non c'è niente da confrontare.
 function pubblica(grezzo, { fresco = true } = {}) {
   const nuovo = S().normalizza(grezzo);
   const f = JSON.stringify(nuovo);
   stato = { ...nuovo, letto: fresco ? Date.now() : (stato ? stato.letto : 0) };
+  const prima = ultimoPerFilo;
+  ultimoPerFilo = nuovo;
   if (f !== firma) {
     firma = f;
     annuncia();
+    if (prima) { try { require('./accaduti').sistema(prima, nuovo); } catch (_) {} }
   }
   return stato;
+}
+
+// Il lettore dorme quando nessuno guarda: la rete che cade, e su Linux la batteria che scende, si vedono senza
+// processi; a batteria una lettura ogni tanto, che poi si spegne. Così i cambi che contano arrivano anche a home chiusa.
+const GUARDIA_MS = 30 * 1000;
+const GUARDIA_BATTERIA_MS = 10 * 60 * 1000;
+let guardia = null;
+let ultimaGuardia = 0;
+function aBatteria() {
+  try { return !!electron().powerMonitor.isOnBatteryPower(); } catch (_) { return false; }
+}
+function sottoSoglia(prima, dopo) {
+  const soglie = (globalThis.SN_FILO_ACCADUTI && globalThis.SN_FILO_ACCADUTI.SOGLIE_BATTERIA) || [];
+  return soglie.some((x) => prima > x && dopo <= x);
+}
+async function letturaDiGuardia() {
+  ultimaGuardia = Date.now();
+  await leggiAdesso();
+  if (!giro && windows) windows.ferma();
+}
+// Chromium che la pensa diversamente dalla piattaforma si rilegge poche volte per ogni suo cambio: con un adattatore
+// virtuale acceso (Docker, una macchina virtuale) dice online anche a rete giù, e la differenza non passa.
+const RILETTURE_RETE = 3;
+function reteDaRileggere(g, online, rete) {
+  if (online !== g.visto) { g.visto = online; g.riletture = 0; }
+  if (online === null || rete === null || online === rete || g.riletture >= RILETTURE_RETE) return false;
+  g.riletture += 1;
+  return true;
+}
+const guardiaRete = { visto: null, riletture: 0 };
+function guarda() {
+  if (lettoreProve || giro || letturaInCorso || !ultimoPerFilo) return;
+  const online = onlineDaElectron();
+  const rete = ultimoPerFilo.rete && typeof ultimoPerFilo.rete.online === 'boolean' ? ultimoPerFilo.rete.online : null;
+  let leggi = reteDaRileggere(guardiaRete, online, rete);
+  const b = ultimoPerFilo.batteria;
+  if (!leggi && b && Number.isFinite(b.livello) && process.platform === 'linux') {
+    const ora = batteriaLinux();
+    if (ora && Number.isFinite(ora.livello) && (ora.collegata !== b.collegata || sottoSoglia(b.livello, ora.livello))) leggi = true;
+  } else if (!leggi && b && process.platform !== 'linux' && aBatteria() && Date.now() - ultimaGuardia > GUARDIA_BATTERIA_MS) {
+    leggi = true;
+  }
+  if (leggi) letturaDiGuardia().catch(() => {});
+}
+function sorveglia() {
+  if (guardia) return;
+  guardia = setInterval(guarda, GUARDIA_MS);
+  if (guardia.unref) guardia.unref();
 }
 
 // Una lettura cominciata (o una riga di Windows scritta) prima dell'avviso del caricatore non lo smentisce.
@@ -826,7 +881,7 @@ function aggancia() {
     e.powerMonitor.on('lock-screen', () => { bloccato = true; if (giro) { ferma(); aspettaRitorno(); } });
     e.powerMonitor.on('unlock-screen', () => { bloccato = false; if (osservatoreInVista()) richiedi(); });
   } catch (_) {}
-  try { e.app.on('will-quit', ferma); } catch (_) {}
+  try { e.app.on('will-quit', () => { ferma(); if (guardia) clearInterval(guardia); guardia = null; }); } catch (_) {}
 }
 
 function ferma() {
@@ -909,7 +964,7 @@ function offline() {
 
 // Le prove staccano il caricatore e la rete di un computer finto: il giro, l'annuncio e la home restano quelli veri.
 const _perProve = {
-  usaLettore(fn) { lettoreProve = typeof fn === 'function' ? fn : null; firma = null; return leggiAdesso(); },
+  usaLettore(fn) { lettoreProve = typeof fn === 'function' ? fn : null; firma = null; ultimoPerFilo = null; return leggiAdesso(); },
   leggiOra: () => leggiAdesso(),
   attivo: () => !!giro,
   veglia(ms) { vegliaMs = Number(ms) > 0 ? Number(ms) : VEGLIA_MS; },
@@ -921,6 +976,7 @@ const _perProve = {
 const api = {
   dopoComando,
   richiedi,
+  sorveglia,
   schedaDavanti,
   stato: () => stato,
   statoPerChat,
@@ -936,6 +992,8 @@ module.exports = {
   ...api,
   GIRO_MS,
   VEGLIA_MS,
+  RILETTURE_RETE,
+  reteDaRileggere,
   componi,
   sintesiBatterie,
   batteriaLinux,

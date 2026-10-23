@@ -598,3 +598,13 @@ const S = require(MODULO);
 })();`);
   assert.deepEqual(mac, [false, false, false, false, false, false]);
 });
+
+test('con un adattatore virtuale Chromium dice online a rete giù: la sorveglianza rilegge poche volte, non ogni 30 secondi', () => {
+  const g = { visto: null, riletture: 0 };
+  const giri = Array.from({ length: 120 }, () => L.reteDaRileggere(g, true, false));
+  assert.equal(giri.filter(Boolean).length, L.RILETTURE_RETE, 'un\'ora di rete giù rilegge il sistema a ogni giro');
+  // Chromium che cambia idea è un fatto nuovo: si rilegge di nuovo, e quando i due sono d'accordo no.
+  assert.equal(L.reteDaRileggere(g, false, true), true);
+  assert.equal(L.reteDaRileggere(g, false, false), false);
+  assert.equal(L.reteDaRileggere(g, null, false), false);
+});
