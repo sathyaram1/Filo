@@ -110,12 +110,37 @@ test('un comando che contiene la chiusura della here-string arriva intero', { sk
   assert.equal(righe(sonda.stdout), 'unodue');
 });
 
-// Riga e testo che PowerShell mostra nell'errore: «Line | / 3 |  testo» (7) o «At line:3 char:1 / + testo» (5.1).
+// Riga e testo dell'errore, riconosciuti dalla forma e non dalle parole, che cambiano con la lingua di Windows:
+// «Line | / 3 |  testo» (7) o «At line:3 char:1 / + testo» (5.1; in italiano «In riga:3 car:1»).
 function rigaErrore(stderr) {
   const s = stderr.replace(/\r/g, '');
-  const m = s.match(/Line \|\n\s*(\d+) \|\s(.*)/) || s.match(/At line:(\d+) char:\d+\n\+\s(.*)/);
+  const m = s.match(/\|\n[^\S\n]*(\d+) \|[^\S\n](.*)/)
+    || s.match(/^[^\n]*?:[^\S\n]?(\d+)[^\d\n]+\d+[^\S\n]*\n\+[^\S\n](.*)/m);
   return m ? { riga: Number(m[1]), testo: m[2].trim() } : null;
 }
+
+const POSIZIONI_51 = ['At line:2 char:19', 'In riga:2 car:19', 'In Zeile:2 Zeichen:19', 'Au caractère Ligne:2 : 19',
+  'En línea: 2 Carácter: 19', 'No linha:2 caractere:19', 'строка:2 знак:19', '発生場所 行:2 文字:19', '所在位置 行:2 字符: 19'];
+const errore51 = (posizione) => [
+  "Get-Content : Impossibile trovare il percorso 'C:\\Users\\AGENTI~1\\AppData\\Local\\Temp\\filo-esito-ps-a1\\manca-corto.txt' perché non esiste.",
+  posizione,
+  `+ Write-Output due; ${MANCA_CORTO}`,
+  '+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+  '    + CategoryInfo          : ObjectNotFound: (C:\\Users\\AGENTI~1\\...\\manca-corto.txt:String) [Get-Content], ItemNotFoundException',
+  '    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand',
+  '',
+].join('\r\n');
+
+// Gira anche senza PowerShell: sulla macchina dell'owner la 5.1 scrive in italiano (#1571).
+test('la riga dell\'errore si legge con PowerShell in qualunque lingua', () => {
+  const atteso = { riga: 2, testo: `Write-Output due; ${MANCA_CORTO}` };
+  for (const posizione of POSIZIONI_51) assert.deepEqual(rigaErrore(errore51(posizione)), atteso, posizione);
+  const concisa = ['Get-Content: ', 'Line |', `   2 |  Write-Output due; ${MANCA_CORTO}`,
+    '     |                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~',
+    "     | Cannot find path '/tmp/filo-esito-ps-a1/manca-corto.txt' because it does not exist.", ''].join('\n');
+  assert.deepEqual(rigaErrore(concisa), atteso);
+  assert.equal(rigaErrore("Get-Content: Cannot find path '/tmp/filo-esito-ps-a1/manca-corto.txt' because it does not exist.\n"), null);
+});
 
 test('un errore indica la riga e il testo che l\'utente ha scritto, non quelli delle sonde', { skip: salta }, () => {
   const comando = `Write-Output uno\nWrite-Output due; ${MANCA_CORTO}\nWrite-Output tre`;
