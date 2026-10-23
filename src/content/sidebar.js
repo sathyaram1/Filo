@@ -61,8 +61,27 @@
       feedbackShown: false,
       webSearchCount: 0,
       documentiCount: 0,
+      // Per i contatori (#1467): l'esito dell'ultimo turno (null finché è in corso) e i passi, mai cosa c'era nella pagina.
+      esito: null,
+      passiDaSolo: 0,
+      passiCliccati: 0,
+      nonTrovati: 0,
+      contata: false,
     };
   }
+  // Una sessione si conta una volta, quando finisce: chiusa, o portata via dalla pagina che se ne va.
+  function contaSessione() {
+    const s = session;
+    if (!s || s.contata) return;
+    s.contata = true;
+    try {
+      Popup?.conta?.({
+        misura: 'aiuto', esito: s.esito || 'chiusa_prima', passiDaSolo: s.passiDaSolo, passiCliccati: s.passiCliccati,
+        nonTrovati: s.nonTrovati, documenti: s.documentiCount,
+      });
+    } catch (_) {}
+  }
+  try { global.addEventListener?.('pagehide', () => { if (isOpen()) contaSessione(); }); } catch (_) {}
   // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
   // limite si ignorano in silenzio.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
