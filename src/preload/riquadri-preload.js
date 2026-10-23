@@ -132,8 +132,8 @@ const strato = {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
-// Lo stesso elenco di internal-preload.js, senza ciò che descrive la scheda (colore, traduzione della pagina): lo strato
-// parla come la pagina, ma non è la pagina. Ogni require si legge da fermo: il pacchetto in sandbox lo porta dentro.
+// Lo stesso elenco di internal-preload.js, senza il colore della scheda: lo strato parla come la pagina, ma non è la
+// pagina. Ogni require si legge da fermo: il pacchetto in sandbox lo porta dentro.
 function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo riquadri] constants.js', e); }
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo riquadri] contenutoEsterno.js', e); }
@@ -175,6 +175,7 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo riquadri] feedbackAttachTypes.js', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo riquadri] feedback.js', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo riquadri] redteamAttack.js', e); }
+  try { require(path.join(CONTENT_DIR, 'translatePage.js')); } catch (e) { console.error('[Filo riquadri] translatePage.js', e); }
   try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo riquadri] ttsChunk.js', e); }
   try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo riquadri] modelCaps.js', e); }
   try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo riquadri] ttsVoices.js', e); }

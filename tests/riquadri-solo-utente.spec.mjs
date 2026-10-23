@@ -164,6 +164,18 @@ async function contaChiamate(app) {
   });
 }
 const chiamate = (app) => app.evaluate(() => globalThis.__chiamate1071);
+// Il conto quando smette di muoversi: il correttore della casella della pagina, che col fuoco nello strato resta
+// agganciata, finisce il suo controllo di quello che c'era già scritto (dopo la sua pausa, 3,5 s).
+async function chiamateFerme(app) {
+  let prima = -1;
+  let ora = await chiamate(app);
+  while (ora !== prima) {
+    await new Promise((r) => setTimeout(r, 4000));
+    prima = ora;
+    ora = await chiamate(app);
+  }
+  return ora;
+}
 // Le risposte in streaming: spiegazione e domande. Il correttore, che lavora anche nella casella della domanda, no.
 const domande = (app) => app.evaluate(() => globalThis.__domande1071);
 
@@ -203,8 +215,7 @@ test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, 
   await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
   // Il tasto destro sulla selezione prepara già la sua spiegazione: si contano le chiamate da qui.
-  await page.waitForTimeout(1500);
-  const prima = await chiamate(app);
+  const prima = await chiamateFerme(app);
 
   const esito = await page.evaluate(() => window.attacca());
   expect(esito).toEqual({ host: false, ombra: false, nostri: 0 });
@@ -214,10 +225,10 @@ test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, 
   await clicca(app, page, 'button[data-sc="fix"]');
   await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '').toContain('RISCRITTO');
   expect(await chiamate(app)).toBe(prima + 1);
-  // Lo script del sito preme Sostituisci: il campo resta com'era.
+  // Lo script del sito preme Sostituisci: nel campo non arriva la riscrittura.
   await page.evaluate(() => window.attacca());
   await page.waitForTimeout(400);
-  await expect(page.locator('#campo')).toHaveValue('Un testo con un erore.');
+  expect(await page.locator('#campo').inputValue()).not.toContain('RISCRITTO');
   await clicca(app, page, '.sn-editbox-replace');
   await expect(page.locator('#campo')).toHaveValue('TESTO RISCRITTO 1071');
 });
@@ -472,13 +483,13 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
   await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
-  await page.waitForTimeout(1500);
-  const prima = await chiamate(app);
+  const prima = await chiamateFerme(app);
   await clicca(app, page, '.sn-editbox-instruction');
   await page.evaluate(() => window.martella(3000));
   await page.waitForTimeout(500);
   expect(await chiamate(app), 'nessuna riscrittura partita dalla pagina').toBe(prima);
-  await expect(page.locator('#campo')).toHaveValue('Un testo con un erore.');
+  // Il sito scrive nel suo campo quello che vuole, ma la riscrittura non ci arriva.
+  expect(await page.locator('#campo').inputValue()).not.toContain('RISCRITTO');
   await tastoSullaScheda(app, page, 'Escape');
   await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
 

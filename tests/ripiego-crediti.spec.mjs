@@ -22,7 +22,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, tastoSullaScheda } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Sui siti spiegazione e Modifica stanno in uno shadow root chiuso (#1071): si leggono dal mondo dei content script.
@@ -1018,7 +1018,7 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   prima = seen.completions.length;
   await clicca(app, page, '.sn-editbox button[data-sc="fix"]');
   await allaPersonale(prima);
-  await page.keyboard.press('Escape');
+  await tastoSullaScheda(app, page, 'Escape');
   await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
 
