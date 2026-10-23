@@ -2,12 +2,13 @@
 // sopra la scheda, una per pagina, fuori dal documento del sito, che così non li legge, non li cerca e non li tocca.
 // Regole: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
-const path = require('node:path');
 const { webContents: WebContents } = require('electron');
 const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
+const { percorsoDelPreload } = require('./preloadPacchetto');
 
 const INDIRIZZO = 'filo://riquadri/riquadri.html';
+const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta']);
 // Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina.
 const DATI_MAX_BYTE = 8 * 1024 * 1024;
@@ -293,10 +294,10 @@ class StratoDeiRiquadri {
     const { WebContentsView } = require('electron');
     const vista = new WebContentsView({
       webPreferences: {
-        preload: path.join(__dirname, '..', 'preload', 'riquadri-preload.js'),
-        // I riquadri girano nel mondo isolato, come sui siti: la pagina dello strato non ha né Node né lo shim.
+        // Come le schede web: i riquadri nel mondo isolato, in sandbox; la pagina dello strato non ha né Node né lo shim.
+        preload: percorsoDelPreload(PRELOAD),
         contextIsolation: true,
-        sandbox: false,
+        sandbox: true,
         nodeIntegration: false,
         spellcheck: false,
         backgroundThrottling: false,

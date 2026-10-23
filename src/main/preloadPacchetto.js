@@ -13,6 +13,11 @@ const INGRESSO = 'src/preload/page-preload.js';
 // Il file che il pacchetto di Filo porta con sé: lo scrive beforePack qui sotto prima che nasca l'asar. Fuori da src/,
 // perché chi legge i sorgenti (sentinelle, mappe) non trovi tutto due volte.
 const NEL_PACCHETTO = path.join(RADICE, 'generato', 'page-preload.js');
+// Ogni preload che gira in sandbox e il file che il pacchetto porta per lui: anche lo strato dei riquadri sopra un sito.
+const PACCHETTI = Object.freeze({
+  [INGRESSO]: NEL_PACCHETTO,
+  'src/preload/riquadri-preload.js': path.join(RADICE, 'generato', 'riquadri-preload.js'),
+});
 // Quelli che la sandbox dà da sé: li chiede il preload vero, a chiamata.
 const DELLA_SANDBOX = new Set(['electron', 'events', 'timers', 'url']);
 // Quelli di Node che il pacchetto rifà: `path` sui suoi percorsi, `fs` in sola lettura sui testi che porta; `url` lo completa.
