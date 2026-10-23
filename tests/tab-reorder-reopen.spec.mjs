@@ -6,6 +6,8 @@
 //      (riapertura compresa), NON solo quando qualcosa viene archiviato;
 //   2) la sessione salva e ripristina il colore identità di ogni scheda, così
 //      la barra riparte già tinta e il riordino ha i dati subito.
+// #349: alla riapertura vera il modello sa da quanto ogni scheda non si usa, le vecchie si archiviano, e un avviso
+// dice sempre com'è andata, anche quando il giudizio non arriva.
 
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
@@ -77,13 +79,12 @@ test('alla riapertura le schede vengono riordinate per colore anche senza archiv
   });
   expect(after).toEqual(expectedOrder);
   // E lo dice (#349): senza avviso «ho guardato e tenuto tutto» e «non sono partito» erano uguali.
-  await expect.poll(() => avviso(shell), { timeout: 6_000 }).toBe('Schede riordinate, nessuna da chiudere');
+  await expect.poll(() => avvisi(shell), { timeout: 6_000 }).toContain('Schede riordinate, nessuna da chiudere');
 });
 
-const avviso = (shell) => shell.evaluate(() => {
-  const el = document.querySelector('.shell-notif.show .shell-notif-msg');
-  return el ? el.textContent : '';
-});
+// Gli avvisi a schermo: altri possono stare accanto (la chiave salvata senza portachiavi, nelle prove).
+const avvisi = (shell) => shell.evaluate(() => [...document.querySelectorAll('.shell-notif.show .shell-notif-msg')]
+  .map((el) => el.textContent));
 
 // Un modello finto che fa quello che chiede il prompt della riapertura: archivia le schede non toccate da ore.
 // Registra il prompt, così si vede cosa Filo gli ha detto delle schede riaperte.
@@ -149,7 +150,7 @@ test.describe('la riapertura vera', () => {
       await tm.restoreSession();
     }, { schede, ora });
 
-    await expect.poll(() => avviso(shell), { timeout: 40_000 }).toBe('Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
+    await expect.poll(() => avvisi(shell), { timeout: 40_000 }).toContain('Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
 
     // Il modello ha saputo che è una riapertura e da quanto ogni scheda non si usa: senza, ogni scheda riaperta
     // risultava «inattiva da 0min» (il primo segnale della pagina contava come uso) e la teneva.
@@ -188,7 +189,7 @@ test.describe('la riapertura vera', () => {
       await tm.restoreSession();
     }, [su('blu.test', pagina('Blu', 'rgb(40,80,200)', 'uno')), su('rosso.test', pagina('Rosso', 'rgb(200,40,40)', 'due'))]);
 
-    await expect.poll(() => avviso(shell), { timeout: 40_000 }).toBe('Schede riordinate, ma non sono riuscito a valutare quali chiudere');
+    await expect.poll(() => avvisi(shell), { timeout: 40_000 }).toContain('Schede riordinate, ma non sono riuscito a valutare quali chiudere');
     const titoli = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
       .filter((t) => /\.test:/.test(t.url || '')).map((t) => t.title));
     expect(titoli).toEqual(['Rosso', 'Blu']);
