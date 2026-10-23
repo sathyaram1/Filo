@@ -157,8 +157,9 @@ service firebase.storage {
 
       allow create: if resource == null
         && dimensioneAmmessa()
-        && tipoPassivo()
-        && nomeConEntropia(file);
+        && soloCifrato()
+        && nomeConEntropia(file)
+        && senzaMetadatiScelti(request.resource, file);
 
       // Un allegato non si sovrascrive e non si cancella: quello che il
       // mittente ha spedito resta quello che l'owner e i giudici leggono.
