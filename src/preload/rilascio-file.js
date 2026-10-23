@@ -85,4 +85,13 @@ module.exports = function osservaRilascio(win, { pronta, consegna, pannello = ()
     e.stopImmediatePropagation();
     try { consegna(files); } catch (_) {}
   }, true);
+  // «Incolla» del menu di Filo manda l'immagine con un evento che attraversa il documento: lo script della pagina ne
+  // leggerebbe il contenuto.
+  win.addEventListener('filo:paste-image', (e) => {
+    const blob = e.detail && e.detail.blob;
+    if (!blob || !delPannello(e) || globalThis.SN_FILO_UI?.veroONostro?.(e) !== true) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    try { consegna([blob]); } catch (_) {}
+  }, true);
 };
