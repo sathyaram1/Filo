@@ -17,7 +17,11 @@ const userData = cartellaTemporanea('filo-cambi-icone-');
 process.env.FILO_USER_DATA = userData;
 // Una disposizione salvata prima del #1246, con la riga del tasto destro: la sua migrazione non è un cambio di nessuno.
 writeFileSync(join(userData, 'storage.json'), JSON.stringify({
-  sn_icon_layout: { primary: ['translate', 'qrCode'], secondary: ['openOptions'], bar: ['help', 'back', 'forward', 'reload'] },
+  sn_icon_layout: {
+    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'],
+    secondary: ['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker', 'fullscreen'],
+    bar: ['help', 'back', 'forward', 'reload', 'home', 'incognito', 'closeTab'],
+  },
 }));
 
 const origLoad = Module._load;
@@ -48,6 +52,8 @@ async function eventi(tipo) {
   return (r[K.FILO_CAMBI] || []).filter((e) => !tipo || e.tipo === tipo);
 }
 const dallaBarra = (fn) => Registro.con({ via: 'interfaccia', dove: 'barra' }, fn);
+// Dove sta rispetto alle vicine: il posto in numeri cambia se un'altra icona si sposta sopra di lei.
+const vicina = (l, id) => { const p = D.posizione(l, id); return p && { zona: p.zona, davanti: p.davanti }; };
 
 test('la frase dice quale icona e dove: nella stessa zona i posti, fra barra e «Altro…» le zone', () => {
   const prima = D.migra(undefined).layout;
@@ -69,14 +75,14 @@ test('annullare rimette solo l\'icona di quel cambio: quelle spostate dopo resta
   const cambio = { cambi: C.cambiIcone(a, b, { mossa: 'qrCode' }) };
   const c = D.applicaPosa(b, { id: 'translate', target: 'secondary', beforeId: null });
   const rimessa = C.annulloIcone(cambio, c);
-  assert.deepEqual(D.posizione(rimessa, 'qrCode'), D.posizione(a, 'qrCode'));
+  assert.deepEqual(vicina(rimessa, 'qrCode'), vicina(a, 'qrCode'));
   assert.equal(D.posizione(rimessa, 'translate').zona, 'secondary', 'lo spostamento dopo non si tocca');
   assert.deepEqual(C.annulloIcone(cambio, b), a);
 });
 
 test('la riga di prima che entra nella barra non è un cambio; uno spostamento dalla barra sì, e si annulla da solo', async () => {
   const migrata = await Layout.leggi();
-  assert.deepEqual(migrata.bar.slice(0, 6), ['help', 'back', 'forward', 'reload', 'translate', 'qrCode']);
+  assert.deepEqual(migrata.bar.slice(-6), ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']);
   assert.equal(migrata.primary, undefined);
   assert.deepEqual(await eventi('icone'), [], 'la migrazione non l\'ha chiesta nessuno');
 
@@ -86,7 +92,7 @@ test('la riga di prima che entra nella barra non è un cambio; uno spostamento d
   const [mossa] = await eventi('icone');
   assert.equal(mossa.via, 'interfaccia');
   assert.equal(C.provenienza(mossa), 'dalla barra laterale');
-  assert.match(C.frase(mossa), /icona «QR code della pagina» nella barra laterale: 6° posto → 2° posto/);
+  assert.match(C.frase(mossa), /icona «QR code della pagina» nella barra laterale: 12° posto → 2° posto/);
   assert.deepEqual((await Layout.leggi()).bar.slice(0, 3), ['help', 'qrCode', 'back']);
 
   const r = await Registro.annulla(null, { via: 'chat' });
@@ -113,6 +119,6 @@ test('due spostamenti di icone diverse sono due cambi, e annullare il primo lasc
   const r = await Registro.annulla(ultimi[0].id, { via: 'chat' });
   assert.equal(r.ok, true);
   const dopo = await Layout.leggi();
-  assert.deepEqual(D.posizione(dopo, 'share'), D.posizione(prima, 'share'));
+  assert.deepEqual(vicina(dopo, 'share'), vicina(prima, 'share'));
   assert.equal(dopo.bar[0], 'colorPicker', 'il secondo spostamento resta');
 });
