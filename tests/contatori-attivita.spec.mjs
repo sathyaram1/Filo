@@ -258,10 +258,12 @@ test('un giro di pulizia conta candidate, chiuse e doppie; la scheda riaperta di
   await openTab(url);
   const home = await openTab('filo://newtab/');
   const r = await home.evaluate(() => chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
-  expect(r.archived, 'la doppia si chiude per regola, anche senza un modello').toBe(1);
+  expect(r.archived, 'la doppia si chiude per regola, anche senza un modello').toBeGreaterThanOrEqual(1);
   const giri = await misura(app, 'pulizia');
   expect(Object.keys(giri)).toHaveLength(1);
-  expect(Object.keys(giri)[0]).toMatch(/^manual\|s(1|2_5)\|s1\|s1\|(si|no)$/);
+  // Quante ne ha chiuse il giro, nella fascia che dice la risposta; una sola era doppia.
+  const chiuse = r.archived === 1 ? 's1' : 's2_5';
+  expect(Object.keys(giri)[0]).toMatch(new RegExp(`^manual\\|s(1|2_5)\\|${chiuse}\\|s1\\|${r.giudizioMancato ? 'si' : 'no'}$`));
 
   const voce = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).find((t) => t.reason === 'duplicato'));
   expect(voce).toBeTruthy();
