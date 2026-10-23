@@ -9,6 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.248', date: '2026-10-23',
+      features: [],
+      fixes: [
+        'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
+        'Il tasto che apre Crediti, Opzioni o Preferenze c\'è anche nell\'avviso di «Leggi», in quello della descrizione di un\'immagine copiata e sotto una ricerca dei mazzi il cui controllo delle carte non è partito. Nell\'Editor «Rigenera titolo» e «Rigenera riassunto», quando non riescono, dicono perché e portano dove si rimedia. «Leggi» coi crediti finiti dice che sono finiti, non più che la voce non è disponibile.',
+        'Quando un errore chiede di scegliere un altro modello, manda in Opzioni → Modelli per azione e ha il tasto per andarci. Prima nominava una pagina che solo chi gestisce Filo ha. Un\'immagine copiata la cui descrizione non può arrivare, per esempio coi crediti finiti, nella cronologia degli appunti non resta più su «Descrizione…».',
+      ],
+    },
+    {
       version: '0.2.247', date: '2026-10-22',
       features: [
         'Quando un sito si prende lo schermo intero, come il pulsante di un video, in alto compare per qualche secondo il suo nome vero con «Esc per uscire». Così sai chi hai davanti anche quando la pagina copre tutto lo schermo. Torna portando il mouse sul bordo alto, e quanto resta lo scegli in Preferenze, nelle impostazioni avanzate.',

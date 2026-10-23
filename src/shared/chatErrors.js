@@ -34,7 +34,7 @@
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
 //
-//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | ''
+//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | 'voce' | ''
 //     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
 //     collegamento al «Riprova» (che su questi codici non porta da nessuna
 //     parte finché non si cambia qualcosa).
@@ -97,6 +97,10 @@
     'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
+  // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
+  // gestisce Filo non ce l'ha (#1344.1).
+  const DOVE_ALTRO_MODELLO = 'in Opzioni → Modelli per azione';
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
@@ -106,8 +110,17 @@
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     NO_ALLOWED_HOST: 'opzioni',
     LIMIT_REACHED: 'opzioni',
+    // Errori la cui cura è un altro modello: la frase dice DOVE_ALTRO_MODELLO, il tasto porta lì.
+    NO_TOOL_HOST: 'opzioni',
+    MODEL_UNAVAILABLE: 'opzioni',
+    DATA_POLICY: 'opzioni',
+    NO_PROVIDER_ALLOWED: 'opzioni',
+    ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
+    // Il modello di lettura vuole il nome di una voce, o non conosce quello scritto: si scrive in Preferenze.
+    TTS_VOICE_REQUIRED: 'voce',
+    TTS_VOICE_UNKNOWN: 'voce',
   };
   // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
   // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
@@ -131,6 +144,7 @@
     crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti', title: 'Controlla o togli la chiave OpenRouter' },
     opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni', title: 'Scegli il modello per questa funzione' },
     preferenze: { url: 'filo://preferences/preferences.html#sec-lunghezza', label: 'Apri Preferenze', title: 'Cambia quanto può essere lunga una risposta' },
+    voce: { url: 'filo://preferences/preferences.html#sec-lettura', label: 'Apri Preferenze', title: 'Scegli o scrivi la voce di lettura' },
   };
   function rimedioPagina(x) {
     const dove = rimedio(x);
@@ -267,14 +281,14 @@
       // Con la chiave dell'utente la rimedia lui; con quella di Filo resta solo un altro modello.
       if ((e && e.code === 'DATA_POLICY') || (st === 404 && /data policy/i.test(raw))) {
         return e && e.keySource === 'own'
-          ? 'nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello in Modelli predefiniti.'
-          : 'nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello in Modelli predefiniti.';
+          ? `nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
+          : `nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
       if (e && e.code === 'NO_PROVIDER_ALLOWED') {
         return e.keySource === 'own'
-          ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
-          : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
+          ? `nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
+          : `nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #1097.3: fra gli host ammessi nessuno regge il tetto di lunghezza della risposta di questa funzione.
       if (e && e.code === 'TETTO_RISPOSTA') {
@@ -283,26 +297,26 @@
         // Testo più tetto oltre la memoria del modello: il testo da solo ci stava.
         const f = Number(e.finestra);
         if (Number.isFinite(f) && f > 0) {
-          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria in Modelli predefiniti.`;
+          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
         }
-        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
+        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
-        return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
+        return `il modello scelto non è più disponibile sul servizio AI: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
       if (e && e.code === 'NO_TOOL_HOST') {
         const n = Number(e.maxTokens);
         if (Number.isFinite(n) && n > 0) {
-          return `per il modello scelto nessun fornitore ammesso regge insieme gli strumenti della chat (cercare, leggere, impostare) e risposte lunghe quanto il tetto di ${n.toLocaleString('it-IT', { useGrouping: true })} token: abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
+          return `per il modello scelto nessun fornitore ammesso regge insieme gli strumenti della chat (cercare, leggere, impostare) e risposte lunghe quanto il tetto di ${n.toLocaleString('it-IT', { useGrouping: true })} token: abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
         }
-        return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+        return `per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // Il router non ha trovato un host che accetti gli strumenti (tool
       // calling) per il modello scelto: la chat della home non funziona senza.
       // Non è un guasto passeggero, è una scelta di modello da cambiare.
       if (/tool/i.test(raw) && (st === 404 || st === 400)) {
-        return 'il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+        return `il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // Chiave rifiutata (#629): se c'era un portafoglio, il ripiego sui
       // crediti di Filo è già scattato prima di arrivare qui; se l'errore
@@ -313,7 +327,7 @@
       // verifica del ramo: dava la colpa alla chiave, che era a posto).
       const W = globalThis.SN_WALLET;
       if (st === 403 && W && W.isModerationBlock(raw)) {
-        return 'OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione in Modelli predefiniti.';
+        return `OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione ${DOVE_ALTRO_MODELLO}.`;
       }
       if (st === 401 || st === 403) {
         return 'il servizio AI ha rifiutato la tua chiave API: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
@@ -449,7 +463,7 @@
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
-    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti,
+    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

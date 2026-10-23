@@ -1065,13 +1065,13 @@
     try {
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
+      if (rawText == null) { if (!auto) avvisoNonGenerato('il titolo', r); return false; }
       const ok = applyGeneratedTitle(id, rawText);
       if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
       if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
-    } catch (_) {
-      if (!auto) showEditorToast('Non sono riuscito a generare il titolo.');
+    } catch (e) {
+      if (!auto) avvisoNonGenerato('il titolo', { error: e && e.message, code: e && e.code });
       return false;
     } finally {
       if (docSwitchBtn) docSwitchBtn.classList.remove('ed-doc-generating');
@@ -1146,14 +1146,27 @@
     try {
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      const ok = rawText != null && applyGeneratedSummary(id, rawText);
+      if (rawText == null) { if (manuale) avvisoNonGenerato('il riassunto', r); return false; }
+      const ok = applyGeneratedSummary(id, rawText);
       if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
       if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
       return ok;
-    } catch (_) {
-      if (manuale) showEditorToast('Non sono riuscito a generare il riassunto.');
+    } catch (e) {
+      if (manuale) avvisoNonGenerato('il riassunto', { error: e && e.message, code: e && e.code });
       return false;
     }
+  }
+
+  // Titolo o riassunto chiesti a mano che non arrivano: il perché, come nelle chat, e il tasto per la pagina dove si
+  // toglie l'ostacolo (Crediti, Opzioni). «Non sono riuscito» da solo lasciava senza motivo e senza strada (#1344.1).
+  function avvisoNonGenerato(cosa, r) {
+    const CE = window.SN_CHAT_ERRORS;
+    const frase = CE ? CE.sentence(CE.fromResponse(r, '')) : '';
+    const pagina = CE?.rimedioPagina?.(r) || null;
+    const via = pagina
+      ? { label: pagina.label, title: pagina.title, durata: 15000, onClick: () => sendMessage({ type: MSG.OPEN_URL, url: pagina.url }) }
+      : undefined;
+    showEditorToast(`Non sono riuscito a generare ${cosa}.${frase ? ` ${frase}` : ''}`, via);
   }
 
   // Il debounce evita chiamate a ogni battitura, la firma evita rigenerazioni quando il contenuto
@@ -4209,7 +4222,7 @@
     if (immediate) { via(); return; }
     setTimeout(via, motionMs(220));
   }
-  // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
+  // `action` opzionale = { label, onClick, title?, durata? }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
   function showEditorToast(text, action) {
     const el = document.createElement('div');
@@ -4223,6 +4236,7 @@
       btn.type = 'button';
       btn.className = 'ed-toast-action';
       btn.textContent = action.label;
+      if (action.title) btn.title = action.title;
       btn.addEventListener('click', () => {
         removeEdToast(el);
         try { action.onClick(); } catch (_) {}
@@ -4249,8 +4263,9 @@
     void el.offsetWidth;
     el.classList.add('show');
     syncEdToastOverflow();
-    // Con un'azione lascio più tempo per cliccarla.
-    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(hasAction ? 7000 : 3400), () => removeEdToast(el));
+    // Con un'azione lascio più tempo per cliccarla; col tasto per un'altra pagina ancora di più, come sulle pagine web.
+    const base = hasAction ? Math.max(7000, Number(action.durata) || 0) : 3400;
+    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(base), () => removeEdToast(el));
     return el;
   }
 

@@ -144,6 +144,8 @@
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
         intera: true,
+        // «Aggiorna» e «Riprova» chiedono un parere nuovo: la risposta di prima, magari senza la carta, tornerebbe uguale.
+        noCache: mode === 'force',
       });
       const parsed = P.parseOpinionBatch(r.text);
       sintesi = parsed.sintesi;
@@ -315,7 +317,8 @@
         const keep = P.parseSearchKeep(r && r.text, ids);
         if (keep) return { keep };
         error = Object.assign(new Error('risposta del filtro illeggibile'), {
-          userText: 'il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» in Modelli predefiniti.',
+          userText: `il modello del filtro ha risposto in un formato che non so leggere. Riprova, o scegli un altro modello per «Mazzi — filtro dei risultati di ricerca» ${globalThis.SN_CHAT_ERRORS.DOVE_ALTRO_MODELLO}.`,
+          code: 'ALTRO_MODELLO',
         });
       } catch (e) {
         if (isBusy(e)) return { error: e, busy: true };

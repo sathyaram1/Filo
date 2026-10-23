@@ -131,6 +131,18 @@ module.exports = function register(on, ctx) {
     return CE.friendly(e, { dataSource: SCRYFALL_SOURCE });
   }
 
+  // Il codice e il rifiuto della chiave dicono alla pagina dove si toglie l'ostacolo: la frase da sola non ci porta (#663).
+  function rimedioDi(e) {
+    const R = globalThis.SN_WALLET;
+    return {
+      ...(e && e.code ? { code: e.code } : {}),
+      ...(R && R.keyRefusalOf && R.keyRefusalOf(e) ? { keyRefused: true } : {}),
+      ...(e && e.reason === 'crediti' ? { reason: 'crediti' } : {}),
+      ...(e && Number(e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {}),
+      ...(e && e.finishReason ? { finishReason: e.finishReason } : {}),
+    };
+  }
+
   // Scryfall che non risponde non è una carta che non esiste, né una query sbagliata: la frase dice quale dei due.
   function scryfallDownText(e) {
     if (Scry.isTimeout && Scry.isTimeout(e)) return e.userText;
@@ -271,6 +283,9 @@ module.exports = function register(on, ctx) {
       // Il turno è andato solo in parte (ricerca non partita, carte non controllate) e la risposta dice di riprovare:
       // la bolla allora tiene il tasto Riprova, come una risposta in errore.
       let retryable = false;
+      // Il controllo delle carte non è partito per un ostacolo che si toglie in Crediti o nelle Opzioni: la risposta
+      // arriva lo stesso, e la bolla porta il tasto per andarci accanto a Riprova.
+      let rimedio = null;
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
@@ -454,6 +469,8 @@ module.exports = function register(on, ctx) {
               broken: !!sr.broken, why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
             });
             if (note) reply = [reply, note].filter(Boolean).join('\n');
+            const dove = fr.error ? rimedioDi(fr.error) : null;
+            if (dove && globalThis.SN_CHAT_ERRORS && globalThis.SN_CHAT_ERRORS.rimedioPagina(dove)) rimedio = dove;
             // In cache vanno le carte che si mostrano, non le centinaia della rete larga.
             Scry.remember(cardIds.map((id) => cards[id]).filter(Boolean)).catch(() => {});
             cards = Object.fromEntries(cardIds.filter((id) => cards[id]).map((id) => [id, cards[id]]));
@@ -654,6 +671,7 @@ module.exports = function register(on, ctx) {
         ...(sort && (cardIds.length || hadList) ? { sort } : {}),
         ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
         ...(retryable ? { retryable: true } : {}),
+        ...(rimedio ? { rimedio } : {}),
         ...(reasoning ? { reasoning } : {}),
         ...(deckOut ? { deck: deckOut } : {}),
         ...(importPending ? { importPending } : {}),
@@ -664,15 +682,10 @@ module.exports = function register(on, ctx) {
       // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
       // Il dettaglio tecnico resta nei log per la diagnosi.
       console.warn('[SN] decks chat fallita:', (e && e.message) || e);
-      // Il codice e il rifiuto della chiave dicono alla pagina dove si toglie l'ostacolo: la frase da sola non ci porta (#663).
-      const R = globalThis.SN_WALLET;
       return {
         ok: false,
         error: friendlyChatError(e) || 'chat fallita',
-        ...(e && e.code ? { code: e.code } : {}),
-        ...(R && R.keyRefusalOf && R.keyRefusalOf(e) ? { keyRefused: true } : {}),
-        ...(e && Number(e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {}),
-        ...(e && e.finishReason ? { finishReason: e.finishReason } : {}),
+        ...rimedioDi(e),
         ...(reasoning ? { reasoning } : {}),
       };
     } finally {

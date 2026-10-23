@@ -266,7 +266,7 @@ for (const metodo of ['streamComplete', 'complete']) {
         assert.doesNotMatch(s, /strumenti/);
         assert.match(s, frase);
       }
-      assert.match(CE.sentence({ ...err, message: err.message, keySource: 'own' }), code === 'NO_PROVIDER_ALLOWED' ? /account OpenRouter/ : /Modelli predefiniti/);
+      assert.match(CE.sentence({ ...err, message: err.message, keySource: 'own' }), code === 'NO_PROVIDER_ALLOWED' ? /account OpenRouter/ : /Opzioni → Modelli per azione/);
     });
   }
 
