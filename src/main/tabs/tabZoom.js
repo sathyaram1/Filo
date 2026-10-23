@@ -99,4 +99,4 @@ function installZoom(wc) {
   wc.on('did-navigate', () => { modalita = false; campo = false; });
 }
 
-module.exports = { installZoom };
+module.exports = { installZoom, zoomDaTasto, rotellaZoom };
