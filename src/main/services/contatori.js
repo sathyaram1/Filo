@@ -1,6 +1,6 @@
 // I contatori anonimi (#969, #1461, #1464): misura usi e chiamate dei modelli, azioni e gli altri gesti di elenco chiuso,
 // li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
-// spedisce; spenti, butta anche quello che aveva. Cosa esce e in che forma: src/shared/contatoriGiornalieri.js.
+// spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const crypto = require('node:crypto');
