@@ -81,8 +81,10 @@
     }
     function posa() {
       const barra = barraDiScorrimento();
+      const aiuto = aiutoADestra();
       html.style.setProperty('--pd-barra', `${barra}px`);
-      html.style.setProperty('--pd-destra', `${Math.max(barra, aiutoADestra())}px`);
+      html.style.setProperty('--pd-destra', `${Math.max(barra, aiuto)}px`);
+      html.classList.toggle('pd-accanto', aiuto > barra);
     }
     window.addEventListener('resize', posa);
     try {
@@ -112,7 +114,8 @@
       const host = n.querySelector('.pd-contenuto');
       try { definiti[id] && definiti[id].disegna(host); } catch (e) { console.warn('[Filo] elemento del pannello', id, e); }
       n.querySelector('.pd-maniglia').addEventListener('mousedown', (e) => iniziaTrascina(e, id, 'elenco', n));
-      n.addEventListener('mousedown', (e) => { if (espanso && !e.target.closest('input, textarea, select, button, [contenteditable="true"]')) iniziaTrascina(e, id, 'elenco', n); });
+      // Espanso il pannello si dispone: ogni strumento si prende da dove lo si afferra, i suoi comandi aspettano.
+      n.addEventListener('mousedown', (e) => { if (espanso) iniziaTrascina(e, id, 'elenco', n); });
       n.addEventListener('contextmenu', (e) => {
         if (e.target.closest('input, textarea')) return;
         e.preventDefault();

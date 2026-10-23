@@ -72,6 +72,13 @@
       ],
     },
     {
+      version: '0.2.248', date: '2026-10-23',
+      features: [
+        'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.247', date: '2026-10-22',
       features: [
         'Quando un sito si prende lo schermo intero, come il pulsante di un video, in alto compare per qualche secondo il suo nome vero con «Esc per uscire». Così sai chi hai davanti anche quando la pagina copre tutto lo schermo. Torna portando il mouse sul bordo alto, e quanto resta lo scegli in Preferenze, nelle impostazioni avanzate.',

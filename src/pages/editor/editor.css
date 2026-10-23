@@ -161,7 +161,14 @@ html, body {
 }
 .ed-sr-row button:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
 .ed-sr-row + .ed-sr-row { margin-top: 4px; }
-.ed-sr-count { font-size: 11px; color: var(--sn-muted); margin-bottom: 4px; min-height: 1.1em; }
+/* Il conto sta dentro il campo Cerca: comparendo non sposta i tasti sotto. */
+.ed-sr-campo { position: relative; }
+.ed-sr-campo input { padding-right: 84px; }
+.ed-sr-count {
+  position: absolute; right: 8px; top: 0; height: calc(100% - 6px);
+  display: flex; align-items: center; pointer-events: none;
+  font-size: 11px; color: var(--sn-muted); white-space: nowrap;
+}
 
 /* L'ingranaggio: le regolazioni di ogni strumento. */
 .ed-strumenti-btn { width: 100%; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; border: none; background: transparent; }

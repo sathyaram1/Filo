@@ -64,10 +64,9 @@ test('il conteggio nel pannello cambia scrivendo; Ctrl+\\ apre e chiude il panne
   await premi(app, '\\', ['control']);
   await expect.poll(() => aperto(ed)).toBe(true);
   await expect(ed.locator('.pd-pannello')).toBeVisible();
-  const box = await ed.locator('.pd-pannello').boundingBox();
   const vw = await ed.evaluate(() => window.innerWidth);
-  expect(box.x + box.width).toBeLessThanOrEqual(vw);
-  expect(box.x + box.width, 'il pannello sta alla sinistra della barra di scorrimento').toBeLessThan(vw - 4);
+  // Finito di scivolare dentro, il pannello sta alla sinistra della barra di scorrimento.
+  await expect.poll(async () => { const b = await ed.locator('.pd-pannello').boundingBox(); return b.x + b.width; }).toBeLessThan(vw - 4);
   await premi(app, '\\', ['control']);
   await expect.poll(() => aperto(ed)).toBe(false);
 
@@ -130,7 +129,7 @@ test('il «+» mostra tutti gli strumenti: uno trascinato dentro resta dopo il r
     await shell.evaluate((u) => window.filoShell.tabs.open(u), EDITOR);
     let ed = null;
     await expect.poll(() => Boolean(ed = app.windows().find((w) => { try { return w.url().startsWith(EDITOR); } catch (_) { return false; } })), { timeout: 15_000 }).toBe(true);
-    await ed.waitForSelector('.pd-elemento[data-elemento="word-count"]');
+    await ed.waitForSelector('.pd-elemento[data-elemento="word-count"]', { state: 'attached' });
     return { app, ed };
   };
   try {
@@ -276,7 +275,7 @@ test('i vecchi moduli: il conteggio dei caratteri e la scorciatoia passano allo 
     }));
   });
   await ed0.reload();
-  await ed0.waitForSelector('.pd-elemento[data-elemento="word-count"]');
+  await ed0.waitForSelector('.pd-elemento[data-elemento="word-count"]', { state: 'attached' });
   await expect(ed0.locator('#doc')).toContainText('ciao mondo');
   await expect(ed0.locator('.pd-elemento[data-elemento="word-count"] .wc-cap')).toHaveText('caratteri');
   await expect(ed0.locator('.pd-elemento[data-elemento="word-count"] .wc-num')).toHaveText('10');

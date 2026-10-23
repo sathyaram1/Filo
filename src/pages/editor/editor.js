@@ -2342,9 +2342,8 @@
     const pad = document.createElement('div');
     pad.className = 'ed-mod-pad ed-sr';
     pad.innerHTML = `
-      <input type="text" placeholder="Cerca" data-sr="find" />
+      <div class="ed-sr-campo"><input type="text" placeholder="Cerca" data-sr="find" /><span class="ed-sr-count" data-sr="count"></span></div>
       <input type="text" placeholder="Sostituisci" data-sr="repl" />
-      <div class="ed-sr-count" data-sr="count"></div>
       <div class="ed-sr-row">
         <button data-sr="prev">‹ Prec</button>
         <button data-sr="next">Succ ›</button>
@@ -3245,13 +3244,22 @@
   }
 
   // I moduli della vecchia griglia (#1433): quello che sapevano passa agli strumenti del pannello, poi i documenti li
-  // perdono. Senza risposta dal main restano dove sono, e la prossima apertura ci riprova.
+  // perdono. Si leggono all'apertura, prima che il documento aperto li butti al primo salvataggio; senza risposta dal
+  // main restano dove sono, e la prossima apertura ci riprova.
+  let moduliVecchi = [];
+  const conModuli = (f) => !!(f && Array.isArray(f.modules) && f.modules.length);
+  function ricordaModuli() {
+    moduliVecchi = ((collection && collection.files) || []).filter(conModuli)
+      .map((f) => ({ id: f.id, meta: { modified: f.meta && f.meta.modified }, modules: cloneJson(f.modules) }));
+  }
   async function migraModuli() {
     const files = (collection && collection.files) || [];
-    if (!files.some((f) => f && ((Array.isArray(f.modules) && f.modules.length) || (f.meta && f.meta.grid)))) return;
-    const config = PANNELLI ? PANNELLI.configDaModuli('editor', collection) : {};
+    const fonte = { activeId: collection.activeId, files: [...moduliVecchi, ...files.filter((f) => conModuli(f) && !moduliVecchi.some((v) => v.id === f.id))] };
+    if (!fonte.files.length && !files.some((f) => f && f.meta && f.meta.grid)) return;
+    const config = PANNELLI ? PANNELLI.configDaModuli('editor', fonte) : {};
     const r = await sendMessage({ type: MSG.PANNELLO_APP_MODIFICA, app: 'editor', op: 'migra', config });
     if (!r || !r.ok) return;
+    moduliVecchi = [];
     for (const f of files) { if (f) { f.modules = []; if (f.meta) delete f.meta.grid; } }
     writeCollection();
   }
@@ -3681,6 +3689,7 @@
   loadVersions();                           // storico dall'archivio app (async)
   loadTrash();
   loadCollection();                         // da localStorage (sincrono)
+  ricordaModuli();
   // ?file=<id>: un documento scelto da fuori (la carta dell'Editor nella home, #870). Può stare solo
   // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
   const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
