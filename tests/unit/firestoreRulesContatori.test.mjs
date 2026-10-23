@@ -48,6 +48,7 @@ function corpo(nome) {
 const GIORNO = corpo('contatoriGiorno');
 const ORA = corpo('contatoriOra');
 const CHIAMATE = corpo('contatoriChiamate');
+const ATTIVITA = corpo('contatoriAttivita');
 
 function regole(testo) {
   const out = [];
