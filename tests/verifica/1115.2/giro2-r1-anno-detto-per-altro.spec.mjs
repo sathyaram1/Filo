@@ -47,7 +47,7 @@ for (const [nome, sopra, anno] of [
   ['menu autunno 2023', '<h2>Menu autunno 2023</h2>', 2023],
   ['data dell\'articolo', '<article><h1>Le castagne</h1><p>Pubblicato il 3 marzo 2023</p><p>Testo.</p></article>', 2023],
 ]) {
-  test(`r1 «${nome}» sopra il modulo: spiegazione e prima proposta della data sbagliata usano l'anno vicino a oggi`, async ({ app, openTab, testServer }) => {
+  test(`r1 «${nome}» sopra il modulo: la data sbagliata si spiega e si corregge con l'anno vicino a oggi`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await apri(app, openTab, testServer, pagina(sopra));
     const g = NOMI[giornoSbagliato(anno)];
