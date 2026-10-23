@@ -81,7 +81,7 @@
       });
     } catch (_) {}
   }
-  try { global.addEventListener?.('pagehide', () => { if (isOpen()) contaSessione(); }); } catch (_) {}
+  try { window.addEventListener('pagehide', () => { if (isOpen()) contaSessione(); }); } catch (_) {}
   // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
   // limite si ignorano in silenzio.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
