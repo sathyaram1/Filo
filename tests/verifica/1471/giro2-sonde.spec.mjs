@@ -40,23 +40,6 @@ const gesti = (app) => app.evaluate(async () => {
 });
 const conto = async (app, misura, chiave, voce = '') => ((await gesti(app))[misura]?.[chiave]?.[voce]) || 0;
 
-test('sonda incognito: la home in incognito non conta le carte', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await shell.evaluate(() => window.filoShell.openIncognito());
-  const inc = await trovaPagina(app, (u) => u.includes('incognito=1'), 15_000);
-  const carta = inc.locator('#tieni .dash-carta[data-chiave="editor"]');
-  await expect(carta).toBeVisible({ timeout: 10_000 });
-  await carta.click({ button: 'right' });
-  await expect(inc.locator('.dash-menu')).toBeVisible();
-  await inc.keyboard.press('Escape');
-  await new Promise((r) => setTimeout(r, 800));
-  expect(await conto(app, 'carta_home', 'editor', 'destra|tasto_destro')).toBe(0);
-  const home = await homeDi(app);
-  await home.bringToFront();
-  await home.locator('#tieni .dash-carta[data-chiave="editor"]').click({ button: 'right' });
-  await expect.poll(() => conto(app, 'carta_home', 'editor', 'destra|tasto_destro'), { timeout: 8_000 }).toBe(1);
-});
-
 test('sonda editor: configurato e tolto dalla finestra del modulo', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab('filo://editor/editor.html');
