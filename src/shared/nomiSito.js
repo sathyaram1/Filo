@@ -177,7 +177,7 @@
     return typeof voce === 'string' && !!voce && !!h && (h === voce || h.endsWith(`.${voce}`));
   }
 
-  const api = { valido, leggibile, sitoDi, daScritto, elencoDaTesto, testoDaElenco, ripulisciElenco, copre };
+  const api = { valido, leggibile, sitoDi, daScritto, pezziDi, elencoDaTesto, testoDaElenco, ripulisciElenco, copre };
   global.SN_NOMI_SITO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
