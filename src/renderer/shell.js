@@ -504,6 +504,20 @@
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
+  // A schermo intero il quadrato si vede solo con le schede scese dal bordo alto, e lì fa uscire (#1343).
+  function quadratoPerSchermoIntero(on) {
+    if (!winMaxBtn) return;
+    const testo = on ? 'Esci da schermo intero' : 'Massimizza';
+    setIcon(winMaxBtn, on ? 'restore' : 'maximize', 14);
+    winMaxBtn.dataset.tip = testo;
+    winMaxBtn.setAttribute('aria-label', testo);
+  }
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
+      if (m && m.type === tipo) quadratoPerSchermoIntero(!!m.fullscreen);
+    });
+  }
 
   // L'agente "Aiuto" clicca il bottone VERO, così non si duplica niente.
   // "close" non è mappato apposta: l'agente non deve chiudere la finestra.
