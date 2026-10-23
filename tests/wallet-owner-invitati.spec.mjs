@@ -119,10 +119,11 @@ test('chi è entrato coi codici di un tester sta sotto di lui, e il numero dice 
   expect(r2).toBeGreaterThan(r1);
   await page.screenshot({ path: 'tests/.shots/1519-invitati-chiaro.png', fullPage: true });
 
-  // Il clic sul numero lascia le tre persone contate, senza aprire la scheda del tester.
+  // Il clic sul numero lascia le tre persone contate sotto il tester, senza aprire la sua scheda.
   await bottone.click();
-  expect(await visibili(page)).toEqual(['aaaa000000000013', 'aaaa000000000012', 'aaaa000000000011']);
-  await expect(page.locator('#ownerFiltro')).toContainText(`Solo le 3 persone entrate coi codici di ${T}.`);
+  expect(await visibili(page)).toEqual([T, 'aaaa000000000013', 'aaaa000000000012', 'aaaa000000000011']);
+  await expect(page.locator('#ownerFiltro')).toContainText(`Solo ${T} e le 3 persone entrate coi suoi codici.`);
+  await page.screenshot({ path: 'tests/.shots/1519-invitati-filtro.png', fullPage: true });
   await expect(bottone).toHaveAttribute('aria-pressed', 'true');
   await expect(rigaDi(page, T)).toHaveAttribute('aria-expanded', 'false');
   // «Mostra tutte» rimette tutti, e il fuoco torna sul numero.
@@ -133,7 +134,7 @@ test('chi è entrato coi codici di un tester sta sotto di lui, e il numero dice 
 
   // Da tastiera: Invio apre, Spazio chiude; la scheda del tester resta chiusa.
   await page.keyboard.press('Enter');
-  expect(await visibili(page)).toHaveLength(3);
+  expect(await visibili(page)).toHaveLength(4);
   await page.keyboard.press(' ');
   expect(await visibili(page)).toHaveLength(6);
   await expect(rigaDi(page, T)).toHaveAttribute('aria-expanded', 'false');
@@ -143,12 +144,16 @@ test('chi è entrato coi codici di un tester sta sotto di lui, e il numero dice 
   const menu = page.locator('.sn-wallet-ctx');
   await expect(menu.locator('.sn-select-option')).toHaveText(['Mostra le 3 persone che ha fatto entrare', 'Copia il numero']);
   await menu.locator('.sn-select-option').first().click();
-  expect(await visibili(page)).toHaveLength(3);
+  expect(await visibili(page)).toHaveLength(4);
   await page.click('#ownerFiltroTogli');
   await rigaDi(page, T).locator('td').nth(1).click({ button: 'right' });
   await expect(menu.locator('.sn-select-option').last()).toHaveText('Mostra le 3 persone che ha fatto entrare');
   await menu.locator('.sn-select-option').last().click();
-  expect(await visibili(page)).toHaveLength(3);
+  expect(await visibili(page)).toHaveLength(4);
+  // Il tasto destro sul numero premuto offre di rimettere tutti.
+  await bottone.click({ button: 'right' });
+  await expect(menu.locator('.sn-select-option').first()).toHaveText('Mostra tutte le persone');
+  await page.keyboard.press('Escape');
   await page.click('#ownerFiltroTogli');
   // Chi non ha fatto entrare nessuno non ha la voce.
   await rigaDi(page, 'rrrr000000000002').locator('td').nth(1).click({ button: 'right' });
@@ -174,7 +179,7 @@ test('un ingresso nuovo coi codici del tester entra sotto di lui alla rilettura:
   expect(await page.evaluate((p) => window.__bottone === document.querySelector(`#ownerUsers tr[data-pseudonym="${p}"] .sn-wallet-invitati-btn`), T)).toBe(true);
   expect((await ordine(page)).slice(1, 3)).toEqual([T, 'aaaa000000000014']);
   // Il filtro aperto conta anche chi è appena entrato.
-  expect(await visibili(page)).toEqual(['aaaa000000000014', 'aaaa000000000013', 'aaaa000000000012', 'aaaa000000000011']);
-  await expect(page.locator('#ownerFiltro')).toContainText('Solo le 4 persone entrate');
+  expect(await visibili(page)).toEqual([T, 'aaaa000000000014', 'aaaa000000000013', 'aaaa000000000012', 'aaaa000000000011']);
+  await expect(page.locator('#ownerFiltro')).toContainText('e le 4 persone entrate coi suoi codici');
   await expect(rigaDi(page, 'aaaa000000000014')).toHaveClass(/is-invitato/);
 });
