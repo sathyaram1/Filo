@@ -150,8 +150,15 @@ test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei l
   expect(r.giudizioMancato).toBe(true);
   await expect(shell.locator('.shell-notif-msg', { hasText: 'senza dire quali schede tenere' })).toBeVisible({ timeout: 5_000 });
 
+  // Il suo tasto porta dove si sceglie un altro modello.
+  await shell.locator('.shell-notif-msg', { hasText: 'senza dire quali schede tenere' }).locator('xpath=..').locator('.shell-notif-action', { hasText: 'Apri Opzioni' }).click();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    return (tm.tabs.find((t) => t.id === tm.activeId) || {}).url || '';
+  }), { timeout: 8_000 }).toMatch(/^filo:\/\/options\/options\.html/);
+  await expect(shell.locator('.shell-notif-msg', { hasText: 'senza dire quali schede tenere' })).toHaveCount(0, { timeout: 3_000 });
+
   // Il cammino manuale lo dice già lui: niente avviso in più.
-  await shell.locator('.shell-notif-msg', { hasText: 'senza dire quali schede tenere' }).locator('xpath=..').locator('.shell-notif-close').click();
   await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = async () => { throw new Error('rete giù'); }; });
   const manuale = await app.evaluate(async ({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.runAutoTriage({ trigger: 'manual' }));
   expect(manuale.giudizioMancato).toBe(true);
