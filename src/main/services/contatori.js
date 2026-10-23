@@ -1105,6 +1105,81 @@ function crea(dip = {}) {
     return { ieri: { giorno: ieri, ...a }, mese: { mese, ...b } };
   }
 
+  // Le somme della scheda Contatori (#1462): i documenti di un intervallo, a pagine e coi soli campi che si sommano,
+  // tenuti qualche minuto per la stessa richiesta. Alla pagina escono solo le somme di src/main/services/contatoriSomme.js.
+  const letture = new Map();
+
+  async function documentiFra(idToken, dal, al) {
+    const { FIRESTORE_BASE, API_KEY } = rest();
+    if (!FIRESTORE_BASE || !API_KEY) throw new Error('server non configurato');
+    const docs = [];
+    let dopo = null;
+    let letti = 0;
+    for (let pagina = 0; pagina < TETTO_PAGINE; pagina++) {
+      const structuredQuery = {
+        from: [{ collectionId: C.COLLEZIONE }],
+        where: { compositeFilter: { op: 'AND', filters: [
+          { fieldFilter: { field: { fieldPath: 'giorno' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: dal } } },
+          { fieldFilter: { field: { fieldPath: 'giorno' }, op: 'LESS_THAN_OR_EQUAL', value: { stringValue: al } } },
+        ] } },
+        select: { fields: Somme.CAMPI_LETTI.map((f) => ({ fieldPath: f })) },
+        orderBy: [{ field: { fieldPath: 'giorno' }, direction: 'ASCENDING' }, { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+        limit: PAGINA_LETTURA,
+        ...(dopo ? { startAt: { values: [{ stringValue: dopo.giorno }, { referenceValue: dopo.nome }], before: false } } : {}),
+      };
+      const res = await fetchFn(`${FIRESTORE_BASE}:runQuery?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ structuredQuery }),
+        signal: AbortSignal.timeout(ATTESA_RETE_MS),
+      });
+      if (!res.ok) {
+        let det = '';
+        try { const j = await res.json(); det = (Array.isArray(j) ? j[0] : j)?.error?.status || ''; } catch (_) {}
+        throw new Error(`contatori ${res.status}${det ? ` ${det}` : ''}`);
+      }
+      const righe = ((await res.json()) || []).filter((r) => r && r.document);
+      letti += righe.length;
+      for (const r of righe) {
+        const d = Somme.documentoDa(r.document.fields || {}, C);
+        if (d) docs.push(d);
+      }
+      // Quanti documenti ci sono è quante ore le copie erano aperte: resta qui, nel registro, e non va alla pagina.
+      if (righe.length < PAGINA_LETTURA) { log(`somme: ${letti} documenti letti dal ${dal} al ${al}`); return { docs, completo: true }; }
+      const ultimo = righe[righe.length - 1].document;
+      dopo = { nome: ultimo.name, giorno: String(Somme.daFs(ultimo.fields && ultimo.fields.giorno) || '') };
+    }
+    log(`somme: ${letti} documenti letti dal ${dal} al ${al}, tetto raggiunto: lettura parziale`);
+    return { docs, completo: false };
+  }
+
+  function lettura(idToken, dal, al, forza) {
+    const chiave = `${dal}|${al}`;
+    const tenuta = letture.get(chiave);
+    if (tenuta && !forza && (tenuta.promessa || adesso() - tenuta.at < LETTURA_VALE_MS)) return tenuta.promessa || Promise.resolve(tenuta);
+    const voce = { at: 0, docs: [], completo: true };
+    voce.promessa = documentiFra(idToken, dal, al).then((r) => {
+      Object.assign(voce, r, { at: adesso() });
+      delete voce.promessa;
+      return voce;
+    }, (e) => {
+      if (letture.get(chiave) === voce) letture.delete(chiave);
+      throw e;
+    });
+    letture.delete(chiave);
+    letture.set(chiave, voce);
+    while (letture.size > LETTURE_TENUTE) letture.delete(letture.keys().next().value);
+    return voce.promessa;
+  }
+
+  async function somme({ idToken, dal, al, app = '', os = '', forza = false } = {}) {
+    const storta = Somme.richiestaStorta({ dal, al, app, os }, C);
+    if (storta) throw new Error(storta);
+    if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
+    const l = await lettura(idToken, dal, al, forza === true);
+    return Somme.somma(l.docs, { dal, al, app: app || '', os: os || '', completo: l.completo, lettoAlle: l.at, C });
+  }
+
   async function letto() { await carica(); return JSON.parse(JSON.stringify(stato)); }
 
   return {

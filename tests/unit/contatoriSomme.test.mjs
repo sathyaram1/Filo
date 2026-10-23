@@ -84,6 +84,24 @@ test('nessuno pseudonimo esce dalla somma, e nemmeno quanti documenti ci sono', 
   assert.equal(riga(s.erroriVisti, 'crash:scheda:oom').etichetta, 'Scheda caduta: memoria finita');
 });
 
+test('le voci che esistono solo perché qualcuno le ha viste, sotto soglia, non escono nemmeno col nome', () => {
+  const docs = [];
+  for (let i = 0; i < 3; i++) {
+    docs.push(documento(i, '2026-10-15T09', (o) => {
+      C.registraErroreVisto(o, 'rete:-105');
+      C.registraProposta(o, 'frase', 'qualcuno/modello-raro', 'mostrata');
+      C.registraErrore(o, 'explain', { modello: 'qualcuno/modello-raro', host: 'Host', tipo: 'rete' });
+    }));
+  }
+  const s = somma(docs);
+  assert.deepEqual(s.erroriVisti, []);
+  assert.deepEqual(s.guasti, []);
+  assert.equal(riga(s.correttore, 'frase|qualcuno/modello-raro'), undefined);
+  // Il tipo è un elenco chiuso: resta, col suo «meno di 5».
+  assert.deepEqual(riga(s.correttore, 'frase').principale, { sotto: true });
+  assert.ok(!JSON.stringify(s).includes('modello-raro'));
+});
+
 test('a cavallo di due mesi tre copie restano tre, anche con sei pseudonimi; cinque in un mese bastano', () => {
   const docs = [];
   for (let i = 0; i < 3; i++) {
@@ -98,6 +116,25 @@ test('a cavallo di due mesi tre copie restano tre, anche con sei pseudonimi; cin
   // Cinque copie in ottobre: il numero si mostra; le copie contano una volta per mese, e lo si dice.
   assert.deepEqual(riga(s.chiedi, 'explain').principale, { n: 8, copie: 8 });
   assert.equal(s.copie.mesi, 2);
+});
+
+test('un documento con chiavi come «constructor» o «__proto__» non rompe la somma e non presta nomi ereditati', () => {
+  const docs = [];
+  for (let i = 0; i < 5; i++) {
+    const d = documento(i, '2026-10-15T09');
+    d.conferme = { constructor: 'altro|altro|altro|altro|altro|altro|__proto__|3', NAVIGA: 'altro|altro|altro|altro|altro|altro|toString|2' };
+    d.erroriVisti = { 'crash:constructor:toString': '3', 'chat:__proto__': '2' };
+    d.ricerche = { constructor: '1;0,0,0,0,0,0,0;0,0,0,0,0,0;0' };
+    d.impostazioni = { __proto__: null, constructor: 'toString|mano|1' };
+    docs.push(d);
+  }
+  const s = somma(docs);
+  const testo = JSON.stringify(s);
+  assert.ok(!/function|\[native code\]/.test(testo), 'un nome ereditato è finito in pagina');
+  assert.deepEqual(riga(s.conferme, 'NAVIGA').principale, { sotto: true });
+  assert.equal(riga(s.erroriVisti, 'crash:constructor:toString').etichetta, 'constructor caduta: toString');
+  assert.equal(riga(s.ricerche, 'constructor').etichetta, 'constructor');
+  assert.deepEqual(riga(s.impostazioni, 'constructor').principale, { n: 5, copie: 5 });
 });
 
 test('versione e sistema filtrano prima della somma; le versioni lette si offrono tutte', () => {

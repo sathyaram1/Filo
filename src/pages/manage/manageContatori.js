@@ -35,6 +35,7 @@
     si: 'sì', no: 'no', completa: 'completa', anticipata: 'chiusa prima della fine', saltata: 'con «Salta»',
     uscita: 'uscendo da Filo', tetto: 'al tetto dei turni',
   };
+  const nomeScelta = (k) => (Object.prototype.hasOwnProperty.call(SCELTE, k) ? SCELTE[k] : String(k));
   const GIORNO_RE = /^20\d{2}-[01]\d-[0-3]\d$/;
   const APP_RE = /^\d{1,4}\.\d{1,4}\.\d{1,6}$/;
   const SOTTO = 'meno di 5';
@@ -202,6 +203,9 @@
     let al = el.al.value;
     if (!valido(dal) || !valido(al)) return;
     if (dal > al) [dal, al] = [al, dal];
+    // Raddrizzate si riscrivono subito, anche nel campo col fuoco: il prossimo «change» le rilegge da lì.
+    el.dal.value = dal;
+    el.al.value = al;
     if (dal === scelta.dal && al === scelta.al) return;
     scelta = { ...scelta, preset: 'mano', dal, al };
     salvaScelta();
@@ -383,7 +387,7 @@
     {
       id: 'intervista', titolo: 'Intervista di benvenuto', righe: (s) => s.intervista, fisso: true, copie: true, colonne: [
         tx('Passo', (r) => r.etichetta), n('Superato', C('spuntata'), 'copie'), n('Abbandonata qui', C('abbandono'), 'copie'),
-        ch('Risposte e chiusure', (r) => r.celle.scelte.map((x) => ({ etichetta: SCELTE[x.scelta] || x.scelta, cella: x.copie }))),
+        ch('Risposte e chiusure', (r) => r.celle.scelte.map((x) => ({ etichetta: nomeScelta(x.scelta), cella: x.copie }))),
       ],
     },
     {
@@ -562,10 +566,12 @@
       return td;
     }
     if (col.tipo === 'fasce') {
+      const lista = Array.isArray(v) ? v : [];
+      // Tutte sotto soglia: sette tacche uguali non dicono niente di più della scritta.
+      if (lista.every(sotto)) return scriviSotto(td);
       const box = document.createElement('span');
       box.className = 'mg-ct-fasce';
       box.setAttribute('role', 'img');
-      const lista = Array.isArray(v) ? v : [];
       const max = Math.max(1, ...lista.filter((c) => !sotto(c)).map((c) => c.n));
       const detti = [];
       lista.forEach((c, i) => {

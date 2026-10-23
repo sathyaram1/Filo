@@ -82,9 +82,7 @@ const breve = (g) => { const [y, m, d] = g.split('-').map(Number); return new Da
 const blocco = (page, id) => page.locator(`#mgCtBlocchi section[data-blocco="${id}"]`);
 const riga = (page, id, testo) => blocco(page, id).locator('tr.mg-ct-riga', { has: page.locator('td:first-child', { hasText: testo }) });
 
-async function scegli(page, id, valore) {
-  await page.evaluate(([i, v]) => { const s = document.getElementById(i); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); }, [id, valore]);
-}
+const scegli = (page, id, valore) => page.locator(`#${id}`).selectOption(valore);
 
 test('la porta delle somme è solo dell’owner e solo dalle pagine di Filo; chi non è owner legge un permesso che manca', async ({ app, openTab }) => {
   const negato = await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
@@ -181,10 +179,11 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await expect(page.locator('.mg-ctxmenu')).toHaveCount(0);
     await expect(blocco(page, 'azioni').locator('.mg-ct-andamento')).toHaveCount(1);
 
+    // I filtri non rileggono: la stessa finestra è già in mano al main.
+    await blocco(page, 'azioni').locator('.mg-ct-altre button').click();
     mkdirSync(SHOTS, { recursive: true });
     await page.screenshot({ path: `${SHOTS}/contatori-gestione-chiaro.png`, fullPage: true });
-
-    // I filtri non rileggono: la stessa finestra è già in mano al main.
+    await page.screenshot({ path: `${SHOTS}/contatori-gestione-chiaro-cima.png` });
     const prima = await letture(app);
     await scegli(page, 'mgCtVersione', '0.2.299');
     await expect(page.locator('#mgCtTotale b')).toHaveText('meno di 5');
@@ -204,6 +203,7 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await expect(page.locator('#mgCtDati')).toBeVisible({ timeout: 15_000 });
     await riga(page, 'azioni', 'Apri una nuova scheda').click();
     await page.screenshot({ path: `${SHOTS}/contatori-gestione-scuro.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/contatori-gestione-scuro-cima.png` });
     await page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { theme: 'light' } }));
   } finally {
     await rimetti(app);

@@ -1,18 +1,11 @@
-// Le somme dei contatori anonimi per la scheda Contatori di Gestione (#1462): legge i documenti di un intervallo e li somma.
-// Alla pagina escono solo somme, e una cella contata su meno di cinque copie esce senza numero. Forma dei documenti:
-// src/shared/contatoriGiornalieri.js; la porta dell'owner: src/main/services/handlers/contatori.js.
+// Le somme dei contatori anonimi per la scheda Contatori di Gestione (#1462): logica pura, niente rete né disco.
+// Alla pagina escono solo somme, e una cella contata su meno di cinque copie esce senza numero. La lettura sta in
+// src/main/services/contatori.js; la forma dei documenti in src/shared/contatoriGiornalieri.js.
 
 'use strict';
 
 // Sotto questa soglia di copie una cella dice «meno di 5»: con pochi tester, un numero è il comportamento di uno di loro.
 const SOGLIA_COPIE = 5;
-const PAGINA = 1000;
-// Duecentomila documenti prima di dire che la lettura è parziale: un mese di cinquecento copie sempre accese.
-const TETTO_PAGINE = 200;
-const ATTESA_RETE_MS = 30000;
-// Le ore nuove arrivano ogni ora: una lettura vale dieci minuti per la stessa richiesta, «Rileggi» la rifà subito.
-const VALE_MS = 10 * 60 * 1000;
-const RICHIESTE_TENUTE = 4;
 // Tre anni, detto col numero a chi chiede di più: oltre, anche una colonna al mese non si legge più.
 const TETTO_GIORNI = 1100;
 const GIORNI_PER_GIORNO = 62;
@@ -21,6 +14,9 @@ const GIORNI_PER_SETTIMANA = 548;
 const CAMPI_LETTI = Object.freeze(['v', 'pseudonimo', 'giorno', 'ora', 'app', 'os', 'uso', 'errori', 'azioni',
   'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista',
   'primeVolte']);
+
+// Le tabelle dei nomi si interrogano con chiavi scritte da chi manda il documento: solo le loro chiavi, mai l'eredità.
+const di = (o, k) => (Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined);
 
 const ESITI_CONFERMA_CHIAVE = Object.freeze({
   automatica: 'automatica', approvata: 'approvata', rifiutata: 'rifiutata', 'senza-risposta': 'senzaRisposta',
@@ -183,12 +179,12 @@ function catalogo(g = globalThis) {
     tipoAzione(tipo) {
       if (tipo === C.AZIONE_PAGINA) return 'Azioni dell’Aiuto nella pagina';
       const pagina = { correzione: 'Correzione del correttore', 'correzione-automatica': 'Correzione automatica', 'modifica-testo': 'Modifica del testo' };
-      if (pagina[tipo]) return pagina[tipo];
+      if (di(pagina, tipo)) return pagina[tipo];
       return grande(String(tipo).toLowerCase().replace(/_/g, ' '));
     },
     erroreVisto: (k) => etichettaErrore(k, t),
-    pannello: (p) => PANNELLI[p] || p,
-    tipoProposta: (tp) => TIPI_PROPOSTA[tp] || tp,
+    pannello: (p) => di(PANNELLI, p) || p,
+    tipoProposta: (tp) => di(TIPI_PROPOSTA, tp) || tp,
   };
 }
 
@@ -213,11 +209,11 @@ const GUASTI = Object.freeze({
 
 function etichettaErrore(k, t) {
   const [a, b, c] = String(k).split(':');
-  if (a === 'crash') return `${DOVE[b] || b} caduta: ${MOTIVI[c] || c}`;
-  if (a === 'bloccata') return `${DOVE[b] || b} bloccata`;
+  if (a === 'crash') return `${di(DOVE, b) || b} caduta: ${di(MOTIVI, c) || c}`;
+  if (a === 'bloccata') return `${di(DOVE, b) || b} bloccata`;
   if (a === 'rete') return b === 'bloccato' ? 'Pagina bloccata dalla rete' : `Pagina d’errore di rete (${b})`;
-  if (a === 'chat') return `Risposta non arrivata in chat: ${GUASTI[b] || b}`;
-  if (a === 'modello') return `Risposta non arrivata in una pagina: ${GUASTI[b] || b}`;
+  if (a === 'chat') return `Risposta non arrivata in chat: ${di(GUASTI, b) || b}`;
+  if (a === 'modello') return `Risposta non arrivata in una pagina: ${di(GUASTI, b) || b}`;
   if (a === 'avviso') return `Avviso «${t(b) || String(b).replace(/_/g, ' ')}»`;
   return String(k);
 }
@@ -350,7 +346,7 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
       for (const v of voci(s)) {
         const parti = v.split('|');
         const n = intero(parti[parti.length - 1]);
-        const esito = ESITI_CONFERMA_CHIAVE[parti[parti.length - 2]];
+        const esito = di(ESITI_CONFERMA_CHIAVE, parti[parti.length - 2]);
         if (!n || !esito) continue;
         const r = rigaConferma(tipo);
         principale(r, doc, per, n);
@@ -477,7 +473,7 @@ function somma(documenti, { dal, al, app = '', os = '', completo = true, lettoAl
 
   const outChiedi = lista(chiedi).map((r) => chiusa(r, periodi, K.funzione(r.id), {}));
   const outErrori = lista(erroriVisti).map((r) => chiusa(r, periodi, K.erroreVisto(r.id), {}));
-  const outGuasti = lista(guasti).map((r) => chiusa(r, periodi, K.funzione(r.f), { modello: r.modello, host: r.host, tipo: GUASTI[r.tipo] || r.tipo }));
+  const outGuasti = lista(guasti).map((r) => chiusa(r, periodi, K.funzione(r.f), { modello: r.modello, host: r.host, tipo: di(GUASTI, r.tipo) || r.tipo }));
   const ordinePassi = C.passiIntervista();
   const outIntervista = lista(intervista)
     .sort((a, b) => indice(ordinePassi, a.id) - indice(ordinePassi, b.id))
@@ -540,91 +536,16 @@ function confrontaVersioni(a, b) {
   return 0;
 }
 
-// ── La lettura ───────────────────────────────────────────────────────────────
-function crea(dip = {}) {
-  const C = dip.contatori || globalThis.SN_CONTATORI;
-  const fetchFn = dip.fetch || ((...a) => fetch(...a));
-  const rest = dip.rest || (() => (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest) || {});
-  const adesso = dip.adesso || (() => Date.now());
-  const log = dip.log || ((...a) => console.log('[contatori/somme]', ...a));
-  const letture = new Map();
-
-  async function pagine(idToken, dal, al) {
-    const { FIRESTORE_BASE, API_KEY } = rest();
-    if (!FIRESTORE_BASE || !API_KEY) throw new Error('server non configurato');
-    const docs = [];
-    let dopo = null;
-    let letti = 0;
-    for (let pagina = 0; pagina < TETTO_PAGINE; pagina++) {
-      const structuredQuery = {
-        from: [{ collectionId: C.COLLEZIONE }],
-        where: { compositeFilter: { op: 'AND', filters: [
-          { fieldFilter: { field: { fieldPath: 'giorno' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: dal } } },
-          { fieldFilter: { field: { fieldPath: 'giorno' }, op: 'LESS_THAN_OR_EQUAL', value: { stringValue: al } } },
-        ] } },
-        select: { fields: CAMPI_LETTI.map((f) => ({ fieldPath: f })) },
-        orderBy: [{ field: { fieldPath: 'giorno' }, direction: 'ASCENDING' }, { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
-        limit: PAGINA,
-        ...(dopo ? { startAt: { values: [{ stringValue: dopo.giorno }, { referenceValue: dopo.nome }], before: false } } : {}),
-      };
-      const res = await fetchFn(`${FIRESTORE_BASE}:runQuery?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ structuredQuery }),
-        signal: AbortSignal.timeout(ATTESA_RETE_MS),
-      });
-      if (!res.ok) {
-        let det = '';
-        try { const j = await res.json(); det = (Array.isArray(j) ? j[0] : j)?.error?.status || ''; } catch (_) {}
-        throw new Error(`contatori ${res.status}${det ? ` ${det}` : ''}`);
-      }
-      const righe = ((await res.json()) || []).filter((r) => r && r.document);
-      letti += righe.length;
-      for (const r of righe) {
-        const d = documentoDa(r.document.fields || {}, C);
-        if (d) docs.push(d);
-      }
-      if (righe.length < PAGINA) { log(`${letti} documenti letti dal ${dal} al ${al}`); return { docs, completo: true }; }
-      const ultimo = righe[righe.length - 1].document;
-      dopo = { nome: ultimo.name, giorno: String(daFs(ultimo.fields && ultimo.fields.giorno) || '') };
-    }
-    log(`${letti} documenti letti dal ${dal} al ${al}: tetto raggiunto, lettura parziale`);
-    return { docs, completo: false };
-  }
-
-  function leggi(idToken, dal, al, forza) {
-    const chiave = `${dal}|${al}`;
-    const tenuta = letture.get(chiave);
-    if (tenuta && !forza && (tenuta.promessa || adesso() - tenuta.at < VALE_MS)) return tenuta.promessa || Promise.resolve(tenuta);
-    const voce = { at: 0, docs: [], completo: true };
-    voce.promessa = pagine(idToken, dal, al).then((r) => {
-      Object.assign(voce, r, { at: adesso() });
-      delete voce.promessa;
-      return voce;
-    }, (e) => {
-      if (letture.get(chiave) === voce) letture.delete(chiave);
-      throw e;
-    });
-    letture.delete(chiave);
-    letture.set(chiave, voce);
-    while (letture.size > RICHIESTE_TENUTE) letture.delete(letture.keys().next().value);
-    return voce.promessa;
-  }
-
-  // `dal`/`al`: giorni del calendario di chi usa Filo; `app`/`os`: '' per tutte.
-  async function somme({ idToken, dal, al, app = '', os = '', forza = false } = {}) {
-    if (!giornoValido(dal, C) || !giornoValido(al, C)) throw new Error('Intervallo non valido: servono due date.');
-    if (dal > al) throw new Error('Intervallo non valido: la prima data viene dopo la seconda.');
-    const lungo = giorniFra(dal, al).length;
-    if (lungo > TETTO_GIORNI) throw new Error(`Intervallo troppo lungo: ${lungo} giorni, al massimo ${TETTO_GIORNI}.`);
-    if (app && !C.APP_RE.test(String(app))) throw new Error('Versione non valida.');
-    if (os && !C.OS.includes(os)) throw new Error('Sistema non valido.');
-    if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
-    const l = await leggi(idToken, dal, al, forza === true);
-    return somma(l.docs, { dal, al, app: app || '', os: os || '', completo: l.completo, lettoAlle: l.at, C });
-  }
-
-  return { somme };
+// ── La richiesta ─────────────────────────────────────────────────────────────
+// `dal`/`al`: giorni del calendario di chi usa Filo; `app`/`os`: '' per tutte. Il motivo del no, in una frase; '' se va.
+function richiestaStorta({ dal, al, app = '', os = '' } = {}, C = globalThis.SN_CONTATORI) {
+  if (!giornoValido(dal, C) || !giornoValido(al, C)) return 'Intervallo non valido: servono due date.';
+  if (dal > al) return 'Intervallo non valido: la prima data viene dopo la seconda.';
+  const lungo = giorniFra(dal, al).length;
+  if (lungo > TETTO_GIORNI) return `Intervallo troppo lungo: ${lungo} giorni, al massimo ${TETTO_GIORNI}.`;
+  if (app && !C.APP_RE.test(String(app))) return 'Versione non valida.';
+  if (os && !C.OS.includes(os)) return 'Sistema non valido.';
+  return '';
 }
 
 // I due riquadri delle installazioni attive (Inviti e utenti) seguono la stessa soglia delle celle della scheda.
@@ -633,4 +554,4 @@ function sottoSoglia(v) {
   return v && Number.isFinite(n) && n < SOGLIA_COPIE ? { ...v, n: null, sotto: true } : v;
 }
 
-module.exports = { crea, somma, documentoDa, catalogo, sottoSoglia, SOGLIA_COPIE, CAMPI_LETTI, periodoDi, passoPer };
+module.exports = { somma, documentoDa, daFs, richiestaStorta, catalogo, sottoSoglia, SOGLIA_COPIE, CAMPI_LETTI, periodoDi, passoPer };
