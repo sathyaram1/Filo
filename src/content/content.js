@@ -373,12 +373,17 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
-  // scrollato (0-100%). Throttled per non inondare l'IPC.
+  // Riporta al main quanto ha scrollato (0-100%) e, solo dopo un gesto fisico vero, l'ultima interazione: il
+  // caricamento e lo scorrimento fatto dalla pagina (chat, feed, caroselli) non azzerano l'inattività (#1618).
   function startTabActivityReporter() {
+    // Uno scorrimento è dell'utente se parte entro questo tempo da un suo tasto, clic, rotella o dito.
+    const SCORRE_DOPO_GESTO_MS = 1000;
+    const INTERAZIONE_OGNI_MS = 2000;
     let lastSentScroll = -1;
     let pending = false;
-    let lastSend = 0;
+    let ultimoGesto = -Infinity;
+    let ultimaInterazione = -Infinity;
+    let scrollDaGesto = false;
 
     function scrollPct() {
       const doc = document.documentElement;
@@ -388,38 +393,50 @@
       return Math.max(0, Math.min(100, (y / max) * 100));
     }
 
-    function send(extra) {
-      const payload = { type: MSG.TAB_ACTIVITY, lastInteractionAt: Date.now(), ...extra };
+    function send(extra, interazione) {
+      const payload = { type: MSG.TAB_ACTIVITY, ...extra };
+      if (interazione) {
+        payload.lastInteractionAt = Date.now();
+        ultimaInterazione = performance.now();
+      }
       try {
         Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {});
       } catch (_) {}
-      lastSend = performance.now();
     }
 
-    function onInteract() {
-      const since = performance.now() - lastSend;
-      if (since < 2000) return;
-      send({});
+    // Un evento lanciato da uno script della pagina non è un gesto (isTrusted falso).
+    function onGesto(e) {
+      if (!e || e.isTrusted !== true) return;
+      ultimoGesto = performance.now();
+      if (ultimoGesto - ultimaInterazione < INTERAZIONE_OGNI_MS) return;
+      send({}, true);
     }
 
     function onScroll() {
+      if (performance.now() - ultimoGesto <= SCORRE_DOPO_GESTO_MS) scrollDaGesto = true;
       if (pending) return;
       pending = true;
       setTimeout(() => {
         pending = false;
+        const daGesto = scrollDaGesto;
+        scrollDaGesto = false;
         const pct = Math.round(scrollPct());
         if (pct !== lastSentScroll) {
           lastSentScroll = pct;
-          send({ scrollPct: pct });
+          send({ scrollPct: pct }, daGesto);
         }
       }, 500);
     }
 
-    window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
-    window.addEventListener('keydown', onInteract, { passive: true, capture: true });
+    for (const tipo of ['pointerdown', 'keydown', 'wheel', 'touchmove']) {
+      window.addEventListener(tipo, onGesto, { passive: true, capture: true });
+    }
     window.addEventListener('scroll', onScroll, { passive: true });
 
-    setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+    setTimeout(() => {
+      lastSentScroll = Math.round(scrollPct());
+      send({ scrollPct: lastSentScroll }, false);
+    }, 600);
   }
 
   // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
