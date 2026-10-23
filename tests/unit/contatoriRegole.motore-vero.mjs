@@ -9,9 +9,9 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 60 righe verdi, uscita 0 (#1464, 2026-10-23). Le regole dell'ora valutano già circa 950 delle mille
-// espressioni che Firestore concede a una scrittura: un controllo in più lì le fa rifiutare tutte, per questo le
-// chiamate ai modelli hanno il loro documento. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
+// Esito atteso: 73 righe verdi, uscita 0 (#1467, 2026-10-23). Le regole dell'ora valutano già circa 950 delle mille
+// espressioni che Firestore concede a una scrittura: un controllo in più lì le fa rifiutare tutte, per questo chiamate
+// ai modelli e attività hanno il loro documento. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection } from 'firebase/firestore';
