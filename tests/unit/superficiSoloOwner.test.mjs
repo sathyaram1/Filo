@@ -50,7 +50,7 @@ test('l\'icona «Feedback» della barra laterale esiste solo per l\'owner', () =
   const barra = leggi('src', 'main', 'barraLaterale.js');
   assert.match(barra, /_icone\(\) \{[\s\S]{0,900}?if \(!d \|\| \(d\.soloOwner && !owner\)\) continue;/,
     'la barra non deve disegnare un\'icona del solo owner a chi non lo è');
-  assert.match(barra, /esegui\(id\) \{[\s\S]{0,400}?if \(d\.soloOwner && !this\._owner\(\)\) return;/,
+  assert.match(barra, /esegui\(id[^\n]*\{\n[\s\S]{0,400}?if \(d\.soloOwner && !this\._owner\(\)\) return;/,
     'né eseguirla: un clic arrivato lo stesso non apre la posta delle segnalazioni');
   assert.match(barra, /_owner\(\) \{\s*try \{ return !!require\('\.\/auth\/google-auth'\)\.isAdmin\(\); \} catch \(_\) \{ return false; \}/,
     'lo stato di owner lo dice l\'accesso, e nel dubbio è «non owner»');

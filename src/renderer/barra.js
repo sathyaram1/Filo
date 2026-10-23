@@ -157,13 +157,25 @@
     }
   }
 
+  // Il contagocce vuole il gesto dell'utente, e la pagina non l'ha avuto: lo apre la barra, dove il clic c'è stato, e alla
+  // pagina va solo il colore. Rinunciare (Esc) non fa niente; senza contagocce decide la pagina, che lo dice.
+  function contagocce(id) {
+    let aperto;
+    try { aperto = new window.EyeDropper().open(); } catch (_) { api.azione({ id }); return; }
+    aperto.then((r) => {
+      const colore = String((r && r.sRGBHex) || '');
+      if (/^#[0-9a-f]{6}$/i.test(colore)) api.azione({ id, colore });
+    }, (err) => { if (!err || err.name !== 'AbortError') api.azione({ id }); });
+  }
+
   function bottoneIcona(it, animaNuove, prima) {
     const b = bottone(it.riserva ? 'ico riserva' : 'ico');
     aggiornaIcona(b, it);
     if (animaNuove && !prima.has(it.id)) b.classList.add('nuova');
     b.addEventListener('click', (e) => {
       if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
-      api.azione({ id: it.id });
+      if (it.id === 'colorPicker' && typeof window.EyeDropper === 'function') contagocce(it.id);
+      else api.azione({ id: it.id });
     });
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -415,7 +427,8 @@
     stato = s || { aperta: false, icone: [] };
     applicaTema(stato.tema);
     root.classList.toggle('aperta', !!stato.aperta);
-    if (!stato.aperta && altroAperto && !trascina) { altroAperto = false; firma = null; }
+    // «Altro…» si richiude con la barra: alla riapertura, così mentre scivola via non cambia sotto gli occhi.
+    if (stato.aperta && !eraAperta && altroAperto) { altroAperto = false; firma = null; }
     root.classList.toggle('senza-striscia', opzioni().striscia === false);
     // Il puntatore fermo nella fascia del bordo che la vista non vede: la sorveglia il main, e la striscia lo mostra.
     striscia.classList.toggle('bordo', !stato.aperta && !!stato.bordo);

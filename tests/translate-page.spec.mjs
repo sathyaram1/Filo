@@ -277,7 +277,7 @@ test('traduzione interrotta: lo dice in italiano, con quanto ne manca, e NON dic
   const msg = await stopped();
   // Dice quanto ne manca (…dopo N blocchi su M) e come riprendere.
   expect(msg).toMatch(/Traduzione interrotta dopo \d+ blocchi su \d+\./);
-  expect(msg).toContain('riprenderla dal tasto destro');
+  expect(msg).toContain('riprenderla dall\'icona Traduci della barra laterale');
   // Motivo tradotto per l'utente, MAI il messaggio grezzo del provider.
   expect(msg).toContain('rete');
   const all = await toasts(page);
@@ -481,7 +481,7 @@ test('pagina più lunga del tetto: lo dice e la ripresa la finisce', async ({ ap
   // blocco vuol dire leggerli a lavoro in corso, e l'unico avviso sullo schermo
   // è ancora quello di avanzamento.
   await expect
-    .poll(async () => (await toasts(page)).join(' | ').includes('Riprendi dal tasto destro'), { timeout: 120000 })
+    .poll(async () => (await toasts(page)).join(' | ').includes('Riprendi dall\'icona Traduci della barra laterale'), { timeout: 120000 })
     .toBe(true);
   await expect(page.locator('#b2099')).toHaveText('Block number 2099 of this page.');
 
@@ -1298,7 +1298,7 @@ test('blocchi tornati vuoti dal modello: l’avviso lo dice, invece di "qualcosa
   // Quella sbagliata non dice niente e contraddice la riga dopo, che invita a
   // riprendere: "riprova" e "puoi riprenderla" non possono stare insieme.
   expect(msg).not.toContain('Qualcosa è andato storto');
-  expect(msg).toContain('Puoi riprenderla dal tasto destro');
+  expect(msg).toContain('Puoi riprenderla dall\'icona Traduci della barra laterale');
 });
 
 // Riquadro SENZA indirizzo, riempito dalla pagina stessa (about:blank, srcdoc):

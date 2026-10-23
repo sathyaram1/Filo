@@ -15,7 +15,7 @@
 
   const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
   const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
-  const ICONE_CAMBIO = { impostazioni: 'options', timer: 'timer', proxy: 'globe', zoom: 'zoom' };
+  const ICONE_CAMBIO = { impostazioni: 'options', timer: 'timer', proxy: 'globe', zoom: 'zoom', icone: 'pin' };
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;

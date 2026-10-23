@@ -2424,7 +2424,7 @@
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
         else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
-        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId);
+        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
       if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);

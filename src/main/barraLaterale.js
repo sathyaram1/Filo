@@ -597,7 +597,8 @@ class BarraLaterale {
 
   // ── azioni ──────────────────────────────────────────────────────────────
 
-  esegui(id) {
+  // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
+  esegui(id, { colore = '' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     if (!d || !this.layout || !this._inBarra().includes(id)) return;
@@ -610,8 +611,12 @@ class BarraLaterale {
       if (!attiva || !this._nav().pagina) return;
       this.chiudi();
       this._restituisciTastiera();
+      const wc = attiva.view.webContents;
+      // Un gesto sull'interfaccia di Filo, come la voce di un menu: vale per gli appunti di Filo, non apre niente alla pagina.
+      try { require('./services/permessiPagine').gestoDiFilo(wc); } catch (_) {}
       const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
-      try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true }); } catch (_) {}
+      const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
+      try { wc.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true, ...(scelto ? { colore: scelto } : {}) }); } catch (_) {}
       return;
     }
     const daTastiera = this.motivo === 'tasto';
@@ -859,7 +864,7 @@ class BarraLaterale {
         this._nascondiSuggerimento();
         if (this.aperta && (this.motivo !== 'tasto' || !this._haFuoco())) this._programmaUscita();
         break;
-      case 'barra:azione': this.esegui(testo(d.id)); break;
+      case 'barra:azione': this.esegui(testo(d.id), { colore: testo(d.colore) }); break;
       case 'barra:sistema': this.sistema(testo(d.comando), d); break;
       case 'barra:menu': this._menu(d); break;
       case 'barra:suggerimento': this._mostraSuggerimento(d); break;

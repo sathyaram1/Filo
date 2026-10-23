@@ -89,4 +89,4 @@ class SchedeInAlto {
   }
 }
 
-module.exports = { SchedeInAlto, BORDO_PX };
+module.exports = { SchedeInAlto };

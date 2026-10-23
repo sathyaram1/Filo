@@ -44,7 +44,7 @@ test('un’icona della barra si conta una volta sola: quelle della pagina nella 
   assert.match(icone, /for \(const \[id, voce\] of Object\.entries\(reg\)\) contaIcona\(id, voce\)/);
   // La barra le manda alla pagina e se ne va prima di contare: quelle della finestra le conta lei, una volta.
   const barra = leggi('src', 'main', 'barraLaterale.js');
-  const esegui = /\n {2}esegui\(id\) \{([\s\S]*?)\n {2}\}/.exec(barra);
+  const esegui = /\n {2}esegui\(id[^\n]*\{\n([\s\S]*?)\n {2}\}/.exec(barra);
   assert.ok(esegui, 'manca esegui() nella barra');
   const pagina = esegui[1].indexOf("if (d.tipo === 'pagina')");
   const conta = esegui[1].indexOf('AzioniContate.azione(');

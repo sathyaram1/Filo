@@ -60,6 +60,26 @@ test('le azioni della fila sono nella barra e agiscono sulla scheda davanti; il 
   expect(await salvate(app)).not.toContain(dietro.url());
 });
 
+test('Screenshot e Color picker dalla barra arrivano agli appunti: la pagina non ha avuto il clic, la barra sì', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGINA('Appunti'));
+  await app.evaluate(({ clipboard }) => clipboard.clear());
+  await premiNellaBarra(app, 'screenshot');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.has('image/png')), { timeout: 15_000 }).toBe(true);
+
+  // Il contagocce lo apre la barra, che il gesto l'ha avuto; alla pagina arriva solo il colore. Qui quello di sistema
+  // non si può guidare: lo sostituisce uno che sceglie subito.
+  const barra = await barraPage(app);
+  await barra.evaluate(() => { window.EyeDropper = class { open() { return Promise.resolve({ sRGBHex: '#12ab34' }); } }; });
+  await premiNellaBarra(app, 'colorPicker');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 10_000 }).toBe('#12AB34');
+  // Rinunciare non fa niente.
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+  await barra.evaluate(() => { window.EyeDropper = class { open() { return Promise.reject(new DOMException('no', 'AbortError')); } }; });
+  await premiNellaBarra(app, 'colorPicker');
+  await new Promise((r) => setTimeout(r, 800));
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('prima');
+});
+
 test('trascinandole si riordinano, sul cassetto vanno in «Altro…», e col tasto destro tornano in vista', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, PAGINA('Riordino'));
   const barra = await barraPage(app);
