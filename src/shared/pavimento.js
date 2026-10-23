@@ -96,7 +96,7 @@
   const FORMA_FORTE = (v) => /[A-Za-zÀ-ÿ]/.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // Le parole che una pagina mette accanto all'etichetta senza che siano la password.
-  const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or)$/i;
+  const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or)$/i;
 
   function testo(v) {
     return String(v == null ? '' : v);

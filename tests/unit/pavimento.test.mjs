@@ -202,3 +202,28 @@ test('le etichette corte e le frasi intorno restano quando il valore non ha la f
   ]) assert.equal(P.oscura(t), t, t);
   assert.equal(P.oscura('Password: Girasole2024 (cambiala al primo accesso)'), `Password: ${S} (cambiala al primo accesso)`);
 });
+
+// Il posto del valore, non le parole vicine: quello che sta accanto all'etichetta senza esserne il valore arriva com'è.
+test('vicino alla parola «password» restano i nomi di prodotto, gli utenti, gli indirizzi dei campi e il codice', () => {
+  for (const t of [
+    '✓ label "Password" :: form > div > label:nth-of-type(1)\n✓ input[type=password] "Password" :: #password1\n✓ button "Accedi" :: form > button.btn-primary',
+    '✓ input "Password:" :: #c\n✓ label "Hasło" :: label[for="c"]',
+    'come cambio la password del router TP-Link AX1500? E quella di Office365?',
+    'ho dimenticato la password di Windows11',
+    'password wifi Fritz!Box 7530 dove la trovo',
+    'Hai richiesto di reimpostare la password per l\'account mario.rossi_87',
+    'Reset password - Ticket #INC0012345',
+    'Password scaduta: aggiornala entro il 30/11',
+    'Wi-Fi password del bar: chiedi al bancone',
+    'body: JSON.stringify({ username, password: form.password.value }),',
+    'const password = process.env.DB_PASSWORD;',
+    '<input type="password" name="password" id="pwd1" required>',
+    '$hash = password_hash($password, PASSWORD_DEFAULT);',
+  ]) assert.equal(P.oscura(t), t, t);
+  assert.ok(!P.oscura('password provvisoria Tr7#kq29Lm').includes('Tr7#kq29Lm'));
+  assert.ok(!P.oscura('Password per il wifi (chiedila a Mario se non va): Faro#Blu55').includes('Faro#Blu55'));
+});
+
+test('una password che è una parola si toglie intera, non dentro le altre parole', () => {
+  assert.equal(P.oscura('Password del wifi: casa\nLa casalinga ha le chiavi di casa.'), `Password del wifi: ${S}\nLa casalinga ha le chiavi di ${S}.`);
+});
