@@ -159,6 +159,8 @@ test.describe('la riapertura vera', () => {
     const riga = (titolo) => chiesto.utente.split('\n').find((r) => r.includes(`"${titolo}"`)) || '';
     const inattiva = (titolo) => Number((/inattiva da (\d+)min/.exec(riga(titolo)) || [])[1]);
     expect(inattiva('Vecchia')).toBeGreaterThanOrEqual(3 * 24 * 60 - 2);
+    // Riaperta, la pagina riparte dall'inizio: «scroll 0%» direbbe «letta a metà», che non si sa.
+    expect(riga('Vecchia')).not.toMatch(/scroll \d+%/);
     expect(inattiva('Verde')).toBeLessThan(60);
     expect(inattiva('Rosso')).toBeLessThan(60);
 
