@@ -18,6 +18,9 @@ const __repoRoot = join(__agentDir, '..', '..');
 const __require = createRequire(import.meta.url);
 __require(join(__repoRoot, 'src', 'shared', 'feedbackPublicKey.js'));
 const CRYPTO = __require(join(__repoRoot, 'src', 'shared', 'feedbackCrypto.js'));
+// Nome e tipo dell'allegato dalla stessa fonte dell'app: storage.rules ammette solo quelli (#1518).
+__require(join(__repoRoot, 'src', 'shared', 'feedback.js'));
+const FB = globalThis.SN_FEEDBACK;
 
 // Stessi valori (pubblici) di src/shared/feedback.js.
 const PROJECT_ID = 'filo-8b9cb';
