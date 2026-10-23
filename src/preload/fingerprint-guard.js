@@ -255,10 +255,10 @@ const PROPAGAZIONE = `
   var TAG = { __proto__: null, IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1 };
   var NP = Node.prototype, EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute;
   var qsaE = EP.querySelectorAll, qsaF = DocumentFragment.prototype.querySelectorAll, qsaD = Document.prototype.querySelectorAll;
-  var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(NP, 'nodeType').get, genitore = gOPD(NP, 'parentNode').get;
+  var localName = gOPD(EP, 'localName').get, nodeType = gOPD(NP, 'nodeType').get, genitore = gOPD(NP, 'parentNode').get;
   var docDi = gOPD(NP, 'ownerDocument').get, baseDi = gOPD(NP, 'baseURI').get, quanti = gOPD(NodeList.prototype, 'length').get;
   var primoFiglio = gOPD(EP, 'firstElementChild').get;
-  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice, cerca = SP.indexOf;
+  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, upper = SP.toUpperCase, taglia = SP.slice, cerca = SP.indexOf;
   var URLc = URL, origineUrl = gOPD(URL.prototype, 'origin').get, costruisci = Reflect.construct;
   var MO = MutationObserver, moObserve = MO.prototype.observe;
   var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
@@ -267,6 +267,8 @@ const PROPAGAZIONE = `
   var dW = function (n) { return gOPD(window, n) || gOPD(Window.prototype, n) || {}; };
   var cornice = dW('frameElement').get, quanteF = dW('length').get;
   var vista = gOPD(Document.prototype, 'defaultView').get, misura = gOPD(HTMLElement.prototype, 'offsetWidth').get;
+  // Dal nome locale: in un documento XML o SVG tagName resta minuscolo (o col prefisso) e il riquadro sfuggirebbe.
+  function tagName(el) { return R(upper, '' + R(localName, el, []), []); }
   var GETTER = { __proto__: null };
   for (var k = 0; k < CORNICI.length; k++) {
     var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
@@ -339,7 +341,7 @@ const PROPAGAZIONE = `
   // dentro se il documento arriva dopo. In Privacy massima, dopo qualche secondo ancora vuoto, si copre (decisione owner).
   var ATTESA_VUOTO = 3000, attesi = new WeakSet();
   function tocca(el) {
-    var tag = R(tagName, el, []);
+    var tag = tagName(el);
     if (!TAG[tag]) return;
     if (anticipabile(el, tag)) { prepara(finestraDi(el, tag)); return; }
     if (LIVELLO < 2 || R(wsHas, attesi, [el])) return;
@@ -350,7 +352,7 @@ const PROPAGAZIONE = `
   function cornici(n, fa) {
     var t = R(nodeType, n, []), l = null;
     if (t === 1) {
-      if (TAG[R(tagName, n, [])]) fa(n);
+      if (TAG[tagName(n)]) fa(n);
       if (R(primoFiglio, n, [])) l = R(qsaE, n, [SEL]);
     } else if (t === 11) l = R(qsaF, n, [SEL]);
     else if (t === 9) l = R(qsaD, n, [SEL]);
@@ -361,7 +363,7 @@ const PROPAGAZIONE = `
   // si prepara al suo load, che arriva al documento che lo contiene e mai alla sua finestra.
   function alCarico(w) {
     R(ascoltoDi(w), w.document, ['load', function (e) {
-      try { var el = R(bersaglio, e, []), tag = R(tagName, el, []); if (TAG[tag]) prepara(finestraDi(el, tag)); } catch (x) {}
+      try { var el = R(bersaglio, e, []), tag = tagName(el); if (TAG[tag]) prepara(finestraDi(el, tag)); } catch (x) {}
     }, true]);
   }
 
@@ -457,7 +459,7 @@ const PROPAGAZIONE = `
     if (!CANALE) return;
     R(ascoltoDi(w), w, [CANALE, function (e) {
       try {
-        var el = R(bersaglio, e, []), tag = R(tagName, el, []);
+        var el = R(bersaglio, e, []), tag = tagName(el);
         if (!TAG[tag]) return;
         var cw = finestraDi(el, tag);
         prepara(cw, true);
