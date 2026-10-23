@@ -157,8 +157,10 @@
     if (!inPaginaDiFilo && !global.SN_FILO_UI?.veroONostro?.(e)) return;
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
-  if (inPaginaDiFilo) document.addEventListener('click', suCollegamento);
-  else {
+  if (inPaginaDiFilo) {
+    document.addEventListener('click', suCollegamento);
+    document.addEventListener('auxclick', suCollegamento);
+  } else {
     window.addEventListener('click', suCollegamento, true);
     window.addEventListener('auxclick', suCollegamento, true);
   }
