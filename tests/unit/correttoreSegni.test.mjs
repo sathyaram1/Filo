@@ -136,6 +136,55 @@ test('una data che si può leggere in un altro modo non si segna: nel dubbio si 
   assert.deepEqual(date('ci vediamo domenica 2 marzo').map((s) => s.pezzo), ['domenica 2 marzo'], 'nessuna delle due letture torna');
 });
 
+// #1115.2: l'anno lo dice la pagina intorno (la conversazione, il titolo, un'altra riga del campo).
+const OGGI_23 = new Date(2026, 9, 23); // venerdì 23 ottobre 2026
+const dateIntorno = (testo, intorno) => C.dateDi(testo, OGGI_23, intorno).map((s) => ({ pezzo: s.segment, perche: s.spiegazione, correzioni: s.correzioni }));
+
+test('una data giusta nell\'anno che dice la pagina intorno non si segna', () => {
+  // Il 9 ottobre 2024 era mercoledì; il 9 ottobre 2026 è venerdì.
+  const risposta = 'certo, mercoledì 9 ottobre, pioveva';
+  assert.equal(dateIntorno(risposta).length, 1, 'senza la pagina intorno la lettura vicina a oggi non torna');
+  for (const intorno of [
+    { prima: 'Luca: ti ricordi il matrimonio di Marta, nel 2024?' },
+    { titolo: 'Diario 2024' },
+    { prima: 'Diario 2024\nlunedì 7 ottobre: niente di che' },
+    { dopo: 'Il 12 ott 2024, Luca ha scritto:\n> ti ricordi il matrimonio di Marta?' },
+    { prima: 'Luca: ti ricordi il matrimonio di Marta, nel \'24?' },
+    { prima: 'Luca: ti ricordi il matrimonio di Marta, due anni fa?' },
+    { prima: 'Luca: e il matrimonio di Marta, 2 years ago?' },
+  ]) assert.deepEqual(dateIntorno(risposta, intorno), [], JSON.stringify(intorno));
+  assert.deepEqual(dateIntorno('2024\n\nmercoledì 9 ottobre: pioveva'), [], 'l\'anno in cima al campo');
+  assert.deepEqual(dateIntorno('certo, giovedì 9 ottobre', { prima: 'Luca: ti ricordi, l\'anno scorso?' }), []);
+  // Il 29 febbraio esiste solo nell'anno bisestile detto intorno.
+  assert.deepEqual(dateIntorno('giovedì 29 febbraio', { titolo: 'Diario 2024' }), []);
+});
+
+test('una data sbagliata anche nell\'anno detto intorno si segna con quell\'anno davanti, e la lettura di oggi in fondo', () => {
+  assert.deepEqual(dateIntorno('martedì 9 ottobre', { titolo: 'Diario 2024' }), [{
+    pezzo: 'martedì 9 ottobre',
+    perche: 'Il 9 ottobre 2024 è mercoledì, il 9 ottobre 2026 è venerdì.',
+    correzioni: ['mercoledì 9 ottobre', 'martedì 8 ottobre', 'venerdì 9 ottobre'],
+  }]);
+  assert.deepEqual(dateIntorno('venerdì 29 febbraio', { titolo: 'Diario 2024' }).map((s) => s.perche), ['Il 29 febbraio 2024 è giovedì.']);
+  // L'anno detto più vicino alla data vince su quelli più lontani.
+  const lontano = `Luca: nel 2019 eravamo a Roma\n${'bla '.repeat(200)}\nLuca: e il matrimonio di Marta, nel 2024?`;
+  assert.deepEqual(dateIntorno('certo, martedì 9 ottobre', { prima: lontano }).map((s) => s.perche),
+    ['Il 9 ottobre 2024 è mercoledì, il 9 ottobre 2026 è venerdì.']);
+  // Un anno lontano dalla data rende giusta la data che ci torna, ma non cambia la lettura proposta.
+  assert.deepEqual(dateIntorno('certo, martedì 9 ottobre', { prima: `nel 2024\n${'bla '.repeat(200)}` }).map((s) => s.perche),
+    ['Il 9 ottobre 2026 è venerdì.']);
+});
+
+test('un numero che non è un anno, intorno, non cambia il controllo', () => {
+  for (const prima of ['Luca: costa 2024 euro', 'Luca: sono 2024€', 'Luca: siamo a 1800 metri', 'Luca: tel 3332024123',
+    'Luca: l\'80% dice di sì', 'Luca: versione 1.2024', 'Luca: ho fatto 2024 km']) {
+    assert.deepEqual(dateIntorno('certo, mercoledì 9 ottobre', { prima }).map((s) => s.perche), ['Il 9 ottobre 2026 è venerdì.'], prima);
+  }
+  // Senza pagina intorno, o con l'anno di oggi detto vicino, tutto come prima.
+  assert.deepEqual(dateIntorno('ci vediamo giovedì 23 ottobre', { prima: 'Luca: 22/10/2026 alle 18:40' }).map((s) => s.perche),
+    ['Il 23 ottobre 2026 è venerdì.']);
+});
+
 test('«Ignora» copre i segni dello stesso tipo che toccano il pezzo ignorato, anche se il modello lo allarga', () => {
   const ig = [{ fonte: 'modello', tipo: 'contraddizione', segment: 'mercoledì' }];
   const testo = 'sì ci vediamo mercoledì alle 18';
