@@ -106,7 +106,8 @@
 
   // Una riga coi siti incollati di fila («a.it, b.com», «a.it b.com»): un pezzo per sito, e quello che sta fra due siti
   // in un pezzo solo com'era scritto, perché l'avviso lo ridica intero («studio rossi», non «studio» e «rossi»).
-  // Una riga che è già un sito (un indirizzo con virgole nei parametri) resta una; `salta` (le «e» della chat) non apre pezzi.
+  // Una riga che è già un sito (un indirizzo con virgole nei parametri) resta una; le parole di `salta` (le «e» della
+  // chat) separano due pezzi e non ne fanno parte.
   function pezziDi(riga, salta) {
     const intera = String(riga == null ? '' : riga).trim();
     if (!intera) return [];
