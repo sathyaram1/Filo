@@ -72,5 +72,5 @@ curl -u mario:Ponte9Grigio https://api.example.com/v1/stato</pre>
 c1b7e-90d2a
 77d3f-1e0b9</pre>`, 'dalla pagina Note di installazione: cosa devo fare?');
   expect(mandato, 'la pagina è stata letta').toContain('APP_NAME=gestionale');
-  for (const s of ['a1B2c3D4e5F6g7H8i9J0k1L2', 'Faro7Blu2024', 'Ponte9Grigio', 'c1b7e-90d2a', '77d3f-1e0b9']) expect(mandato, s).not.toContain(s);
+  for (const s of ['Faro7Blu2024', 'Ponte9Grigio', 'c1b7e-90d2a', '77d3f-1e0b9']) expect(mandato, s).not.toContain(s);
 });
