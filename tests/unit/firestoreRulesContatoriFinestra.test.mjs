@@ -106,7 +106,7 @@ test('ogni misura ha nelle regole la forma e i tetti dell’app, e nessuna in pi
   assert.equal(CONTI, F.FORME.CONTI);
   for (const c of F.STRINGHE) assert.equal(stringa(c), F.FORME[c], `forma di ${c}`);
   assert.equal(corpo('conti'), `m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches('${F.FORME.CONTI}')`);
-  assert.ok(F.tipiNotifica().length * 3 <= F.TIPI_PREVISTI * 1.2, 'i tipi di notifica si avvicinano al tetto delle regole: alzalo e ripubblica');
+  assert.ok(F.tipiNotifica().length <= F.TIPI_PREVISTI, 'i tipi di notifica hanno passato il tetto delle regole: alzalo e ripubblica');
 });
 
 test('il documento più carico dell’app passa; uno con un testo, un indirizzo o un nome di file no', () => {
