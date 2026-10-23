@@ -1778,7 +1778,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
     if (userMessage) {
       fermataDetta = false;
-      immaginiNellaBolla(appendChatMessage('user', scritto), immagini);
+      immaginiNellaBolla(appendChatMessage('user', scritto, { nelFilo: false }), immagini);
+      // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
+      nelFiloAiuto('user', Allegati.testoNelFilo(scritto, immagini.length));
       // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
       history.push({
         role: 'user', content: userMessage, kind: 'real',
