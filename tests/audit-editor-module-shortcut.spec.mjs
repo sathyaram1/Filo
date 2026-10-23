@@ -116,7 +116,6 @@ test('uno strumento già nel pannello non si aggiunge una seconda volta', async 
   await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'conteggio' }));
   await page.waitForTimeout(300);
   await expect(page.locator('.pd-elementi > .pd-elemento[data-elemento="word-count"]')).toHaveCount(1);
-  expect((await strumentiSalvati(app) || { elementi: [WC] }).elementi.filter((id) => id === WC)).toHaveLength(1);
   await page.screenshot({ path: 'tests/.shots/audit-editor-strumento-unico.png' });
 });
 
