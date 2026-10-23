@@ -613,8 +613,8 @@ test('(I) «spiega» su una pagina con la chiave propria rifiutata: il riquadro,
     .toBe('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
   await page.screenshot({ path: 'tests/.shots/662-spiega-riquadro.png' }).catch(() => {});
   // Una domanda dopo, nello stesso riquadro: anche lei pagata così, anche lei lo dice.
-  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e poi?');
-  await page.keyboard.press('Enter');
+  const dove = await scrivi(app, page, '.sn-popup .sn-popup-input', 'e poi?');
+  await dove.keyboard.press('Enter');
   await expect.poll(() => conta(app, page, '.sn-popup .sn-key-fallback'), { timeout: 30000 }).toBe(2);
   await clicca(app, page, '.sn-popup .sn-popup-close');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);

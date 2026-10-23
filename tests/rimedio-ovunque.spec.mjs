@@ -5,7 +5,7 @@
 // La dettatura usa un microfono finto (un oscillatore): il resto, dalla trascrizione all'avviso, è quello vero.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, clicca, scrivi, nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { statoDi, clicca, scrivi, neiRiquadri } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
@@ -136,8 +136,8 @@ test('riquadro «Modifica», senza invito: il motivo ha lo stile dell’errore, 
   await page.locator('#campo').click({ button: 'right' });
   await menuDi(page).voce('Modifica').click();
   await expect.poll(async () => (await statoDi(app, page, '.sn-editbox'))?.visibile, { timeout: 10_000 }).toBe(true);
-  await scrivi(app, page, '.sn-editbox-instruction', 'rendilo più corto');
-  await page.keyboard.press('Enter');
+  const dove = await scrivi(app, page, '.sn-editbox-instruction', 'rendilo più corto');
+  await dove.keyboard.press('Enter');
 
   await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.classi || '', { timeout: 30_000 })
     .toContain('sn-editbox-errore');
@@ -145,7 +145,7 @@ test('riquadro «Modifica», senza invito: il motivo ha lo stile dell’errore, 
   expect(prop.classi).not.toContain('sn-editbox-empty');
   expect(prop.testo).toMatch(/invito|Crediti/);
   // Il colore è quello dell'errore del tema, non il grigio corsivo dell'attesa.
-  const stile = await nelMondoDiFilo(app, page, () => {
+  const stile = await neiRiquadri(app, page, () => {
     const T = globalThis.SN_FILO_UI._test;
     const el = T.trova('.sn-editbox-proposed');
     const cs = getComputedStyle(el);
@@ -161,7 +161,7 @@ test('riquadro «Modifica», senza invito: il motivo ha lo stile dell’errore, 
 
   const tasto = await statoDi(app, page, '.sn-editbox .sn-msg-rimedio');
   expect(tasto?.testo).toBe('Apri Crediti');
-  await page.screenshot({ path: `${SHOTS}/663-modifica.png` }).catch(() => {});
+  await dove.screenshot({ path: `${SHOTS}/663-modifica.png` }).catch(() => {});
   expect(await aperta(app, 'filo://credits')).toBe(false);
   await clicca(app, page, '.sn-editbox .sn-msg-rimedio');
   await siApre(app, 'filo://credits');
