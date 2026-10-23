@@ -1,5 +1,5 @@
 // Verifica #1589 giro 14, rilievo 1: chiavi e codici con una forma inconfondibile (il corpo di una chiave privata, un
-// webhook, la password di una riga di comando, la lista dei codici di recupero) arrivano al modello.
+// la password di una riga di comando, la lista dei codici di recupero) arrivano al modello.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function leggiInChat({ app, openTab, testServer }, titolo, corpo, domanda) {
