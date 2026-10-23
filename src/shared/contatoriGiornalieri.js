@@ -861,6 +861,43 @@
     return out;
   }
 
+  // Una misura delle chiamate: «modello|resto|n» separati da «;». Oltre TETTO_MODELLI_ORA voci col modello, su tutte le
+  // funzioni, il modello diventa «altro» e la voce si somma alla sua riga.
+  function modelliPuliti(mappa, campo) {
+    const out = {};
+    const resti = RESTI[campo];
+    let specifiche = 0;
+    for (const f of funzioni()) {
+      const per = oggetto(mappa) && has(mappa, f) ? mappa[f] : null;
+      if (!oggetto(per)) continue;
+      const voci = new Map();
+      for (const [k, v] of Object.entries(per)) {
+        const i = String(k).indexOf('|');
+        const resto = i < 0 ? '' : k.slice(i + 1);
+        const n = Math.round(Number(v));
+        if (!resti.includes(resto) || !intero(n) || n === 0) continue;
+        let m = modelloPulito(k.slice(0, i));
+        if (m !== ALTRO && !voci.has(`${m}|${resto}`)) {
+          if (specifiche >= TETTO_MODELLI_ORA) m = ALTRO; else specifiche += 1;
+        }
+        voci.set(`${m}|${resto}`, conto(Math.min(MAX_CONTO, (voci.get(`${m}|${resto}`) || 0) + n)));
+      }
+      if (voci.size) out[f] = [...voci].map(([k, n]) => `${k}|${n}`).join(';');
+    }
+    return out;
+  }
+
+  function chiamatePulite(mappa) {
+    const out = {};
+    for (const f of funzioni()) {
+      const per = oggetto(mappa) && has(mappa, f) ? mappa[f] : null;
+      if (!oggetto(per)) continue;
+      const v = fasceIn(per, nomi(FASCE_CHIAMATE), MAX_CONTO);
+      if (/[1-9]/.test(v)) out[f] = v;
+    }
+    return out;
+  }
+
   function meseDi(giorno) { return String(giorno || '').slice(0, 7); }
 
   function documento({ pseudonimo, chiave, app, os, dati, primo = '' }) {
