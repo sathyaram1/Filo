@@ -1,11 +1,12 @@
 // Le richieste che il main fa per conto di una scheda (anteprima di un link, llms.txt, byte di un'immagine): escono come
-// uscirebbero da lei, dalla sua sessione (proxy, certificati, cache, identità, protezioni), mai verso la rete interna e
-// col Referer ridotto all'origine. Prove: tests/unit/perContoDellaScheda.test.mjs, tests/proxy-tab.spec.mjs.
+// uscirebbero da lei, dalla sua sessione (proxy, certificati, cache, identità, protezioni, cookie concessi), mai verso la
+// rete interna e col Referer ridotto all'origine. Prove: tests/unit/perContoDellaScheda.test.mjs, tests/proxy-tab.spec.mjs.
 
 'use strict';
 
 const netNode = require('node:net');
 const { assertPublicHost, isPrivateAddr } = require('./safe-fetch');
+const Sito = require('../../shared/stessoSito');
 
 // ── Referer ────────────────────────────────────────────────────────────────
 
