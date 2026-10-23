@@ -126,6 +126,7 @@
     if (isOpen()) { mostra(); return; }
     if (root) close({ davvero: true });
     history = [];
+    allegati = { immagini: [] };
     documenti = null;
     ripiegoDetto = false;
     ripiegoDaDire = '';
