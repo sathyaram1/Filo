@@ -212,29 +212,81 @@
   // dentro un nome di variabile («DB_PASSWORD=…», «"adminPassword": "…"», «<password>…</password>»). Conta come codice
   // una chiave fra virgolette o composta, un uguale o un valore fra virgolette: «Password: deve…» è testo, e lo guardano
   // le regole sopra. Un'espressione, una variabile o un percorso («process.env.X», «${X}», «PWD=/home») non sono valori.
+  // La regola è sul nome della chiave, come negli indirizzi: un nome di password (anche incollato, «PGPASSWORD») o di
+  // segreto (secret, token, «api_key», «Chiave API») annuncia il valore. Per i segreti conta solo un valore con la forma
+  // di una credenziale (vedi formaDiSegreto): «max_tokens: 4096» e «token_type: bearer» restano.
   const PAROLA_CHIAVE = /^(?:password|passwd|pwd|pass|passphrase|passcode)$/i;
-  const CHIAVE = /(?<![\w$.-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,128})"|'([^'\n]{1,128})'|([^\s,;"'`<>(){}[\]]{1,128}))/gd;
-  const ELEMENTO = /<([A-Za-z_][\w.:-]{0,60})>([^<\n]{1,128})<\/\1>/gd;
+  const CHIAVE = /(?<![\w$.-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,256})"|'([^'\n]{1,256})'|([^\s,;"'`<>(){}[\]]{1,256}))/gd;
+  const ELEMENTO = /<([A-Za-z_][\w.:-]{0,60})>([^<\n]{1,256})<\/\1>/gd;
+  const ADD_KEY = /<add\b[^>\n]*?\bkey\s*=\s*"([^"\n]{1,60})"[^>\n]*?\bvalue\s*=\s*"([^"\n]{1,256})"/gid;
   const SEGNAPOSTO_DI_TIPO = /^(?:string|text|null|none|nil|undefined|true|false|required|optional|secret|changeit|\*+|x+|\.+|<[^>]*>)$/i;
-  const nomeDaPassword = (nome) => nome.split(/[_.:-]+|(?<=[a-z0-9])(?=[A-Z])/).some((p) => PAROLA_CHIAVE.test(p));
+  const QUALIFICA_CHIAVE = /^(?:api|secret|private|access|auth|client|app|master|signing|encryption|license|licence|account|service|subscription|webhook|session)$/;
+  function tipoDiNome(nome) {
+    const parti = nome.split(/[_.:\s-]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean).map((p) => p.toLowerCase());
+    if (parti.some((p) => PAROLA_CHIAVE.test(p) || /(?:password|passwd|passphrase)$/.test(p))) return 'password';
+    if (parti.some((p, i) => /^(?:secrets?|tokens?|credentials?)$/.test(p) || /(?:secret|token|apikey)$/.test(p)
+      || (/^keys?$/.test(p) && i > 0 && QUALIFICA_CHIAVE.test(parti[i - 1])))) return 'segreto';
+    return '';
+  }
   function valoreDiChiave(grezzo) {
     const v = testo(grezzo).trim();
     if (v.length < 3 || /^[$%{!]|^[/~]|^[A-Za-z]:\\/.test(v) || CODICE_SORGENTE.test(v) || SEGNAPOSTO_DI_TIPO.test(v) || PAROLA_CHIAVE.test(v) || v.includes(SEGNAPOSTO)) return '';
     return v;
   }
+  // Un segreto che non porta il prefisso di un servizio: almeno dodici caratteri senza spazi, con lettere e cifre.
+  function formaDiSegreto(grezzo) {
+    const v = valoreDiChiave(grezzo);
+    if (!v || v.length < 12 || /\s/.test(v) || /:\/\/|^www\./i.test(v) || EMAIL.test(v)) return '';
+    return /[A-Za-z]/.test(v) && /[0-9]/.test(v) ? v : '';
+  }
+  function valorePerNome(nome, grezzo) {
+    const tipo = tipoDiNome(nome);
+    if (tipo === 'password') return valoreDiChiave(grezzo);
+    return tipo === 'segreto' ? formaDiSegreto(grezzo) : '';
+  }
   function chiaviDiConfigurazione(s, out) {
     for (const m of s.matchAll(CHIAVE)) {
       const [, virgolette, nome, sep, dq, sq, nudo] = m;
-      if (!nomeDaPassword(nome)) continue;
+      const tipo = tipoDiNome(nome);
+      if (!tipo) continue;
       const composta = nome !== nome.replace(/[_.-]|(?<=[a-z0-9])(?=[A-Z])/g, '');
-      if (!virgolette && !composta && sep === ':' && nudo !== undefined) continue;
+      if (tipo === 'password' && !virgolette && !composta && sep === ':' && nudo !== undefined) continue;
       const g = dq !== undefined ? 4 : sq !== undefined ? 5 : 6;
-      const v = valoreDiChiave(m[g]);
-      if (v) out.push(alPosto(v, m.indices[g][0], m[g]));
+      const v = valorePerNome(nome, m[g]);
+      if (v) out.push({ ...alPosto(v, m.indices[g][0], m[g]), regola: tipo === 'password' ? 'password' : 'chiave' });
     }
-    for (const m of s.matchAll(ELEMENTO)) {
-      const v = nomeDaPassword(m[1]) ? valoreDiChiave(m[2]) : '';
-      if (v) out.push(alPosto(v, m.indices[2][0], m[2]));
+    for (const re of [ELEMENTO, ADD_KEY]) {
+      for (const m of s.matchAll(re)) {
+        const v = valorePerNome(m[1], m[2]);
+        if (v) out.push(alPosto(v, m.indices[2][0], m[2]));
+      }
+    }
+  }
+
+  // Le stesse chiavi scritte per un umano, sulla pagina dell'account di un servizio: «Chiave API: …», «Secret key» con la
+  // chiave sulla riga sotto (anche dopo «Copia»), un'intestazione «Authorization: Basic …», la password di una riga di comando.
+  const ETICHETTA_SEGRETO = '\\b(?:chiave\\s+(?:api|segreta|privata|di\\s+accesso|d[\'’]accesso|di\\s+licenza|personale)'
+    + '|(?:api|secret|private|access|client|license|licence|subscription)[ \\t_-]?key|client[ \\t_-]?secret|secret|segreto'
+    + '|(?:access|api|auth|personal\\s+access|refresh|bearer)[ \\t_-]?token|token(?:\\s+(?:di\\s+accesso|api|personale|segreto))?)\\b';
+  const SEGRETO_ACCANTO = new RegExp(`${ETICHETTA_SEGRETO}(?:[ \\t]+\\([^)\\n]{0,24}\\))?[ \\t]*(?:[:=]|[-–—→](?=[ \\t]))[ \\t]*["'«“]?([^\\s"'»”,;<>]{12,256})`, 'gi');
+  const SEGRETO_SOLO = new RegExp(`^[ \\t]*${ETICHETTA_SEGRETO}[ \\t]*:?[ \\t]*$`, 'i');
+  const BASIC = /\bAuthorization\s*:\s*Basic\s+([A-Za-z0-9+/]{8,}={0,2})/gi;
+  const RIGA_DI_COMANDO = /\bsshpass\s+-p\s*(?:'([^'\n]+)'|"([^"\n]+)"|(\S+))|\b(?:mysql|mysqldump|mysqladmin|mariadb)\b[^\n]*?\s-p(?:'([^'\n]+)'|"([^"\n]+)"|([^\s'"]+))/gi;
+  function chiaviInChiaro(s, out) {
+    for (const m of s.matchAll(SEGRETO_ACCANTO)) {
+      const v = formaDiSegreto(m[1].replace(/[.»”"']+$/, ''));
+      if (v) out.push({ valore: v, regola: 'chiave' });
+    }
+    const righe = s.split('\n');
+    for (let i = 0; i < righe.length; i++) {
+      if (!SEGRETO_SOLO.test(righe[i])) continue;
+      const v = formaDiSegreto(rigaSotto(righe, i).riga.trim());
+      if (v) out.push({ valore: v, regola: 'chiave' });
+    }
+    for (const m of s.matchAll(BASIC)) out.push({ valore: m[1], regola: 'token' });
+    for (const m of s.matchAll(RIGA_DI_COMANDO)) {
+      const v = m.slice(1).find((x) => x !== undefined);
+      if (v && v.length >= 3) out.push({ valore: v, regola: 'password' });
     }
   }
 
