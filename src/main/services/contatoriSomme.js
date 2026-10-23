@@ -13,6 +13,8 @@ const ATTESA_RETE_MS = 30000;
 // Le ore nuove arrivano ogni ora: una lettura vale dieci minuti per la stessa richiesta, «Rileggi» la rifà subito.
 const VALE_MS = 10 * 60 * 1000;
 const RICHIESTE_TENUTE = 4;
+// Tre anni: i contatori orari esistono dal 2026, e oltre una colonna al mese non si legge più.
+const TETTO_GIORNI = 1100;
 const GIORNI_PER_GIORNO = 62;
 const GIORNI_PER_SETTIMANA = 548;
 // I campi che la scheda somma, e nient'altro: «primo» e «mese» si ricavano o non servono.
