@@ -6491,12 +6491,17 @@ async function filoPuoParlare() {
 // La home chiede i suggerimenti aprendosi: quelli in cache, senza mai chiamare il modello (#869). Il modello parte solo
 // con `force` («Aggiorna» sulla carta, la fine dell'accoglienza, i crediti arrivati). Senza un modello servibile, la
 // frase che dice perché e la strada ai Crediti.
-async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
+// `apertura`: la home che si apre (non un ricalcolo): è lì che si conta la home senza un modello, col suo motivo (#1467).
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0, apertura = false } = {}) {
   await FiloMem.gcTimers();
   const settings = await getEffectiveSettings();
   if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) {
     const saved = await SavedPages.list();
     const payload = buildNoKeyDashboard(settings, saved);
+    if (apertura) {
+      const esito = globalThis.SN_CONTATORI?.esitoHome(SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT]));
+      try { if (esito) globalThis.SN_CONTATORI_MAIN?.attivita('home', { esito }); } catch (_) {}
+    }
     return { ...payload, senzaChiave: true, cached: false, ts: new Date().toISOString() };
   }
   if (force) {
