@@ -1069,19 +1069,25 @@ async function dueAppuntamenti(app, shell, quale) {
 
   const bottoni = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
   await expect(bottoni).toHaveCount(2, { timeout: 10_000 });
-  await bottoni.first().click();
-  await expect(page.locator('.dash-action-btn', { hasText: /Aperto nel calendario|Evento salvato/ }))
-    .toBeVisible({ timeout: 10_000 });
+  await bottoni.nth(quale).click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Aperto nel calendario' })).toBeVisible({ timeout: 10_000 });
 
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
   const righe = await activity.locator('.dash-activity-body .dash-activity-row').allTextContents();
-  expect(righe.join(' | '), `il secondo appuntamento è sparito dal diario: ${JSON.stringify(righe)}`).toContain('Bruno');
-  expect(righe.filter((t) => /aggiunt/i.test(t)).length, `un solo evento aggiunto: ${JSON.stringify(righe)}`).toBe(1);
+  const testo = JSON.stringify(righe);
+  expect(righe.join(' | '), `il primo appuntamento è sparito dal diario: ${testo}`).toContain('Anna');
+  expect(righe.join(' | '), `il secondo appuntamento è sparito dal diario: ${testo}`).toContain('Bruno');
+  const aggiunte = righe.filter((t) => /aggiunt/i.test(t));
+  expect(aggiunte.length, `un solo evento aggiunto: ${testo}`).toBe(1);
+  expect(aggiunte[0], `aggiunto ${quale ? 'il secondo' : 'il primo'}, e il diario dice: ${testo}`).toContain(quale ? 'Bruno' : 'Anna');
   await expect(activity.locator('.dash-activity-label')).not.toContainText('aggiunto 2 eventi');
 
   await restore(app, '__fakeM');
-});
+}
+
+test('M — due appuntamenti chiesti insieme restano due nel diario', ({ app, shell }) => dueAppuntamenti(app, shell, 0));
+test('M2 — aggiungere il secondo dei due appuntamenti non riscrive il primo', ({ app, shell }) => dueAppuntamenti(app, shell, 1));
 
 // (N) Il riordino che non è potuto partire lo DICE. Il giudizio sulle schede
 // può mancare (crediti finiti, chiave sbagliata, rete giù): Filo se lo teneva
