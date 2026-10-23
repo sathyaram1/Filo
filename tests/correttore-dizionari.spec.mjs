@@ -63,7 +63,7 @@ test('col browser senza italiano, come su Windows: «andatto» ha il segno anche
     });
   });
   await expect.poll(() => app.evaluate(() => globalThis.__filoDizionarioDiFilo.stato()), { timeout: 20_000 })
-    .toMatchObject({ fase: 'pronto', lingue: expect.arrayContaining(['it-IT']) });
+    .toMatchObject({ fase: 'pronto', lingue: expect.arrayContaining(['it-IT']), dove: 'thread' });
 
   const url = testServer.html(`<!doctype html><meta charset="utf-8"><body style="margin:0">
     <textarea id="ta" lang="it" style="display:block;width:760px;height:120px;font:22px monospace"></textarea>
