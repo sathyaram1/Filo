@@ -259,7 +259,7 @@ module.exports = function register(on, ctx) {
         ).length;
       }
     } catch (_) {}
-    const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount });
+    const r = await handleFiloGenerateDashboard({ force: !!msg.force, openTabsCount, apertura: msg.apertura === true });
     return { ok: true, ...r };
   });
 
