@@ -65,6 +65,31 @@
       }
     }
   }
+  // L'elenco sotto un titolo di codici di recupero («Recovery codes», «Codici di backup»): ogni riga con la forma di un
+  // codice fino alla prima che non ce l'ha, anche dopo una o due righe di spiegazione fra il titolo e l'elenco.
+  const TITOLO_RECUPERO = /\b(?:codici|codes|chiavi|keys)\b/i;
+  const SENSO_RECUPERO = /\b(?:recupero|ripristino|backup|recovery|emergenza|emergency|monouso|one-?time|single-?use|2fa|two-?factor)\b/i;
+  const PEZZO_RECUPERO = /^[A-Za-z0-9]{4,12}(?:-[A-Za-z0-9]{3,12}){0,3}$/;
+  function rigaDiCodici(riga) {
+    const pezzi = riga.trim().replace(/^(?:\d{1,2}[.)]|[•·*-])\s+/, '').split(/\s+/);
+    return pezzi.length <= 4 && pezzi.every((p) => PEZZO_RECUPERO.test(p) && /\d/.test(p)) ? pezzi : null;
+  }
+  function codiciDiRecupero(s, out) {
+    const righe = s.split('\n');
+    for (let i = 0; i < righe.length; i++) {
+      if (righe[i].length > 80 || !TITOLO_RECUPERO.test(righe[i]) || !SENSO_RECUPERO.test(righe[i])) continue;
+      let presi = 0;
+      for (let j = i + 1, vuote = 0, prosa = 0; j < righe.length; j++) {
+        if (!righe[j].trim()) { if (++vuote > 2) break; continue; }
+        vuote = 0;
+        const pezzi = rigaDiCodici(righe[j]);
+        if (!pezzi) { if (presi || ++prosa > 2) break; continue; }
+        for (const p of pezzi) out.push({ valore: p, regola: 'codice' });
+        presi++;
+        i = j;
+      }
+    }
+  }
   // Un token col suo formato: JWT e «Bearer …».
   const JWT = /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g;
   const BEARER = /\bBearer\s+([A-Za-z0-9._~+/-]{16,}=*)/g;
