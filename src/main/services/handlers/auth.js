@@ -362,6 +362,7 @@ module.exports = function register(on, ctx) {
     if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
     const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
     if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
+    // Un numero di più feedback (#1517) non si lega al primo che capita: lo si dice all'owner, con gli id.
     return A.valida({
       id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
       risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
