@@ -57,6 +57,7 @@
     COMANDO_FINESTRA: ['Azionata la finestra', (k) => `Azionata la finestra ${n(k)} volte`, 'finestra'],
     CARTA_HOME: ['Sistemata una carta della home', (k) => `Sistemate ${n(k)} carte della home`, 'carta'],
     SPOSTA_ICONA: ['Spostata un\'icona', (k) => `Spostate ${n(k)} icone`, 'icona'],
+    PANNELLO_APP: ['Sistemato il pannello degli strumenti', (k) => `Sistemato il pannello degli strumenti ${n(k)} volte`, 'pannello'],
     STILE_PAGINA: ['Cambiato l\'aspetto della pagina', (k) => `Cambiato l'aspetto della pagina ${n(k)} volte`, 'aspetto della pagina'],
     RIPRISTINA_STILE_PAGINA: ['Rimessa la pagina com\'era', (k) => `Rimesse ${n(k)} pagine com'erano`, 'aspetto della pagina'],
     ZOOM_PAGINA: ['Cambiato lo zoom', (k) => `Cambiato lo zoom ${n(k)} volte`, 'zoom'],

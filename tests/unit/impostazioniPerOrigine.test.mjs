@@ -128,7 +128,11 @@ test('da un sito si chiedono solo le azioni della barra d\'aiuto, confermate o n
 test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle ammesse dai siti', () => {
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
-  const src = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
+  // La parte del prompt che vede solo l'Editor (#1433, `documentoEditorAiuto`) non arriva mai a un sito.
+  const tutto = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
+  const soloEditor = /\n {4}documentoEditorAiuto: \(documento\) => \{[\s\S]*?\n {4}\},\n/.exec(tutto);
+  assert.ok(soloEditor, 'la sentinella non trova più la parte del prompt dell\'Aiuto riservata all\'Editor');
+  const src = tutto.replace(soloEditor[0], '\n');
   const descritte = [...src.matchAll(/"action":\s*"filo",\s*"filo":\s*\{\s*"type":\s*"([A-Z_]+)"/g)].map((m) => m[1]);
   assert.ok(descritte.includes('INVIA_FEEDBACK'), 'la sentinella non vede più le azioni del prompt della barra d\'aiuto');
   const siti = scriptDeiSiti().map((x) => x.src).join('\n');

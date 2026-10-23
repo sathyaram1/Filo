@@ -52,6 +52,7 @@
     NON_TENERE_APERTA: 'eraser',
     COMANDO_FINESTRA: 'windowFrame',
     SPOSTA_ICONA: 'pin',
+    PANNELLO_APP: 'apps',
     INSTALLA_AGGIORNAMENTO: 'download',
     RIMEDIO_CREDITI: 'credits',
     CARTA_HOME: 'home',

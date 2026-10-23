@@ -26,17 +26,17 @@ async function tutti() {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
-// La prima lettura di un'app porta dentro quello che i suoi vecchi moduli sapevano, una volta sola.
+// La prima lettura di un'app porta dentro quello che i suoi vecchi moduli sapevano, una volta sola, dalla copia della
+// collezione che la pagina rispecchia. Senza copia aspetta la pagina, che manda la sua (op 'migra').
 async function leggiEMigra(app) {
   const salvati = await tutti();
-  const prima = salvati[app];
-  const stato = P().normalizza(app, prima);
-  if (!stato) return null;
-  if (stato.migrato) return stato;
+  const stato = P().normalizza(app, salvati[app]);
+  if (!stato || stato.migrato) return stato;
   let collezione = null;
   if (app === 'editor') {
     try { collezione = (await storage.get([COLLEZIONE_EDITOR]))[COLLEZIONE_EDITOR] || null; } catch (_) { collezione = null; }
   }
+  if (!collezione) return stato;
   const migrato = P().migra(app, stato, collezione) || stato;
   await storage.set({ [CHIAVE]: { ...salvati, [app]: migrato } });
   return migrato;
@@ -47,7 +47,7 @@ function leggi(app) {
   return inFila(() => leggiEMigra(app));
 }
 
-// op: { op: 'posa'|'togli'|'configura', id, primaDi?, config? }. null se la mossa non vale (elemento ignoto, già fuori).
+// op: { op: 'posa'|'togli'|'configura'|'migra', id, primaDi?, config? }. null se la mossa non vale (elemento ignoto, già fuori).
 async function modifica(app, op) {
   if (!P() || !P().catalogo(app) || !op || typeof op !== 'object') return null;
   const esito = await inFila(async () => {
@@ -57,6 +57,7 @@ async function modifica(app, op) {
     if (op.op === 'posa') dopo = P().posa(app, prima, id, op.primaDi ? String(op.primaDi) : null);
     else if (op.op === 'togli') dopo = P().togli(app, prima, id);
     else if (op.op === 'configura') dopo = P().configura(app, prima, id, op.config);
+    else if (op.op === 'migra') dopo = P().migraConfig(app, prima, op.config);
     if (!dopo) return { stato: prima, cambiato: false };
     if (JSON.stringify(dopo) === JSON.stringify(prima)) return { stato: prima, cambiato: false };
     const salvati = await tutti();

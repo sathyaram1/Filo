@@ -175,6 +175,6 @@ html.pd-bloccato .pd-pannello {
   box-shadow: 0 4px 14px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
   font-size: 12px;
 }
-.pd-fantasma.pd-toglie { border-color: var(--sn-error, #c0392b); opacity: 0.8; }
+.pd-fantasma.pd-toglie { border-color: var(--sn-error); opacity: 0.8; }
 html.pd-trascina, html.pd-trascina * { cursor: grabbing !important; }
 .pd-menu { position: fixed; z-index: 2147483001; }

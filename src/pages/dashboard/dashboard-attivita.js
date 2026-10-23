@@ -597,6 +597,7 @@
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     SPOSTA_ICONA: () => 'spostato un\'icona',
+    PANNELLO_APP: () => 'sistemato il pannello degli strumenti',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     RIMEDIO_CREDITI: () => 'lavorato sui crediti',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
@@ -940,6 +941,18 @@
       const dove = { barra: 'nella barra laterale', menu: 'nel tasto destro', altro: 'in «Altro…»' }[String(a.dove || '').toLowerCase()] || '';
       return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
     },
+    PANNELLO_APP: (a) => {
+      const P = window.SN_PANNELLI_APP;
+      const op = String(a.operazione || '').toLowerCase();
+      const id = P ? P.risolvi('editor', a.elemento) : null;
+      const nome = id ? P.nome('editor', id) : '';
+      const testo = {
+        apri: 'Pannello degli strumenti aperto', chiudi: 'Pannello degli strumenti chiuso',
+        blocca: 'Pannello degli strumenti tenuto aperto', sblocca: 'Pannello degli strumenti sbloccato',
+        aggiungi: `Nel pannello degli strumenti · ${nome}`, togli: `Tolto dal pannello degli strumenti · ${nome}`,
+      }[op] || 'Pannello degli strumenti';
+      return { icon: '🧰', text: testo };
+    },
   };
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
   // del diario resta (è successo qualcosa), ma non promette il contrario.
@@ -966,6 +979,7 @@
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
+    PANNELLO_APP: 'Pannello degli strumenti non cambiato',
     TIENI_APERTA: 'Sito non salvato', NON_TENERE_APERTA: 'Nessun sito da togliere',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',
