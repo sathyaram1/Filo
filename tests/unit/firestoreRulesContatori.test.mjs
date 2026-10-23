@@ -256,7 +256,7 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  for (const testo of [ORA, CHIAMATE]) {
+  for (const testo of [ORA, CHIAMATE, ATTIVITA]) {
     assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
     const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
     assert.ok(ora);
