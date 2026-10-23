@@ -1,0 +1,177 @@
+// #1596 — tre pagine lette nello stesso turno che insieme non stanno nella finestra del modello: Filo ne tiene quante
+// ci stanno, dice in chat quali ha lasciato fuori e risponde; chiedendolo le rilegge; se non basta, l'errore dice cosa fare.
+// Il modello è finto e rifiuta come OpenRouter oltre una soglia di caratteri; il server di prova sta su 127.0.0.1.
+
+import { test, expect } from './fixtures/electron.mjs';
+
+const NEWTAB = 'filo://newtab/';
+const URL_RE = 'http://127\\.0\\.0\\.1:\\d+/\\d+';
+const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
+
+// Una pagina da circa 60.000 token: il marchio sta in cima, dentro il primo pezzo che Filo legge.
+function paginaEnorme(nome) {
+  const riga = `Paragrafo della pagina ${nome} con dati, prezzi e orari da leggere con calma prima di rispondere. `;
+  const corpo = Array.from({ length: 2200 }, (_, i) => `<p>${i}. ${riga}</p>`).join('\n');
+  return `<!doctype html><html lang="it"><head><title>Guida ${nome}</title></head><body><main><article>
+<h1>Guida ${nome}</h1><p>MARCHIO_${nome}: il dato che serve sta qui.</p>
+${corpo}
+</article></main></body></html>`;
+}
+
+// `limite`: oltre questi caratteri di messaggi il fornitore rifiuta, con le misure (o senza, `misure: false`).
+// `finestra`: quella che il listino di OpenRouter dice per il modello (null: il listino non risponde).
+// `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
+// (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti.
+async function modello(app, { limite, finestra = null, misure = true, piani }) {
+  await app.evaluate(async (_e, { limite, finestra, misure, piani }) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const vero = globalThis.__fetchVeroListino || globalThis.fetch;
+    globalThis.__fetchVeroListino = vero;
+    globalThis.fetch = async (input, init) => {
+      const url = String((input && input.url) || input);
+      if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
+        if (!finestra) return new Response('giù', { status: 503 });
+        const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: finestra, pricing: { prompt: '0.0000001', completion: '0.0000002' } }];
+        return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return vero(input, init);
+    };
+    globalThis.__rifiutate = 0;
+    globalThis.__accettate = [];
+    globalThis.__misure = [];
+    const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
+      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
+      const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
+      const n = testi.reduce((s, t) => s + t.length, 0);
+      globalThis.__misure.push({ n, strumenti: tools ? JSON.stringify(tools).length : 0, esiti: messages.filter((m) => m.role === 'tool').map((m) => String(m.content).length) });
+      if (n > limite) {
+        globalThis.__rifiutate++;
+        const detto = misure
+          ? `This endpoint's maximum context length is 32768 tokens. However, you requested about ${Math.ceil(n / 3.35)} tokens. Please reduce the length of the messages.`
+          : 'Prompt is too long for this model.';
+        const e = new Error(`OpenRouter 400: {"error":{"message":"${detto}","code":400}}`);
+        e.status = 400;
+        e.provider = 'openrouter';
+        throw e;
+      }
+      const tutto = testi.join('\n');
+      const k = globalThis.__accettate.push(tutto) - 1;
+      const piano = piani[Math.min(k, piani.length - 1)];
+      if (piano.finale) {
+        const visti = MARCHI.filter((x) => tutto.includes(`MARCHIO_${x}`));
+        const text = `${piano.finale} (visti: ${visti.join(', ') || 'nessuno'})`;
+        try { onDelta && onDelta(text); } catch (_) {}
+        return { ...base, text, toolCalls: [], finishReason: 'stop' };
+      }
+      const esiti = messages.filter((m) => m.role !== 'system').map((m) => String(m.content || '')).join('\n');
+      const toolCalls = piano.strumenti.map((s, i) => {
+        const args = { ...(s.args || {}) };
+        if (s.urlDa) args.url = (esiti.match(new RegExp(s.urlDa, 'g')) || [])[s.indice || 0] || '';
+        if (s.gruppoDa) { const m = new RegExp(s.gruppoDa).exec(esiti); args.url = m ? m[1] : ''; }
+        return { id: `c${k}_${i}`, name: s.nome, arguments: JSON.stringify(args) };
+      });
+      for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
+      return { ...base, text: '', toolCalls, finishReason: 'tool_calls' };
+    };
+  }, { limite, finestra, misure, piani });
+}
+
+async function preparaPagine(app, testServer) {
+  const urls = MARCHI.map((x) => testServer.html(paginaEnorme(x)));
+  await app.evaluate((_e, results) => {
+    globalThis.SN_WEB_SEARCH.search = async () => ({ ok: true, provider: 'stub', results });
+    globalThis.SN_LETTURA_PAGINE._cache.clear();
+    // Lo scaricatore vero rifiuta 127.0.0.1.
+    globalThis.SN_LETTURA_PAGINE._dip.scarica = async (url, opts) => fetch(url, opts);
+  }, urls.map((url, i) => ({ title: `Guida ${MARCHI[i]}`, url, snippet: 'Una guida lunghissima.' })));
+  return urls;
+}
+
+const RICERCA_E_TRE_PAGINE = [
+  { strumenti: [{ nome: 'CERCA_WEB', args: { query: 'guide' } }] },
+  { strumenti: [0, 1, 2].map((indice) => ({ nome: 'LEGGI_PAGINA', urlDa: URL_RE, indice })) },
+  { finale: 'RISPOSTA PRONTA' },
+];
+
+async function chiedi(page, testo) {
+  await page.locator('#input').fill(testo);
+  await page.locator('#sendBtn').click();
+}
+
+for (const caso of [
+  { nome: 'senza la finestra nota, il rifiuto del fornitore', finestra: null, rifiuti: (n) => expect(n).toBeGreaterThan(0) },
+  { nome: 'con la finestra nota dal listino, prima di mandare', finestra: 40000, rifiuti: (n) => expect(n).toBe(0) },
+]) {
+  test(`tre pagine enormi nello stesso turno (${caso.nome}): la risposta arriva con la prima pagina e in chat c'è l'avviso delle altre`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    const page = await openTab(NEWTAB);
+    const urls = await preparaPagine(app, testServer);
+    await modello(app, { limite: 110000, finestra: caso.finestra, piani: RICERCA_E_TRE_PAGINE });
+
+    await chiedi(page, 'confronta le tre guide che trovi');
+
+    const bolla = page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA PRONTA' });
+    await expect(bolla).toBeVisible({ timeout: 40_000 });
+    // La prima pagina chiesta il modello l'ha davanti intera; la terza no.
+    await expect(bolla).toContainText('visti: ALFA');
+    await expect(bolla).not.toContainText('GAMMA');
+    // L'avviso è nella bolla, coi siti, e dice che si possono rileggere.
+    await expect(bolla).toContainText('Per stare nella memoria del modello');
+    await expect(bolla).toContainText(/chiedimi di rileggerl[ae]/);
+    await expect(bolla).toContainText('127.0.0.1');
+    caso.rifiuti(await app.evaluate(() => globalThis.__rifiutate));
+
+    // Al modello le pagine tolte arrivano come rimando: titolo e indirizzo, nessun testo inventabile.
+    const ultima = (await app.evaluate(() => globalThis.__accettate)).pop();
+    expect(ultima).toContain('lasciata fuori');
+    expect(ultima).toContain('Titolo: Guida GAMMA');
+    expect(ultima).toContain(`Indirizzo: ${urls[2]}`);
+    expect(ultima).not.toContain('MARCHIO_GAMMA');
+  });
+}
+
+test('le pagine lasciate fuori si rileggono chiedendolo, e la pagina riletta arriva al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  const page = await openTab(NEWTAB);
+  await preparaPagine(app, testServer);
+  await modello(app, {
+    limite: 110000,
+    piani: [
+      ...RICERCA_E_TRE_PAGINE,
+      // Turno dopo: l'indirizzo lo prende dal rimando che ha davanti, come farebbe il modello.
+      { strumenti: [{ nome: 'LEGGI_PAGINA', gruppoDa: `lasciata fuori[\\s\\S]*?Titolo: Guida GAMMA[\\s\\S]*?Indirizzo: (${URL_RE})` }] },
+      { finale: 'RILETTA' },
+    ],
+  });
+  await chiedi(page, 'confronta le tre guide che trovi');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA PRONTA' })).toBeVisible({ timeout: 40_000 });
+
+  await chiedi(page, 'rileggi la guida GAMMA che hai lasciato fuori');
+  const riletta = page.locator('.dash-bubble-filo', { hasText: 'RILETTA' });
+  await expect(riletta).toBeVisible({ timeout: 40_000 });
+  await expect(riletta).toContainText('GAMMA');
+  // Riletta, la pagina è davanti al modello per intero: niente avviso su di lei.
+  await expect(riletta).not.toContainText('Per stare nella memoria del modello');
+});
+
+test('se il fornitore rifiuta anche dopo aver accorciato tutto, l\'errore dice cosa fare e non manda a cambiare modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await openTab(NEWTAB);
+  await preparaPagine(app, testServer);
+  // Nessuna richiesta ci sta, nemmeno la prima.
+  await modello(app, { limite: 10, piani: RICERCA_E_TRE_PAGINE });
+  await chiedi(page, 'confronta le tre guide che trovi');
+  const errore = page.locator('.dash-bubble-filo', { hasText: 'meno pagine' });
+  await expect(errore).toBeVisible({ timeout: 40_000 });
+  await expect(errore).toContainText('chat nuova');
+  await expect(errore).not.toContainText(/altro modello|Modelli predefiniti/);
+});
