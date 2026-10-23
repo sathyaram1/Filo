@@ -66,10 +66,14 @@ for (const tema of ['light', 'dark']) {
     await expect(page.locator('.dash-action-btn', { hasText: /torna alla home/i })).toHaveCount(0);
     await page.screenshot({ path: `tests/.shots/1115.5-prima-${tema}.png` });
 
-    // Doppio clic in fretta: una chiusura sola, il segno resta.
-    await btn.dblclick();
+    await btn.click();
     await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
     await expect(page.locator('#input')).toBeFocused();
+    // Un secondo clic sul segno (il doppio clic di chi non sa se il primo è arrivato): dove finisce il cursore?
+    await page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' }).click({ force: true });
+    globalThis.__fuocoDopoSecondo = await page.evaluate(() => document.activeElement && (document.activeElement.id || document.activeElement.tagName));
+    console.log('FUOCO DOPO SECONDO CLIC:', globalThis.__fuocoDopoSecondo);
+    await page.locator('#input').focus();
     const [chiusa] = await chatDi(app, 'portami alla home');
     await expect.poll(async () => (await chatDi(app, 'portami alla home'))[0]?.finita).toBe(true);
     await page.screenshot({ path: `tests/.shots/1115.5-chiusa-${tema}.png` });
