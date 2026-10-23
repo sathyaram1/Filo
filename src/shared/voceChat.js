@@ -103,17 +103,38 @@
     // Un sito che ospita la chat non accende il microfono di Filo con un clic fabbricato.
     try { global.SN_FILO_UI && global.SN_FILO_UI.soloGestiVeri(b); } catch (_) {}
 
-    // `perche`: come la persona ha preso in mano il testo mentre si parlava; `inAttesa`: la sessione il cui invio
-    // aspetta l'attimo per annullare. Servono ai contatori (#1467), che contano l'invio una volta per sessione.
+    // Per i contatori (#1467), che contano una dettatura quando si sa che fine ha fatto il testo, cioè quando parte:
+    // `perche` 'cambiata' se la persona l'ha toccato mentre si parlava; `inviata` se l'ha mandato mentre si parlava;
+    // `inAttesa` la sessione che aspetta l'attimo per annullare; `dettate` quelle rimaste nella casella da mandare.
     const c = {
       campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, preso: false, lasciato: '',
-      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0, perche: '', inAttesa: null,
+      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0, perche: '', inviata: false, inAttesa: null, dettate: [],
     };
     const contaFine = (esito, invio) => { try { global.SN_ASCOLTO.contaSessione(esito, invio); } catch (_) {} };
+    const segnaLasciata = (esito) => { try { global.SN_ASCOLTO.segnaSessione(esito, 'tenuta'); } catch (_) {} };
     function esitoDellAttesa(invio) {
       const e = c.inAttesa;
       c.inAttesa = null;
       if (e) contaFine(e, invio);
+    }
+    // Il testo dettato resta nella casella: si conta quando parte (corretto o no), si cancella, o la chat se ne va.
+    function lasciaInCasella(esito, cambiata) {
+      c.dettate.push({ esito, cambiata });
+      segnaLasciata(esito);
+    }
+    function chiudiDettate(invio) {
+      const l = c.dettate;
+      c.dettate = [];
+      for (const d of l) contaFine(d.esito, typeof invio === 'function' ? invio(d) : invio);
+    }
+    // La casella svuotata senza che la persona l'abbia cancellata (quello passa da `suInput`): l'ha mandata la chat.
+    function verificaInvio() {
+      if (c.dettate.length && campo.isConnected && !campo.value.trim()) chiudiDettate((d) => (d.cambiata ? 'cambiata' : 'a_mano'));
+    }
+    function verificaPresto() {
+      if (!c.dettate.length) return;
+      setTimeout(verificaInvio, 0);
+      setTimeout(verificaInvio, 300);
     }
 
     function imposta(stato) {
