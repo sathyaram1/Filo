@@ -51,6 +51,18 @@ test('serve una pagina HTML interna con header CSP', async () => {
   assert.match(csp, /object-src 'none'/);
 });
 
+// #830.4: le altre pagine si scrivono <host>/<host>.html, e chi scrive così l'indirizzo della home la deve trovare.
+test('l\'indirizzo della home scritto come «newtab.html» apre la home', async () => {
+  const home = await (await filoHandler({ url: 'filo://newtab/' })).text();
+  assert.match(home, /id="input"/, 'filo://newtab/ non è più la home');
+  for (const url of ['filo://newtab/newtab.html', 'filo://newtab/NewTab.html', 'filo://newtab/newtab.html?accoglienza=1']) {
+    const res = await filoHandler({ url });
+    assert.equal(res.status, 200, `${url} non si apre`);
+    assert.equal(await res.text(), home, `${url} non apre la home`);
+    assert.equal(res.headers.get('content-security-policy'), FILO_PAGE_CSP, `${url} senza CSP`);
+  }
+});
+
 test('NON aggiunge CSP a risorse non-HTML (es. CSS)', async () => {
   const res = await filoHandler({ url: 'filo://style/theme.css' });
   assert.equal(res.status, 200);
