@@ -150,7 +150,7 @@ test('tasto destro su Indietro e Avanti: le pagine della scheda dalla più vicin
   await barra.locator('#nav .ico[data-id="back"]').click({ button: 'right' });
   let menu = await menuAperto(app);
   expect(menu, 'il menu di Indietro non si è aperto').toBeTruthy();
-  expect(await vociDelMenu(menu)).toEqual(['Pagina Beta', 'Pagina Alfa', 'Rimetti nel menu del tasto destro']);
+  expect(await vociDelMenu(menu)).toEqual(['Pagina Beta', 'Pagina Alfa', 'Sposta in «Altro…»']);
   await scegliNelMenu(menu, 'Pagina Alfa');
   await page.waitForURL(a);
 
@@ -158,7 +158,7 @@ test('tasto destro su Indietro e Avanti: le pagine della scheda dalla più vicin
   await pannelloFermo(barra);
   await barra.locator('#nav .ico[data-id="forward"]').click({ button: 'right' });
   menu = await menuAperto(app);
-  expect(await vociDelMenu(menu)).toEqual(['Pagina Beta', 'Pagina Gamma', 'Rimetti nel menu del tasto destro']);
+  expect(await vociDelMenu(menu)).toEqual(['Pagina Beta', 'Pagina Gamma', 'Sposta in «Altro…»']);
   await scegliNelMenu(menu, 'Pagina Gamma');
   await page.waitForURL(c);
 });

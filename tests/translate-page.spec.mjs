@@ -857,7 +857,6 @@ test('la sezione ripiegata che si apre DOPO si traduce dalla barra laterale, sen
   // L'icona se ne accorge e offre di tradurre quello, non di buttare via tutto.
   const icon = await iconaTraduci(app);
   await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
-  await page.screenshot({ path: 'tests/.shots/translate-page-revealed-menu.png' }).catch(() => {});
   await icon.click();
 
   await expect(page.locator('#mtitle')).toHaveText(/^IT /, { timeout: 60000 });
@@ -1091,7 +1090,8 @@ const SLOW = `<!doctype html><html lang="en"><body style="font:16px sans-serif;p
 
 test('chiedere l’originale mentre traduce: la pagina torna indietro e ci RESTA', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
-  await stubTranslationProvider(app, 1200);
+  // Un modello lento quanto basta perché la barra si apra e l'icona si prema a lavoro ancora in corso.
+  await stubTranslationProvider(app, 3000);
   const page = await testServer.openReady(openTab, SLOW);
   await watchToasts(page);
   await clickTranslateIcon(app);
@@ -1524,8 +1524,10 @@ test('aperta una sezione ripiegata, l\'icona Traduci offre di tradurre il testo 
   await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
   await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
 
+  // La sezione la apre l'utente: il suo clic nella pagina è quello che dice a Filo di riguardare cosa si vede.
   const label = async (apri, chiudi) => {
     await page.evaluate(apri);
+    await page.locator('#vis').click();
     await page.waitForTimeout(120);
     const btn = await iconaTraduci(app);
     const offre = await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo', { timeout: 3000 }).then(() => true, () => false);
