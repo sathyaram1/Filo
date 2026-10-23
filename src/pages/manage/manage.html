@@ -2381,6 +2381,43 @@
                   <span class="mg-action-msg" id="mgJudgeTimeoutMsg" role="status"></span>
                 </div>
               </section>
+
+              <!-- Il tetto di spesa dei giudici per i non fidati e la lunghezza che leggono (#1515): li legge e li
+                 scrive manage.js, le regole stanno in spesaGiudici.js. -->
+              <section class="mg-auto-block sn-manopola" id="mgJudgeBudgetBlock">
+                <label class="mg-auto-field-label" for="mgJudgeBudget">Tetto di spesa dei giudici (dollari al giorno)</label>
+                <p class="mg-auto-block-desc">
+                  Quanto possono spendere in un giorno i giudici sui feedback dei non fidati. Oltre il tetto
+                  quei feedback non vengono giudicati e aspettano te.
+                </p>
+                <div class="mg-judge-spesa" id="mgJudgeSpesa">
+                  <div class="mg-judge-spesa-barra" id="mgJudgeSpesaBarra" hidden><span id="mgJudgeSpesaQuota"></span></div>
+                  <span class="mg-judge-spesa-testo" id="mgJudgeSpesaTesto" role="status">Oggi: —</span>
+                  <span class="mg-judge-spesa-nota" id="mgJudgeSpesaNota" hidden></span>
+                </div>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgJudgeBudget" class="mg-auto-number" step="0.01"
+                    inputmode="decimal" autocomplete="off" />
+                  <button type="button" class="sn-btn" id="mgJudgeBudgetSave">Salva</button>
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgJudgeBudgetRimetti" hidden>Rimetti com’era</button>
+                  <span class="mg-action-msg" id="mgJudgeBudgetMsg" role="status"></span>
+                </div>
+              </section>
+
+              <section class="mg-auto-block sn-manopola" id="mgJudgeCharsBlock">
+                <label class="mg-auto-field-label" for="mgJudgeChars">Feedback più lungo che i giudici leggono (caratteri)</label>
+                <p class="mg-auto-block-desc">
+                  Un feedback di un non fidato più lungo di così, fra testo e documenti, non va ai giudici e
+                  aspetta te. Non si taglia: chi ci lavora riceverebbe anche la parte che nessuno ha giudicato.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgJudgeChars" class="mg-auto-number mg-auto-number--largo"
+                    inputmode="numeric" autocomplete="off" />
+                  <button type="button" class="sn-btn" id="mgJudgeCharsSave">Salva</button>
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgJudgeCharsRimetti" hidden>Rimetti com’era</button>
+                  <span class="mg-action-msg" id="mgJudgeCharsMsg" role="status"></span>
+                </div>
+              </section>
             </div>
           </div>
         </div>
