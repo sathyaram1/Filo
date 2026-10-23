@@ -1083,7 +1083,7 @@
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, USAGE_LIMITS, rifiutoDellaRigaUso, scriviIsolando, registroScartateTesto, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, USAGE_LIMITS, rifiutoDellaRigaUso, scriviIsolando, registroScartateTesto, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, inviterCapMessage, riscattoDaRiprovare, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
