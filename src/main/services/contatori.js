@@ -292,13 +292,18 @@ function crea(dip = {}) {
       const funzione = C.funzioneDi(action);
       if (!funzione || inIncognito()) return MUTO;
       // Un lavoro partito dentro un uso e arrivato dopo la sua fine conta da sé.
+      const chiamata = (info) => chiamataServita(funzione, info);
+      const tardiva = (modello, usd) => spesaTardiva(funzione, modello, usd);
       const uso = usoCorrente.getStore();
       if (uso && !uso.chiuso && uso.funzione === funzione) {
         uso.chiamate += 1;
+        uso.alModello += 1;
         return {
           visto() { if (uso.visto == null) uso.visto = adesso() - uso.t0; },
           errore: errorePer(uso.errori),
           fine(ok) { if (ok && uso.visto == null) uso.visto = adesso() - uso.t0; },
+          chiamata,
+          tardiva,
         };
       }
       const t0 = adesso();
@@ -313,8 +318,10 @@ function crea(dip = {}) {
           chiuso = true;
           const fine = ok ? adesso() - t0 : null;
           if (ok && visto == null) visto = fine;
-          registraUso(funzione, { visto, fine }, errori, { t0 }).catch(() => {});
+          registraUso(funzione, { visto, fine }, errori, { t0, chiamate: 1 }).catch(() => {});
         },
+        chiamata,
+        tardiva,
       };
     } catch (_) { return MUTO; }
   }
