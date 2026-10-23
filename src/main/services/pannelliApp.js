@@ -26,9 +26,8 @@ async function tutti() {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
-// La prima lettura di un'app porta dentro quello che i suoi vecchi moduli sapevano, una volta sola, dalla copia della
-// collezione che la pagina rispecchia. Una copia senza moduli non dice niente (può essere più vecchia di quella della
-// pagina): allora aspetta la pagina, che manda la sua (op 'migra').
+// La prima lettura porta dentro i vecchi moduli, una volta, dalla copia della collezione. Una copia senza moduli può
+// essere più vecchia di quella della pagina: allora aspetta la pagina, che manda la sua (op 'migra').
 async function leggiEMigra(app) {
   const salvati = await tutti();
   const stato = P().normalizza(app, salvati[app]);
