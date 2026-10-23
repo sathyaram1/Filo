@@ -12,10 +12,11 @@ function homeNuda(u) {
 }
 
 /** Vero se la navigazione va fermata: porta su una pagina di Filo e non parte da una vista di Filo. */
-function navigazioneVersoFilo(url, { interna = false } = {}) {
+// La finestrella non diventa mai una vista di Filo: lì la home girerebbe senza i suoi servizi, e si ferma anche lei.
+function navigazioneVersoFilo(url, { interna = false, finestrella = false } = {}) {
   const u = letto(url);
   if (!u || u.protocol !== 'filo:' || interna) return false;
-  return !homeNuda(u);
+  return finestrella || !homeNuda(u);
 }
 
 // «Gestisci i siti bloccati» della pagina «Sito bloccato» (src/pages/error/error.html): l'unica pagina di Filo che una
