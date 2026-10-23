@@ -595,6 +595,8 @@
               promptTokens: obj.usage.prompt_tokens || 0,
               completionTokens: obj.usage.completion_tokens || 0,
               cachedPromptTokens: cachedPromptTokens(obj.usage),
+              cacheDetta: cacheDetta(obj.usage),
+              reasoningTokens: reasoningTokensOf(obj.usage),
               cacheWriteTokens: cacheWriteTokens(obj.usage),
               costUsd: costUsdOf(obj.usage),
               servedBy: servedBy || extractServedBy(obj),
