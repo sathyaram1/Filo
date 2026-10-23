@@ -1255,6 +1255,7 @@
     COMANDO_FINESTRA: senza('already'),
     TIENI_APERTA: fatta,
     NON_TENERE_APERTA: fatta,
+    CHIUDI_SCHEDE: senza('restano'),
     STILE_PAGINA: fatta,
     RIPRISTINA_STILE_PAGINA: fatta,
     SALVA_APPUNTO: fatta,
