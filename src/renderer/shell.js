@@ -2336,7 +2336,7 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.reload(a.id);
     } else {
-      // Salto alla N-esima scheda col fuoco sulla barra (per le pagine ci pensa il main). La
+      // Salto alla N-esima scheda, o alla vicina con Ctrl+Tab, col fuoco sulla barra (per le pagine ci pensa il main). La
       // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.
       const schede = state.tabs || [];
       let idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, schede.length) : null;
