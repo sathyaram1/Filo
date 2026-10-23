@@ -37,9 +37,9 @@ const premi = (app, keyCode, modifiers) => app.evaluate(async ({ BrowserWindow, 
   // Lo strato se ne va con la scheda chiusa o la pagina cambiata: l'indirizzo si legge prima del tasto.
   const dove = f.getURL();
   f.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: m });
-  f.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: m });
+  try { f.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: m }); } catch (_) {}
   await new Promise((ok) => setTimeout(ok, 800));
-  return { dove: f.getURL(), schede: w._filoTabs.tabs.map((t) => t.view.webContents.getURL()) };
+  return { dove, schede: w._filoTabs.tabs.map((t) => t.view.webContents.getURL()) };
 }, { k: keyCode, m: modifiers });
 
 async function rispostaAperta(app, p) {
