@@ -386,7 +386,7 @@
   function caricaImpostazioni() {
     // Le pause non trattengono gli altri controlli «in lettura»: sono una riga in più, non un valore da scegliere.
     loadPause();
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadJudgeBudget(), loadMergeApprovals()])
       .finally(fineLetturaAutomazioni);
   }
 
