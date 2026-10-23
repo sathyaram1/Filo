@@ -2690,7 +2690,7 @@
     const eventoId = onbState ? null : eventoFromUrl();
     // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
-      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      onbState ? Promise.resolve() : loadDashboard({ apertura: true }).catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
       onbState ? Promise.resolve() : caricaFilo().catch((e) => console.warn('[Filo] coda del filo', e)),
     ]);
