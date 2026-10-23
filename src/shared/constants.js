@@ -3054,9 +3054,12 @@
       ? `${quante(n)} immagini superano i 4 MB e non sono entrate. Salvale sul computer e trascinale da lì: entreranno come file.`
       : 'L’immagine supera i 4 MB e non è entrata. Salvala sul computer e trascinala da lì: entrerà come file.'),
     fraseTroppoGrandiAiuto: (n) => (quante(n) > 1
-      ? `${quante(n)} immagini superano i 4 MB: l’Aiuto non le può vedere.`
-      : 'L’immagine supera i 4 MB: l’Aiuto non la può vedere.'),
+      ? `${quante(n)} immagini superano i 64 MB: l’Aiuto non le può vedere.`
+      : 'L’immagine supera i 64 MB: l’Aiuto non la può vedere.'),
     fraseIlleggibili: (n) => (quante(n) > 1 ? `${quante(n)} immagini non si sono aperte.` : 'L’immagine non si è aperta.'),
+    fraseNonImmaginiAiuto: (n) => (quante(n) > 1
+      ? `${quante(n)} file non sono immagini e non sono entrati: all’Aiuto si danno solo immagini.`
+      : 'Un file non è un’immagine e non è entrato: all’Aiuto si danno solo immagini.'),
   });
   // Le soglie dell'avviso dei crediti (#818): 0 spegne quella condizione. Le usano la pagina, la chat e la proiezione.
   const AVVISO_CREDITI_LIMITI = Object.freeze({ giorni: Object.freeze([0, 30]), percento: Object.freeze([0, 100]) });
