@@ -505,6 +505,10 @@
     STRATO_MENU_ESEGUI: 'strato_menu_esegui',        // main → content script { id, n, args, chiude } | { id, inline, cammino }
     STRATO_MENU_INCOLLA: 'strato_menu_incolla',      // main → content script { id, testo, immagine } | { id, voce }
     STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
+    // I riquadri di Filo su un sito nello strato sopra la scheda (#1509.1). Aperto ai siti: chi apre è il content script
+    // della scheda, e il riquadro nasce dove il sito non lo vede.
+    RIQUADRO_APRI: 'riquadro_apri',                  // { tipo: feedback|modifica|redteam|risposta, dati } → { ok, id }
+    RIQUADRO_SOSTITUISCI: 'riquadro_sostituisci',    // main → content script { id, testo }: Sostituisci della Modifica
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
