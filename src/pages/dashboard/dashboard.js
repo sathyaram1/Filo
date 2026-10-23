@@ -1807,7 +1807,7 @@
     spegniBersaglio();
     if (e.defaultPrevented || !portaFile(e.dataTransfer)) return;
     e.preventDefault();
-    fileNelCampo(e.dataTransfer);
+    if (fileNelCampo(e.dataTransfer)) contaNellaChat(e.dataTransfer, true);
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
