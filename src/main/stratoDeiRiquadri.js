@@ -101,8 +101,10 @@ class StratoDeiRiquadri {
   // o una risposta nata in uno strato largo zero sceglierebbe il lato sbagliato e non lo cambierebbe più.
   _consegna(s, richiesta) {
     const b = this._area(s.wc);
+    // Il riquadro nuovo può nascere ovunque: finché lo strato non ridice la sua zona, la cornice è la scheda intera.
+    s.zona = null;
     if (b) {
-      s.vista.setBounds(b);
+      this._bordi(s, b);
       this._inCima(s);
     }
     this._manda(s, 'riquadri:apri', { ...richiesta, misura: b ? { w: b.width, h: b.height } : null });
