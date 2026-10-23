@@ -482,6 +482,13 @@
         const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
         return { text: `Aspetta la fusione di ${num || 'il feedback da cui nasce'}, poi entra in coda da solo.`, color: null };
       }
+      // Un non fidato che i giudici non hanno visto (#1515): è fermo per l'owner, non in attesa del giudizio.
+      if (statusReason === 'budget_giudici' || statusReason === 'lunghezza_giudici') {
+        const perche = statusReason === 'budget_giudici'
+          ? 'Non giudicato: oggi i giudici dei non fidati hanno già speso il tetto.'
+          : 'Non giudicato: troppo lungo per i giudici.';
+        return { text: `${perche} Leggilo e decidi tu, o «Ri-valuta i non filtrati» lo manda ai giudici lo stesso.`, color: null };
+      }
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
