@@ -1776,7 +1776,7 @@ class TabManager {
     if (next && host) this._identityColorCache.set(host, next);
     // Anche «nessun colore» è una risposta: il riordino della riapertura aspetta di averla da ogni pagina.
     tab._identitaNota = true;
-    for (const avvisa of [...this._attesaColori]) avvisa();
+    for (const avvisa of [...(this._attesaColori || [])]) avvisa();
     if (tab.identityColor === next) return;
     tab.identityColor = next;
     if (this.tabs.includes(tab)) this._broadcast();
