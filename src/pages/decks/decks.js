@@ -1798,6 +1798,21 @@
   // calcolo e la cache persistente per (carta, versione mazzo) vivono nel main.
   const opinionsByCard = new Map();
   const opinionPending = new Set();
+  // Il parere che non è arrivato, col perché (la frase e quello che serve al tasto del rimedio): finché c'è, la
+  // carta non si richiede da sola. Senza, il riquadro la richiedeva a ogni ridisegno, centinaia di volte al secondo (#1344.1).
+  const opinionErrors = new Map();
+  const SENZA_RISPOSTA = 'non ho avuto risposta. Riprova.';
+  function erroreDelParere(r) {
+    const frase = r && r.error && r.error !== 'not_found' ? String(r.error) : SENZA_RISPOSTA;
+    return {
+      frase,
+      ...(r && r.code ? { code: r.code } : {}),
+      ...(r && r.keyRefused ? { keyRefused: true } : {}),
+      ...(r && r.reason ? { reason: r.reason } : {}),
+      ...(r && Number(r.maxTokens) > 0 ? { maxTokens: Number(r.maxTokens) } : {}),
+      ...(r && r.finishReason ? { finishReason: r.finishReason } : {}),
+    };
+  }
 
   // La carta mostrata ADESSO nel pannello destro (preview o carosello).
   function currentDetailCard() {
