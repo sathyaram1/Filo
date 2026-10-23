@@ -1858,12 +1858,17 @@
   // Ristampe (modulo «Prezzo e dati»): conteggio lazy, cache nel main.
   const printsByName = new Map();
   const printsPending = new Set();
+  // Come per i pareri: un conteggio che Scryfall non ha dato non si richiede a ogni ridisegno del riquadro.
+  const printsFailed = new Set();
   async function fetchPrints(card) {
-    if (printsByName.has(card.name) || printsPending.has(card.name)) return;
+    if (printsByName.has(card.name) || printsPending.has(card.name) || printsFailed.has(card.name)) return;
     printsPending.add(card.name);
     try {
       const r = await send({ type: MSG.SCRYFALL_PRINTS, name: card.name });
       if (r && r.ok) printsByName.set(card.name, r.prints);
+      else printsFailed.add(card.name);
+    } catch (_) {
+      printsFailed.add(card.name);
     } finally { printsPending.delete(card.name); }
     const cur = currentDetailCard();
     if (cur && cur.name === card.name && layout.module === 'price') renderDetailModule(cur);
