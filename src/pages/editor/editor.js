@@ -1164,7 +1164,7 @@
     const frase = CE ? CE.sentence(CE.fromResponse(r, '')) : '';
     const pagina = CE?.rimedioPagina?.(r) || null;
     const via = pagina
-      ? { label: pagina.label, title: pagina.title, onClick: () => sendMessage({ type: MSG.OPEN_URL, url: pagina.url }) }
+      ? { label: pagina.label, title: pagina.title, durata: 15000, onClick: () => sendMessage({ type: MSG.OPEN_URL, url: pagina.url }) }
       : undefined;
     showEditorToast(`Non sono riuscito a generare ${cosa}.${frase ? ` ${frase}` : ''}`, via);
   }
