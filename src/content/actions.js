@@ -1815,7 +1815,7 @@
   // Resta nero su bianco a prescindere dal tema: il contrasto che gli scanner pretendono.
   function showPageQrCode() {
     const QR = global.SN_QR;
-    const url = String(location.href || '');
+    const url = indirizzoDellaPagina();
     if (!QR || typeof QR.toMatrix !== 'function') {
       Popup.toastErrore('qr_error', { duration: 3000 });
       return;
