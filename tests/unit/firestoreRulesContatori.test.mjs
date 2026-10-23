@@ -20,32 +20,43 @@ for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLeve
 const C = globalThis.SN_CONTATORI;
 const F = C.FORME;
 
-function blocco() {
+const senzaCommenti = (s) => s.replace(/\/\/[^\n]*/g, ' ');
+function blocco(collezione) {
   const righe = RULES.split('\n');
-  const i = righe.findIndex((r) => new RegExp(`^ {4}match\\s+/${C.COLLEZIONE}/\\{`).test(r));
-  assert.ok(i >= 0, `manca il blocco match /${C.COLLEZIONE}`);
+  const i = righe.findIndex((r) => new RegExp(`^ {4}match\\s+/${collezione}/\\{`).test(r));
+  assert.ok(i >= 0, `manca il blocco match /${collezione}`);
   const j = righe.findIndex((r, k) => k > i && /^ {4}\}\s*$/.test(r));
-  return righe.slice(i, j + 1).join('\n').replace(/\/\/[^\n]*/g, ' ');
+  return senzaCommenti(righe.slice(i, j + 1).join('\n'));
 }
-const B = blocco();
+const B = blocco(C.COLLEZIONE);
+const BC = blocco(C.COLLEZIONE_CHIAMATE);
+// Le funzioni che le ore e le loro chiamate condividono stanno fra l'intestazione dei contatori e il blocco delle ore.
+const CONDIVISE = (() => {
+  const a = RULES.indexOf('    // ── I contatori anonimi');
+  const b = RULES.indexOf(`    match /${C.COLLEZIONE}/{`);
+  assert.ok(a >= 0 && b > a, 'le funzioni condivise dei contatori stanno prima del blocco delle ore');
+  return senzaCommenti(RULES.slice(a, b));
+})();
+const TUTTO = [CONDIVISE, B, BC].join('\n');
 
 function corpo(nome) {
-  const m = new RegExp(`function ${nome}\\([^)]*\\)\\s*\\{\\s*return([\\s\\S]*?);\\s*\\}`).exec(B);
+  const m = new RegExp(`function ${nome}\\([^)]*\\)\\s*\\{\\s*((?:let [^;]+;\\s*)*)return([\\s\\S]*?);\\s*\\}`).exec(TUTTO);
   assert.ok(m, `manca la funzione ${nome} nelle regole`);
-  return m[1].replace(/\s+/g, ' ').trim();
+  return m[2].replace(/\s+/g, ' ').trim();
 }
 const GIORNO = corpo('contatoriGiorno');
 const ORA = corpo('contatoriOra');
+const CHIAMATE = corpo('contatoriChiamate');
 
-function regole() {
+function regole(testo) {
   const out = [];
   const re = /allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g;
   let m;
-  while ((m = re.exec(B)) !== null) out.push({ verbi: m[1].split(',').map((v) => v.trim()), cond: m[2].replace(/\s+/g, ' ').trim() });
+  while ((m = re.exec(testo)) !== null) out.push({ verbi: m[1].split(',').map((v) => v.trim()), cond: m[2].replace(/\s+/g, ' ').trim() });
   return out;
 }
-const R = regole();
-const per = (verbo) => R.filter((r) => r.verbi.includes(verbo));
+const R = regole(B);
+const per = (verbo, r = R) => r.filter((x) => x.verbi.includes(verbo));
 
 const stringhe = (s) => [...s.matchAll(/'([^']*)'/g)].map((x) => x[1]);
 function elencoDopo(testo, etichetta) {
