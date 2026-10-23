@@ -1861,6 +1861,7 @@
               ? `reveal rifiutato (motivo: ${result.reason}). L'elemento non è un disclosure sicuro (details/aria-expanded+aria-controls non-link non-submit). Usa "click" con highlight per chiedere conferma all'utente, oppure scegli un altro target.`
               : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
             appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
+            if (session && result.reason === 'selector-not-found') session.nonTrovati += 1;
             if (parsed.status === 'continue') {
               setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 50);
             }
