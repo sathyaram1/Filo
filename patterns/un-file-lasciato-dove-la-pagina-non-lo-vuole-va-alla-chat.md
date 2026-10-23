@@ -14,14 +14,17 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
 
 ## Come è fatta, e le trappole
 
-- **Decide la pagina, sul dragover**, come fa Chromium: un punto accoglie il rilascio se la pagina ha cancellato il
-  dragover lì. Il preload ascolta in cattura e aggiunge, mentre l'evento scende, un ascolto in bolla su `window` che
-  arriva dopo quelli della pagina: solo se nessuno l'ha cancellato lo cancella lui e se lo segna. Al drop, se il
-  dragover era suo, ferma l'evento prima della pagina: i file erano per la chat, e la pagina non li vede.
+- **Decide il drop, non il dragover.** Il preload ascolta in cattura e aggiunge, mentre l'evento scende, un ascolto
+  in bolla su `window` che arriva dopo quelli della pagina. Se nessuno ha cancellato il dragover lo cancella lui:
+  fuori da una casella, al drop ferma l'evento prima della pagina (i file erano per la chat, e la pagina non li
+  vede). Dove la pagina ha accettato il passaggio, o sopra una casella di testo o un editor, il drop arriva alla
+  pagina e Filo lo prende in bolla su `window` solo se nessuno l'ha cancellato: una pagina può accettare il file su
+  tutto il documento e prenderlo solo in una zona, e una barra di ricerca il file non lo vuole (#1623, giri 1 e 3).
   Il campo file prende il rilascio da sé senza che la pagina cancelli niente: lì Filo non si mette in mezzo, o un
-  sito con un semplice `<input type="file">` lo perde. Sopra una casella di testo o un editor la pagina riceve il drop
-  anche senza aver cancellato il dragover: Filo lo lascia passare e lo prende in bolla su `window` solo se nessuno
-  l'ha cancellato (una barra di ricerca il file non lo vuole, e il gesto non deve perdersi lì).
+  sito con un semplice `<input type="file">` lo perde.
+- **Quello che si dà al pannello non passa dalla pagina.** Il pannello sta nel documento del sito: un file lasciato
+  sul pannello, un'immagine incollata nella sua casella o mandata da «Incolla» del menu (`filo:paste-image`) la
+  prende il preload in cattura su `window`, prima di ogni ascolto della pagina, e la ferma lì.
   Codice: `src/preload/rilascio-file.js`, montato da `page-preload.js` in ogni frame e da `internal-preload.js`. Un
   riquadro incorporato non ha il pannello: legge le immagini e le manda al main, che le gira al frame principale della
   sua scheda senza mai leggere un percorso per conto di un sito.
