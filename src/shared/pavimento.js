@@ -369,7 +369,9 @@
     }
     passwordAccanto(s, out);
     for (const m of s.matchAll(CVV)) out.push({ valore: m[1], regola: 'cvv' });
-    for (const re of [CODICE_ACCESSO, CODICE_ACCESSO_EN]) for (const m of s.matchAll(re)) out.push({ valore: m[1], regola: 'codice' });
+    for (const re of [CODICE_ACCESSO, CODICE_ACCESSO_EN]) {
+      for (const m of s.matchAll(re)) if (!FINE_DI_UN_NUMERO.test(m[0].slice(0, -m[1].length))) out.push({ valore: m[1], regola: 'codice' });
+    }
     for (const m of s.matchAll(PIN)) out.push({ valore: m[1], regola: 'codice' });
     codiciVicini(s, out);
     for (const m of s.matchAll(JWT)) out.push({ valore: m[0], regola: 'token' });
