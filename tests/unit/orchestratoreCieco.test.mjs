@@ -388,3 +388,29 @@ test('il preflight installa il gancio nelle impostazioni utente solo in cloud, m
   assert.ok(chiamata > 0 && guardia > 0 && chiamata - guardia < 200, 'installaCecita deve stare dietro la guardia del cloud');
   assert.equal(src.split('installaCecita(').length - 1, 1, 'una chiamata sola, quella guardata');
 });
+
+// #1454: le regole esatte del riallineamento entrano nella stessa scrittura del gancio, senza doppioni e senza toccare il
+// resto dei permessi; una regola col jolly non si scrive, e lo dice.
+test('installa: i permessi del giro si uniscono a permissions.allow senza doppioni; una regola non esatta ferma tutto', async () => {
+  const { regoleGit } = await import('../../scripts/lib/permessi-routine.mjs');
+  const dir = cartellaTemporanea('filo-cieco-permessi-');
+  const vuota = cartellaTemporanea('filo-cieco-permessi-vuota-');
+  try {
+    const file = join(dir, 'settings.json');
+    const regole = regoleGit({ clone: '/home/utente/filo-security' });
+    writeFileSync(file, JSON.stringify({ permissions: { allow: ['Bash(ls)', regole[0]], deny: ['Bash(rm:*)'], defaultMode: 'auto' } }));
+    assert.equal(installa({ dir, sessione: 's1', creato: 10, permessi: regole }).ok, true);
+    assert.equal(installa({ dir, sessione: 's2', creato: 20, permessi: regole }).ok, true);
+    const s = JSON.parse(readFileSync(file, 'utf8'));
+    assert.deepEqual(s.permissions, { allow: ['Bash(ls)', ...regole], deny: ['Bash(rm:*)'], defaultMode: 'auto' });
+    assert.ok(s.hooks.ConfigChange.some((g) => g.hooks[0].command.includes(ETICHETTA)), 'stessa scrittura del gancio');
+    for (const storta of ['Bash(git push:*)', 'Bash(git *)', 'Read(x)', 42]) {
+      const r = installa({ dir, sessione: 's3', creato: 30, permessi: [...regole, storta] });
+      assert.equal(r.ok, false, String(storta));
+      assert.match(r.why, /non esatto/);
+    }
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')).permissions.allow, ['Bash(ls)', ...regole], 'il rifiuto non scrive niente');
+    assert.equal(installa({ dir: vuota, sessione: 's1', permessi: regole }).ok, true);
+    assert.deepEqual(JSON.parse(readFileSync(join(vuota, 'settings.json'), 'utf8')).permissions, { allow: regole });
+  } finally { togliCartella(dir); togliCartella(vuota); }
+});

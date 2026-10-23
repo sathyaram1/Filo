@@ -88,6 +88,7 @@ import {
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
+import { regoleGit, regoleMergeServer } from './lib/permessi-routine.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
@@ -2436,10 +2437,13 @@ if (isMainModule) {
           // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
           // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
           // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
+          // Nella stessa scrittura entrano le regole esatte del riallineamento (lib/permessi-routine.mjs, #1454): un ramo
+          // vecchio non le tocca, e un comando che combacia non passa dal classificatore della modalità auto.
           const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
-            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '' })
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', permessi: regoleGit({ clone: cartellaCloneServer() }) })
             : { ok: true, saltato: true };
           if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+          else if (!regoleMergeServer(cartellaCloneServer()).length) console.error(`[dispatch] ATTENZIONE: il percorso del clone del server (${cartellaCloneServer()}) non entra in una regola esatta: la fusione di main nel clone resta al controllo dei permessi.`);
           if (!cieco.ok) {
             console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
             process.exit(3);

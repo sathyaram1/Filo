@@ -41,8 +41,10 @@ Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --ab
   `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`. Se sul server il ramo non c'è (git: «couldn't find remote
   ref»), il lavoro sta tutto nell'app.
 - Riallineamento del server (lo dice la critica): `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
-  `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove
-  e spinta come sotto.
+  `git -C "<CLONE>" merge origin/main`, da solo nella sua chiamata e scritto così, col percorso fra virgolette e senza
+  `cd` né `&&` davanti: è la sola forma che il controllo dei permessi ammette, e se la ferma è un guasto (gruppo
+  `guasto: permessi git`). Conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove e spinta
+  come sotto.
 
 ### Prove, spinta, registro
 
