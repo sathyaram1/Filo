@@ -284,6 +284,7 @@ module.exports = function register(on, ctx) {
         }
         if (out.hasPersonalKey) walletStore.saveLastServer({ ...out.server, readAt: new Date().toISOString() });
       }
+      out.chiaveStaccata = chiaveStaccata(out);
     } catch (e) {
       out.error = /callable \w+ 5\d\d|fetch failed|ENOTFOUND|ECONN/i.test(String(e?.message || e)) ? 'not_reachable' : String(e?.message || e);
       // Server muto ma chiave personale qui: si mostra l'ultimo stato letto, dichiarato vecchio.
