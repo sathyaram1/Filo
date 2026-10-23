@@ -675,9 +675,7 @@
             if (e.offsetParent !== null || (UI && UI.inside(e))) continue;
             const cs = window.getComputedStyle(e);
             if (cs.position !== 'fixed' || cs.pointerEvents !== 'none' || cs.visibility === 'hidden') continue;
-            const fondo = /^rgba?\(([^)]+)\)$/.exec(cs.backgroundColor);
-            const alfa = fondo ? Number((fondo[1].split(/[,\s/]+/)[3] ?? '1')) : 0;
-            if (alfa >= 0.5 || cs.backgroundImage !== 'none') v.push(e);
+            if (coperturaDelVelo(e, cs) >= 0.5) v.push(e);
           }
         } catch (_) {}
         veliVisti = { t: Date.now(), v, inCorso: false };
