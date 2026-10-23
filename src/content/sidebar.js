@@ -1548,9 +1548,13 @@
       passiDaSolo = 0;
       if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
     } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
+      if (session) session.esito = 'tetto_passi';
       fermaPassiDaSolo(userAction, esterno, dopoDocumenti);
       return;
+    } else if (session) {
+      session.passiDaSolo += 1;
     }
+    if (session) session.esito = null;
     const wasCollapsed = collapsed;
     // Si espande solo se l'utente ha scritto: sui proseguimenti automatici il box non deve
     // riaprirsi mentre il modello elabora.
