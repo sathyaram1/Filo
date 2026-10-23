@@ -297,6 +297,14 @@ module.exports = function register(on, ctx) {
     return out;
   }
 
+  // La chiave personale qui non è del portafoglio che il server lega a questa identità (#1601): ogni riga
+  // del registro firmata con lo pseudonimo locale la regola la rifiuta, e la pagina Crediti lo dice.
+  function chiaveStaccata({ hasPersonalKey, pseudonym, server }) {
+    if (!hasPersonalKey || !server) return '';
+    if (!server.hasWallet) return 'senza_portafoglio';
+    return server.pseudonym && pseudonym && server.pseudonym !== pseudonym ? 'altro_pseudonimo' : '';
+  }
+
   // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
   // server, e il conteggio locale non riceve premi né si racconta in chat.
   function haPortafoglio() {
