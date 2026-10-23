@@ -231,6 +231,14 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
   assert.equal(passa(doc), '', 'il documento più carico dell’app deve passare le regole');
+  for (const c of C.MISURE_MODELLI) {
+    const voci = Object.values(doc[c]).flatMap((v) => C.leggiModelli(c, v));
+    assert.equal(voci.filter((x) => x.modello !== 'altro').length, C.TETTO_MODELLI_ORA, `${c}: le voci col modello si fermano al tetto`);
+    assert.equal(voci.filter((x) => x.modello === 'altro').length, C.funzioni().length * C.RESTI[c].length, `${c}: il resto finisce in «altro»`);
+  }
+  // La v2 delle copie vecchie passa ancora: è la v3 senza le misure delle chiamate.
+  const v2 = Object.fromEntries(C.CAMPI_V2.map((k2) => [k2, doc[k2]]));
+  assert.equal(passa({ ...v2, v: C.VERSIONE_V2 }), '');
   const totale = Object.values(M).reduce((a, r) => a + r.tetto + (r.tettoChiavi || 0), 0);
   assert.ok(totale <= 1000000, `i tetti delle regole sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
   assert.ok(JSON.stringify(doc).length < 1000000);
