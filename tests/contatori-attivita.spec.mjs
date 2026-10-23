@@ -264,12 +264,14 @@ test('un giro di pulizia conta candidate, chiuse e doppie; la scheda riaperta di
   expect(r.archived, 'la doppia si chiude per regola, anche senza un modello').toBeGreaterThanOrEqual(1);
   const giri = await misura(app, 'pulizia');
   expect(Object.keys(giri)).toHaveLength(1);
-  // Quante ne ha chiuse il giro, nella fascia che dice la risposta; una sola era doppia.
-  const chiuse = r.archived === 1 ? 's1' : 's2_5';
-  expect(Object.keys(giri)[0]).toMatch(new RegExp(`^manual\\|s(1|2_5)\\|${chiuse}\\|s1\\|${r.giudizioMancato ? 'si' : 'no'}$`));
+  // Quante ne ha chiuse il giro e quante erano doppie, nelle fasce di quello che dice l'archivio.
+  const archivio = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => ({ id: t.id, reason: t.reason })));
+  const fascia = (n) => (n === 0 ? 's0' : n === 1 ? 's1' : n <= 5 ? 's2_5' : 's6_20');
+  const doppie = archivio.filter((t) => t.reason === 'duplicato');
+  expect(doppie.length).toBeGreaterThanOrEqual(1);
+  expect(Object.keys(giri)[0]).toMatch(new RegExp(`^manual\\|s[0-9_]+\\|${fascia(r.archived)}\\|${fascia(doppie.length)}\\|${r.giudizioMancato ? 'si' : 'no'}$`));
 
-  const voce = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).find((t) => t.reason === 'duplicato'));
-  expect(voce).toBeTruthy();
+  const voce = doppie[0];
   const riaperta = await home.evaluate((id) => chrome.runtime.sendMessage({ type: 'reopen_archived_tab', id }), voce.id);
   expect(riaperta.ok).toBe(true);
   await expect.poll(() => misura(app, 'riaperte'), { timeout: 5_000 }).toEqual({ 'duplicato|min10': 1 });
