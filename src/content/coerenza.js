@@ -111,7 +111,9 @@
   // Gli anni che dice la pagina intorno a una data senza anno (un'altra riga del campo, la conversazione, il titolo):
   // giusta in uno di loro non si segna, e il più vicino entro ANNO_VICINO è la prima lettura proposta (#1115.2).
   const ANNO_VICINO = 600;
-  const ANNO_DETTO = /(?<![\p{L}\p{N}.,€$£])(?<![€$£]\s)(1[6-9]\d\d|2[01]\d\d)(?!\p{N}|[.,]\p{N}|\s*(?:[€$£%‰]|(?:euro|eur|usd|dollari|dollars?|sterline|km|kg|mq|metri|persone|people|pagine|pages|parole|words)(?!\p{L})))/giu;
+  // Non è l'anno di una data l'anno dei diritti nel piè di pagina («© 2024»), quello da cui parte o fin dove arriva un
+  // periodo («dal 1999», «2015-2024»): la pagina lo dice per altro (#1115.2).
+  const ANNO_DETTO = /(?<![\p{L}\p{N}.,€$£])(?<![€$£]\s)(?<!(?:(?<!\p{L})(?:dal|since|desde|depuis|seit|until|till|fino al)|©|\(c\)|copyright)\s*)(?<!\d{4}\s*[-–—/]\s*)(1[6-9]\d\d|2[01]\d\d)(?!\p{N}|[.,]\p{N}|\s*[-–—/]\s*\d{4}|\s*(?:[€$£%‰]|(?:euro|eur|usd|dollari|dollars?|sterline|km|kg|mq|metri|persone|people|pagine|pages|parole|words)(?!\p{L})))/giu;
   const ANNO_APOSTROFO = /(?<![\p{L}\p{N}])['’‘](\d\d)(?![\p{N}%])/gu;
   const QUANTI = { a: 1, an: 1, one: 1, un: 1, uno: 1, due: 2, two: 2, tre: 3, three: 3, quattro: 4, four: 4, cinque: 5,
     five: 5, sei: 6, six: 6, sette: 7, seven: 7, otto: 8, eight: 8, nove: 9, nine: 9, dieci: 10, ten: 10 };
