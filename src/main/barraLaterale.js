@@ -42,6 +42,12 @@ const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
 // Perché l'icona Aiuto è spenta, nel suggerimento: chiavi i18n per i motivi che la pagina riferisce.
 const MOTIVI_AIUTO_SPENTO = { aiuto: 'aiuto_spento_barra', sito: 'aiuto_spento_sito', pagina: 'aiuto_spento_pagina' };
+// Le azioni sulla pagina le esegue Filo dentro la pagina: dove non c'è si spengono dicendo perché (#1343 r1).
+const MOTIVI_AZIONI_SPENTE = { sito: 'aiuto_spento_sito', pagina: 'azioni_spente_pagina', interna: 'azioni_spente_interna' };
+// Quelle che portano via l'indirizzo della pagina: una pagina di Filo (tranne l'errore, che sta per il sito) non ne ha uno.
+const AZIONI_CON_INDIRIZZO = new Set(['share', 'qrCode', 'saveForLater']);
+// Quanto un'azione premuta su una pagina in arrivo aspetta che Filo ci sia dentro: oltre, il clic è vecchio.
+const ATTESA_DELLA_PAGINA_MS = 20_000;
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
