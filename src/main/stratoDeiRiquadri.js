@@ -320,7 +320,7 @@ class StratoDeiRiquadri {
     });
     this.strati.set(wc, s);
     perVista.set(vista.webContents, { strato: this, s });
-    this._segui(wc);
+    this.segui(wc);
     const v = vista.webContents;
     v.setWindowOpenHandler(() => ({ action: 'deny' }));
     v.on('will-navigate', (e) => e.preventDefault());
