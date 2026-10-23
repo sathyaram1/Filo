@@ -552,9 +552,10 @@
     riga.textContent = '';
     riga.hidden = !chi;
     if (!chi) return;
+    const n = letto.contati;
     riga.append(filtro.invitante
-      ? `Solo ${chi.size === 1 ? 'la persona entrata' : `le ${formatInt(chi.size)} persone entrate`} coi codici di ${filtro.invitante}. `
-      : `Solo ${chi.size === 1 ? 'la persona che ha' : `le ${formatInt(chi.size)} persone che hanno`} usato Filo negli ultimi ${filtro.giorni} giorni. `);
+      ? `Solo ${filtro.invitante} e ${n === 1 ? 'la persona entrata' : `le ${formatInt(n)} persone entrate`} coi suoi codici. `
+      : `Solo ${n === 1 ? 'la persona che ha' : `le ${formatInt(n)} persone che hanno`} usato Filo negli ultimi ${filtro.giorni} giorni. `);
     const tutte = document.createElement('button');
     tutte.type = 'button';
     tutte.className = 'sn-btn sn-btn-secondary';
