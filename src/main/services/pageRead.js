@@ -563,7 +563,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   const richiesto = String(input == null ? '' : input).trim();
   const vuoto = {
     pageRead: richiesto, ok: false, url: '', titolo: '', testo: '', fonte: '', da: 0, fino: 0, totale: 0,
-    troncata: false, soloJavaScript: false, sospetto: '', errore: null, dettaglio: '', stato: 0,
+    troncata: false, soloJavaScript: false, sospetto: '', errore: null, dettaglio: '', stato: 0, schedaNonRisponde: false,
   };
   const n = normalizzaUrl(richiesto);
   if (n.errore) {
