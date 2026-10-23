@@ -23,9 +23,10 @@ ${corpo}
 // Il fornitore finto conta come OpenRouter: messaggi e strumenti, più il tetto della risposta. Oltre `finestra` token
 // rifiuta, con le misure (o senza, `misure: false`). `listino`: il listino di OpenRouter dice la stessa finestra.
 // `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
-// (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti.
-async function modello(app, { finestra, listino = false, misure = true, piani }) {
-  await app.evaluate(async (_e, { finestra, listino, misure, piani }) => {
+// (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti. `posto`: al posto di
+// `finestra`, i caratteri liberi oltre la prima richiesta della chat (la finestra si misura lì).
+async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani }) {
+  await app.evaluate(async (_e, { finestra, posto, listino, misure, piani }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -54,6 +55,7 @@ async function modello(app, { finestra, listino = false, misure = true, piani })
       const testi = messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
       const ingresso = Math.ceil((testi.reduce((s, t) => s + t.length, 0) + (tools ? JSON.stringify(tools).length : 0)) / 3.5);
       const uscita = Number(attempts[0].maxTokens) || 16384;
+      if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / 3.5);
       if (ingresso + uscita > finestra) {
         globalThis.__rifiutate++;
         const detto = misure
@@ -83,7 +85,7 @@ async function modello(app, { finestra, listino = false, misure = true, piani })
       for (const c of toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       return { ...base, text: '', toolCalls, finishReason: 'tool_calls' };
     };
-  }, { finestra, listino, misure, piani });
+  }, { finestra, posto, listino, misure, piani });
 }
 
 async function preparaPagine(app, testServer) {
@@ -176,4 +178,30 @@ test('se il fornitore rifiuta anche dopo aver accorciato tutto, l\'errore dice c
   await expect(errore).toBeVisible({ timeout: 40_000 });
   await expect(errore).toContainText('chat nuova');
   await expect(errore).not.toContainText(/altro modello|Modelli predefiniti/);
+  // «Riprova» manderebbe la stessa richiesta contro lo stesso limite: la chat nuova che la frase consiglia è un tasto,
+  // e il messaggio torna nel campo da accorciare o mandare.
+  await errore.locator('button', { hasText: 'Chat nuova' }).click();
+  await expect(page.locator('#input')).toHaveValue('confronta le tre guide che trovi');
+  await expect(page.locator('#input')).toBeFocused();
+  await modello(app, { finestra: 200000, piani: [{ finale: 'RISPOSTA_NELLA_NUOVA' }] });
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA_NELLA_NUOVA' })).toBeVisible({ timeout: 40_000 });
+});
+
+test('una pagina sola più grande del posto rimasto: il modello ne ha davanti l\'inizio, e lo stesso quando la si rilegge', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await openTab(NEWTAB);
+  const [url] = await preparaPagine(app, testServer);
+  const leggi = { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] };
+  // Posto per due terzi della pagina: il taglio dopo il rifiuto ne lascia la parte che ci sta, non solo il rimando.
+  await modello(app, { posto: 20000, piani: [leggi, { finale: 'LETTURA_UNO' }, leggi, { finale: 'LETTURA_DUE' }] });
+  await chiedi(page, `leggimi ${url}`);
+  const prima = page.locator('.dash-bubble-filo', { hasText: 'LETTURA_UNO' });
+  await expect(prima).toBeVisible({ timeout: 40_000 });
+  await expect(prima).toContainText('visti: ALFA');
+  await expect(prima).toContainText('ho tenuto solo l\'inizio');
+  await chiedi(page, 'rileggila');
+  const seconda = page.locator('.dash-bubble-filo', { hasText: 'LETTURA_DUE' });
+  await expect(seconda).toBeVisible({ timeout: 40_000 });
+  await expect(seconda).toContainText('visti: ALFA');
 });

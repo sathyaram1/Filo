@@ -345,7 +345,7 @@ test('una frase di cortesia detta una volta sola in una conversazione vecchia no
 
 test('il rifiuto per finestra del modello si riconosce, e il tratto si stringe quanto basta', () => {
   const or = { status: 400, message: 'OpenRouter 400: {"error":{"message":"This endpoint\'s maximum context length is 32768 tokens. However, you requested about 70000 tokens (69000 of text input, 1000 in the output). Please reduce the length of the messages or completion."}}' };
-  assert.deepEqual(FC.troppoLungo(or), { max: 32768, chiesti: 70000 });
+  assert.deepEqual(FC.troppoLungo(or), { ingresso: 69000, max: 32768, chiesti: 70000 });
   assert.deepEqual(FC.troppoLungo({ status: 400, message: 'prompt is too long' }), { max: null, chiesti: null });
   assert.equal(FC.troppoLungo({ status: 400, message: 'Invalid tool schema' }), null);
   assert.equal(FC.troppoLungo({ status: 503, message: 'maximum context length is 32768 tokens' }), null);

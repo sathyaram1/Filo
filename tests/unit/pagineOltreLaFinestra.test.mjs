@@ -72,6 +72,23 @@ test('dopo un rifiuto: con le misure in proporzione, con la sola finestra dalla 
   assert.equal(FC.eccessoDopoRifiuto({ caratteri }), null);
 });
 
+test('dopo un rifiuto il tetto della risposta resta fuori dalla proporzione: si toglie quanto basta, non un quarto in più', () => {
+  // OpenRouter: 40.000 token di posto per l'ingresso, 16.384 al tetto della risposta, ne sono arrivati 50.000.
+  const msg = 'OpenRouter 400: This endpoint\'s maximum context length is 56384 tokens. However, you requested about 66384 tokens (50000 of text input, 16384 of output).';
+  const rifiuto = FC.troppoLungo({ status: 400, message: msg });
+  assert.equal(rifiuto.ingresso, 50000);
+  const caratteri = 175000;
+  const e = FC.eccessoDopoRifiuto({ ...rifiuto, caratteri, risposta: 16384 });
+  const restano = caratteri - e;
+  // Ci stanno 4/5 dei caratteri: ne restano poco meno, col margine stretto di prima di mandare.
+  assert.ok(restano <= caratteri * 0.8 && restano >= caratteri * 0.8 * 0.94, `restano ${restano}`);
+  // Senza l'ingresso detto (Anthropic conta solo l'ingresso), il tetto della risposta si toglie dalla finestra.
+  const a = FC.eccessoDopoRifiuto({ max: 200000, chiesti: 214263, caratteri: 700000, risposta: 16384 });
+  assert.ok(700000 - a <= 700000 * ((200000 - 16384) / 214263) && 700000 - a > 700000 * 0.8, `anthropic ${a}`);
+  // Il tetto della risposta da solo riempie la finestra: togliere pagine non basta a dire quanto, chi taglia dimezza.
+  assert.equal(FC.eccessoDopoRifiuto({ max: 16000, chiesti: 66384, ingresso: 50000, caratteri }), null);
+});
+
 test('la frase sotto la risposta nomina i siti delle pagine rimaste fuori e dice che si possono rileggere', () => {
   const due = FC.frasePagineLasciate([
     { url: 'https://www.esempio.it/a', parziale: false },
