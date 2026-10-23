@@ -3,6 +3,7 @@
 // accesa è firestoreRulesContatoriFinestra.test.mjs. Si lancia come contatoriRegole.motore-vero.mjs:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-1470 "node <cartella>/contatoriFinestraRegole.motore-vero.mjs"
+// Esito atteso: 14 righe verdi, uscita 0 (2026-10-23).
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';

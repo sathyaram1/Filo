@@ -230,6 +230,7 @@ test('le schede: si scrive solo quando il massimo cresce o cambia l’ora', asyn
   b.schede = b.schede.slice(0, 1);
   m.schede();
   assert.equal(scritture, 2, 'una scheda chiusa non abbassa il massimo e non scrive');
+  await attendi();
   b.t += ORA;
   m.schede();
   assert.equal(scritture, 3, 'l’ora nuova ha il suo massimo');
