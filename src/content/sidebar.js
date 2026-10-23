@@ -1608,15 +1608,17 @@
 
       // Il tooltip usa SOLO highlight.note, non il testo della chat, per non duplicare il
       // messaggio; per i fill il riquadro resta comunque (valore + Accetta).
-      Highlight.clear();
+      evidenziato = null;
+      await Pagina.pulisci({}).catch(() => null);
       // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
       if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
         if (act === 'reveal' || act === 'hover') {
           // Eseguita da noi, senza l'utente: validazione e whitelist stanno in
-          // Highlight.autoAction.
-          const result = Highlight.autoAction(parsed.highlight.selector, act);
-          const targetLabel = result.target ? describeElementBriefly(result.target) : '';
+          // Highlight.autoAction, nella pagina.
+          const result = (await Pagina.auto({ selector: parsed.highlight.selector, act }).catch(() => null))
+            || { ok: false, reason: 'pagina non raggiungibile', etichetta: '' };
+          const targetLabel = String(result.etichetta || '');
           if (result.ok) {
             if (session) session.executedSteps.push({
               selector: parsed.highlight.selector,
