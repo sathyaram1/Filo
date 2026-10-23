@@ -33,3 +33,26 @@ test('r1 un rinvio del server verso la home la apre come home vera di Filo, che 
   expect(t.interna, 'la scheda della home è una scheda di Filo').toBe(true);
   expect(t.api, 'la home ha i servizi di Filo (la chat, le carte)').toBe('function');
 });
+
+const GOOGLE = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=1&redirect_uri=x';
+test('r1 la finestrella di accesso non mostra la home di Filo dentro la vista del sito', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ session, net }, html) => {
+    const risposta = (req) => {
+      const u = new URL(req.url);
+      if (u.hostname === 'accounts.google.com') return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+    };
+    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
+    session.defaultSession.protocol.handle('https', risposta);
+    globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
+  }, `<title>Accedi</title><h1>Accesso</h1><script>setTimeout(function(){ location.href = ${JSON.stringify(HOME)}; }, 200);</script>`);
+  const page = await testServer.openReady(openTab, `<title>Negozio</title><button id="b" style="width:220px;height:60px"
+  onclick="window.open(${JSON.stringify(GOOGLE).replace(/"/g, '&quot;')},'login','width=420,height=520')">Accedi con…</button>`);
+  await page.click('#b');
+  const finestrella = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w._filoTabs && !w.isDestroyed() && w.webContents._filoFinestrella)
+    .map((w) => w.webContents.getURL()));
+  await expect.poll(() => finestrella(app), { timeout: 8000 }).not.toEqual([]);
+  await new Promise((r) => setTimeout(r, 2000));
+  expect(await finestrella(app), 'la finestrella non arriva sulla home di Filo').not.toContain(HOME);
+});
