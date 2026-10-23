@@ -1,6 +1,6 @@
-// Il dizionario con cui il correttore sa quali parole non conosce (#1585). Il motore (dizionarioMotore.js) gira in un thread:
-// caricarlo tiene la CPU per un decimo di secondo, e il processo principale non si ferma. Non sceglie i segni. Perché non
-// quello del browser: patterns/il-dizionario-del-correttore-e-di-filo.md; regole: tests/unit/dizionarioDiFilo.test.mjs.
+// Il dizionario con cui il correttore sa quali parole non conosce (#1585), col motore (dizionarioMotore.js) in un thread:
+// caricarlo tiene la CPU per un decimo di secondo, e il processo principale non deve fermarsi. Non sceglie i segni.
+// Perché non quello del browser: patterns/il-dizionario-del-correttore-e-di-filo.md; tests/unit/dizionarioDiFilo.test.mjs.
 
 'use strict';
 
