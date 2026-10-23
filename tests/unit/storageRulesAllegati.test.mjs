@@ -86,7 +86,7 @@ function espandi(cond) {
   let out = cond;
   for (let giro = 0; giro < 3; giro++) {
     for (const [nome, corpo] of FUNZIONI) {
-      out = out.split(`${nome}()`).join(`( ${corpo} )`).split(`${nome}(file)`).join(`( ${corpo} )`);
+      out = out.replace(new RegExp(`\\b${nome}\\([^()]*\\)`, 'g'), `( ${corpo} )`);
     }
   }
   return out;
