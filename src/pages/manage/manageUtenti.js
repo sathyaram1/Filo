@@ -203,7 +203,6 @@
       ? `, il primo ${formatDateTime(inv.primo)} e l’ultimo ${formatDateTime(inv.ultimo)}`
       : (inv.primo ? `, ${formatDateTime(inv.primo)}` : '');
     b.title = `${inv.n === 1 ? 'Una persona è entrata' : `${formatInt(inv.n)} persone sono entrate`} coi suoi codici${quando}. Clic per vedere solo ${inv.n === 1 ? 'lei' : 'loro'}.`;
-    b.setAttribute('aria-pressed', filtro && filtro.invitante === r.u.pseudonym ? 'true' : 'false');
   }
 
   function vociInvitati(r) {
