@@ -43,7 +43,6 @@ const ROOT = join(__dirname, '..', '..');
 const RULES = readFileSync(process.env.STORAGE_RULES_FILE || join(ROOT, 'storage.rules'), 'utf8');
 
 const FB = globalThis.SN_FEEDBACK;
-const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
 
 /** Il file senza commenti: una regola commentata non è una regola. */
 const VIVO = RULES.replace(/\/\/[^\n]*/g, ' ');
