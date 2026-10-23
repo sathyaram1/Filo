@@ -154,3 +154,74 @@ test('la finestrella di accesso aperta da un sito ha i suoi riquadri sopra la pa
   expect(await popup.evaluate(() => window.cosaHaVisto())).not.toContain('zibaldone');
   expect(await popup.evaluate(() => document.querySelector('[data-sn-riquadro], .sn-fb-text'))).toBeNull();
 });
+
+// Scrivendo in un riquadro sopra un sito i tasti del browser valgono come nella pagina: il tasto arriva dove sta la
+// tastiera, cioè allo strato.
+async function premiDoveScrive(app, keyCode, modifiers) {
+  await app.evaluate(({ webContents }, { k, m }) => {
+    const f = webContents.getFocusedWebContents();
+    if (!f || !String(f.getURL()).startsWith('filo://riquadri/')) throw new Error(`la tastiera non è nello strato: ${f && f.getURL()}`);
+    f.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: m });
+    f.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: m });
+  }, { k: keyCode, m: modifiers });
+}
+
+async function traduzioneConLaTastiera(app, p) {
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.show(); w.focus();
+    w._filoTabs.tabs.find((t) => t.view?.webContents?.getURL() === u).view.webContents.focus();
+  }, p.url());
+  await p.locator('#parola').dblclick();
+  await comando(app, 'translate-selection');
+  await expect.poll(async () => (await statoDi(app, p, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('The cat');
+  await expect.poll(() => app.evaluate(({ webContents }) => String(webContents.getFocusedWebContents()?.getURL() || '')))
+    .toMatch(/^filo:\/\/riquadri\//);
+}
+
+const urlDelleSchede = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .find((w) => w._filoTabs)._filoTabs.tabs.map((t) => t.view.webContents.getURL()));
+
+test('con la risposta aperta su un sito Ctrl+W chiude la scheda e Alt+Sinistra torna indietro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await modelloFinto(app);
+  const prima = await testServer.openReady(openTab, '<h1>prima</h1>');
+  const indietro = prima.url();
+  await prima.goto(testServer.html(pagina()));
+  await prima.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await traduzioneConLaTastiera(app, prima);
+  await premiDoveScrive(app, 'Left', ['alt']);
+  await expect.poll(() => prima.url()).toBe(indietro);
+
+  const p = await testServer.openReady(openTab, pagina());
+  const url = p.url();
+  await traduzioneConLaTastiera(app, p);
+  await premiDoveScrive(app, 'W', ['control']);
+  await expect.poll(() => urlDelleSchede(app)).not.toContain(url);
+});
+
+test('la prima risposta su una parola in un riquadro incorporato si apre accanto alla parola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await modelloFinto(app);
+  const dentro = testServer.html('<!doctype html><body style="margin:10px;font:18px sans-serif">Il <span id="w">topo</span> corre.</body>');
+  const p = await testServer.openReady(openTab, pagina(`<iframe id="embed" src="${dentro}" width="420" height="100" style="margin-left:500px;margin-top:300px;border:1px solid #333"></iframe>`));
+  await expect.poll(() => p.frames().length).toBeGreaterThan(1);
+  await p.waitForTimeout(500);
+  const box = await p.frameLocator('#embed').locator('#w').boundingBox();
+  // Doppio clic vero sulla scheda: l'ancora di un riquadro incorporato è il punto dove l'utente ha cliccato.
+  await app.evaluate(({ BrowserWindow }, { u, x, y }) => {
+    const w = BrowserWindow.getAllWindows().find((q) => q._filoTabs);
+    const wc = w._filoTabs.tabs.find((t) => t.view?.webContents?.getURL() === u).view.webContents;
+    wc.sendInputEvent({ type: 'mouseMove', x, y });
+    for (const c of [1, 2]) {
+      wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: c });
+      wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: c });
+    }
+  }, { u: p.url(), x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) });
+  await expect.poll(() => p.frames().find((f) => f !== p.mainFrame()).evaluate(() => String(getSelection()).trim())).toBe('topo');
+  await comando(app, 'translate-selection');
+  await expect.poll(() => conta(app, p, '.sn-popup'), { timeout: 15_000 }).toBe(1);
+  const pop = await statoDi(app, p, '.sn-popup');
+  expect(pop.left <= box.x + box.width && pop.right >= box.x, `risposta a x=${Math.round(pop.left)}…${Math.round(pop.right)}, parola a x=${Math.round(box.x)}`).toBe(true);
+  expect(Math.min(Math.abs(pop.top - (box.y + box.height)), Math.abs(pop.bottom - box.y))).toBeLessThan(250);
+});
