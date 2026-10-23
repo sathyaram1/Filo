@@ -307,7 +307,7 @@
     tieniEl: $('tieni'),
     altroEl: $('altro'),
     refreshLive: () => refreshLive(),
-    onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
+    onSuggestionClick: (s, vicino, posizione) => onSuggestionClick(s, vicino, posizione),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
     iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
