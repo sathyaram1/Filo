@@ -35,6 +35,7 @@
         'Le pubblicità dei video che si possono saltare Filo le salta anche quando il video suona in una scheda che non stai guardando, o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.',
         'Un sito vede i nomi dei tuoi microfoni, fotocamere e casse solo dopo che gli hai consentito il microfono o la fotocamera, come in Chrome, e l\'elenco dei font installati sul computer non lo legge più. Prima bastava aprire la pagina, o un clic, e uno script di tracciamento poteva riconoscerti da quei nomi su ogni sito, anche in incognito.',
         'Un colore che scrivi nelle Preferenze resta anche se subito dopo cambi il tema o chiudi la scheda. Prima a volte tornava quello di prima.',
+        'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
       ],
     },
     {
