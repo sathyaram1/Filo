@@ -1,9 +1,11 @@
 // #413 — «chiudi tutte le schede tranne questa» chiesto alla chat della home: le schede si chiudono davvero, quella
-// della conversazione resta, e a «tutte» resta aperta anche quella con del testo scritto e non inviato, nominata
-// al modello. La scelta delle schede: tests/unit/chiudiSchede.test.mjs.
+// della conversazione resta (si chiude solo nominata), e a «tutte» resta aperta quella col testo non inviato, nominata
+// al modello; all'OK si chiudono quelle che il popup ha mostrato. La scelta delle schede: tests/unit/chiudiSchede.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const schede = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
   .map((t) => ({ id: t.id, title: t.title, url: t.url, formDirty: t.formDirty })));
@@ -46,8 +48,6 @@ test('«chiudi tutte le schede tranne questa»: restano la home con la chat, le 
   await expect(activity).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
   await expect(activity.locator('.dash-activity-head')).toContainText('Ha chiuso delle schede');
   await expect(activity.locator('.dash-activity-row', { hasText: 'Chiuse 3 schede' })).toHaveCount(1);
-  await page.getByRole('button', { name: 'Chiuse delle schede' }).click();
-  await expect(activity.locator('.dash-activity-row', { hasText: 'Chiuse 3 schede' })).toBeVisible();
   // Un comando riuscito senza schede lasciate aperte parla da sé: una chiamata sola.
   expect((await chiamateAlModello(app)).length).toBe(1);
   // Il modello vede quale scheda è la sua, e i numeri da usare.
@@ -118,5 +118,37 @@ test('«chiudi questa scheda» detto nella home la chiude: si torna alla pagina 
   expect(attiva).toBe('Lettura');
   // Il turno finisce anche senza la sua scheda: il processo risponde e la chiamata al modello è una.
   await expect.poll(() => app.evaluate(() => (globalThis.__chatFinta_calls || []).length)).toBe(1);
+  await ripristina(app);
+});
+
+test('quando chiede conferma, il popup elenca le schede e all\'OK chiude proprio quelle', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  // A Conservativo più schede insieme (costo 2) chiedono anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
+  await openTab(testServer.html('<title>Ricetta della torta</title><p>ricetta'));
+  await openTab(testServer.html('<title>Orari dei treni</title><p>treni', { pubblico: true }));
+  await tornaAllaHome(shell);
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'k1', name: 'CHIUDI_SCHEDE', arguments: JSON.stringify({ tutte: true }) }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(page, 'chiudi tutte le altre schede');
+
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  const testo = await confirmText(page);
+  expect(testo).toContain('queste 2 schede');
+  expect(testo).toContain('Ricetta della torta');
+  expect(testo).toContain('Orari dei treni');
+  expect(testo).toContain('filo della home');
+  expect(await pagineWeb(shell)).toEqual(['Orari dei treni', 'Ricetta della torta']);
+  await page.screenshot({ path: 'tests/.shots/chat-chiudi-schede-conferma.png' });
+
+  // Nel frattempo se ne apre un'altra: l'OK chiude quelle mostrate, non «tutte» di adesso.
+  await openTab(testServer.html('<title>Aperta dopo</title><p>dopo'));
+  await tornaAllaHome(shell);
+  await scrollConfirmToEnd(page).catch(() => {});
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => pagineWeb(shell), { timeout: 10_000 }).toEqual(['Aperta dopo']);
   await ripristina(app);
 });

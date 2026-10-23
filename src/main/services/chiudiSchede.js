@@ -32,11 +32,8 @@ function richiesta(action) {
   };
 }
 
-// `schede`: quelle della finestra ({ id, url }). `viste`: gli id nell'ordine dell'elenco che il modello aveva davanti
-// (anche oltre i numerati); `numerate`: quanti ne mostrava col numero. `chat`: la scheda della conversazione, che si
-// chiude solo nominata col suo numero. `resta(tab, modo)`: perché una scheda presa in blocco ('tutte' o 'sito') resta
-// aperta, o ''. Torna { errore } oppure { chiudere: [tab], restano: [{ tab, numero?, perche }] }; `perche` fra chiusa,
-// nuova e quelli di `resta`.
+// `viste`: gli id nell'ordine dell'elenco del modello, `numerate` quanti avevano il numero; `chat` si chiude solo nominata;
+// `resta(tab, modo)` dice perché una presa in blocco resta aperta. Torna { errore } o { chiudere, restano: [{ perche }] }.
 function risolvi(action, { schede = [], viste = [], numerate = 12, chat = null, resta = () => '' } = {}) {
   const r = richiesta(action);
   if (r.schede === null || r.tranne === null) {
