@@ -16,10 +16,11 @@
 
   // chrome.tabs non è disponibile in tutti i contesti (es. in un content script
   // top-frame con permessi limitati). Gestione difensiva: se non c'è, ritorna [].
-  async function listTabs() {
+  // `windowId`: le schede della finestra di chi chiede; senza, quelle della prima finestra.
+  async function listTabs({ windowId = null } = {}) {
     try {
       if (!global.chrome?.tabs?.query) return [];
-      const tabs = await chrome.tabs.query({});
+      const tabs = await chrome.tabs.query(windowId == null ? {} : { windowId });
       // `lastAccessed` manca nelle versioni vecchie: si ripiega su `id`,
       // proxy debole della recency (id più alti = aperti più di recente).
       const sorted = [...tabs].sort((a, b) => {
