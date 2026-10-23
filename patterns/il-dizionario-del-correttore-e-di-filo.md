@@ -12,9 +12,10 @@ controlla il correttore di Windows, nel processo del browser; le altre Hunspell,
 interroga solo la parte della pagina, e una lingua lasciata al sistema lì è «spenta»: con nessuna lingua accesa la
 risposta è «giusta» per ogni parola. Su un Windows italiano l'italiano è del sistema, quindi i candidati del correttore
 (#1446) non nascevano mai, e col modello spento non c'era nessun segno. Su un Windows inglese col solo italiano di
-Hunspell nella pagina, ogni parola inglese nasceva sbagliata. Su Mac il correttore è tutto del sistema. Non c'è
-un'opzione per spegnere il correttore di Windows (Chromium la tiene solo per le sue prove), e il menu nativo intanto
-funziona: il guasto si vede solo dove Filo chiede alla pagina.
+Hunspell nella pagina, ogni parola inglese nasceva sbagliata. Non c'è un'opzione per spegnere il correttore di
+Windows (Chromium la tiene solo per le sue prove), e il menu nativo intanto funziona: il guasto si vede solo dove Filo
+chiede alla pagina. Su Mac la pagina chiede al correttore del sistema parola per parola, con un dizionario diverso da
+quello degli altri sistemi e che nessuna prova può guardare: anche lì vale quello di Filo.
 
 Le sorgenti sono le stesse ovunque: l'italiano da `assets/dizionari/sorgenti` (Latin-9 con CRLF, convertito al
 caricamento, più il delta che Chromium aggiunge al suo `.bdic`), l'inglese dai pacchetti `dictionary-en` e
@@ -23,7 +24,7 @@ la lingua del sistema. I limiti di parola sono quelli di Chromium (64 byte per i
 più cinque proposte alternate fra le lingue).
 
 Il correttore chiede le parole nuove di un testo in un viaggio solo (`pareriDelTesto` in `src/content/spellcheck.js`):
-una domanda sincrona per parola bloccava la pagina per centinaia di viaggi al primo ingresso in un campo lungo.
+con una domanda sincrona per parola, il primo ingresso in un campo lungo fermerebbe la pagina per centinaia di viaggi.
 
 Prove: `tests/unit/dizionarioDiFilo.test.mjs` (gira anche nel lavoro Windows della suite) e, con il browser lasciato
 senza lingue come su Windows, `tests/correttore-dizionari.spec.mjs`. Per Mac nessuna prova lo dice senza una macchina

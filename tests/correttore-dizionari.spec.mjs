@@ -52,7 +52,7 @@ test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli a
   await expect(menuDi(page).locator('.sn-menu-correction:visible').first()).not.toBeEmpty({ timeout: 4000 });
 });
 
-// #1585 — su Windows (e su Mac) il browser lascia l'italiano al dizionario del sistema, e la pagina non lo vede: ogni
+// #1585 — su Windows il browser lascia l'italiano al dizionario del sistema, e la pagina non lo vede: ogni
 // parola le risulta giusta. Qui il browser resta senza lingue, come lì: il correttore deve vedere lo stesso l'errore.
 test('col browser senza italiano, come su Windows: «andatto» ha il segno anche col modello spento, «andato» no', async ({ app, openTab, testServer }) => {
   await app.evaluate(async ({ session }) => {
