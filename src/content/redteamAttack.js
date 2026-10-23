@@ -208,9 +208,7 @@
       if (msg.ok && res && res.attemptId) {
         clearDraft();
         setStatus(msg.text, 'ok');
-        // Naviga alla pagina red-team sul tentativo: lì parte la rivelazione live.
-        const url = 'filo://redteam/redteam.html?attempt=' + encodeURIComponent(String(res.attemptId));
-        try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url }); } catch (_) {}
+        // La pagina del tentativo, dove parte la rivelazione live, la apre il main con la risposta (apri: true).
         close();
         return;
       }
