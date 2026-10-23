@@ -65,8 +65,18 @@ function crea(dip = {}) {
     if (timerAmbiente && typeof timerAmbiente.unref === 'function') timerAmbiente.unref();
   }
   function seguiFinestra(win) {
-    if (!win || win._filoIncognito || typeof win.on !== 'function') return;
-    for (const ev of ['resize', 'maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen']) win.on(ev, () => ambienteCambiato());
+    if (!win || typeof win.on !== 'function') return;
+    for (const ev of ['resize', 'maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen']) {
+      win.on(ev, () => { if (win._filoTabs && !win._filoIncognito) ambienteCambiato(); });
+    }
+  }
+  if (dip.segui !== false) {
+    try {
+      const { app, nativeTheme } = electron();
+      app.on('browser-window-created', (_e, win) => seguiFinestra(win));
+      nativeTheme.on('updated', () => ambienteCambiato());
+      app.on('before-quit', () => allUscita());
+    } catch (_) {}
   }
 
   const etaDi = (tab) => {
