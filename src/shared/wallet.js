@@ -1098,6 +1098,8 @@
     SALDO_CHAT_VALIDO_MS, saldoPerChat, rilettoreSaldo, conteggioLocaleInVista,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
+    // Chi è entrato coi codici di chi (#1519)
+    personeInAlbero, invitatiTesto,
     // Gli avvisi all'owner nella home (#855)
     AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
     // La riconciliazione col consumo che il router dichiara per chiave (#1520)
