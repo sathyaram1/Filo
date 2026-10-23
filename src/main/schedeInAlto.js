@@ -95,6 +95,14 @@ class SchedeInAlto {
     });
   }
 
+  // A tasto giù sulla pagina le schede restano: se salissero, la pagina scorrerebbe sotto un clic o una selezione a
+  // metà e il rilascio cadrebbe altrove. Se ne vanno dopo il rilascio, con l'attesa di sempre.
+  _tasto(giu) {
+    this.premuto = giu;
+    if (giu) this._ferma('uscita');
+    else if (this.visibili && this._attivo()) this._programmaUscita();
+  }
+
   _sulBordo(y) {
     if (y > BORDO_PX) { this._ferma('spinta'); return; }
     if (!this.timer.spinta) this.timer.spinta = setTimeout(() => { this.timer.spinta = null; this.mostra(); }, this._opzioni().attesaMs);
