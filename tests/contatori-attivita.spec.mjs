@@ -94,6 +94,36 @@ test('l’Aiuto chiuso conta la sessione: com’è finita e i passi da solo; le 
   await expect.poll(() => misura(app, 'aiuto'), { timeout: 5_000 }).toEqual({ 'fatto|p2_5|p0|n0|n0': 1, 'chiusa_prima|p0|p0|n0|n0': 1 });
 });
 
+// Chiudere una scheda non dà alla pagina nessun evento: la sessione aperta la conta il main, com'era.
+const chiudiScheda = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => !w._filoIncognito && w._filoTabs)._filoTabs;
+  tm.closeTab(tm.tabs.find((t) => t.url === u).id);
+}, url);
+
+test('l’Aiuto aperto su una scheda che si chiude conta la sessione, una volta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const url = 'filo://newtab/?prova=aiuto-chiusa';
+  const page = await openTab(url);
+  await page.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 8000 });
+  await page.evaluate(() => {
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...rest) => {
+      if (msg && msg.type === 'ai_request') return Promise.resolve({ ok: true, text: '{"text":"Ecco come si fa.","status":"done"}' });
+      if (msg && msg.type === 'capture_visible_tab') return Promise.resolve({ ok: false });
+      return orig(msg, ...rest);
+    };
+  });
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  await page.fill('.sn-sidebar-input textarea', 'come disdico l\'abbonamento?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(page.locator('.sn-sidebar-conv')).toContainText('Ecco come si fa.', { timeout: 20_000 });
+  expect(await misura(app, 'aiuto')).toEqual({});
+  await chiudiScheda(app, url);
+  await expect.poll(() => misura(app, 'aiuto'), { timeout: 8_000 }).toEqual({ 'fatto|p0|p0|n0|n0': 1 });
+  await new Promise((r) => setTimeout(r, 500));
+  expect(await misura(app, 'aiuto')).toEqual({ 'fatto|p0|p0|n0|n0': 1 });
+});
+
 test('l’Aiuto in una finestra in incognito non conta sessioni né ricerche', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await ricercheFinte(app);
@@ -117,22 +147,22 @@ test('l’Aiuto in una finestra in incognito non conta sessioni né ricerche', a
 
 // ── La dettatura ─────────────────────────────────────────────────────────
 const DETTO = 'che tempo fa domani a Lisbona';
-async function vocePronta(app) {
-  await app.evaluate(async (_e, detto) => {
+async function vocePronta(app, { autoSend = true } = {}) {
+  await app.evaluate(async (_e, { detto, autoSend }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
-      dictation: { autoSend: true },
+      dictation: { autoSend },
     });
     globalThis.SN_PROVIDER_OPENROUTER.transcribe = async () => ({ text: ` ${detto} `, usage: { seconds: 1, costUsd: 0.00001 }, generationId: null });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       try { onDelta && onDelta('Domani c\'è il sole.'); } catch (_) {}
       return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: 'Domani c\'è il sole.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
     };
-  }, DETTO);
+  }, { detto: DETTO, autoSend });
 }
 async function microfonoFinto(page) {
   await page.evaluate(() => {
@@ -157,7 +187,7 @@ async function parla(page, mic) {
   await page.evaluate(() => { window.__mic.gain.gain.value = 0; });
 }
 
-test('una dettatura in chat conta il motivo della chiusura, le frasi e che fine ha fatto il testo, mai le parole', async ({ app, shell }) => {
+test('una dettatura in chat si conta quando il testo parte: da solo, mandato com’era o corretto prima, mai le parole', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await vocePronta(app);
@@ -165,32 +195,56 @@ test('una dettatura in chat conta il motivo della chiusura, le frasi e che fine 
   await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
   await microfonoFinto(page);
   const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  const chiavi = async () => Object.keys(await misura(app, 'dettatura'));
 
   // Parte da sola dopo l'attimo per annullare.
   await mic.click();
   await parla(page, mic);
   await expect(page.locator('.dash-bubble-user', { hasText: DETTO })).toBeVisible({ timeout: 15_000 });
-  await expect.poll(async () => Object.keys(await misura(app, 'dettatura')), { timeout: 5_000 }).toHaveLength(1);
-  expect(Object.keys(await misura(app, 'dettatura'))[0]).toMatch(/^(finito|utente)\|f(1|2_5)\|da_sola\|no$/);
+  await expect.poll(chiavi, { timeout: 5_000 }).toHaveLength(1);
+  expect((await chiavi())[0]).toMatch(/^(finito|utente)\|f(1|2_5)\|da_sola\|no$/);
 
-  // Annullata nell'attimo: il testo resta, e si conta così.
+  // Fermata nell'attimo: il testo resta, e non si conta finché non parte. Mandato com'era, è «a mano».
   await mic.click();
   await parla(page, mic);
   await expect(mic).toHaveAttribute('data-stato', 'attesa', { timeout: 10_000 });
   await mic.click();
   await expect(page.locator('#input')).toHaveValue(DETTO);
-  await expect.poll(async () => Object.keys(await misura(app, 'dettatura')).some((k) => /\|annullata\|no$/.test(k)), { timeout: 5_000 }).toBe(true);
+  await page.waitForTimeout(500);
+  expect(await chiavi()).toHaveLength(1);
+  await page.locator('#input').press('Enter');
+  await expect.poll(async () => (await chiavi()).some((k) => /\|a_mano\|no$/.test(k)), { timeout: 5_000 }).toBe(true);
 
-  // Esc mentre ascolta: tiene il testo e non invia.
-  await page.locator('#input').fill('');
+  // Esc mentre ascolta tiene il testo; corretto e poi mandato è «cambiata».
+  await expect(page.locator('#input')).toHaveValue('', { timeout: 10_000 });
   await mic.click();
   await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
   await page.waitForTimeout(1500);
   await page.locator('#input').press('Escape');
   await expect(page.locator('#input')).toHaveValue(DETTO, { timeout: 10_000 });
-  await expect.poll(async () => Object.keys(await misura(app, 'dettatura')).some((k) => /^utente\|f(1|2_5)\|tenuta\|no$/.test(k)), { timeout: 5_000 }).toBe(true);
+  await page.locator('#input').fill(`${DETTO}, in Portogallo`);
+  await page.locator('#input').press('Enter');
+  await expect.poll(async () => (await chiavi()).some((k) => /^utente\|f(1|2_5)\|cambiata\|no$/.test(k)), { timeout: 5_000 }).toBe(true);
   expect(Object.values(await misura(app, 'dettatura')).reduce((a, n) => a + n, 0)).toBe(3);
-  expect(await tutteLeChiavi(app)).not.toMatch(/Lisbona|tempo fa/);
+  expect(await tutteLeChiavi(app)).not.toMatch(/Lisbona|tempo fa|Portogallo/);
+});
+
+test('col «manda da solo» spento, la trascrizione corretta a mano e poi inviata si conta «cambiata»', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await vocePronta(app, { autoSend: false });
+  const page = await trovaPagina(app, (u) => u.startsWith('filo://newtab') && !u.includes('incognito'));
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await microfonoFinto(page);
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await parla(page, mic);
+  await expect(page.locator('#input')).toHaveValue(DETTO, { timeout: 15_000 });
+  await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
+  await page.locator('#input').fill(`${DETTO}, in Portogallo`);
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'Portogallo' })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => Object.keys(await misura(app, 'dettatura')), { timeout: 5_000 }).toEqual([expect.stringMatching(/\|cambiata\|no$/)]);
 });
 
 // ── La lettura ad alta voce ──────────────────────────────────────────────
@@ -220,6 +274,19 @@ test('una lettura fermata conta la voce, il perché del ripiego e fin dove è ar
   const ripiego = Object.keys(await misura(app, 'lettura')).find((k) => k.startsWith('browser|'));
   expect(ripiego.split('|')[1], 'il motivo del ripiego, dall’elenco').not.toBe('nessuno');
   expect(await tutteLeChiavi(app)).not.toMatch(/gatto|divano/);
+});
+
+test('una lettura in corso su una scheda che si chiude si conta, fin dove era arrivata', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const url = 'filo://newtab/?prova=lettura-chiusa';
+  const page = await openTab(url);
+  await page.waitForFunction(() => typeof window.SN_TTS?.readAloud === 'function', null, { timeout: 8000 });
+  await app.evaluate(() => { globalThis.__filoTestTtsCanned = true; });
+  await page.evaluate(() => { window.SN_TTS.readAloud('Il gatto dorme sul divano. Fuori piove da stamattina, e la casa è silenziosa.'); });
+  await expect.poll(() => page.evaluate(() => window.SN_TTS.ttsBusy()), { timeout: 8_000 }).toBe(true);
+  expect(await misura(app, 'lettura')).toEqual({});
+  await chiudiScheda(app, url);
+  await expect.poll(async () => Object.keys(await misura(app, 'lettura')), { timeout: 8_000 }).toEqual([expect.stringMatching(/^modello\|nessuno\|q(25|50|75|100)$/)]);
 });
 
 // ── Lezioni, riordino e quaderno ────────────────────────────────────────
@@ -324,4 +391,41 @@ test('la home senza un modello conta il suo motivo all’apertura, e il suggerim
   await voce.click();
   await expect.poll(() => misura(app, 'suggerimenti'), { timeout: 5_000 }).toEqual({ 'NAVIGA|1|ora': 1 });
   expect(await tutteLeChiavi(app)).not.toMatch(/ricetta|salvata\.test/i);
+});
+
+test('la home senza un modello suo (la chat ne ha uno) conta il motivo; con i suggerimenti di un modello, ogni apertura conta «generata»', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_DASHBOARD]: 'modello-che-non-esiste' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  const servibili = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return { home: C.canServeAction(s, C.ACTIONS.FILO_DASHBOARD), chat: C.canServeAction(s, C.ACTIONS.FILO_CHAT) };
+  });
+  expect(servibili).toEqual({ home: false, chat: true });
+  const prima = await misura(app, 'home');
+  await openTab('filo://newtab/?prova=home-senza-modello');
+  await expect.poll(async () => (await misura(app, 'home')).senza_ai_modelli || 0, { timeout: 8_000 }).toBe((prima.senza_ai_modelli || 0) + 1);
+
+  // Un modello per la home e i suoi suggerimenti già pronti: ogni scheda nuova che li mostra è una home scritta da lui.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ models: { ...s.models, [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash' } });
+    await globalThis.SN_FILO_MEMORY.setDashboardCache({
+      message: 'Buongiorno.',
+      suggestions: [{ icon: 'web', text: 'Le notizie', action: { type: 'NAVIGA', url: 'https://notizie.test/' }, importance: 3 }],
+    });
+  });
+  const generate = (await misura(app, 'home')).generata || 0;
+  await openTab('filo://newtab/?prova=home-1');
+  await openTab('filo://newtab/?prova=home-2');
+  await expect.poll(async () => (await misura(app, 'home')).generata || 0, { timeout: 8_000 }).toBe(generate + 2);
 });

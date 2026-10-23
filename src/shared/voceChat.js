@@ -254,7 +254,7 @@
         // d'invio col mouse); cambiata, aspetta l'invio.
         if (!campo.isConnected) esitoDellAttesa('annullata');
         else if (!campo.value.trim()) esitoDellAttesa('a_mano');
-        else annullaInvio(true);
+        else if (c.inAttesa) { lasciaInCasella(c.inAttesa, true); c.inAttesa = null; }
         return;
       }
       if (Date.now() - c.dal < c.attesaMs) return;
