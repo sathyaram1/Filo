@@ -1705,8 +1705,7 @@ class TabManager {
     // la barra dev'essere riordinata comunque.
     const reordered = this.reorderTabsByColor();
     if (toArchive.length || reordered) this._broadcast();
-    if (toArchive.length) this._showTriageToast(toArchive.length);
-    return { archived: toArchive.length };
+    return { archived: toArchive.length, reordered };
   }
 
   // §1.3 — riordina la striscia per colore con la stessa regola della Cronologia (compareRainbow).
