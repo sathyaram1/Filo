@@ -295,21 +295,26 @@ export async function esegui(argv, io = {}) {
     }
     if (a.cmd === 'rispondi') {
       if (a.testo === '-') a.testo = await stdin();
+      const conTesto = typeof a.testo === 'string' && a.testo.trim() !== '';
+      if (a.scelta === undefined && !conTesto) { errore(`RIFIUTATO: il testo per ${a.id} è vuoto e non hai scelto un'opzione. Non ho risposto.`); return 1; }
+      let riferimenti = {};
       if (a.scelta !== undefined) {
-        const { domanda } = await chiama({ op: 'mostra', id: a.id });
-        const o = domanda && Array.isArray(domanda.opzioni) ? domanda.opzioni[a.scelta] : null;
+        const m = await chiama({ op: 'mostra', id: a.id });
+        const o = m.domanda && Array.isArray(m.domanda.opzioni) ? m.domanda.opzioni[a.scelta] : null;
         if (!o) { errore(`RIFIUTATO: ${a.id} non ha l'opzione ${a.scelta + 1}. Non ho risposto.`); return 1; }
         if (soloDaFilo(o.azione)) {
           errore(`RIFIUTATO: l'opzione ${a.scelta + 1} di ${a.id} vale solo dalla finestra di Filo (Gestione, Domande): da qui non la applico.`);
           return 1;
         }
+        riferimenti = m.riferimenti || {};
       }
       const data = Object.assign({ op: 'rispondi', id: a.id }, await daSessione());
       if (a.scelta !== undefined) data.scelta = a.scelta;
-      if (typeof a.testo === 'string' && a.testo.trim()) data.testo = a.testo;
+      if (conTesto) data.testo = a.testo;
       const r = await chiama(data);
-      const e = r.esito || {};
-      scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}${e.ok === false && e.errore ? ` (azione non applicata: ${visibile(e.errore)})` : ''}.`);
+      const detto = esitoRisposta(r.esito, Object.assign({}, riferimenti, r.riferimenti), { conScelta: a.scelta !== undefined });
+      scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}; ${detto.riga}.`);
+      if (detto.avviso) errore(detto.avviso);
       return 0;
     }
     if (a.cmd === 'consiglio') {
