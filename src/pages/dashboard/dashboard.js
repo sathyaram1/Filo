@@ -32,6 +32,8 @@
 
   // Stato locale
   let suggestions = [];
+  // Quando sono stati scritti i suggerimenti a schermo: l'età che i contatori leggono a un clic (#1467).
+  let suggerimentiDel = null;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
   // a scrivere la conversazione su disco, turno per turno, così una chat
