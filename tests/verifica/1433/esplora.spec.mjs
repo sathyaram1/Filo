@@ -126,8 +126,7 @@ test('strumenti aggiunti funzionano', async ({ app, openTab }) => {
 });
 
 test('pagina web: il pannello a parole non si apre', async ({ app, openTab, testServer }) => {
-  const p = await openTab(`${testServer.url || testServer}/`);
-  await p.waitForLoadState('domcontentloaded');
+  const p = await testServer.openReady(openTab, '<html><body style="height:3000px">ciao</body></html>');
   const r = await esegui(app, { type: 'PANNELLO_APP', operazione: 'apri' });
   console.log('WEB', JSON.stringify(r));
   const pd = await p.evaluate(() => !!document.querySelector('.pd-pannello'));
