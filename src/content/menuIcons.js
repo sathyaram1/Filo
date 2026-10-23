@@ -15,8 +15,8 @@
   };
 
   // Dentro un riquadro incorporato le icone globali restano azioni sulla PAGINA (#405):
-  // si rimandano al frame principale, o condividerebbero l'indirizzo del player.
-  const IS_SUBFRAME = (() => {
+  // si rimandano al frame principale, o condividerebbero l'indirizzo del player. Lo strato dei riquadri vale come lui.
+  const IS_SUBFRAME = global.SN_FILO_UI?.nelloStrato === true || (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
 

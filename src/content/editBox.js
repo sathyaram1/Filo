@@ -15,13 +15,19 @@
     restorePasteContext: () => false,
   };
 
-  function openEditBox(originalText) {
-    if (!deps.getPasteContext()) {
+  // `sostituisci`: nello strato sopra un sito il campo sta nella pagina sotto, e il testo scelto torna a lei (#1509.1).
+  function openEditBox(originalText, { sostituisci: altrove = null } = {}) {
+    if (!altrove && !deps.getPasteContext()) {
       // Rivalido al volo: senza editable il "Sostituisci" non avrebbe senso.
       Popup.showToast(I18n.t('err_no_selection'));
       return;
     }
-    const savedCtx = deps.getPasteContext(); // congelo il riferimento per il momento del replace
+    const savedCtx = altrove ? null : deps.getPasteContext(); // congelo il riferimento per il momento del replace
+    if (savedCtx && global.SN_RIQUADRI_SOPRA?.apri('modifica', { testo: originalText, contesto: savedCtx }, () => apriQui(originalText, savedCtx, null))) return;
+    apriQui(originalText, savedCtx, altrove);
+  }
+
+  function apriQui(originalText, savedCtx, altrove) {
 
     const root = document.createElement('div');
     root.className = 'sn-editbox-overlay';
@@ -158,28 +164,12 @@
     });
     $replace.addEventListener('click', (e) => {
       if (!e.isTrusted) return;
-      deps.setPasteContext(savedCtx);
-      deps.restorePasteContext();
-      // In contenteditable l'inserimento passa da execCommand dopo aver ripristinato la selezione,
-      // così Ctrl+Z funziona.
-      if (savedCtx.kind === 'input') {
-        const el = savedCtx.el;
-        const start = savedCtx.start, end = savedCtx.end;
-        const caret = start + currentResult.length;
-        // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
-        if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, currentResult)) {
-          el.setSelectionRange(start, caret);
-        } else {
-          el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
-          el.setSelectionRange(start, caret);
-          // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
-          const ev = new Event('input', { bubbles: true });
-          el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
-        }
-      } else if (savedCtx.kind === 'ce') {
-        try { document.execCommand('insertText', false, currentResult); } catch (_) {}
+      if (altrove) {
+        close();
+        altrove(currentResult);
+        return;
       }
-      Popup.showToast(I18n.t('edit_box_replaced'));
+      sostituisci(savedCtx, currentResult);
       close();
     });
 
@@ -202,6 +192,33 @@
     $instr.value = '';
     // No autorun — l'utente deve dare istruzione esplicita.
     $prop.textContent = '—';
+  }
+
+  // Il testo scelto entra nel campo e nella selezione di quando la Modifica è stata chiesta.
+  function sostituisci(savedCtx, testo) {
+    if (!savedCtx) return;
+    deps.setPasteContext(savedCtx);
+    deps.restorePasteContext();
+    // In contenteditable l'inserimento passa da execCommand dopo aver ripristinato la selezione,
+    // così Ctrl+Z funziona.
+    if (savedCtx.kind === 'input') {
+      const el = savedCtx.el;
+      const start = savedCtx.start, end = savedCtx.end;
+      const caret = start + testo.length;
+      // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
+      if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, testo)) {
+        el.setSelectionRange(start, caret);
+      } else {
+        el.value = el.value.slice(0, start) + testo + el.value.slice(end);
+        el.setSelectionRange(start, caret);
+        // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
+        const ev = new Event('input', { bubbles: true });
+        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+      }
+    } else if (savedCtx.kind === 'ce') {
+      try { document.execCommand('insertText', false, testo); } catch (_) {}
+    }
+    Popup.showToast(I18n.t('edit_box_replaced'));
   }
 
   function renderDiff(container, original, proposed) {
@@ -245,5 +262,5 @@
 
   function init(d) { deps = { ...deps, ...d }; }
 
-  global.SN_EDITBOX = { init, openEditBox };
+  global.SN_EDITBOX = { init, openEditBox, sostituisci };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

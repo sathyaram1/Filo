@@ -37,6 +37,10 @@ function finestraDellaBarra(wc) {
 }
 
 function senderInfo(event) {
+  // Lo strato dei riquadri sopra un sito (#1509.1) parla come la pagina sotto, col suo frame principale: niente di più di
+  // quello che potrebbe chiedere il suo content script.
+  const sotto = require('./stratoDeiRiquadri').paginaDelloStrato(event.sender);
+  if (sotto) return { ...senderInfo({ sender: sotto.wc, senderFrame: sotto.wc.mainFrame }), strato: event.sender };
   const wc = event.sender;
   // `fromWebContents` torna null per le WebContentsView figlie: senza il giro su tutte le
   // finestre `tab` resta null e le voci del menu che leggono il suo id non fanno niente.
@@ -344,7 +348,7 @@ function registerIpcHandlers() {
         const K = globalThis.SN_WALLET_MAIN;
         const conDetto = (fn) => (K && K.conRipiegoDetto ? K.conRipiegoDetto(fn) : fn());
         const result = await conDetto(() => handleStream({
-          action, payload, origin: event.sender.getURL(),
+          action, payload, origin: senderInfo(event).url,
           signal: ac.signal,
           onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
           onDelta: (delta) => send('delta', { delta }),
