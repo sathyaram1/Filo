@@ -98,6 +98,8 @@
    un'ombra chiusa (sidebar.js), qui solo il posto. */
 .sn-sidebar-allegati { flex-shrink: 0; border-top: 1px solid var(--sn-border); }
 .sn-sidebar-allegati[hidden] { display: none; }
+.sn-sidebar-allegati:not([hidden]) + .sn-sidebar-input,
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-allegati { border-top: 0; }
 .sn-sidebar-msg-immagini { display: block; }
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }

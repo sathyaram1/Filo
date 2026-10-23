@@ -152,7 +152,13 @@ const AGENTE = () => {
 test('Aiuto: l’immagine allegata parte col messaggio, si vede nella bolla, e la × la toglie prima dell’invio', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   await nelMondoDiFilo(app, page, AGENTE);
-  const foto = immaginiSulDisco(2);
+  // Una foto con una misura vera, per guardare anteprima e bolla come le vede l'utente.
+  const vera = Buffer.from(await app.evaluate(({ nativeImage }) => {
+    const w = 160, h = 100, px = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) px.set(i % w < w / 2 ? [60, 120, 200, 255] : [40, 160, 90, 255], i * 4);
+    return nativeImage.createFromBitmap(px, { width: w, height: h }).toPNG().toString('base64');
+  }), 'base64');
+  const foto = immaginiSulDisco(2, { byte: vera });
   await lascia(page, foto);
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(2);
 
@@ -172,6 +178,14 @@ test('Aiuto: l’immagine allegata parte col messaggio, si vede nella bolla, e l
   expect(await nelMondoDiFilo(app, page, () => globalThis.__filoSidebarTest.immaginiNelleBolle())).toEqual([1]);
   expect((await statoAiuto(app, page)).allegati).toEqual([]);
   await page.screenshot({ path: 'tests/.shots/rilascio-aiuto-inviata.png' });
+  await lascia(page, [foto[1]]);
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
+  await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { url: 'filo://preferences/preferences.html' });
+  });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'tests/.shots/rilascio-aiuto-scuro.png' });
 });
 
 test('Aiuto: Ctrl+V di un’immagine nella casella la allega, e le sole immagini senza testo partono lo stesso', async ({ app, openTab, testServer }) => {
