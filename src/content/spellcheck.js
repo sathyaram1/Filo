@@ -1125,7 +1125,7 @@
         }
       }
     }
-    if (dubbi.length) for (const w of sopraIlCampo(state, dubbi)) coperti.push(w);
+    if (dubbi.length) for (const w of veliSopraIlCampo(state, dubbi)) coperti.push(w);
     return coperti;
   }
 
@@ -1164,7 +1164,7 @@
   const SENZA_VELI = typeof CSSStyleSheet === 'function' ? (() => {
     try { const s = new CSSStyleSheet(); s.replaceSync('*:not(.sn-spell-overlay):not(.sn-spell-overlay *) { pointer-events: auto !important; }'); return s; } catch (_) { return null; }
   })() : null;
-  function sopraIlCampo(state, dubbi) {
+  function veliSopraIlCampo(state, dubbi) {
     const out = [];
     if (!SENZA_VELI) return out;
     const el = state.el;
