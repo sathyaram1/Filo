@@ -28,6 +28,24 @@ export async function aspettaStrumenti(page) {
   await page.waitForSelector('.pd-elemento[data-elemento="settings"]', { state: 'attached' });
 }
 
+// Un documento che dice «ciao mondo», con nel pannello gli strumenti scelti e le loro regolazioni. La pagina si
+// ricarica: gli addInitScript messi prima (tastiera, sistema finti) valgono da qui.
+export async function apriDocConStrumenti(app, page, elementi, config = {}) {
+  await seminaStrumenti(app, elementi, config);
+  await page.evaluate(() => {
+    const now = new Date().toISOString();
+    const raw = {
+      id: 'file-tasti', meta: { title: 'Tasti', created: now, modified: now, version: 1 },
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ciao mondo' }] }] },
+      comments: [],
+    };
+    localStorage.setItem('filo.editor.collection', JSON.stringify({ version: 2, activeId: raw.id, files: [raw] }));
+  });
+  await page.reload();
+  await aspettaStrumenti(page);
+  await expect(page.locator('#doc')).toBeVisible();
+}
+
 export const strumentiSalvati = (app) => app.evaluate(async () => {
   const v = await globalThis.SN_STORAGE.getRaw('sn_pannelli_app', null);
   return (v && v.editor) || null;
