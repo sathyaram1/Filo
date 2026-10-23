@@ -529,30 +529,40 @@ describe('release.yml: si pubblica il commit più nuovo di main con la suite ver
       'la guardia della pubblicazione ferma conterebbe come codice nuovo il commit del numero di versione');
   });
 
-  test('il lavoro Windows aspetta `scegli` e parte solo con uno sha (e il Mac dipende ancora da Windows)', () => {
+  test('cancello e lavoro Windows aspettano `scegli` e partono solo con uno sha (e il Mac dipende ancora da Windows)', () => {
+    const c = cancello();
+    assert.match(c, /needs:\s*scegli/, 'senza `needs: scegli` si proverebbe senza sapere cosa è verde');
+    assert.match(c, /if:\s*\$\{\{\s*success\(\) && needs\.scegli\.outputs\.sha != ''\s*\}\}/,
+      'senza un commit verde nuovo il cancello non deve partire');
     const r = release();
-    assert.match(r, /needs:\s*scegli/, 'senza `needs: scegli` si pubblicherebbe senza sapere cosa è verde');
-    assert.match(r, /if:\s*\$\{\{\s*success\(\) && needs\.scegli\.outputs\.sha != ''\s*\}\}/,
-      'senza un commit verde nuovo il lavoro Windows non deve partire');
+    assert.match(r, /needs:\s*\[scegli, cancello\]/, 'il lavoro Windows legge lo sha da `scegli` e l\'esito dal cancello');
+    assert.match(r, /if:\s*\$\{\{\s*success\(\) && needs\.cancello\.outputs\.should_release == 'true'/,
+      'senza codice nuovo dopo l\'ultima versione il lavoro Windows non deve partire');
     assert.match(senzaCommenti(job('release-mac')), /needs:\s*release/, 'il Mac resta appeso a Windows');
     assert.doesNotMatch(YML, /needs\.suite\./);
   });
 
-  test('il lavoro Windows fa il checkout del commit scelto, non di main, e non rilegge main nell\'albero', () => {
-    const r = release();
-    assert.match(r, /uses: actions\/checkout@v4\s*\n\s*with:\s*\n\s*ref:\s*\$\{\{\s*needs\.scegli\.outputs\.sha\s*\}\}/,
-      'il checkout deve partire dallo sha scelto');
-    assert.doesNotMatch(r, /ref:\s*main\b/, 'costruire la punta di main pubblicherebbe codice mai provato');
-    assert.doesNotMatch(r, /git (pull|merge|rebase|reset|checkout)\b/, 'niente deve spostare l\'albero dal commit provato');
-  });
+  for (const [nome, lavoro] of [['cancello', cancello], ['release', release]]) {
+    test(`\`${nome}\` fa il checkout del commit scelto, non di main, e non rilegge main nell'albero`, () => {
+      const r = lavoro();
+      assert.match(r, /uses: actions\/checkout@v4\s*\n\s*with:\s*\n\s*ref:\s*\$\{\{\s*needs\.scegli\.outputs\.sha\s*\}\}/,
+        'il checkout deve partire dallo sha scelto');
+      assert.doesNotMatch(r, /ref:\s*main\b/, 'provare o costruire la punta di main pubblicherebbe codice mai provato');
+      assert.doesNotMatch(r, /git (pull|merge|rebase|reset|checkout)\b/, 'niente deve spostare l\'albero dal commit provato');
+    });
+  }
 
-  test('senza lo sha scelto non si pubblica (il checkout cadrebbe sul ramo di default)', () => {
+  test('senza lo sha scelto non si prova e non si pubblica (il checkout cadrebbe sul ramo di default)', () => {
+    const c = cancello();
     const r = release();
-    const check = r.slice(r.indexOf('id: check'), r.indexOf('git fetch --tags --force'));
-    assert.match(check, /PROVATO="\$\{\{ needs\.scegli\.outputs\.sha \}\}"/);
-    assert.match(check, /-z "\$PROVATO"/);
-    assert.match(check, /"\$QUI" != "\$PROVATO"/);
-    assert.match(check, /exit 1/);
+    const check = c.slice(c.indexOf('id: check'), c.indexOf('git fetch --tags --force'));
+    const guardia = r.slice(r.indexOf('steps:'), r.indexOf('npm-ci-ritenta'));
+    for (const [dove, testo] of [['cancello', check], ['release', guardia]]) {
+      assert.match(testo, /PROVATO="\$\{\{ needs\.scegli\.outputs\.sha \}\}"/, dove);
+      assert.match(testo, /-z "\$PROVATO"/, dove);
+      assert.match(testo, /"\$QUI" != "\$PROVATO"/, dove);
+      assert.match(testo, /exit 1/, dove);
+    }
   });
 
   test('il numero del server si applica in locale al commit provato, dopo il bump e prima della build', () => {
