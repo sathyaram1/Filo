@@ -76,7 +76,8 @@ class SchedeInAlto {
     setImmediate(() => {
       if (this.mossePagina !== prima || !this._attivo()) return;
       if (this.visibili) {
-        if (Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
+        this.premuto = !!tastoPremuto(input);
+        if (!this.premuto && Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
         return;
       }
       const gy = Number(input.globalY);
