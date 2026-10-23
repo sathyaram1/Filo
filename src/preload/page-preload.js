@@ -568,7 +568,11 @@ try {
     pronta: () => true,
     consegna: async (files) => {
       const voci = [];
-      for (const f of files) { const dataUrl = await leggi(f); if (dataUrl) voci.push({ nome: f.name || '', dataUrl }); }
+      for (const f of files) {
+        if (!/^image\//i.test(f.type || '')) { voci.push({ nome: f.name || '', altro: true }); continue; }
+        const dataUrl = await leggi(f);
+        if (dataUrl) voci.push({ nome: f.name || '', dataUrl });
+      }
       if (voci.length) { try { ipcRenderer.send('filo:rilascio-riquadro', voci); } catch (_) {} }
     },
   } : {
