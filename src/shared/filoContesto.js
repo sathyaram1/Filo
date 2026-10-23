@@ -585,14 +585,15 @@
 
   // #1596 — quanto resta, in caratteri, di ogni pagina letta nel turno perché insieme stiano nella finestra. `pagine`:
   // le lunghezze nell'ordine in cui tenerle. Le prime restano intere, la prima che non ci sta resta a metà se ne avanza
-  // il minimo, le altre scendono a 0 (titolo e indirizzo, che costano PESO_RIMANDO ciascuna).
+  // il minimo, le altre scendono a 0 (titolo e indirizzo, che costano PESO_RIMANDO ciascuna, la prima esclusa: resta
+  // quasi sempre, e il margine della finestra copre il caso in cui no).
   const PAGINA_MIN = 4000;
   const PESO_RIMANDO = 800;
   function pagineDaTenere(pagine, eccesso) {
     const lunghe = (Array.isArray(pagine) ? pagine : []).map((n) => Math.max(0, Math.floor(Number(n) || 0)));
     const e = Math.max(0, Math.ceil(Number(eccesso) || 0));
     if (!e) return lunghe;
-    let resta = lunghe.reduce((s, n) => s + n, 0) - e - PESO_RIMANDO * lunghe.length;
+    let resta = lunghe.reduce((s, n) => s + n, 0) - e - PESO_RIMANDO * Math.max(0, lunghe.length - 1);
     return lunghe.map((n) => {
       if (n <= resta) { resta -= n; return n; }
       if (resta < PAGINA_MIN) return 0;
