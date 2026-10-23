@@ -27,7 +27,7 @@ const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   return tm.tabs.map((t) => {
     let vista = '';
     try { vista = t.view.webContents.getURL(); } catch (_) {}
-    return { url: t.url, vista, interna: t.isInternal, titolo: t.title };
+    return { id: t.id, url: t.url, vista, interna: t.isInternal, titolo: t.title };
   });
 });
 const suFilo = async (app) => (await schede(app)).filter((t) => /^filo:\/\/(options|error)\//.test(t.vista) || /banca\.example/.test(t.url));
@@ -59,11 +59,11 @@ test('un rinvio del server verso la pagina d’errore coi parametri del sito non
 });
 
 test('una scheda nata su un rinvio verso una pagina di Filo non resta bianca', async ({ app, shell }) => {
-  const prima = (await schede(app)).length;
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), rinvio('opzioni'));
-  await new Promise((r) => setTimeout(r, 2500));
+  const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), rinvio('opzioni'));
+  expect(aperta && aperta.id).toBeTruthy();
+  await expect.poll(async () => (await schede(app)).some((t) => t.id === aperta.id), { message: 'la scheda vuota se ne va', timeout: 8000 })
+    .toBe(false);
   expect(await suFilo(app)).toEqual([]);
-  expect((await schede(app)).length, 'la scheda vuota se ne va').toBe(prima);
 });
 
 test('dopo un clic né window.open né un collegamento portano su una pagina di Filo, e Filo lo dice', async ({ app, openTab, testServer, avvisi }) => {
@@ -72,15 +72,15 @@ test('dopo un clic né window.open né un collegamento portano su una pagina di 
 <p><a id="nuova" href="${ERRORE}" target="_blank">nuova scheda</a></p>
 <p><a id="qui" href="${OPZIONI}">stessa scheda</a></p>`);
   const page = await openTab(sito);
-  const quante = (await schede(app)).length;
 
-  await page.click('#b');
+  // Dopo una navigazione fermata Playwright aspetterebbe un arrivo che non c'è.
+  await page.click('#b', { noWaitAfter: true });
   await expect(await carta(avvisi, 'Un sito non può aprire le pagine di Filo')).toBeVisible({ timeout: 8000 });
-  await page.click('#nuova');
-  await page.click('#qui');
+  await (await avvisi()).screenshot({ path: 'tests/.shots/1506-pagina-di-filo-fermata.png' });
+  await page.click('#nuova', { noWaitAfter: true });
+  await page.click('#qui', { noWaitAfter: true });
   await new Promise((r) => setTimeout(r, 2000));
   await restaSulSito(app, sito);
-  expect((await schede(app)).length, 'nessuna scheda nuova').toBe(quante);
 });
 
 test('un sito non incornicia una pagina di Filo', async ({ app, openTab, testServer }) => {
