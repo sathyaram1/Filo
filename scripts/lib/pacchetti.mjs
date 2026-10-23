@@ -148,5 +148,7 @@ export function allineaPacchetti(radice, {
   } catch (e) {
     log(`${prefisso} Controllo dei pacchetti saltato: ${e && e.message ? e.message : e}.`);
     return { esito: 'non riuscita', mancanti: [] };
+  } finally {
+    if (blocco) { try { rmSync(blocco, { force: true }); } catch (_) { /* lo toglie il tetto */ } }
   }
 }
