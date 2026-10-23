@@ -325,10 +325,11 @@ class StratoDeiRiquadri {
     v.setWindowOpenHandler(() => ({ action: 'deny' }));
     v.on('will-navigate', (e) => e.preventDefault());
     collegaScorciatoie(v, this.win);
-    // Scrivendo in un riquadro i tasti del browser (chiudi, indietro, salto di scheda) valgono come nella pagina sotto.
+    // Scrivendo in un riquadro i tasti del browser (chiudi, indietro, salto di scheda) e quelli dello zoom valgono come
+    // nella pagina sotto: lo zoom è suo, anche col fuoco qui.
     v.on('before-input-event', (e, input) => {
       let preso = false;
-      try { preso = vivo(s.wc) && this.tastoDellaScheda(s.wc, input); } catch (_) { preso = false; }
+      try { preso = vivo(s.wc) && (this.tastoDellaScheda(s.wc, input) || zoomDaTasto(s.wc, input)); } catch (_) { preso = false; }
       if (preso) e.preventDefault();
     });
     // Un gesto sui riquadri è dell'interfaccia di Filo: vale per ciò che Filo fa (appunti, il suo menu), mai per il sito.
