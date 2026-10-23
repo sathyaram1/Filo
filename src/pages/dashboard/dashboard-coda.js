@@ -746,7 +746,12 @@
     });
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
-        if (m && m.type === MSG.FILO_PAGINE_TOLTE) { ripassaPagine().catch(() => {}); return; }
+        if (m && m.type === MSG.FILO_PAGINE_CAMBIATE) {
+          // Una visita e il titolo che la pagina si dà subito dopo: una rilettura sola.
+          clearTimeout(attesaPagine);
+          attesaPagine = setTimeout(() => { ripassaPagine().catch(() => {}); }, 120);
+          return;
+        }
         if (m && m.type === MSG.DATI_IMPORTATI) { ripassaPagine({ importate: true }).catch(() => {}); return; }
         if (!m || m.type !== MSG.CAMBI_AGGIORNATI) return;
         clearTimeout(attesaCambi);
