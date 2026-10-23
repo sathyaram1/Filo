@@ -97,6 +97,9 @@
     'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
+  const FRASE_CONTESTO_PIENO = 'c\'è più testo di quanto il modello riesca a leggere insieme: chiedimi meno pagine alla volta, '
+    + 'accorcia il messaggio o ricomincia in una chat nuova.';
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
