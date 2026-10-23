@@ -1934,8 +1934,14 @@
       render(card, host) {
         const op = opinionsByCard.get(card.id);
         const pending = opinionPending.has(card.id);
+        const errore = pending ? null : opinionErrors.get(card.id);
         let body;
-        if (op) {
+        if (op && errore) {
+          // L'«Aggiorna» non è andato: il parere vecchio resta, col perché e le stesse strade.
+          body = `<p class="dk-op-text">${proseHtml(op.text)}</p>${erroreParereHtml(card.id, errore, 'Non sono riuscito ad aggiornarlo.', 'Aggiorna')}`;
+        } else if (errore) {
+          body = erroreParereHtml(card.id, errore, 'Il parere non è arrivato.', 'Riprova');
+        } else if (op) {
           const staleBar = !op.stale ? '' : (pending
             ? `
               <div class="dk-mod-actions">
