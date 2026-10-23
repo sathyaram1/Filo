@@ -789,7 +789,7 @@
     try {
       const r = await chrome.runtime.sendMessage({
         type: MSG.PATH_COLLECTABLE,
-        payload: { url: (session && session.initialUrl) || location.href },
+        payload: { url: (session && session.initialUrl) || paginaOra().url },
       });
       return !!(r && r.raccoglibile);
     } catch (_) { return false; }
