@@ -192,7 +192,7 @@
   }
 
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
-    noto, nome, valida, migra, applicaPosa, aspettoAiuto,
+    ZONE, GLOBALI, ICONE, DEFAULT, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
+    noto, nome, valida, migra, applicaPosa, aspettoAiuto, posizione, spostate, posaPer,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
