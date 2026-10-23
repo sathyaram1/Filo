@@ -17,6 +17,7 @@ class SchedeInAlto {
     this.tabs = tabs;
     this.visibili = false;
     this.scese = 0;
+    this.premuto = false;
     // I movimenti visti dal riquadro principale: uno che arriva solo da un altro riquadro non li fa crescere.
     this.mossePagina = 0;
     // Dove comincia la pagina sullo schermo (per scheda), e la domanda in volo: un movimento lontano dal bordo la annulla.
@@ -131,6 +132,7 @@ class SchedeInAlto {
     this._ferma('spinta');
     this._ferma('uscita');
     this.visibili = false;
+    this.premuto = false;
     this.cimaSulloSchermo = null;
   }
 

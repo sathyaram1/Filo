@@ -2,6 +2,7 @@
 // pagina, con le attese della barra laterale; non per uno sfioramento, non nello schermo pieno di un video, e si spengono.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { barraPage, menuAperto, statoBarra } from './helpers/barra.mjs';
 
 const PAGINA = `<!doctype html><html><body style="margin:0;padding:40px;font:16px sans-serif;height:1400px">
   <h1>Schermo intero</h1><p id="p">Pagina di prova.</p></body></html>`;
@@ -130,4 +131,101 @@ test('sopra un riquadro di un altro sito in cima le schede compaiono; sul bordo 
   await muovi(page, 400, 150);
   await page.mouse.move(400, 0, { steps: 4 });
   await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(true);
+});
+
+// Le schede scoperte: due schede, così la fila ha una scheda su cui aprire il menu.
+async function scopri(app, openTab, testServer) {
+  await testServer.openReady(openTab, '<!doctype html><html><head><title>Prima</title></head><body><h1>Prima</h1></body></html>');
+  const page = await testServer.openReady(openTab, PAGINA);
+  await schermoIntero(app, true);
+  await expect.poll(async () => (await stato(app)).alto).toBe(0);
+  await muovi(page, 400, 200);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(true);
+  return page;
+}
+const allaShell = (app, ev) => app.evaluate(({ BrowserWindow }, e) => {
+  BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).webContents.sendInputEvent(e);
+}, ev);
+const allaPagina = (app, ev) => app.evaluate(({ BrowserWindow }, e) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+  tm.tabs.find((x) => x.id === tm.activeId).view.webContents.sendInputEvent(e);
+}, ev);
+
+test('a tasto giù sulla pagina le schede restano: un clic dato subito su un collegamento in cima lo segue (#1343)', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif;height:1400px">
+    <div style="height:100px"></div><a id="link" href="#arrivato" style="display:inline-block;height:20px;margin-left:200px">vai</a>
+    <div style="height:400px"></div><h2 id="arrivato">Capitolo</h2></body></html>`);
+  await schermoIntero(app, true);
+  await expect.poll(async () => (await stato(app)).alto).toBe(0);
+  await muovi(page, 400, 200);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(true);
+  await pausa(300);
+  const box = await page.locator('#link').boundingBox();
+  const x = Math.round(box.x + 20);
+  const y = Math.round(box.y + 10);
+  // Arrivo sul collegamento e pressione con i tempi di una mano: l'uscita delle schede scade a tasto giù.
+  await allaPagina(app, { type: 'mouseMove', x, y });
+  await pausa(300);
+  await allaPagina(app, { type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+  await pausa(700);
+  expect((await stato(app)).visibili, 'a tasto giù la pagina non si sposta sotto il puntatore').toBe(true);
+  await allaPagina(app, { type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+  await expect.poll(() => page.evaluate(() => location.hash), { timeout: 3000 }).toBe('#arrivato');
+  // Dopo il rilascio se ne vanno con l'attesa di sempre.
+  await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(false);
+});
+
+test('il quadrato fra le schede scoperte dice «Esci da schermo intero» e ne esce; fuori torna «Massimizza» (#1343)', async ({ app, shell, openTab, testServer }) => {
+  await scopri(app, openTab, testServer);
+  const max = shell.locator('#win-max');
+  await expect(max).toHaveAttribute('aria-label', 'Esci da schermo intero');
+  const box = await max.boundingBox();
+  await shell.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await max.click();
+  await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 3000 }).toBe(false);
+  await expect(max).toHaveAttribute('aria-label', 'Massimizza');
+  await expect(max).toHaveAttribute('data-tip', 'Massimizza');
+});
+
+for (const [nome, dove] of [['di una scheda', '.tab:has-text("Prima")'], ['della linguetta della barra', '#barra-maniglia']]) {
+  test(`col menu ${nome} aperto dalla fila le schede restano finché il menu è aperto (#1343)`, async ({ app, shell, openTab, testServer }) => {
+    await scopri(app, openTab, testServer);
+    const bersaglio = shell.locator(dove).first();
+    const box = await bersaglio.boundingBox();
+    await shell.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await bersaglio.click({ button: 'right' });
+    const menu = await menuAperto(app);
+    expect(menu, 'il menu si apre').not.toBeNull();
+    // Il puntatore scende nel menu: la shell sotto lo sente uscire.
+    await allaShell(app, { type: 'mouseLeave', x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height + 20) });
+    await menu.mouse.move(20, 20);
+    await menu.mouse.move(30, 40, { steps: 3 });
+    await pausa(1200);
+    expect((await stato(app)).visibili).toBe(true);
+  });
+}
+
+test('la barra laterale aperta dalla linguetta nella fila resta ferma sotto il puntatore (#1343)', async ({ app, shell, openTab, testServer }) => {
+  await scopri(app, openTab, testServer);
+  const maniglia = shell.locator('#barra-maniglia');
+  const box = await maniglia.boundingBox();
+  await shell.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await maniglia.click();
+  const barra = await barraPage(app);
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
+  await pausa(400);
+  const prima = await statoBarra(app);
+  await allaShell(app, { type: 'mouseLeave', x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height + 4) });
+  const home = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
+  const x = home.x + home.width / 2;
+  const y = home.y + home.height / 2;
+  await barra.mouse.move(x, y, { steps: 3 });
+  await pausa(1500);
+  const dopo = await statoBarra(app);
+  const sotto = await barra.evaluate(([px, py]) => document.elementFromPoint(px, py)?.closest('.ico')?.dataset.id || null,
+    [x, y + (prima.bounds.y - dopo.bounds.y)]);
+  expect(dopo.aperta).toBe(true);
+  expect(sotto, 'sotto il puntatore fermo c\'è ancora Home').toBe('home');
 });

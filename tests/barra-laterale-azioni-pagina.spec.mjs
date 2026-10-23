@@ -249,3 +249,13 @@ test('Condividi premuto su una pagina che sta ancora arrivando aspetta la pagina
     lento.close();
   }
 });
+
+test('con «Altro…» aperto Opzioni Filo e Impostazioni hanno disegni diversi: fanno cose diverse a poche icone di distanza', async ({ app }) => {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav [data-altro]').click();
+  const opzioni = barra.locator('#nav .ico[data-id="openOptions"] svg');
+  await expect(opzioni).toBeVisible();
+  expect(await opzioni.innerHTML()).not.toBe(await barra.locator('[data-comando="settings"] svg').innerHTML());
+});
