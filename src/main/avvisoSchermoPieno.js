@@ -122,14 +122,14 @@ class AvvisoSchermoPieno {
     this.posa();
   }
 
-  // Il puntatore sul bordo alto: torna la stessa frase, e se è già lì riparte il suo tempo.
-  ricompari() {
-    if (!this.parti || !this.parti.length) return;
-    if (this.mostrata()) {
-      if (!this.sopra) this._arma(this.durata);
+  // Il puntatore sul bordo alto: torna la frase di quella scheda, e se è già lì riparte il suo tempo.
+  ricompari(parti) {
+    if (!Array.isArray(parti) || !parti.length) return;
+    if (this.attivo && this.parti && JSON.stringify(parti) === JSON.stringify(this.parti)) {
+      if (this.mostrata() && !this.sopra) this._arma(this.durata);
       return;
     }
-    this.mostra(this.parti);
+    this.mostra(parti);
   }
 
   nascondi() {

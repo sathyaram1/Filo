@@ -46,6 +46,7 @@ const { VisiteSchede } = require('./tabs/visite');
 const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
+const { AvvisoSchermoPieno, partiDellAvviso } = require('./avvisoSchermoPieno');
 const { PropostaEmail } = require('./propostaEmail');
 const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
@@ -109,12 +110,14 @@ function tabDiWebContents(wc) {
 // Microfono, fotocamera, appunti e posizione li decide l'utente (#591.1): regole in services/permessiPagine.js.
 function installaPermessi(ses) {
   Permessi.installa(ses, {
-    prima: (wc, permission, callback) => {
+    prima: (wc, permission, callback, details) => {
       if (permission !== 'fullscreen') return false;
       // A schermo intero la finestrella di accesso perderebbe la barra col sito (#1066).
       if (wc && wc._filoFinestrella) { callback(false); return true; }
       const t = tabDiWebContents(wc);
       if (t && t._ultimoInputEsc) { callback(false); return true; }
+      // #1526 — il frame che chiede (anche un riquadro di un altro sito): la pillola dello schermo pieno lo nomina.
+      if (t) t._schermoPienoDa = { url: String((details && details.requestingUrl) || ''), alle: Date.now() };
       return false;
     },
     schedaDi: schedaPerPermessi,
@@ -460,6 +463,26 @@ class TabManager {
       cambiata: () => { if (this.barra) this.barra.aggiornaNav(); },
       input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
     });
+    // #1526 — chi si è preso lo schermo pieno: sopra la scheda e l'avviso del sito, sotto conferme, barra e menu.
+    this.schermoPieno = new AvvisoSchermoPieno(window, {
+      area: () => {
+        const t = schedaDavanti();
+        return t && t.view && this.contentFullscreen && !this._attivaNascosta ? t.view.getBounds() : null;
+      },
+      sotto: () => this.vistaSottoIlVuoto(),
+      restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
+      dopoInCima: () => {
+        if (this.propostaEmail) this.propostaEmail.inCima();
+        this.conferme.inCima();
+        if (this.barra) this.barra._inCima();
+        if (this.strato) this.strato.inCima();
+      },
+      esci: () => this.setContentFullscreen(false),
+      regola: () => {
+        this.setContentFullscreen(false);
+        this.openTab('filo://preferences/preferences.html#sec-schermo-pieno');
+      },
+    });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
@@ -592,6 +615,7 @@ class TabManager {
   // stati divergono. Ritorna lo stato risultante.
   setContentFullscreen(on) {
     on = !!on;
+    if (!on) this.schermoPieno.nascondi();
     // La modalità è cambiata: un'uscita ancora in attesa parla di un momento
     // che non c'è più.
     this.annullaUscitaSchermoIntero();
@@ -1788,7 +1812,8 @@ class TabManager {
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    if (this.activeId !== id) this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
+    const cambiata = this.activeId !== id;
+    if (cambiata) this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
     this.anteprime.mostrata(tab);
     this.activeId = id;
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
@@ -1806,7 +1831,28 @@ class TabManager {
     if (tab._rinviata && !this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
+    // Tornando sulla pagina che tiene lo schermo pieno si rivede di chi è; su un'altra scheda la pillola non vale.
+    if (cambiata) this._avvisaSchermoPieno(tab);
     this._broadcast();
+  }
+
+  // #1526 — la pillola nomina il frame che ha chiesto lo schermo (letto dal gestore dei permessi), mai il titolo.
+  // `nuovo`: lo schermo pieno è appena stato chiesto, e chi l'ha chiesto si legge adesso.
+  _avvisaSchermoPieno(tab, { nuovo = false } = {}) {
+    if (!tab || !this.pageFullscreen || this.pageFullscreenTabId !== tab.id || tab.id !== this.activeId) {
+      this.schermoPieno.nascondi();
+      return;
+    }
+    if (nuovo || !tab._schermoPienoParti) {
+      let pagina = '';
+      try { pagina = tab.view.webContents.getURL(); } catch (_) { pagina = ''; }
+      const da = tab._schermoPienoDa;
+      tab._schermoPienoDa = null;
+      const chiede = da && Date.now() - da.alle < 10_000 ? da.url : '';
+      const esc = globalThis.SN_TASTI ? globalThis.SN_TASTI.etichetta('Esc') : 'Esc';
+      tab._schermoPienoParti = partiDellAvviso(pagina || tab.url, chiede, esc);
+    }
+    this.schermoPieno.mostra(tab._schermoPienoParti);
   }
 
   // La scheda davanti prende la tastiera se questa era su una scheda che non si
@@ -2235,6 +2281,7 @@ class TabManager {
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.avvisi.posa();
+    this.schermoPieno.posa();
     this.propostaEmail.posa();
     this.conferme.posa();
     this.barra.posa();
@@ -2383,6 +2430,7 @@ class TabManager {
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
       this.setContentFullscreen(true);
+      this._avvisaSchermoPieno(tab, { nuovo: true });
     });
     wc.on('leave-html-full-screen', () => {
       // Solo la scheda che l'aveva chiesto spegne la modalità: l'uscita di una pagina appena
@@ -2766,6 +2814,7 @@ class TabManager {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
       this.barra.inputDa(wc, input);
+      if (this.pageFullscreenTabId === tab.id && tab.id === this.activeId && this.schermoPieno.sulBordoAlto(input)) this.schermoPieno.ricompari(tab._schermoPienoParti);
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
       // #514 — qui passa l'input VERO, che la pagina non può fabbricare: è il
