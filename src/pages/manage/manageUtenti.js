@@ -200,9 +200,14 @@
     }
     b.textContent = W.invitatiTesto(inv);
     const quando = inv.primo && inv.ultimo && inv.n > 1
-      ? `, il primo ${formatDateTime(inv.primo)} e l’ultimo ${formatDateTime(inv.ultimo)}`
-      : (inv.primo ? `, ${formatDateTime(inv.primo)}` : '');
+      ? `: la prima ${quandoBreve(inv.primo)}, l’ultima ${quandoBreve(inv.ultimo)}`
+      : (inv.primo ? ` ${quandoBreve(inv.primo)}` : '');
     b.title = `${inv.n === 1 ? 'Una persona è entrata' : `${formatInt(inv.n)} persone sono entrate`} coi suoi codici${quando}. Clic per vedere solo ${inv.n === 1 ? 'lei' : 'loro'}.`;
+  }
+
+  function quandoBreve(iso) {
+    const d = new Date(iso);
+    return `il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   function vociInvitati(r) {
