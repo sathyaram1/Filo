@@ -390,7 +390,13 @@
 
   // ── I pezzi ───────────────────────────────────────────────────────────────
 
-  async function carica() {
+  // In fila con chi allinea e ripassa: un annuncio arrivato mentre la coda si legge rilegge dopo di lei, non a vuoto.
+  function carica() {
+    const p = coda.then(caricaOra, caricaOra);
+    coda = p.then(() => {}, () => {});
+    return p;
+  }
+  async function caricaOra() {
     primo = null;
     finito = false;
     const res = await d.send({ type: MSG.FILO_CODA });
