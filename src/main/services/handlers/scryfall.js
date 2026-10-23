@@ -271,6 +271,9 @@ module.exports = function register(on, ctx) {
       // Il turno è andato solo in parte (ricerca non partita, carte non controllate) e la risposta dice di riprovare:
       // la bolla allora tiene il tasto Riprova, come una risposta in errore.
       let retryable = false;
+      // Il controllo delle carte non è partito per un ostacolo che si toglie in Crediti o nelle Opzioni: la risposta
+      // arriva lo stesso, e la bolla porta il tasto per andarci accanto a Riprova.
+      let rimedio = null;
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
