@@ -518,16 +518,22 @@
     if (torna && typeof torna.focus === 'function') torna.focus();
   }
 
+  // Chi ha invitato resta in testa ai suoi: il numero premuto resta sotto gli occhi, e lo stesso clic lo richiude.
   function personeDelFiltro() {
     if (!filtro) return null;
-    if (filtro.invitante) return new Set(invitatiLetti.get(filtro.invitante) || []);
-    return new Set(filtro.giorni === 7 ? usoLetto.attivi7 : usoLetto.attivi30);
+    if (filtro.invitante) {
+      const loro = invitatiLetti.get(filtro.invitante) || [];
+      return { contati: loro.length, chi: new Set(loro.length ? [filtro.invitante, ...loro] : []) };
+    }
+    const loro = filtro.giorni === 7 ? usoLetto.attivi7 : usoLetto.attivi30;
+    return { contati: loro.length, chi: new Set(loro) };
   }
 
   function applicaFiltro() {
-    const chi = personeDelFiltro();
+    const letto = personeDelFiltro();
+    const chi = letto && letto.chi;
     // Se il conto nuovo è vuoto non c'è più niente da mostrare: il filtro si toglie da sé.
-    if (chi && !chi.size) { filtro = null; return applicaFiltro(); }
+    if (chi && !letto.contati) { filtro = null; return applicaFiltro(); }
     for (const tr of $('ownerUsers').querySelectorAll('tbody tr[data-pseudonym]')) {
       tr.classList.toggle('is-fuori', Boolean(chi && !chi.has(tr.dataset.pseudonym)));
     }
