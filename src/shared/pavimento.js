@@ -179,14 +179,48 @@
   }
 
   // Una frase di più parole dopo i due punti, da sola sulla riga e con l'etichetta in testa («Password: casa mia al mare
-  // 2019»): la password con gli spazi. Toglierla toglie solo quella frase, mai una parola sola altrove.
+  // 2019»): la password con gli spazi. Toglierla toglie solo quella frase, mai una parola sola altrove. Una frase che
+  // comincia come una spiegazione («disponibile alla reception», «sul retro del modem», «vedi email») o che misura la
+  // password («min. 8 caratteri») dice dove trovarla o come sceglierla, e resta.
   const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\n|\\t]{3,64}?)[ \\t]*(?=\\n|$)`, 'gi');
+  const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use)$/i;
+  const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?)[.,;:]?$/i;
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       const v = m[1].trim();
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
+      if (INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p))) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
+    }
+  }
+
+  // Un file di configurazione o di codice (JSON, .env, YAML, XML): il valore della chiave che si chiama password, anche
+  // dentro un nome di variabile («DB_PASSWORD=…», «"adminPassword": "…"», «<password>…</password>»). Conta come codice
+  // una chiave fra virgolette o composta, un uguale o un valore fra virgolette: «Password: deve…» è testo, e lo guardano
+  // le regole sopra. Un'espressione, una variabile o un percorso («process.env.X», «${X}», «PWD=/home») non sono valori.
+  const PAROLA_CHIAVE = /^(?:password|passwd|pwd|pass|passphrase|passcode)$/i;
+  const CHIAVE = /(?<![\w$.-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,128})"|'([^'\n]{1,128})'|([^\s,;"'`<>(){}[\]]{1,128}))/g;
+  const ELEMENTO = /<([A-Za-z_][\w.:-]{0,60})>([^<\n]{1,128})<\/\1>/g;
+  const SEGNAPOSTO_DI_TIPO = /^(?:string|text|null|none|nil|undefined|true|false|required|optional|secret|changeit|\*+|x+|\.+|<[^>]*>)$/i;
+  const nomeDaPassword = (nome) => nome.split(/[_.:-]+|(?<=[a-z0-9])(?=[A-Z])/).some((p) => PAROLA_CHIAVE.test(p));
+  function valoreDiChiave(grezzo) {
+    const v = testo(grezzo).trim();
+    if (v.length < 3 || /^[$%{!]|^[/~]|^[A-Za-z]:\\/.test(v) || CODICE_SORGENTE.test(v) || SEGNAPOSTO_DI_TIPO.test(v) || PAROLA_CHIAVE.test(v) || v.includes(SEGNAPOSTO)) return '';
+    return v;
+  }
+  function chiaviDiConfigurazione(s, out) {
+    for (const m of s.matchAll(CHIAVE)) {
+      const [, virgolette, nome, sep, dq, sq, nudo] = m;
+      if (!nomeDaPassword(nome)) continue;
+      const composta = nome !== nome.replace(/[_.-]|(?<=[a-z0-9])(?=[A-Z])/g, '');
+      if (!virgolette && !composta && sep === ':' && nudo !== undefined) continue;
+      const v = valoreDiChiave(dq ?? sq ?? nudo);
+      if (v) out.push({ valore: v, regola: 'password' });
+    }
+    for (const m of s.matchAll(ELEMENTO)) {
+      const v = nomeDaPassword(m[1]) ? valoreDiChiave(m[2]) : '';
+      if (v) out.push({ valore: v, regola: 'password' });
     }
   }
 
