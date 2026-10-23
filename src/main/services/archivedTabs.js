@@ -82,6 +82,18 @@
     return (await apri()).tutti();
   }
 
+  // La voce più recente di una pagina chiusa con questo indirizzo intero, o null: chi la riapre per indirizzo (la home,
+  // la chat) la riapre com'era e la conta fra le riaperte (#1467).
+  async function ultimaPer(url) {
+    if (typeof url !== 'string' || !url) return null;
+    let ultima = null;
+    for (const t of await list()) {
+      if (!t || t.url !== url || t.urlTagliato) continue;
+      if (!ultima || (Date.parse(t.closedAt) || 0) > (Date.parse(ultima.closedAt) || 0)) ultima = t;
+    }
+    return ultima;
+  }
+
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
@@ -217,7 +229,7 @@
   }
 
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa,
+    list, listMeta, ultimaPer, archive, update, remove, removeMany, dimenticaPagine, clear, importa,
     suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
