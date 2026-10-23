@@ -31,7 +31,8 @@ if (process.platform === 'win32') {
 // siti esterni (Google, Claude, …) non scambiano Filo per un browser embedded
 // e non rifiutano l'accesso. `userAgentFallback` è il default ereditato da ogni
 // session/webContents che non imposta una UA propria, quindi vale per tutte le
-// tab. Va fissato PRIMA di whenReady.
+// tab. Va fissato PRIMA di whenReady. I client hints (Sec-CH-UA*) che una UA
+// riscritta fa sparire li rimette services/clientHints.js, dall'unico onBeforeSendHeaders.
 try {
   const { stripEmbeddedUaTokens } = require('./userAgent');
   const cleaned = stripEmbeddedUaTokens(app.userAgentFallback || '', app.getName());
