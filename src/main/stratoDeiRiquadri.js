@@ -189,6 +189,12 @@ class StratoDeiRiquadri {
       return;
     }
     if (canale === 'riquadri:vuoto') s.vuoto.inoltra(d);
+    // Un trascinamento sul vuoto (un file da allegare al sito, un pezzo della pagina) non si può rigirare: lo strato si
+    // toglie finché il puntatore non torna sulla pagina, così il rilascio cade dove l'utente lo vede.
+    if (canale === 'riquadri:lascia-passare' && !s.modale && s.visibile) {
+      s.lasciaPassare = true;
+      this._nascondi(s);
+    }
   }
 
   // L'Aiuto nello strato chiede alla pagina sotto (#1509.3): la domanda va al suo frame principale, che risponde con
@@ -257,7 +263,7 @@ class StratoDeiRiquadri {
   posa() {
     if (!this.win || this.win.isDestroyed()) return;
     for (const s of this.strati.values()) {
-      const b = s.pronta && s.aperti > 0 ? this._area(s.wc) : null;
+      const b = s.pronta && s.aperti > 0 && !s.lasciaPassare ? this._area(s.wc) : null;
       if (!b) { this._nascondi(s); continue; }
       this._bordi(s, b);
       this._inCima(s);
@@ -265,6 +271,8 @@ class StratoDeiRiquadri {
         s.visibile = true;
         s.cornice.setVisible(true);
         s.vista.setVisible(true);
+        // Un riquadro che copre la pagina, tornato a vedersi, riprende la tastiera: dietro di lui non si scrive.
+        if (s.modale) s.vuoleTastiera = true;
       }
       if (s.vuoleTastiera) { s.vuoleTastiera = false; this._tastiera(s); }
     }
@@ -428,6 +436,12 @@ class StratoDeiRiquadri {
       if ((t === 'mouseDown' || t === 'mouseUp') && Number.isFinite(input.x) && Number.isFinite(input.y)) {
         wc._filoUltimoPuntatore = { x: input.x, y: input.y, alle: Date.now() };
       }
+      // Finito il trascinamento, il primo gesto del mouse sulla pagina rimette lo strato.
+      const s = this.strati.get(wc);
+      if (s && s.lasciaPassare && /^mouse/.test(String(t || ''))) {
+        s.lasciaPassare = false;
+        this.posa();
+      }
     });
   }
 
@@ -486,7 +500,7 @@ class StratoDeiRiquadri {
       try { if (vivo(s.wc)) this.suInput(s.wc, input); } catch (_) {}
     });
     v.on('ipc-message', (_e, canale, dati) => {
-      if (/^riquadri:(stato|in-pagina|vuoto)$/.test(canale)) this._dalloStrato(s, canale, dati);
+      if (/^riquadri:(stato|in-pagina|vuoto|lascia-passare)$/.test(canale)) this._dalloStrato(s, canale, dati);
     });
     v.on('ipc-message-sync', (e, canale) => {
       if (canale !== 'riquadri:chi') return;
@@ -520,6 +534,7 @@ class StratoDeiRiquadri {
 
   _butta(s) {
     clearTimeout(s.timerVuoto);
+    try { s.vuoto.stacca(); } catch (_) {}
     if (this.strati.get(s.wc) === s) this.strati.delete(s.wc);
     for (const chiudi of [...s.attese.values()]) chiudi({ ok: false });
     // L'Aiuto se ne va con lo strato: la pagina, che lo dice alla barra laterale, lo sa chiuso.

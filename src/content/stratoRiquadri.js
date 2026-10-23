@@ -149,6 +149,7 @@
       },
       // Uscire dalla cornice dentro la scheda è entrare nella pagina, che da lì riceve i gesti veri.
       versoLaPagina: (e) => e.clientX > 0 && e.clientY > 0 && e.clientX < innerWidth - 1 && e.clientY < innerHeight - 1,
+      lasciaPassare: () => S.lasciaPassare(),
     });
   } catch (e) { console.error('[Filo riquadri] vuoto', e); }
 
