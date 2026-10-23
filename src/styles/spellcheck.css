@@ -281,6 +281,13 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 .sn-spell-valori .sn-spell-valore:active {
   transform: translate(-50%, calc(-100% - 1px)) scale(0.96);
 }
+/* Sopra le parole della riga prima il valore è velato e lascia il clic al testo; il puntatore sulle x lo sveglia. */
+.sn-spell-valori .sn-spell-valore.sn-sopra-testo:not(.sn-sveglio) {
+  pointer-events: none;
+  opacity: var(--sn-spell-valore-velato, 0.45);
+  box-shadow: none;
+  transition: opacity calc(120ms * var(--sn-motion, 1));
+}
 /* Mentre Filo cerca il dato: tre puntini che respirano al posto del valore. */
 .sn-spell-valori .sn-spell-valore.sn-cercando {
   cursor: progress;
