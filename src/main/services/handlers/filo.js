@@ -420,7 +420,9 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const id = msg.id;
     if (!id) return { ok: false, error: 'id mancante' };
-    closeAndTriageChat(id, { fine: msg.fine === true })
+    // Come è finita, per i contatori (#1463): la dice la scheda, da un elenco chiuso.
+    const via = ['home', 'chat_nuova', 'uscita'].includes(msg.via) ? msg.via : (msg.fine === true ? 'chat_nuova' : 'uscita');
+    closeAndTriageChat(id, { fine: msg.fine === true, via })
       // La Cronologia può essere aperta in un'altra scheda mentre qui si
       // finisce di chattare: l'annuncio la fa riallineare da sola, invece di
       // lasciarla ferma a com'era e far credere che la chat non si sia

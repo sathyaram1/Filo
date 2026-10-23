@@ -1,6 +1,7 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464, #1466): le collezioni sono a sola creazione, lette
-// solo dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v3, più le v2 e i giorni v1 delle copie
-// vecchie) e le chiamate ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file.
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1463, #1464, #1466): le collezioni sono a sola creazione,
+// lette solo dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v3, più le v2 e i giorni v1 delle
+// copie vecchie), la loro chat (v4) e le chiamate ai modelli di un'ora. Il motore vero la prova
+// contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
 
-for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'actionTools', 'chatArchive', 'contatoriGiornalieri']) {
   require(join(ROOT, 'src', 'shared', `${f}.js`));
 }
 const C = globalThis.SN_CONTATORI;
@@ -57,6 +58,7 @@ const CHIAMATE = corpo('contatoriChiamate');
 const ORA3 = corpo('contatoriOra3');
 const TESTA = corpo('testaOra');
 const MISURE_ORA = corpo('misureOra');
+const CHAT = corpo('contatoriChat');
 
 function regole(testo) {
   const out = [];
@@ -137,7 +139,7 @@ test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   assert.equal(per('create').length, 1);
   assert.equal(per('create')[0].cond, 'contatori(request.resource.data)');
   // La forma si sceglie dalla versione: provarle tutte in fila passerebbe il tetto di mille espressioni a richiesta.
-  assert.equal(corpo('contatori'), '(d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 1 && contatoriGiorno(d))');
+  assert.equal(corpo('contatori'), '(d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 4 && contatoriChat(d)) || (d.v == 1 && contatoriGiorno(d))');
 });
 
 test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; le ore v2 e i giorni di prima tengono la loro forma', () => {
@@ -310,7 +312,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, TESTA, CHIAMATE]) {
+  for (const testo of [GIORNO, TESTA, CHAT, CHIAMATE]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
@@ -422,4 +424,94 @@ test('nessuna espressione regolare del blocco passa i 4096 caratteri che le rego
 test('le due funzioni di controllo delle mappe sono quelle che si credono', () => {
   assert.equal(corpo('chiuse'), "m is map && m.keys().hasOnly(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori)");
   assert.equal(corpo('aForma'), "m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori)");
+});
+
+// ── La chat dell'ora (#1463) ────────────────────────────────────────────────
+// Nell'ora le regole non hanno più posto: il motore valuta al più mille espressioni per scrittura, e l'ora ne usa quasi
+// tutte. La chat ha il suo documento, coi suoi elenchi chiusi e le sue forme, tutte uguali a quelle dell'app.
+function misureDellaChat() {
+  const out = {};
+  for (const m of CHAT.matchAll(/chiuse\(d\.(\w+), (\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    out[m[1]] = { chiavi: stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  }
+  return out;
+}
+const MCHAT = misureDellaChat();
+const formaChat = {
+  chatTurni: F.TURNI_FORMA, chatRecuperi: F.CONTO_FORMA, strumenti: F.STRUMENTI_FORMA, azioniPerGiro: F.AZIONI_PER_GIRO_FORMA,
+  chatReazioni: F.CONTO_FORMA, chatCopie: F.CONTO_FORMA, chatChiuse: F.CHIUSE_FORMA,
+};
+const chiaviChat = {
+  chatTurni: C.AGENTI, strumenti: C.AGENTI, azioniPerGiro: C.AGENTI, chatRecuperi: C.RECUPERI, chatReazioni: C.REAZIONI,
+  chatCopie: C.RUOLI_COPIA, chatChiuse: C.VIE_CHIUSURA,
+};
+function passaChat(doc) {
+  for (const [campo, r] of Object.entries(MCHAT)) {
+    const v = doc[campo];
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return `${campo} non è una mappa`;
+    if (!Object.keys(v).every((k) => r.chiavi.includes(k))) return `${campo}: chiave fuori elenco`;
+    const valori = Object.values(v);
+    if (!valori.every((x) => typeof x === 'string' || Number.isInteger(x))) return `${campo}: un valore non si unisce`;
+    if (valori.join('#').length > r.tetto || !new RegExp(r.valori).test(valori.join('#'))) return `${campo}: valori fuori forma`;
+  }
+  return '';
+}
+
+test('la chat dell’ora ha i campi, le chiavi chiuse e le forme dell’app, e l’id dell’ora con «_chat»', () => {
+  assert.deepEqual(elencoDopo(CHAT, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_CHAT]);
+  assert.deepEqual(elencoDopo(CHAT, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_CHAT]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(CHAT)[1]), C.VERSIONE_CHAT);
+  assert.match(CHAT, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora \+ '_chat'/);
+  assert.ok(new Set([C.VERSIONE, C.VERSIONE_GIORNO, C.VERSIONE_CHAT]).size === 3);
+  assert.deepEqual(Object.keys(MCHAT).sort(), [...C.MISURE_CHAT].sort(), 'ogni misura della chat ha il suo controllo, e nessuna in più');
+  for (const campo of C.MISURE_CHAT) {
+    assert.deepEqual(MCHAT[campo].chiavi, [...chiaviChat[campo]], `chiavi di ${campo}`);
+    assert.equal(MCHAT[campo].valori, unite(formaChat[campo]), `forma dei valori di ${campo}`);
+  }
+  const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(CHAT);
+  assert.ok(ora);
+  for (let h = 0; h < 24; h++) assert.ok(new RegExp(ora[1]).test(String(h).padStart(2, '0')));
+  const doc = C.documentoChat({ pseudonimo: 'b'.repeat(20), chiave: '2026-10-15T07', app: '0.2.243', os: 'mac', dati: C.oraVuota() });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_CHAT]);
+  assert.equal(C.idDocumento(doc), `${'b'.repeat(20)}_2026-10-15_07_chat`);
+  // Il tipo di una chat è quello dell'archivio, più «nessuno»; ogni strumento ha un nome che le regole accettano.
+  assert.deepEqual([...C.TIPI_CHAT], [...globalThis.SN_CHAT_ARCHIVE.KINDS, C.SENZA_TIPO]);
+  const nomi = globalThis.SN_ACTION_TOOLS.NAMES;
+  assert.ok(nomi.length >= 50);
+  assert.deepEqual(nomi.filter((n) => !new RegExp(F.NOME_STRUMENTO_FORMA).test(n)), []);
+  assert.deepEqual(C.strumenti(), [...nomi]);
+});
+
+test('la chat più carica che l’app sa fare passa le regole, e una manomessa no', () => {
+  const dati = C.oraVuota();
+  for (const f of C.AGENTI) {
+    for (const esito of C.ESITI_TURNO) for (const giri of [1, 2, 3, 5, 9, 12, 40]) C.registraTurno(dati, f, { esito, giri });
+    for (const nome of [...C.strumenti(), ...Array.from({ length: 80 }, (_, i) => `INVENTATO_${i}`)]) {
+      for (const esito of C.ESITI_STRUMENTO) C.registraStrumento(dati, f, nome, esito, 999999999);
+    }
+    for (const n of [1, 2, 4, 30]) C.registraAzioniDelGiro(dati, f, n, 999999999);
+  }
+  for (const v of C.RECUPERI) for (let i = 0; i < 3; i++) C.registraRecupero(dati, v);
+  for (const v of C.REAZIONI) C.registraReazione(dati, v);
+  for (const r of C.RUOLI_COPIA) C.registraCopia(dati, r);
+  for (const via of C.VIE_CHIUSURA) for (const messaggi of [1, 2, 4, 8, 50]) for (const durataMs of [0, 2e5, 6e5, 2e6, 1e9]) {
+    for (const tipo of C.TIPI_CHAT) C.registraChatChiusa(dati, { via, messaggi, durataMs, tipo });
+  }
+  const gonfia = (o) => { for (const k of Object.keys(o)) { if (Number.isInteger(o[k])) o[k] = 999999999; else if (o[k] && typeof o[k] === 'object') gonfia(o[k]); } };
+  gonfia(dati);
+  const doc = C.documentoChat({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati });
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+  assert.equal(passaChat(doc), '', 'la chat più carica dell’app deve passare le regole');
+  assert.ok(JSON.stringify(doc).length < 200000);
+  const vuota = C.documentoChat({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.243', os: 'win', dati: C.oraVuota() });
+  assert.equal(passaChat(vuota), '');
+  const manomesso = (campo, v) => passaChat({ ...doc, [campo]: v });
+  assert.notEqual(manomesso('strumenti', { 'filo-chat': 'cerca mario rossi|eseguito|1' }), '');
+  assert.notEqual(manomesso('strumenti', { 'filo-chat': 'NAVIGA|https://x.it|1' }), '');
+  assert.notEqual(manomesso('strumenti', { explain: 'NAVIGA|eseguito|1' }), '');
+  assert.notEqual(manomesso('chatTurni', { 'filo-chat': 'risposta|g1|1 ciao' }), '');
+  assert.notEqual(manomesso('chatChiuse', { home: 'm1|min1|chat con mario|1' }), '');
+  assert.notEqual(manomesso('chatReazioni', { 'ferma perché sbagliava': '1' }), '');
+  assert.notEqual(manomesso('chatCopie', { risposta: 'il testo copiato' }), '');
+  assert.notEqual(manomesso('chatRecuperi', { sollecito: { n: 1, nota: 'ciao' } }), '', 'una mappa al posto della stringa non si unisce');
 });

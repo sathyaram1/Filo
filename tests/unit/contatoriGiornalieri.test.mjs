@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-for (const f of ['constants', 'tasti', 'modelUsage', 'wallet', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'wallet', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'actionTools', 'contatoriGiornalieri']) {
   require(join(ROOT, 'src', 'shared', `${f}.js`));
 }
 const C = globalThis.SN_CONTATORI;
@@ -291,4 +291,129 @@ test('ogni pagina di Filo contata come azione porta un id del manifesto delle ca
   assert.equal(C.azioneDiPagina('filo://editor/editor.html'), 'editor');
   assert.equal(C.azioneDiPagina('https://filo://editor/'), '');
   assert.ok(C.PANNELLI.includes('barra-laterale') && C.PANNELLI.includes('tasto-destro'));
+});
+
+// ── La chat e l'agente (#1463) ──────────────────────────────────────────────
+const chatDi = (dati, chiave = '2026-10-15T09') => C.documentoChat({ pseudonimo: PSEUDO, chiave, app: '0.2.243', os: 'win', dati });
+const voci = (s) => Object.fromEntries(String(s).split(';').map((v) => { const p = v.split('|'); return [p.slice(0, -1).join('|'), Number(p[p.length - 1])]; }));
+
+test('un turno di chat esce come «esito|fascia dei giri|n»: il dodicesimo giro è il tetto, uno fermato prima del primo vale un giro', () => {
+  const g = C.oraVuota();
+  for (const giri of [1, 1, 2, 3, 4, 6, 7, 11, 12]) assert.ok(C.registraTurno(g, 'filo-chat', { esito: 'risposta', giri }));
+  assert.ok(C.registraTurno(g, 'filo-chat', { esito: 'fermato', giri: 0 }));
+  assert.ok(C.registraTurno(g, 'filo-chat', { esito: 'tetto_giri', giri: 12 }));
+  for (const no of [{ esito: 'boh', giri: 1 }, { esito: 'risposta', giri: -1 }, { esito: 'risposta', giri: 'tre' }]) assert.ok(!C.registraTurno(g, 'filo-chat', no));
+  assert.ok(!C.registraTurno(g, 'explain', { esito: 'risposta', giri: 1 }), 'solo le funzioni che girano coi loro strumenti');
+  const d = chatDi(g);
+  assert.deepEqual(voci(d.chatTurni['filo-chat']), {
+    'risposta|g1': 2, 'risposta|g2': 1, 'risposta|g3': 1, 'risposta|g4_6': 2, 'risposta|g7_11': 2, 'risposta|tetto': 1,
+    'tetto_giri|tetto': 1, 'fermato|g1': 1,
+  });
+  assert.deepEqual(Object.keys(d.chatTurni), ['filo-chat']);
+  assert.equal(C.valida(d).ok, true, C.valida(d).motivo);
+});
+
+test('gli strumenti per nome ed esito: un nome che Filo non offre è «altro», oltre il tetto si somma in «altro» e non si perde', () => {
+  const g = C.oraVuota();
+  assert.ok(C.registraStrumento(g, 'filo-chat', 'naviga', 'eseguito'));
+  assert.ok(C.registraStrumento(g, 'filo-chat', 'NAVIGA', 'eseguito'));
+  assert.ok(C.registraStrumento(g, 'filo-chat', 'cerca mario rossi su google', 'rifiutato'));
+  assert.ok(!C.registraStrumento(g, 'filo-chat', 'NAVIGA', 'boh'));
+  const d = chatDi(g);
+  assert.deepEqual(voci(d.strumenti['filo-chat']), { 'NAVIGA|eseguito': 2, 'altro|rifiutato': 1 });
+
+  const pieno = C.oraVuota();
+  let tot = 0;
+  for (const nome of C.strumenti()) for (const esito of C.ESITI_STRUMENTO) { C.registraStrumento(pieno, 'filo-chat', nome, esito); tot += 1; }
+  const lista = chatDi(pieno).strumenti['filo-chat'].split(';');
+  assert.ok(tot > C.TETTO_STRUMENTI && lista.length <= C.TETTO_STRUMENTI);
+  assert.equal(lista.reduce((a, v) => a + Number(v.split('|')[2]), 0), tot);
+  assert.ok(lista.some((v) => v.startsWith('altro|')));
+  assert.equal(C.valida(chatDi(pieno)).ok, true);
+
+  // Uno strumento sparito da Filo mentre la sua ora aspettava esce come «altro», col suo conto.
+  const vecchia = C.oraVuota();
+  vecchia.strumenti['filo-chat'] = { 'STRUMENTO_TOLTO|eseguito': 3, 'NAVIGA|eseguito': 1, 'NAVIGA|eseguito|x': 9, 'ciao mario': 5 };
+  assert.deepEqual(voci(chatDi(vecchia).strumenti['filo-chat']), { 'NAVIGA|eseguito': 1, 'altro|eseguito': 3 });
+});
+
+test('l’esito di uno strumento: argomenti, segreto, conferma, rifiuto, proxy non disponibile, riuscita', () => {
+  const E = (a, res) => C.esitoStrumento(a, res);
+  assert.equal(E({ argomenti: 'JSON non valido' }, { rejected: true }), 'argomenti_errati');
+  assert.equal(E({ argomenti: 'tagliati', tagliati: true }, { rejected: true }), 'argomenti_tagliati');
+  assert.equal(E({}, { output: { blocked: 'segreto' }, executed: false }), 'fermato_segreto');
+  assert.equal(E({}, { needsConfirm: 2, kept: true }), 'in_conferma');
+  assert.equal(E({}, { rejected: true }), 'rifiutato');
+  assert.equal(E({}, { no: true }), 'rifiutato');
+  assert.equal(E({}, { executed: true, output: { proxy: 'non_disponibile' } }), 'non_disponibile');
+  assert.equal(E({}, { executed: true, kept: true }), 'eseguito');
+  assert.equal(E({}, { executed: false, kept: false }), 'non_riuscito');
+  assert.equal(E(undefined, undefined), 'non_riuscito');
+});
+
+test('azioni per giro, strade di riserva, reazioni e copie: solo dagli elenchi chiusi, in conti', () => {
+  const g = C.oraVuota();
+  for (const n of [1, 1, 2, 3, 5, 6, 40]) assert.ok(C.registraAzioniDelGiro(g, 'filo-chat', n));
+  assert.ok(!C.registraAzioniDelGiro(g, 'filo-chat', 0), 'un giro senza azioni non è un giro di strumenti');
+  assert.ok(C.registraAzioniDelGiro(g, 'filo-chat', 2, 4), 'più giri uguali in un colpo');
+  for (const v of ['sollecito', 'sollecito', 'senza_foto']) assert.ok(C.registraRecupero(g, v));
+  for (const v of ['ferma_durante_testo', 'riprova', 'riprova', 'seguito_scritto', 'continua_muto_dopo_letture']) assert.ok(C.registraReazione(g, v));
+  for (const r of ['risposta', 'attivita', 'utente', 'utente']) assert.ok(C.registraCopia(g, r));
+  for (const [f, v] of [[C.registraRecupero, 'ripiego qualunque'], [C.registraReazione, 'ferma'], [C.registraCopia, 'il testo copiato']]) assert.ok(!f(g, v), v);
+  const d = chatDi(g);
+  assert.deepEqual(d.azioniPerGiro, { 'filo-chat': '2,5,2,2' });
+  assert.deepEqual(d.chatRecuperi, { senza_foto: '1', sollecito: '2' });
+  assert.deepEqual(d.chatReazioni, { ferma_durante_testo: '1', continua_muto_dopo_letture: '1', riprova: '2', seguito_scritto: '1' });
+  assert.deepEqual(d.chatCopie, { risposta: '1', attivita: '1', utente: '2' });
+  assert.equal(C.valida(d).ok, true, C.valida(d).motivo);
+});
+
+test('una chat chiusa esce come «messaggi|durata|tipo|n» per via; senza tipo è «nessuno», e senza messaggi della persona non conta', () => {
+  const g = C.oraVuota();
+  const MIN = 60 * 1000;
+  assert.ok(C.registraChatChiusa(g, { via: 'uscita', messaggi: 1, durataMs: 0, tipo: 'comando' }));
+  assert.ok(C.registraChatChiusa(g, { via: 'uscita', messaggi: 4, durataMs: 3 * MIN, tipo: 'conversazione' }));
+  assert.ok(C.registraChatChiusa(g, { via: 'chat_nuova', messaggi: 12, durataMs: 3 * 60 * MIN, tipo: null }));
+  assert.ok(C.registraChatChiusa(g, { via: 'risposta_tardiva', messaggi: 7, durataMs: 45 * MIN, tipo: 'nessuno' }));
+  assert.ok(!C.registraChatChiusa(g, { via: 'uscita', messaggi: 0, durataMs: 0, tipo: 'comando' }));
+  assert.ok(!C.registraChatChiusa(g, { via: 'chiusa da mario', messaggi: 1, durataMs: 0 }));
+  assert.ok(!C.registraChatChiusa(g, { via: 'home', messaggi: 1, durataMs: -5 }));
+  const d = chatDi(g);
+  assert.deepEqual(d.chatChiuse, {
+    chat_nuova: 'oltre|oltre|nessuno|1', uscita: 'm1|min1|comando|1;m3_5|min5|conversazione|1', risposta_tardiva: 'm6_10|ora|nessuno|1',
+  });
+  assert.equal(C.valida(d).ok, true, C.valida(d).motivo);
+  // Il titolo non c'è da nessuna parte: un tipo scritto a mano sul disco non esce.
+  g.chatChiuse.home = { 'm1|min1|Ricetta della nonna': 2 };
+  assert.equal(chatDi(g).chatChiuse.home, undefined);
+});
+
+test('il validatore respinge una voce della chat fuori forma, ripetuta o a zero', () => {
+  const base = chatDi(C.oraVuota());
+  for (const [campo, v] of [
+    ['chatTurni', { 'filo-chat': 'risposta|g1|0' }], ['chatTurni', { 'filo-chat': 'risposta|g1|1;risposta|g1|2' }],
+    ['strumenti', { 'filo-chat': 'naviga|eseguito|1' }], ['strumenti', { explain: 'NAVIGA|eseguito|1' }],
+    ['chatChiuse', { uscita: 'm1|min1|nessuno|1;m1|min1|nessuno|1' }], ['chatCopie', { risposta: 'tutto' }],
+    ['azioniPerGiro', { 'filo-chat': '1,2,3' }], ['chatReazioni', { stop: '1' }],
+  ]) assert.equal(C.valida({ ...base, [campo]: v }).ok, false, `${campo} ${JSON.stringify(v)}`);
+});
+
+test('la chat ha il suo documento per l’ora: la testa dell’ora senza il segno del primo, l’id con «_chat», e parte solo se ha qualcosa', () => {
+  const g = C.oraVuota();
+  C.registraUso(g, 'help', { visto: 100, fine: 200 });
+  const ora = docDi(g);
+  const vuota = chatDi(g);
+  assert.deepEqual(Object.keys(ora), [...C.CAMPI], 'l’ora resta quella di #1461');
+  assert.ok(!C.MISURE_CHAT.some((k) => k in ora));
+  assert.deepEqual(Object.keys(vuota), [...C.CAMPI_CHAT]);
+  assert.equal(vuota.v, C.VERSIONE_CHAT);
+  assert.equal(C.haChat(vuota), false);
+  C.registraCopia(g, 'utente');
+  const chat = chatDi(g);
+  assert.equal(C.haChat(chat), true);
+  assert.equal(C.idDocumento(chat), `${C.idDocumento(ora)}_chat`);
+  assert.equal(C.valida(chat).ok, true, C.valida(chat).motivo);
+  assert.equal(C.valida({ ...chat, primo: 'mese' }).ok, false, 'un campo dell’ora nella chat non passa');
+  assert.equal(C.valida({ ...ora, chatCopie: {} }).ok, false, 'un campo della chat nell’ora non passa');
+  assert.equal(C.valida({ ...chat, ora: '24' }).ok, false);
 });

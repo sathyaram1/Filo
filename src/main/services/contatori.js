@@ -1,6 +1,6 @@
-// I contatori anonimi (#969, #1461, #1464, #1466): misura usi e chiamate dei modelli, azioni, gesti e guasti di elenco
-// chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
-// spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
+// I contatori anonimi (#969, #1461, #1463, #1464, #1466): misura usi e chiamate dei modelli, azioni, chat, gesti e guasti
+// di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non
+// conta e non spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const crypto = require('node:crypto');
@@ -31,8 +31,13 @@ const INTERVISTA_FERMA_MS = 24 * 60 * 60 * 1000;
 const PAGINA_LETTURA = 1000;
 const TETTO_PAGINE = 200;
 
+// Una chat chiusa aspetta il suo tipo al più due giorni (la classificazione ritenta all'avvio dopo): poi esce senza.
+const CHIUSA_ASPETTA_MS = 2 * 24 * 60 * 60 * 1000;
+const TETTO_CHIUSE_IN_ATTESA = 500;
+
 const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} });
 const AZIONE_MUTA = Object.freeze({ visto() {}, fine() {}, scheda() {} });
+const TURNO_MUTO = Object.freeze({ giro() {}, azioni() {}, strumento() {}, recupero() {}, fine() {} });
 
 function valoreFs(v) {
   if (v === null || v === undefined) return { nullValue: null };
@@ -44,7 +49,7 @@ function valoreFs(v) {
 }
 
 function statoVuoto() {
-  return { ore: {}, giorni: {}, pseudonimi: {}, mesi: {}, primi: {}, presenza: '', fallitoIl: '', rifiutati: {}, ultimo: null, errore: '', intervista: null };
+  return { ore: {}, giorni: {}, pseudonimi: {}, mesi: {}, primi: {}, presenza: '', fallitoIl: '', rifiutati: {}, ultimo: null, errore: '', intervista: null, chiuse: {}, uscite: {} };
 }
 
 const oggetto = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -69,6 +74,10 @@ function normale(s) {
     errore: typeof o.errore === 'string' ? o.errore : '',
     // L'intervista aperta: il passo dove è, quando è stata toccata l'ultima volta, e se il suo abbandono è già contato.
     intervista: oggetto(o.intervista) ? o.intervista : null,
+    // Le chat chiuse che aspettano il tipo dal classificatore, per id: restano sul disco, non partono mai così.
+    chiuse: oggetto(o.chiuse) ? o.chiuse : {},
+    // Le chat la cui scheda se n'è andata e che non si sono ancora contate: all'avvio dopo escono come «uscita».
+    uscite: oggetto(o.uscite) ? o.uscite : {},
   };
 }
 
@@ -80,6 +89,7 @@ function crea(dip = {}) {
   const impostazioni = dip.impostazioni || (() => storage.getSettings());
   const inIncognito = dip.inIncognito || (() => disco().inIncognito());
   const runNormale = dip.runNormale || ((fn) => disco().runNormale(fn));
+  const scriviSubito = dip.scriviSubito || ((k, v) => disco().setSync({ [k]: v }));
   const fetchFn = dip.fetch || ((...a) => fetch(...a));
   const adesso = dip.adesso || (() => Date.now());
   const versione = dip.versione || (() => require('electron').app.getVersion());
@@ -116,6 +126,8 @@ function crea(dip = {}) {
   let stato = null;
   let carico = null;
   let timerSalva = null;
+  // Da quando Filo esce ogni salvataggio è sincrono: un timer non arriverebbe più.
+  let inUscita = false;
   let giroInVolo = null;
   // Spegnere a metà di una registrazione la butta: quella partita prima non rientra dopo lo spegnimento.
   let generazione = 0;
@@ -154,9 +166,22 @@ function crea(dip = {}) {
   }
 
   function salvaPresto() {
+    if (inUscita) { scriviOra(); return; }
     if (timerSalva) return;
     timerSalva = setTimeout(() => { timerSalva = null; salva().catch(() => {}); }, SALVA_DOPO_MS);
     if (timerSalva && typeof timerSalva.unref === 'function') timerSalva.unref();
+  }
+
+  function scriviOra() {
+    if (timerSalva) { clearTimeout(timerSalva); timerSalva = null; }
+    if (!stato) return;
+    try { scriviSubito(CHIAVE, stato); } catch (e) { log('stato non salvato alla chiusura', String((e && e.message) || e)); }
+  }
+
+  // Alla chiusura di Filo (before-quit e will-quit): quello che aspettava il timer va sul disco adesso.
+  function alChiudere() {
+    inUscita = true;
+    scriviOra();
   }
 
   const spentiIn = (s) => Boolean(s && s.contatori && s.contatori.attivi === false);
@@ -180,7 +205,8 @@ function crea(dip = {}) {
     await carica();
     const c = stato;
     const vuoto = !Object.keys(c.ore).length && !Object.keys(c.giorni).length && !Object.keys(c.pseudonimi).length
-      && !Object.keys(c.mesi).length && !c.ultimo && !c.fallitoIl && !c.presenza && !c.intervista;
+      && !Object.keys(c.mesi).length && !c.ultimo && !c.fallitoIl && !c.presenza && !c.intervista && !Object.keys(c.chiuse).length
+      && !Object.keys(c.uscite).length;
     if (vuoto) return false;
     stato = statoVuoto();
     await salva();
@@ -848,6 +874,121 @@ function crea(dip = {}) {
   }
   function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
 
+  // ── La chat e l'agente (#1463) ───────────────────────────────────────────
+  // Un turno raccoglie giri, strumenti e strade di riserva mentre lavora, e li conta alla fine, col suo esito, in una
+  // scrittura sola. Un turno partito in incognito non conta niente.
+  function turnoChat(action) {
+    try {
+      const funzione = C.funzioneDi(action);
+      if (!C.AGENTI.includes(funzione) || inIncognito()) return TURNO_MUTO;
+      let giri = 0;
+      let chiuso = false;
+      const azioni = new Map();
+      const usati = new Map();
+      const recuperi = new Set();
+      const piu = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+      return {
+        giro() { giri += 1; },
+        azioni(n) { if (Number.isInteger(n) && n > 0) piu(azioni, n); },
+        strumento(nome, esito) { if (C.ESITI_STRUMENTO.includes(esito)) piu(usati, `${C.nomeStrumento(nome)}|${esito}`); },
+        recupero(voce) { if (C.RECUPERI.includes(voce)) recuperi.add(voce); },
+        fine(esito) {
+          if (chiuso || !C.ESITI_TURNO.includes(esito)) return;
+          chiuso = true;
+          conta((ora) => {
+            C.registraTurno(ora, funzione, { esito, giri });
+            for (const [n, volte] of azioni) C.registraAzioniDelGiro(ora, funzione, n, volte);
+            for (const [k, volte] of usati) { const [nome, e] = k.split('|'); C.registraStrumento(ora, funzione, nome, e, volte); }
+            for (const v of recuperi) C.registraRecupero(ora, v);
+          }, { incognito: false }).catch(() => {});
+        },
+      };
+    } catch (_) { return TURNO_MUTO; }
+  }
+
+  function reazione(voce) {
+    if (!C.REAZIONI.includes(voce)) return false;
+    conta((ora) => C.registraReazione(ora, voce)).catch(() => {});
+    return true;
+  }
+
+  // Non «copia»: il nome è già del clone dello stato, qui sopra.
+  function copiaDaBolla(ruolo) {
+    if (!C.RUOLI_COPIA.includes(ruolo)) return false;
+    conta((ora) => C.registraCopia(ora, ruolo)).catch(() => {});
+    return true;
+  }
+
+  // Una chat chiusa si conta col tipo che le dà il classificatore, dopo: fino ad allora aspetta sul disco, così una
+  // chiusa all'uscita di Filo si conta quando la classificazione riesce, al giro dopo.
+  async function chatChiusa(id, { via, messaggi, durataMs } = {}) {
+    try {
+      const k = String(id || '');
+      if (!k || inIncognito() || !C.VIE_CHIUSURA.includes(via) || !(Number(messaggi) >= 1)) return false;
+      const mia = generazione;
+      if (!(await accesi())) { await azzera(); return false; }
+      await carica();
+      if (mia !== generazione) return false;
+      stato.chiuse[k] = { via, messaggi: Number(messaggi), durataMs: Math.max(0, Number(durataMs) || 0), t: adesso() };
+      delete stato.uscite[k];
+      const ids = Object.keys(stato.chiuse);
+      if (ids.length > TETTO_CHIUSE_IN_ATTESA) {
+        ids.sort((a, b) => Number(stato.chiuse[a].t) - Number(stato.chiuse[b].t));
+        for (const vecchia of ids.slice(0, ids.length - TETTO_CHIUSE_IN_ATTESA)) chiusaContata(vecchia, C.SENZA_TIPO);
+      }
+      await salva();
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // La scheda della chat se n'è andata: la chiusura vera è asincrona e, se Filo sta uscendo, non arriva in fondo. Il
+  // segno è sincrono, va sul disco con l'uscita, e all'avvio dopo la chat si conta come «uscita» (#1463).
+  function chatInUscita(id) {
+    const k = String(id || '');
+    if (!k || !stato || inIncognito()) return false;
+    stato.uscite[k] = adesso();
+    salvaPresto();
+    return true;
+  }
+
+  // La chiusura è arrivata in fondo senza contarla (chat vuota, di un'app, già chiusa, contatori spenti): il segno va via.
+  function uscitaFinita(id) {
+    const k = String(id || '');
+    if (!stato || !k || !Object.prototype.hasOwnProperty.call(stato.uscite, k)) return false;
+    delete stato.uscite[k];
+    salvaPresto();
+    return true;
+  }
+
+  async function usciteInSospeso() {
+    try { await carica(); return Object.keys(stato.uscite); } catch (_) { return []; }
+  }
+
+  function chiusaContata(id, tipo) {
+    const c = stato.chiuse[id];
+    delete stato.chiuse[id];
+    if (oggetto(c)) C.registraChatChiusa(oraCorrente(), { ...c, tipo: C.TIPI_CHAT.includes(tipo) ? tipo : C.SENZA_TIPO });
+  }
+
+  async function chatClassificata(id, tipo) {
+    try {
+      const k = String(id || '');
+      if (!k || inIncognito()) return false;
+      await carica();
+      if (!oggetto(stato.chiuse[k])) return false;
+      const fatto = await conta(() => { if (!oggetto(stato.chiuse[k])) return false; chiusaContata(k, tipo); return true; });
+      // Subito sul disco, insieme all'ora: un'uscita di Filo qui non la lascia in attesa da contare una seconda volta.
+      if (fatto) await salva();
+      return fatto;
+    } catch (_) { return false; }
+  }
+
+  function chiuseScadute() {
+    for (const [id, c] of Object.entries(stato.chiuse)) {
+      if (!oggetto(c) || !(adesso() - Number(c.t) < CHIUSA_ASPETTA_MS)) chiusaContata(id, C.SENZA_TIPO);
+    }
+  }
+
   // ── La spedizione ────────────────────────────────────────────────────────
   async function spedisci(doc, collezione = C.COLLEZIONE) {
     const { FIRESTORE_BASE, API_KEY } = rest();
@@ -880,6 +1021,7 @@ function crea(dip = {}) {
     const oggi = C.giornoDi(adesso());
     scaduteLeConferme();
     abbandonoPerFermo();
+    chiuseScadute();
     segnaPresenza();
     // Ogni ora con una finestra normale aperta entrano il campione del sistema e quello che aspettava; con sole
     // finestre incognito, o nessuna, non entra niente.
@@ -930,11 +1072,20 @@ function crea(dip = {}) {
       }
       const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
       const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
+      // La chat della stessa ora parte nel suo documento, dopo l'ora (#1463). Rifiutata, l'ora resta: rispedita, quella
+      // già arrivata risponde 409 e la chat riparte con lei.
+      let chat = giorno ? null : C.documentoChat({ ...base, chiave: k });
+      if (chat && !C.haChat(chat)) chat = null;
+      if (chat && !C.valida(chat).ok) { log(`la chat di ${k} non parte: ${C.valida(chat).motivo}`); chat = null; }
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
       // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
       // allora l'ora rispedita risponde 409.
       if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
+      if (r.ok && chat) {
+        r = await spedisci(chat);
+        if (mia !== generazione) return 'spenti';
+      }
       if (r.ok && chiamate) {
         r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
         if (mia !== generazione) return 'spenti';
@@ -1111,11 +1262,12 @@ function crea(dip = {}) {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura,
-    controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
+    turnoChat, reazione, copia: copiaDaBolla, chatChiusa, chatClassificata, chatInUscita, uscitaFinita, usciteInSospeso,
+    controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva, alChiudere,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,
     avvioProcesso, secondaIstanza, inizioChiusura, tettoChiusura, fineChiusura, perLaChiusura, salvaSubito,
     leggiFermo, sonno, avviaFermo, fermaFermo,
   };
 }
 
-module.exports = { crea, CHIAVE, MUTO, FILE_SEGNO };
+module.exports = { crea, CHIAVE, MUTO, FILE_SEGNO, TURNO_MUTO };

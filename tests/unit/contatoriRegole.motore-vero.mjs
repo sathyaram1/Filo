@@ -1,18 +1,18 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1464, #1466), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1463, #1464, #1466), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
 // firestoreRulesContatori.test.mjs; questo è l'altra metà: l'ora che l'app spedisce davvero (il servizio
-// src/main/services/contatori.js, con la sua chiamata REST) passa insieme alle sue chiamate ai modelli, e il giorno
-// delle copie vecchie anche; uno manomesso no, e la lettura è dell'admin.
+// src/main/services/contatori.js, con la sua chiamata REST) passa con la sua chat e le sue chiamate ai modelli, e il
+// giorno delle copie vecchie anche; uno manomesso no, e la lettura è dell'admin.
 //
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 71 righe verdi, uscita 0 (#1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
-// che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più le fa
-// rifiutare tutte (per questo le chiamate ai modelli hanno il loro documento), mentre la sentinella che legge il file
-// non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
+// Esito atteso: 85 righe verdi, uscita 0 (#1463 e #1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille
+// espressioni che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più
+// le fa rifiutare tutte (per questo le chiamate ai modelli e la chat hanno il loro documento), mentre la sentinella che
+// legge il file non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection } from 'firebase/firestore';
@@ -26,7 +26,7 @@ const PROGETTO = 'filo-prova-969';
 const BASE = `http://127.0.0.1:8089/v1/projects/${PROGETTO}/databases/(default)/documents`;
 
 const require = createRequire(join(REPO, 'package.json'));
-for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'actionTools', 'chatArchive', 'contatoriGiornalieri']) {
   require(join(REPO, `src/shared/${f}.js`));
 }
 const Servizio = require(join(REPO, 'src/main/services/contatori.js'));
@@ -112,10 +112,17 @@ await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', asy
   s.aggiornamento('trovato');
   s.sessione({ esito: 'ripristinata', schede: 3, t0: 0 }).vista();
   s.secondaIstanza();
+  const t = s.turnoChat(A.FILO_CHAT);
+  t.giro(); t.azioni(2); t.strumento('CERCA_WEB', 'eseguito'); t.strumento('inventato', 'rifiutato'); t.recupero('sollecito'); t.giro();
+  t.fine('risposta');
+  s.reazione('ferma_durante_testo'); s.copia('risposta');
+  await s.chatChiusa('chat-1', { via: 'uscita', messaggi: 3, durataMs: 120000 });
+  await s.chatClassificata('chat-1', 'conversazione');
   await new Promise((r) => setTimeout(r, 30));
   sposta(ORA);
   const esito = await s.controlla();
   vero(esito === 'inviati', `esito ${esito}, errore ${JSON.stringify(disco.get(Servizio.CHIAVE)?.errore)}`);
+  vero(Object.keys(disco.get(Servizio.CHIAVE).ore).every((k) => !k.endsWith('T10')), 'l’ora e la sua chat sono arrivate');
 });
 await prova('rispedita, la stessa ora non si riscrive (create sì, update no) e l’app la dà per arrivata', async () => {
   const { s, sposta } = servizio(IERI);
@@ -151,6 +158,12 @@ C.registraChiamata(datiBuoni, 'help', { modello: 'deepseek/deepseek-v4-flash', i
 C.registraChiamate(datiBuoni, 'help', 2);
 const CHIAMATE = C.documentoChiamate({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
 const COLL_CHIAMATE = C.COLLEZIONE_CHIAMATE;
+const datiChat = C.oraVuota();
+C.registraTurno(datiChat, 'filo-chat', { esito: 'risposta', giri: 2 });
+C.registraStrumento(datiChat, 'filo-chat', 'NAVIGA', 'eseguito');
+C.registraChatChiusa(datiChat, { via: 'chat_nuova', messaggi: 2, durataMs: 90000, tipo: 'comando' });
+const CHAT = C.documentoChat({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiChat });
+const idChat = C.idDocumento(CHAT);
 const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
@@ -197,6 +210,19 @@ await prova('un segno di primo documento fuori elenco', () => rifiuta({ primo: '
 await prova('senza il segno di primo documento', () => { const { primo, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
 await prova('una versione dell’app che è testo', () => rifiuta({ app: 'ciao mamma' }));
 await prova('un campo mancante', () => { const { intervista, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
+const rifiutaChat = (patch) => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idChat}`), { ...CHAT, ...patch }));
+await prova('la chat con un campo dell’ora', () => rifiutaChat({ primo: 'mese' }));
+await prova('l’ora con un campo della chat', () => rifiuta({ chatCopie: {} }));
+await prova('la chat con l’id dell’ora', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), CHAT)));
+await prova('la chat senza una sua misura', () => { const { chatCopie, ...senza } = CHAT; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idChat}`), senza)); });
+await prova('uno strumento col nome scritto a parole', () => rifiutaChat({ strumenti: { 'filo-chat': 'cerca mario rossi|eseguito|1' } }));
+await prova('uno strumento con l’argomento al posto dell’esito', () => rifiutaChat({ strumenti: { 'filo-chat': 'NAVIGA|https://mario.it|1' } }));
+await prova('un turno con un esito inventato', () => rifiutaChat({ chatTurni: { 'filo-chat': 'benissimo|g1|1' } }));
+await prova('una chat chiusa col titolo al posto del tipo', () => rifiutaChat({ chatChiuse: { uscita: 'm1|min1|Ricetta della nonna|1' } }));
+await prova('una chat chiusa con una via inventata', () => rifiutaChat({ chatChiuse: { 'chiusa da mario': 'm1|min1|comando|1' } }));
+await prova('una reazione scritta a parole', () => rifiutaChat({ chatReazioni: { 'non mi piaceva': '1' } }));
+await prova('una copia col testo copiato', () => rifiutaChat({ chatCopie: { risposta: 'il testo che ho copiato' } }));
+await prova('le azioni per giro con una fascia in più', () => rifiutaChat({ azioniPerGiro: { 'filo-chat': '1,0,0,0,7' } }));
 await prova('un giorno di prima con un campo dell’ora', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), { ...GIORNO_VECCHIO, azioni: {} })));
 // Il sistema (#1466): niente percorsi, messaggi o chiavi dello storage, né come voce né come conto.
 await prova('un processo morto col percorso del dump', () => rifiuta({ sistema: 'processoMorto.gpu.crashed|1;C:/Users/mario/crash.dmp|1' }));
@@ -232,6 +258,22 @@ await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogn
   const piene = C.documentoChiamate({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
   vero(C.validaChiamate(piene).ok, C.validaChiamate(piene).motivo);
   return assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${C.idDocumento(piene)}`), piene));
+});
+await prova('un anonimo crea la chat della sua ora', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idChat}`), CHAT)));
+await prova('la chat più carica che l’app costruisce passa', () => {
+  const dati = C.oraVuota();
+  for (const esito of C.ESITI_TURNO) for (const giri of [1, 2, 3, 5, 9, 12]) C.registraTurno(dati, 'filo-chat', { esito, giri });
+  for (const nome of C.strumenti()) for (const esito of C.ESITI_STRUMENTO) C.registraStrumento(dati, 'filo-chat', nome, esito, 999999999);
+  for (const n of [1, 2, 4, 9]) C.registraAzioniDelGiro(dati, 'filo-chat', n, 999999999);
+  for (const v of C.RECUPERI) C.registraRecupero(dati, v);
+  for (const v of C.REAZIONI) C.registraReazione(dati, v);
+  for (const r of C.RUOLI_COPIA) C.registraCopia(dati, r);
+  for (const via of C.VIE_CHIUSURA) for (const messaggi of [1, 2, 4, 8, 50]) for (const durataMs of [0, 2e5, 6e5, 2e6, 1e9]) {
+    for (const tipo of C.TIPI_CHAT) C.registraChatChiusa(dati, { via, messaggi, durataMs, tipo });
+  }
+  const piena = C.documentoChat({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '0.2.243', os: 'linux', dati });
+  vero(C.valida(piena).ok, C.valida(piena).motivo);
+  return assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(piena)}`), piena));
 });
 await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
 await prova('una copia vecchia crea ancora la sua ora v2, senza il sistema', () => {

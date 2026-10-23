@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461, #1464, #1466): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1463, #1464, #1466): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
@@ -6,9 +6,12 @@
   'use strict';
 
   // Un documento per pseudonimo e ora (#1461); v3 porta anche le misure del sistema (#1466). Le ore e i giorni rimasti
-  // in attesa partono nella forma di adesso; le copie vecchie mandano ancora v2 e v1, e le regole le accettano.
+  // in attesa partono nella forma di adesso; le copie vecchie mandano ancora v2 e v1, e le regole le accettano. La
+  // chat e l'agente (#1463) hanno un documento loro per la stessa ora: nel primo le regole non hanno più posto (il
+  // motore valuta al più mille espressioni per scrittura, e l'ora ne usa quasi tutte).
   const VERSIONE = 3;
   const VERSIONE_GIORNO = 1;
+  const VERSIONE_CHAT = 4;
   const COLLEZIONE = 'contatori-giornalieri';
   // Le misure delle chiamate ai modelli (#1464) partono in un documento a parte, con lo stesso id dell'ora: le regole
   // dell'ora sono già vicine al tetto di mille espressioni che Firestore valuta per scrittura.
@@ -35,6 +38,9 @@
     'eccezioneMain', 'memoria', 'ipcSincrono', 'chiusura', 'uscitaPrecedente', 'storageEsito', 'sessione', 'aggiornamento']);
   const CAMPI_ORA_V2 = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE_ORA]);
   const CAMPI = Object.freeze([...CAMPI_ORA_V2, 'sistema']);
+  const MISURE_CHAT = Object.freeze(['chatTurni', 'chatRecuperi', 'strumenti', 'azioniPerGiro', 'chatReazioni', 'chatCopie',
+    'chatChiuse']);
+  const CAMPI_CHAT = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_CHAT]);
 
   // ── Le chiamate ai modelli (#1464) ────────────────────────────────────────
   // Misurate al cancello, sul tentativo che ha servito: per funzione e modello, «modello|…|n». Fasce in token da 1024.
@@ -120,6 +126,35 @@
     'completa', 'anticipata', 'saltata', 'uscita', 'tetto']);
   const AVVIO = 'avvio';
 
+  // La chat e l'agente (#1463). Le funzioni che girano coi loro strumenti: si contano i turni, non solo le chiamate.
+  const AGENTI = Object.freeze(['filo-chat']);
+  const ESITI_TURNO = Object.freeze(['risposta', 'tetto_giri', 'fermato', 'tagliato', 'muto_dopo_letture', 'non_disponibile',
+    'vuoto', 'errore']);
+  // I giri di un turno: il dodicesimo è il tetto del ciclo. Un turno fermato o fallito prima del primo vale un giro.
+  const GIRI = Object.freeze([['g1', 1], ['g2', 2], ['g3', 3], ['g4_6', 6], ['g7_11', 11], ['tetto', Infinity]]);
+  const NOMI_GIRI = Object.freeze(GIRI.map(([k]) => k));
+  // Le strade di riserva di un turno: ognuna dice una debolezza del modello scelto. Si conta il turno, non le volte.
+  const RECUPERI = Object.freeze(['senza_foto', 'contesto_stretto', 'sollecito', 'formato_vecchio', 'file_aggiunto',
+    'proposta_segnalazione']);
+  const ESITI_STRUMENTO = Object.freeze(['eseguito', 'non_riuscito', 'rifiutato', 'argomenti_errati', 'argomenti_tagliati',
+    'in_conferma', 'fermato_segreto', 'non_disponibile']);
+  const AZIONI_PER_GIRO = Object.freeze([['a1', 1], ['a2', 2], ['a3_5', 5], ['oltre', Infinity]]);
+  const NOMI_AZIONI_PER_GIRO = Object.freeze(AZIONI_PER_GIRO.map(([k]) => k));
+  // Quello che la persona fa durante o dopo una risposta: ognuna dice che la risposta non andava.
+  const REAZIONI = Object.freeze(['ferma_prima_del_testo', 'ferma_durante_azioni', 'ferma_durante_testo', 'riprendi',
+    'continua_tetto_giri', 'continua_tagliato', 'continua_muto_dopo_letture', 'riprova', 'seguito_scritto']);
+  const RUOLI_COPIA = Object.freeze(['risposta', 'attivita', 'utente']);
+  // Come finisce una chat: «home» quando la scheda passa a un'altra conversazione, «chat_nuova» quando la chiude la
+  // persona, «uscita» quando la scheda o Filo se ne vanno; una risposta arrivata a chat chiusa la richiude e si conta.
+  const VIE_CHIUSURA = Object.freeze(['home', 'chat_nuova', 'uscita', 'nascosta', 'appesa_all_avvio', 'risposta_tardiva']);
+  const MESSAGGI_CHAT = Object.freeze([['m1', 1], ['m2', 2], ['m3_5', 5], ['m6_10', 10], ['oltre', Infinity]]);
+  const NOMI_MESSAGGI_CHAT = Object.freeze(MESSAGGI_CHAT.map(([k]) => k));
+  const DURATE_CHAT = Object.freeze([['min1', 60e3], ['min5', 5 * 60e3], ['min30', 30 * 60e3], ['ora', 60 * 60e3], ['oltre', Infinity]]);
+  const NOMI_DURATE_CHAT = Object.freeze(DURATE_CHAT.map(([k]) => k));
+  // I tipi di SN_CHAT_ARCHIVE.KINDS (la sentinella li confronta), più «nessuno» se la classificazione non è riuscita.
+  const TIPI_CHAT = Object.freeze(['conversazione', 'comando', 'nessuno']);
+  const SENZA_TIPO = 'nessuno';
+
   // Tetti larghi: in un'ora le combinazioni vere sono poche; oltre si somma in «altro», detto, e non si perde niente.
   const TETTO_COMBINAZIONI = 50;
   // Gli errori di un'ora per funzione: trenta combinazioni di modello e host bastano anche a un pomeriggio di guasti.
@@ -130,6 +165,8 @@
   // Le voci con un modello di un'ora in una misura delle chiamate, su tutte le funzioni insieme: oltre, il modello
   // diventa «altro». Le righe «altro» restano libere, così la somma non perde niente.
   const TETTO_MODELLI_ORA = 80;
+  // Gli strumenti di un'ora per esito: un pomeriggio d'agente ne tocca una ventina; oltre, in «altro» per esito.
+  const TETTO_STRUMENTI = 120;
   // Due mesi di ore in attesa, e trecento invii a giro: un server tornato dopo settimane si rimette in pari in un giorno.
   const TETTO_ORE_IN_ATTESA = 62 * 24;
   const TETTO_GIORNI_IN_ATTESA = 62;
@@ -273,6 +310,16 @@
   const VOCE_SISTEMA = `${alternative(MISURE_SISTEMA.map((m) => `${m}[.]${percorsiDi(SCHEMA_SISTEMA[m])}`))}[|]${N}`;
   // La voce una volta sola, preceduta dall'inizio o da «;»: le regole non accettano un'espressione oltre i 4096 caratteri.
   const SISTEMA_FORMA = `^((^|;)${VOCE_SISTEMA})*$`;
+  // La chat (#1463): «esito|fascia dei giri|n», «strumento|esito|n», «messaggi|durata|tipo|n». Il nome di uno strumento
+  // ha nelle regole la sua forma (maiuscole, cifre, trattino basso): l'elenco cresce con Filo e lo tiene l'app.
+  const VOCE_TURNO = `${alternative(ESITI_TURNO)}[|]${alternative(NOMI_GIRI)}[|]${N}`;
+  const TURNI_FORMA = forma(VOCE_TURNO);
+  const NOME_STRUMENTO_FORMA = '^[A-Z][A-Z0-9_]{0,39}$';
+  const VOCE_STRUMENTO = `(${ALTRO}|[A-Z][A-Z0-9_]{0,39})[|]${alternative(ESITI_STRUMENTO)}[|]${N}`;
+  const STRUMENTI_FORMA = forma(VOCE_STRUMENTO);
+  const AZIONI_PER_GIRO_FORMA = `^${N}(,${N}){${AZIONI_PER_GIRO.length - 1}}$`;
+  const VOCE_CHIUSA = `${alternative(NOMI_MESSAGGI_CHAT)}[|]${alternative(NOMI_DURATE_CHAT)}[|]${alternative(TIPI_CHAT)}[|]${N}`;
+  const CHIUSE_FORMA = forma(VOCE_CHIUSA);
 
   const re = (s) => new RegExp(s);
   const USO_RE = re(USO_FORMA);
@@ -288,6 +335,10 @@
   const MODELLI_RE = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, re(FORME_MODELLI[c])])));
   const CHIAMATE_RE = re(CHIAMATE_FORMA);
   const SISTEMA_RE = re(SISTEMA_FORMA);
+  const TURNI_RE = re(TURNI_FORMA);
+  const STRUMENTI_RE = re(STRUMENTI_FORMA);
+  const AZIONI_PER_GIRO_RE = re(AZIONI_PER_GIRO_FORMA);
+  const CHIUSE_RE = re(CHIUSE_FORMA);
 
   // Il tetto di caratteri di ogni valore annidato, misurato sulla sua voce più lunga possibile, con margine.
   const TETTO_CARATTERI_USO = 80;
@@ -308,6 +359,10 @@
   const TETTO_CARATTERI_CHIAMATE = 49;
   // Ogni percorso del sistema una volta, col conto più alto: il caso che non arriva mai, e il documento resta piccolo.
   const TETTO_CARATTERI_SISTEMA = 16000;
+  const TETTO_CARATTERI_TURNI = 36 * ESITI_TURNO.length * NOMI_GIRI.length;
+  const TETTO_CARATTERI_STRUMENTI = 70 * TETTO_STRUMENTI;
+  const TETTO_CARATTERI_AZIONI_PER_GIRO = 10 * AZIONI_PER_GIRO.length;
+  const TETTO_CARATTERI_CHIUSE = 36 * NOMI_MESSAGGI_CHAT.length * NOMI_DURATE_CHAT.length * TIPI_CHAT.length;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
@@ -430,6 +485,34 @@
     return [...(O && Array.isArray(O.ITEM_IDS) ? O.ITEM_IDS : []), ...PASSI_EXTRA];
   }
 
+  // Gli strumenti dell'agente, come li nomina il registro che li offre al modello: un nome inventato esce come «altro».
+  function strumenti() {
+    const T = global.SN_ACTION_TOOLS;
+    return T && Array.isArray(T.NAMES) ? T.NAMES.filter((n) => re(NOME_STRUMENTO_FORMA).test(n)) : [];
+  }
+  function nomeStrumento(nome) {
+    const s = String(nome || '').toUpperCase();
+    return strumenti().includes(s) ? s : ALTRO;
+  }
+
+  // L'esito di una chiamata a uno strumento: prima gli argomenti, poi quello che ha detto chi la esegue.
+  function esitoStrumento({ argomenti = '', tagliati = false } = {}, res) {
+    const r = oggetto(res) ? res : {};
+    const o = oggetto(r.output) ? r.output : {};
+    if (argomenti) return tagliati ? 'argomenti_tagliati' : 'argomenti_errati';
+    if (o.blocked === 'segreto') return 'fermato_segreto';
+    if (r.needsConfirm) return 'in_conferma';
+    if (r.rejected || r.no) return 'rifiutato';
+    if (o.proxy === 'non_disponibile') return 'non_disponibile';
+    return r.executed ? 'eseguito' : 'non_riuscito';
+  }
+
+  function fasciaFra(fasce, v, minimo = 0) {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < minimo) return '';
+    return fasce.find(([, fino]) => n <= fino)[0];
+  }
+
   // Gli errori che una persona vede: crash e blocchi, pagine d'errore di rete (il codice di Chromium è un numero),
   // risposte non arrivate (in chat o in una pagina), avvisi d'errore per chiave.
   function erroreVisto(tipo) {
@@ -543,6 +626,7 @@
       uso: {}, errori: {}, azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {},
       anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {}, primeVolte: [],
       contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
+      chatTurni: {}, chatRecuperi: {}, strumenti: {}, azioniPerGiro: {}, chatReazioni: {}, chatCopie: {}, chatChiuse: {},
     };
     for (const k of MISURE_SISTEMA) o[k] = {};
     return o;
@@ -550,7 +634,7 @@
 
   function normale(o) {
     const d = oggetto(o) ? o : {};
-    for (const k of [...MISURE, ...MISURE_SISTEMA]) {
+    for (const k of [...MISURE, ...MISURE_SISTEMA, ...MISURE_CHAT]) {
       if (k === 'primeVolte') { if (!Array.isArray(d[k])) d[k] = []; } else if (!oggetto(d[k])) d[k] = {};
     }
     return d;
@@ -977,6 +1061,70 @@
     return !MISURE_SISTEMA.some((k) => pieno(d && d[k]));
   }
 
+
+  // ── La chat e l'agente (#1463) ────────────────────────────────────────────
+  function piuN(mappa, chiave, n) { mappa[chiave] = Math.min(conto(mappa[chiave]) + n, MAX_CONTO); }
+  const quante = (n) => (n == null ? 1 : Number.isInteger(n) && n > 0 ? n : 0);
+  function mappaDi(g, campo, chiave) {
+    if (!oggetto(g[campo][chiave])) g[campo][chiave] = {};
+    return g[campo][chiave];
+  }
+
+  function registraTurno(ora, funzione, { esito, giri } = {}) {
+    const f = fasciaFra(GIRI, giri);
+    if (!AGENTI.includes(funzione) || !ESITI_TURNO.includes(esito) || !f) return false;
+    piuUno(mappaDi(normale(ora), 'chatTurni', funzione), `${esito}|${f}`);
+    return true;
+  }
+
+  function registraStrumento(ora, funzione, nome, esito, n = null) {
+    const k = quante(n);
+    if (!AGENTI.includes(funzione) || !ESITI_STRUMENTO.includes(esito) || !k) return false;
+    const per = mappaDi(normale(ora), 'strumenti', funzione);
+    let chiave = `${nomeStrumento(nome)}|${esito}`;
+    // Il posto per le righe «altro» (una per esito) resta sempre libero: oltre il tetto non si perde niente.
+    const specifiche = Object.keys(per).filter((x) => !x.startsWith(`${ALTRO}|`)).length;
+    if (!has(per, chiave) && specifiche >= TETTO_STRUMENTI - ESITI_STRUMENTO.length) chiave = `${ALTRO}|${esito}`;
+    piuN(per, chiave, k);
+    return true;
+  }
+
+  function registraAzioniDelGiro(ora, funzione, azioni, n = null) {
+    const f = fasciaFra(AZIONI_PER_GIRO, azioni, 1);
+    const k = quante(n);
+    if (!AGENTI.includes(funzione) || !f || !k) return false;
+    piuN(mappaDi(normale(ora), 'azioniPerGiro', funzione), f, k);
+    return true;
+  }
+
+  function registraRecupero(ora, voce) {
+    if (!RECUPERI.includes(voce)) return false;
+    piuUno(normale(ora).chatRecuperi, voce);
+    return true;
+  }
+
+  function registraReazione(ora, voce) {
+    if (!REAZIONI.includes(voce)) return false;
+    piuUno(normale(ora).chatReazioni, voce);
+    return true;
+  }
+
+  function registraCopia(ora, ruolo) {
+    if (!RUOLI_COPIA.includes(ruolo)) return false;
+    piuUno(normale(ora).chatCopie, ruolo);
+    return true;
+  }
+
+  // `messaggi`: quelli scritti dalla persona; `durataMs`: dal primo all'ultimo messaggio; `tipo` quello del classificatore.
+  function registraChatChiusa(ora, { via, messaggi, durataMs, tipo } = {}) {
+    const m = fasciaFra(MESSAGGI_CHAT, messaggi, 1);
+    const d = fasciaFra(DURATE_CHAT, durataMs);
+    if (!VIE_CHIUSURA.includes(via) || !m || !d) return false;
+    const t = TIPI_CHAT.includes(tipo) ? tipo : SENZA_TIPO;
+    piuUno(mappaDi(normale(ora), 'chatChiuse', via), `${m}|${d}|${t}`);
+    return true;
+  }
+
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
@@ -1233,6 +1381,52 @@
     return out;
   }
 
+  // Le voci della chat si ricostruiscono dagli elenchi chiusi, in ordine fisso: una chiave scritta a mano non esce.
+  function prodotto(assi) {
+    return assi.reduce((acc, asse) => acc.flatMap((p) => asse.map((v) => [...p, v])), [[]]).map((p) => p.join('|'));
+  }
+  function vociPulite(mappa, chiavi, assi) {
+    const out = {};
+    const voci = prodotto(assi);
+    for (const k of chiavi) {
+      const per = oggetto(mappa) && has(mappa, k) ? mappa[k] : null;
+      if (!oggetto(per)) continue;
+      const lista = voci.filter((v) => has(per, v) && intero(per[v]) && per[v] > 0).map((v) => `${v}|${conto(per[v])}`);
+      if (lista.length) out[k] = lista.join(';');
+    }
+    return out;
+  }
+
+  // Uno strumento tolto da Filo mentre la sua ora aspettava esce come «altro», col suo conto.
+  function strumentiPuliti(mappa) {
+    const out = {};
+    const nomi = [...strumenti(), ALTRO];
+    for (const f of AGENTI) {
+      const per = oggetto(mappa) && has(mappa, f) ? mappa[f] : null;
+      if (!oggetto(per)) continue;
+      const somme = {};
+      for (const [k, n] of Object.entries(per)) {
+        const [nome, esito, resto] = String(k).split('|');
+        if (resto !== undefined || !ESITI_STRUMENTO.includes(esito) || !intero(n) || n === 0) continue;
+        piuN(somme, `${nomi.includes(nome) ? nome : ALTRO}|${esito}`, n);
+      }
+      const lista = prodotto([nomi, ESITI_STRUMENTO]).filter((v) => somme[v] > 0).slice(0, TETTO_STRUMENTI)
+        .map((v) => `${v}|${somme[v]}`);
+      if (lista.length) out[f] = lista.join(';');
+    }
+    return out;
+  }
+
+  function azioniPerGiroPulite(mappa) {
+    const out = {};
+    for (const f of AGENTI) {
+      const per = oggetto(mappa) && has(mappa, f) ? mappa[f] : null;
+      const s = oggetto(per) ? fasceIn(per, NOMI_AZIONI_PER_GIRO, MAX_CONTO) : '';
+      if (s && s.split(',').some((n) => Number(n) > 0)) out[f] = s;
+    }
+    return out;
+  }
+
   function meseDi(giorno) { return String(giorno || '').slice(0, 7); }
 
   function documento({ pseudonimo, chiave, app, os, dati, primo = '' }) {
@@ -1283,6 +1477,29 @@
   // Un'ora senza chiamate ai modelli non ha il secondo documento.
   function senzaChiamate(doc) { return MISURE_CHIAMATE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
+  // La chat della stessa ora, nel suo documento (#1463): parte solo se ha qualcosa, e l'id è quello dell'ora più «_chat».
+  function documentoChat({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    return {
+      v: VERSIONE_CHAT,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
+      chatTurni: vociPulite(d.chatTurni, AGENTI, [ESITI_TURNO, NOMI_GIRI]),
+      chatRecuperi: contiPuliti(d.chatRecuperi, RECUPERI),
+      strumenti: strumentiPuliti(d.strumenti),
+      azioniPerGiro: azioniPerGiroPulite(d.azioniPerGiro),
+      chatReazioni: contiPuliti(d.chatReazioni, REAZIONI),
+      chatCopie: contiPuliti(d.chatCopie, RUOLI_COPIA),
+      chatChiuse: vociPulite(d.chatChiuse, VIE_CHIUSURA, [NOMI_MESSAGGI_CHAT, NOMI_DURATE_CHAT, TIPI_CHAT]),
+    };
+  }
+  function haChat(doc) { return !!doc && MISURE_CHAT.some((k) => oggetto(doc[k]) && Object.keys(doc[k]).length > 0); }
+
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
     const d = oggetto(dati) ? dati : {};
@@ -1306,6 +1523,7 @@
   }
 
   function idDocumento(doc) {
+    if (doc && doc.v === VERSIONE_CHAT) return `${doc.pseudonimo}_${doc.giorno}_${doc.ora}_chat`;
     return oggetto(doc) && has(doc, 'ora') ? `${doc.pseudonimo}_${doc.giorno}_${doc.ora}` : `${doc.pseudonimo}_${doc.giorno}`;
   }
 
@@ -1352,6 +1570,7 @@
     const no = (motivo) => ({ ok: false, motivo });
     if (!oggetto(doc)) return no('non è un documento');
     if (doc.v === VERSIONE_GIORNO) return validaGiorno(doc);
+    if (doc.v === VERSIONE_CHAT) return validaChat(doc);
     const chiavi = Object.keys(doc);
     if (chiavi.length !== CAMPI.length || !CAMPI.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
     if (doc.v !== VERSIONE) return no('versione');
@@ -1380,15 +1599,8 @@
     if ((sis.chiusura.tetto || 0) > somma(sis.chiusura.durata || {})) return no('sistema: tetto oltre le chiusure');
     const rip = sis.sessione.esiti?.ripristinata || 0;
     if (somma(sis.sessione.vista || {}) > rip || somma(sis.sessione.coda || {}) > rip) return no('sistema: attese oltre le sessioni ripristinate');
-    for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
-      const m = doc[campo];
-      if (!oggetto(m)) return no(campo);
-      for (const [k, v] of Object.entries(m)) {
-        const chiaveOk = Array.isArray(chiaviAmmesse) ? chiaviAmmesse.includes(k) : chiaviAmmesse.test(k);
-        if (!chiaveOk) return no(`${campo}: chiave ${k}`);
-        if (typeof v !== 'string' || v.length > tetto || !formaValore.test(v)) return no(`${campo} di ${k}`);
-      }
-    }
+    const fuori = mappeFuoriForma(doc, mappe);
+    if (fuori) return no(fuori);
     for (const [campo, s] of [...Object.entries(doc.uso), ...Object.entries(doc.azioni)].map(([k, v]) => [k, leggiMisura(v)])) {
       if (somma(s.visto) > s.n || somma(s.fine) > s.n || s.ripetute > s.n) return no(`attese di ${campo} oltre gli usi`);
     }
@@ -1426,6 +1638,46 @@
       if (c === 'chiamate') continue;
       const tutte = Object.values(doc[c]).flatMap((v) => leggiModelli(c, v));
       if (tutte.filter((x) => x.modello !== ALTRO).length > TETTO_MODELLI_ORA) return no(`${c}: voci oltre il tetto`);
+    }
+    return { ok: true, motivo: '' };
+  }
+
+  function mappeFuoriForma(doc, mappe) {
+    for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
+      const m = doc[campo];
+      if (!oggetto(m)) return campo;
+      for (const [k, v] of Object.entries(m)) {
+        const chiaveOk = Array.isArray(chiaviAmmesse) ? chiaviAmmesse.includes(k) : chiaviAmmesse.test(k);
+        if (!chiaveOk) return `${campo}: chiave ${k}`;
+        if (typeof v !== 'string' || v.length > tetto || !formaValore.test(v)) return `${campo} di ${k}`;
+      }
+    }
+    return '';
+  }
+
+  function validaChat(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_CHAT.length || !CAMPI_CHAT.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    const fuori = mappeFuoriForma(doc, {
+      chatTurni: [AGENTI, TURNI_RE, TETTO_CARATTERI_TURNI],
+      chatRecuperi: [RECUPERI, CONTO_RE, TETTO_CARATTERI_CONTO],
+      strumenti: [AGENTI, STRUMENTI_RE, TETTO_CARATTERI_STRUMENTI],
+      azioniPerGiro: [AGENTI, AZIONI_PER_GIRO_RE, TETTO_CARATTERI_AZIONI_PER_GIRO],
+      chatReazioni: [REAZIONI, CONTO_RE, TETTO_CARATTERI_CONTO],
+      chatCopie: [RUOLI_COPIA, CONTO_RE, TETTO_CARATTERI_CONTO],
+      chatChiuse: [VIE_CHIUSURA, CHIUSE_RE, TETTO_CARATTERI_CHIUSE],
+    });
+    if (fuori) return no(fuori);
+    for (const campo of ['chatTurni', 'strumenti', 'chatChiuse']) {
+      for (const [k, v] of Object.entries(doc[campo])) {
+        const voci = v.split(';');
+        if (voci.some((x) => /[|]0+$/.test(x)) || new Set(voci.map((x) => x.replace(/[|][0-9]+$/, ''))).size !== voci.length) return no(`${campo} di ${k}`);
+        if (campo === 'strumenti' && voci.length > TETTO_STRUMENTI) return no(`strumenti di ${k} oltre il tetto`);
+      }
     }
     return { ok: true, motivo: '' };
   }
@@ -1518,8 +1770,9 @@
   }
 
   global.SN_CONTATORI = {
-    VERSIONE, VERSIONE_GIORNO, VERSIONE_CHIAMATE, COLLEZIONE, COLLEZIONE_CHIAMATE, ERRORI, OS, PRIMI, FASCE, NOMI_FASCE, POSIZIONI,
-    NOMI_POSIZIONI, CAMPI, CAMPI_GIORNO, CAMPI_CHIAMATE, MISURE, MISURE_ORA, MISURE_MODELLI, MISURE_CHIAMATE,
+    VERSIONE, VERSIONE_GIORNO, VERSIONE_CHAT, VERSIONE_CHIAMATE, COLLEZIONE, COLLEZIONE_CHIAMATE, ERRORI, OS, PRIMI, FASCE,
+    NOMI_FASCE, POSIZIONI, NOMI_POSIZIONI, CAMPI, CAMPI_GIORNO, CAMPI_CHIAMATE, CAMPI_CHAT, MISURE, MISURE_ORA, MISURE_MODELLI,
+    MISURE_CHIAMATE, MISURE_CHAT,
     FASCE_CONTESTO, FASCE_CACHE, FASCE_RAGIONAMENTO, FASCE_USCITA, FINI, TENTATIVI, ORIGINI_SPESA, CENTOMILLESIMI, FASCE_CHIAMATE,
     ADATTAMENTI, RESTI, TETTO_MODELLI_ORA,
     CAMPI_ORA_V2, MISURE_SISTEMA, PASSI_AVVIO, TIPI_AVVIO, TIPO_PROCESSO_DI, TIPI_PROCESSO, COSE_FINESTRA, SOGLIE_FERMO,
@@ -1528,23 +1781,27 @@
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
+    AGENTI, ESITI_TURNO, GIRI, NOMI_GIRI, RECUPERI, ESITI_STRUMENTO, AZIONI_PER_GIRO, NOMI_AZIONI_PER_GIRO, REAZIONI,
+    RUOLI_COPIA, VIE_CHIUSURA, MESSAGGI_CHAT, NOMI_MESSAGGI_CHAT, DURATE_CHAT, NOMI_DURATE_CHAT, TIPI_CHAT, SENZA_TIPO,
     TETTO_COMBINAZIONI, TETTO_ERRORI_ORA, TETTO_CONFERME, TETTO_VALORI, TETTO_PRIME_VOLTE, TETTO_ORE_IN_ATTESA, TETTO_GIORNI_IN_ATTESA,
-    TETTO_INVII_PER_GIRO, RIPETUTA_MS, ANNULLO_MS,
+    TETTO_INVII_PER_GIRO, TETTO_STRUMENTI, RIPETUTA_MS, ANNULLO_MS,
     PSEUDONIMO_RE, GIORNO_RE, ORA_RE, CHIAVE_ORA_RE, APP_RE, MODELLO_RE, HOST_RE,
     FORME: Object.freeze({
       USO_FORMA, ERRORI_FORMA, MISURA_FORMA, IMPOSTAZIONI_FORMA, RICERCA_FORMA, CORRETTORE_FORMA, CONFERME_FORMA,
       CONTO_FORMA, ANTICIPO_FORMA, INTERVISTA_FORMA, CHIAVE_AZIONE_FORMA, CHIAVE_IMPOSTAZIONE_FORMA, TIPO_AZIONE_FORMA,
-      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI,
+      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, TURNI_FORMA, NOME_STRUMENTO_FORMA,
+      STRUMENTI_FORMA, AZIONI_PER_GIRO_FORMA, CHIUSE_FORMA,
     }),
     TETTI: Object.freeze({
       TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI, TETTO_CARATTERI_ERRORI_ORA, TETTO_CARATTERI_MISURA, TETTO_CARATTERI_IMPOSTAZIONE,
       TETTO_CARATTERI_RICERCA, TETTO_CARATTERI_CORRETTORE, TETTO_CARATTERI_CONFERME, TETTO_CARATTERI_CONTO,
       TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, TETTO_CARATTERI_SISTEMA,
       MODELLI: TETTI_CARATTERI_MODELLI,
+      TETTO_CARATTERI_TURNI, TETTO_CARATTERI_STRUMENTI, TETTO_CARATTERI_AZIONI_PER_GIRO, TETTO_CARATTERI_CHIUSE,
     }),
     funzioni, funzioneDi, azioni, azioneDiPagina, tipiAzione, chiaviImpostazioni, chiaveImpostazione, valoreImpostazione, viaDi,
     passiIntervista, erroreVisto, tipoErroreVisto, fasciaDi, posizioneDi, famigliaOs, versioneApp, modelloPulito,
-    hostPulito, tipoErrore,
+    hostPulito, tipoErrore, strumenti, nomeStrumento, esitoStrumento,
     oraVuota, registraUso, registraAzione, registraErrore, registraImpostazione, registraRicerca, registraProposta,
     registraConferma, registraAnnullato, registraAnticipo, registraChiesto, registraErroreVisto, registraIntervista,
     registraPrimaVolta, registraChiamata, registraSpesa, registraAdattamento, registraChiamate,
@@ -1552,7 +1809,8 @@
     registraMemoria, registraIpcSincrono, registraChiusura, registraUscita, registraStorage, registraSessione, registraAggiornamento,
     tipoProcesso, nomeEccezione, eventoLettura, eventoSalvataggio, eventoRinomina, eventoDimensione, eventoFlush,
     unisciSistema, sistemaVuoto,
-    documento, documentoGiorno, documentoChiamate, senzaChiamate, idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
+    registraTurno, registraStrumento, registraAzioniDelGiro, registraRecupero, registraReazione, registraCopia, registraChatChiusa,
+    documento, documentoGiorno, documentoChiamate, senzaChiamate, documentoChat, haChat, idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
     leggiSistema, sistemaInChiaro,
     giornoDi, oraDi, giornoPrima, meseDi, oreDaInviare, daInviare, potaOre, potaGiorni, pseudonimoDelMese,
   };
