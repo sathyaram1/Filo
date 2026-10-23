@@ -63,8 +63,10 @@
     adattamenti: ADATTAMENTI,
   });
   const MISURE_MODELLI = Object.freeze(Object.keys(RESTI));
-  const MISURE = Object.freeze([...MISURE_V2, ...MISURE_MODELLI, 'chiamate']);
-  const CAMPI = Object.freeze([...TESTA_ORA, ...MISURE]);
+  const MISURE_CHIAMATE = Object.freeze([...MISURE_MODELLI, 'chiamate']);
+  const CAMPI_CHIAMATE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_CHIAMATE]);
+  // Tutto quello che un'ora tiene sul disco, nei due documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
