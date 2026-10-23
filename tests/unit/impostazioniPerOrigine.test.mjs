@@ -132,7 +132,8 @@ test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle
   const descritte = [...src.matchAll(/"action":\s*"filo",\s*"filo":\s*\{\s*"type":\s*"([A-Z_]+)"/g)].map((m) => m[1]);
   assert.ok(descritte.includes('INVIA_FEEDBACK'), 'la sentinella non vede più le azioni del prompt della barra d\'aiuto');
   const siti = scriptDeiSiti().map((x) => x.src).join('\n');
-  const mandate = [...siti.matchAll(/runFiloAction\(\s*\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
+  // Anche quelle che la pagina rimanda all'Aiuto da far partire (src/content/aiutoPagina.js, `{ filo: { action } }`).
+  const mandate = [...siti.matchAll(/(?:runFiloAction\(\s*|\{\s*filo:\s*\{\s*action:\s*)\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
   assert.ok(mandate.includes('NAVIGA'), 'la sentinella non vede più le azioni che la barra manda da sé');
   // #843 — IMPOSTA_PREFERENZA passa solo nella forma stretta del prompt (Filo spento sul sito stesso): la prova sotto.
   assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t) && t !== 'IMPOSTA_PREFERENZA'), [], 'azioni della barra d\'aiuto non ammesse dai siti');

@@ -302,11 +302,14 @@ test('la ricerca dell\'Aiuto passa da NAVIGA col testo cercato: costo 2 lì, una
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), 2);
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://esempio.it/' }), 1);
   assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n«gatti»/);
-  const side = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
+  // Le azioni sulla pagina dell'Aiuto stanno con la pagina (#1509.3): quella che esce torna all'Aiuto come azione di Filo.
+  const side = readFileSync(join(ROOT, 'src', 'content', 'aiutoPagina.js'), 'utf8');
   for (const op of ['search_text', 'search_image']) {
     assert.match(side, new RegExp(`${op}:\\s*\\{[^}]*viaFilo: true`), `${op} non chiede anche lui prima del dispatch`);
-    assert.match(side, new RegExp(`case '${op}': return await runFiloAction\\(\\{[\\s\\S]{0,120}?cerca:`), `${op} porta il testo cercato`);
+    assert.match(side, new RegExp(`case '${op}': return \\{ filo: \\{[\\s\\S]{0,160}?type: 'NAVIGA'[\\s\\S]{0,120}?cerca:`), `${op} porta il testo cercato`);
   }
+  const aiuto = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
+  assert.match(aiuto, /if \(r\.filo && r\.filo\.action\) return runFiloAction\(r\.filo\.action/, 'l\'uscita della pagina passa dal dispatch di Filo');
 });
 
 // Il cammino del dispatch, senza Electron: ingressi dal registro, stato dalle fonti, risposta dal modulo.
@@ -421,8 +424,9 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
     'la sospensione viene dalla risposta di SN_AUTONOMIA');
   assert.match(h, /function decisioneAutonomia[\s\S]*?A\.decideDettaglio\(/);
   // L'agente sulla pagina: le sue azioni locali dichiarano il costo e chiedono la risposta al main.
-  const side = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
-  const tab = side.slice(side.indexOf('const PAGE_ACTIONS = {'), side.indexOf('};', side.indexOf('const PAGE_ACTIONS = {')));
+  const side = readFileSync(join(ROOT, 'src', 'content', 'aiutoPagina.js'), 'utf8');
+  const tab = side.slice(side.indexOf('const AZIONI = Object.freeze({'), side.indexOf('});', side.indexOf('const AZIONI = Object.freeze({')));
+  assert.ok(tab.length > 100, 'la tabella delle azioni sulla pagina c\'è');
   assert.doesNotMatch(tab, /confirm\s*:/, 'un\'azione della pagina non decide da sé se chiedere');
   for (const riga of tab.split('\n').filter((r) => /^\s+[a-z_]+:\s*\{/.test(r))) assert.match(riga, /costo:\s*[0-3]/, riga.trim());
   assert.match(side, /MSG\.FILO_DECIDI_PAGINA/);
