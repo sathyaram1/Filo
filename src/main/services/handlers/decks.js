@@ -80,8 +80,11 @@ module.exports = function register(on, ctx) {
 
   // Una carta chiesta e tornata senza parere porta il perché: la pagina lo mostra e non la richiede da sola, che
   // coi crediti finiti o un modello che salta la carta era una raffica di chiamate (#1344.1).
-  const SENZA_DATI = 'non ho i dati della carta: Scryfall, l\'archivio delle carte, non ha risposto. Riprova tra poco.';
-  const SENZA_PARERE = 'il modello ha risposto senza il parere di questa carta. Riprova, o scegli un altro modello per «Mazzi — parere su una carta» in Modelli predefiniti.';
+  const SENZA_DATI = { error: 'non ho i dati della carta: Scryfall, l\'archivio delle carte, non ha risposto. Riprova tra poco.' };
+  const senzaParere = () => ({
+    error: `il modello ha risposto senza il parere di questa carta. Riprova, o scegli un altro modello per «Mazzi — parere su una carta» ${globalThis.SN_CHAT_ERRORS.DOVE_ALTRO_MODELLO}.`,
+    code: 'ALTRO_MODELLO',
+  });
 
   // compute=false: solo cache, MAI una chiamata LLM; compute=true calcola i mancanti in un
   // batch; refresh=true rifà anche i freschi. Le carte possono non essere nel mazzo.
