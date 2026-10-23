@@ -83,6 +83,9 @@ test.beforeAll(async () => {
           if (url === '/redteamState') return json(res, 200, { result: { paused: true, error: PAUSA, verified: false } });
           if (url === '/redteamLeaderboard') return json(res, 200, { result: { paused: true, error: PAUSA, entries: [] } });
         }
+        if (url === '/redteamSubmit' && invioLento) {
+          return setTimeout(() => json(res, 200, { result: { status: 'ok', attemptId: 'tentativo-lento' } }), invioLento);
+        }
         if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'insufficient_credits', have: 0, needed: 50 } });
         if (url === '/redteamState') return json(res, 200, { result: { verified: false } });
         if (url === '/redteamLeaderboard') return json(res, 200, { result: { entries: [] } });
