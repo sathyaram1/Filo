@@ -435,6 +435,7 @@ class BarraLaterale {
     const dove = t ? `${t.id}|${t.url || ''}` : '';
     const cambiataPagina = dove !== this.ultimaPagina;
     this.ultimaPagina = dove;
+    this._consegnaInAttesa();
     if (cambiataPagina && this.aperta) this._chiediEtichette();
     const n = JSON.stringify(this._nav());
     if (n === this.ultimoNav && !cambiataPagina) return;
