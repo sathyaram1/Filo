@@ -296,7 +296,7 @@ test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una 
   }
   assert.ok(nomi.size > 15);
   const regole = new Set([...Object.keys(Permessi.TIPI), ...Object.keys(Permessi.SECONDO_L_ACCESSO), ...Permessi.INNOCUI,
-    ...Permessi.NON_DISPONIBILI, ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
+    ...Permessi.NON_DISPONIBILI, 'openExternal']);
   assert.deepEqual([...nomi].filter((n) => !regole.has(n)), []);
 });
 
