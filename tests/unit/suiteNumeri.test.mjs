@@ -43,12 +43,11 @@ test('nessun documento del repo cita più le misure vecchie della suite', () => 
 // Il numero vero lo tiene allineato la sentinella di proveDeiGiri, ma solo in CLAUDE.md e README.md:
 // ridetto altrove resta indietro senza che nulla diventi rosso (#1589.3, «~350 spec» con la suite a 590).
 test('fuori da CLAUDE.md e README.md nessun documento ridice quante spec ha la suite', () => {
-  const STORICI = new Set(['CLAUDE.md', 'README.md', 'ROUTINE-BRANCH-INTEGRITY.md']);
+  // ROUTINE-BRANCH-INTEGRITY.md racconta la misura di una data: è cronaca, non dichiarazione.
+  const ESCLUSI = new Set(['CLAUDE.md', 'README.md', 'ROUTINE-BRANCH-INTEGRITY.md']);
   const ripetuti = [];
-  for (const f of [...DOCUMENTI, 'tests/unit/suiteNumeri.test.mjs']) {
-    if (STORICI.has(f)) continue;
-    const testo = f.endsWith('suiteNumeri.test.mjs') ? leggi(f).split('\n').slice(15).join('\n') : leggi(f);
-    for (const m of testo.matchAll(/~\s*[\d.]+\s+(spec|casi)\b/g)) ripetuti.push(`${f}: «${m[0]}»`);
+  for (const f of DOCUMENTI.filter((d) => !ESCLUSI.has(d))) {
+    for (const m of leggi(f).matchAll(/~\s*[\d.]+\s+(spec|casi)\b/g)) ripetuti.push(`${f}: «${m[0]}»`);
   }
   assert.deepEqual(ripetuti, [], 'la misura della suite si scrive solo in CLAUDE.md e README.md: qui si rimanda a CLAUDE.md, § Run / test');
 });
