@@ -169,11 +169,9 @@
     tokenDaSalvare.clear();
     tokenAzzeraTutti = false;
     const giro = ++giriToken;
-    const inViaggio = tutti && Tokens ? Tokens.names() : nomi;
-    for (const name of inViaggio) tokenInViaggio.set(name, giro);
-    const miei = {};
+    const spediti = tutti && Tokens ? Tokens.names() : nomi;
+    for (const name of spediti) tokenInViaggio.set(name, giro);
     for (const name of nomi) {
-      if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) miei[name] = currentOverrides[name];
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
       if (v === '' || !Tokens || Tokens.validate(name, v)) tokenInCorso.delete(name);
@@ -181,8 +179,12 @@
     let next = {};
     if (!tutti) {
       const fresh = await Storage.getSettings().catch(() => null);
-      next = { ...((fresh && fresh.themeTokens) || {}), ...miei };
-      for (const name of nomi) if (!Object.prototype.hasOwnProperty.call(miei, name)) delete next[name];
+      next = { ...((fresh && fresh.themeTokens) || {}) };
+      // Anche quelli di un salvataggio partito prima e non ancora arrivato: la memoria riletta non li ha.
+      for (const name of tokenInViaggio.keys()) {
+        if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) next[name] = currentOverrides[name];
+        else delete next[name];
+      }
     }
     currentOverrides = { ...next };
     for (const name of tokenInCorso) {
