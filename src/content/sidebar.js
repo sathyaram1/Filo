@@ -107,7 +107,11 @@
   // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
   function close({ davvero = false } = {}) {
     if (!root) return;
-    if (!davvero && inVolo > 0) { if (!nascosto) nascondi(); return; }
+    if (!davvero && inVolo > 0) {
+      if (session) { session.chiusaPrima = true; segnaSessione(); }
+      if (!nascosto) nascondi();
+      return;
+    }
     Highlight.clear();
     try { Highlight.clearForceHover?.(); } catch (_) {}
     if (docClickHandler) {
