@@ -3830,6 +3830,7 @@ class TabManager {
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
+        if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
         nata.paginaDal = pagine[i] || null;
         nate.push(nata);
         return nata;
