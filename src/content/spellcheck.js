@@ -1968,8 +1968,28 @@
         if (h.tagName === 'H1') h1 = h; else altra = h;
       }
       for (const h of [h1, altra]) if (h) pezzi.push(String(h.textContent || '').slice(0, 300));
+      pezzi.push(campoTitoloSopra(el).slice(0, 300));
     } catch (_) {}
     return pezzi.join('\n');
+  }
+
+  // Il titolo scritto in un campo sopra il corpo (la casella del titolo di una nota, «Diario 2024»): l'ultimo campo prima
+  // di questo, salendo di pochi livelli. Resta qui: serve solo all'anno delle date, non va al modello.
+  const TIPI_TITOLO = new Set(['text', 'search', '']);
+  function campoTitoloSopra(el) {
+    let a = el.parentElement;
+    for (let i = 0; a && i < 6 && a !== document.body && a !== document.documentElement; i++, a = a.parentElement) {
+      let ultimo = null;
+      for (const c of a.querySelectorAll('input, textarea, [contenteditable]')) {
+        if (c === el || el.contains(c) || c.contains(el)) continue;
+        if (!(c.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (c.tagName === 'INPUT' ? !TIPI_TITOLO.has(c.type) : (c.tagName !== 'TEXTAREA' && (!c.isContentEditable || (c.parentElement && c.parentElement.isContentEditable)))) continue;
+        if (typeof c.checkVisibility === 'function' && !c.checkVisibility({ visibilityProperty: true })) continue;
+        ultimo = c;
+      }
+      if (ultimo) return String((ultimo.isContentEditable ? ultimo.textContent : ultimo.value) || '');
+    }
+    return '';
   }
 
   // ============================================================================
