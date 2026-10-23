@@ -5,9 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import os from 'node:os';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/contenutoEsterno.js');
@@ -52,7 +52,7 @@ test('#1298: oltre il tetto un’immagine non sparisce in silenzio, la frase dic
 });
 
 test('dalla fila delle schede: il main legge solo immagini vere dal disco, e oltre il tetto il percorso va solo alla home', async () => {
-  const dir = mkdtempSync(join(os.tmpdir(), 'filo-allegati-'));
+  const dir = cartellaTemporanea('filo-allegati-');
   try {
     const piccola = join(dir, 'piccola.png');
     const grande = join(dir, 'grande.jpg');
@@ -81,6 +81,6 @@ test('dalla fila delle schede: il main legge solo immagini vere dal disco, e olt
     const enorme = `data:image/png;base64,${'A'.repeat(Math.ceil(ALLEGATI_CHAT.tettoImmagineByte * 4 / 3) + 8)}`;
     assert.equal((await prepara([{ dataUrl: enorme }], { casa: true })).grandi, 1);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
