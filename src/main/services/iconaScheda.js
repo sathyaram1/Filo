@@ -4,6 +4,8 @@
 
 'use strict';
 
+const { stessoSitoWeb } = require('./perContoDellaScheda');
+
 // Una favicon vera sta sotto i 400 KB (un .ico col 256 px non compresso): oltre, la scheda resta senza icona.
 const TETTO_BYTE = 1024 * 1024;
 const ATTESA_MS = 15000;
