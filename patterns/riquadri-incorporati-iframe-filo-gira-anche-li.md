@@ -101,7 +101,12 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   coprirli spegne Filo in quei riquadri. In Automatico restano aperti per scelta
   dell'owner (Automatico promette nessun impatto); in Privacy massima un riquadro
   ancora vuoto dopo qualche secondo si copre, e il contenuto che arriva dopo ha il
-  rumore ma non Filo. **Un preambolo per albero della stessa
+  rumore ma non Filo. Scoperti per scelta dell'owner anche gli script di un
+  documento che un riquadro già nella pagina riceve da un indirizzo `javascript:`
+  (`src`, attributo, `location`): Chromium non avvisa quando nasce, la guardia lo
+  raggiunge al suo `load` e da fuori dopo si legge col rumore. Chiuderlo vorrebbe
+  dire intercettare ogni modo di dare un indirizzo a un riquadro, un elenco che
+  per tre giri non ha tenuto. **Un preambolo per albero della stessa
   origine**: il preload di un riquadro della stessa origine chiede la guardia
   alla finestra che lo contiene con un evento sull'elemento, il cui tipo è un
   segreto della sessione; se nessuno risponde la inietta da sé. Senza, un canvas
