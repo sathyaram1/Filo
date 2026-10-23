@@ -94,7 +94,44 @@ test('la giornaliera che ha rifiutato delle quote, e lo scarto della riconciliaz
   // Senza le righe per persona vale il conto del riassunto.
   const soloRiassunto = caso(W.avvisiOwner({ reconcile: { summary: { flagged: 1 } } }), 'scarto');
   assert.deepEqual(soloRiassunto.marcatori, ['scarto:?']);
-  assert.match(soloRiassunto.testo, /su 1 portafoglio\. Qualcuno consuma/);
+  // Il riassunto non dice perché (#1520): la frase non indovina il motivo.
+  assert.equal(soloRiassunto.testo, 'La riconciliazione ha segnato 1 portafoglio. Trovi le righe segnate in Gestione, sezione Utenti.');
+});
+
+test('un uso fuori politica si dice col suo motivo, anche su un portafoglio già segnato per lo scarto (#1520)', () => {
+  const con = (reconcile) => caso(W.avvisiOwner({ users: [{ pseudonym: 'aaaa000000000001', reconcile }] }), 'scarto');
+  const scarto = con({ flagged: true, driftUsd: 0.4 });
+  const fuori = con({ flagged: true, driftUsd: 0, reasons: ['off_policy'], offPolicy: [{ model: 'openai/gpt-5', provider: 'Azure', usd: 1, violation: 'model' }] });
+  assert.deepEqual(fuori.marcatori, ['scarto:aaaa000000000001:off_policy']);
+  assert.equal(fuori.testo, 'La riconciliazione ha segnato 1 portafoglio (aaaa000000000001): la chiave dei crediti ha pagato modelli o fornitori fuori dalla politica sui modelli. Trovi le righe segnate in Gestione, sezione Utenti.');
+  const entrambi = con({ flagged: true, driftUsd: 0.4, reasons: ['unrecorded', 'off_policy'] });
+  assert.deepEqual(entrambi.marcatori, ['scarto:aaaa000000000001', 'scarto:aaaa000000000001:off_policy']);
+  const piano = W.avvisiOwnerPiano(scarto.marcatori, [entrambi]);
+  assert.deepEqual(piano.scrivi.map((c) => c.caso), ['scarto'], 'il motivo nuovo scrive una carta nuova');
+  const eccesso = con({ flagged: true, driftUsd: -1, reasons: ['excess_rows'] });
+  assert.match(eccesso.testo, /: il registro d'uso conta più di quanto il router ha fatto pagare\./);
+});
+
+test('i motivi di un segno coi loro dollari, e il consumo del router che non si è letto non è zero (#1520)', () => {
+  assert.deepEqual(W.motiviScarto({ flagged: false, driftUsd: 3 }), []);
+  assert.deepEqual(W.motiviScarto({ flagged: true, driftUsd: 0.42 }), [{ chiave: 'unrecorded', testo: 'non registrato', usd: 0.42 }]);
+  assert.deepEqual(W.motiviScarto({ flagged: true, driftUsd: -1, reasons: ['excess_rows'] }), [{ chiave: 'excess_rows', testo: 'righe in eccesso', usd: 1 }]);
+  const fuori = W.motiviScarto({ flagged: true, reasons: ['off_policy'], offPolicy: [
+    { model: 'openai/gpt-5', provider: 'Azure', usd: 1, violation: 'model' },
+    { model: 'deepseek/deepseek-v4-pro', provider: 'DeepSeek', usd: 0.5, violation: 'excluded' },
+    { model: 'deepseek/deepseek-v4-pro', provider: 'DeepInfra', usd: 9, violation: '' },
+  ] });
+  assert.deepEqual(fuori, [{ chiave: 'off_policy', testo: 'fuori politica', usd: 1.5 }]);
+  assert.deepEqual(W.motiviScarto({ flagged: true, reasons: ['nuovo'] }), [{ chiave: 'nuovo', testo: 'segnato', usd: null }]);
+  assert.deepEqual(W.consumoRouter(undefined), { letto: false, errore: '', righe: [] });
+  assert.equal(W.consumoRouter({ error: 'HTTP 401' }).errore, 'HTTP 401');
+  const r = W.consumoRouter({ rows: [
+    { model: 'deepseek/deepseek-v4-pro', provider: 'DeepInfra', usd: 0.2, requests: 4 },
+    { model: 'openai/gpt-5', provider: 'Azure', usd: 1, requests: 2, violation: 'model' },
+    { model: '', provider: 'X', usd: 5 },
+  ] });
+  assert.equal(r.letto, true);
+  assert.deepEqual(r.righe.map((x) => [x.model, x.fuori]), [['openai/gpt-5', 'modello fuori politica'], ['deepseek/deepseek-v4-pro', '']]);
 });
 
 test('quello che la vista non dice non è un caso, e una vista che non c’è non dà avvisi', () => {
