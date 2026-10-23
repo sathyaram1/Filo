@@ -490,8 +490,13 @@ class TabManager {
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
     this._identityColorCache = new Map();
-    // §2.1 — l'auto-archiviazione misura l'inattività dell'APP INTERA da qui.
+    // §2.1 — l'auto-archiviazione misura l'inattività dell'APP INTERA da qui: gesti nelle schede, scheda attivata, barra.
     this._lastAppInteractionAt = Date.now();
+    try {
+      this.win.webContents.on('input-event', (_e, input) => {
+        if (GESTI_DELLA_BARRA.has(input && input.type)) this._lastAppInteractionAt = Date.now();
+      });
+    } catch (_) {}
     this._triageRunning = false;
     if (!this.incognito) {
       // Soglia e interruttore stanno nelle preferenze e si rileggono a ogni
