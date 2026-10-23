@@ -386,7 +386,7 @@ class StratoDeiRiquadri {
     vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
     const s = {
       wc, vista, pronta: false, coda: [], aperti: 0, riquadri: 0, modale: false, visibile: false,
-      vuoleTastiera: false, inPagina: new Map(),
+      vuoleTastiera: false, inPagina: new Map(), aiuto: false, attese: new Map(),
     };
     s.vuoto = new VuotoDellaVista({
       vista: () => s.vista,
