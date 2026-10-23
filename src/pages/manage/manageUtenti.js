@@ -115,6 +115,8 @@
     const celle = celleDi(u).map(() => tr.appendChild(document.createElement('td')));
     celle[0].className = 'sn-wallet-pseudonym';
     celle[0].title = 'Copia';
+    celle.push(tr.appendChild(document.createElement('td')));
+    celle[CELLA_INVITATI].className = 'sn-wallet-invitati';
 
     // La scheda della persona sta in una riga sotto, che si apre al clic sulla riga. Il contenuto è una chiamata a parte
     // (movimenti, inviti, ultime chiamate), chiesta alla prima apertura: fino ad allora c'è quello che la vista sa già.
