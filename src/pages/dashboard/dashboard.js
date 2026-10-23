@@ -2003,6 +2003,14 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
       avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.CHAT_ALLEGA && msg.dove === 'casa') {
+      // Le immagini lasciate sulla fila delle schede o sulla barra (#1623), già lette dal main.
+      for (const im of Array.isArray(msg.immagini) ? msg.immagini : []) {
+        if (im && /^data:image\//i.test(String(im.dataUrl || ''))) addPendingImage(im.dataUrl, typeof im.percorso === 'string' ? im.percorso : '');
+      }
+      for (const p of Array.isArray(msg.file) ? msg.file : []) if (typeof p === 'string') addPendingFile(p);
+      for (let i = 0; i < Math.min(Number(msg.grandi) || 0, 1000); i++) avvisaTroppoGrandi();
+      inputEl.focus();
     } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
