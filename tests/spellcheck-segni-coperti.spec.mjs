@@ -59,9 +59,10 @@ function caldi(app, page, rect) {
   }, { u: page.url(), rect });
 }
 
+// La prima riga del campo, dentro il bordo: l'anello del fuoco è caldo anche lui.
 const riga = (page) => page.evaluate(() => {
   const r = document.getElementById('f').getBoundingClientRect();
-  return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) + 10 };
+  return { x: Math.round(r.left) + 5, y: Math.round(r.top) + 5, width: Math.round(r.width) - 10, height: 34 };
 });
 const BARRA = { x: 0, y: 0, width: 800, height: 90 };
 
