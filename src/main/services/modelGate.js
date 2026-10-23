@@ -110,14 +110,51 @@
     } = deps;
 
     // I contatori giornalieri (#969): ogni chiamata è un uso della sua funzione, con l'attesa fino alla prima cosa
-    // visibile e il guasto di ogni tentativo fallito. Un contatore rotto non ferma mai una risposta.
-    const MUTO = { visto() {}, errore() {}, fine() {} };
+    // visibile e il guasto di ogni tentativo fallito; il tentativo che ha servito porta i suoi numeri (#1464), e il
+    // costo chiesto dopo arriva da sé. Un contatore rotto non ferma mai una risposta.
+    const MUTO = { visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} };
     function misura(action) {
       let m = null;
       try { const c = contatore(); m = c && typeof c.apri === 'function' ? c.apri(action) : null; } catch (_) { m = null; }
       if (!m) return MUTO;
-      const quieto = (fn) => (...a) => { try { fn(...a); } catch (_) {} };
-      return { visto: quieto(m.visto), errore: quieto(m.errore), fine: quieto(m.fine) };
+      const quieto = (fn) => (...a) => { try { fn.apply(m, a); } catch (_) {} };
+      return { visto: quieto(m.visto), errore: quieto(m.errore), fine: quieto(m.fine), chiamata: quieto(m.chiamata), tardiva: quieto(m.tardiva) };
+    }
+
+    // Quello che i contatori leggono di una risposta servita: numeri e nome del modello, mai il testo. Senza token
+    // detti la risposta non dice niente del contesto; ragionamento e fine ci sono solo nelle risposte di testo.
+    function chiamataDi(res, modello, { tentativo, spesa } = {}) {
+      const r = res || {};
+      const u = r.usage || {};
+      const n = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : 0);
+      const detto = n(u.promptTokens) > 0 || n(u.completionTokens) > 0;
+      const testo = r.finishReason !== undefined;
+      return {
+        modello,
+        ingresso: detto ? n(u.promptTokens) : null,
+        cacheLetti: n(u.cachedPromptTokens),
+        cacheDetta: u.cacheDetta === undefined ? undefined : Boolean(u.cacheDetta),
+        ragionamento: testo && detto && u.reasoningTokens !== undefined ? u.reasoningTokens : undefined,
+        uscita: testo && detto ? n(u.completionTokens) : null,
+        fine: testo ? r.finishReason : undefined,
+        tentativo,
+        ricominciata: Boolean(r.ricominciata),
+        ragionamentoTolto: Boolean(r.ragionamentoTolto),
+        spesa,
+      };
+    }
+
+    // Il costo in dollari di una risposta: quello detto dal router, o la stima dal listino delle Opzioni.
+    function spesaDi(s, model, usage) {
+      const u = usage || {};
+      const usd = Number(u.costUsd);
+      if (Number.isFinite(usd) && usd > 0) return { usd, origine: 'router' };
+      const pricing = (s && s.pricing && s.pricing[model]) || null;
+      if (!pricing || !costs || typeof costs.estimateCostEur !== 'function') return null;
+      let stima = 0;
+      // Con un cambio di 1 la stima del listino resta in dollari.
+      try { stima = Number(costs.estimateCostEur({ usage: u, pricing, usdToEur: 1 })); } catch (_) { stima = 0; }
+      return stima > 0 ? { usd: stima, origine: 'stima' } : null;
     }
     function vedendo(m, fn) {
       return typeof fn === 'function' ? (...a) => { m.visto(); return fn(...a); } : fn;
