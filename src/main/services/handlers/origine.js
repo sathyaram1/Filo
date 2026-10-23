@@ -2,6 +2,8 @@
 // Il canale è uno solo: shell, pagine filo:// e content script dei siti. Per le cose con
 // potere «chi sei» non basta: con una sessione aperta si vota e si spende al posto altrui.
 
+const { navigazioneVersoFilo } = require('../navigazioneVersoFilo');
+
 // Vale come Filo chi ha una vista di Filo: la barra, una scheda interna, la home pronta. L'indirizzo non basta: la
 // finestrella di accesso e le schede del web girano col preload delle pagine web anche su un filo:// (#1506). PURA.
 function vistaInterna({ isShell = false, riserva = false, tab = null, segnata = false } = {}) {
@@ -22,6 +24,13 @@ function daFilo(origin, sender) {
   return String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
 }
 
+// Un sito, o un content script che lui guida, apre una pagina di Filo solo col clic dell'utente, come quello sul menu
+// di Filo che la pagina non può fingere (#1506).
+function filoNegatoAllaPagina(url, sender, origin) {
+  if (daFilo(origin, sender) || !navigazioneVersoFilo(url)) return false;
+  return !require('../permessiPagine').gestoDellUtente(sender && sender.wc);
+}
+
 function soloFilo(handler) {
   return async (msg, sender, origin) => {
     if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
@@ -29,4 +38,4 @@ function soloFilo(handler) {
   };
 }
 
-module.exports = { daFilo, soloFilo, vistaInterna, origineDi };
+module.exports = { daFilo, soloFilo, vistaInterna, origineDi, filoNegatoAllaPagina };

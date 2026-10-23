@@ -1,7 +1,7 @@
 // Handler di dominio: navigazione, apertura/chiusura tab, fullscreen e comandi shell.
 
 const { app } = require('electron');
-const { soloFilo } = require('./origine');
+const { soloFilo, filoNegatoAllaPagina } = require('./origine');
 const { azione: contata } = require('../azioniContate');
 
 // Un'icona della home dice dove sta in px della sua pagina; il menu della shell lo vuole in px della finestra.
@@ -95,6 +95,7 @@ module.exports = function register(on, ctx) {
       const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url, { origine }) });
       return { ok: true, ...r };
     }
+    if (filoNegatoAllaPagina(url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const daPagina = /^https?:/i.test(String(sender?.url || ''));
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
     win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto } } : {});
@@ -206,8 +207,9 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
+  on(MSG.OPEN_NEW_TAB, async (msg, sender, origin) => {
     const win = winOf(sender);
+    if (filoNegatoAllaPagina(msg.url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     if (win?._filoTabs) {
       const apri = () => win._filoTabs.openTab(msg.url || 'filo://newtab/');
       if (msg.url) apri(); else contata('new-tab', apri);
