@@ -106,6 +106,15 @@ test('sito che il rilascio lo gestisce (preventDefault): il file va alla pagina 
   expect(await statoAiuto(app, page)).toMatchObject({ aperto: false, allegati: [] });
 });
 
+test('sito con un campo per caricare file, senza codice suo: il file entra nel campo, come in ogni browser', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><input id="carica" type="file" style="position:fixed;left:0;top:0;width:400px;height:300px"></body></html>`);
+  const [foto] = immaginiSulDisco(1);
+  await lascia(page, [foto], { x: 150, y: 150 });
+  await expect.poll(() => page.evaluate(() => [...document.getElementById('carica').files].map((f) => f.name)), { timeout: 8_000 }).toEqual(['foto 1.png']);
+  expect(await statoAiuto(app, page)).toMatchObject({ aperto: false, allegati: [] });
+});
+
 test('sito: più immagini entrano tutte nell’Aiuto, oltre i 4 MB lo dice, e un rilascio finto della pagina non entra', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   // Il rilascio che la pagina si fabbrica da sé non arriva all'Aiuto.
