@@ -354,6 +354,7 @@
     // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
     stopReading();
     const s = newSession();
+    Object.assign(s, { totale: full.length, letti: 0, pezziModello: 0, ripiego: null, contata: false });
     reportReadingState(true);
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
