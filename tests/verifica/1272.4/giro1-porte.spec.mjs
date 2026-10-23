@@ -3,7 +3,6 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
-import { nelMondoDiFilo as nelMondo } from '../../helpers/riquadri.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const nomi = (c) => String(c || '').split(';').map((x) => x.trim().split('=')[0]).filter(Boolean).sort();
@@ -13,7 +12,7 @@ async function sito(host, html = '') {
   const visti = [];
   const s = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
-    visti.push({ percorso: req.url, cookie: String(req.headers.cookie || ''), dest: String(req.headers['sec-fetch-dest'] || '') });
+    visti.push({ percorso: req.url, cookie: String(req.headers.cookie || ''), dest: String(req.headers['sec-fetch-dest'] || ''), modo: String(req.headers['sec-fetch-mode'] || '') });
     if (u.pathname === '/rimanda') { res.writeHead(302, { location: u.searchParams.get('a'), 'cache-control': 'no-store' }); res.end(); return; }
     if (u.pathname === '/pagina') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(html); return; }
     res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' });
@@ -25,8 +24,16 @@ async function sito(host, html = '') {
     origine: `http://${host}:${s.address().port}`,
     set html(h) { html = h; },
     daFilo: (p) => visti.filter((v) => v.percorso.startsWith(p) && v.dest !== 'image' && v.dest !== 'iframe' && v.dest !== 'document'),
+    dalMain: (p) => visti.filter((v) => v.percorso.includes(p) && v.dest === 'empty' && v.modo === 'no-cors'),
     chiudi: async () => { try { s.closeAllConnections(); } catch (_) {} await new Promise((r) => s.close(r)); },
   };
+}
+
+// Tasto destro vero sulla foto dentro il riquadro: descrizione e origine partono dai byte che scarica il main.
+async function tastoDestro(page, frame) {
+  const box = await (await frame.frameElement()).boundingBox();
+  const r = await frame.evaluate(() => { const b = document.getElementById('foto').getBoundingClientRect(); return { x: b.x, y: b.y }; });
+  await page.mouse.click(box.x + r.x + 10, box.y + r.y + 10, { button: 'right' });
 }
 
 async function cookieSu(app, url) {
@@ -86,10 +93,9 @@ test('immagine dentro un riquadro di un altro sito: solo i cookie concessi', asy
     const frame = page.frames().find((f) => f.url().startsWith(annuncio.origine));
     expect(frame).toBeTruthy();
     await frame.waitForFunction(() => document.getElementById('foto')?.complete);
-    const r = await nelMondo(app, page, (s) => globalThis.SN_ACTIONS.scaricaImmagine(s, document.getElementById('foto'))
-      .then((d) => d.slice(0, 22), (e) => 'errore: ' + e.message), src, frame);
-    expect(r).toBe('data:image/png;base64,');
-    const letture = banca.daFilo('/foto.png?riquadro');
+    await tastoDestro(page, frame);
+    await expect.poll(() => banca.dalMain('riquadro=1').length, { timeout: 15_000 }).toBeGreaterThan(0);
+    const letture = banca.dalMain('riquadro=1');
     expect(letture.length).toBeGreaterThan(0);
     for (const v of letture) expect(nomi(v.cookie)).toEqual(['libero']);
   } finally { await banca.chiudi(); await annuncio.chiudi(); }
@@ -98,9 +104,11 @@ test('immagine dentro un riquadro di un altro sito: solo i cookie concessi', asy
 test('pagina ostile che incorpora il sito della banca: la foto della banca nel riquadro non porta la sessione', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const banca = await sito('127.0.0.1');
+  const cdn = await sito('127.0.0.1');
   const ostile = await sito('localhost');
   try {
-    const src = `${banca.origine}/foto.png?incorporata=1`;
+    // La foto sta su un'altra porta dello stesso sito: il riquadro non la può leggere da script e la scarica il main.
+    const src = `${cdn.origine}/foto.png?incorporata=1`;
     banca.html = `<!doctype html><title>banca</title><img id="foto" src="${src}" width="50" height="50">`;
     ostile.html = `<!doctype html><title>ostile</title><iframe src="${banca.origine}/pagina" width="300" height="200"></iframe>`;
     const page = await openTab(`${ostile.origine}/pagina`);
@@ -111,12 +119,34 @@ test('pagina ostile che incorpora il sito della banca: la foto della banca nel r
     await frame.waitForFunction(() => document.getElementById('foto')?.complete);
     // Quello che manderebbe il riquadro stesso.
     await frame.evaluate((u) => new Promise((ok) => { const i = new Image(); i.onload = i.onerror = ok; i.src = u; }), src + '&dalriquadro=1');
-    const delRiquadro = banca.visti.find((v) => v.percorso.includes('dalriquadro'));
-    const r = await nelMondo(app, page, (s) => globalThis.SN_ACTIONS.scaricaImmagine(s, document.getElementById('foto'))
-      .then((d) => d.slice(0, 22), (e) => 'errore: ' + e.message), src + '&filo=1', frame);
-    expect(r).toBe('data:image/png;base64,');
-    const letture = banca.visti.filter((v) => v.percorso.includes('filo=1'));
+    const delRiquadro = cdn.visti.find((v) => v.percorso.includes('dalriquadro'));
+    expect(delRiquadro).toBeTruthy();
+    await tastoDestro(page, frame);
+    await expect.poll(() => cdn.dalMain('incorporata=1').length, { timeout: 15_000 }).toBeGreaterThan(0);
+    const letture = cdn.dalMain('incorporata=1');
     expect(letture.length).toBeGreaterThan(0);
     for (const v of letture) expect(nomi(v.cookie)).toEqual(nomi(delRiquadro.cookie));
-  } finally { await banca.chiudi(); await ostile.chiudi(); }
+  } finally { await banca.chiudi(); await cdn.chiudi(); await ostile.chiudi(); }
+});
+
+test('immagine di un altro sito, nella pagina della banca, che rimanda alla banca: come la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const banca = await sito('127.0.0.1');
+  const evil = await sito('localhost');
+  try {
+    const src = `${evil.origine}/rimanda?a=${encodeURIComponent(`${banca.origine}/foto.png?giro=1`)}`;
+    const page = await testServer.openReady(openTab, `<!doctype html><title>p</title><img id="foto" src="${src}" width="50" height="50">`);
+    await cookieSu(app, `${banca.origine}/`);
+    await page.evaluate((u) => new Promise((ok) => { const i = new Image(); i.onload = i.onerror = ok; i.src = u; }),
+      `${evil.origine}/rimanda?a=${encodeURIComponent(`${banca.origine}/foto.png?pagina=1`)}`);
+    const dellaPagina = banca.visti.find((v) => v.percorso.includes('pagina=1'));
+    const host = new URL(page.url()).hostname;
+    const r = await app.evaluate(async ({ BrowserWindow }, { host, code }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const t = w._filoTabs.tabs.find((x) => { try { return new URL(x.view.webContents.getURL()).hostname === host; } catch (_) { return false; } });
+      return t.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }]);
+    }, { host, code: `SN_ACTIONS.scaricaImmagine(${JSON.stringify(src)}, document.getElementById('foto')).then((d) => d.slice(0, 22), (e) => 'errore: ' + e.message)` });
+    expect(r).toBe('data:image/png;base64,');
+    for (const v of banca.dalMain('giro=1')) expect(nomi(v.cookie)).toEqual(nomi(dellaPagina.cookie));
+  } finally { await banca.chiudi(); await evil.chiudi(); }
 });
