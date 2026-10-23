@@ -22,6 +22,12 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   di una finestra qualunque: un popup «Accedi con…» è una finestra vera con
   dentro un sito, e le porte chiuse ai siti gli rispondevano (#589.3,
   `tests/popup-di-accesso-da-un-sito.spec.mjs`).
+- **Filo è la vista, non l'indirizzo**: vale come Filo la barra, una scheda
+  interna o la home pronta (`sender.interna`, da `vistaInterna` in
+  `origine.js`). Una pagina filo:// in una finestrella o in una scheda del web
+  gira col preload delle pagine web, e per i servizi la sua origine è vuota.
+  Un sito non porta nessuna vista su un filo:// (#1506,
+  `src/main/services/navigazioneVersoFilo.js`).
 - **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema
