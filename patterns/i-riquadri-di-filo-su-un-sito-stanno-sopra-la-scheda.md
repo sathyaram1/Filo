@@ -30,6 +30,8 @@ lì non c'è codice di altri.
   pagina. Si vede solo con la sua scheda davanti, senza l'avviso del sito pericoloso, e solo se ha qualcosa aperto.
 - **Il vuoto è della pagina:** fuori dai riquadri clic, rotella e trascinamenti tornano alla scheda
   (`src/main/vuotoDellaVista.js`, `src/renderer/vuoto.js`), solo se veri, perché lì arrivano come gesti dell'utente;
+  il dito che scorre passa come rotella, e un trascinamento che entra nel vuoto (un file, un pezzo di pagina) toglie lo
+  strato finché il mouse non torna sulla pagina, perché un rilascio non si può rigirare;
   un riquadro che copre la pagina (feedback, Modifica, red-team) è tutto suo. Un gesto sullo strato è dell'interfaccia di Filo (`gestoNelloStrato`): vale per gli appunti e
   il menu di Filo, mai per finestre e permessi del sito.
 - **Tastiera ed Esc:** chi apre un riquadro ci scrive, quindi lo strato prende la tastiera; quando non ha più niente la
