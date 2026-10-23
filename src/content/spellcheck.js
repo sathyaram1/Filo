@@ -1793,10 +1793,11 @@
         }
         return s.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim();
       };
-      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, CONTESTO_DOPO_MAX);
+      const tettoDopo = intorno || CONTESTO_DOPO_MAX;
+      const dopo = soloPrima ? { pezzi: [], pieno: false } : raccogli(true, tettoDopo);
       let testoDopo = cuci(dopo.pezzi);
-      if (testoDopo.length > CONTESTO_DOPO_MAX) testoDopo = testoDopo.slice(0, CONTESTO_DOPO_MAX);
-      const tettoPrima = soloPrima || CONTESTO_MAX - testoDopo.length;
+      if (testoDopo.length > tettoDopo) testoDopo = testoDopo.slice(0, tettoDopo);
+      const tettoPrima = soloPrima || intorno || CONTESTO_MAX - testoDopo.length;
       const prima = raccogli(false, tettoPrima);
       let testoPrima = cuci(prima.pezzi.reverse());
       if (testoPrima.length > tettoPrima) testoPrima = testoPrima.slice(-tettoPrima);
