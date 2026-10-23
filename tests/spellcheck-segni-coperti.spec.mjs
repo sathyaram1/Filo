@@ -101,6 +101,32 @@ test('un campo posato fuori da un riquadro che taglia ma non è il suo contenito
   expect(await caldi(app, page, await riga(page))).toBeGreaterThan(20);
 });
 
+test('un\'intestazione fissa che lascia passare il mouse copre i segni come le altre', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const html = CON_INTESTAZIONE(TA).replace('z-index:5"', 'z-index:5;pointer-events:none"');
+  const page = await apri(app, openTab, testServer, html);
+  await page.evaluate(() => window.scrollBy(0, document.getElementById('f').getBoundingClientRect().top - 30));
+  await expect.poll(() => page.evaluate(() => Math.round(document.getElementById('f').getBoundingClientRect().top))).toBe(30);
+  await expect.poll(() => caldi(app, page, BARRA), { timeout: 3000 }).toBe(0);
+  await page.waitForTimeout(300);
+  expect(await caldi(app, page, BARRA), 'nessun segno sopra l\'intestazione').toBe(0);
+});
+
+// Un velo che lascia passare il mouse ma sta sotto il campo (lo sfondo dipinto della pagina), o trasparente sopra (il
+// contenitore degli avvisi di un sito): i segni restano.
+for (const [nome, velo] of [
+  ['uno sfondo fissato sotto il campo', `<div style="position:fixed;inset:0;z-index:-1;pointer-events:none;background:${SFONDO}"></div>`],
+  ['un contenitore trasparente fissato sopra il campo', '<div style="position:fixed;inset:0;z-index:50;pointer-events:none"></div>'],
+]) {
+  test(`${nome}, che lascia passare il mouse: i segni si vedono`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;font:16px sans-serif">${velo}<main style="padding:40px 20px">${TA}</main></body>`;
+    const page = await apri(app, openTab, testServer, html);
+    await page.waitForTimeout(2000);
+    expect(await caldi(app, page, await riga(page))).toBeGreaterThan(20);
+  });
+}
+
 for (const [nome, campo] of [['casella di testo', TA], ['campo modificabile', CE]]) {
   test(`${nome} sotto un'intestazione fissa: i segni restano sotto con la parola`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
