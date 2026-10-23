@@ -34,7 +34,7 @@ const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tabColor');
 const { compareRainbow } = globalThis.SN_TAB_COLOR;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
-const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
+const { indiceSaltoScheda, indiceSchedaAccanto, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie, staRegistrandoTasti } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
