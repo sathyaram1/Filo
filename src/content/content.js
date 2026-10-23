@@ -373,12 +373,17 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
-  // scrollato (0-100%). Throttled per non inondare l'IPC.
+  // Riporta al main quanto ha scrollato (0-100%) e, solo dopo un gesto fisico vero, l'ultima interazione: il
+  // caricamento e lo scorrimento fatto dalla pagina (chat, feed, caroselli) non azzerano l'inattività (#1618).
   function startTabActivityReporter() {
+    // Uno scorrimento è dell'utente se parte entro questo tempo da un suo tasto, clic, rotella o dito.
+    const SCORRE_DOPO_GESTO_MS = 1000;
+    const INTERAZIONE_OGNI_MS = 2000;
     let lastSentScroll = -1;
     let pending = false;
-    let lastSend = 0;
+    let ultimoGesto = -Infinity;
+    let ultimaInterazione = -Infinity;
+    let scrollDaGesto = false;
 
     function scrollPct() {
       const doc = document.documentElement;
