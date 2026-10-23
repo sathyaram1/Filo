@@ -288,16 +288,17 @@
     }
     // Un Esc o un Invio finché la sessione non ha consegnato tutto (anche mentre trascrive l'ultima frase):
     // quello che arriva ancora resta nella casella e non parte da solo.
-    function tieni(perche) {
+    // `inviata`: l'ha mandata la chat (Invio, o la casella svuotata da lei).
+    function tieni(inviata = false) {
       if (!c.sessione) return false;
       c.toccato = true;
-      if (perche && !c.perche) c.perche = perche;
+      if (inviata) c.inviata = true;
       c.sessione.ferma('utente');
       return true;
     }
     // Esc tiene quello che è stato detto e non invia.
     function esc() {
-      if (tieni('tenuta')) return true;
+      if (tieni()) return true;
       if (c.stato === 'attesa') { annullaInvio(); return true; }
       return false;
     }
