@@ -219,7 +219,7 @@
       base: [], indirizzo: 'il sito che ospita il file',
       quando: 'funzione',
       occasione: 'quando salvi, copi, fai descrivere o controlli l’origine di un’immagine o di un video della pagina',
-      riceve: 'la richiesta del file, con i cookie di quel sito e al massimo l’indirizzo del sito della pagina, dalla rete della scheda',
+      riceve: 'la richiesta del file, con i soli cookie che quel sito concederebbe alla pagina e al massimo l’indirizzo del sito della pagina, dalla rete della scheda',
       frase: 'Filo lo chiede al sito che lo ospita',
       dove: ['src/main/services/handlers/misc.js', 'src/content/actions.js', 'src/main/services/perContoDellaScheda.js'], prova: ["credenziali: 'include'", 'fetch(src)', 'useSessionCookies'],
     },
