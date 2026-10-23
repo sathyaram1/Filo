@@ -297,8 +297,10 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
     const riquadri = page.locator('#ownerInstallazioni .sn-wallet-numero');
     await expect(riquadri).toHaveCount(2, { timeout: 10_000 });
-    await expect(riquadri.nth(0).locator('.sn-wallet-numero-valore')).toHaveText('1');
-    await expect(riquadri.nth(0).locator('.sn-wallet-numero-nome')).toHaveText('installazione attiva ieri');
+    // Una copia sola: sotto le cinque il numero non si mostra (#1462).
+    await expect(riquadri.nth(0).locator('.sn-wallet-numero-valore')).toHaveText('meno di 5');
+    await expect(riquadri.nth(0).locator('.sn-wallet-numero-nome')).toHaveText('installazioni attive ieri');
+    await expect(riquadri.nth(0)).toHaveAttribute('title', /Meno di cinque: il numero esatto non si mostra/);
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-valore')).toHaveText('1.234');
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-nome')).toHaveText('installazioni attive a ottobre');
     await expect(riquadri.nth(0)).toHaveAttribute('title', /15 ott/);
@@ -307,7 +309,7 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
 
     // Il tasto destro copia il numero; «Rileggi» chiede di nuovo, e un guasto è un trattino che dice perché.
     await riquadri.nth(1).click({ button: 'right' });
-    await expect(page.locator('.sn-wallet-ctx .sn-select-option')).toHaveText(['Copia il numero', 'Rileggi']);
+    await expect(page.locator('.sn-wallet-ctx .sn-select-option')).toHaveText(['Copia il numero', 'Apri i contatori', 'Rileggi']);
     await app.evaluate(() => { globalThis.__installazioniGuaste = true; });
     await page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Rileggi' }).click();
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-valore')).toHaveText('—', { timeout: 5_000 });
@@ -319,6 +321,12 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     await ricaricaSu(page, 'utenti');
     await page.waitForFunction(() => document.querySelectorAll('#ownerInstallazioni .sn-wallet-numero').length === 2, null, { timeout: 10_000 });
     await page.screenshot({ path: `${SHOTS}/contatori-owner-scuro-guasto.png`, fullPage: true });
+    // Il numero si apre sulla scheda Contatori, dove le stesse copie stanno per giorno e per ora.
+    await app.evaluate(() => { globalThis.__installazioniGuaste = false; });
+    await ricaricaSu(page, 'utenti');
+    await page.locator('#ownerInstallazioni .sn-wallet-numero').nth(0).click();
+    await expect(page.locator('#panel-contatori')).toHaveClass(/mg-panel--active/, { timeout: 5_000 });
+    await expect(page.locator('.mg-tab[data-tab="contatori"]')).toHaveClass(/mg-tab--active/);
   } finally {
     await app.evaluate(() => {
       globalThis.SN_CONTATORI_MAIN.installazioni = globalThis.__installazioniVere;
