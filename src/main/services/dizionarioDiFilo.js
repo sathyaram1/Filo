@@ -144,14 +144,11 @@ function sbagliate(parole) {
 /** Le correzioni, alternate fra le lingue come fa Chromium; `null` finché il dizionario non è pronto. */
 function proposte(parola) {
   if (!motori.length) { avviaSeAtteso(); return null; }
-  const p = typeof parola === 'string' ? parola : '';
-  if (!p.trim() || byte(p) > PROPOSTE_PAROLA_MAX_BYTE) return [];
+  const p = normale(parola);
+  if (!p.trim() || byte(p) > PROPOSTE_PAROLA_MAX_BYTE || !sbagliataGia(p)) return [];
   const liste = [];
   try {
-    for (const { h } of motori) {
-      if (h.testSpelling(p)) return [];
-      liste.push(h.getSpellingSuggestions(p).slice(0, PROPOSTE_MAX));
-    }
+    for (const { h } of motori) liste.push(h.getSpellingSuggestions(p).slice(0, PROPOSTE_MAX));
   } catch (_) { return []; }
   const out = [];
   const lunga = Math.max(0, ...liste.map((l) => l.length));
