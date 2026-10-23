@@ -101,7 +101,7 @@ test('F Aiuto spento nelle impostazioni: avviso', async ({ app, openTab, testSer
   const page = await testServer.openReady(openTab, '<!doctype html><html><body style="height:100vh">x</body></html>');
   await app.evaluate(async () => {
     const MSG = globalThis.SN_MSG.MSG;
-    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { aiutoAcceso: false, helpEnabled: false } }, { url: 'filo://preferences/preferences.html' });
+    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.UPDATE_SETTINGS, settings: { featureFlags: { help: false } } }, { url: 'filo://preferences/preferences.html' });
   });
   await page.waitForTimeout(500);
   await lascia(page, foto(1));
