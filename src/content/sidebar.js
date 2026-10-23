@@ -178,12 +178,14 @@
     // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
-    session.initialUrl = location.href;
+    paginaNota = { url: '', titolo: '' };
+    const qui = paginaOra();
+    session.initialUrl = qui.url;
     // Aperta dal tasto destro su una scheda: una riga di storia non mostrata in chat dice
     // all'agente che la richiesta parte da lì.
     if (context && context.source === 'tab') {
-      const ctxTitle = context.title || document.title || '';
-      const ctxUrl = context.url || location.href;
+      const ctxTitle = context.title || qui.titolo || '';
+      const ctxUrl = context.url || qui.url;
       history.push({
         role: 'user',
         kind: 'action',
