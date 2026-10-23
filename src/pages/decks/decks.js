@@ -1446,6 +1446,7 @@
       // la cache di pagina si svuota così il prossimo hover legge dal main
       // i pareri freschi invece di mostrare quelli vecchi.
       opinionsByCard.clear();
+      opinionErrors.clear();
       // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
       // aggiornato torna nella risposta → header e statistiche si rinfrescano.
       if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
