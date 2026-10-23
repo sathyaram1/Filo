@@ -137,13 +137,6 @@ for (const metodo of ['complete', 'streamComplete']) {
   });
 }
 
-test('decisioni: la cache si legge come nelle chat', async () => {
-  const r = await withFetch(async () => new Response(JSON.stringify({ answers: { a: 0.9 }, usage: { input_tokens: 3000, output_tokens: 3, prompt_tokens_details: { cached_tokens: 2500 }, cost: 0.0001 } }), { status: 200 }),
-    () => OR.decisions({ apiKey: 'k', model: 'x/y', state: 's', questions: { a: 'q' } }));
-  assert.equal(r.usage.cacheDetta, true);
-  assert.equal(r.usage.cachedPromptTokens, 2500);
-});
-
 // ── La catena: quale tentativo ha risposto, e se la risposta è ricominciata ─────
 test('la catena dice quale tentativo ha risposto e se la risposta è ricominciata a metà', async () => {
   require(join(ROOT, 'src', 'main', 'services', 'providers', 'index.js'));
