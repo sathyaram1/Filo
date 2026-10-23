@@ -273,6 +273,9 @@
     box.hidden = false;
     const note = $('walletNote');
     note.hidden = true;
+    const registro = W.registroScartateTesto(w.usageLog && w.usageLog.discardedBy);
+    $('usageLogNote').textContent = registro;
+    $('usageLogNote').hidden = !registro;
     // Senza nessuna chiave (né personale, né propria, né di fabbrica) il
     // conteggio locale non compra niente: saldo, ricarica a mezzanotte e
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
@@ -297,7 +300,12 @@
       $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
       $('redeemForm').hidden = true;
-      if (w.usingOwnKey) {
+      if (w.chiaveStaccata === 'altro_pseudonimo') {
+        // Una chiave nuova è di questo portafoglio: da lì i consumi tornano a registrarsi.
+        note.textContent = 'La chiave personale salvata qui non è quella del tuo portafoglio, e quello che consumi non si registra. Chiedine una nuova.';
+        note.hidden = false;
+        reissue.hidden = false;
+      } else if (w.usingOwnKey) {
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
@@ -343,6 +351,9 @@
       note.textContent = noKey || w.keySource === 'own'
         ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
         : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
+      note.hidden = false;
+    } else if (w.chiaveStaccata === 'senza_portafoglio') {
+      note.textContent = 'La chiave personale salvata qui non è di nessun portafoglio sul server, e quello che consumi non si registra. Con un invito ne ricevi una tua.';
       note.hidden = false;
     } else if (server && server.invitesOpen === false) {
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';

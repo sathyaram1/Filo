@@ -34,13 +34,17 @@ const PSEUDONYM = 'abcdef0123456789';
 
 let server;
 let base = '';
-const seen = { completions: [], commits: [], keyInfo: [], credits: [] };
+const seen = { completions: [], commits: [], commitRifiutati: [], keyInfo: [], credits: [] };
 let ownKeyStatus = 401; // cosa risponde OpenRouter alla chiave propria
 let personalKeyStatus = 200; // …e alla personale (402 = anche i crediti di Filo finiti)
 let ownKeyLimit = 10;   // il tetto della chiave propria; null = nessun tetto
 let ownKeyUsage = 1.5;  // quanto la chiave propria ha speso, secondo OpenRouter
 let personalDelayMs = 0; // la personale risponde in ritardo: il riquadro si chiude prima
 let redeemed = false;   // il portafoglio esiste solo dopo il riscatto (ogni test riparte da zero)
+// Lo pseudonimo che il server lega a questa identità: la regola su wallet-usage prende solo righe firmate così.
+let serverPseudonym = PSEUDONYM;
+// Una riga con questa azione la regola finta la rifiuta: un rifiuto di cui l'app non sa il perché (#1601).
+const AZIONE_RIFIUTATA = 'RIFIUTATA_DAL_SERVER';
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -69,11 +73,15 @@ test.beforeAll(async () => {
         if (!redeemed) return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
         return json(res, 200, {
           result: {
-            hasWallet: true, pseudonym: PSEUDONYM,
+            hasWallet: true, pseudonym: serverPseudonym,
             balance: { credits: 4990, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0.0084, remainingUsd: 4.1916, eurUsd: 1.2, eurPerCredit: 0.0007 },
             stale: false, dailyCredits: 100, invites: [],
           },
         });
+      }
+      if (url === '/walletReissue') {
+        if (!redeemed) return json(res, 200, { result: { status: 'no_wallet' } });
+        return json(res, 200, { result: { status: 'ok', key: PERSONAL_KEY, pseudonym: serverPseudonym } });
       }
       if (url === '/walletRedeem') {
         redeemed = true;
@@ -127,9 +135,17 @@ test.beforeAll(async () => {
       if (url === '/api/v1/generation') return json(res, 404, { error: { message: 'not yet' } });
 
       // ── Firestore: la riga d'uso ──
+      // Il commit è atomico come quello vero: una riga che la regola non prende respinge tutto il lotto.
       if (url.startsWith('/v1/projects/') && url.endsWith(':commit')) {
-        seen.commits.push({ auth: bearer, writes: body.writes || [] });
-        return json(res, 200, { writeResults: (body.writes || []).map(() => ({})) });
+        const writes = body.writes || [];
+        const passa = (w) => redeemed && w.update.fields.pseudonym?.stringValue === serverPseudonym
+          && w.update.fields.action?.stringValue !== AZIONE_RIFIUTATA;
+        if (!writes.every(passa)) {
+          seen.commitRifiutati.push({ auth: bearer, writes });
+          return json(res, 403, { error: { code: 403, message: 'Missing or insufficient permissions.', status: 'PERMISSION_DENIED' } });
+        }
+        seen.commits.push({ auth: bearer, writes });
+        return json(res, 200, { writeResults: writes.map(() => ({})) });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
     });
@@ -151,6 +167,7 @@ test.afterAll(async () => {
 test.beforeEach(() => {
   seen.completions.length = 0;
   seen.commits.length = 0;
+  seen.commitRifiutati.length = 0;
   seen.keyInfo.length = 0;
   seen.credits.length = 0;
   ownKeyStatus = 401;
@@ -158,6 +175,7 @@ test.beforeEach(() => {
   ownKeyLimit = 10;
   ownKeyUsage = 1.5;
   redeemed = false;
+  serverPseudonym = PSEUDONYM;
   personalDelayMs = 0;
 });
 
@@ -1039,4 +1057,95 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   await clicca(app, page, '.sn-popup .sn-popup-close');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+});
+
+// ── Il registro d'uso (#1601) ────────────────────────────────────────────────
+// Il commit su wallet-usage è atomico: una riga che la regola rifiuta faceva respingere il lotto intero, e la coda
+// lo ritentava ogni 30 secondi per sempre. Le righe si mettono in coda come le lascia una chiusura di Filo, e la
+// coda si rilegge come all'avvio.
+async function righeInCoda(app, righe) {
+  await app.evaluate(async (_, rr) => {
+    const W = globalThis.SN_WALLET;
+    await globalThis.SN_STORAGE.setRaw('walletUsageQueue', rr.map((r) => W.usageRow({ model: 'deepseek-flash', servedBy: 'Fake', usage: { promptTokens: 3, completionTokens: 2 }, costUsd: 0.0001, credits: 0.2, ...r })));
+    await globalThis.SN_WALLET_MAIN.rileggiCodaPerTest();
+  }, righe);
+}
+const statoRegistro = (app) => app.evaluate(() => globalThis.SN_WALLET_MAIN.usageLogStatus());
+const azioniArrivate = () => seen.commits.flatMap((c) => c.writes.map((w) => w.update.fields.action.stringValue));
+
+test('(V) una riga che il server rifiuta non ferma il registro: le buone arrivano, le altre escono dalla coda e Crediti lo dice', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+  await righeInCoda(app, [
+    { pseudonym: PSEUDONYM, action: 'PROVA_1' },
+    { pseudonym: PSEUDONYM, action: 'PROVA_2' },
+    { pseudonym: '0000000000000000', action: 'DI_UN_ALTRA_IDENTITA' },
+    { pseudonym: PSEUDONYM, action: AZIONE_RIFIUTATA },
+    { pseudonym: PSEUDONYM, action: 'PROVA_3' },
+  ]);
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.flush());
+
+  // SUCCESSO: le tre buone sono sul server, una volta sola ciascuna.
+  await expect.poll(() => azioniArrivate().sort(), { timeout: 20_000 }).toEqual(['PROVA_1', 'PROVA_2', 'PROVA_3']);
+  // Quella di un'altra identità non parte nemmeno; quella rifiutata è stata provata ed è uscita.
+  expect(seen.commitRifiutati.flatMap((c) => c.writes.map((w) => w.update.fields.pseudonym.stringValue))).not.toContain('0000000000000000');
+  const stato = await statoRegistro(app);
+  expect(stato).toMatchObject({ pending: 0, written: 3, discarded: 2, discardedBy: { altra_identita: 1, rifiutata: 1 }, lastError: '' });
+  expect(stato.lastDiscardReason).toMatch(/403/);
+  expect(await app.evaluate(() => globalThis.SN_STORAGE.getRaw('walletUsageQueue', null))).toBeNull();
+  // Niente resta da ritentare: un altro giro non manda niente.
+  const commitPrima = seen.commits.length + seen.commitRifiutati.length;
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.flush());
+  expect(seen.commits.length + seen.commitRifiutati.length).toBe(commitPrima);
+
+  await credits.reload();
+  const nota = credits.locator('#usageLogNote');
+  await expect(nota).toHaveText('2 consumi non sono stati registrati: 1 rifiutato dal server, 1 di un portafoglio di prima.', { timeout: 15_000 });
+  await credits.screenshot({ path: 'tests/.shots/1601-registro-chiaro.png' });
+  await credits.evaluate(async () => { await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }); });
+  await credits.reload();
+  await expect(nota).toBeVisible({ timeout: 15_000 });
+  await credits.screenshot({ path: 'tests/.shots/1601-registro-scuro.png' });
+});
+
+test('(W) la chiave personale di un altro portafoglio: Crediti lo dice al posto del 403 ripetuto, e una chiave nuova rimette in moto il registro', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+  const nota = credits.locator('#walletNote');
+  const nuovaChiave = credits.locator('#reissueBtn');
+
+  // Il server lega a questa identità un portafoglio con un altro pseudonimo.
+  serverPseudonym = 'fedcba9876543210';
+  await credits.reload();
+  await expect(nota).toContainText('non è quella del tuo portafoglio', { timeout: 15_000 });
+  await expect(nuovaChiave).toBeVisible();
+  await expect(credits.locator('#pseudonym')).toHaveText('fedcba9876543210');
+  await credits.screenshot({ path: 'tests/.shots/1601-chiave-di-un-altro.png' });
+
+  // Un consumo adesso: il server lo rifiuta, e la coda non lo ritenta.
+  const consumo = (azione) => app.evaluate((_, a) => globalThis.SN_WALLET_MAIN.recordUsage({ action: a, model: 'deepseek-flash', servedBy: 'Fake', usage: { keySource: 'personal', promptTokens: 4, completionTokens: 1, costUsd: 0.0002 } }), azione);
+  await consumo('PRIMA_DELLA_CHIAVE_NUOVA');
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.flush());
+  await expect.poll(async () => (await statoRegistro(app)).discardedBy.rifiutata, { timeout: 15_000 }).toBe(1);
+  expect((await statoRegistro(app)).pending).toBe(0);
+
+  // «Richiedi una nuova chiave»: la chiave è del portafoglio giusto, e da qui i consumi arrivano.
+  await nuovaChiave.click();
+  await expect(nota).toContainText('Nuova chiave pronta', { timeout: 15_000 });
+  await expect(nuovaChiave).toBeHidden();
+  await consumo('DOPO_LA_CHIAVE_NUOVA');
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.flush());
+  await expect.poll(azioniArrivate, { timeout: 15_000 }).toEqual(['DOPO_LA_CHIAVE_NUOVA']);
+  expect(seen.commits[0].writes[0].update.fields.pseudonym.stringValue).toBe('fedcba9876543210');
+  await credits.reload();
+  await expect(nota).not.toContainText('non è quella del tuo portafoglio', { timeout: 15_000 });
+  await expect(credits.locator('#usageLogNote')).toHaveText('Un consumo non è stato registrato: rifiutato dal server.');
+
+  // Il server non ha più nessun portafoglio per questa identità, e la chiave personale è ancora qui.
+  redeemed = false;
+  await credits.reload();
+  await expect(nota).toContainText('non è di nessun portafoglio', { timeout: 15_000 });
+  await expect(credits.locator('#redeemForm')).toBeVisible();
 });
