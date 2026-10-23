@@ -618,7 +618,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     }
     if (schedaVuota && (!esito.ok || !String(esito.testo || '').trim())) { esito = schedaVuota; fonte = 'scheda'; }
   }
-  if (!esito.ok) return { ...vuoto, ...esito, pageRead: richiesto, url: esito.url || url };
+  if (!esito.ok) return { ...vuoto, ...esito, pageRead: richiesto, url: esito.url || url, schedaNonRisponde };
   const dopo = pericolo(esito.url);
   if (dopo) return dopo;
   const v = verdetto(esito.url, analizza);
