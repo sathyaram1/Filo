@@ -427,7 +427,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
       'senza la riprova un flaky su Windows butta un verde, o un giro di pubblicazione');
     assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
     const node = (t) => (t.match(/node-version:\s*(\S+)/) || [])[1];
-    assert.equal(node(lavoro), node(senzaCommenti(job('release'))));
+    assert.equal(node(lavoro), node(senzaCommenti(job('cancello'))));
     assert.match(lavoro, /node scripts\/npm-ci-ritenta\.mjs/);
   });
 
