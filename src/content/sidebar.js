@@ -380,22 +380,17 @@
   }
 
   // La cornice del passo si muove con la pagina: il pannello nello strato le si sposta di lato, una volta per fotogramma.
-  let evitaDetto = '';
   let evitaInCoda = null;
   function evita(rect) {
     if (!inFacciata()) { ensureNotOverTarget(rect); return; }
     if (!rect) return;
-    const r = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
     const prima = evitaInCoda;
-    evitaInCoda = r;
+    evitaInCoda = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
     if (prima) return;
     requestAnimationFrame(() => {
       const x = evitaInCoda;
       evitaInCoda = null;
-      const firma = JSON.stringify(x);
-      if (!x || firma === evitaDetto) return;
-      evitaDetto = firma;
-      comandoAlloStrato({ comando: 'evita', rect: x });
+      if (x) comandoAlloStrato({ comando: 'evita', rect: x });
     });
   }
 
