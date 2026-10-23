@@ -114,6 +114,19 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-who { color: color-mix(in srgb, var(--sn-fg) 72%, var(--sn-muted)); }
 /* La scadenza è l'unica cosa che scade: si distingue dal resto del sottotono. */
 .sn-mac-expiry { color: var(--sn-accent); }
+/* Stato e mittente della pratica, accanto al suo numero (#1517): sottotono, è un controllo non una notizia. */
+.sn-mac-fbinfo { color: var(--sn-muted); font-size: 11.5px; }
+/* Un numero di più segnalazioni sì è una notizia: chi approva deve sapere che il numero da solo non basta. */
+.sn-mac-fbdoppio {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  color: var(--sn-error);
+  border: 1px solid color-mix(in srgb, var(--sn-error) 45%, transparent);
+  background: color-mix(in srgb, var(--sn-error) 8%, transparent);
+  cursor: help;
+}
 
 .sn-mac-why {
   margin: 0;

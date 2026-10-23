@@ -87,6 +87,7 @@ test('domanda: il collegamento apre il documento del suo id, con stato, mittente
   await expect(dq.locator('.mg-dq-legame')).toHaveAttribute('data-feedback-id', 'fb-vero');
   await expect(dq.locator('.mg-dq-legame-info')).toHaveText('In lavorazione · sessione locale');
   await expect(dq.locator('.mg-dq-legame-doppio')).toHaveText('numero doppio');
+  await expect(dq.locator('.mg-dq-legame-doppio')).toHaveAttribute('title', /#5 è il numero di 2 segnalazioni/);
   await scatta(page, 'domanda');
   await dq.locator('.mg-dq-legame').click();
   await expect(page.locator('#mgDetail')).toBeVisible();
