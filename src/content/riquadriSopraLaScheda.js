@@ -12,7 +12,8 @@
   const SOSTITUZIONI_MAX = 20;
 
   // `apri(tipo, dati, ripiego)`: false sulle pagine di Filo, dove il riquadro resta nel documento. Se lo strato non si
-  // può fare (una finestra che non ne ha), il riquadro si apre col ripiego, nel documento come prima.
+  // può fare (una finestra che non ne ha), il riquadro si apre col ripiego, nel documento come prima; una richiesta
+  // troppo grossa per lo strato lo dice col numero, invece di aprirsi dove il sito la legge.
   function apri(tipo, dati, ripiego) {
     if (inPaginaDiFilo || !MSG.RIQUADRO_APRI || !global.chrome?.runtime?.sendMessage) return false;
     const conSostituzione = tipo === 'modifica' && dati && dati.contesto;
@@ -23,6 +24,11 @@
           sostituzioni.set(r.id, dati.contesto);
           while (sostituzioni.size > SOSTITUZIONI_MAX) sostituzioni.delete(sostituzioni.keys().next().value);
         }
+        return;
+      }
+      if (r && r.error === 'troppo') {
+        const mb = Math.round((Number(r.limite) || 0) / (1024 * 1024));
+        global.SN_POPUP?.showToast?.(`Il testo è troppo lungo per aprirlo in un riquadro: il massimo è ${mb} MB.`);
         return;
       }
       if (typeof ripiego === 'function') ripiego();

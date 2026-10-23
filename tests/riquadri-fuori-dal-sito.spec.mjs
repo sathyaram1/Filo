@@ -121,3 +121,36 @@ test('la risposta su un sito: sotto la parola, la domanda non la legge il sito, 
   await tastoSullaScheda(app, p, 'Escape');
   await expect.poll(() => conta(app, p, '.sn-popup')).toBe(0);
 });
+
+test('la finestrella di accesso aperta da un sito ha i suoi riquadri sopra la pagina, come una scheda', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const login = `${testServer.html(`<h1>accedi</h1>${SPIA}`)}?client_id=filo1509&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  const sito = await testServer.openReady(openTab, `<h1>sito</h1>
+    <button id="accedi" onclick='window.open(${JSON.stringify(login)}, "_blank", "width=520,height=640")'>Accedi con…</button>`);
+  await sito.click('#accedi');
+  const nelPopup = (code) => app.evaluate(async ({ BrowserWindow }, c) => {
+    const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes('client_id=filo1509'));
+    if (!w) return null;
+    try { return await w.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: c }]); } catch (_) { return null; }
+  }, code);
+  await expect.poll(() => nelPopup('document.documentElement.dataset.filoContentReady || ""'), { timeout: 10_000 }).toBe('1');
+  await nelPopup('globalThis.SN_FEEDBACK_UI.open()');
+  // Il riquadro sta nella vista dello strato della finestrella, non nel documento del sito.
+  let strato = null;
+  await expect.poll(async () => {
+    const id = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes('client_id=filo1509'));
+      return w ? w.webContents.id : null;
+    });
+    strato = app.windows().find((p) => p.url() === `filo://riquadri/riquadri.html#${id}`) || null;
+    return strato ? strato.locator('.sn-fb-text').count() : 0;
+  }, { timeout: 10_000 }).toBe(1);
+  await strato.locator('.sn-fb-text').click();
+  await strato.keyboard.insertText(SEGRETO);
+  await strato.keyboard.press('ControlOrMeta+A');
+  await strato.keyboard.press('ControlOrMeta+C');
+  const popup = app.windows().find((p) => p.url().includes('client_id=filo1509'));
+  await popup.waitForTimeout(400);
+  expect(await popup.evaluate(() => window.cosaHaVisto())).not.toContain('zibaldone');
+  expect(await popup.evaluate(() => document.querySelector('[data-sn-riquadro], .sn-fb-text'))).toBeNull();
+});

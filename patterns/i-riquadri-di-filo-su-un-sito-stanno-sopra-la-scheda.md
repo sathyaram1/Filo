@@ -28,8 +28,8 @@ lì non c'è codice di altri.
 - **Subito sopra la sua scheda:** avvisi della barra, conferme, barra laterale e menu restano sopra, come sopra la
   pagina. Si vede solo con la sua scheda davanti, senza l'avviso del sito pericoloso, e solo se ha qualcosa aperto.
 - **Il vuoto è della pagina:** fuori dai riquadri clic, rotella e trascinamenti tornano alla scheda
-  (`src/main/vuotoDellaVista.js`, `src/renderer/vuoto.js`); un riquadro che copre la pagina (feedback, Modifica,
-  red-team) è tutto suo. Un gesto sullo strato è dell'interfaccia di Filo (`gestoNelloStrato`): vale per gli appunti e
+  (`src/main/vuotoDellaVista.js`, `src/renderer/vuoto.js`), solo se veri, perché lì arrivano come gesti dell'utente;
+  un riquadro che copre la pagina (feedback, Modifica, red-team) è tutto suo. Un gesto sullo strato è dell'interfaccia di Filo (`gestoNelloStrato`): vale per gli appunti e
   il menu di Filo, mai per finestre e permessi del sito.
 - **Tastiera ed Esc:** chi apre un riquadro ci scrive, quindi lo strato prende la tastiera; quando non ha più niente la
   rende alla pagina. Esc premuto sulla pagina chiude il riquadro più in alto prima di ogni modalità; la scorciatoia che

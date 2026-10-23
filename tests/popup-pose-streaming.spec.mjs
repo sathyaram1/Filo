@@ -16,11 +16,11 @@
 // casella di testo dentro il viewport diventa rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo, statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { neiRiquadri, statoDi, conta, clicca, scrivi, tastieraDi } from './helpers/riquadri.mjs';
 
-// Sui siti il riquadro sta in uno shadow root chiuso (#1071): le misure si prendono nel mondo dei content script, dove
-// SN_FILO_UI._test lo raggiunge; sulle pagine di Filo è nel documento e le stesse funzioni lo trovano lì.
-const valuta = (app, page, fn, frame = null) => nelMondoDiFilo(app, page, fn, null, frame);
+// Sui siti il riquadro sta nello strato sopra la scheda (#1509.1): le misure si prendono lì, nel mondo dei content
+// script, in px della vista; sulle pagine di Filo è nel documento e le stesse funzioni lo trovano lì.
+const valuta = (app, page, fn, frame = null) => neiRiquadri(app, page, fn, null, frame);
 const testoDi = async (app, page, sel, frame = null) => (await statoDi(app, page, sel, frame))?.testo || '';
 const valoreDi = async (app, page, sel, frame = null) => (await statoDi(app, page, sel, frame))?.valore ?? null;
 
@@ -731,10 +731,11 @@ for (const alto of [130, 180, 240]) {
     await expect.poll(() => conta(app, page, '.sn-popup', frame), { timeout: 10_000 }).toBeGreaterThan(0);
     await attendiIngresso(app, page, frame);
 
-    // Lo scenario è quello vero: il popup vive dentro il riquadro, e il riquadro
-    // è più basso del tetto d'altezza del popup.
+    // Dal #1509.1 il popup non vive più nel riquadro incorporato, che lo tagliava, ma nello strato sopra la scheda,
+    // grande quanto lei.
     const daVuoto = await valuta(app, page, misura, frame);
-    expect(daVuoto.vh, 'il popup non sta nel frame del riquadro').toBeLessThanOrEqual(alto);
+    expect((await statoDi(app, page, '.sn-popup', frame))?.nelloStrato, 'il popup non sta nello strato sopra la scheda').toBe(true);
+    expect(daVuoto.vh, 'lo strato è più alto del riquadro incorporato').toBeGreaterThan(alto);
 
     // SUCCESSO 1 — già da vuoto è tutto dentro il riquadro: intestazione e riga
     // per scrivere comprese. Senza il rimedio nasce mozzato, prima ancora che
@@ -838,10 +839,9 @@ for (const alto of [240, 300, 340, 420]) {
       .poll(() => testoDi(app, page, '.sn-popup-meta', frame), { timeout: 20_000 })
       .toContain('€');
 
-    // Lo scenario è quello vero: il box è più basso del tetto del riquadro, e
-    // la parola sta a metà — nessuno dei due lati basta.
+    // Il popup sta nello strato sopra la scheda (#1509.1): il box basso non gli toglie più spazio.
     const m = await valuta(app, page, misura, frame);
-    expect(m.vh, 'il popup non sta nel frame del riquadro').toBeLessThanOrEqual(alto);
+    expect((await statoDi(app, page, '.sn-popup', frame))?.nelloStrato, 'il popup non sta nello strato sopra la scheda').toBe(true);
 
     // SUCCESSO 1 — della spiegazione se ne legge almeno il minimo comodo: non
     // una fessura da scorrere con la rotella.
@@ -899,10 +899,10 @@ for (const largo of [320, 280]) {
     await expect.poll(() => conta(app, page, '.sn-popup', frame), { timeout: 10_000 }).toBeGreaterThan(0);
     await attendiIngresso(app, page, frame);
 
-    // Lo scenario è quello vero: il riquadro incorporato è più STRETTO della
-    // larghezza naturale del popup.
+    // Il popup sta nello strato sopra la scheda (#1509.1): il riquadro stretto non lo taglia più.
     const daVuoto = await valuta(app, page, misura, frame);
-    expect(daVuoto.vw, 'il riquadro incorporato non è più stretto del popup').toBeLessThan(380);
+    expect((await statoDi(app, page, '.sn-popup', frame))?.nelloStrato, 'il popup non sta nello strato sopra la scheda').toBe(true);
+    expect(daVuoto.vw, 'lo strato è più largo del riquadro incorporato').toBeGreaterThan(largo);
 
     // SUCCESSO 1 — già da vuoto è tutto dentro, tasto di invio compreso.
     expect(fuoriDaiBordi(daVuoto), 'il popup nasce fuori dal bordo del riquadro stretto').toEqual([]);
@@ -1260,14 +1260,15 @@ test('aperta con la scorciatoia: si può scrivere la domanda dopo senza toccare 
     { timeout: 5000, message: 'dopo la scorciatoia il cursore non è nella riga per scrivere' },
   ).toBe(true);
 
-  // E si scrive davvero: tastiera e basta, niente clic e niente Tab.
-  await page.keyboard.type('e questo cosa vuol dire?');
+  // E si scrive davvero: tastiera e basta, niente clic e niente Tab. Sui siti la tastiera è quella dello strato.
+  const tastiera = (await tastieraDi(app, page)).keyboard;
+  await tastiera.type('e questo cosa vuol dire?');
   await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e questo cosa vuol dire?');
 
   // Il fuoco nella casella spegne la selezione della pagina, che è una sola.
   // Chiuso il riquadro la parola deve tornare selezionata: da lì l'utente ci
   // fa la cosa dopo (tradurre, copiare, cercare) senza rifare la selezione.
-  await page.keyboard.press('Escape');
+  await tastiera.press('Escape');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect
     .poll(() => page.evaluate(() => String(window.getSelection())), {
@@ -1419,8 +1420,8 @@ const invioCliccabile = () => {
 const TESTO_DOMANDA = 'e questo invece cosa vorrebbe dire nel contesto della frase che avevo selezionato prima, e in che modo cambia se la frase parlasse di altro? aggiungi anche un esempio pratico che si capisca subito';
 async function domandaLunga(page, { app = null, frame = null } = {}) {
   if (frame) {
-    await clicca(app, page, '.sn-popup .sn-popup-input', { frame });
-    await page.keyboard.type(TESTO_DOMANDA, { delay: 0 });
+    const dove = await clicca(app, page, '.sn-popup .sn-popup-input', { frame });
+    await dove.keyboard.type(TESTO_DOMANDA, { delay: 0 });
     return;
   }
   const input = page.locator('.sn-popup .sn-popup-input');

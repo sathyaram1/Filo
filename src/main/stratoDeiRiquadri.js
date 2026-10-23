@@ -10,9 +10,9 @@ const { percorsoDelPreload } = require('./preloadPacchetto');
 const INDIRIZZO = 'filo://riquadri/riquadri.html';
 const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta']);
-// Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina.
+// Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina. Oltre, la
+// richiesta si rifiuta col numero, mai tagliata.
 const DATI_MAX_BYTE = 8 * 1024 * 1024;
-const TESTO_MAX = 4 * 1024 * 1024;
 // Un ultimo punto del puntatore sulla scheda vale come ancora di una risposta chiesta da un riquadro incorporato.
 const PUNTATORE_MS = 15000;
 const ID_MAX = 80;
@@ -49,14 +49,12 @@ function ancoraNellaVista(ancora, zoom) {
 }
 
 class StratoDeiRiquadri {
-  // pagine(): i webContents che possono averne uno (schede, finestrella); area(wc): dove sta la pagina nella finestra, null
-  // se non si vede o se qualcosa la copre; sopraA(wc): la vista sopra cui posarlo (null: in cima); dopoInCima(): chi deve
-  // restargli sopra; scheda(wc): { id, url, title } della pagina.
-  constructor(win, { area = () => null, sopraA = () => null, dopoInCima = () => {}, scheda = () => null } = {}) {
+  // area(wc): dove sta la pagina nella finestra, null se non si vede o se qualcosa la copre; sopraA(wc): la vista sopra
+  // cui posarlo (null: in cima alla finestra); scheda(wc): { id, url, title } della pagina, null se non è sua.
+  constructor(win, { area = () => null, sopraA = () => null, scheda = () => null } = {}) {
     this.win = win;
     this.area = area;
     this.sopraA = sopraA;
-    this.dopoInCima = dopoInCima;
     this.scheda = scheda;
     this.strati = new Map(); // wc della pagina → { wc, vista, pronta, coda, aperti, riquadri, modale, inPagina }
     this.seguite = new WeakSet();
@@ -97,7 +95,7 @@ class StratoDeiRiquadri {
   }
 
   _datiPuliti(tipo, dati, sender, wc) {
-    const testo = (v) => String(v == null ? '' : v).slice(0, TESTO_MAX);
+    const testo = (v) => String(v == null ? '' : v);
     if (tipo === 'feedback') return { testo: testo(dati.testo) };
     if (tipo === 'modifica') return { testo: testo(dati.testo) };
     if (tipo === 'redteam') return {};
@@ -112,9 +110,9 @@ class StratoDeiRiquadri {
       if (p && Date.now() - p.alle < PUNTATORE_MS) ancora = { x: p.x, y: p.y, top: p.y, bottom: p.y };
     }
     return {
-      action: testo(dati.action).slice(0, 200),
+      action: testo(dati.action),
       payload: dati.payload && typeof dati.payload === 'object' ? dati.payload : {},
-      title: testo(dati.title).slice(0, 500),
+      title: testo(dati.title),
       anchor: ancora,
     };
   }
@@ -145,7 +143,7 @@ class StratoDeiRiquadri {
       const frame = s.inPagina.get(id);
       if (!id || id.length > ID_MAX || !s.inPagina.has(id)) return;
       s.inPagina.delete(id);
-      if (!d || d.cosa !== 'sostituisci' || typeof d.testo !== 'string' || d.testo.length > TESTO_MAX) return;
+      if (!d || d.cosa !== 'sostituisci' || typeof d.testo !== 'string' || pesa(d.testo) > DATI_MAX_BYTE) return;
       // Il testo va nel campo della pagina col fuoco già tornato a lei, come una battuta.
       this._restituisci(s, { forza: true });
       const dati = { type: msg().RIQUADRO_SOSTITUISCI, id, testo: d.testo };
@@ -192,7 +190,6 @@ class StratoDeiRiquadri {
       if (mia >= 0) cv.removeChildView(s.vista);
       cv.addChildView(s.vista, figli().indexOf(sotto) + 1);
     }
-    try { this.dopoInCima(); } catch (_) {}
   }
 
   _nascondi(s) {
