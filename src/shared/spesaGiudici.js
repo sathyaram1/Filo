@@ -57,7 +57,7 @@
       const campo = CAMPI[tipo];
       if (v === null || (typeof v === 'string' && !v.trim())) { valori[campo] = REGOLE[tipo].fabbrica; continue; }
       const esito = global.SN_CAMPO_NUMERO.controlla(v, REGOLE_CAMPO[tipo]);
-      if (!esito.ok) return { ok: false, testo: `${esito.testo} Non salvato.` };
+      if (!esito.ok) return { ok: false, testo: esito.testo };
       valori[campo] = tipo === 'tetto' ? centesimi(esito.valore) : esito.valore;
     }
     return { ok: true, valori };
