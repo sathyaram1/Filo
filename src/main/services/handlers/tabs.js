@@ -214,6 +214,10 @@ module.exports = function register(on, ctx) {
       if (!voce) return { ok: false, error: 'not_found' };
       // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: chi chiede apre il sito, e la riapertura conta.
       if (voce.urlTagliato) { contaRiaperta(voce, win); return { ok: false, error: 'url_tagliato' }; }
+    } else if (msg && msg.perIndirizzo === true) {
+      // Una pagina del filo senza la sua voce (una visita): se è una scheda chiusa, si riapre da lì.
+      try { voce = await ArchivedTabs.ultimaPer(msg.url); } catch (_) {}
+      if (!voce) return { ok: false, error: 'not_found' };
     }
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
