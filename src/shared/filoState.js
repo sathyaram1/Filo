@@ -14,6 +14,9 @@
 (function (global) {
   'use strict';
 
+  // Le schede che lo stato elenca col loro numero: CHIUDI_SCHEDE accetta solo quei numeri (#413).
+  const SCHEDE_ELENCATE = 12;
+
   // chrome.tabs non è disponibile in tutti i contesti (es. in un content script
   // top-frame con permessi limitati). Gestione difensiva: se non c'è, ritorna [].
   // `windowId`: le schede della finestra di chi chiede; senza, quelle della prima finestra.
