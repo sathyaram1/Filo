@@ -324,6 +324,15 @@ async function cambiDiDocumento(interno) {
     out[nome + 'Elemento'] = daFuori(f.contentWindow);
     out[nome + 'Indice'] = daFuori(window[i]);
   }
+  // Gli script di un documento da indirizzo javascript: girano prima della guardia (limite accettato dall'owner, nel
+  // pattern dei riquadri); letto da fuori dopo il load ha il rumore.
+  const js = document.createElement('iframe');
+  document.body.appendChild(js);
+  const k = window.length - 1;
+  js.src = 'javascript:"<!doctype html><body>js</body>"';
+  await carico(js);
+  out.javascriptElemento = daFuori(js.contentWindow);
+  out.javascriptIndice = daFuori(window[k]);
   const pigro = document.getElementById('pigro');
   pigro.src = interno('pigro');
   await carico(pigro);
