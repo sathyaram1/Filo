@@ -176,7 +176,8 @@
     function presaInMano() {
       if (!c.sessione || c.preso || campo.value === c.lasciato) return false;
       c.preso = true;
-      tieni('a_mano');
+      tieni(true);
+      verificaInvio();
       return true;
     }
 
