@@ -2351,6 +2351,40 @@ async function eseguiAzioneFilo(action, {
     action._detto = detto || davanti;
   }
 
+  // CHIUDI_SCHEDE (#413): le schede le sceglie il main dai numeri che il modello aveva davanti, prima del gate, così il
+  // popup le nomina; all'OK si chiudono quelle mostrate (bersagliMostrati). La scheda della chat non si chiude mai.
+  if (type === 'CHIUDI_SCHEDE') {
+    const tm = winOf(sender)?._filoTabs;
+    if (!tm) return { executed: false, kept: false, output: { error: 'nessuna finestra con schede' } };
+    const chat = sender?.tab?.id ?? null;
+    let scelta;
+    if (confirmed) {
+      const visti = bersagliMostrati(sender, action);
+      const ids = visti && Array.isArray(visti.targetIds) ? visti.targetIds : [];
+      scelta = { chiudere: tm.tabs.filter((t) => ids.includes(t.id) && t.id !== chat), restano: [] };
+    } else {
+      const viste = Array.isArray(schedeViste) ? schedeViste
+        : (await FiloState.listTabs({ windowId: winOf(sender)?.id ?? null })).map((t) => t.id);
+      const motivo = await tm.motiviPerRestare();
+      // Un sito nominato si chiude anche se è tenuto sempre aperto: l'ha detto l'utente; il testo non inviato resta.
+      const resta = (tab, modo) => { const m = motivo(tab); return m === 'sempre' && modo !== 'tutte' ? '' : m; };
+      scelta = ChiudiSchede.risolvi(action, { schede: tm.tabs, viste, numerate: FiloState.SCHEDE_ELENCATE, chat, resta });
+      if (scelta.errore) return { executed: false, kept: false, output: { error: scelta.errore } };
+    }
+    const nome = await nomeDellaScheda();
+    action._targets = scelta.chiudere.map(nome);
+    action._targetIds = scelta.chiudere.map((t) => t.id);
+    action._restano = scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
+    action._inIncognito = !!tm.incognito;
+    if (!scelta.chiudere.length) {
+      const nessuna = scelta.restano.length ? '' : (scelta.sito && !scelta.tutte ? 'sito' : 'niente');
+      return {
+        executed: false, kept: false,
+        output: { chiuse: 0, ...(scelta.restano.length ? { restano: scelta.restano.length } : {}), ...(nessuna ? { nessuna } : {}) },
+      };
+    }
+  }
+
   // CANCELLA_PAGINE (#866): periodo e numero di pagine li calcola il main, così il popup dice il conto vero.
   if (type === 'CANCELLA_PAGINE') {
     const sito = globalThis.SN_FILO_EVENTI.normaSito(action.sito ?? action.dominio ?? action.site ?? '');
@@ -5682,7 +5716,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat, capRilettura,
+          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat, capRilettura, schedeViste,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
