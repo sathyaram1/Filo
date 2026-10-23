@@ -149,7 +149,7 @@ test.describe('la riapertura vera', () => {
       await tm.restoreSession();
     }, { schede, ora });
 
-    await expect.poll(() => avviso(shell), { timeout: 40_000 }).toBe('Schede riordinate: 1 chiusa, restano nel filo della home');
+    await expect.poll(() => avviso(shell), { timeout: 40_000 }).toBe('Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
 
     // Il modello ha saputo che è una riapertura e da quanto ogni scheda non si usa: senza, ogni scheda riaperta
     // risultava «inattiva da 0min» (il primo segnale della pagina contava come uso) e la teneva.
