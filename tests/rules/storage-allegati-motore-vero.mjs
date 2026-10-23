@@ -32,21 +32,20 @@
 //   npx firebase emulators:exec --only firestore,storage --project filo-prova-582 \
 //     "node storage-allegati-motore-vero.mjs"
 //
-// Esito atteso: tutte le righe verdi, uscita 0. Al primo passaggio
-// (2026-09-11) è stato così: 25/25, con una riga NOTA perché la lettura
-// dell'owner allora passava da `firestore.exists(...)` e l'emulatore quella
-// chiamata non la inoltrava. Adesso quella nota non serve più: la lettura è
-// negata a tutti, owner compreso, e il motore la sa misurare.
+// Esito atteso: tutte le righe verdi, uscita 0, più le righe NOTA di ciò che
+// l'emulatore non sa misurare. Al passaggio di #1518 (2026-10-23, firebase-tools
+// 15.34): 47/47 con due NOTE (Cache-Control e Content-Language non arrivano alle
+// regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
+// metadati prima di valutarle).
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
-// PRIMA (`git show main:storage.rules > vecchie.rules`, poi
-// `STORAGE_RULES_FILE=vecchie.rules`). Fatta il 2026-09-11: 10/23, e i tredici
-// rossi dicono esattamente il danno — senza nessun login si scaricava
-// l'allegato di un altro, si ELENCAVA feedback/ intero, si sovrascriveva un
-// file esistente, e passavano i nomi indovinabili (`screenshot.png`) e le
-// sottocartelle. Passava anche una cosa che non doveva: un allegato da 4 MB
-// tondi, una volta cifrato, veniva RIFIUTATO. Una prova che resta verde su
-// entrambe le versioni non prova niente.
+// PRIMA (`git show origin/main:storage.rules > vecchie.rules`, poi
+// `STORAGE_RULES_FILE=vecchie.rules`; `HEAD` no, sul ramo il salvataggio
+// automatico ha già le nuove). Per #1518: 27/47, e i venti rossi sono il danno
+// segnalato — senza login entravano immagini e testi in chiaro, octet-stream
+// con estensione libera (.exe, .html), un nome di scarico scelto, una chiave
+// personalizzata, una codifica; e la funzione dei metadati non c'era. Una prova
+// che resta verde su entrambe le versioni non prova niente.
 
 import {
   initializeTestEnvironment,
