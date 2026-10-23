@@ -444,6 +444,14 @@ function crea(dip = {}) {
     return true;
   }
 
+  // La chat che cambia la richiesta per stare nella finestra del modello (#1464): `tipo` dall'elenco chiuso.
+  function adattamento(action, modello, tipo) {
+    const f = C.funzioneDi(action);
+    if (!f || !C.ADATTAMENTI.includes(tipo) || inIncognito()) return false;
+    conta((ora) => C.registraAdattamento(ora, f, modello, tipo)).catch(() => {});
+    return true;
+  }
+
   function chiesto(action) {
     const f = C.funzioneDi(action);
     if (!f) return false;
