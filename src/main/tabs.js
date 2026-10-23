@@ -1924,15 +1924,6 @@ class TabManager {
     return !!tab && !this._copertaDa(tab);
   }
 
-  _vecchiaVistaSottoIlVuoto() {
-    const tab = this.tabs.find((t) => t.id === this.activeId);
-    if (!tab) return null;
-    const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
-    const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    const riquadri = this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null;
-    return domanda || avviso || riquadri || tab.view || null;
-  }
-
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
