@@ -254,13 +254,13 @@
       } catch (e) {
         throw conLaFunzione(e, s, action);
       }
-      return settleChain(s, action, chain, r);
+      return settleChain(s, action, chain, r, m);
     }
 
     // Un tentativo rotto a metà si è già pagato: il suo costo il router lo dice solo dopo, e lo si chiede come per la voce.
-    function auditBroken(s, action, list) {
+    function auditBroken(s, action, list, m) {
       for (const b of list || []) {
-        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource });
+        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource, m });
       }
     }
 
