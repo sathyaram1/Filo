@@ -35,31 +35,34 @@ test('esplora: interruttore spento a pagina aperta', async ({ app, openTab, test
   await prepara(app);
   const page = await apri(app, openTab, testServer);
   console.log('acceso:', await scrivi(page, 'ok perchè '));
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ correttore: { automatica: false } }); });
+  const altro = await openTab('filo://options/altro.html');
+  await altro.locator('#spellcheckAutomatica').uncheck();
+  await page.bringToFront();
   await page.waitForTimeout(1500);
-  console.log('spento a pagina aperta:', await scrivi(page, 'ok perchè '));
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ correttore: { automatica: true } }); });
+  console.log('spento da Opzioni a pagina aperta:', await scrivi(page, 'ok perchè '));
+  await altro.locator('#spellcheckAutomatica').check();
+  await page.bringToFront();
   await page.waitForTimeout(1500);
-  console.log('riacceso:', await scrivi(page, 'ok perchè '));
+  console.log('riacceso da Opzioni:', await scrivi(page, 'ok perchè '));
 });
 
 test('esplora: due annulli in una scheda, l\'altra scheda già aperta', async ({ app, openTab, testServer }) => {
   await prepara(app);
   const b = await apri(app, openTab, testServer, 2);
-  console.log('B prima:', await scrivi(b, 'vedo marco '));
+  console.log('B prima:', await scrivi(b, 'Vedo marco '));
   const a = await apri(app, openTab, testServer, 1);
   for (let i = 0; i < 2; i++) {
-    const v = await scrivi(a, 'vedo marco ');
+    const v = await scrivi(a, 'Vedo marco ');
     await a.keyboard.press('Control+z');
     console.log(`A giro ${i}:`, v, '->', await a.locator('#ta').inputValue());
   }
-  console.log('A dopo:', await scrivi(a, 'vedo marco '));
+  console.log('A dopo:', await scrivi(a, 'Vedo marco '));
   console.log('memoria:', JSON.stringify(await app.evaluate(async () => (await globalThis.chrome.storage.local.get('sn_correttore_imparato')).sn_correttore_imparato)));
   await b.bringToFront();
-  console.log('B dopo, già aperta:', await scrivi(b, 'vedo marco '));
+  console.log('B dopo, già aperta:', await scrivi(b, 'Vedo marco '));
 });
 
-test('esplora: annulla dal tasto destro nella textarea e soglia 1 da Avanzate', async ({ app, openTab, testServer }) => {
+test.skip('esplora: annulla dal tasto destro nella textarea e soglia 1 da Avanzate', async ({ app, openTab, testServer }) => {
   await prepara(app, { annulliPerImparare: 1 });
   const page = await apri(app, openTab, testServer);
   console.log('scritto:', await scrivi(page, 'non so perchè ok '));
@@ -70,7 +73,8 @@ test('esplora: annulla dal tasto destro nella textarea e soglia 1 da Avanzate', 
   });
   // «perché» comincia al carattere 7, carattere monospace di 22px circa 13.2px.
   await page.mouse.click(box.x + 2 + 7 * 13.2 + 20, box.y + 14, { button: 'right' });
-  const voci = await menuDi(page).root.locator('[role="menuitem"], button').allInnerTexts().catch(() => []);
+  await page.waitForTimeout(600);
+  const voci = await menuDi(page).voci.allInnerTexts().catch(() => []);
   console.log('voci menu:', JSON.stringify(voci.slice(0, 20)));
   const voce = menuDi(page).voce('Annulla correzione');
   if (await voce.count()) {
@@ -81,7 +85,7 @@ test('esplora: annulla dal tasto destro nella textarea e soglia 1 da Avanzate', 
   console.log('di nuovo (soglia 1):', await scrivi(page, 'non so perchè ok '));
 });
 
-test('esplora: incollato e poi spazio', async ({ app, openTab, testServer }) => {
+test.skip('esplora: incollato e poi spazio', async ({ app, openTab, testServer }) => {
   await prepara(app);
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();

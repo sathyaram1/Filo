@@ -28,6 +28,15 @@ function App() {
 ReactDOM.render(React.createElement(App), document.getElementById('m'));
 </script></body>`;
 
+const CK = () => `<!doctype html><meta charset="utf-8"><body style="padding:20px;font:22px sans-serif" lang="it">
+<div id="m"></div>
+<script>${leggi('ck/package/build/ckeditor.js')}</script>
+<script>ClassicEditor.create(document.getElementById('m'), { toolbar: [] }).then((ed) => { window.ed = ed; window.modello = () => ed.getData().replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' '); });</script></body>`;
+
+const IFRAME = () => `<!doctype html><meta charset="utf-8"><body style="padding:20px;font:22px sans-serif" lang="it">
+<iframe id="f" style="width:700px;height:200px" srcdoc="<html lang=it><body contenteditable=true style='font:22px sans-serif'></body></html>"></iframe>
+<script>window.modello = () => document.getElementById('f').contentDocument.body.innerText;</script></body>`;
+
 async function apri(app, openTab, testServer, html) {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
@@ -41,13 +50,15 @@ async function apri(app, openTab, testServer, html) {
   return page;
 }
 
-for (const [nome, html, sel] of [['quill', QUILL, '.ql-editor'], ['draft', DRAFT, '.public-DraftEditor-content']]) {
+for (const [nome, html, sel] of [['ck', CK, '.ck-editor__editable'], ['iframe', IFRAME, null]]) {
   test(`esplora ${nome}`, async ({ app, openTab, testServer }) => {
     const page = await apri(app, openTab, testServer, html());
     const m = () => page.evaluate(() => window.modello().replace(/ /g, ' '));
     const dom = () => page.evaluate((s) => document.querySelector(s).innerText.replace(/ /g, ' '), sel);
     const log = [];
-    await page.locator(sel).click();
+    await page.waitForTimeout(1000);
+    if (sel) await page.locator(sel).click();
+    else await page.frameLocator('#f').locator('body').click();
     await page.keyboard.type('Ciao marco come va, non so perchè ');
     await page.waitForTimeout(400);
     log.push(`dopo scritto: modello=${JSON.stringify(await m())} dom=${JSON.stringify(await dom())}`);
