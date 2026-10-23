@@ -272,25 +272,33 @@
     // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
     inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
     network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
+    // Il tetto per chi dà inviti (#1519): conta tutti i codici della stessa persona, non solo quello incollato.
+    inviter_cap: 'Con gli inviti di chi ti ha mandato questo codice sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
   });
 
-  // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
+  // I tetti a tempo del riscatto: il codice resta buono e il server dice quando si libera un posto.
+  const TETTI_A_TEMPO = Object.freeze({ network_cap: 'Da questa connessione', inviter_cap: 'Con gli inviti di chi ti ha mandato questo codice' });
+  function riscattoDaRiprovare(status) { return Object.prototype.hasOwnProperty.call(TETTI_A_TEMPO, status); }
+
+  // `info` è la risposta intera del server: i tetti a tempo portano l'ora in cui riaprire.
   function redeemMessage(status, info) {
-    if (status === 'network_cap' && info && info.reopensAt) return networkCapMessage(info);
+    if (riscattoDaRiprovare(status) && info && info.reopensAt) return tettoMessage(status, info);
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
-  // Il tetto dei riscatti dalla stessa rete (#1120), coi numeri del server e l'ora locale in cui si libera un posto.
-  // Un'ora che non si legge non diventa «adesso»: resta la frase senza ora.
-  function networkCapMessage({ reopensAt, cap, hours } = {}, nowMs = Date.now()) {
+  // Il tetto dei riscatti dalla stessa rete (#1120) o coi codici della stessa persona (#1519), coi numeri del server e
+  // l'ora locale in cui si libera un posto. Un'ora che non si legge non diventa «adesso»: resta la frase senza ora.
+  function tettoMessage(status, { reopensAt, cap, hours } = {}, nowMs = Date.now()) {
     const t = Date.parse(String(reopensAt || ''));
-    if (!Number.isFinite(t)) return REDEEM_MESSAGES.network_cap;
+    if (!Number.isFinite(t)) return REDEEM_MESSAGES[status];
     const n = Math.floor(Number(cap) || 0);
     const h = Number(hours) || 0;
     const chi = n === 1 ? 'è già entrata una persona' : (n > 1 ? `sono già entrate ${fmtInt(n)} persone` : 'sono già entrate troppe persone');
     const finestra = h === 1 ? ' nell’ultima ora' : (h > 0 ? ` nelle ultime ${Number.isInteger(h) ? fmtInt(h) : String(h).replace('.', ',')} ore` : ' di recente');
-    return `Da questa connessione ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
+    return `${TETTI_A_TEMPO[status]} ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
   }
+  function networkCapMessage(info = {}, nowMs = Date.now()) { return tettoMessage('network_cap', info || {}, nowMs); }
+  function inviterCapMessage(info = {}, nowMs = Date.now()) { return tettoMessage('inviter_cap', info || {}, nowMs); }
 
   function quandoRiapre(t, nowMs) {
     const d = new Date(t);
