@@ -508,8 +508,11 @@
     if (Number.isFinite(st) && st > 0 && ![400, 413, 422].includes(st)) return null;
     const s = String((err && (err.message || err.error)) || err || '');
     if (!/maximum context|context[ _-]?(length|window)|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
-    // Anthropic: «prompt is too long: 214263 tokens > 200000 maximum».
+    // Anthropic: «prompt is too long: 214263 tokens > 200000 maximum». OpenRouter mette nel chiesto anche il tetto
+    // della risposta e dice a parte l'ingresso («69000 of text input»): solo quando c'è, `ingresso`.
+    const ingresso = numeroDa(s, new RegExp(`${NUMERO} of (?:text )?input`, 'i'));
     return {
+      ...(ingresso ? { ingresso } : {}),
       max: numeroDa(s, new RegExp(`maximum context (?:length|window) (?:is|of) ${NUMERO}`, 'i'))
         || numeroDa(s, new RegExp(`context (?:length|window|limit)[^0-9]{0,24}${NUMERO}`, 'i'))
         || numeroDa(s, new RegExp(`tokens? > ${NUMERO} maximum`, 'i')),
