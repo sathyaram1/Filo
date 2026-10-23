@@ -109,7 +109,7 @@
   let continuaAperto = null;
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
-  function isOpen() { return !!(root && root.isConnected); }
+  function apertoQui() { return !!(root && root.isConnected); }
 
   // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
   function close({ davvero = false } = {}) {
