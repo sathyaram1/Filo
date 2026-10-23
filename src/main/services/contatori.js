@@ -1,5 +1,5 @@
-// I contatori anonimi (#969, #1461, #1464, #1466): misura usi e chiamate dei modelli, azioni, gesti e guasti di elenco
-// chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
+// I contatori anonimi (#969, #1461, #1464, #1466, #1469): misura usi e chiamate dei modelli, azioni, navigazione, gesti e guasti
+// di elenco chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
 // spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -714,6 +714,20 @@ function crea(dip = {}) {
     return true;
   }
 
+  // La navigazione (#1469): `voce` la costruisce C.NAV coi suoi elenchi chiusi; una voce che non lo è non conta.
+  function navigazione(voce, { incognito = null } = {}) {
+    if (!oggetto(voce)) return false;
+    conta((ora) => C.registraNavigazione(ora, voce.misura, voce.chiave, voce.voci), { incognito }).catch(() => {});
+    return true;
+  }
+
+  // All'uscita il salvataggio non aspetta i suoi tre secondi, o l'ultima voce (la pulizia dei cookie) non arriverebbe
+  // sul disco: il main lo scrive tutto prima di chiudere.
+  async function allUscita(voce = null) {
+    if (oggetto(voce)) await conta((ora) => C.registraNavigazione(ora, voce.misura, voce.chiave, voce.voci), { incognito: false }).catch(() => false);
+    await salva();
+  }
+
   // La chat che cambia la richiesta per stare nella finestra del modello (#1464): `tipo` dall'elenco chiuso.
   function adattamento(action, modello, tipo) {
     const f = C.funzioneDi(action);
@@ -918,14 +932,15 @@ function crea(dip = {}) {
         delete mappa[k];
         continue;
       }
-      const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
+      const accanto = giorno ? [] : documentiAccanto(k, { ...base, chiave: k });
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
-      // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
-      // allora l'ora rispedita risponde 409.
+      // L'ora è arrivata: il suo segno di primo documento vale anche se i documenti accanto partono al giro dopo, e
+      // allora l'ora (e quelli già arrivati) rispediti rispondono 409.
       if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
-      if (r.ok && chiamate) {
-        r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
+      for (const [d, collezione] of accanto) {
+        if (!r.ok) break;
+        r = await spedisci(d, collezione);
         if (mia !== generazione) return 'spenti';
       }
       if (!r.ok && r.soloQuesto) {
@@ -952,14 +967,21 @@ function crea(dip = {}) {
     return esito;
   }
 
-  // Le chiamate ai modelli di un'ora (#1464), se ne ha: un documento che non passa la validazione non ferma l'ora.
-  function documentoChiamate(k, base) {
-    const d = C.documentoChiamate(base);
-    if (C.senzaChiamate(d)) return null;
-    const v = C.validaChiamate(d);
-    if (v.ok) return d;
-    log(`le chiamate di ${k} non partono: ${v.motivo}`);
-    return null;
+  // Le chiamate ai modelli (#1464) e la navigazione (#1469) di un'ora, se ne ha: un documento che non passa la
+  // validazione non ferma l'ora.
+  function documentiAccanto(k, base) {
+    const out = [];
+    for (const [costruisci, vuoto, valida, collezione, cosa] of [
+      [C.documentoChiamate, C.senzaChiamate, C.validaChiamate, C.COLLEZIONE_CHIAMATE, 'le chiamate'],
+      [C.documentoNavigazione, C.senzaNavigazione, C.validaNavigazione, C.COLLEZIONE_NAVIGAZIONE, 'la navigazione'],
+    ]) {
+      const d = costruisci(base);
+      if (vuoto(d)) continue;
+      const v = valida(d);
+      if (v.ok) out.push([d, collezione]);
+      else log(`${cosa} di ${k} non partono: ${v.motivo}`);
+    }
+    return out;
   }
 
   // Si ricordano i giorni che possono ancora partire (le ore restano in attesa al più due mesi) e tre mesi.
@@ -1084,6 +1106,7 @@ function crea(dip = {}) {
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
+    navigazione, allUscita,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina,
     controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,

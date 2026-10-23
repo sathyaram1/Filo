@@ -150,5 +150,7 @@
     targetOf,
     shouldShowErrorPage,
     describe,
+    // I codici con un messaggio loro: i contatori (#1469) ne tengono la copia.
+    CODICI: Object.freeze(Object.keys(KNOWN)),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

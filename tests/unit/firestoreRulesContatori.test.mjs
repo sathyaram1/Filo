@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464, #1466): le collezioni sono a sola creazione, lette
-// solo dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v3, più le v2 e i giorni v1 delle copie
-// vecchie) e le chiamate ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file.
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464, #1466, #1469): collezioni a sola creazione, lette solo
+// dall'admin, nella forma che l'app costruisce: ore (v3, più v2 e giorni v1 delle copie vecchie), chiamate e navigazione di
+// un'ora; e gli elenchi della navigazione uguali al codice che li possiede. Il motore vero: contatoriRegole.motore-vero.mjs.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,6 +31,7 @@ function blocco(collezione) {
 }
 const B = blocco(C.COLLEZIONE);
 const BC = blocco(C.COLLEZIONE_CHIAMATE);
+const BN = blocco(C.COLLEZIONE_NAVIGAZIONE);
 // Le funzioni che le ore e le loro chiamate condividono stanno fra l'intestazione dei contatori e il blocco delle ore.
 const CONDIVISE = (() => {
   const a = RULES.indexOf('    // ── I contatori anonimi');
@@ -38,7 +39,7 @@ const CONDIVISE = (() => {
   assert.ok(a >= 0 && b > a, 'le funzioni condivise dei contatori stanno prima del blocco delle ore');
   return senzaCommenti(RULES.slice(a, b));
 })();
-const TUTTO = [CONDIVISE, B, BC].join('\n');
+const TUTTO = [CONDIVISE, B, BC, BN].join('\n');
 
 // Il corpo di una funzione delle regole, coi `let` già sostituiti dove sono usati: la rilettura vede quello che si valuta.
 function corpo(nome) {
@@ -57,6 +58,7 @@ const CHIAMATE = corpo('contatoriChiamate');
 const ORA3 = corpo('contatoriOra3');
 const TESTA = corpo('testaOra');
 const MISURE_ORA = corpo('misureOra');
+const NAVIGAZIONE = corpo('contatoriNavigazione');
 
 function regole(testo) {
   const out = [];
@@ -310,7 +312,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, TESTA, CHIAMATE]) {
+  for (const testo of [GIORNO, TESTA, CHIAMATE, NAVIGAZIONE]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
@@ -328,7 +330,7 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  for (const testo of [TESTA, CHIAMATE]) {
+  for (const testo of [TESTA, CHIAMATE, NAVIGAZIONE]) {
     assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
     const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
     assert.ok(ora);
@@ -417,6 +419,92 @@ test('le chiamate: ogni misura si chiude sulle funzioni con la forma dell’app,
 test('nessuna espressione regolare del blocco passa i 4096 caratteri che le regole accettano', () => {
   const lunghe = [...B.matchAll(/'(\^[^']*)'/g)].map((m) => m[1].length).filter((n) => n > 4096);
   assert.deepEqual(lunghe, [], 'una forma oltre i 4096 caratteri: le regole non si pubblicano');
+});
+
+// ── La navigazione di un'ora (#1469) ─────────────────────────────────────
+const CODICI_REGOLE = (() => {
+  const m = /let codici = \[([^\]]*)\];/.exec(BN);
+  assert.ok(m, 'manca l’elenco dei codici di rete nelle regole della navigazione');
+  return stringhe(m[1]);
+})();
+const MN = (() => {
+  const out = {};
+  for (const m of NAVIGAZIONE.matchAll(/chiuse\(d\.(\w+), (codici|\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    out[m[1]] = { chiavi: m[2] === 'codici' ? CODICI_REGOLE : stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  }
+  return out;
+})();
+
+test('la navigazione: sola creazione, letta dall’admin, coi campi e la versione dell’app', () => {
+  const RN = regole(BN);
+  assert.deepEqual(per('get', RN).map((r) => r.cond), ['isAdmin()']);
+  assert.deepEqual(per('list', RN).map((r) => r.cond), ['isAdmin()']);
+  assert.ok(!per('read', RN).length && !per('write', RN).length);
+  for (const v of ['update', 'delete']) assert.ok(per(v, RN).length >= 1 && per(v, RN).every((r) => r.cond === 'false'));
+  assert.deepEqual(per('create', RN).map((r) => r.cond), ['contatoriNavigazione(request.resource.data)']);
+  assert.deepEqual(elencoDopo(NAVIGAZIONE, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_NAVIGAZIONE]);
+  assert.deepEqual(elencoDopo(NAVIGAZIONE, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_NAVIGAZIONE]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(NAVIGAZIONE)[1]), C.VERSIONE_NAVIGAZIONE);
+  const doc = C.documentoNavigazione({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_NAVIGAZIONE]);
+  assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
+  assert.ok(!/primo/.test(NAVIGAZIONE), 'il segno del primo documento è dell’ora');
+});
+
+test('la navigazione: ogni misura ha le chiavi, il tetto e la forma dell’app, e il documento più carico passa', () => {
+  assert.deepEqual(Object.keys(MN).sort(), [...C.MISURE_NAVIGAZIONE].sort(), 'ogni misura ha il suo controllo, e nessuna in più');
+  for (const c of C.MISURE_NAVIGAZIONE) {
+    assert.deepEqual(MN[c].chiavi, [...C.NAVIGAZIONE[c].chiavi], `${c}: le chiavi delle regole sono quelle dell’app`);
+    assert.equal(MN[c].tetto, C.TETTI.NAVIGAZIONE[c], `${c}: il tetto`);
+    assert.equal(MN[c].valori, unite(C.FORME.NAVIGAZIONE[c]), `${c}: la forma dei valori`);
+  }
+  const ora = C.oraVuota();
+  for (const c of C.MISURE_NAVIGAZIONE) {
+    const n = C.NAVIGAZIONE[c].gruppi.reduce((a, g) => a + g.length, 0);
+    for (const k of C.NAVIGAZIONE[c].chiavi) ora[c][k] = Array(n).fill(999999999);
+  }
+  const doc = C.documentoNavigazione({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'linux', dati: ora });
+  assert.equal(C.validaNavigazione(doc).ok, true, C.validaNavigazione(doc).motivo);
+  assert.equal(passa(doc, MN), '', 'la navigazione più carica dell’app deve passare le regole');
+  assert.ok(JSON.stringify(doc).length < 1000000);
+  const vuoto = C.documentoNavigazione({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.equal(passa(vuoto, MN), '');
+  assert.equal(C.senzaNavigazione(vuoto), true, 'un’ora senza navigazione non ha il terzo documento');
+  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MN);
+  assert.notEqual(manomesso('navFallite', { 'mario.rossi.it': '1,0' }), '', 'un dominio come chiave');
+  assert.notEqual(manomesso('navFallite', { '-105': '1,0 https://mario.it' }), '', 'un indirizzo dentro il valore');
+  assert.notEqual(manomesso('scaricamenti', { 'relazione finale.docx': '1,0,0,0,0;1,0,0,0,0,0' }), '', 'un nome di file come chiave');
+  assert.notEqual(manomesso('riquadri', { 'instagram-accesso.xyz': '1,0,0,0,0,0,0,0,0,0,0' }), '', 'un sito fuori dai servizi');
+  assert.notEqual(manomesso('geoProxy', { 'it|datacenter': '1,0' }), '', 'un paese fuori elenco ha la sua riga «altro»');
+  assert.notEqual(manomesso('liste', { adblock: '1,0,0,0;1,0,0,0,0,0' }), '', 'un gruppo che manca');
+  assert.notEqual(manomesso('programmi', { programma: { n: 1 } }), '', 'una mappa al posto della stringa');
+});
+
+test('gli elenchi della navigazione sono la copia di quelli del codice: cambiarne uno da solo fa rosso', () => {
+  const S = (...p) => require(join(ROOT, 'src', 'main', 'services', ...p));
+  const ordina = (l) => [...l].sort();
+  require(join(ROOT, 'src', 'shared', 'netError.js'));
+  assert.deepEqual(ordina(globalThis.SN_NET_ERROR.CODICI), ordina(C.CODICI_RETE), 'i codici con un messaggio di netError.js');
+  assert.deepEqual(ordina(Object.values(S('geoBlock.js').SOURCES)), ordina(C.FONTI_GEO), 'le fonti del blocco per paese');
+  const classi = Object.values(S('geoBlockClassifier.js').CLASSES);
+  assert.deepEqual(ordina([...classi, 'saltato_budget', 'no_model']), ordina(C.CLASSI_GEO), 'le classi del modello e i due salti');
+  const sorgente = readFileSync(join(ROOT, 'src', 'main', 'services', 'geoBlockClassifier.js'), 'utf8');
+  assert.match(sorgente, /reason: 'budget'/, 'il salto per il tetto che classeGeo riconosce');
+  assert.match(sorgente, /error: 'no_model'/, 'il salto senza modello che classeGeo riconosce');
+  const Rg = S('geoBlockRules.js');
+  const motivi = new Set();
+  for (const flaggedDangerous of [true, false]) for (const hasLoginCookies of [true, false]) for (const proxyConfigured of [true, false]) {
+    for (const stage of [undefined, ...Object.values(Rg.STAGES)]) motivi.add(Rg.decideGeoAction({ flaggedDangerous, hasLoginCookies, proxyConfigured, stage }).reason);
+  }
+  assert.deepEqual(ordina(motivi), ordina(C.MOTIVI_GEO), 'i motivi delle decisioni sul blocco per paese');
+  const P = S('proxyTab.js');
+  assert.deepEqual(P.LOCATIONS.map((l) => l.code), [...C.PAESI_PROXY], 'i paesi della scelta «Apri da un altro paese»');
+  assert.deepEqual(ordina(Object.values(P.TIERS)), ordina(C.TIER_PROXY));
+  const servizi = S('riquadriRottiRegole.js').SERVIZI;
+  assert.ok(servizi.every((s) => typeof s.id === 'string' && /^[a-z0-9-]{1,30}$/.test(s.id)), 'ogni servizio ha il suo id');
+  assert.deepEqual(servizi.map((s) => s.id), [...C.SERVIZI_RIQUADRO], 'i servizi dei riquadri rotti');
+  // E le regole tengono gli stessi elenchi dell'app: le chiavi delle misure sopra lo confrontano voce per voce.
+  assert.deepEqual(CODICI_REGOLE, [...C.CODICI_RETE, 'altro']);
 });
 
 test('le due funzioni di controllo delle mappe sono quelle che si credono', () => {

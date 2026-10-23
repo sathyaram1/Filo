@@ -514,12 +514,25 @@ app.on('before-quit', (e) => {
   try { pending = Promise.all([pending, require('./services/cookieIncorporati').allUscita()]); } catch (_) {}
   if (!pending || typeof pending.then !== 'function') return;
   e.preventDefault();
-  const finish = () => { cookieWipeDone = true; app.quit(); };
+  // L'esito della pulizia va nei contatori (#1469) e i contatori sul disco, prima di uscire: al più 400 ms in più.
+  const finish = (esito) => {
+    if (cookieWipeDone) return;
+    cookieWipeDone = true;
+    let scritto = Promise.resolve();
+    try {
+      const M = globalThis.SN_CONTATORI_MAIN;
+      const N = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.NAV;
+      if (M && N) scritto = Promise.race([M.allUscita(esito ? N.pulizia(esito) : null), new Promise((r) => setTimeout(r, 400))]);
+    } catch (_) {}
+    scritto.catch(() => {}).then(() => app.quit());
+  };
+  // In Privacy e a mano la pulizia non c'è: si salta, e non si conta.
+  const saltata = (r) => { const w = Array.isArray(r) ? r[0] : r; return !!(w && w.skipped); };
   const timer = setTimeout(() => {
     try { contatori()?.tettoChiusura(); } catch (_) {}
-    finish();
+    finish('tetto_2500ms');
   }, 2500);
-  pending.then(() => { clearTimeout(timer); finish(); }, () => { clearTimeout(timer); finish(); });
+  pending.then((r) => { clearTimeout(timer); finish(saltata(r) ? null : 'finita'); }, () => { clearTimeout(timer); finish(null); });
 });
 
 app.on('window-all-closed', () => {

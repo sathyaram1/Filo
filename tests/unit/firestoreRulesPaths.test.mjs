@@ -51,6 +51,9 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   'contatori-chiamate':
     'le chiamate ai modelli di un’ora dei contatori (#1464), accanto all’ora e con lo stesso id: stesse ragioni e ' +
     'stessa forma chiusa (numeri, fasce e nomi di modello), a sola creazione e letti solo dall’admin.',
+  'contatori-navigazione':
+    'la navigazione di un’ora dei contatori (#1469), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
+    'numeri sotto chiavi di elenchi chiusi (codici di rete, fonti, paesi, servizi), mai un sito o un nome di file.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

@@ -60,6 +60,8 @@ const HOVER_INPUT_TYPES = new Set([
 
 // Per le pagine visitate (#1525) vale come gesto un input vero sulla scheda o una navigazione chiesta a Filo.
 const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
+// Il salto dalla pagina d'errore al sito è un «Riprova» premuto se arriva entro questo tempo da un input vero (#1469).
+const RIPROVA_GESTO_MS = 5_000;
 
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
 // conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
@@ -939,6 +941,7 @@ class TabManager {
     const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
     if (bloccata && !bloccoInPagina) {
       this._notifyBlocked(bloccata);
+      this._contaBloccato(bloccata);
       return null;
     }
     const isInternal = url.startsWith('filo://');
@@ -1356,7 +1359,9 @@ class TabManager {
       : (ProxyTab.normalizeCountry(p.lastCountry) || ProxyTab.normalizeCountry(p.defaultCountry) || 'us');
     if (!code) return { ok: false, error: 'bad_country' };
     const resolved = ProxyTab.resolve(code, { tier, settings });
-    if (!resolved) return { ok: false, error: 'not_configured' };
+    // Ogni instradamento, da qualunque strada (blocco per paese, proposta, menu, chat, regola del sito): riuscito o no (#1469).
+    const conta = (ok) => this._contaNavigazione((N) => N.proxy(code, resolved ? resolved.tier : tier, ok));
+    if (!resolved) { conta(false); return { ok: false, error: 'not_configured' }; }
     const partition = `proxy:${tab.id}`;
     // Sessione effimera (niente 'persist:'). setProxy va ATTESO prima di creare
     // la vista, o le prime richieste partono dirette.
@@ -1372,6 +1377,7 @@ class TabManager {
         ...(resolved.bypassRules ? { proxyBypassRules: resolved.bypassRules } : {}),
       });
     } catch (e) {
+      conta(false);
       return { ok: false, error: 'proxy_failed' };
     }
     await ProxyTab.registraRete(partition, ses, resolved);
@@ -1380,6 +1386,7 @@ class TabManager {
     // paese: stessa partizione, proxy aggiornato, ricarica dal nuovo endpoint.
     this._recreateView(tab, tab.url || 'filo://newtab/');
     try { globalThis.SN_STORAGE?.updateSettings?.({ proxy: { lastCountry: code } }); } catch (_) {}
+    conta(true);
     return { ok: true, country: code, tier: resolved.tier };
   }
 
@@ -2001,6 +2008,8 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     tab._gestoFiloAt = Date.now();
+    // Un indirizzo nuovo chiesto mentre «Riprova» era in volo: il suo esito non è più quello della pagina d'errore.
+    tab._riprova = null;
     const target = normalizeUrl(url);
     // SICUREZZA (#248) — come openTab: un loadURL programmatico non emette will-navigate, e qui
     // convergono TUTTI gli handler IPC che rinavigano una scheda. mailto/tel/sms vanno all'OS.
@@ -2332,6 +2341,7 @@ class TabManager {
     if (this._maybeBlockNavigation(tab, target || current)) return;
     AzioniContate.scheda(tab.view.webContents);
     if (target) {
+      this._segnaRiprova(tab, current);
       try { tab.view.webContents.loadURL(target); } catch (_) {}
       return;
     }
@@ -2609,6 +2619,7 @@ class TabManager {
       }
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
       if (this._apriComunqueDallaPagina(tab, url, event)) this._concediApriComunque(tab, url);
+      else if (this._riprovaDallaPagina(tab, wc, url, event)) this._segnaRiprova(tab, wc.getURL());
       // #170.3 — link o window.location verso un sito della lista: fermato.
       if (this._fermaSaltoDellaScheda(tab, url)) {
         event.preventDefault();
@@ -2682,9 +2693,14 @@ class TabManager {
       // faccia del fallimento, non una destinazione.
       tab.url = failed;
       this._erroreVisto(`rete:${Math.trunc(Number(code)) || 0}`);
+      this._contaNavigazione((N) => N.navFallita(code, !!tab.proxy));
+      this._esitoRiprova(tab, wc, false);
       try {
         if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc, { altroPaese: !!tab.proxy }));
       } catch (_) {}
+    });
+    wc.on('did-navigate', (_e, url) => {
+      if (tab._riprova && !(globalThis.SN_NET_ERROR && globalThis.SN_NET_ERROR.isErrorPageUrl(url))) this._esitoRiprova(tab, wc, true);
     });
     wc.on('did-finish-load', () => { if (tab._invioRespinto) tab._invioRespinto.caricata = true; });
     // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
@@ -3374,6 +3390,7 @@ class TabManager {
     if (openExternalScheme(url)) return;
     if (this._riapriAccessoDallaPagina(origine, url)) return;
     const eredita = this._siteAllowedIn(origine, url);
+    if (apriComunque) this._contaApriComunque(url);
     // Per il giudizio sui siti il popup resta chiesto dalla pagina: il clic su «Apri» è sulla notifica, non sul sito.
     // Senza una scheda di partenza è l'«Apri comunque» della chat.
     const da = (!origine || origine.isInternal) ? { tipo: 'filo' }
@@ -3614,7 +3631,7 @@ class TabManager {
   // Come _decisioneBlocco, e se blocca lo dice con la notifica «Sito bloccato».
   _maybeBlockNavigation(tab, url) {
     const decision = this._decisioneBlocco(tab, url);
-    if (decision) this._notifyBlocked(decision);
+    if (decision) { this._notifyBlocked(decision); this._contaBloccato(decision); }
     return decision;
   }
 
@@ -3635,12 +3652,64 @@ class TabManager {
     tab._pagineBloccate.add(indirizzoCanonico(url));
     tab.url = url;
     this._erroreVisto('rete:bloccato');
+    this._contaBloccato(decision);
     try { tab.view.webContents.loadURL(NE.buildUrl(url, NE.BLOCKED_CODE, decision.reason)); } catch (_) {}
   }
 
   // La pagina d'errore che la persona vede è un errore visto (#1461): il codice di Chromium, un numero, mai l'indirizzo.
   _erroreVisto(tipo) {
     try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.erroreVisto(tipo, { incognito: !!this.win._filoIncognito }); } catch (_) {}
+  }
+
+  // I contatori della navigazione (#1469): `costruisci` riceve SN_CONTATORI.NAV e ne sceglie la voce.
+  _contaNavigazione(costruisci) {
+    try {
+      const M = globalThis.SN_CONTATORI_MAIN;
+      const C = globalThis.SN_CONTATORI;
+      if (M && C) M.navigazione(costruisci(C.NAV), { incognito: !!(this.incognito || (this.win && this.win._filoIncognito)) });
+    } catch (_) {}
+  }
+
+  // Un sito bloccato si conta una volta per sito ogni mezzo minuto: una pagina che riprova di continuo è un blocco solo.
+  _contaBloccato(decision) {
+    const host = String((decision && decision.host) || '');
+    const ora = Date.now();
+    if (!this._bloccatiContati) this._bloccatiContati = new Map();
+    const prima = this._bloccatiContati.get(host);
+    if (prima != null && ora - prima < 30 * 1000) return;
+    this._bloccatiContati.set(host, ora);
+    if (this._bloccatiContati.size > 200) this._bloccatiContati.delete(this._bloccatiContati.keys().next().value);
+    this._contaNavigazione((N) => N.sitoBloccato(decision && decision.reason));
+  }
+
+  // «Riprova» sulla pagina d'errore (#1469), o la ricarica che fa lo stesso: l'esito lo dice la navigazione che segue,
+  // arrivata (did-navigate) o fallita di nuovo (did-fail-load). Un minuto senza esito non conta.
+  _segnaRiprova(tab, paginaErrore) {
+    const NE = globalThis.SN_NET_ERROR;
+    const p = NE && NE.parse(paginaErrore);
+    if (!p || !p.target || p.code === NE.BLOCKED_CODE || p.code === NE.CRASH_CODE) return;
+    tab._riprova = { codice: p.code, wc: tab.view.webContents, t: Date.now() };
+  }
+
+  // Il salto chiesto dalla pagina d'errore stessa verso il suo sito: il suo «Riprova». Solo dietro un input vero:
+  // la pagina «Sei offline» riprova da sola al ritorno della rete, e quello non è un «Riprova» premuto.
+  _riprovaDallaPagina(tab, wc, url, event) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (Date.now() - (tab._userInputAt || 0) > RIPROVA_GESTO_MS) return false;
+    try {
+      const corrente = wc.getURL() || '';
+      const da = (event && event.initiator && event.initiator.url) || corrente;
+      const target = NE && NE.isErrorPageUrl(corrente) ? NE.targetOf(corrente) : null;
+      return !!target && da === corrente && indirizzoCanonico(target) === indirizzoCanonico(url);
+    } catch (_) { return false; }
+  }
+
+  _esitoRiprova(tab, wc, riuscita) {
+    const r = tab._riprova;
+    if (!r || r.wc !== wc) return;
+    tab._riprova = null;
+    if (Date.now() - r.t > 60 * 1000) return;
+    this._contaNavigazione((N) => N.navRiprova(r.codice, riuscita));
   }
 
   // Il salto da una pagina «Sito bloccato» messa dal main al suo sito è il suo «Apri comunque»:
@@ -3660,9 +3729,16 @@ class TabManager {
   _concediApriComunque(tab, url) {
     const sito = siteBlockSiteOf(url);
     if (!sito) return;
+    this._contaApriComunque(url);
     tab.siteBlockAllowed = sito;
     tab._permessoRichieste = true;
     this._registraPermessoRichieste(tab);
+  }
+
+  // «Apri comunque» su un sito ancora in lista, dalla pagina, dalla notifica o dalla chat: il conto per lista (#1469).
+  _contaApriComunque(url) {
+    const d = this._decisioneBlocco(null, url);
+    if (d) this._contaNavigazione((N) => N.apriComunque(d.reason));
   }
 
   // Il sì di un «Apri comunque» vale anche per il blocco delle richieste di quel webContents.

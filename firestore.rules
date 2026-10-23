@@ -1086,6 +1086,49 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── La navigazione dei contatori (#1469) ─────────────────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi, copie di quelli del codice: le pagine d'errore
+    // di rete per codice di Chromium, con la scheda diretta o da un altro paese, e il loro «Riprova»; il blocco per
+    // paese (fonte, classe del modello, decisione, instradamenti per paese e tier); le liste della pubblicità e dei
+    // banner (esito, età e domini in fasce); i siti bloccati per lista e i loro «Apri comunque»; i banner dei cookie;
+    // la pulizia dei cookie all'uscita; i riquadri rotti per servizio; gli scaricamenti in fasce e le domande dei
+    // programmi per classe. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle
+    // espressioni; le stesse regole: sola creazione, senza login, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-navigazione/{docId} {
+      function contatoriNavigazione(d) {
+        let codici = ['-105', '-137', '-106', '-102', '-104', '-100', '-101', '-109', '-118', '-7', '-21', '-130', '-111', '-20', '-501', '-324', 'altro'];
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'navFallite', 'navRiprove', 'geoRilevati', 'geoClassi', 'geoDecisioni', 'geoProxy', 'liste', 'sitiBloccati', 'bannerCookie', 'puliziaCookie', 'riquadri', 'scaricamenti', 'programmi'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'navFallite', 'navRiprove', 'geoRilevati', 'geoClassi', 'geoDecisioni', 'geoProxy', 'liste', 'sitiBloccati', 'bannerCookie', 'puliziaCookie', 'riquadri', 'scaricamenti', 'programmi'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.navFallite, codici, 340, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.navRiprove, codici, 340, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.geoRilevati, ['http_451', 'redirect_pattern', 'text_pattern', 'llm_classifier'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.geoClassi, ['geo_block', 'bot_block', 'paywall', 'login_wall', 'errore_generico', 'saltato_budget', 'no_model'], 70, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.geoDecisioni, ['flagged_dangerous', 'not_configured', 'login_session', 'safe_no_login', 'datacenter_ipblock', 'retry_failed'], 60, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.geoProxy, ['us|datacenter', 'us|residential', 'gb|datacenter', 'gb|residential', 'fr|datacenter', 'fr|residential', 'de|datacenter', 'de|residential', 'es|datacenter', 'es|residential', 'nl|datacenter', 'nl|residential', 'jp|datacenter', 'jp|residential', 'altro|datacenter', 'altro|residential'], 320, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.liste, ['adblock', 'cookie_banner'], 340, '^([0-9]{1,9}(,[0-9]{1,9}){3};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){3};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.sitiBloccati, ['liste', 'lista_utente'], 40, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.bannerCookie, ['rejected', 'hidden', 'unconfirmed', 'mostra_banner'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.puliziaCookie, ['finita', 'tetto_2500ms'], 20, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.riquadri, ['instagram', 'x', 'tiktok', 'facebook', 'spotify', 'soundcloud', 'vimeo', 'youtube', 'google-maps', 'disqus', 'pinterest', 'linkedin', 'twitch', 'altro'], 1540, '^([0-9]{1,9}(,[0-9]{1,9}){10}(#[0-9]{1,9}(,[0-9]{1,9}){10})*)?$')
+          && chiuse(d.scaricamenti, ['completed', 'interrupted', 'cancelled'], 330, '^([0-9]{1,9}(,[0-9]{1,9}){4};[0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){4};[0-9]{1,9}(,[0-9]{1,9}){5})*)?$')
+          && chiuse(d.programmi, ['programma', 'immagine_disco'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriNavigazione(request.resource.data);
+      allow update, delete: if false;
+    }
+
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
     // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
     // Campi non enumerati, come gli altri config/*: aggiungerne uno non

@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461, #1464, #1466): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1464, #1466, #1469): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
@@ -70,8 +70,70 @@
   const MISURE_MODELLI = Object.freeze(Object.keys(RESTI));
   const MISURE_CHIAMATE = Object.freeze([...MISURE_MODELLI, 'chiamate']);
   const CAMPI_CHIAMATE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_CHIAMATE]);
-  // Tutto quello che un'ora tiene sul disco, nei due documenti.
-  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE]);
+  const ALTRO = 'altro';
+
+  // ── La navigazione (#1469) ────────────────────────────────────────────────
+  // Pagine d'errore, blocchi per paese, liste, siti bloccati, cookie, riquadri rotti e scaricamenti: un terzo documento
+  // dell'ora, per il tetto delle espressioni come le chiamate. Gli elenchi sono COPIE di quelli del codice che li
+  // possiede (netError, geoBlock, geoBlockClassifier, geoBlockRules, proxyTab, riquadriRottiRegole, eseguibili):
+  // tests/unit/contatoriNavigazione.test.mjs li confronta, e la sentinella delle regole li confronta con queste.
+  const VERSIONE_NAVIGAZIONE = 1;
+  const COLLEZIONE_NAVIGAZIONE = 'contatori-navigazione';
+  const CODICI_RETE = Object.freeze(['-105', '-137', '-106', '-102', '-104', '-100', '-101', '-109', '-118', '-7', '-21',
+    '-130', '-111', '-20', '-501', '-324']);
+  const FONTI_GEO = Object.freeze(['http_451', 'redirect_pattern', 'text_pattern', 'llm_classifier']);
+  // Le classi del modello, più i due casi in cui il modello non è stato chiamato.
+  const CLASSI_GEO = Object.freeze(['geo_block', 'bot_block', 'paywall', 'login_wall', 'errore_generico', 'saltato_budget', 'no_model']);
+  const MOTIVI_GEO = Object.freeze(['flagged_dangerous', 'not_configured', 'login_session', 'safe_no_login', 'datacenter_ipblock',
+    'retry_failed']);
+  const PAESI_PROXY = Object.freeze(['us', 'gb', 'fr', 'de', 'es', 'nl', 'jp']);
+  const TIER_PROXY = Object.freeze(['datacenter', 'residential']);
+  const LISTE = Object.freeze(['adblock', 'cookie_banner']);
+  const ESITI_LISTA = Object.freeze(['ok', 'saltato', 'download_failed', 'errore']);
+  // L'età della lista in uso dopo il tentativo, in giorni; «mai» se non ne è mai arrivata una.
+  const FASCE_ETA = Object.freeze([['g1', 1], ['g7', 7], ['g14', 14], ['g30', 30], ['oltre', Infinity]]);
+  const MAI = 'mai';
+  const FASCE_DOMINI = Object.freeze([['d0', 0], ['d1k', 1000], ['d10k', 10000], ['d50k', 50000], ['d100k', 100000],
+    ['d500k', 500000], ['oltre', Infinity]]);
+  // Il motivo della decisione di src/main/services/siteBlock.js: le liste pubbliche o la lista dell'utente.
+  const ORIGINI_BLOCCO = Object.freeze({ lists: 'liste', blacklist: 'lista_utente' });
+  const ESITI_BANNER = Object.freeze(['rejected', 'hidden', 'unconfirmed', 'mostra_banner']);
+  const ESITI_PULIZIA = Object.freeze(['finita', 'tetto_2500ms']);
+  const SERVIZI_RIQUADRO = Object.freeze(['instagram', 'x', 'tiktok', 'facebook', 'spotify', 'soundcloud', 'vimeo', 'youtube',
+    'google-maps', 'disqus', 'pinterest', 'linkedin', 'twitch']);
+  // Riconosciuto (a regole, dal modello, o il modello dice che funziona), saltato prima del modello, la proposta
+  // mostrata e accettata, e il riquadro ricaricato col sì: poi funziona o è ancora rotto.
+  const EVENTI_RIQUADRO = Object.freeze(['regola', 'modello', 'no', 'pagina_delicata', 'password', 'tetto_visioni', 'foto_mancata',
+    'mostrata', 'accettata', 'funziona', 'ancora_rotto']);
+  const ESITI_SCARICAMENTO = Object.freeze(['completed', 'interrupted', 'cancelled']);
+  const MB = 1024 * 1024;
+  const FASCE_MB_SCARICAMENTO = Object.freeze([['m1', 1], ['m10', 10], ['m100', 100], ['m1000', 1000], ['oltre', Infinity]]);
+  const FASCE_DURATA = Object.freeze([['s1', 1000], ['s10', 10000], ['min1', 60000], ['min10', 600000], ['h1', 3600000], ['oltre', Infinity]]);
+  const CLASSI_PROGRAMMA = Object.freeze(['programma', 'immagine_disco']);
+  // Le due domande dei programmi (#588): «scaricarlo?» con la risposta, e «aprirlo?» con l'apertura confermata.
+  const EVENTI_PROGRAMMA = Object.freeze(['domanda', 'scaricato', 'rifiutato', 'conferma', 'aperto']);
+  const UNO = Object.freeze(['n']);
+  // Per ogni chiave chiusa, un conto per voce di ogni gruppo: «n,n;n,n,n».
+  const misuraNav = (chiavi, gruppi) => Object.freeze({ chiavi: Object.freeze([...chiavi]), gruppi: Object.freeze(gruppi.map((g) => Object.freeze([...g]))) });
+  const NAVIGAZIONE = Object.freeze({
+    navFallite: misuraNav([...CODICI_RETE, ALTRO], [['diretta', 'proxy']]),
+    navRiprove: misuraNav([...CODICI_RETE, ALTRO], [['riuscita', 'fallita']]),
+    geoRilevati: misuraNav(FONTI_GEO, [UNO]),
+    geoClassi: misuraNav(CLASSI_GEO, [UNO]),
+    geoDecisioni: misuraNav(MOTIVI_GEO, [UNO]),
+    geoProxy: misuraNav([...PAESI_PROXY, ALTRO].flatMap((p) => TIER_PROXY.map((t) => `${p}|${t}`)), [['ok', 'fallito']]),
+    liste: misuraNav(LISTE, [ESITI_LISTA, [...nomi(FASCE_ETA), MAI], nomi(FASCE_DOMINI)]),
+    sitiBloccati: misuraNav(Object.values(ORIGINI_BLOCCO), [['bloccato', 'apri_comunque']]),
+    bannerCookie: misuraNav(ESITI_BANNER, [UNO]),
+    puliziaCookie: misuraNav(ESITI_PULIZIA, [UNO]),
+    riquadri: misuraNav([...SERVIZI_RIQUADRO, ALTRO], [EVENTI_RIQUADRO]),
+    scaricamenti: misuraNav(ESITI_SCARICAMENTO, [nomi(FASCE_MB_SCARICAMENTO), nomi(FASCE_DURATA)]),
+    programmi: misuraNav(CLASSI_PROGRAMMA, [EVENTI_PROGRAMMA]),
+  });
+  const MISURE_NAVIGAZIONE = Object.freeze(Object.keys(NAVIGAZIONE));
+  const CAMPI_NAVIGAZIONE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_NAVIGAZIONE]);
+  // Tutto quello che un'ora tiene sul disco, nei tre documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_NAVIGAZIONE]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
@@ -150,7 +212,6 @@
   const MODELLO_RE = /^[a-z0-9][a-z0-9._-]{0,59}(?:\/[a-z0-9][a-z0-9._-]{0,79})?(?::[a-z0-9._-]{1,30})?$/;
   // Chi ha servito, come lo dichiara il router («DeepInfra», «Google Vertex»): mai scritto da chi usa Filo.
   const HOST_RE = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,47}$/;
-  const ALTRO = 'altro';
 
   // ── Gli elenchi chiusi del sistema (#1466) ────────────────────────────────
   // Un codice (il tipo di un processo, il nome di un'eccezione, l'errore del disco) si mappa sul suo elenco, e il resto
@@ -273,6 +334,10 @@
   const VOCE_SISTEMA = `${alternative(MISURE_SISTEMA.map((m) => `${m}[.]${percorsiDi(SCHEMA_SISTEMA[m])}`))}[|]${N}`;
   // La voce una volta sola, preceduta dall'inizio o da «;»: le regole non accettano un'espressione oltre i 4096 caratteri.
   const SISTEMA_FORMA = `^((^|;)${VOCE_SISTEMA})*$`;
+  // La navigazione: i conti di un gruppo separati da «,», i gruppi da «;».
+  const conti = (k) => (k > 1 ? `${N}(,${N}){${k - 1}}` : N);
+  const FORME_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
+    `^${NAVIGAZIONE[c].gruppi.map((g) => conti(g.length)).join(';')}$`])));
 
   const re = (s) => new RegExp(s);
   const USO_RE = re(USO_FORMA);
@@ -288,6 +353,7 @@
   const MODELLI_RE = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, re(FORME_MODELLI[c])])));
   const CHIAMATE_RE = re(CHIAMATE_FORMA);
   const SISTEMA_RE = re(SISTEMA_FORMA);
+  const NAVIGAZIONE_RE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, re(FORME_NAVIGAZIONE[c])])));
 
   // Il tetto di caratteri di ogni valore annidato, misurato sulla sua voce più lunga possibile, con margine.
   const TETTO_CARATTERI_USO = 80;
@@ -308,6 +374,11 @@
   const TETTO_CARATTERI_CHIAMATE = 49;
   // Ogni percorso del sistema una volta, col conto più alto: il caso che non arriva mai, e il documento resta piccolo.
   const TETTO_CARATTERI_SISTEMA = 16000;
+  // Ogni conto nove cifre più il suo separatore; la misura, tutte le sue chiavi unite.
+  const TETTI_VOCE_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
+    NAVIGAZIONE[c].gruppi.reduce((a, g) => a + g.length * 10, 0)])));
+  const TETTI_CARATTERI_NAVIGAZIONE = Object.freeze(Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c,
+    NAVIGAZIONE[c].chiavi.length * TETTI_VOCE_NAVIGAZIONE[c]])));
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
@@ -543,6 +614,7 @@
       uso: {}, errori: {}, azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {},
       anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {}, primeVolte: [],
       contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
+      ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, {}])),
     };
     for (const k of MISURE_SISTEMA) o[k] = {};
     return o;
@@ -977,6 +1049,82 @@
     return !MISURE_SISTEMA.some((k) => pieno(d && d[k]));
   }
 
+  // ── La navigazione (#1469) ──────────────────────────────────────────────
+  // Dove sta ogni voce nella fila dei conti della sua chiave; null se misura, chiave o una voce non sono dei loro elenchi.
+  function posizioniNav(misura, chiave, voci) {
+    const m = has(NAVIGAZIONE, misura) ? NAVIGAZIONE[misura] : null;
+    if (!m || !m.chiavi.includes(chiave) || !Array.isArray(voci) || voci.length !== m.gruppi.length) return null;
+    const pos = [];
+    let base = 0;
+    for (let i = 0; i < m.gruppi.length; i++) {
+      const j = m.gruppi[i].indexOf(voci[i]);
+      if (j < 0) return null;
+      pos.push(base + j);
+      base += m.gruppi[i].length;
+    }
+    return { pos, lunghezza: base };
+  }
+
+  function registraNavigazione(ora, misura, chiave, voci) {
+    const p = posizioniNav(misura, chiave, voci);
+    if (!p) return false;
+    const mappa = normale(ora)[misura];
+    const c = Array.isArray(mappa[chiave]) && mappa[chiave].length === p.lunghezza ? mappa[chiave] : Array(p.lunghezza).fill(0);
+    for (const i of p.pos) c[i] = conto(c[i]) + 1;
+    mappa[chiave] = c;
+    return true;
+  }
+
+  // Le voci si costruiscono da qui, coi valori che il codice ha in mano: quello che non è degli elenchi diventa
+  // «altro» dove l'elenco lo prevede, e altrimenti la voce non c'è (null) e non si conta niente.
+  const voceNav = (misura, chiave, voci) => (posizioniNav(misura, chiave, voci) ? Object.freeze({ misura, chiave, voci }) : null);
+  const testoDa = (v) => (typeof v === 'string' ? v : '');
+  const daElenco = (v, elenco) => (elenco.includes(testoDa(v)) ? v : ALTRO);
+  function codiceRete(code) {
+    const n = typeof code === 'number' || /^-?\d{1,6}$/.test(testoDa(code)) ? Number(code) : NaN;
+    return Number.isInteger(n) && CODICI_RETE.includes(String(n)) ? String(n) : ALTRO;
+  }
+  const inFascia = (fasce, n) => fasce.find(([, fino]) => n <= fino)[0];
+  const quantita = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+  function fasciaEta(ms) {
+    const n = Number(ms);
+    return ms == null || ms === '' || !Number.isFinite(n) ? MAI : inFascia(FASCE_ETA, Math.max(0, n) / (24 * 60 * 60 * 1000));
+  }
+  // L'esito di un `refresh()` delle liste (adblock.js, cookieBanners.js).
+  function esitoLista(r) {
+    if (!oggetto(r)) return 'errore';
+    if (r.ok && r.skipped) return 'saltato';
+    if (r.ok) return 'ok';
+    return r.error === 'download_failed' ? 'download_failed' : 'errore';
+  }
+  // Quello che il classificatore del blocco per paese ha risposto (geoBlockClassifier.classify): senza la chiamata
+  // al modello per il tetto o perché non c'è; un caso non ambiguo, che il modello non vede, non è una classe.
+  function classeGeo(r) {
+    if (!oggetto(r)) return '';
+    if (r.reason === 'budget') return 'saltato_budget';
+    if (r.error === 'no_model') return 'no_model';
+    return r.skipped ? '' : testoDa(r.class);
+  }
+  const NAV = Object.freeze({
+    navFallita: (codice, proxy) => voceNav('navFallite', codiceRete(codice), [proxy ? 'proxy' : 'diretta']),
+    navRiprova: (codice, riuscita) => voceNav('navRiprove', codiceRete(codice), [riuscita ? 'riuscita' : 'fallita']),
+    geoRilevato: (fonte) => voceNav('geoRilevati', testoDa(fonte), UNO),
+    geoClasse: (risultato) => voceNav('geoClassi', classeGeo(risultato), UNO),
+    geoDecisione: (motivo) => voceNav('geoDecisioni', testoDa(motivo), UNO),
+    proxy: (paese, tier, ok) => voceNav('geoProxy', `${daElenco(paese, PAESI_PROXY)}|${tier === 'residential' ? 'residential' : 'datacenter'}`,
+      [ok ? 'ok' : 'fallito']),
+    lista: (lista, risultato, etaMs, domini) => voceNav('liste', testoDa(lista),
+      [esitoLista(risultato), fasciaEta(etaMs), inFascia(FASCE_DOMINI, quantita(domini))]),
+    sitoBloccato: (motivo) => voceNav('sitiBloccati', has(ORIGINI_BLOCCO, testoDa(motivo)) ? ORIGINI_BLOCCO[motivo] : '', ['bloccato']),
+    apriComunque: (motivo) => voceNav('sitiBloccati', has(ORIGINI_BLOCCO, testoDa(motivo)) ? ORIGINI_BLOCCO[motivo] : '', ['apri_comunque']),
+    banner: (esito) => voceNav('bannerCookie', testoDa(esito), UNO),
+    pulizia: (esito) => voceNav('puliziaCookie', testoDa(esito), UNO),
+    riquadro: (servizio, evento) => voceNav('riquadri', daElenco(servizio, SERVIZI_RIQUADRO), [testoDa(evento)]),
+    scaricamento: (esito, byte, ms) => voceNav('scaricamenti', testoDa(esito),
+      [inFascia(FASCE_MB_SCARICAMENTO, quantita(byte) / MB), inFascia(FASCE_DURATA, quantita(ms))]),
+    programma: (classe, evento) => voceNav('programmi', testoDa(classe), [testoDa(evento)]),
+  });
+
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
@@ -1283,6 +1431,37 @@
   // Un'ora senza chiamate ai modelli non ha il secondo documento.
   function senzaChiamate(doc) { return MISURE_CHIAMATE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
+  // Una misura della navigazione: per ogni chiave dell'elenco i suoi conti, gruppo per gruppo.
+  function navigazionePulita(mappa, misura) {
+    const m = NAVIGAZIONE[misura];
+    const lunghezza = m.gruppi.reduce((a, g) => a + g.length, 0);
+    const out = {};
+    for (const k of m.chiavi) {
+      const c = oggetto(mappa) && has(mappa, k) ? mappa[k] : null;
+      if (!Array.isArray(c) || c.length !== lunghezza || !c.every(intero) || c.every((x) => x === 0)) continue;
+      let i = 0;
+      out[k] = m.gruppi.map((g) => g.map(() => conto(c[i++])).join(',')).join(';');
+    }
+    return out;
+  }
+
+  // La navigazione della stessa ora (#1469), nel suo documento: stesso pseudonimo, stessa ora, stesso id.
+  function documentoNavigazione({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    return {
+      v: VERSIONE_NAVIGAZIONE,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
+      ...Object.fromEntries(MISURE_NAVIGAZIONE.map((c) => [c, navigazionePulita(d[c], c)])),
+    };
+  }
+  function senzaNavigazione(doc) { return MISURE_NAVIGAZIONE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
+
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
     const d = oggetto(dati) ? dati : {};
@@ -1346,6 +1525,15 @@
     });
   }
   function leggiChiamate(s) { return CHIAMATE_RE.test(String(s)) ? fasceLette(s, nomi(FASCE_CHIAMATE)) : null; }
+  // Una voce della navigazione: un oggetto per gruppo, coi conti per nome («ok», «g1», «d100k»…).
+  function leggiNavigazione(misura, s) {
+    if (!has(NAVIGAZIONE_RE, misura) || !NAVIGAZIONE_RE[misura].test(String(s))) return null;
+    const parti = String(s).split(';');
+    return NAVIGAZIONE[misura].gruppi.map((g, i) => {
+      const n = parti[i].split(',').map(Number);
+      return Object.fromEntries(g.map((nome, j) => [nome, n[j]]));
+    });
+  }
   const somma = (o) => Object.values(o).reduce((a, n) => a + n, 0);
   // ── La validazione: la stessa forma che chiedono le regole, e in più i conti che devono tornare ─────────────
   function valida(doc) {
@@ -1426,6 +1614,25 @@
       if (c === 'chiamate') continue;
       const tutte = Object.values(doc[c]).flatMap((v) => leggiModelli(c, v));
       if (tutte.filter((x) => x.modello !== ALTRO).length > TETTO_MODELLI_ORA) return no(`${c}: voci oltre il tetto`);
+    }
+    return { ok: true, motivo: '' };
+  }
+
+  function validaNavigazione(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    if (!oggetto(doc)) return no('non è un documento');
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_NAVIGAZIONE.length || !CAMPI_NAVIGAZIONE.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== VERSIONE_NAVIGAZIONE) return no('versione');
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    for (const c of MISURE_NAVIGAZIONE) {
+      if (!oggetto(doc[c])) return no(c);
+      for (const [k, v] of Object.entries(doc[c])) {
+        if (!NAVIGAZIONE[c].chiavi.includes(k)) return no(`${c}: chiave ${k}`);
+        if (typeof v !== 'string' || v.length > TETTI_VOCE_NAVIGAZIONE[c] || !NAVIGAZIONE_RE[c].test(v)) return no(`${c} di ${k}`);
+      }
     }
     return { ok: true, motivo: '' };
   }
@@ -1525,6 +1732,9 @@
     CAMPI_ORA_V2, MISURE_SISTEMA, PASSI_AVVIO, TIPI_AVVIO, TIPO_PROCESSO_DI, TIPI_PROCESSO, COSE_FINESTRA, SOGLIE_FERMO,
     ORIGINI_ECCEZIONE, NOMI_ECCEZIONE, FASCE_MB, NOMI_MB, FASCE_SCHEDE, NOMI_SCHEDE, CANALI_SINCRONI, ESITI_USCITA, ESITI_LETTURA,
     CODICI_DISCO, CODICI_RINOMINA, FASCE_MB_FILE, EVENTI_STORAGE, ESITI_SESSIONE, EVENTI_AGGIORNAMENTO, SCHEMA_SISTEMA,
+    VERSIONE_NAVIGAZIONE, COLLEZIONE_NAVIGAZIONE, CAMPI_NAVIGAZIONE, MISURE_NAVIGAZIONE, NAVIGAZIONE, NAV, CODICI_RETE, FONTI_GEO,
+    CLASSI_GEO, MOTIVI_GEO, PAESI_PROXY, TIER_PROXY, LISTE, ESITI_LISTA, FASCE_ETA, FASCE_DOMINI, ORIGINI_BLOCCO, ESITI_BANNER,
+    ESITI_PULIZIA, SERVIZI_RIQUADRO, EVENTI_RIQUADRO, ESITI_SCARICAMENTO, FASCE_MB_SCARICAMENTO, FASCE_DURATA, CLASSI_PROGRAMMA, EVENTI_PROGRAMMA,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
@@ -1534,25 +1744,26 @@
     FORME: Object.freeze({
       USO_FORMA, ERRORI_FORMA, MISURA_FORMA, IMPOSTAZIONI_FORMA, RICERCA_FORMA, CORRETTORE_FORMA, CONFERME_FORMA,
       CONTO_FORMA, ANTICIPO_FORMA, INTERVISTA_FORMA, CHIAVE_AZIONE_FORMA, CHIAVE_IMPOSTAZIONE_FORMA, TIPO_AZIONE_FORMA,
-      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI,
+      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI, NAVIGAZIONE: FORME_NAVIGAZIONE,
     }),
     TETTI: Object.freeze({
       TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI, TETTO_CARATTERI_ERRORI_ORA, TETTO_CARATTERI_MISURA, TETTO_CARATTERI_IMPOSTAZIONE,
       TETTO_CARATTERI_RICERCA, TETTO_CARATTERI_CORRETTORE, TETTO_CARATTERI_CONFERME, TETTO_CARATTERI_CONTO,
       TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, TETTO_CARATTERI_SISTEMA,
-      MODELLI: TETTI_CARATTERI_MODELLI,
+      MODELLI: TETTI_CARATTERI_MODELLI, NAVIGAZIONE: TETTI_CARATTERI_NAVIGAZIONE,
     }),
     funzioni, funzioneDi, azioni, azioneDiPagina, tipiAzione, chiaviImpostazioni, chiaveImpostazione, valoreImpostazione, viaDi,
     passiIntervista, erroreVisto, tipoErroreVisto, fasciaDi, posizioneDi, famigliaOs, versioneApp, modelloPulito,
     hostPulito, tipoErrore,
     oraVuota, registraUso, registraAzione, registraErrore, registraImpostazione, registraRicerca, registraProposta,
     registraConferma, registraAnnullato, registraAnticipo, registraChiesto, registraErroreVisto, registraIntervista,
-    registraPrimaVolta, registraChiamata, registraSpesa, registraAdattamento, registraChiamate,
+    registraPrimaVolta, registraChiamata, registraSpesa, registraAdattamento, registraChiamate, registraNavigazione,
     registraPassoAvvio, registraTipoAvvio, registraProcessoMorto, registraFinestraBloccata, registraMainFermo, registraEccezione,
     registraMemoria, registraIpcSincrono, registraChiusura, registraUscita, registraStorage, registraSessione, registraAggiornamento,
     tipoProcesso, nomeEccezione, eventoLettura, eventoSalvataggio, eventoRinomina, eventoDimensione, eventoFlush,
     unisciSistema, sistemaVuoto,
-    documento, documentoGiorno, documentoChiamate, senzaChiamate, idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
+    documento, documentoGiorno, documentoChiamate, senzaChiamate, documentoNavigazione, senzaNavigazione, idDocumento, valida,
+    validaChiamate, validaNavigazione, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate, leggiNavigazione,
     leggiSistema, sistemaInChiaro,
     giornoDi, oraDi, giornoPrima, meseDi, oreDaInviare, daInviare, potaOre, potaGiorni, pseudonimoDelMese,
   };

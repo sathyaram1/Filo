@@ -11,6 +11,10 @@ const Registro = require('../registroCambi');
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const testo = (v) => (typeof v === 'string' ? v : '');
 const numero = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const sitiCoiBanner = (s) => {
+  const l = s && s.security && s.security.cookies && s.security.cookies.bannerSites;
+  return Array.isArray(l) ? [...new Set(l.filter((x) => typeof x === 'string' && x))] : [];
+};
 
 // Crash e blocchi di ogni renderer e processo (#1461, #1466): dove, quale e perché, come lo dice Electron. Una scheda in
 // incognito non si conta; quello che cade mentre Filo si chiude non è un crash.
@@ -97,6 +101,12 @@ module.exports = function register(on, ctx) {
     contatori.impostazioniCambiate(c.oldValue, c.newValue, {
       via: C.viaDi(prov), incognito, normalizza: globalThis.SN_STORAGE && globalThis.SN_STORAGE.normalizza,
     });
+    // «Mostra il banner» per un sito, da qualunque strada scelta da una persona (menu della scheda, Sicurezza,
+    // Preferenze, chat): sono i siti che Filo ha rotto nascondendo il banner (#1469). Un'importazione no.
+    if (['mano', 'chat'].includes(C.viaDi(prov))) {
+      const prima = new Set(sitiCoiBanner(c.oldValue));
+      for (const s of sitiCoiBanner(c.newValue)) if (!prima.has(s)) contatori.navigazione(C.NAV.banner('mostra_banner'), { incognito });
+    }
   }, [SETTINGS]);
 
   seguiCrash(contatori, C);

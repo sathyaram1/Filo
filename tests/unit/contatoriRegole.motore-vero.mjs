@@ -1,4 +1,4 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1464, #1466), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1464, #1466, #1469), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
@@ -9,7 +9,7 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 71 righe verdi, uscita 0 (#1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
+// Esito atteso: 86 righe verdi, uscita 0 (#1466 e #1469 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
 // che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più le fa
 // rifiutare tutte (per questo le chiamate ai modelli hanno il loro documento), mentre la sentinella che legge il file
 // non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
@@ -112,6 +112,15 @@ await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', asy
   s.aggiornamento('trovato');
   s.sessione({ esito: 'ripristinata', schede: 3, t0: 0 }).vista();
   s.secondaIstanza();
+  // La navigazione (#1469): una voce per misura, col suo documento accanto all'ora.
+  const N = C.NAV;
+  for (const v of [N.navFallita(-105, true), N.navRiprova(-106, true), N.geoRilevato('http_451'), N.geoClasse({ class: 'paywall' }),
+    N.geoDecisione('not_configured'), N.proxy('jp', 'residential', false), N.lista('adblock', { ok: true }, 3 * 60 * 60 * 1000, 120000),
+    N.sitoBloccato('lists'), N.apriComunque('blacklist'), N.banner('mostra_banner'), N.pulizia('tetto_2500ms'),
+    N.riquadro('google-maps', 'ancora_rotto'), N.scaricamento('cancelled', 3 * 1024 * 1024, 4000), N.programma('immagine_disco', 'aperto')]) {
+    vero(v, 'una voce della navigazione non si costruisce');
+    s.navigazione(v);
+  }
   await new Promise((r) => setTimeout(r, 30));
   sposta(ORA);
   const esito = await s.controlla();
@@ -151,6 +160,12 @@ C.registraChiamata(datiBuoni, 'help', { modello: 'deepseek/deepseek-v4-flash', i
 C.registraChiamate(datiBuoni, 'help', 2);
 const CHIAMATE = C.documentoChiamate({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
 const COLL_CHIAMATE = C.COLLEZIONE_CHIAMATE;
+const COLL_NAV = C.COLLEZIONE_NAVIGAZIONE;
+for (const v of [C.NAV.navFallita(-118, false), C.NAV.scaricamento('completed', 10, 10), C.NAV.riquadro('youtube', 'regola')]) {
+  C.registraNavigazione(datiBuoni, v.misura, v.chiave, v.voci);
+}
+const NAVIGA = C.documentoNavigazione({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
+const rifiutaNav = (patch) => assertFails(setDoc(doc(anon, `${COLL_NAV}/${idBuono}`), { ...NAVIGA, ...patch }));
 const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
@@ -185,6 +200,17 @@ await prova('le chiamate senza una misura', () => { const { spesa, ...senza } = 
 await prova('le chiamate sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${'c'.repeat(20)}_2026-10-14_11`), CHIAMATE)));
 await prova('le chiamate nella collezione delle ore', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), CHIAMATE)));
 await prova('un anonimo legge le chiamate', () => assertFails(getDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`))));
+await prova('una navigazione con un dominio come codice', () => rifiutaNav({ navFallite: { 'mario.rossi.it': '1,0' } }));
+await prova('una navigazione con un indirizzo nel valore', () => rifiutaNav({ navFallite: { '-105': '1,0 https://mario.it/' } }));
+await prova('uno scaricamento col nome del file', () => rifiutaNav({ scaricamenti: { 'relazione finale.docx': '1,0,0,0,0;1,0,0,0,0,0' } }));
+await prova('un riquadro col sito al posto del servizio', () => rifiutaNav({ riquadri: { 'instagram-accesso.xyz': '1,0,0,0,0,0,0,0,0,0,0' } }));
+await prova('un paese fuori elenco', () => rifiutaNav({ geoProxy: { 'it|datacenter': '1,0' } }));
+await prova('una lista senza un gruppo', () => rifiutaNav({ liste: { adblock: '1,0,0,0;1,0,0,0,0,0' } }));
+await prova('un conto con dentro una mappa', () => rifiutaNav({ bannerCookie: { hidden: { n: 1, nota: 'testo libero' } } }));
+await prova('la navigazione con un campo dell’ora', () => rifiutaNav({ uso: {} }));
+await prova('la navigazione senza una misura', () => { const { programmi, ...senza } = NAVIGA; return assertFails(setDoc(doc(anon, `${COLL_NAV}/${idBuono}`), senza)); });
+await prova('la navigazione sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_NAV}/${'c'.repeat(20)}_2026-10-14_11`), NAVIGA)));
+await prova('un anonimo legge la navigazione', () => assertFails(getDoc(doc(anon, `${COLL_NAV}/${idBuono}`))));
 await prova('una prima volta che è un testo', () => rifiuta({ primeVolte: ['help', 'appunti di mario'] }));
 await prova('le prime volte come stringa', () => rifiuta({ primeVolte: 'help' }));
 await prova('un’ora che non esiste', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14_24`), conCampo({ ora: '24' }))));
@@ -216,6 +242,19 @@ console.log('\n— quello che si deve poter fare, e poi più —');
 await prova('un anonimo crea la sua ora', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
 await prova('un anonimo crea le chiamate della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), CHIAMATE)));
 await prova('ma non le riscrive', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), CHIAMATE)));
+await prova('un anonimo crea la navigazione della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_NAV}/${idBuono}`), NAVIGA)));
+await prova('ma non la riscrive', () => assertFails(setDoc(doc(anon, `${COLL_NAV}/${idBuono}`), NAVIGA)));
+await prova('l’admin legge la navigazione', () => assertSucceeds(getDoc(doc(owner, `${COLL_NAV}/${idBuono}`))));
+await prova('la navigazione più carica che l’app costruisce (ogni chiave di ogni misura, ai tetti) passa', () => {
+  const dati = C.oraVuota();
+  for (const c of C.MISURE_NAVIGAZIONE) {
+    const n = C.NAVIGAZIONE[c].gruppi.reduce((a, g) => a + g.length, 0);
+    for (const k of C.NAVIGAZIONE[c].chiavi) dati[c][k] = Array(n).fill(999999999);
+  }
+  const piena = C.documentoNavigazione({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
+  vero(C.validaNavigazione(piena).ok, C.validaNavigazione(piena).motivo);
+  return assertSucceeds(setDoc(doc(anon, `${COLL_NAV}/${C.idDocumento(piena)}`), piena));
+});
 await prova('l’admin le legge', () => assertSucceeds(getDoc(doc(owner, `${COLL_CHIAMATE}/${idBuono}`))));
 await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogni funzione, ai tetti) passano', () => {
   const dati = C.oraVuota();
