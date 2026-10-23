@@ -985,6 +985,7 @@
           settings: 'Aprire il menu Impostazioni',
           apps: 'Aprire il menu App',
           account: 'Aprire il menu Account',
+          aiuto: 'Aprire l\'Aiuto sulla scheda davanti',
         };
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
