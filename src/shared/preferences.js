@@ -354,7 +354,8 @@
       const m = s.match(re);
       if (m) { op = nome; resto = s.slice(m[0].length); break; }
     }
-    const pezzi = resto.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => x && !CONGIUNZIONI.has(x.toLowerCase()));
+    const N = nomiSito();
+    const pezzi = N ? N.pezziDi(resto, CONGIUNZIONI) : [];
     if (!pezzi.length) return null;
     const voci = [];
     const errati = [];
