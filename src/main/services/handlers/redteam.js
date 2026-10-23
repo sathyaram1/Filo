@@ -64,14 +64,22 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  on(MSG.REDTEAM_SUBMIT, async (msg) => {
+  on(MSG.REDTEAM_SUBMIT, async (msg, sender, origin) => {
+    // Il clic su «Invia» vale per la pagina del tentativo anche se il server risponde tardi: dalla pagina di un sito
+    // una pagina di Filo si apre solo entro il gesto (#1506), e qui il gesto si legge prima dell'attesa.
+    const apri = msg?.apri === true && (daFilo(origin, sender) || require('../permessiPagine').gestoDellUtente(sender?.wc));
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
     try {
-      return await callable('redteamSubmit', {
+      const r = await callable('redteamSubmit', {
         attackText: String(msg?.attackText || ''),
         description: String(msg?.description || ''),
       });
+      if (apri && r && r.status === 'ok' && r.attemptId) {
+        const url = 'filo://redteam/redteam.html?attempt=' + encodeURIComponent(String(r.attemptId));
+        try { ctx.winOf(sender)?._filoTabs?.openTab(url); } catch (_) {}
+      }
+      return r;
     } catch (e) {
       if (e && e.paused) return { status: 'paused', paused: true, error: e.message };
       return { status: 'error', error: e?.message || String(e) };
