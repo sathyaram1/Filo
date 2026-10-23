@@ -102,10 +102,9 @@ service firebase.storage {
     // in laboratorio non si riusciva a misurare (il motore degli emulatori al
     // database quella domanda non la gira).
 
-    // Solo il tipo dei blob cifrati (#1518). Con la lista dei tipi «passivi» chiunque, senza
-    // mandare un feedback, ci metteva byte qualunque come octet-stream o un testo in chiaro, e
-    // si portava via un link che non scade sul dominio di Google. Tipo ed estensione sono
-    // quelli di `SN_FEEDBACK.attachmentPath` (src/shared/feedback.js): la sentinella li confronta.
+    // Solo il tipo dei blob cifrati (#1518): con la lista dei tipi «passivi» chiunque, senza
+    // mandare un feedback, ci teneva un file qualunque dietro un link che non scade. Tipo ed
+    // estensione vengono da `SN_FEEDBACK` (src/shared/feedback.js): la sentinella li confronta.
     function soloCifrato() {
       return request.resource.contentType == 'application/octet-stream';
     }
