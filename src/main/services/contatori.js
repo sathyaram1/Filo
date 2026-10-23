@@ -132,6 +132,8 @@ function crea(dip = {}) {
   // comunque (un conto, il giro dell'ora, la chiusura). Un campione al secondo o una chiamata sincrona per pagina non
   // diventano così una scrittura dello storage ciascuno.
   let sospesa = C.oraVuota();
+  // Chi tiene uno stato da fotografare nell'ora a ogni scrittura (la finestra, #1470): sincrono, non lancia mai.
+  const primaDiScrivere = [];
 
   function carica() {
     if (!carico) {
