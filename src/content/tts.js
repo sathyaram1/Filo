@@ -411,14 +411,15 @@
       if (!sessionAlive(s)) return;
       if (res && res.ok && res.audioBase64) {
         startFetch(ci + 1); // mantieni il successivo in volo mentre si suona
-        s.pezziModello += 1;
-        await playModelChunk(s, res, chunks[ci]);
+        const suonato = await playModelChunk(s, res, chunks[ci]);
         if (!sessionAlive(s)) return;
-        s.letti = Math.max(s.letti, chunks[ci].end);
+        if (suonato && chunks[ci].sentito) s.letti = Math.max(s.letti, chunks[ci].end);
+        segnaLettura(s, true);
       } else {
         // Dal chunk fallito in poi la voce del browser legge tutto il resto, in un'unica
         // utterance con onboundary.
         s.ripiego = { res };
+        segnaLettura(s, true);
         notifyModelFallback(res);
         playBrowserChunk(s, full.slice(chunks[ci].start), chunks[ci].start);
         return;
