@@ -142,7 +142,7 @@ test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria',
 });
 
 test('ogni esito del server ha una frase; uno sconosciuto cade su quella generica', () => {
-  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable', 'inviter_not_linked', 'network_cap']) {
+  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable', 'inviter_not_linked', 'network_cap', 'inviter_cap']) {
     assert.ok(W.redeemMessage(s).length > 10, s);
   }
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
@@ -446,11 +446,12 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
 // la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
 // numero storto prima di scriverlo): se divergessero, il main accetterebbe
 // quello che la pagina rifiuta.
-test('le manopole dei crediti sono undici, hanno un nome e limiti sensati', () => {
-  assert.equal(W.OWNER_KNOBS.length, 11);
+test('le manopole dei crediti sono dodici, hanno un nome e limiti sensati', () => {
+  assert.equal(W.OWNER_KNOBS.length, 12);
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
     'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses', 'invitesRemaining',
-    'maxGrantCredits', 'rewardFeedbackSent', 'rewardSentPerDay', 'rewardFeedbackClosed', 'redeemsPerNetwork', 'redeemsPerNetworkHours',
+    'maxGrantCredits', 'rewardFeedbackSent', 'rewardSentPerDay', 'rewardFeedbackClosed', 'redeemsPerNetwork', 'redeemsPerInviter',
+    'redeemsPerNetworkHours',
   ]);
   // #1077 — il tetto giornaliero dei premi d'invio si può chiudere (zero) e aprire a molti.
   assert.equal(W.knobOf('rewardSentPerDay').min, 0);
@@ -476,6 +477,13 @@ test('le manopole dei crediti sono undici, hanno un nome e limiti sensati', () =
   assert.match(W.knobOf('redeemsPerNetwork').aiuto, /A zero nessun limite/);
   assert.equal(W.knobOf('redeemsPerNetworkHours').min, 1);
   assert.ok(W.knobOf('redeemsPerNetworkHours').max >= 24 * 365);
+  // #1519 — il tetto per chi dà inviti si spegne a zero, non tocca i codici dell'owner e conta nella stessa finestra.
+  const perInvitante = W.knobOf('redeemsPerInviter');
+  assert.equal(perInvitante.min, 0);
+  assert.ok(perInvitante.max >= 100);
+  assert.match(perInvitante.aiuto, /A zero nessun limite/);
+  assert.match(perInvitante.aiuto, /I tuoi codici non contano/);
+  assert.match(W.knobOf('redeemsPerNetworkHours').aiuto, /stessa persona/);
 });
 
 // #1120 — chi trova il tetto per rete deve sapere quando riprovare, coi numeri del server, e che il codice resta buono.
@@ -496,6 +504,83 @@ test('tetto per rete: la frase dice quante persone, in quante ore, e l\'ora in c
   }
   assert.match(W.REDEEM_MESSAGES.network_cap, /resta valido/);
   assert.match(W.redeemMessage('inviter_not_linked'), /Google/);
+});
+
+// #1519 — il tetto per chi dà inviti si legge come quello per rete: quante persone, in quante ore, quando riprovare.
+test('tetto per chi dà inviti: la frase dice di chi sono i codici, quante persone, in quante ore e quando riprovare', () => {
+  const ora = (iso) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const ieri = new Date(2026, 9, 21, 9, 0).getTime();
+  const domani = new Date(2026, 9, 22, 8, 30).toISOString();
+  const info = { status: 'inviter_cap', reopensAt: domani, cap: 3, hours: 24 };
+  assert.equal(W.redeemMessage('inviter_cap', info), W.inviterCapMessage(info));
+  assert.equal(W.inviterCapMessage(info, ieri),
+    `Con gli inviti di chi ti ha mandato questo codice sono già entrate 3 persone nelle ultime 24 ore. Il tuo codice resta valido, riprova domani dopo le ${ora(domani)}.`);
+  const oggi = new Date(2026, 9, 21, 17, 5).toISOString();
+  assert.match(W.inviterCapMessage({ reopensAt: oggi, cap: 1, hours: 1 }, ieri), new RegExp(`è già entrata una persona nell’ultima ora\\. .* riprova dopo le ${ora(oggi)}\\.$`));
+  for (const storto of [{}, { reopensAt: 'mai' }, null, undefined]) {
+    assert.equal(W.redeemMessage('inviter_cap', storto), W.REDEEM_MESSAGES.inviter_cap, JSON.stringify(storto));
+  }
+  assert.match(W.REDEEM_MESSAGES.inviter_cap, /resta valido/);
+  assert.notEqual(W.REDEEM_MESSAGES.inviter_cap, W.REDEEM_MESSAGES.network_cap);
+  // I due tetti a tempo lasciano l'invito in attesa per il prossimo avvio; gli altri rifiuti no.
+  assert.equal(W.riscattoDaRiprovare('network_cap'), true);
+  assert.equal(W.riscattoDaRiprovare('inviter_cap'), true);
+  for (const s of ['ok', 'code_used', 'inviter_not_linked', 'internal', 'toString', '__proto__', '', undefined]) {
+    assert.equal(W.riscattoDaRiprovare(s), false, String(s));
+  }
+});
+
+// #1519 — nella pagina dell'owner chi è entrato coi codici di una persona sta sotto di lei, con quanti e in quanto.
+test('persone in albero: gli invitati stanno sotto chi li ha invitati, coi conti; i casi storti non perdono nessuno', () => {
+  const u = (pseudonym, invitedBy, createdAt) => ({ pseudonym, invitedBy, createdAt });
+  const users = [
+    u('aaaa', 'owner', '2026-10-01T08:00:00.000Z'),
+    u('bbbb', 'owner', '2026-10-05T08:00:00.000Z'),
+    u('a1', 'aaaa', '2026-10-21T10:00:00.000Z'),
+    u('a2', 'aaaa', '2026-10-21T10:20:00.000Z'),
+    u('a3', 'aaaa', '2026-10-21T11:40:00.000Z'),
+    u('a2x', 'a2', '2026-10-22T09:00:00.000Z'),
+    u('orfano', 'zzzz', '2026-10-03T08:00:00.000Z'),
+    u('se', 'se', '2026-10-02T08:00:00.000Z'),
+  ];
+  const albero = W.personeInAlbero(users);
+  assert.deepEqual(albero.map((n) => [n.u.pseudonym, n.livello]), [
+    ['bbbb', 0], ['orfano', 0], ['se', 0], ['aaaa', 0], ['a3', 1], ['a2', 1], ['a2x', 2], ['a1', 1],
+  ]);
+  const di = (p) => albero.find((n) => n.u.pseudonym === p).invitati;
+  assert.equal(di('aaaa').n, 3);
+  assert.deepEqual(di('aaaa').pseudonimi, ['a3', 'a2', 'a1']);
+  assert.equal(di('aaaa').spanMs, 100 * 60 * 1000);
+  assert.equal(di('aaaa').primo, '2026-10-21T10:00:00.000Z');
+  assert.equal(di('aaaa').ultimo, '2026-10-21T11:40:00.000Z');
+  assert.equal(di('a2').n, 1);
+  assert.equal(di('a2').spanMs, null);
+  assert.equal(di('bbbb'), null);
+  assert.equal(W.invitatiTesto(di('aaaa')), '3 in 2 ore');
+  assert.equal(W.invitatiTesto(di('a2')), '1');
+  assert.equal(W.invitatiTesto(null), '');
+  assert.equal(W.invitatiTesto({ n: 2, spanMs: 20 * 60 * 1000 }), '2 in meno di un’ora');
+  assert.equal(W.invitatiTesto({ n: 2, spanMs: 60 * 60 * 1000 }), '2 in 1 ora');
+  assert.equal(W.invitatiTesto({ n: 5, spanMs: 47 * 60 * 60 * 1000 }), '5 in 47 ore');
+  assert.equal(W.invitatiTesto({ n: 5, spanMs: 6 * 24 * 60 * 60 * 1000 }), '5 in 6 giorni');
+  assert.equal(W.invitatiTesto({ n: 1200, spanMs: null }), '1.200');
+
+  // Un giro chiuso (A da B, B da A), date illeggibili, voci senza pseudonimo: ognuno compare una volta sola.
+  const storti = W.personeInAlbero([
+    u('x', 'y', '2026-10-01T08:00:00.000Z'), u('y', 'x', '2026-10-02T08:00:00.000Z'),
+    u('d1', 'x', 'non una data'), null, { invitedBy: 'x' },
+  ]);
+  assert.deepEqual(storti.map((n) => n.u.pseudonym).sort(), ['d1', 'x', 'y']);
+  assert.equal(new Set(storti.map((n) => n.u)).size, 3);
+  assert.deepEqual(W.personeInAlbero(null), []);
+  assert.deepEqual(W.personeInAlbero([]), []);
+
+  // Una catena lunga non sfonda la pila.
+  const catena = [u('p0', 'owner', '2026-01-01T00:00:00.000Z')];
+  for (let i = 1; i < 5000; i++) catena.push(u(`p${i}`, `p${i - 1}`, new Date(Date.UTC(2026, 0, 1) + i * 60000).toISOString()));
+  const lunga = W.personeInAlbero(catena);
+  assert.equal(lunga.length, 5000);
+  assert.equal(lunga[4999].livello, 4999);
 });
 
 // #854 — il main rifà il controllo della pagina con la stessa tabella: un numero storto per gli ingressi
