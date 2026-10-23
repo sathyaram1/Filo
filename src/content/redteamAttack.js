@@ -59,7 +59,14 @@
     }
   }
 
+  // Su un sito il pannello sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
   function open() {
+    if (activeRoot) return;
+    if (global.SN_RIQUADRI_SOPRA?.apri('redteam', {}, apriQui)) return;
+    apriQui();
+  }
+
+  function apriQui() {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-rt-overlay';

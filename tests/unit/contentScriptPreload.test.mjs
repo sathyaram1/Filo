@@ -30,6 +30,7 @@ const DIFFERENZE = {
     'src/content/propostaEmail.js': 'l\'email dell\'account proposta nei campi di accesso: niente proposte sulle pagine di Filo',
     'src/shared/menuDescritto.js': 'il menu come dati per lo strato sopra la scheda: sulle pagine di Filo resta nella pagina',
     'src/content/menuNelloStrato.js': 'il menu nello strato sopra la scheda: sulle pagine di Filo resta nella pagina',
+    'src/content/riquadriSopraLaScheda.js': 'i riquadri nello strato sopra la scheda: sulle pagine di Filo restano nella pagina',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
