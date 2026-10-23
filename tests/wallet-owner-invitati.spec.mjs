@@ -109,7 +109,7 @@ test('chi è entrato coi codici di un tester sta sotto di lui, e il numero dice 
   ]);
   const bottone = rigaDi(page, T).locator('.sn-wallet-invitati-btn');
   await expect(bottone).toHaveText('3 in 2 ore');
-  await expect(bottone).toHaveAttribute('title', /^3 persone sono entrate coi suoi codici, il primo .* e l’ultimo .*\. Clic per vedere solo loro\.$/);
+  await expect(bottone).toHaveAttribute('title', /^3 persone sono entrate coi suoi codici: la prima il 21 ott alle \d\d:\d\d, l’ultima il 21 ott alle \d\d:\d\d\. Clic per vedere solo loro\.$/);
   await expect(rigaDi(page, 'aaaa000000000012').locator('.sn-wallet-invitati-btn')).toHaveText('1');
   await expect(rigaDi(page, 'rrrr000000000002').locator('td').nth(8)).toHaveText('');
   // Il rientro cresce col livello: chi è entrato da un invitato sta più dentro di lui.
