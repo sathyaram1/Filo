@@ -1614,6 +1614,7 @@
           c._tempo = null;
         } else {
           delete c.dataset.attesa;
+          if (sopraOra) c._letta = true;
           avviaTempo(c, c._durata);
         }
       });
