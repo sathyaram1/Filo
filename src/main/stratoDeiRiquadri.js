@@ -448,6 +448,12 @@ class StratoDeiRiquadri {
   _butta(s) {
     clearTimeout(s.timerVuoto);
     if (this.strati.get(s.wc) === s) this.strati.delete(s.wc);
+    for (const chiudi of [...s.attese.values()]) chiudi({ ok: false });
+    // L'Aiuto se ne va con lo strato: la pagina, che lo dice alla barra laterale, lo sa chiuso.
+    if (s.aiuto && vivo(s.wc)) {
+      s.aiuto = false;
+      try { s.wc.send('filo:broadcast', { type: msg().AIUTO_DALLO_STRATO, op: 'stato', args: AIUTO_CHIUSO }); } catch (_) {}
+    }
     const aveva = s.visibile && this._haTastiera(s);
     s.visibile = false;
     const v = s.vista;
