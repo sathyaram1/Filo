@@ -41,6 +41,8 @@
     const righe = [
       ...T.scorciatoieFilo().map((s) => [s.etichetta, s.nome]),
       [T.etichettaSaltoScheda(), T.descrizioneSaltoScheda()],
+      [T.etichetteSchedaAccanto(1), 'Vai alla scheda successiva'],
+      [T.etichetteSchedaAccanto(-1), 'Vai alla scheda precedente'],
       [T.etichettaIndietro(), 'Torna alla pagina precedente'],
       [T.etichettaAvanti(), 'Vai alla pagina successiva'],
       [T.etichettaBarra(), 'Apri e chiudi la barra laterale'],
