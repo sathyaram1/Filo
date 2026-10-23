@@ -117,10 +117,10 @@ test('fuori dalla riapertura un giro che non chiude niente non mostra avvisi, ma
 });
 
 test('testoEsito: un avviso per ogni esito, e niente quando non c’è niente da dire', () => {
-  assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 2, riordinate: true }), 'Schede riordinate: 2 chiuse, restano nel filo della home');
-  assert.equal(T.testoEsito({ trigger: 'idle', valutate: 3, archiviate: 1 }), 'Schede riordinate: 1 chiusa, restano nel filo della home');
-  assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 2, giudizioMancato: true }),
-    'Schede riordinate: 2 doppioni chiusi, restano nel filo della home. Le altre non sono riuscito a valutarle');
+  assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 2, riordinate: true }), 'Schede riordinate, 2 chiuse. Le ritrovi nel filo della home');
+  assert.equal(T.testoEsito({ trigger: 'idle', valutate: 3, archiviate: 1 }), 'Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
+  assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, archiviate: 1, giudizioMancato: true }),
+    'Schede riordinate e 1 doppione chiuso, lo ritrovi nel filo della home. Le altre non sono riuscito a valutarle');
   assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 3, giudizioMancato: true }), 'Non sono riuscito a valutare quali schede chiudere');
   assert.equal(T.testoEsito({ trigger: 'reopen', valutate: 0, riordinate: false }), '');
   assert.equal(T.testoEsito({ trigger: 'manual', valutate: 3, riordinate: true }), '');
