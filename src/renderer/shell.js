@@ -2343,6 +2343,14 @@
         e.preventDefault();
         const tab = state.tabs[idx];
         if (tab) api.tabs.activate(tab.id);
+        return;
+      }
+      const tabs = state.tabs || [];
+      const accanto = TASTI ? TASTI.indiceSchedaAccanto(e, tabs.findIndex((t) => t.id === state.activeId), tabs.length) : null;
+      if (accanto != null) {
+        e.preventDefault();
+        const tab = tabs[accanto];
+        if (tab && tab.id !== state.activeId) api.tabs.activate(tab.id);
       }
     }
   });
