@@ -1583,27 +1583,23 @@ class TabManager {
   }
 
   async _gatherTriageInput(cands) {
-    const now = Date.now();
-    const out = [];
     let fuori = () => null;
     try { fuori = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
-    for (const t of cands) {
-      // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
-      const delicata = fuori(t.url);
-      let contentExtract = '';
-      if (!delicata && !t._rinviata) {
-        try {
-          contentExtract = await t.view.webContents.executeJavaScript(
-            '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
-            false,
-          );
-        } catch (_) {}
-      }
+    // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
+    const delicate = cands.map((t) => fuori(t.url));
+    const estratti = await Promise.all(cands.map((t, i) => (delicate[i] || t._rinviata ? '' : leggiEstratto(t))));
+    const now = Date.now();
+    const minutiDa = (ms) => (Number.isFinite(ms) && ms > 0 ? Math.max(0, Math.round((now - ms) / 60000)) : null);
+    const out = [];
+    for (const [i, t] of cands.entries()) {
+      const delicata = delicate[i];
+      const contentExtract = typeof estratti[i] === 'string' ? estratti[i] : '';
       out.push({
         url: t.url,
         title: t.title,
-        ageMin: t.openedAt ? Math.round((now - new Date(t.openedAt).getTime()) / 60000) : null,
-        idleMin: t.lastInteractionAt ? Math.round((now - t.lastInteractionAt) / 60000) : null,
+        ageMin: minutiDa(Date.parse(t.openedAt)),
+        // Mai toccata da quando c'è: inattiva da quando è arrivata la sua pagina (#1618).
+        idleMin: minutiDa(t.lastInteractionAt || Date.parse(t.paginaDal) || Date.parse(t.openedAt)),
         scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : null,
         formDirty: !!t.formDirty,
         audible: !!t.audible,
