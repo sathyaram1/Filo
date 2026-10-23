@@ -1729,12 +1729,15 @@
     }
   }
 
-  // L'utente ha eseguito l'azione che l'AI aveva indicato (click sul target
-  // o accept di un fill). Logghiamo l'azione e chiediamo il passo successivo.
-  function onUserAction(highlight) {
-    if (!root) return;
-    const el = (() => { try { return document.querySelector(highlight.selector); } catch (_) { return null; } })();
-    const label = describeElementBriefly(el);
+  // L'utente ha eseguito l'azione che l'AI aveva indicato (click sul target o accept di un fill): lo dice la pagina,
+  // col nome dell'elemento e l'indirizzo di prima del clic, e la cornice l'ha già tolta. Si chiede il passo successivo.
+  let passiIndicati = 0;
+  let evidenziato = null;
+  function suAzioneUtente(ev) {
+    const highlight = evidenziato;
+    if (!root || !highlight || !ev || Number(ev.id) !== highlight.id) return;
+    evidenziato = null;
+    const label = String(ev.etichetta || '');
     let logText, aiNote;
     if (highlight.action === 'fill') {
       logText = label ? `testo inserito in ${label}` : 'testo inserito';
@@ -1752,32 +1755,29 @@
       retracted: false,
     });
     appendActionLog(logText);
-    Highlight.clear();
-    // Dopo un click utente "vero" il menu hover-forced non serve più: il
-    // browser gestirà gli hover successivi naturalmente.
-    try { Highlight.clearForceHover?.(); } catch (_) {}
-
-    // URL catturato PRIMA del click, così waitForPageSettle vede il cambio di route e aspetta
-    // la pagina nuova prima dello screenshot.
-    const preActionUrl = location.href;
+    // URL catturato PRIMA del click, così la pagina vede il cambio di route e aspetta quella nuova prima della foto.
     submit({
       userAction: aiNote,
       esterno: { elementoPagina: { etichetta: label, selettore: highlight.selector } },
-      preActionUrl,
+      preActionUrl: String(ev.daUrl || ''),
       daGesto: true,
     });
   }
 
   global.SN_SIDEBAR = {
-    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
+    open, close: chiudi, isOpen, ensureNotOverTarget: evita, paroleUtente, notaFermata, fileSotto, passo, stato,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
+    dalloStrato, dallaPagina,
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
+  const P = () => global.SN_AIUTO_PAGINA;
   global.__filoSidebarTest = {
     runFiloAction, filoActionLabel,
     runPageAction, parseAssistantOutput,
-    resolveImageEl, resolveLinkEl, resolveActionText,
+    resolveImageEl: (p) => P().resolveImageEl(p),
+    resolveLinkEl: (p) => P().resolveLinkEl(p),
+    resolveActionText: (p) => P().resolveActionText(p),
     // Il riquadrino «Ha funzionato?»: da lì il percorso finisce in una raccolta
     // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).
     // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è

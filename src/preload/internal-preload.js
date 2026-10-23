@@ -312,6 +312,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
+  safe(path.join(CONTENT, 'aiutoPagina.js')); // #1509.3 — quello che l'Aiuto fa sulla pagina: DOPO highlight.js
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'correttoreRegole.js')); // #1446 — candidati e risposte del correttore: PRIMA di spellcheck.js

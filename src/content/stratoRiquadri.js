@@ -7,7 +7,8 @@
 
   const S = global.SN_STRATO_RIQUADRI;
   if (!S) return;
-  const RADICI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-popup, .sn-sidebar';
+  // L'Aiuto non c'è: Esc non lo chiude, nemmeno quando stava nella pagina, e sulla pagina sotto il tasto resta suo.
+  const RADICI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay, .sn-popup';
   const MODALI = '.sn-fb-overlay, .sn-editbox-overlay, .sn-rt-overlay';
 
   // La pagina sotto, per il feedback e le bozze: la manda il main con ogni apertura.
@@ -44,9 +45,14 @@
       global.SN_POPUP?.openStreaming({
         action: dati.action, payload: dati.payload || {}, anchor: dati.anchor || undefined, title: dati.title || '',
       });
+    } else if (d.tipo === 'aiuto') {
+      global.SN_SIDEBAR?.open(dati.invocazione || undefined);
     }
     riferisci();
   }
+
+  // Dalla pagina sotto al suo Aiuto, che sta qui (#1509.3).
+  S.onAiuto?.((d) => global.SN_SIDEBAR?.dallaPagina?.(d));
 
   // Esc premuto sulla pagina: si chiude il riquadro più in alto, come se il tasto fosse arrivato qui.
   S.onEsc(() => {
@@ -78,10 +84,12 @@
     const aperti = pezzi.filter(aSchermo).length;
     const riquadri = [...document.querySelectorAll(RADICI)].filter(visibile).length;
     const modale = [...document.querySelectorAll(MODALI)].some(visibile);
-    const firma = `${aperti}|${riquadri}|${modale}`;
+    // Un Aiuto nascosto mentre Filo risponde tiene vivo lo strato: la risposta resta da aprire.
+    const aiuto = !!global.SN_SIDEBAR?.isOpen?.();
+    const firma = `${aperti}|${riquadri}|${modale}|${aiuto}`;
     if (firma === detto) return;
     detto = firma;
-    S.stato({ aperti, riquadri, modale });
+    S.stato({ aperti, riquadri, modale, aiuto });
   }
   let inCoda = false;
   const presto = () => {
