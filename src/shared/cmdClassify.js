@@ -642,40 +642,129 @@
     return out;
   }
 
+  // sh e bash (anche su Windows) tolgono i backslash e decodificano `$'…'`; PowerShell e cmd no.
+  // Fuori da Windows una shell non indicata è POSIX: lì non ce ne sono altre. Senza contesto il sistema non si sa.
+  function shellPosix(c) {
+    if (c.sistemaIgnoto) return false;
+    return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
+  }
+
+  // /bin/sh su Debian e Ubuntu è dash, che non conosce `$'…'`: lì `\'` chiude la stringa e il resto diventa
+  // altri argomenti. Dove sh può essere dash si misurano tutte e due le letture (#1511).
+  function forseDash(c) {
+    return shellPosix(c) && !c.win && c.shell !== 'bash';
+  }
+  // Senza un `\'` le due letture hanno gli stessi confini, e quella di dash è un nome con `$` e backslash letterali.
+  const APICE_CHE_DASH_CHIUDE = /\$'(?:[^'\\]|\\[^'])*\\'/;
+
+  const ESCAPE_ANSI = { a: 7, b: 8, e: 27, E: 27, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '\'': 39, '"': 34, '?': 63 };
+  const UTF8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
+
+  function byteUtf8(cp, b) {
+    if (cp < 0x80) b.push(cp);
+    else if (cp < 0x800) b.push(0xc0 | (cp >> 6), 0x80 | (cp & 63));
+    else if (cp < 0x10000) b.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+    else b.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+  }
+
+  // Il contenuto di `$'…'` come lo produce bash (da `i`, dopo l'apice). `ignoto`: un escape che non si
+  // riconosce, un NUL o byte che non sono UTF-8; lì le shell non concordano e il percorso non si sa.
+  function ansiC(s, i) {
+    const b = [];
+    let ignoto = false;
+    const hex = (k, max) => { let n = 0; while (n < max && /[0-9A-Fa-f]/.test(s[k + n] || '')) n += 1; return n; };
+    for (; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '\'') break;
+      if (ch !== '\\') { const cp = s.codePointAt(i); byteUtf8(cp, b); if (cp > 0xffff) i += 1; continue; }
+      const e = s[i + 1];
+      if (e === undefined) { ignoto = true; break; }
+      i += 1;
+      if (Object.prototype.hasOwnProperty.call(ESCAPE_ANSI, e)) { b.push(ESCAPE_ANSI[e]); continue; }
+      if (/[0-7]/.test(e)) {
+        let v = Number(e);
+        for (let n = 0; n < 2 && /[0-7]/.test(s[i + 1] || ''); n++) { i += 1; v = v * 8 + Number(s[i]); }
+        b.push(v & 0xff);
+        continue;
+      }
+      if (e === 'x' || e === 'u' || e === 'U') {
+        const n = hex(i + 1, e === 'x' ? 2 : e === 'u' ? 4 : 8);
+        if (!n) { ignoto = true; continue; }
+        const v = parseInt(s.slice(i + 1, i + 1 + n), 16);
+        i += n;
+        if (e === 'x') b.push(v);
+        else if (v > 0x10ffff) ignoto = true;
+        else byteUtf8(v, b);
+        continue;
+      }
+      if (e === 'c') {
+        const x = s[i + 1];
+        // Come bash: `\c\` è 0x1c e quel che segue resta com'è (`\c\/` tiene la barra); `\c\\` è uno solo, `\c\'` tiene l'apice.
+        if (x === '\\') {
+          b.push(0x1c);
+          i += 1;
+          if (s[i + 1] === '\\') i += 1;
+          else if (s[i + 1] === '\'') { b.push(39); i += 1; }
+          continue;
+        }
+        if (x === undefined || x === '\'' || !/[\x20-\x7e]/.test(x)) { ignoto = true; continue; }
+        i += 1;
+        b.push(x === '?' ? 0x7f : x.toUpperCase().charCodeAt(0) & 0x1f);
+        continue;
+      }
+      ignoto = true;
+    }
+    if (i >= s.length) ignoto = true;
+    let testo = '';
+    if (b.includes(0) || !UTF8) ignoto = true;
+    else { try { testo = UTF8.decode(new Uint8Array(b)); } catch (_) { ignoto = true; } }
+    return { testo, fine: i, ignoto };
+  }
+
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
   // Su Windows `\` prima di uno spazio è la fine di un percorso (`src\ \\host\x` sono due operandi), non un escape.
-  function argomenti(raw, win) {
+  function argomenti(raw, c) {
+    const win = c.win;
+    const posix = shellPosix(c);
     const out = [];
     const s = String(raw);
     let cur = '';
     let espande = ''; // il testo fuori dagli apici singoli, dove `$` si espande
     let q = '';
     let aperto = false;
+    let ignoto = false;
     const chiudi = () => {
       if (cur || aperto) {
         // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
         const nomi = nomiVariabili(espande, { percento: false })
           .concat(cur.startsWith('+') ? [] : nomiVariabili(cur, { dollaro: false }));
-        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)) });
+        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)), ignoto });
       }
-      cur = ''; espande = ''; aperto = false;
+      cur = ''; espande = ''; aperto = false; ignoto = false;
     };
     for (let i = 0; i < s.length; i++) {
       const ch = s[i];
       if (q) {
         if (ch === q) { q = ''; continue; }
+        if (posix && q === '"' && ch === '\\' && /[$`"\\]/.test(s[i + 1] || '')) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
         cur += ch;
         if (q === '"') espande += ch;
         continue;
       }
-      // `$'…'` (ANSI-C) e `$"…"` (traduzione locale) di bash: il `$` è prefisso
-      // di quoting, non testo. Toltolo, la stringa torna com'è, e le sequenze di
-      // escape restano col loro backslash — che `pezzi()` tratta da separatore,
-      // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
+      // Il classificatore misura il percorso che vedrà la shell: `$'\x2essh'` è `.ssh`, `.\ssh` pure (#1511).
+      if (posix && !c.senzaAnsi && ch === '$' && s[i + 1] === '\'') {
+        const r = ansiC(s, i + 2);
+        cur += r.testo;
+        if (r.ignoto) ignoto = true;
+        aperto = true;
+        i = r.fine;
+        continue;
+      }
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
+      if (posix && ch === '\\' && i + 1 < s.length) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
       if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
       cur += ch;
@@ -766,7 +855,7 @@
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
     const shell = String(x.shell || '').toLowerCase();
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell };
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
@@ -928,10 +1017,13 @@
   }
 
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
-  function gitPerimetro(trimmed, c) {
-    const sub = subcommandOf(trimmed);
+  function gitPerimetro(raw, c) {
+    const sub = subcommandOf(dequote(raw));
     if (sub === 'grep') return due(MOTIVI.ricorsivo);
-    const args = gitArgsAfterSub(trimmed);
+    // I percorsi come li legge la shell, come per gli altri lettori.
+    const testi = argomenti(raw, c).slice(1).map((a) => a.testo).filter(Boolean);
+    const k = testi.findIndex((x) => !x.startsWith('-'));
+    const args = k < 0 ? [] : testi.slice(k + 1);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
     // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
@@ -1047,7 +1139,7 @@
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw, c.win).slice(1);
+    const args = argomenti(raw, c).slice(1);
     const testi = args.map((a) => a.testo);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
@@ -1059,8 +1151,9 @@
     if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
     if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (!stampaSoltanto && args.some((a) => a.ignoto)) return due(MOTIVI.ignoto);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
-    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    if (prog === 'git') return gitPerimetro(raw, c);
     if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     if (cerca) {
       if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
@@ -1101,8 +1194,8 @@
   // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw, c.win).slice(1);
-    if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
+    const args = argomenti(raw, c).slice(1);
+    if (prog === 'popd' || args.some((a) => a.variabile || a.ignoto)) return { ...c, cwd: null };
     let dest = null;
     for (let i = 0; i < args.length; i++) {
       const t = args[i].testo;
@@ -1405,7 +1498,9 @@
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
     const letture = comeLaShell(cmd, c);
-    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
+    if (letture == null) return TRE;
+    const contesti = forseDash(c) && APICE_CHE_DASH_CHIUDE.test(cmd) ? [c, { ...c, senzaAnsi: true }] : [c];
+    return letture.flatMap((l) => contesti.map((cc) => classifica(l, cc, 0))).reduce(peggiore);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
@@ -1446,7 +1541,7 @@
         if (i > 0 && (PERCORSO_DAL_TUBO.has(progs[i]) || CERCANO_NOME.has(progs[i])) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
         // Join-Path/Split-Path sul valore del tubo compongono ciò che nessun argomento scrive (`'\\' | Join-Path`):
         // chi lo riceve come percorso chiede (noto), e Join-Path -Resolve lo apre da sé.
-        if (i > 0 && progs[i] === 'join-path' && argomenti(p, c.win).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
+        if (i > 0 && progs[i] === 'join-path' && argomenti(p, c).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
         if (!FONTI_NOTE.has(progs[i]) || (i > 0 && CALCOLANO.has(progs[i])) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
         if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
         if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
