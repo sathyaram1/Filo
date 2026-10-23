@@ -501,10 +501,18 @@ class StratoDelMenu {
       // finestra di questo strato. Lo strato nomina solo questi due pannelli.
       if (canale === 'strato:conta') {
         const d = dati && typeof dati === 'object' ? dati : {};
+        const incognito = !!(this.win && this.win._filoIncognito);
+        // I gesti del menu (#1471): il main ne prende solo le chiavi e le voci dei loro elenchi.
+        if (d.misura === 'gesto') {
+          const C = globalThis.SN_CONTATORI;
+          const g = String(d.gesto || '');
+          try { if (C && C.GESTI_DALLE_PAGINE.includes(g)) globalThis.SN_CONTATORI_MAIN?.gesto(g, d, { incognito }); } catch (_) {}
+          return;
+        }
         const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
         const pannello = d.pannello === 'tasto-destro' ? 'tasto-destro' : 'incolla';
         try {
-          globalThis.SN_CONTATORI_MAIN?.ricerca(pannello, { esito: String(d.esito || ''), attesaMs: n(d.attesaMs), posizione: n(d.posizione) }, { incognito: !!(this.win && this.win._filoIncognito) });
+          globalThis.SN_CONTATORI_MAIN?.ricerca(pannello, { esito: String(d.esito || ''), attesaMs: n(d.attesaMs), posizione: n(d.posizione) }, { incognito });
         } catch (_) {}
         return;
       }

@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('barra', {
   misure: manda('barra:misure'),
   posa: manda('barra:posa'),
   trascinaFuori: manda('barra:trascina-fuori'),
+  // Un'icona presa e lasciata andare senza posarla: la conta il main (#1471).
+  annullato: manda('barra:annullato'),
   // I gesti caduti nel vuoto della vista (ombra, fasce sopra e sotto il pannello): li rigira il main alla scheda.
   inoltra: manda('barra:inoltra'),
   onCursore: (fn) => {

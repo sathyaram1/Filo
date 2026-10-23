@@ -66,7 +66,7 @@ test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri'
     + leggi('src', 'pages', 'dashboard', 'dashboard-cerca.js') + leggi('src', 'pages', 'editor', 'editor.js') + leggi('src', 'shared', 'comboBox.js');
   for (const m of tutto.matchAll(/misura: '([a-z-]+)'/g)) {
     assert.ok(['azione', 'icona', 'ricerca', 'proposta', 'annullato', 'chiesto', 'avviso', 'errore-modello', 'intervista',
-      'tasto-annulla', 'anticipo-aperto', 'conferma'].includes(m[1]), m[1]);
+      'tasto-annulla', 'anticipo-aperto', 'conferma', 'gesto'].includes(m[1]), m[1]);
     assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), new RegExp(`case '${m[1]}':`), `il main riceve «${m[1]}»`);
   }
   for (const m of tutto.matchAll(/pannello: '([a-z-]+)'/g)) assert.ok(C.PANNELLI.includes(m[1]), m[1]);

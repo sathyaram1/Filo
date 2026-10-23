@@ -80,6 +80,7 @@ const COLLEZIONI = {
   '/contatori-giornalieri/{docId}': { frase: 'Ogni ora Filo manda al server i numeri dell\'ora prima' },
   '/contatori-chiamate/{docId}': { frase: 'Per ogni risposta di un modello, per funzione e modello' },
   '/contatori-finestra/{docId}': { frase: 'Della finestra di Filo, in fasce' },
+  '/contatori-gesti/{docId}': { frase: 'Cosa sposti, trascini e rimetti com\'era' },
   '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },

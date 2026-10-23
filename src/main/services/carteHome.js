@@ -17,10 +17,22 @@ function modifica(mossa) {
   const giro = coda.then(async () => {
     const esito = Carte().applica(await leggi(), mossa);
     if (esito.cambiato) await chrome.storage.local.set({ [chiave()]: esito.layout });
+    if (!esito.errore) contaMossa(mossa);
     return esito;
   });
   coda = giro.catch(() => {});
   return giro;
+}
+
+// Per i contatori (#1471): la mossa, e la carta che muove (del catalogo, o il tipo di una carta di sinistra).
+function contaMossa(mossa) {
+  const K = globalThis.SN_CONTATORI_MAIN;
+  const v = K && globalThis.SN_CONTATORI?.cartaDellaMossa(mossa);
+  if (!v) return;
+  try {
+    K.gesto('carta_home', v);
+    if (v.mossa === 'ripristina') K.gesto('ripristino', { cosa: 'carte_home' });
+  } catch (_) {}
 }
 
 module.exports = { leggi, modifica };

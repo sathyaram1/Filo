@@ -244,7 +244,13 @@
     caselle.cambiato('token', e);
   }
 
+  // Chi torna indietro dalla personalizzazione (#1471): cosa rimette di serie, per nome dell'elenco, mai il valore.
+  function contaRipristino(campi) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', gesto: 'ripristino', ...campi })).catch(() => {}); } catch (_) {}
+  }
+
   function resetToken(name) {
+    contaRipristino({ cosa: 'token', token: name });
     delete currentOverrides[name];
     tokenInCorso.delete(name);
     tokenDaSalvare.add(name);
@@ -255,12 +261,27 @@
   }
 
   function resetAllTokens() {
+    contaRipristino({ cosa: 'tutti_token' });
     currentOverrides = {};
     tokenInCorso.clear();
     tokenAzzeraTutti = true;
     if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
     applyTokensLive();
     persistTokens();
+  }
+
+  // La sezione delle impostazioni avanzate arrivata sotto gli occhi, una volta per apertura della pagina (#1471).
+  let avanzateGuardate = false;
+  function guardaLeAvanzate() {
+    const sezione = document.getElementById('sec-advanced');
+    if (avanzateGuardate || !sezione || typeof IntersectionObserver !== 'function') return;
+    avanzateGuardate = true;
+    const io = new IntersectionObserver((voci) => {
+      if (!voci.some((v) => v.isIntersecting)) return;
+      io.disconnect();
+      contaRipristino({ cosa: 'avanzate_viste' });
+    });
+    io.observe(sezione);
   }
 
   // Un solo bottone riporta TUTTE le impostazioni ai predefiniti: una personalizzazione
@@ -274,6 +295,7 @@
     const ok = Ui
       ? await Ui.confirm({ title: 'Ripristina tutte le impostazioni', text, okLabel: 'Ripristina tutto' })
       : window.confirm(`${text} Procedo?`);
+    contaRipristino({ cosa: 'tutte_impostazioni', esito: ok ? 'confermato' : 'annullato' });
     if (!ok) return;
     await chrome.runtime.sendMessage({ type: MSG.RESET_SETTINGS });
     // Ricarica la pagina: si ri-bootstrappa dai predefiniti, senza stato residuo.
@@ -483,6 +505,7 @@
   function resetTabColorParam(key) {
     const m = tabColorMeta(key);
     if (!m) return;
+    contaRipristino({ cosa: 'colore_schede', parametro: key });
     currentTabColor[key] = m.def;
     tabColInCorso.delete(key);
     tabColDaSalvare.add(key);
@@ -491,6 +514,7 @@
   }
 
   function resetAllTabColor() {
+    contaRipristino({ cosa: 'tutto_colore_schede' });
     currentTabColor = TabColor ? TabColor.defaultParams() : {};
     tabColInCorso.clear();
     if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
@@ -1743,6 +1767,7 @@
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
     caricato = true;
+    guardaLeAvanzate();
     // La sezione chiesta dall'indirizzo (la carta dell'aggiornamento manda a #sec-aggiornamenti) si raggiunge solo
     // adesso: le sezioni costruite qui sopra l'hanno spostata in giù dopo lo scorrimento del browser.
     try {
