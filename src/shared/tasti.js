@@ -234,6 +234,42 @@
       : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
+  // ── La scheda accanto ──────────────────────────────────────────────────────
+  // Ctrl+Tab e Ctrl+Shift+Tab, Ctrl+PagGiù e Ctrl+PagSu: i tasti di ogni browser. È Control anche su Mac (lì
+  // Cmd+Tab è del sistema), quindi Cmd non conta e il nome resta «Ctrl». Torna 1 (la successiva), -1 o 0.
+  const ACCEL_SCHEDA_SUCCESSIVA = 'Ctrl+Tab';
+  const ACCEL_SCHEDA_PRECEDENTE = 'Ctrl+Shift+Tab';
+  const ALTRI_TASTI_SCHEDA_ACCANTO = [['Ctrl+PagGiù', 1], ['Ctrl+PagSu', -1]];
+  function versoSchedaAccanto(ev) {
+    if (!ev || !modificatore(ev, 'ctrl') || modificatore(ev, 'alt') || modificatore(ev, 'meta')) return 0;
+    const code = String(ev.code || '');
+    const key = String(ev.key || '');
+    const shift = modificatore(ev, 'shift');
+    if (code === 'Tab' || key === 'Tab') return shift ? -1 : 1;
+    if (shift) return 0;
+    if (code === 'PageDown' || key === 'PageDown') return 1;
+    if (code === 'PageUp' || key === 'PageUp') return -1;
+    return 0;
+  }
+
+  // L'indice della scheda accanto ad `attuale` fra `quante`, in giro (dopo l'ultima la prima), o null se il tasto non
+  // è questo. Un'attuale che non si trova vale «prima della prima».
+  function indiceSchedaAccanto(ev, attuale, quante) {
+    const verso = versoSchedaAccanto(ev);
+    const n = Math.floor(Number(quante));
+    if (!verso || !(n > 0)) return null;
+    const da = Number.isInteger(attuale) && attuale >= 0 && attuale < n ? attuale : (verso > 0 ? -1 : 0);
+    return (da + verso + n) % n;
+  }
+
+  function etichettaSchedaSuccessiva() { return ACCEL_SCHEDA_SUCCESSIVA; }
+  function etichettaSchedaPrecedente() { return ACCEL_SCHEDA_PRECEDENTE; }
+  // Tutti i nomi di un verso, per chi li elenca: «Ctrl+Tab, Ctrl+PagGiù».
+  function etichetteSchedaAccanto(verso) {
+    const prima = verso < 0 ? ACCEL_SCHEDA_PRECEDENTE : ACCEL_SCHEDA_SUCCESSIVA;
+    return [prima, ...ALTRI_TASTI_SCHEDA_ACCANTO.filter(([, v]) => v === (verso < 0 ? -1 : 1)).map(([a]) => a)].join(', ');
+  }
+
   // ── Indietro e avanti ──────────────────────────────────────────────────────
   // Chi arriva da un browser qualunque prova Alt+freccia e i due tasti laterali
   // del mouse. Nome e comportamento stanno qui insieme per lo stesso motivo del
