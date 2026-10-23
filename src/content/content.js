@@ -2429,6 +2429,8 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
+  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale.
+  Sidebar?.suChiusura?.(() => (IS_SUBFRAME || motivoBlocco() ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
   // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
