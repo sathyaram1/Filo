@@ -107,7 +107,7 @@
     const riparte = new Date(prossimoGiornoMs(oraMs)).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     const prenotato = spesa.prenotatoUsd > 0 ? `, più ${usd(spesa.prenotatoUsd)} prenotati per i giudizi in corso` : '';
     const dettaglio = pieno
-      ? `Tetto raggiunto: i nuovi feedback dei non fidati aspettano te fino alle ${riparte}.`
+      ? `Tetto raggiunto. I nuovi feedback dei non fidati aspettano te fino alle ${riparte}.`
       : `Il contatore riparte da zero alle ${riparte}.`;
     return {
       testo: `Oggi: ${usd(spesa.spesoUsd)} su ${usd(tetto)}${prenotato}`,
