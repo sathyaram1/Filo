@@ -194,7 +194,7 @@
     }
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } }); } catch (_) {}
-    for (const name of inViaggio) if (tokenInViaggio.get(name) === giro) tokenInViaggio.delete(name);
+    for (const name of spediti) if (tokenInViaggio.get(name) === giro) tokenInViaggio.delete(name);
     if (r && r.ok && r.settings) riallineaToken(r.settings.themeTokens);
     if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
   }
