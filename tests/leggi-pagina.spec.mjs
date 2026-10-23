@@ -460,6 +460,7 @@ test('una scheda aperta che non risponde in tempo lo dice al modello, con la cop
     { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
     { finale: { cerca: '(scaricarla a parte non è riuscito)', testo: 'RISPOSTA BIS: $1.' } },
   ]);
+  await occupa();
   await chiedi(page, 'riprova a leggerla');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA BIS: scaricarla a parte non è riuscito.' })).toBeVisible({ timeout: 30_000 });
   const niente = esitiDi((await chiamate(app))[1]).at(-1);
