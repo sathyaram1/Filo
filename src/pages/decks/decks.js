@@ -2191,6 +2191,7 @@
     document.addEventListener('mouseover', (e) => {
       const id = hoverCardId(e.target);
       if (id) hoverEnter(id);
+      else if (detailState === 'preview' && e.target.closest && e.target.closest('#statePreview')) holdPreview();
       else hoverLeave();
     });
 
