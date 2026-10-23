@@ -1146,14 +1146,27 @@
     try {
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      const ok = rawText != null && applyGeneratedSummary(id, rawText);
+      if (rawText == null) { if (manuale) avvisoNonGenerato('il riassunto', r); return false; }
+      const ok = applyGeneratedSummary(id, rawText);
       if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
       if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
       return ok;
-    } catch (_) {
-      if (manuale) showEditorToast('Non sono riuscito a generare il riassunto.');
+    } catch (e) {
+      if (manuale) avvisoNonGenerato('il riassunto', { error: e && e.message, code: e && e.code });
       return false;
     }
+  }
+
+  // Titolo o riassunto chiesti a mano che non arrivano: il perché, come nelle chat, e il tasto per la pagina dove si
+  // toglie l'ostacolo (Crediti, Opzioni). «Non sono riuscito» da solo lasciava senza motivo e senza strada (#1344.1).
+  function avvisoNonGenerato(cosa, r) {
+    const CE = window.SN_CHAT_ERRORS;
+    const frase = CE ? CE.sentence(CE.fromResponse(r, '')) : '';
+    const pagina = CE?.rimedioPagina?.(r) || null;
+    const via = pagina
+      ? { label: pagina.label, title: pagina.title, onClick: () => sendMessage({ type: MSG.OPEN_URL, url: pagina.url }) }
+      : undefined;
+    showEditorToast(`Non sono riuscito a generare ${cosa}.${frase ? ` ${frase}` : ''}`, via);
   }
 
   // Il debounce evita chiamate a ogni battitura, la firma evita rigenerazioni quando il contenuto
