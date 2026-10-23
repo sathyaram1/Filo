@@ -298,3 +298,77 @@ test('i vecchi moduli: il conteggio dei caratteri e la scorciatoia passano allo 
   const salvato = await app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('sn_pannelli_app', null)));
   expect(salvato.editor.config['word-count']).toMatchObject({ count: 'chars', shortcut: 'Ctrl+Shift+7' });
 });
+
+test('bloccato, con l\'Aiuto aperto accanto il foglio si stringe fino al pannello e il testo non finisce sotto', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+  await ed.evaluate(() => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = Array.from({ length: 12 }, () => '<p>Una riga di testo abbastanza lunga da arrivare fino al bordo destro della colonna centrale del foglio, e anche oltre.</p>').join('');
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await ed.evaluate(() => document.querySelector('.pd-striscia').click());
+  await ed.click('.pd-lucchetto');
+  await expect.poll(() => ed.evaluate(() => document.documentElement.classList.contains('pd-bloccato'))).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.barra.esegui('help'));
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  const misure = () => ed.evaluate(() => ({
+    testo: document.getElementById('doc').getBoundingClientRect().right,
+    pannello: document.querySelector('.pd-pannello').getBoundingClientRect().left,
+    pannelloDestra: document.querySelector('.pd-pannello').getBoundingClientRect().right,
+    aiuto: document.querySelector('.sn-sidebar').getBoundingClientRect().left,
+  }));
+  await expect.poll(async () => { const m = await misure(); return m.testo <= m.pannello && m.pannelloDestra <= m.aiuto + 1; }).toBe(true);
+  mkdirSync(SHOTS, { recursive: true });
+  await ed.screenshot({ path: `${SHOTS}/pannello-destro-bloccato-con-aiuto.png` });
+  // Chiuso l'Aiuto, il foglio torna largo quanto basta al solo pannello.
+  const conAiuto = await misure();
+  await ed.locator('.sn-sidebar-close').click();
+  await expect(ed.locator('.sn-sidebar')).toHaveCount(0);
+  await expect.poll(() => ed.evaluate(() => document.documentElement.classList.contains('pd-accanto'))).toBe(false);
+  const senza = await ed.evaluate(() => ({
+    testo: document.getElementById('doc').getBoundingClientRect().right,
+    pannello: document.querySelector('.pd-pannello').getBoundingClientRect().left,
+  }));
+  expect(senza.pannello).toBeGreaterThan(conAiuto.pannello);
+  expect(senza.testo).toBeGreaterThan(conAiuto.testo);
+  expect(senza.testo).toBeLessThanOrEqual(senza.pannello);
+});
+
+test('la scorciatoia data a un vecchio modulo fuori dalla partenza continua a funzionare: lo strumento entra nel pannello', async ({ app, openTab }) => {
+  const ed0 = await openTab(EDITOR);
+  await ed0.waitForSelector('#doc');
+  await ed0.evaluate(() => {
+    localStorage.setItem('filo.editor.collection', JSON.stringify({
+      version: 2, activeId: 'f1',
+      files: [{
+        id: 'f1', meta: { title: 'Vecchio', created: '2026-01-01T00:00:00Z', modified: '2026-01-02T00:00:00Z', version: 1, grid: { cols: 7, rows: 10 } },
+        content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ciao mondo' }] }] },
+        comments: [],
+        modules: [{ id: 'm2', type: 'bold', cells: [{ x: 1, y: 0, z: 0 }], data: { shortcut: 'Ctrl+G' } }],
+      }],
+    }));
+  });
+  await ed0.reload();
+  await ed0.waitForSelector('.pd-elemento[data-elemento="word-count"]', { state: 'attached' });
+  await expect.poll(() => elementi(ed0)).toEqual(['word-count', 'search-replace', 'comment', 'bold']);
+  await ed0.click('#doc');
+  await ed0.keyboard.press('Control+KeyA');
+  await ed0.keyboard.press('Control+KeyG');
+  await expect(ed0.locator('#doc b, #doc strong').first()).toContainText('ciao');
+  const salvato = await app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('sn_pannelli_app', null)));
+  expect(salvato.editor.elementi).toContain('bold');
+});
+
+test('a parole: Filo apre l\'Aiuto sull\'Editor, ed è la chat del documento', async ({ app, openTab }) => {
+  const ed = await apriEditor(openTab);
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1');
+  const r = await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'COMANDO_FINESTRA', comando: 'aiuto' }));
+  expect(r.executed).toBe(true);
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+  await expect(ed.locator('.sn-sidebar-input textarea')).toHaveAttribute('placeholder', 'Chiedi al documento…');
+  // Chiesto di nuovo, resta aperto: «apri» non chiude.
+  await app.evaluate((_e) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'COMANDO_FINESTRA', comando: 'aiuto' }));
+  await ed.waitForTimeout(300);
+  await expect(ed.locator('.sn-sidebar')).toBeVisible();
+});
