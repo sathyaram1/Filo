@@ -20,9 +20,7 @@ contextBridge.exposeInMainWorld('barra', {
   sistema: manda('barra:sistema'),
   menu: manda('barra:menu'),
   suggerimento: manda('barra:suggerimento'),
-  misure: manda('barra:misure'),
   posa: manda('barra:posa'),
-  trascinaFuori: manda('barra:trascina-fuori'),
   // I gesti caduti nel vuoto della vista (ombra, fasce sopra e sotto il pannello): li rigira il main alla scheda.
   inoltra: manda('barra:inoltra'),
   onCursore: (fn) => {

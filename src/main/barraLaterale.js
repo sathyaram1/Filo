@@ -6,6 +6,7 @@ const path = require('node:path');
 const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
+const Registro = require('./services/registroCambi');
 const RedteamGate = require('./services/redteamGate');
 const AzioniContate = require('./services/azioniContate');
 const { tastoPremuto } = require('./tastoDelMouse');
@@ -26,8 +27,6 @@ const SONDA_MS = 50;
 const SONDA_LONTANO_MS = 150;
 // Dopo un ridimensionamento o uno spostamento della finestra il bordo non spinge: era il sistema al lavoro.
 const QUIETE_MS = 600;
-// Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
-const DOPO_POSA_MS = 900;
 // Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
 const PAGINE_NEL_MENU = 15;
 
@@ -38,7 +37,6 @@ const PAGINE_FISSE = {
   history: 'filo://quaderno/quaderno.html',
   redteam: 'filo://redteam/redteam.html',
 };
-const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
@@ -69,11 +67,8 @@ class BarraLaterale {
     this.layout = null;
     this.tema = {};
     this.account = null;
-    this.misure = [];
-    this.mira = null;
-    this.trascinamento = null;
     this.suggerimento = false;
-    this.timer = { uscita: null, stringi: null, fine: null, trascina: null, sonda: null };
+    this.timer = { uscita: null, stringi: null, fine: null, sonda: null };
     this.ultimoNav = '';
     this.opzioni = opzioniDi(null);
     this.bordo = false;
@@ -122,7 +117,7 @@ class BarraLaterale {
 
   // ── apertura e chiusura ──────────────────────────────────────────────────
 
-  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat' | 'trascina'. Da tastiera la barra prende il fuoco.
+  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat'. Da tastiera la barra prende il fuoco.
   apri(motivo = 'clic') {
     RedteamGate.aggiorna();
     this._ferma('stringi');
@@ -152,7 +147,6 @@ class BarraLaterale {
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
-    this.mira = null;
     this._nascondiSuggerimento();
     this._invia();
     this._ferma('stringi');
@@ -222,15 +216,6 @@ class BarraLaterale {
       if (input.type === 'mouseLeave') this._guarda();
       else if (input.type === 'mouseMove') this._forseBordo();
     }
-    // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più
-    // «fine» (ha navigato, è caduta), la barra non resta ferma ad aspettarla.
-    if (this.trascinamento) {
-      if (input.type === 'mouseUp') {
-        this._ferma('trascina');
-        this.timer.trascina = setTimeout(() => { this.timer.trascina = null; this._fineTrascinamento(); }, 500);
-      }
-      return;
-    }
     if (!this.aperta) return;
     if (input.type === 'mouseDown' && (input.button || 'left') === 'left') { this.chiudi(); return; }
     if (input.type !== 'mouseMove') return;
@@ -241,10 +226,10 @@ class BarraLaterale {
   }
 
   _programmaUscita() {
-    if (this.timer.uscita || this.trascinamento) return;
+    if (this.timer.uscita) return;
     this.timer.uscita = setTimeout(() => {
       this.timer.uscita = null;
-      if (!this.dentro && !this.trascinamento) this.chiudi();
+      if (!this.dentro) this.chiudi();
     }, this.opzioni.uscitaMs);
   }
 
@@ -287,7 +272,7 @@ class BarraLaterale {
       const quiete = Date.now() < this.quieteFino;
       // Finito un ridimensionamento dal bordo il puntatore è ancora lì: conta solo quando si muove di nuovo.
       if (quiete && punto) this.puntoFermo = punto;
-      const fermo = !!this.trascinamento || this.tasti.scheda || this.tasti.shell || quiete;
+      const fermo = this.tasti.scheda || this.tasti.shell || quiete;
       if (dove === 'bordo' && !fermo && this._mosso(punto)) {
         if (!this.bordoDal) this.bordoDal = Date.now();
         this._segnaBordo(true);
@@ -433,7 +418,8 @@ class BarraLaterale {
   disposizione(layout) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     if (!D || !D.valida(layout)) return;
-    this.layout = { primary: [...layout.primary], secondary: [...layout.secondary], bar: [...(layout.bar || [])] };
+    const l = D.migra(layout).layout;
+    this.layout = { bar: l.bar, secondary: l.secondary };
     this._invia();
   }
 
@@ -480,6 +466,11 @@ class BarraLaterale {
     return this.tabs.tabs.find((t) => t.id === this.tabs.activeId) || null;
   }
 
+  // Le icone che la barra mostra: quelle in vista e quelle di «Altro…».
+  _inBarra() {
+    return this.layout ? [...this.layout.bar, ...this.layout.secondary] : [];
+  }
+
   // Tema e profilo li tiene la shell, come per gli avvisi: qui arrivano già calcolati.
   dallaShell(dati) {
     const vars = {};
@@ -507,10 +498,11 @@ class BarraLaterale {
     const owner = this._owner();
     const dallaPagina = this._etichetteAttive();
     const out = [];
-    for (const id of this.layout.bar) {
+    const zone = [...this.layout.bar.map((id) => [id, false]), ...this.layout.secondary.map((id) => [id, true])];
+    for (const [id, riserva] of zone) {
       const d = D.ICONE[id];
       if (!d || (d.soloOwner && !owner)) continue;
-      if (d.tipo === 'aiuto') { out.push(this._iconaAiuto(id, nav.aiuto)); continue; }
+      if (d.tipo === 'aiuto') { out.push({ ...this._iconaAiuto(id, nav.aiuto), riserva }); continue; }
       let icona = d.icona;
       let chiave = d.etichetta;
       if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
@@ -520,7 +512,7 @@ class BarraLaterale {
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
         || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
       const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
+      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', riserva });
     }
     return out;
   }
@@ -552,7 +544,7 @@ class BarraLaterale {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const t = this._attiva();
     if (!D || !t || !this.layout) return;
-    const ids = this.layout.bar.filter((id) => D.ICONE[id] && D.ICONE[id].tipo === 'pagina');
+    const ids = this._inBarra().filter((id) => D.ICONE[id] && D.ICONE[id].tipo === 'pagina');
     if (!ids.length) return;
     const tipo = globalThis.SN_MSG?.MSG?.BARRA_ETICHETTE_CHIEDI || 'barra_etichette_chiedi';
     try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, ids }); } catch (_) {}
@@ -569,7 +561,7 @@ class BarraLaterale {
     for (const v of (Array.isArray(voci) ? voci : []).slice(0, 50)) {
       const id = testo(v && v.id);
       const d = D.noto(id) ? D.ICONE[id] : null;
-      if (!d || d.tipo !== 'pagina' || !this.layout.bar.includes(id)) continue;
+      if (!d || d.tipo !== 'pagina' || !this._inBarra().includes(id)) continue;
       const ammesse = ICONE_DELLA_PAGINA[id];
       const icona = ammesse && ammesse.has(testo(v.icona)) ? testo(v.icona) : d.icona;
       mappa[id] = { etichetta: testo(v.etichetta).slice(0, 200), icona };
@@ -589,8 +581,6 @@ class BarraLaterale {
       redteam: RedteamGate.visibile(),
       account: this.account,
       tema: this.tema,
-      mira: this.mira,
-      trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
       // Una risposta di Filo da leggere nella scheda davanti (#1432).
@@ -610,7 +600,7 @@ class BarraLaterale {
   esegui(id) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
-    if (!d || !this.layout || !this.layout.bar.includes(id)) return;
+    if (!d || !this.layout || !this._inBarra().includes(id)) return;
     if (d.soloOwner && !this._owner()) return;
     this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
     const tabs = this.tabs;
@@ -685,7 +675,7 @@ class BarraLaterale {
     try { this.win.webContents.send('shell:trigger-button', { command: comando, anchor }); } catch (_) {}
   }
 
-  // Tasto destro su un'icona della barra: la sua azione, e la strada per rimetterla nel menu.
+  // Tasto destro su un'icona della barra: la sua azione, e la strada fra la barra e il suo «Altro…».
   _menu(dati) {
     if (!this.vista || !this.win || this.win.isDestroyed()) return;
     const d = dati && typeof dati === 'object' ? dati : {};
@@ -717,10 +707,11 @@ class BarraLaterale {
       if (pagine.length) voci.push({ type: 'separator' });
       else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
       else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
-      voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
+      voci.push(icona.riserva ? { label: 'Porta fra le icone in vista', action: 'barra:in-vista' } : { label: 'Sposta in «Altro…»', action: 'barra:in-altro' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);
-        else if (a === 'barra:al-menu') Layout.posa({ id, target: 'secondary', beforeId: null }, { incognito: this._incognito() }).catch(() => {});
+        else if (a === 'barra:in-altro') this._posa({ id, target: 'secondary', beforeId: null });
+        else if (a === 'barra:in-vista') this._posa({ id, target: 'bar', beforeId: null });
         else if (a.startsWith('barra:voce:') && scheda) {
           this.tabs.vaiAllaVoce(scheda.id, Number(a.slice('barra:voce:'.length)));
           if (this.motivo === 'tasto') this.chiudi();
@@ -842,101 +833,10 @@ class BarraLaterale {
 
   // ── trascinamenti ────────────────────────────────────────────────────────
 
-  // Da una scheda: il menu del tasto destro trascina un'icona verso la barra. La scheda ha il
-  // puntatore per tutto il trascinamento, quindi le coordinate arrivano da lei (px della pagina).
-  // `zoom`: dallo strato del menu sopra la scheda (#1054) i px sono già della vista, non della pagina.
-  dallaScheda(msg, tabId, { zoom: zoomDato = null } = {}) {
-    const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const fase = testo(msg.fase);
-    const attiva = this._attiva();
-    if (!attiva || attiva.id !== tabId) return { ok: false };
-    let zoom = 1;
-    try { zoom = zoomDato || attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
-    const yLocale = (y) => {
-      const tb = attiva.view.getBounds();
-      const vb = this.vista ? this.vista.getBounds() : { y: tb.y };
-      return Math.round(tb.y + Number(y || 0) * zoom - vb.y);
-    };
-    if (fase === 'inizio') {
-      const id = testo(msg.id);
-      if (!D || !D.noto(id)) return { ok: false };
-      this._ferma('fine');
-      const piena = Math.ceil((PANNELLO + 8) / zoom);
-      const sinistra = msg.menuSinistra == null ? NaN : Number(msg.menuSinistra);
-      // Il menu sta dove si aprirebbe la barra: aperta subito coprirebbe i posti in cui si riordina. Si apre
-      // quando il puntatore va al bordo, a sinistra del menu, e si richiude se ci torna sopra.
-      const rimandata = !this.aperta && Number.isFinite(sinistra) && sinistra < piena;
-      this.trascinamento = { id, tabId, rimandata };
-      if (!rimandata && !this.aperta) this.apri('trascina');
-      else this._invia();
-      const stretta = Math.max(Math.ceil(12 / zoom), Math.floor(sinistra) - 4);
-      return { ok: true, larghezza: rimandata ? Math.min(piena, stretta) : piena };
-    }
-    if (!this.trascinamento || this.trascinamento.tabId !== tabId) return { ok: false };
-    if (fase === 'sopra') {
-      if (this.trascinamento.rimandata) {
-        if (msg.y != null && !this.aperta) this.apri('trascina');
-        else if (msg.y == null && this.aperta && this.motivo === 'trascina') this.chiudi();
-      }
-      this.mira = msg.y == null ? null : { y: yLocale(msg.y) };
-      this._invia();
-      return { ok: true };
-    }
-    if (fase === 'posa') {
-      const id = this.trascinamento.id;
-      const beforeId = this._primaDi(yLocale(msg.y), id);
-      this.mira = null;
-      this.trascinamento.posata = true;
-      Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
-      return { ok: true };
-    }
-    if (fase === 'fine') {
-      this._fineTrascinamento();
-      return { ok: true };
-    }
-    return { ok: false };
-  }
-
-  _fineTrascinamento() {
-    this._ferma('trascina');
-    if (!this.trascinamento) return;
-    const posata = !!this.trascinamento.posata;
-    this.trascinamento = null;
-    this.mira = null;
-    this._invia();
-    if (this.motivo === 'trascina' && !this.dentro) {
-      this._ferma('fine');
-      this.timer.fine = setTimeout(() => { this.timer.fine = null; if (!this.dentro) this.chiudi(); }, posata ? DOPO_POSA_MS : 0);
-    }
-  }
-
-  // L'icona davanti alla quale posare, dalle misure che la barra ha mandato (px della vista).
-  _primaDi(y, escluso) {
-    for (const m of this.misure) {
-      if (m.id === escluso) continue;
-      if (y < (m.alto + m.basso) / 2) return m.id;
-    }
-    return null;
-  }
-
-  // Dalla barra: un'icona trascinata fuori dal pannello, sopra la pagina. La barra ha il puntatore
-  // per tutto il gesto, e la scheda davanti ne riceve le coordinate per il suo menu aperto.
-  _fuori(dati) {
-    const fase = testo(dati && dati.fase);
-    const id = testo(dati && dati.id);
-    const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const attiva = this._attiva();
-    if (!FASI_FUORI.has(fase) || !D || !D.noto(id) || !attiva || !this.vista) return;
-    let zoom = 1;
-    try { zoom = attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
-    const vb = this.vista.getBounds();
-    const tb = attiva.view.getBounds();
-    const x = (vb.x + numero(dati.x) - tb.x) / zoom;
-    const y = (vb.y + numero(dati.y) - tb.y) / zoom;
-    const tipo = globalThis.SN_MSG?.MSG?.BARRA_FUORI || 'barra_fuori';
-    // Col menu nello strato (#1054) la posa è una voce dello strato: vale per il gesto fatto qui.
-    try { this.tabs.strato?.gestoDallaBarra?.(); } catch (_) {}
-    try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, fase, id, x, y }); } catch (_) {}
+  // Un gesto della persona nella barra: diventa un cambio del filo «dalla barra laterale» (#867.1).
+  _posa(drop) {
+    const scrivi = () => Registro.con({ via: 'interfaccia', dove: 'barra' }, () => Layout.posa(drop, { incognito: this._incognito() }));
+    Promise.resolve().then(scrivi).catch(() => {});
   }
 
   // ── la vista ─────────────────────────────────────────────────────────────
@@ -963,20 +863,15 @@ class BarraLaterale {
       case 'barra:sistema': this.sistema(testo(d.comando), d); break;
       case 'barra:menu': this._menu(d); break;
       case 'barra:suggerimento': this._mostraSuggerimento(d); break;
-      case 'barra:misure':
-        this.misure = (Array.isArray(d.icone) ? d.icone : []).slice(0, 200)
-          .map((m) => ({ id: testo(m && m.id), alto: numero(m && m.alto), basso: numero(m && m.basso) }))
-          .filter((m) => m.id);
-        break;
       case 'barra:posa': {
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = testo(d.id);
-        if (!D || !D.noto(id)) break;
-        const beforeId = d.beforeId ? testo(d.beforeId) : null;
-        Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
+        const target = testo(d.target) || 'bar';
+        if (!D || !D.noto(id) || !D.ZONE.includes(target)) break;
+        const beforeId = d.beforeId && D.noto(testo(d.beforeId)) ? testo(d.beforeId) : null;
+        this._posa({ id, target, beforeId });
         break;
       }
-      case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;
