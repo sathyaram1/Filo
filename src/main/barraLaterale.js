@@ -471,6 +471,21 @@ class BarraLaterale {
     return { pannello: a.pannello, voce: a.voce, risposta: RisposteInAttesa.inAttesa(t, 'aiuto') };
   }
 
+  // La stessa notizia dell'Aiuto: Filo spento sul sito, o nessun Filo dentro la pagina (il visore PDF). Su una pagina
+  // ancora in arrivo le azioni restano accese, e il clic aspetta che Filo ci sia (_consegnaInAttesa).
+  _azioniFerme(t) {
+    if (!t) return 'pagina';
+    const a = t.aiuto;
+    if (!a) return t.loading ? '' : 'pagina';
+    return a.spento === 'sito' || a.spento === 'pagina' ? a.spento : '';
+  }
+
+  // Perché l'azione `id` sulla pagina non può partire adesso ('' se può): la regola unica per l'icona e per il clic.
+  _motivoAzione(id, nav) {
+    if (nav.azioniFerme) return nav.azioniFerme;
+    return nav.interna && AZIONI_CON_INDIRIZZO.has(id) ? 'interna' : '';
+  }
+
   _attiva() {
     return this.tabs.tabs.find((t) => t.id === this.tabs.activeId) || null;
   }
