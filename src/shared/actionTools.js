@@ -617,7 +617,7 @@
     },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra; le schede si chiudono con CHIUDI_SCHEDE. Esegue subito.',
-      properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (solo aprire il menu Account: per entrare, collegare Google o uscire c\'è ACCOUNT), sidebar (apri la barra laterale).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar'] }) },
+      properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (solo aprire il menu Account: per entrare, collegare Google o uscire c\'è ACCOUNT), sidebar (apri la barra laterale), aiuto (apri l\'Aiuto sulla scheda davanti: nell\'Editor è la chat del documento).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account', 'sidebar', 'aiuto'] }) },
       required: ['comando'],
     },
     ACCOUNT: {
