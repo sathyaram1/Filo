@@ -103,7 +103,7 @@ module.exports = function register(on, ctx) {
         deck, cards, cardIds: ids, mode: msg?.refresh ? 'force' : 'missing', handleAIRequest,
       });
       const mancanti = {};
-      for (const id of ids) if (!r.opinions[id]) mancanti[id] = cards[id] ? SENZA_PARERE : SENZA_DATI;
+      for (const id of ids) if (!r.opinions[id]) mancanti[id] = cards[id] ? senzaParere() : SENZA_DATI;
       return { ok: true, opinions: r.opinions, ...(Object.keys(mancanti).length ? { mancanti } : {}) };
     } catch (e) {
       // La frase per chi legge, e quello che serve alla pagina per il tasto della pagina dove si rimedia (#663).
