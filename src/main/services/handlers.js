@@ -6467,6 +6467,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         threadMessages.push(Tools.toolMessage(x.action._callId, `${toolResultText(x, giro)}${coda}`));
         const o = x.res && x.res.output;
         if (o && o.chatRead && o.found && typeof o.transcript === 'string') riletture.push({ x, i: threadMessages.length - 1, giro, coda });
+        if (o && 'pageRead' in o && o.ok && o.testo && String(x.action.type || '').toUpperCase() === 'LEGGI_PAGINA') {
+          pagineLette.push({ x, i: threadMessages.length - 1, giro, coda, round, ordine: i });
+        }
       });
       if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
     }
