@@ -1,6 +1,6 @@
 // Handler di dominio della barra laterale (#871) e del pannello di destra delle app (#1433). Quelli della barra sono
 // aperti ai content script dei siti (non leggono dati); quelli del pannello solo alle pagine di Filo.
-// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md, patterns/a-sinistra-filo-a-destra-l-app.md
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const Layout = require('../layoutIcone');
 const RisposteInAttesa = require('../../risposteInAttesa');

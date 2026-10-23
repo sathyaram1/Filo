@@ -1,6 +1,6 @@
 // Il pannello di destra delle app di Filo, come dati: cosa può starci per ogni app, cosa c'è di partenza e le mosse
 // (posa, togli, configura, migrazione dai moduli della vecchia griglia). Logica pura: la pagina disegna, il main
-// conserva. Regole: patterns/a-sinistra-filo-a-destra-l-app.md.
+// conserva. Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md.
 
 (function (global) {
   'use strict';
