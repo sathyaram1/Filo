@@ -701,14 +701,12 @@
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
         statusPublic: toFsValue('open'),
-        createdAt: { timestampValue: nowIso },
-        // L'ORA DELL'ULTIMA SCRITTURA, scritta da chi scrive. È il campo su cui
-        // la dashboard chiede «cosa è cambiato da allora?»: un feedback che non
-        // ce l'ha non compare più in quella domanda, quindi OGNI cammino che
-        // tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
-        updatedAt: { timestampValue: nowIso },
       },
     };
+    // `createdAt` e `updatedAt` li mette Firestore all'ora della richiesta (REQUEST_TIME), come le regole chiedono
+    // alla create anonima (#1517). `updatedAt` è il campo su cui la dashboard chiede «cosa è cambiato da allora?»:
+    // OGNI cammino che tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
+    let dateDelServer = ['createdAt', 'updatedAt'];
     if (seq) {
       doc.fields.seq = { integerValue: String(seq) };
       doc.fields.subSeq = { integerValue: '0' };
