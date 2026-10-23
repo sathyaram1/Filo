@@ -56,6 +56,15 @@ function contaSe(metodo, ...args) {
     return C && typeof C[metodo] === 'function' ? C[metodo](...args) : undefined;
   } catch (_) { return undefined; }
 }
+// Una scheda chiusa che la chat riapre col suo indirizzo si conta come quella riaperta dalla home (#1467).
+async function contaSeRiaperta(url, win) {
+  if (!url || !win || win._filoIncognito) return;
+  try {
+    const voci = (await ArchivedTabs.list()).filter((t) => t && t.url === url && !t.urlTagliato);
+    const voce = voci.sort((a, b) => (Date.parse(b.closedAt) || 0) - (Date.parse(a.closedAt) || 0))[0];
+    if (voce) contaSe('riaperta', voce, { incognito: false });
+  } catch (_) {}
+}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
