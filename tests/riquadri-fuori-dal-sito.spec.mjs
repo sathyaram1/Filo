@@ -3,7 +3,7 @@
 // nello strato sopra la scheda. Regola: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo, statoDi, scrivi, clicca, conta, paginaDelloStrato } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'zibaldone-segreto-1509 del mio conto';
@@ -118,6 +118,6 @@ test('la risposta su un sito: sotto la parola, la domanda non la legge il sito, 
   await strato.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
   await expect.poll(() => p.evaluate(() => window.__clic)).toBe(1);
   await expect.poll(() => conta(app, p, '.sn-popup')).toBe(1);
-  await p.keyboard.press('Escape');
+  await tastoSullaScheda(app, p, 'Escape');
   await expect.poll(() => conta(app, p, '.sn-popup')).toBe(0);
 });
