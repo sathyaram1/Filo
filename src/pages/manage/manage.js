@@ -5342,6 +5342,10 @@
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
         toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        if (m.giroNuovo) {
+          esitiSalta.set(fb._id, { m, firma: firmaSalta(fb) });
+          ridisegnaPannelloAperto();
+        }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
         setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
