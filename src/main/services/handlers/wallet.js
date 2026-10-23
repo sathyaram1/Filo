@@ -798,9 +798,13 @@ module.exports = function register(on, ctx) {
   const queue = [];
   const QUEUE_CAP = 2000;
   const QUEUE_KEY = 'walletUsageQueue';
+  // Il conto delle righe scartate sta su disco: lo scarto avviene di solito appena dopo l'avvio, e chi apre Crediti
+  // dopo un riavvio deve trovarlo ancora (#1601).
+  const SCARTI_KEY = 'walletUsageLog';
   let flushTimer = null;
   let flushing = false;
-  let queueLoaded = false;
+  let caricamentoCoda = null;
+  let scartiLetti = false;
   // Cresce a ogni «Ricomincia»: un invio partito prima non rimette in coda le righe dell'identità di prima.
   let generazioneCoda = 0;
   const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null, discardedBy: {}, lastDiscardReason: '', lastDiscardAt: null };
