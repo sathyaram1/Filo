@@ -162,7 +162,8 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
   }
   assert.equal(ses.controllo(wc, 'idle-detection', 'https://video.example', {}), false, 'chi sa che sei al computer lo sa solo col sì');
   for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb', 'captured-surface-control', 'smart-card', 'nfc', 'ar', 'vr',
-    'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync', 'system-wake-lock']) {
+    'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync', 'system-wake-lock',
+    'speaker-selection', 'local-fonts']) {
     assert.deepEqual(chiedi(ses, wc, p), [false], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
   }
