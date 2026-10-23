@@ -115,7 +115,7 @@ test('sito con un campo per caricare file, senza codice suo: il file entra nel c
   expect(await statoAiuto(app, page)).toMatchObject({ aperto: false, allegati: [] });
 });
 
-test('sito: più immagini entrano tutte nell’Aiuto, oltre i 4 MB lo dice, e un rilascio finto della pagina non entra', async ({ app, openTab, testServer }) => {
+test('sito: più immagini entrano tutte nell’Aiuto, oltre i 4 MB rimpicciolita, e un rilascio finto della pagina non entra', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   // Il rilascio che la pagina si fabbrica da sé non arriva all'Aiuto.
   await page.evaluate((b64) => {
@@ -131,8 +131,55 @@ test('sito: più immagini entrano tutte nell’Aiuto, oltre i 4 MB lo dice, e un
   const [grande] = immaginiSulDisco(1, { byte: PNG_GRANDE, nome: () => 'grande.png' });
   await lascia(page, [...foto, grande]);
   await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 })
-    .toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }, { nome: 'foto 2.png' }] });
-  await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 5_000 }).toContain('supera i 4 MB');
+    .toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }, { nome: 'foto 2.png' }, { nome: 'grande.png' }] });
+  // Oltre il tetto l'Aiuto la rimpicciolisce finché ci sta (#1623 giro 1): entra, sotto i 4 MB.
+  const [, , ridotta] = (await statoAiuto(app, page)).allegati;
+  expect(ridotta.byte).toBeLessThan(4 * 1024 * 1024 * 4 / 3);
+  expect(await nelMondoDiFilo(app, page, () => document.querySelector('.sn-toast')?.textContent || '')).not.toContain('MB');
+});
+
+test('sito: una foto oltre i 4 MB lasciata sulla fila delle schede entra nell’Aiuto rimpicciolita', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  const [grande] = immaginiSulDisco(1, { byte: PNG_GRANDE, nome: () => 'grande.png' });
+  const box = await shell.locator('.tab').last().boundingBox();
+  await lascia(shell, [grande], { x: box.x + box.width + 260, y: box.y + box.height / 2 });
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome), { timeout: 8_000 }).toEqual(['grande.png']);
+  expect((await statoAiuto(app, page)).allegati[0].byte).toBeLessThan(4 * 1024 * 1024 * 4 / 3);
+});
+
+test('sito: un’immagine lasciata sopra una casella di testo va all’Aiuto; se la casella il rilascio lo vuole, resta suo', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><input id="q" type="search" placeholder="Cerca" style="position:fixed;left:50px;top:50px;width:500px;height:60px">
+    <textarea id="t" style="position:fixed;left:50px;top:200px;width:500px;height:120px"></textarea>
+    <script>
+      window.ricevuti = [];
+      t.addEventListener('drop', (e) => { e.preventDefault(); window.ricevuti.push(...[...e.dataTransfer.files].map((f) => f.name)); });
+    </script></body></html>`);
+  const [foto, altra] = immaginiSulDisco(2);
+  await lascia(page, [foto], { x: 200, y: 80 });
+  await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }] });
+  expect(await page.locator('#q').inputValue()).toBe('');
+  // Una casella che il rilascio lo gestisce al drop (senza dirlo al dragover) se lo tiene: l'Aiuto non cambia.
+  await lascia(page, [altra], { x: 200, y: 260 });
+  await expect.poll(() => page.evaluate(() => window.ricevuti), { timeout: 8_000 }).toEqual(['foto 2.png']);
+  await page.waitForTimeout(300);
+  expect((await statoAiuto(app, page)).allegati.map((a) => a.nome)).toEqual(['foto 1.png']);
+});
+
+test('un file che non è un’immagine, lasciato insieme a una: nell’Aiuto lo dice un avviso, nella home entra col percorso', async ({ app, shell, openTab, testServer }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const casa = await home(app);
+  const [foto] = immaginiSulDisco(1);
+  const [pdf] = immaginiSulDisco(1, { byte: Buffer.from('%PDF-1.4'), nome: () => 'contratto.pdf' });
+  const box = await shell.locator('.tab').first().boundingBox();
+  await lascia(shell, [foto, pdf], { x: box.x + box.width + 120, y: box.y + box.height / 2 });
+  await expect(casa.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
+  await expect(casa.locator('#imgPreviews .dash-file-chip')).toHaveText(/contratto\.pdf/);
+
+  const page = await testServer.openReady(openTab, SITO);
+  await lascia(page, [foto, pdf]);
+  await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }] });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 5_000 }).toContain('non è un’immagine');
 });
 
 // Il modello finto risponde subito e tiene da parte quello che l'Aiuto gli manda.
