@@ -171,6 +171,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
     uso: F.MISURA_FORMA, errori: F.ERRORI_FORMA, azioni: F.MISURA_FORMA, impostazioni: F.IMPOSTAZIONI_FORMA,
     ricerche: F.RICERCA_FORMA, correttore: F.CORRETTORE_FORMA, conferme: F.CONFERME_FORMA, annullati: F.CONTO_FORMA,
     anticipi: F.ANTICIPO_FORMA, chiedi: F.CONTO_FORMA, erroriVisti: F.CONTO_FORMA, intervista: F.INTERVISTA_FORMA,
+    ...F.MODELLI, chiamate: F.CHIAMATE_FORMA,
   };
   for (const [campo, f] of Object.entries(formaApp)) assert.equal(M[campo].valori, unite(f), `forma dei valori di ${campo}`);
   assert.match(GIORNO, new RegExp(`d\\.uso\\.values\\(\\)\\.join\\('#'\\)\\.matches\\('${unite(F.USO_FORMA).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`));
