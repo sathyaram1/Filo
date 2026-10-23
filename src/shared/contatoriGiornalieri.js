@@ -984,6 +984,15 @@
     const [aperte, scelte, posizioni, vuote] = String(s).split(';');
     return { aperte: Number(aperte), scelte: fasceLette(scelte, NOMI_FASCE), posizioni: fasceLette(posizioni, NOMI_POSIZIONI), vuote: Number(vuote) };
   }
+  // Una misura delle chiamate: { modello, resto, n }, col resto com'è nella voce («o1k|stop», «t2|no»).
+  function leggiModelli(campo, s) {
+    if (!MODELLI_RE[campo] || !MODELLI_RE[campo].test(String(s))) return null;
+    return String(s).split(';').map((v) => {
+      const p = v.split('|');
+      return { modello: p[0], resto: p.slice(1, -1).join('|'), n: Number(p[p.length - 1]) };
+    });
+  }
+  function leggiChiamate(s) { return CHIAMATE_RE.test(String(s)) ? fasceLette(s, nomi(FASCE_CHIAMATE)) : null; }
   const somma = (o) => Object.values(o).reduce((a, n) => a + n, 0);
 
   // ── La validazione: la stessa forma che chiedono le regole, e in più i conti che devono tornare ─────────────
