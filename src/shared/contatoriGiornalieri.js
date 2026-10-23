@@ -1308,6 +1308,28 @@
     return { ok: true, motivo: '' };
   }
 
+  function validaAttivita(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    if (!oggetto(doc)) return no('non è un documento');
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_ATTIVITA.length || !CAMPI_ATTIVITA.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== VERSIONE_ATTIVITA) return no('versione');
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    for (const m of MISURE_ATTIVITA) {
+      const mappa = doc[m];
+      if (!oggetto(mappa)) return no(m);
+      const ks = Object.keys(mappa);
+      if (ks.length > TETTO_VOCI_ATTIVITA + 1 || ks.join('#').length > TETTI_CHIAVI_ATTIVITA[m]) return no(`${m}: oltre il tetto`);
+      for (const [k, v] of Object.entries(mappa)) {
+        if (!combinazioneValida(m, k) || !ATTIVITA_RE[m].test(k)) return no(`${m}: chiave ${k}`);
+        if (typeof v !== 'string' || !CONTO_RE.test(v) || Number(v) === 0) return no(`${m} di ${k}`);
+      }
+    }
+    return { ok: true, motivo: '' };
+  }
+
   function validaTesta(doc) {
     if (!PSEUDONIMO_RE.test(String(doc.pseudonimo))) return 'pseudonimo';
     if (!GIORNO_RE.test(String(doc.giorno)) || doc.mese !== meseDi(doc.giorno)) return 'giorno';
