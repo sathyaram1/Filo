@@ -141,8 +141,10 @@
   }
 
   const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
-  // Un'espressione di codice («form.password.value», «process.env.DB_PASSWORD») sta al posto di un valore ma non lo è.
-  const CODICE_SORGENTE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?$/;
+  // Un'espressione di codice («form.password.value», «process.env.DB_PASSWORD», «input(», «getpass.getpass()») sta al
+  // posto di un valore ma non lo è; così il nome di un tipo («password: str», «password: string»).
+  const CODICE_SORGENTE = /^(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?|[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(.*)$/;
+  const NOME_DI_TIPO = /^(?:str|string|int|integer|bool|boolean|number|bytes|any|object|char|varchar|text|unknown|void)(?:\[\])?$/i;
   function formaVicina(pezzo) {
     const v = pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '').replace(/[.,;:!?)»"'”’\]]+$/, '');
     if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || /:\/\/|^www\./i.test(v) || EMAIL.test(v) || CODICE_SORGENTE.test(v)) return '';
