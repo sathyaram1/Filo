@@ -37,13 +37,12 @@
     feedbackApp: { icona: 'feedback', etichetta: 'menu_open_feedback', tipo: 'finestra', soloOwner: true },
   });
 
+  // Le azioni sulla pagina (quelle che stavano nella riga del tasto destro) vengono dopo quelle della finestra.
   const DEFAULT = Object.freeze({
-    primary: Object.freeze(['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
+    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab',
+      'translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
     secondary: Object.freeze(['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']),
-    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
   });
-
-  const MAX_PRIMARY = 6;
 
   // Ritirate dal registro: restando nel salvato farebbero bottoni fantasma.
   const RITIRATE = Object.freeze(['openForLater']);
@@ -59,12 +58,12 @@
   // Fra le aggiunte, quelle che arrivano in cima alla barra invece che in fondo.
   const IN_CIMA = Object.freeze(['help']);
 
-  const copia = (l) => ({ primary: [...l.primary], secondary: [...l.secondary], bar: [...l.bar] });
+  const copia = (l) => ({ bar: [...l.bar], secondary: [...l.secondary] });
   const uguali = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
   const noto = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(ICONE, id);
 
-  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra, la riga del tasto destro, «Altro…».
-  const DOVE = Object.freeze({ barra: 'bar', menu: 'primary', altro: 'secondary' });
+  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra e il suo «Altro…».
+  const DOVE = Object.freeze({ barra: 'bar', altro: 'secondary' });
 
   // Il nome che l'utente legge nel menu, per la chat.
   function nome(id) {
