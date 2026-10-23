@@ -6638,9 +6638,14 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
   if (globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) throw globalThis.SN_CHAT_ERRORS.erroreTagliata(result.finishReason);
   const { provider: usedProvider, model: concreteModel } = result;
 
-  const parsed = extractJson(result.text) || {};
-  const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
-  return { decisions, model: concreteModel, provider: usedProvider };
+  // Una risposta illeggibile è un giudizio mancato, non un «tieni tutto» (#349).
+  const parsed = extractJson(result.text);
+  if (!parsed || !Array.isArray(parsed.decisions)) {
+    const e = new Error(`risposta senza decisioni leggibili: ${String(result.text || '').slice(0, 200)}`);
+    e.code = 'TRIAGE_RISPOSTA_ILLEGGIBILE';
+    throw e;
+  }
+  return { decisions: parsed.decisions, model: concreteModel, provider: usedProvider };
 }
 
 // Quantizza un vettore float in int8 normalizzato (~1 byte per dimensione invece di 4+).
