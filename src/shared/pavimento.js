@@ -294,6 +294,7 @@
     alPostoDelValore(s, out);
     fraseDopo(s, out);
     chiaviDiConfigurazione(s, out);
+    chiaviInChiaro(s, out);
     for (const m of s.matchAll(ACCANTO_FORTE)) {
       // In una cella tutta la cella, anche con gli spazi; dopo i due punti il primo token, che se è una parola
       // qualunque conta solo da solo in coda («Password: hunter»), non in testa a una frase.
