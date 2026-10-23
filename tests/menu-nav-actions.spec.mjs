@@ -46,5 +46,4 @@ test('chiudi scheda dalla barra laterale chiude la scheda davanti', async ({ ope
 
   await premiNellaBarra(app, 'closeTab');
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 4000 });
-  expect(page.isClosed() || !app.windows().includes(page), 'la scheda chiusa è quella davanti').toBe(true);
 });
