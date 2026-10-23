@@ -466,6 +466,37 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       r.readAsDataURL(f);
     } catch (_) { ok(null); }
   });
+  const byteDi = (dataUrl) => Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
+  const blobDa = (dataUrl) => {
+    const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u]);
+  };
+  // Oltre il tetto l'immagine si rimpicciolisce finché ci sta: il modello la ridurrebbe comunque, e così entra.
+  async function rimpicciolita(blob) {
+    let bmp = null;
+    try { bmp = await createImageBitmap(blob); } catch (_) { return null; }
+    try {
+      for (let lato = Allegati.latoRimpicciolita; lato >= 256; lato = Math.floor(lato * 0.7)) {
+        const k = Math.min(1, lato / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bmp.width * k));
+        c.height = Math.max(1, Math.round(bmp.height * k));
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(bmp, 0, 0, c.width, c.height);
+        const url = c.toDataURL('image/jpeg', 0.85);
+        if (/^data:image\/jpeg;base64,/.test(url) && byteDi(url) <= Allegati.tettoImmagineByte) return url;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      try { bmp.close(); } catch (_) {}
+    }
+  }
 
   // Il pannello pronto a ricevere: false dove Filo è spento, null con l'Aiuto spento (e lo si dice).
   function pannelloPerAllegati() {
