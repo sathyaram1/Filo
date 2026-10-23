@@ -4024,6 +4024,26 @@ function segnaPagina(tab, url) {
   tab.paginaDal = new Date().toISOString();
 }
 
+// Una pulizia senza giudizio che Filo sa spiegare da sé: la frase va all'utente così com'è.
+function erroreDiPulizia(frase) {
+  const e = new Error(frase);
+  e.userMessage = frase;
+  return e;
+}
+
+// Il testo della pagina per il giudizio, o '' se la pagina non risponde entro il tetto.
+function leggiEstratto(tab) {
+  let tetto = null;
+  const lettura = Promise.resolve()
+    .then(() => tab.view.webContents.executeJavaScript(
+      '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
+      false,
+    ))
+    .catch(() => '');
+  const scaduto = new Promise((r) => { tetto = setTimeout(() => r(''), ESTRATTO_TETTO_MS); });
+  return Promise.race([lettura, scaduto]).finally(() => clearTimeout(tetto));
+}
+
 // L'apertura salvata nella sessione, se è una data vera e non nel futuro; sennò la scheda riparte da adesso.
 function aperturaValida(v) {
   const t = typeof v === 'string' ? Date.parse(v) : NaN;
