@@ -551,6 +551,121 @@
     renderOverlayContent(state);
   }
 
+  // I segni si vedono solo dove si vede il campo: non oltre i contenitori che lo tagliano (la colonna di una mail che
+  // scorre) né sopra quello che la pagina gli mette davanti (un'intestazione fissa, un menu a tendina) (#1115.2).
+  const PUNTI_RITAGLIO_MAX = 160;
+  const RITAGLIO_OGNI = 6;
+  const genitoreDi = (n) => n.assignedSlot || n.parentElement || (n.getRootNode && n.getRootNode().host) || null;
+  function contiene(p, n) {
+    for (let x = n, i = 0; x && i < 200; x = genitoreDi(x), i++) if (x === p) return true;
+    return false;
+  }
+
+  function ritaglia(state) {
+    const o = state.overlay;
+    const el = state.el;
+    const u = state.riquadro;
+    if (!o || !el || !u) return;
+    const box = { l: u.left, t: u.top, r: u.left + u.width, b: u.top + u.height + SPORGENZA_SEGNI };
+    const v = { ...box };
+    let vuoto = false;
+    const radiceDoc = document.documentElement;
+    for (let p = genitoreDi(el); p && !vuoto; p = genitoreDi(p)) {
+      // L'overflow di html e body taglia la finestra, che taglia già lo strato.
+      if (p === radiceDoc || p === document.body) break;
+      let cs;
+      try { cs = window.getComputedStyle(p); } catch (_) { break; }
+      const x = cs.overflowX !== 'visible';
+      const y = cs.overflowY !== 'visible';
+      if (x || y) {
+        const q = p.getBoundingClientRect();
+        const l = q.left + p.clientLeft;
+        const t = q.top + p.clientTop;
+        if (x) { v.l = Math.max(v.l, l); v.r = Math.min(v.r, l + p.clientWidth); }
+        if (y) { v.t = Math.max(v.t, t); v.b = Math.min(v.b, t + p.clientHeight); }
+        vuoto = v.r <= v.l || v.b <= v.t;
+      }
+      if (cs.position === 'fixed') break;
+    }
+    const coperti = vuoto ? [] : copertiSuiSegni(state, v, u.top + u.height);
+    let clip = '';
+    if (vuoto) clip = 'inset(50%)';
+    else if (coperti.length || v.l > box.l || v.t > box.t || v.r < box.r || v.b < box.b) {
+      let pezzi = [v];
+      for (const c of coperti) pezzi = senza(pezzi, c);
+      const n = (k) => Math.round(k * 10) / 10;
+      clip = pezzi.length
+        ? `path('${pezzi.map((p) => `M${n(p.l - box.l)} ${n(p.t - box.t)}H${n(p.r - box.l)}V${n(p.b - box.t)}H${n(p.l - box.l)}Z`).join('')}')`
+        : 'inset(50%)';
+    }
+    if (clip !== state.ritaglio) {
+      state.ritaglio = clip;
+      o.style.clipPath = clip;
+    }
+  }
+
+  // Si chiede alla pagina chi sta in cima nei punti dei segni (la parola e i suoi puntini), dentro il campo: quello che
+  // non è il campo lo copre, con tutto il suo strato.
+  function copertiSuiSegni(state, v, fondo) {
+    const el = state.el;
+    const radice = el.getRootNode();
+    const q = radice && typeof radice.elementFromPoint === 'function' ? radice : document;
+    const UI = global.SN_FILO_UI;
+    const coperti = [];
+    let punti = 0;
+    const prova = (x, y) => {
+      if (punti >= PUNTI_RITAGLIO_MAX || x < v.l || x >= v.r || y < v.t || y >= Math.min(v.b, fondo)) return;
+      if (coperti.some((c) => x >= c.l && x < c.r && y >= c.t && y < c.b)) return;
+      punti++;
+      let h = null;
+      try { h = q.elementFromPoint(x, y); } catch (_) { h = null; }
+      if (!h || contiene(el, h) || contiene(h, el) || (UI && UI.inside(h))) return;
+      const c = stratoDi(h, el).getBoundingClientRect();
+      if (c.width > 0 && c.height > 0) coperti.push({ l: c.left, t: c.top, r: c.right, b: c.bottom });
+    };
+    for (const s of state.overlay.querySelectorAll('.sn-errore, .sn-suggerimento')) {
+      for (const r of s.getClientRects()) {
+        if (!r.width || r.right <= v.l || r.left >= v.r || r.bottom <= v.t || r.top >= v.b) continue;
+        const passi = Math.min(6, Math.max(1, Math.ceil(r.width / 16)));
+        for (const y of [r.top + r.height / 2, r.bottom + 4]) {
+          for (let i = 0; i <= passi; i++) prova(r.left + 1 + ((r.width - 2) * i) / passi, y);
+        }
+      }
+    }
+    return coperti;
+  }
+
+  // Lo strato di chi copre: il primo antenato fissato o posato sopra la pagina (l'intestazione intera, non il suo logo),
+  // senza salire a chi contiene il campo né oltre un velo che lascia passare il mouse.
+  function stratoDi(h, el) {
+    let n = h;
+    for (let i = 0; i < 40; i++) {
+      let cs;
+      try { cs = window.getComputedStyle(n); } catch (_) { return h; }
+      if (cs.position === 'fixed' || cs.position === 'sticky' || cs.position === 'absolute') return n;
+      const p = genitoreDi(n);
+      if (!p || p === document.documentElement || p === document.body || contiene(p, el)) return h;
+      try { if (window.getComputedStyle(p).pointerEvents === 'none') return n; } catch (_) { return h; }
+      n = p;
+    }
+    return h;
+  }
+
+  // Un rettangolo meno un altro: i pezzi che restano, senza sovrapporsi.
+  function senza(pezzi, c) {
+    const out = [];
+    for (const p of pezzi) {
+      if (c.r <= p.l || c.l >= p.r || c.b <= p.t || c.t >= p.b) { out.push(p); continue; }
+      if (c.t > p.t) out.push({ l: p.l, t: p.t, r: p.r, b: c.t });
+      if (c.b < p.b) out.push({ l: p.l, t: c.b, r: p.r, b: p.b });
+      const t = Math.max(p.t, c.t);
+      const b = Math.min(p.b, c.b);
+      if (c.l > p.l) out.push({ l: p.l, t, r: c.l, b });
+      if (c.r < p.r) out.push({ l: c.r, t, r: p.r, b });
+    }
+    return out;
+  }
+
   // Svuotare e riempire lo specchio lo riporta in cima: ogni disegno riprende lo scorrimento della casella. Sul campo
   // modificabile i segni sono già dove si vedono le parole: lo specchio non scorre.
   function allineaScorrimento(state) {
