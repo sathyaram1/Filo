@@ -164,6 +164,7 @@ async function stub(page, { pending = [], failed = [], saltaReply = null } = {})
         window.__chiamate.push(msg);
         return cfg.saltaReply || { ok: true, esito: 'fuso' };
       }
+      if (t === 'feedback_update') { window.__chiamate.push(msg); return { ok: true }; }
       return orig(msg);
     };
   }, { pending, failed, saltaReply });
