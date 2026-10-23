@@ -566,6 +566,10 @@
     const el = state.el;
     const u = state.riquadro;
     if (!o || !el || !u) return;
+    if (!state.inVista.length) {
+      if (state.ritaglio) { state.ritaglio = ''; o.style.clipPath = ''; }
+      return;
+    }
     const box = { l: u.left, t: u.top, r: u.left + u.width, b: u.top + u.height + SPORGENZA_SEGNI };
     const v = { ...box };
     let vuoto = false;
