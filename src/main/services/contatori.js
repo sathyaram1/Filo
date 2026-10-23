@@ -6,6 +6,7 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const Somme = require('./contatoriSomme');
 
 const CHIAVE = 'contatoriGiornalieri';
 // Il segno dell'uscita (#1466): «aperta» all'avvio, «chiusa» con la durata della chiusura all'ultimo istante, letto
@@ -30,6 +31,9 @@ const INTERVISTA_FERMA_MS = 24 * 60 * 60 * 1000;
 // La lettura dell'owner: mille pseudonimi a pagina, e duecento pagine prima di dire «almeno».
 const PAGINA_LETTURA = 1000;
 const TETTO_PAGINE = 200;
+// Le ore nuove arrivano ogni ora: la stessa richiesta delle somme vale dieci minuti, «Rileggi» la rifà subito.
+const LETTURA_VALE_MS = 10 * 60 * 1000;
+const LETTURE_TENUTE = 4;
 
 const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} });
 const AZIONE_MUTA = Object.freeze({ visto() {}, fine() {}, scheda() {} });
@@ -1105,13 +1109,88 @@ function crea(dip = {}) {
     return { ieri: { giorno: ieri, ...a }, mese: { mese, ...b } };
   }
 
+  // Le somme della scheda Contatori (#1462): i documenti di un intervallo, a pagine e coi soli campi che si sommano,
+  // tenuti qualche minuto per la stessa richiesta. Alla pagina escono solo le somme di src/main/services/contatoriSomme.js.
+  const letture = new Map();
+
+  async function documentiFra(idToken, dal, al) {
+    const { FIRESTORE_BASE, API_KEY } = rest();
+    if (!FIRESTORE_BASE || !API_KEY) throw new Error('server non configurato');
+    const docs = [];
+    let dopo = null;
+    let letti = 0;
+    for (let pagina = 0; pagina < TETTO_PAGINE; pagina++) {
+      const structuredQuery = {
+        from: [{ collectionId: C.COLLEZIONE }],
+        where: { compositeFilter: { op: 'AND', filters: [
+          { fieldFilter: { field: { fieldPath: 'giorno' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: dal } } },
+          { fieldFilter: { field: { fieldPath: 'giorno' }, op: 'LESS_THAN_OR_EQUAL', value: { stringValue: al } } },
+        ] } },
+        select: { fields: Somme.CAMPI_LETTI.map((f) => ({ fieldPath: f })) },
+        orderBy: [{ field: { fieldPath: 'giorno' }, direction: 'ASCENDING' }, { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+        limit: PAGINA_LETTURA,
+        ...(dopo ? { startAt: { values: [{ stringValue: dopo.giorno }, { referenceValue: dopo.nome }], before: false } } : {}),
+      };
+      const res = await fetchFn(`${FIRESTORE_BASE}:runQuery?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ structuredQuery }),
+        signal: AbortSignal.timeout(ATTESA_RETE_MS),
+      });
+      if (!res.ok) {
+        let det = '';
+        try { const j = await res.json(); det = (Array.isArray(j) ? j[0] : j)?.error?.status || ''; } catch (_) {}
+        throw new Error(`contatori ${res.status}${det ? ` ${det}` : ''}`);
+      }
+      const righe = ((await res.json()) || []).filter((r) => r && r.document);
+      letti += righe.length;
+      for (const r of righe) {
+        const d = Somme.documentoDa(r.document.fields || {}, C);
+        if (d) docs.push(d);
+      }
+      // Quanti documenti ci sono è quante ore le copie erano aperte: resta qui, nel registro, e non va alla pagina.
+      if (righe.length < PAGINA_LETTURA) { log(`somme: ${letti} documenti letti dal ${dal} al ${al}`); return { docs, completo: true }; }
+      const ultimo = righe[righe.length - 1].document;
+      dopo = { nome: ultimo.name, giorno: String(Somme.daFs(ultimo.fields && ultimo.fields.giorno) || '') };
+    }
+    log(`somme: ${letti} documenti letti dal ${dal} al ${al}, tetto raggiunto: lettura parziale`);
+    return { docs, completo: false };
+  }
+
+  function lettura(idToken, dal, al, forza) {
+    const chiave = `${dal}|${al}`;
+    const tenuta = letture.get(chiave);
+    if (tenuta && !forza && (tenuta.promessa || adesso() - tenuta.at < LETTURA_VALE_MS)) return tenuta.promessa || Promise.resolve(tenuta);
+    const voce = { at: 0, docs: [], completo: true };
+    voce.promessa = documentiFra(idToken, dal, al).then((r) => {
+      Object.assign(voce, r, { at: adesso() });
+      delete voce.promessa;
+      return voce;
+    }, (e) => {
+      if (letture.get(chiave) === voce) letture.delete(chiave);
+      throw e;
+    });
+    letture.delete(chiave);
+    letture.set(chiave, voce);
+    while (letture.size > LETTURE_TENUTE) letture.delete(letture.keys().next().value);
+    return voce.promessa;
+  }
+
+  async function somme({ idToken, dal, al, app = '', os = '', forza = false } = {}) {
+    const storta = Somme.richiestaStorta({ dal, al, app, os }, C);
+    if (storta) throw new Error(storta);
+    if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
+    const l = await lettura(idToken, dal, al, forza === true);
+    return Somme.somma(l.docs, { dal, al, app: app || '', os: os || '', completo: l.completo, lettoAlle: l.at, C });
+  }
+
   async function letto() { await carica(); return JSON.parse(JSON.stringify(stato)); }
 
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura,
-    controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
+    controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,
     avvioProcesso, secondaIstanza, inizioChiusura, tettoChiusura, fineChiusura, perLaChiusura, salvaSubito,
     leggiFermo, sonno, avviaFermo, fermaFermo,

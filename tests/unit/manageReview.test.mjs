@@ -1825,7 +1825,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
     inbox: 'feedback', queue: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
     automation: 'routine', crediti: 'routine', log: 'routine',
-    utenti: 'utenti', predefiniti: 'predefinite',
+    utenti: 'utenti', contatori: 'utenti', predefiniti: 'predefinite',
   };
   for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
   const tutte = MR.SEZIONI.flatMap((s) => s.schede);
@@ -1839,6 +1839,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
 // #1414: i vecchi indirizzi delle pagine dell'owner arrivano col nome della sezione.
 test('indirizzo: nomina una scheda o una sezione, il resto non apre niente', () => {
   assert.equal(MR.schedaDaIndirizzo('#utenti'), 'utenti');
+  assert.equal(MR.schedaDaIndirizzo('#contatori'), 'contatori');
   assert.equal(MR.schedaDaIndirizzo('#predefiniti'), 'predefiniti');
   assert.equal(MR.schedaDaIndirizzo('#predefinite'), 'predefiniti');
   assert.equal(MR.schedaDaIndirizzo('#routine'), 'automation');
