@@ -212,11 +212,9 @@ function parteFingerprint(seed) {
     if (OAC && OAC.prototype && OAC.prototype.startRendering) {
       var oStart = OAC.prototype.startRendering;
       var nf = function startRendering() {
+        // Il then preso all'avvio: uno riscritto dalla pagina per un istante restituirebbe il buffer pulito.
         var p = R(oStart, this, arguments);
-        if (p && typeof p.then === 'function') {
-          return p.then(function (buf) { noiseAudio(buf); return buf; });
-        }
-        return p;
+        return p ? R(pThen, p, [function (buf) { noiseAudio(buf); return buf; }]) : p;
       };
       OAC.prototype.startRendering = mask(nf, oStart, 'startRendering');
     }
