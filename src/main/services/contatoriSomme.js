@@ -607,7 +607,8 @@ function crea(dip = {}) {
   async function somme({ idToken, dal, al, app = '', os = '', forza = false } = {}) {
     if (!giornoValido(dal, C) || !giornoValido(al, C)) throw new Error('Intervallo non valido: servono due date.');
     if (dal > al) throw new Error('Intervallo non valido: la prima data viene dopo la seconda.');
-    if (al > oggi()) throw new Error('Intervallo non valido: la seconda data è nel futuro.');
+    const lungo = giorniFra(dal, al).length;
+    if (lungo > TETTO_GIORNI) throw new Error(`Intervallo troppo lungo: ${lungo} giorni, al massimo ${TETTO_GIORNI}.`);
     if (app && !C.APP_RE.test(String(app))) throw new Error('Versione non valida.');
     if (os && !C.OS.includes(os)) throw new Error('Sistema non valido.');
     if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
