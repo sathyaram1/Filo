@@ -49,6 +49,17 @@
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
 
+  // L'indirizzo della pagina per chi lo condivide o lo salva: sulla pagina «sito non raggiungibile» è il sito che si
+  // voleva aprire, non l'indirizzo interno dell'errore (#1343).
+  function indirizzoDellaPagina() {
+    const qui = String(location.href || '');
+    if (!qui.startsWith('filo://error/')) return qui;
+    let voluto = '';
+    try { voluto = new URL(qui).searchParams.get('url') || ''; } catch (_) { voluto = ''; }
+    return /^https?:\/\//i.test(voluto) && isAddress(voluto) ? voluto : qui;
+  }
+  const paginaDErrore = () => indirizzoDellaPagina() !== String(location.href || '');
+
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
       Popup.toastErrore('toast_not_an_address');
