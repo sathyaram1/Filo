@@ -555,6 +555,18 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
+// Prima degli script della pagina: un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623). Il pannello
+// vive nel frame principale.
+if (!IS_SUBFRAME) {
+  try {
+    const percorso = (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } };
+    require('./rilascio-file.js')(window, {
+      pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+      consegna: (files) => globalThis.SN_SIDEBAR.allega(files, { percorso }),
+    });
+  } catch (e) { console.error('[Filo CS] rilascio', e); }
+}
+
 // Il gesto che vale per finestre e schermo pieno lo dice solo questo ascolto, in ogni frame, prima della pagina: è
 // l'unico a sapere se l'input è caduto sull'interfaccia di Filo (#737.1 giri 6 e 7). Solo l'input vero: la pagina non
 // lo fabbrica. Il collegamento cliccato si apre anche se la pagina ha speso il gesto per sé. Regole: services/permessiPagine.js.
