@@ -355,10 +355,10 @@
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
     else {
-      const top = state.tabs.slice(0, 12);
+      const top = state.tabs.slice(0, SCHEDE_ELENCATE);
       const righe = [];
       top.forEach((t, i) => {
-        const focus = t.active ? '[FOCUS] ' : '';
+        const focus = `${t.active ? '[FOCUS] ' : ''}${t.chat ? '[QUESTA CHAT] ' : ''}`;
         const rel = t.lastAccessed ? ` (ultima attività: ${formatRelativeTime(new Date(t.lastAccessed))})` : '';
         if (t.delicata || soloSiti) {
           const sito = sitoDellaScheda(t.url);
