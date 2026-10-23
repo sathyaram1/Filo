@@ -6198,17 +6198,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     });
     return stretta;
   };
-  // Con la finestra nota le pagine si accorciano prima di mandare: niente rifiuto da aspettare. Solo quando a sforare
-  // sono loro; se il resto da solo non ci sta, decide il rifiuto.
+  // Con la finestra nota le pagine si accorciano prima di mandare: niente rifiuto da aspettare. Solo quando basta
+  // togliere le altre; se no decide il rifiuto, che stringe prima la conversazione.
   const pagineNellaFinestra = async () => {
-    const totale = caratteriPagine();
-    if (!totale) return;
+    const { altre } = misuraPagine();
+    if (!altre) return;
     const finestra = await finestraNota();
     if (!finestra) return;
     let caratteri = 0;
     try { caratteri = globalThis.SN_FILO_CONTESTO.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) { return; }
     const eccesso = globalThis.SN_FILO_CONTESTO.eccessoNellaFinestra({ finestra, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat });
-    if (eccesso > 0 && eccesso <= totale) lasciaFuoriPagine(eccesso);
+    if (eccesso > 0 && eccesso <= altre) lasciaFuoriPagine(eccesso);
   };
   // Le pagine rimaste fuori a fine turno, per la frase sotto la risposta: non quelle rilette poi per intero.
   const pagineLasciate = () => {
