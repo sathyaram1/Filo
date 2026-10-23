@@ -328,7 +328,7 @@
       html.classList.toggle('pd-aperto', aperto);
       html.classList.toggle('pd-bloccato', spinge);
       html.classList.toggle('pd-senza-striscia', !opzioni.striscia);
-      html.style.setProperty('--pd-spinta', spinge ? `${LARGHEZZA}px` : '0px');
+      spingi();
       pannello.setAttribute('aria-hidden', aperto ? 'false' : 'true');
       pannello.inert = !aperto;
       striscia.classList.toggle('pd-bordo', bordo && !aperto);
