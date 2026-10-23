@@ -68,6 +68,12 @@
       doesNot: 'Se in quella posizione non c’è nessuna scheda non succede niente.',
     },
     {
+      id: 'switch-tab-next-prev', title: 'Passa alla scheda dopo o a quella prima', category: 'navigation',
+      desc: 'Porta in primo piano la scheda a destra di quella attiva, o quella a sinistra. Dall’ultima si torna alla prima, e dalla prima all’ultima.',
+      invoke: 'Ctrl+Tab per la scheda dopo, Ctrl+Shift+Tab per quella prima, anche su Mac (col tasto Control, perché Cmd+Tab lì cambia applicazione). Funziona anche mentre stai guardando un sito o scrivi in un campo di testo.',
+      doesNot: 'Con una scheda sola non succede niente.',
+    },
+    {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
       desc: 'Ricarica la pagina corrente.',
       invoke: 'Pulsante "Ricarica" della barra laterale, oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',

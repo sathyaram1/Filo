@@ -34,7 +34,7 @@ const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tabColor');
 const { compareRainbow } = globalThis.SN_TAB_COLOR;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
-const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
+const { indiceSaltoScheda, indiceSchedaVicina, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie, staRegistrandoTasti } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
@@ -2099,6 +2099,13 @@ class TabManager {
           this.activate(target.id);
           return true;
         }
+      }
+      // Ctrl+Tab e Ctrl+Shift+Tab (#590.14). Un'azione di Filo che l'utente ci aveva messo prima resta sua.
+      const vicina = globalThis.SN_TASTI.azioneFiloDaTasto(input)
+        ? null : indiceSchedaVicina(input, this.tabs.indexOf(tab), this.tabs.length);
+      if (vicina != null) {
+        if (this.tabs[vicina] && this.tabs[vicina] !== tab) this.activate(this.tabs[vicina].id);
+        return true;
       }
     }
     // Indietro e avanti (#685). Qui, nel main, e non nel content script:

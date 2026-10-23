@@ -2336,12 +2336,14 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.reload(a.id);
     } else {
-      // Salto alla N-esima scheda col fuoco sulla barra (per le pagine ci pensa il main). La
+      // Salto alla N-esima scheda, o alla vicina con Ctrl+Tab, col fuoco sulla barra (per le pagine ci pensa il main). La
       // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.
-      const idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, (state.tabs || []).length) : null;
+      const schede = state.tabs || [];
+      let idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, schede.length) : null;
+      if (idx == null && TASTI) idx = TASTI.indiceSchedaVicina(e, schede.findIndex((t) => t.id === state.activeId), schede.length);
       if (idx != null) {
         e.preventDefault();
-        const tab = state.tabs[idx];
+        const tab = schede[idx];
         if (tab) api.tabs.activate(tab.id);
       }
     }
