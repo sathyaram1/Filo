@@ -72,7 +72,10 @@ async function usa(b, action, { attesa = 0, errore = null, ok = true } = {}) {
   await attendi();
 }
 
-const vuoti = { azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {}, anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {} };
+const vuoti = {
+  azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {}, anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {},
+  contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {},
+};
 
 test('un documento per ora, con la forma giusta e niente altro; un giorno senza niente parte una volta, vuoto', async () => {
   const b = banco();
