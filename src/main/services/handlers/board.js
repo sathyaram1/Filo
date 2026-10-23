@@ -13,6 +13,7 @@ const Mittente = require('../feedbackMittente');
 // fanno in bacheca, che è una pagina di Filo.
 const { soloFilo } = require('./origine');
 const InPausa = require('../inPausa');
+const { randomUUID } = require('node:crypto');
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
@@ -128,6 +129,46 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // L'id d'invio della riapertura (#1517): casuale, nato al primo tentativo di questa voce (fix, persona) e riusato
+  // dai ritentativi finché uno riesce. Ricavato da dati pubblici, un create anonimo poteva occuparlo prima e il 409
+  // passava per «già scritto da me»: il tester pagava e il suo testo si perdeva. Senza storage resta in memoria.
+  const INVII_RIAPERTURA_KEY = 'boardReopenInvii';
+  const INVIO_RIAPERTURA_MAX_MS = 30 * 24 * 60 * 60 * 1000;
+  const inviiInMemoria = new Map();
+  async function leggiInvii() {
+    const S = globalThis.SN_STORAGE;
+    if (!S || typeof S.getRaw !== 'function') return null;
+    try {
+      const v = await S.getRaw(INVII_RIAPERTURA_KEY, null);
+      return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+    } catch (_) { return null; }
+  }
+  async function scriviInvii(voci) {
+    try { await globalThis.SN_STORAGE.setRaw(INVII_RIAPERTURA_KEY, voci); } catch (_) {}
+  }
+  async function idInvioRiapertura(id, uid) {
+    const chiave = `${id}|${uid}`;
+    const voci = await leggiInvii();
+    if (!voci) {
+      if (!inviiInMemoria.has(chiave)) inviiInMemoria.set(chiave, randomUUID());
+      return inviiInMemoria.get(chiave);
+    }
+    const ora = Date.now();
+    const gia = voci[chiave];
+    if (gia && typeof gia.id === 'string' && ora - Number(gia.at) < INVIO_RIAPERTURA_MAX_MS) return gia.id;
+    const tenute = {};
+    for (const [k, v] of Object.entries(voci)) if (v && ora - Number(v.at) < INVIO_RIAPERTURA_MAX_MS) tenute[k] = v;
+    tenute[chiave] = { id: randomUUID(), at: ora };
+    await scriviInvii(tenute);
+    return tenute[chiave].id;
+  }
+  async function dimenticaInvioRiapertura(id, uid) {
+    const chiave = `${id}|${uid}`;
+    inviiInMemoria.delete(chiave);
+    const voci = await leggiInvii();
+    if (voci && voci[chiave]) { delete voci[chiave]; await scriviInvii(voci); }
+  }
+
   // ORDINE DELIBERATO, guard PRIMA del feedback: le due scritture non sono atomiche, e col
   // feedback per primo una caduta di rete lasciava duplicati gratis. Crediti resi se fallisce.
   on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
@@ -175,16 +216,16 @@ module.exports = function register(on, ctx) {
       try {
         // Guard prima (vedi sopra): chiude ai duplicati anche se la creazione qui sotto fallisce.
         await FB.castReopenRequest(id, uid, { idToken });
+        const submissionId = await idInvioRiapertura(id, uid);
         // Dall'owner parte con la sua prova come dal riquadro (#953), mai col ripiego anonimo.
         const firmato = Mittente.firma(`uid:${uid}`);
         created = await FB.submit({
-          // Un id d'invio STABILE per questa coppia (fix, persona): se la
-          // risposta si perde per strada ma il documento è nato lo stesso, un
-          // secondo tentativo non crea un doppione — il server lo riconosce e
-          // torna quello di prima. È ciò che rende sicuro rimettere a posto il
-          // segnale qui sotto quando la creazione fallisce: la porta si riapre
-          // per chi deve riprovare, e resta chiusa ai duplicati.
-          submissionId: `reopen-${id}-${uid}`,
+          // Lo stesso id a ogni ritentativo di questa voce: se la risposta si
+          // perde per strada ma il documento è nato lo stesso, un secondo
+          // tentativo non crea un doppione — il server lo riconosce e torna
+          // quello di prima. È ciò che rende sicuro rimettere a posto il
+          // segnale qui sotto quando la creazione fallisce.
+          submissionId,
           text: `[Riapertura #${original.seq || id}] ${text}`,
           // URL e titolo dell'originale sono di chi l'ha mandato e non arrivano qui (#583):
           // al triage bastano `parentId` e il numero nel testo.
@@ -195,6 +236,8 @@ module.exports = function register(on, ctx) {
           parentId: id,
           name: '',
         }, firmato.dallOwner ? { idToken, soloAdmin: true } : undefined);
+        // Riuscita: una riapertura futura dello stesso fix è un'altra voce, con un id suo.
+        await dimenticaInvioRiapertura(id, uid);
         // #678 — la riapertura è una segnalazione di questa installazione:
         // entra nel registro, e la prossima apertura della home va a vedere
         // subito se c'è una ricompensa da dare (l'attesa si azzera).
@@ -215,7 +258,7 @@ module.exports = function register(on, ctx) {
         // c'è solo chi ha scritto cosa non funziona ancora e, con quel segnale
         // rimasto lì, si sentiva rispondere che il fix era «già stato
         // segnalato»: i crediti tornavano, la spiegazione no, e non poteva più
-        // mandarla. Adesso può riprovare, e l'id d'invio stabile qui sopra
+        // mandarla. Adesso può riprovare, e l'id d'invio riusato qui sopra
         // impedisce che da un ritentativo nasca un doppione.
         try { await FB.clearReopenRequest(id, uid, { idToken }); } catch (_) {}
         throw e;

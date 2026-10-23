@@ -1523,10 +1523,12 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
+  // Con l'id della pratica il numero non conta: può essere anche di un documento estraneo (#1517), che porterebbe la
+  // richiesta e il suo via libera nel dettaglio sbagliato. Il numero vale solo per le richieste che l'id non l'hanno.
   function richiestaDiQuesto(req, fb) {
     if (!req || !fb) return false;
     const id = String(req.feedbackId || '').trim();
-    if (id && id === String(fb._id || '')) return true;
+    if (id) return id === String(fb._id || '');
     const num = String(req.num || '').trim().replace(/^#+/, '');
     return !!num && num === numeroOf(fb);
   }
