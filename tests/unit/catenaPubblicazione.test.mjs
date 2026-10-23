@@ -4,15 +4,14 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { workflowInVigore } from '../helpers/workflowInVigore.mjs';
+import { valutaCondizione } from '../helpers/azioniGithub.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CARTELLA = resolve(ROOT, '.github', 'workflows');
-const WORKFLOW = readdirSync(CARTELLA)
-  .filter((f) => /\.ya?ml$/.test(f))
-  .map((f) => ({ nome: f, testo: readFileSync(resolve(CARTELLA, f), 'utf8') }));
+const WORKFLOW = workflowInVigore();
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 
 const AMBIENTE = 'rilascio';
