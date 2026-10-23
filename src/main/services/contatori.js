@@ -841,6 +841,12 @@ function crea(dip = {}) {
     return true;
   }
 
+  // ── La finestra (#1470): le sue misure entrano nell'ora dalla stessa porta, con interruttore e incognito ───────
+  function finestra(scrivi, { incognito = null } = {}) {
+    return conta(scrivi, { incognito }).catch(() => false);
+  }
+  function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
+
   // ── La spedizione ────────────────────────────────────────────────────────
   async function spedisci(doc, collezione = C.COLLEZIONE) {
     const { FIRESTORE_BASE, API_KEY } = rest();
