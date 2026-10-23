@@ -10,8 +10,8 @@ html, body {
 
 #pillola {
   position: absolute;
-  top: 0;
-  left: 10px;
+  top: 8px;
+  left: 12px;
   box-sizing: border-box;
   width: max-content;
   max-width: var(--max, 640px);

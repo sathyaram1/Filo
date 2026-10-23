@@ -5,8 +5,6 @@
 const path = require('node:path');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 
-// Dal bordo alto della scheda alla pillola; il vuoto attorno (l'ombra) è della pagina e le rigira i gesti.
-const DAL_BORDO = 6;
 // Il puntatore entro questi pixel dal bordo alto la fa ricomparire.
 const BORDO_ALTO_PX = 2;
 // Uscendo dalla pillola col puntatore, quanto resta ancora al massimo.
@@ -151,8 +149,9 @@ class AvvisoSchermoPieno {
     const m = this.misura.giro === this.giro ? this.misura : { w: 0, h: 0 };
     if (!a || !(a.width > 0) || !(a.height > 0) || !m.w || !m.h) { this._togli(); return; }
     const w = Math.min(m.w, a.width);
-    const h = Math.min(m.h, Math.max(0, a.height - DAL_BORDO));
-    vista.setBounds({ x: a.x + Math.round((a.width - w) / 2), y: a.y + DAL_BORDO, width: w, height: h });
+    const h = Math.min(m.h, a.height);
+    // In cima alla scheda: il margine attorno alla pillola (l'ombra) è della pagina, che ne riceve i gesti.
+    vista.setBounds({ x: a.x + Math.round((a.width - w) / 2), y: a.y, width: w, height: h });
     this._inCima();
     vista.setVisible(true);
     const sotto = this._sotto();
