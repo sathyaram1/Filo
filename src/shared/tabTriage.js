@@ -99,6 +99,27 @@
     return (Array.isArray(voci) ? voci : []).filter((v) => copreHost(v, host) || copreHost(host, v));
   }
 
+  // L'avviso dopo un giro di pulizia, o '' se non se ne mostra. Alla riapertura c'è sempre (#349): senza, «ho
+  // guardato e tenuto tutto» e «non sono partito» si confondevano. Negli altri giri solo se si è chiuso qualcosa.
+  function testoEsito({ trigger = '', archiviate = 0, riordinate = false, giudizioMancato = false, valutate = 0 } = {}) {
+    const n = Math.max(0, Number(archiviate) || 0);
+    const riapertura = trigger === 'reopen';
+    if (!n && !(riapertura && (valutate > 0 || riordinate))) return '';
+    if (n) {
+      const chiuse = giudizioMancato
+        ? `${n} ${n === 1 ? 'doppione chiuso' : 'doppioni chiusi'}`
+        : `${n} ${n === 1 ? 'chiusa' : 'chiuse'}`;
+      const coda = giudizioMancato ? '. Le altre non sono riuscito a valutarle' : '';
+      return `Schede riordinate: ${chiuse}, restano nel filo della home${coda}`;
+    }
+    if (giudizioMancato) {
+      return riordinate
+        ? 'Schede riordinate, ma non sono riuscito a valutare quali chiudere'
+        : 'Non sono riuscito a valutare quali schede chiudere';
+    }
+    return riordinate ? 'Schede riordinate, nessuna da chiudere' : 'Schede già in ordine, nessuna da chiudere';
+  }
+
   global.SN_TAB_TRIAGE = {
     isEphemeralInternalUrl,
     isTriageableUrl,
@@ -108,5 +129,6 @@
     hostTenuto,
     voceTenuta,
     vociDaTogliere,
+    testoEsito,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
