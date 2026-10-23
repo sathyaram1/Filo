@@ -6,8 +6,8 @@
   'use strict';
 
   const NOTES = [
-    // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
-    // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
+    // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`). Se il suo
+    // numero è già uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.250', date: '2026-10-23',
       features: [

@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
+import { prossimaVersione, CAMPO } from '../helpers/prossimaVersione.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -20,9 +21,20 @@ const PN = globalThis.SN_PATCH_NOTES;
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
-function prossima(v) {
-  const [a, b, c] = String(v).split('.').map((n) => parseInt(n, 10) || 0);
-  return `${a}.${b}.${c + 1}`;
+// Il blocco in cima: al massimo uno sopra la versione del manifesto, col numero che il server pubblicherà. [] se va bene.
+function problemiInCima(manifesto, notes) {
+  const p = prossimaVersione(manifesto);
+  if (p.errore) return [p.errore];
+  const sopra = notes.filter((n) => PN.cmpVersion(n.version, manifesto.version) > 0);
+  if (!sopra.length) return [];
+  if (sopra.length > 1) {
+    return [`ci sono ${sopra.length} blocchi sopra la versione dell'app (${manifesto.version}): ne serve uno solo, ${p.versione}`];
+  }
+  if (sopra[0] !== notes[0]) return ['il blocco della prossima versione va in cima al registro'];
+  if (sopra[0].version === p.versione) return [];
+  return [`il blocco in cima è ${sopra[0].version}, ma la prossima versione dopo ${manifesto.version} è ${p.versione}`
+    + (p.dichiarata ? ` (la dichiara «${CAMPO}» nel manifesto)`
+      : `. Un salto di versione si dichiara nel manifesto, col campo «${CAMPO}»`)];
 }
 
 const righe = (n) => [...(n.features || []), ...(n.fixes || [])];
@@ -65,16 +77,45 @@ test('si registra su globalThis con la sua API', () => {
 });
 
 test('sopra package.json c\'è al massimo il blocco della prossima versione, in cima', () => {
-  // Numeri più alti farebbero aspettare le righe oltre la versione che le porta; il salto a 0.3.0 non serve
-  // prevederlo: un blocco 0.2.229 cade comunque fra 0.2.228 e 0.3.0.
-  const sopra = PN.NOTES.filter((n) => PN.cmpVersion(n.version, pkg.version) > 0);
-  assert.ok(sopra.length <= 1,
-    `ci sono ${sopra.length} blocchi sopra la versione dell'app (${pkg.version}): ne serve uno solo, ${prossima(pkg.version)}`);
-  if (sopra.length) {
-    assert.equal(sopra[0], PN.NOTES[0], 'il blocco della prossima versione va in cima al registro');
-    assert.equal(sopra[0].version, prossima(pkg.version),
-      `il blocco in cima è ${sopra[0].version}, ma la prossima versione dopo ${pkg.version} è ${prossima(pkg.version)}`);
+  // Un numero diverso da quello che il server pubblicherà fa aspettare le righe oltre la versione che le porta.
+  assert.deepEqual(problemiInCima(pkg, PN.NOTES), []);
+});
+
+test('un blocco che salta di versione vale solo se il manifesto lo dichiara, e il campo dichiarato va rispettato', () => {
+  const blocco = (version) => ({ version, features: ['riga'], fixes: [] });
+  const uscita = blocco('0.2.247');
+  const ok = (m, notes) => assert.deepEqual(problemiInCima(m, notes), [], JSON.stringify(m));
+  const rosso = (m, notes, motivo) => {
+    const p = problemiInCima(m, notes);
+    assert.equal(p.length, 1, `doveva essere rosso: ${JSON.stringify(m)}`);
+    assert.match(p[0], motivo);
+  };
+  const senza = { version: '0.2.247' };
+  const con = { version: '0.2.247', [CAMPO]: '0.3.0' };
+
+  ok(senza, [blocco('0.2.248'), uscita]);
+  rosso(senza, [blocco('0.3.0'), uscita], /prossima versione dopo 0\.2\.247 è 0\.2\.248.*prossimaVersione/);
+  ok(con, [blocco('0.3.0'), uscita]);
+  ok(con, [uscita]);
+  rosso(con, [blocco('0.2.248'), uscita], /in cima è 0\.2\.248.*è 0\.3\.0/);
+  rosso(con, [blocco('0.3.0'), blocco('0.2.248'), uscita], /2 blocchi.*0\.3\.0/);
+
+  // Solo a primo livello, come `version`: un omonimo annidato non dichiara niente.
+  const annidato = { version: '0.2.247', build: { [CAMPO]: '0.3.0' } };
+  ok(annidato, [blocco('0.2.248'), uscita]);
+  rosso(annidato, [blocco('0.3.0'), uscita], /è 0\.2\.248/);
+
+  // Un campo che il server rifiuterebbe è rosso anche senza blocchi sopra: dice perché e non ripiega su patch+1.
+  for (const v of ['0.3', '0.3.0.1', 'v0.3.0', '0.3.0-alpha', ' 0.3.0', '', null, 3, ['0.3.0'], { a: 1 }]) {
+    rosso({ ...senza, [CAMPO]: v }, [uscita], /prossimaVersione.*a\.b\.c/);
+    rosso({ ...senza, [CAMPO]: v }, [blocco('0.2.248'), uscita], /prossimaVersione.*a\.b\.c/);
   }
+  // Il confronto è fra numeri: 0.2.30 viene prima di 0.2.247, anche se come testo verrebbe dopo.
+  for (const v of ['0.2.247', '0.2.30', '0.2.9', '0.1.999']) {
+    rosso({ ...senza, [CAMPO]: v }, [uscita], new RegExp(`prossimaVersione.*${v.replace(/\./g, '\\.')}, non più alta della versione 0\\.2\\.247`));
+  }
+  ok({ version: '0.2.99', [CAMPO]: '0.2.100' }, [blocco('0.2.100'), blocco('0.2.99')]);
+  ok({ version: '0.9.9', [CAMPO]: '1.0.0' }, [blocco('1.0.0'), blocco('0.9.9')]);
 });
 
 test('nessuna riga nuova sotto una versione già uscita (#432)', (t) => {
@@ -96,7 +137,7 @@ test('nessuna riga nuova sotto una versione già uscita (#432)', (t) => {
   const sbagliate = aggiunteSottoUscite(prima, PN.NOTES, pkg.version);
   assert.deepEqual(sbagliate, [],
     `righe aggiunte sotto versioni già uscite (l'app è alla ${pkg.version}): chi ha già quella versione non le vedrà mai. `
-    + `Spostale nel blocco ${prossima(pkg.version)} in cima al registro:\n`
+    + `Spostale nel blocco ${prossimaVersione(pkg).versione || 'della prossima versione'} in cima al registro:\n`
     + sbagliate.map((s) => `  ${s.version}: ${s.riga.slice(0, 100)}`).join('\n'));
 });
 
