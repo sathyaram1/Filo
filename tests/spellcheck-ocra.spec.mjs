@@ -484,3 +484,41 @@ for (const [nome, campo] of [
     await expect.poll(distanza, { timeout: 3000 }).toBe(prima);
   });
 }
+
+// #1115.2: l'anno lo dice la pagina intorno. Il 9 ottobre 2024 era mercoledì; vicino a oggi il 9 ottobre non lo è.
+// «perchè» si segna subito come errore: quando c'è, il controllo delle date è già passato sullo stesso testo.
+const errore = (page) => page.locator('.sn-spell-overlay .sn-errore');
+const PAGINA_ANNO = ({ fuori = '', dentro = '', titolo = 'Chat' }) => `<!doctype html><meta charset="utf-8"><title>${titolo}</title>
+<body style="margin:0;padding:20px;font:16px sans-serif">
+${fuori}
+<main>
+  ${dentro}
+  <textarea id="ta" spellcheck="true" lang="it" style="display:block;width:760px;height:140px;font:22px monospace"></textarea>
+</main>
+</body>`;
+
+for (const [nome, html] of [
+  ['la conversazione dice l\'anno', PAGINA_ANNO({ dentro: '<div class="chat"><p>Luca: ti ricordi il matrimonio di Marta, nel 2024?</p></div>' })],
+  ['il titolo della pagina dice l\'anno', PAGINA_ANNO({ titolo: 'Diario 2024' })],
+  ['l\'intestazione sopra il campo dice l\'anno', PAGINA_ANNO({ fuori: '<header><h1>Diario 2024</h1></header>' })],
+]) {
+  test(`${nome}: una data giusta di quell'anno non si segna, una sbagliata si corregge su quell'anno`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const page = await apri(app, openTab, testServer, '{"issues":[]}', html);
+    await page.locator('#ta').click();
+    await page.keyboard.type('certo, mercoledì 9 ottobre, pioveva perchè era autunno');
+    await expect(errore(page)).toHaveText(['perchè'], { timeout: 5000 });
+    await page.waitForTimeout(300);
+    await expect(ocra(page)).toHaveCount(0);
+
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('e martedì 9 ottobre?');
+    await expect(ocra(page)).toHaveText(['martedì 9 ottobre'], { timeout: 5000 });
+    const menu = await tastoDestroSu(page, ocra(page).first());
+    await expect(menu.locator('.sn-menu-segno')).toContainText('Il 9 ottobre 2024 è mercoledì');
+    await expect(menu.locator('.sn-menu-correction').first()).toHaveText('mercoledì 9 ottobre');
+    await menu.locator('.sn-menu-correction-main', { hasText: 'mercoledì 9 ottobre' }).first().click();
+    await expect(page.locator('#ta')).toHaveValue('certo, mercoledì 9 ottobre, pioveva perchè era autunno\ne mercoledì 9 ottobre?');
+    await expect(ocra(page)).toHaveCount(0);
+  });
+}
