@@ -990,6 +990,8 @@
   }
 
   function buildSavePayload() {
+    // Del sito non raggiungibile si salva solo dove sta: il testo qui è quello dell'errore.
+    if (paginaDErrore()) return { url: indirizzoDellaPagina(), title: document.title, favicon: '', description: '', excerpt: '' };
     const meta = Extract.pageMeta();
     return {
       url: location.href,
