@@ -33,6 +33,7 @@
         'Su Windows puoi chiedere a Filo di mettere in ordine le icone del desktop: «in ordine alfabetico, da sinistra a destra», «per data», «con le cartelle prima». Se non ti piace, «rimettile com\'erano» le riporta dove stavano.',
         'Nella home puoi scrivere a Filo «accedi con Google» e apre lui la pagina d\'accesso. Allo stesso modo collega YouTube e Gmail nelle schede, o ti fa uscire dall\'account.',
         'Quello che fanno i pulsanti delle Preferenze ora lo chiedi anche a Filo: «fammi sentire la suoneria carillon», «com\'è la voce Nicola?», «rifai l\'intervista di benvenuto», «rimetti l\'aspetto di serie», «rimetti tutte le impostazioni di serie». Prima ti diceva dove cliccare.',
+        'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi, e puoi aprirlo anche chiedendolo a Filo.',
       ],
       fixes: [
         'Le icone delle pagine salvate e delle schede chiuse, e la foto del tuo account Google, Filo le tiene sul tuo computer. La home e la chat le mostrano subito, senza chiederle ogni volta ai siti, e l\'icona di una scheda aperta da un altro paese non esce più dal proxy.',
@@ -70,13 +71,6 @@
         'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
         'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
       ],
-    },
-    {
-      version: '0.2.248', date: '2026-10-23',
-      features: [
-        'Nell\'Editor il foglio prende tutta la larghezza. Gli strumenti si aprono dal bordo destro: ci fermi il mouse, clicchi la striscia sottile o premi Ctrl+\\ (Cmd+\\ su Mac). Col «+» scegli quali tenere, e col lucchetto il pannello resta aperto accanto al testo. La chat del documento ora è l\'Aiuto: legge tutto il testo e ne cambia la formattazione quando glielo chiedi.',
-      ],
-      fixes: [],
     },
     {
       version: '0.2.247', date: '2026-10-22',
