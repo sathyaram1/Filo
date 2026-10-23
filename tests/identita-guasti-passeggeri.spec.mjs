@@ -167,7 +167,7 @@ test('ricominciare con dei consumi ancora da registrare li toglie dalla coda, e 
   await page.click('#resetIdentityBtn');
   await page.click('#resetIdentityYes');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
-  await expect(page.locator('#usageLogNote')).toHaveText('3 consumi non sono arrivati al registro dei crediti: tolti ricominciando con un nuovo invito.');
+  await expect(page.locator('#usageLogNote')).toHaveText('3 consumi non sono stati registrati: tolti ricominciando con un nuovo invito.');
   const stato = await app.evaluate(() => globalThis.SN_WALLET_MAIN.usageLogStatus());
   expect(stato).toMatchObject({ pending: 0, discarded: 3, discardedBy: { ricomincia: 3 } });
   expect(await app.evaluate(() => globalThis.SN_STORAGE.getRaw('walletUsageQueue', null))).toBeNull();

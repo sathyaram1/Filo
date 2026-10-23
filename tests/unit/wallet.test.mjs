@@ -117,10 +117,10 @@ test('un guasto passeggero a metà ferma gli invii e tiene tutto ciò che non è
 test('la riga della pagina Crediti sui consumi non registrati: numero, motivo, singolare e plurale', () => {
   assert.equal(W.registroScartateTesto(null), '');
   assert.equal(W.registroScartateTesto({ rifiutata: 0 }), '');
-  assert.equal(W.registroScartateTesto({ rifiutata: 1 }), 'Un consumo non è arrivato al registro dei crediti: rifiutato dal server.');
-  assert.equal(W.registroScartateTesto({ altra_identita: 3 }), '3 consumi non sono arrivati al registro dei crediti: di un portafoglio di prima.');
+  assert.equal(W.registroScartateTesto({ rifiutata: 1 }), 'Un consumo non è stato registrato: rifiutato dal server.');
+  assert.equal(W.registroScartateTesto({ altra_identita: 3 }), '3 consumi non sono stati registrati: di un portafoglio di prima.');
   const misto = W.registroScartateTesto({ rifiutata: 1, altra_identita: 2, coda_piena: 4, ignoto: 9 });
-  assert.equal(misto, '7 consumi non sono arrivati al registro dei crediti: 1 rifiutato dal server, 2 di un portafoglio di prima, 4 persi perché ne aspettavano troppi.');
+  assert.equal(misto, '7 consumi non sono stati registrati: 1 rifiutato dal server, 2 di un portafoglio di prima, 4 persi perché ce n\'erano troppi in attesa.');
 });
 
 test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria', () => {

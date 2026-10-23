@@ -1101,7 +1101,7 @@ test('(V) una riga che il server rifiuta non ferma il registro: le buone arrivan
 
   await credits.reload();
   const nota = credits.locator('#usageLogNote');
-  await expect(nota).toHaveText('2 consumi non sono arrivati al registro dei crediti: 1 rifiutato dal server, 1 di un portafoglio di prima.', { timeout: 15_000 });
+  await expect(nota).toHaveText('2 consumi non sono stati registrati: 1 rifiutato dal server, 1 di un portafoglio di prima.', { timeout: 15_000 });
   await credits.screenshot({ path: 'tests/.shots/1601-registro-chiaro.png' });
   await credits.evaluate(async () => { await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }); });
   await credits.reload();
@@ -1141,7 +1141,7 @@ test('(W) la chiave personale di un altro portafoglio: Crediti lo dice al posto 
   expect(seen.commits[0].writes[0].update.fields.pseudonym.stringValue).toBe('fedcba9876543210');
   await credits.reload();
   await expect(nota).not.toContainText('non è quella del tuo portafoglio', { timeout: 15_000 });
-  await expect(credits.locator('#usageLogNote')).toHaveText('Un consumo non è arrivato al registro dei crediti: rifiutato dal server.');
+  await expect(credits.locator('#usageLogNote')).toHaveText('Un consumo non è stato registrato: rifiutato dal server.');
 
   // Il server non ha più nessun portafoglio per questa identità, e la chiave personale è ancora qui.
   redeemed = false;
