@@ -30,7 +30,13 @@
     getLastMouseEvent: () => ({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 }),
   };
 
-  function copyToClipboard(text) {
+  // Gli appunti li scrive prima il main (anche in cronologia): la pagina può non avere il fuoco, come col visore PDF
+  // o dopo un clic nella barra laterale (#1343). Se il main dice no, ci prova la pagina.
+  async function copyToClipboard(text) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text });
+      if (r && r.ok) { Popup.showToast(I18n.t('toast_copied')); return; }
+    } catch (_) {}
     navigator.clipboard.writeText(text).then(
       () => {
         Popup.showToast(I18n.t('toast_copied'));
