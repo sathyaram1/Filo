@@ -3060,6 +3060,14 @@
     fraseNonImmaginiAiuto: (n) => (quante(n) > 1
       ? `${quante(n)} file non sono immagini e non sono entrati: all’Aiuto si danno solo immagini.`
       : 'Un file non è un’immagine e non è entrato: all’Aiuto si danno solo immagini.'),
+    // Il messaggio dell'Aiuto come resta nel filo, che le immagini non le tiene: quante erano.
+    testoNelFilo: (scritto, immagini) => {
+      const n = Math.max(0, Math.floor(Number(immagini) || 0));
+      const testo = String(scritto || '');
+      if (!n) return testo;
+      const nota = n > 1 ? `(${n} immagini allegate)` : '(un’immagine allegata)';
+      return testo.trim() ? `${testo}\n${nota}` : nota;
+    },
   });
   // Le soglie dell'avviso dei crediti (#818): 0 spegne quella condizione. Le usano la pagina, la chat e la proiezione.
   const AVVISO_CREDITI_LIMITI = Object.freeze({ giorni: Object.freeze([0, 30]), percento: Object.freeze([0, 100]) });
