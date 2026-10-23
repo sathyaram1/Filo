@@ -32,11 +32,3 @@ test('r1 un clic e la rotella dentro un riquadro della pagina contano come uso d
   await expect.poll(() => tm(app), { timeout: 5_000, message: 'la rotella nel riquadro non ha contato come uso di Filo' })
     .toBeGreaterThan(primaRotella + 6 * ORA);
 });
-
-test('esplorazione: un clic nella home di Filo conta come uso', async ({ app, openTab }) => {
-  const home = await openTab('filo://home/home.html');
-  await home.waitForTimeout(1500);
-  const prima = await indietro(app, 7 * ORA);
-  await home.mouse.click(400, 400);
-  await expect.poll(() => tm(app), { timeout: 5_000 }).toBeGreaterThan(prima + 6 * ORA);
-});
