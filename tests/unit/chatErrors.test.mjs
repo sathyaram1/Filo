@@ -141,7 +141,7 @@ test('nessun host con gli strumenti per il modello scelto: dice di cambiare mode
   e.provider = 'openrouter';
   const out = CE.friendly(e);
   assert.match(out, /strumenti/);
-  assert.match(out, /Modelli predefiniti/);
+  assert.match(out, /Opzioni → Modelli per azione/);
   assert.ok(!/riprova tra qualche minuto/i.test(out), out);
 });
 

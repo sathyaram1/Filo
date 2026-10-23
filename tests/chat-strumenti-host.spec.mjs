@@ -130,7 +130,9 @@ test('nessun host ammesso regge gli strumenti: la chat lo dice, e niente parte s
   await scrivi(page, 'apri le impostazioni');
   const bolla = page.locator('.dash-bubble-filo', { hasText: 'nessun fornitore ammesso sa usare gli strumenti' });
   await expect(bolla).toBeVisible({ timeout: 15_000 });
-  await expect(bolla).toContainText('Scegli un altro modello in Modelli predefiniti.');
+  await expect(bolla).toContainText('Scegli un altro modello in Opzioni → Modelli per azione.');
+  // La frase dice dove si cambia il modello, e il tasto porta lì (#1344.1).
+  await expect(page.locator('.dash-action-btn-primary', { hasText: 'Apri Opzioni' })).toBeVisible();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco fatto.' })).toHaveCount(0);
   const corpi = await corpiConStrumenti(app);
   vincoliIntatti(corpi);
