@@ -1148,6 +1148,18 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// Il nome di una scheda come lo vede il modello in TAB APERTE: il titolo, e di una pagina delicata solo il sito (#1004).
+async function nomeDellaScheda() {
+  let delicata = () => null;
+  try { if (globalThis.SN_DELICATE) delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
+  return (t) => {
+    let sito = '';
+    try { sito = new URL(t.url || '').hostname.replace(/^www\./, ''); } catch (_) {}
+    if (delicata(t.url || '')) return `${sito || 'sito'} (pagina delicata)`;
+    return String(t.title || '').replace(/\s+/g, ' ').trim().slice(0, 80) || sito || 'scheda senza titolo';
+  };
+}
+
 // Esito di PROXY_TAB e REGOLA_PROXY_DOMINIO senza fornitore: proxyUnavailableForPrompt
 // e la riga del diario lo riconoscono da `proxy`, e nessuno dei due lo dà per fatto.
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
