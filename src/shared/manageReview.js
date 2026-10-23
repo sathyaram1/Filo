@@ -527,6 +527,9 @@
     guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
+    // #1515: i due motivi con cui il server lascia un non fidato all'owner senza giudici.
+    budget_giudici: 'tetto di spesa dei giudici raggiunto',
+    lunghezza_giudici: 'troppo lungo per i giudici',
   };
   function reasonText(statusReason) {
     const k = String(statusReason || '');
