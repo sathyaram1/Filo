@@ -44,9 +44,10 @@ dell'owner, non di chi disegna.
 
 ## Dove sta
 
-`src/main/services/contatoriSomme.js` (soglia, celle, voci tolte) e la porta
-`CONTATORI_SOMME` in `src/main/services/handlers/contatori.js`, che applica la
-stessa soglia anche ai due riquadri delle installazioni attive. La pagina
+`src/main/services/contatoriSomme.js` (soglia, celle, voci tolte), la lettura
+in `src/main/services/contatori.js` e la porta `CONTATORI_SOMME` in
+`src/main/services/handlers/contatori.js`, che applica la stessa soglia anche
+ai due riquadri delle installazioni attive. La pagina
 (`src/pages/manage/manageContatori.js`) scrive solo quello che riceve. Prove:
 `tests/unit/contatoriSomme.test.mjs`, `tests/manage-contatori.spec.mjs`.
 
