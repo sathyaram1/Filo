@@ -140,6 +140,66 @@ test('un messaggio di chat coi suoi giri di strumenti è un uso, con le attese d
   assert.deepEqual(C.leggiErrori(doc.errori['filo-chat']), [{ modello: 'a/b', host: 'H', tipo: 'fornitore', n: 1 }]);
 });
 
+test('le chiamate di un uso (#1464): i numeri di ognuna subito, quante sono alla fine, la spesa chiesta dopo anche a uso chiuso', async () => {
+  const b = banco();
+  const servita = (h, ingresso, usd) => h.chiamata({
+    modello: 'deepseek/deepseek-v4-pro', ingresso, cacheLetti: ingresso / 2, cacheDetta: true, ragionamento: 300, uscita: 200, fine: 'tool_calls',
+    tentativo: 1, spesa: { usd, origine: 'router' },
+  });
+  let voce = null;
+  await b.s.unUso(A.FILO_CHAT, async () => {
+    const primo = b.s.apri(A.FILO_CHAT);
+    servita(primo, 9000, 0.003); primo.fine(true);
+    b.s.servitaDaCache(A.FILO_CHAT); // una risposta dalla cache non è una chiamata al modello
+    const secondo = b.s.apri(A.FILO_CHAT);
+    servita(secondo, 12000, 0.004); secondo.fine(true);
+  });
+  // La voce: una chiamata sola, il costo arriva dopo che è finita.
+  voce = b.s.apri(A.TTS);
+  voce.chiamata({ modello: 'openai/gpt-4o-mini-tts', ingresso: null, uscita: null, spesa: null });
+  voce.fine(true);
+  voce.tardiva('openai/gpt-4o-mini-tts', 0.0007);
+  await b.s.adattamento(A.FILO_CHAT, 'deepseek/deepseek-v4-pro', 'contesto_stretto');
+  assert.equal(b.s.adattamento(A.FILO_CHAT, 'deepseek/deepseek-v4-pro', 'un tipo inventato'), false);
+  await attendi();
+  b.t += ORA;
+  await b.s.controlla();
+  const { doc } = b.inviati[0];
+  assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
+  assert.deepEqual(C.leggiChiamate(doc.chiamate['filo-chat']), { c2: 1 }, 'due giri del messaggio, la cache no');
+  assert.deepEqual(C.leggiChiamate(doc.chiamate.tts), { c1: 1 });
+  assert.equal(doc.contesto['filo-chat'], 'deepseek/deepseek-v4-pro|t16k|2');
+  assert.equal(doc.cache['filo-chat'], 'deepseek/deepseek-v4-pro|q50|2');
+  assert.equal(doc.uscita['filo-chat'], 'deepseek/deepseek-v4-pro|o256|tool_calls|2');
+  assert.equal(doc.spesa['filo-chat'], 'deepseek/deepseek-v4-pro|router|700');
+  assert.equal(doc.spesa.tts, 'openai/gpt-4o-mini-tts|tardiva|70');
+  assert.equal(doc.adattamenti['filo-chat'], 'deepseek/deepseek-v4-pro|contesto_stretto|1');
+  assert.equal(doc.contesto.tts, undefined);
+});
+
+test('le chiamate in incognito e a contatori spenti non si contano, nemmeno la spesa che arriva dopo (#1464)', async () => {
+  const b = banco({ incognito: true });
+  const h = b.s.apri(A.FILO_CHAT);
+  h.chiamata({ modello: 'a/b', ingresso: 1000, spesa: { usd: 1, origine: 'router' } });
+  h.fine(true);
+  h.tardiva('a/b', 1);
+  assert.equal(b.s.adattamento(A.FILO_CHAT, 'a/b', 'finestra_piccola'), false);
+  b.incognito = false;
+  // Aperta fuori dall'incognito, spenta prima che il costo arrivi.
+  const voce = b.s.apri(A.TTS);
+  voce.fine(true);
+  await attendi();
+  b.accesi = false;
+  voce.tardiva('openai/gpt-4o-mini-tts', 0.5);
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'spenti');
+  b.accesi = true;
+  b.t += ORA;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, 0);
+});
+
 test('in incognito non si conta niente e non parte nessun documento', async () => {
   const b = banco({ incognito: true, finestra: false });
   await usa(b, A.FILO_CHAT, { attesa: 900 });
