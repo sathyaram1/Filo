@@ -27,10 +27,9 @@
   const NOMI_POSIZIONI = Object.freeze(POSIZIONI.map(([k]) => k));
 
   const CAMPI_GIORNO = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori']);
-  const MISURE_V2 = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
+  const MISURE_ORA = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
     'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte']);
-  const TESTA_ORA = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo']);
-  const CAMPI_V2 = Object.freeze([...TESTA_ORA, ...MISURE_V2]);
+  const CAMPI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE_ORA]);
 
   // ── Le chiamate ai modelli (#1464) ────────────────────────────────────────
   // Misurate al cancello, sul tentativo che ha servito: per funzione e modello, «modello|…|n». Fasce in token da 1024.
