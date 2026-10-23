@@ -56,8 +56,9 @@ test('tolto tutto il gruppo, la visita che arriva dopo ha la sua riga', async ({
   await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui delfini');
   await riga.locator('.dash-pagine-testa').click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Togli queste 3 pagine dal filo', { exact: true }).click();
-  const ok = page.getByRole('button', { name: 'Togli', exact: true });
-  await ok.click();
+  await expect.poll(() => page.evaluate(() => !!(window.SN_CONFIRM_UI._test.state() || {}).pronto)).toBe(true);
+  const ok = await page.evaluate(() => window.SN_CONFIRM_UI._test.point('ok') || window.SN_CONFIRM_UI._test.point('danger'));
+  await page.mouse.click(ok.x, ok.y);
   await expect(page.locator('.dash-pagine')).toHaveCount(0);
   await app.evaluate(() => globalThis.SN_IL_FILO.registraVisita({ url: 'https://esempio.test/9', titolo: 'squali' }));
   await expect(page.locator('.dash-pagine .dash-pagine-testo')).toHaveText(['1 pagina: squali']);
