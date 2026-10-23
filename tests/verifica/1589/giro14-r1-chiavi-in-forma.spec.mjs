@@ -59,7 +59,7 @@ qR0sT1uV2wX3yZ4aB5cD6eF7gH8iJ9kL0mN1oP2qR3sT4uV5wX6yZ7aB8cD9eF0gH1iJ
   }
 });
 
-test('r1 un webhook, la password di una riga di comando e i codici di recupero non arrivano al modello', async ({ app, openTab, testServer }) => {
+test('r1 la password di una riga di comando e i codici di recupero non arrivano al modello', async ({ app, openTab, testServer }) => {
   const fx = { app, openTab, testServer };
   test.setTimeout(90_000);
   const mandato = await leggiInChat(fx, 'Note di installazione', `<h1>Note di installazione</h1>
