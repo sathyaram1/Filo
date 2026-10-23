@@ -257,7 +257,7 @@ app.whenReady().then(async () => {
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
     // Le scorciatoie scelte dall'utente (#842) valgono dal primo tasto premuto.
     try { require('./shortcuts').configura(s); } catch (_) {}
-    require('./shortcuts').seguiModuliEditor().catch(() => {});
+    require('./shortcuts').seguiPannelli().catch(() => {});
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}

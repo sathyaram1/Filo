@@ -1458,12 +1458,12 @@
   let scorciatoieSalvate = {};
   let registrando = null;
 
-  // I moduli dell'Editor tengono le loro combinazioni nei documenti: una delle quattro sopra le spegnerebbe.
-  const COLLEZIONE_EDITOR = 'filo.editor.collection';
+  // Gli elementi dei pannelli delle app tengono le loro combinazioni (#1433): una delle quattro sopra le spegnerebbe.
+  const PANNELLI = 'sn_pannelli_app';
   async function caricaModuliEditor() {
     try {
-      const r = await chrome.storage.local.get(COLLEZIONE_EDITOR);
-      window.SN_TASTI?.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+      const r = await chrome.storage.local.get(PANNELLI);
+      window.SN_TASTI?.usaScorciatoiePannelli(r && r[PANNELLI]);
     } catch (_) {}
   }
 

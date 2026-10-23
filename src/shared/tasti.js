@@ -312,6 +312,19 @@
   }
   function etichettaBarra(esplicita) { return etichetta(ACCEL_BARRA, esplicita); }
 
+  // ── Il pannello di destra delle app di Filo (#1433) ───────────────────────
+  // Ctrl+\ era già il tasto che nell'Editor mostrava e nascondeva gli strumenti: ora li apre dal bordo destro in
+  // ogni app di Filo che ha il pannello. Sui siti non è preso. Il tasto fisico cambia con la tastiera: vale il carattere.
+  const ACCEL_PANNELLO = 'Ctrl+\\';
+  function comandoPannello(ev) {
+    if (!ev || modificatore(ev, 'alt') || modificatore(ev, 'shift')) return false;
+    if (!(modificatore(ev, 'ctrl') || modificatore(ev, 'meta'))) return false;
+    const key = String(ev.key || '');
+    if (key) return key === '\\';
+    return String(ev.code || '') === 'Backslash';
+  }
+  function etichettaPannello(esplicita) { return etichetta(ACCEL_PANNELLO, esplicita); }
+
   // ── Lo schermo intero ─────────────────────────────────────────────────────
   // Il tasto abituale di ogni sistema, quindi un tasto DIVERSO e non una riscrittura: F11 su Windows e
   // Linux, Control+Cmd+F su Mac (lì F11 è del sistema e Cmd+F è la ricerca). Valido anche come acceleratore.
@@ -638,7 +651,7 @@
     ['Ctrl+Shift+V', 'incolla senza formattazione'], ['Ctrl+A', 'seleziona tutto'],
     ['Ctrl+B', 'mette il grassetto'], ['Ctrl+I', 'mette il corsivo'], ['Ctrl+U', 'sottolinea'],
     ['Ctrl+S', 'salva il documento nell\'Editor'], ['Ctrl+F', 'porta alla ricerca dell\'Editor'],
-    ['Ctrl+\\', 'mostra e nasconde la barra laterale dell\'Editor'],
+    [ACCEL_PANNELLO, 'apre e chiude il pannello degli strumenti nelle app di Filo'],
     ['Ctrl+Plus', 'ingrandisce la pagina'], ['Ctrl+-', 'rimpicciolisce la pagina'],
     ['Ctrl+_', 'rimpicciolisce la pagina'], ['Ctrl+0', 'riporta la pagina al 100%'],
   ];
@@ -780,18 +793,18 @@
     return null;
   }
 
-  // Le combinazioni date ai moduli dell'Editor, in tutti i documenti: le quattro le prenderebbero prima del modulo.
-  // Chi controlla una delle quattro passa qui la collezione dell'Editor (filo.editor.collection) e i suoi cambi.
+  // Le combinazioni date agli elementi dei pannelli delle app (#1433): le quattro le prenderebbero prima dell'elemento.
+  // Chi controlla una delle quattro passa qui i pannelli salvati (sn_pannelli_app) e i loro cambi.
   let moduliPresi = [];
-  function usaScorciatoieModuli(collezione) {
+  function usaScorciatoiePannelli(pannelli) {
     const lista = [];
-    const files = collezione && Array.isArray(collezione.files) ? collezione.files : [];
-    for (const file of files) {
-      for (const m of (file && Array.isArray(file.modules) ? file.modules : [])) {
-        const sc = m && m.data && typeof m.data.shortcut === 'string' ? m.data.shortcut.trim() : '';
-        if (!sc || sc.length > 80 || !forma(sc)) continue;
-        const titolo = String((file.meta && file.meta.title) || 'Documento senza titolo').slice(0, 60);
-        lista.push([sc, `la usa un modulo dell'Editor nel documento «${titolo}»`]);
+    const P = global.SN_PANNELLI_APP;
+    const tutti = pannelli && typeof pannelli === 'object' ? pannelli : {};
+    for (const app of Object.keys(tutti)) {
+      if (!P || !P.catalogo(app)) continue;
+      for (const e of P.scorciatoie(app, tutti[app])) {
+        if (!forma(e.shortcut)) continue;
+        lista.push([e.shortcut, `la usa «${e.nome}» nel pannello dell'${P.catalogo(app).nome}`]);
       }
     }
     moduliPresi = lista;
@@ -1033,11 +1046,11 @@
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
-    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoSchermoIntero, etichettaSchermoIntero,
+    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
-    AZIONI_FILO, usaScorciatoieFilo, usaScorciatoieModuli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
+    AZIONI_FILO, usaScorciatoieFilo, usaScorciatoiePannelli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
     tastoValido, tastoFisicoDaEvento, tastoFisicoDaScritta, nomeTastoFisico, combaciaFisico, pressioneFisica, rifiutoFisico,
   };

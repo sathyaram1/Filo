@@ -13,20 +13,21 @@ function configura(settings) {
   globalThis.SN_TASTI.usaScorciatoieFilo(settings && settings.scorciatoie);
 }
 
-// Le combinazioni dei moduli dell'Editor stanno nei suoi documenti: la chat e il salvataggio le confrontano con le
-// quattro, quindi il main le segue da quando parte a ogni salvataggio dell'Editor.
-const COLLEZIONE_EDITOR = 'filo.editor.collection';
-let moduliSeguiti = false;
-async function seguiModuliEditor() {
-  if (moduliSeguiti) return;
-  moduliSeguiti = true;
+// Le combinazioni degli elementi dei pannelli delle app (#1433): la chat e il salvataggio le confrontano con le quattro,
+// quindi il main le segue da quando parte e a ogni cambio dei pannelli.
+const PANNELLI = 'sn_pannelli_app';
+let pannelliSeguiti = false;
+async function seguiPannelli() {
   const Storage = require('./shim/storage');
-  Storage.onChanged((cambi) => {
-    if (cambi && cambi[COLLEZIONE_EDITOR]) globalThis.SN_TASTI.usaScorciatoieModuli(cambi[COLLEZIONE_EDITOR].newValue);
-  });
+  if (!pannelliSeguiti) {
+    pannelliSeguiti = true;
+    Storage.onChanged((cambi) => {
+      if (cambi && cambi[PANNELLI]) globalThis.SN_TASTI.usaScorciatoiePannelli(cambi[PANNELLI].newValue);
+    });
+  }
   try {
-    const r = await Storage.get(COLLEZIONE_EDITOR);
-    globalThis.SN_TASTI.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+    const r = await Storage.get(PANNELLI);
+    globalThis.SN_TASTI.usaScorciatoiePannelli(r && r[PANNELLI]);
   } catch (_) {}
 }
 
@@ -225,6 +226,6 @@ async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, total
 }
 
 module.exports = {
-  collegaScorciatoie, comandoDaTasto, configura, seguiModuliEditor, registraTasti, staRegistrandoTasti, dispatch, saveForLater,
+  collegaScorciatoie, comandoDaTasto, configura, seguiPannelli, registraTasti, staRegistrandoTasti, dispatch, saveForLater,
   consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, COMMANDS,
 };

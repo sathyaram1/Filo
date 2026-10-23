@@ -26,6 +26,7 @@ require(path.join(SHARED, 'clipboardHistory.js'));
 require(path.join(SHARED, 'tasti.js'));
 // Dove sta ogni icona globale (riga, «Altro…», barra laterale): la legge la barra, la scrive il main.
 require(path.join(SHARED, 'disposizioneIcone.js'));
+require(path.join(SHARED, 'pannelliApp.js')); // #1433 — il pannello di destra delle app: cataloghi e mosse (logica pura)
 // "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z
 // annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
 // (src/main/menu.js), i content script la chiamano direttamente.
