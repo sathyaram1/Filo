@@ -6251,12 +6251,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const caratteriTratto = conTratto ? FC.caratteriDi(payloadBase.filoTratto) : 0;
     const conRiletture = riletture.length > 0 && stretteRiletture < 3;
     const caratteriRiletture = riletture.reduce((n, y) => n + lunghezzaDi(y), 0);
-    // #1596 — le pagine del turno sono arrivate dopo una richiesta che ci stava: se accorciarle basta, si accorciano
-    // loro e la conversazione resta. Senza misure si dimezzano.
-    const pagine = caratteriPagine();
-    const eccesso = pagine ? FC.eccessoDopoRifiuto({ ...rifiuto, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat }) : null;
-    const accorciaPagine = () => pagine > 0 && lasciaFuoriPagine(eccesso ?? Math.ceil(pagine / 2));
-    if ((eccesso == null || eccesso <= pagine) && accorciaPagine()) return true;
+    // #1596 — le pagine del turno sono arrivate dopo una richiesta che ci stava: se togliere quelle oltre l'ultima chiesta
+    // basta, si tolgono loro e la conversazione resta. Senza misure si dimezzano. Per ultima si accorcia anche quella.
+    const pagine = misuraPagine();
+    const eccesso = pagine.tutte ? FC.eccessoDopoRifiuto({ ...rifiuto, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat }) : null;
+    if (pagine.altre && (eccesso == null || eccesso <= pagine.altre)
+      && lasciaFuoriPagine(eccesso ?? Math.min(Math.ceil(pagine.tutte / 2), pagine.altre))) return true;
+    const accorciaPagine = () => pagine.tutte > 0 && lasciaFuoriPagine(eccesso ?? Math.ceil(pagine.tutte / 2));
     // Si stringe prima la parte più grossa; se non si stringe più, l'altra.
     const prima = conRiletture && caratteriRiletture >= caratteriTratto ? 'riletture' : 'tratto';
     for (const parte of prima === 'riletture' ? ['riletture', 'tratto'] : ['tratto', 'riletture']) {
