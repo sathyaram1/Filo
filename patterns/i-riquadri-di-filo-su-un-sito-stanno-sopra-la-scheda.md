@@ -36,7 +36,8 @@ lì non c'è codice di altri.
   rende alla pagina. Esc premuto sulla pagina chiude il riquadro più in alto prima di ogni modalità; la scorciatoia che
   lavora sulla selezione va nello strato se la tastiera è lì. I tasti che la scheda prende prima della pagina (chiudi,
   apri, indietro, salto di scheda, barra laterale) valgono anche scrivendo nello strato, per la scheda sotto
-  (`tastoDellaScheda`).
+  (`tastoDellaScheda`). Così lo zoom: Ctrl +/-/0 e Ctrl+rotella sopra un riquadro vanno alla pagina
+  (`zoomDaTasto`, `rotellaZoom` in `src/main/tabs/tabZoom.js`), lo strato resta a zoom 1.
 - **Sostituisci torna alla pagina:** il campo e la selezione della Modifica restano nel content script che l'ha chiesta;
   dallo strato torna solo il testo scelto (`RIQUADRO_SOSTITUISCI`), col fuoco già rimesso alla scheda.
 - **Vita:** lo strato se ne va con la pagina (navigazione, chiusura, renderer morto); vuoto resta pronto un minuto, poi
