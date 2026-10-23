@@ -114,7 +114,7 @@ test('fermo sul bordo destro il pannello si apre; nella fila delle schede e scor
 test('aperto dal bordo, un clic sulla barra di scorrimento lo chiude; il pannello non la copre', async () => {
   test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
   test.setTimeout(90_000);
-  const { app, ed, cb, px, destra, y, xDentro, chiudi } = await avvia();
+  const { ed, cb, px, destra, y, xDentro, chiudi } = await avvia();
   try {
     puntatore(`move:${xDentro}:${y};wait:150;move:${destra - 1}:${y};wait:40;move:${destra}:${y + 1};wait:800`);
     await expect.poll(() => aperto(ed), { timeout: 2000 }).toBe(true);
@@ -133,7 +133,6 @@ test('aperto dal bordo, un clic sulla barra di scorrimento lo chiude; il pannell
     puntatore(`move:${xBarra}:${y + 200};wait:80;down;wait:60;up;wait:600`);
     await expect.poll(() => aperto(ed), { timeout: 2000 }).toBe(false);
     expect(await ed.evaluate(() => document.getElementById('docWrap').scrollTop), 'il clic sulla barra fa il suo lavoro').toBeGreaterThan(prima);
-    void destra; void app;
   } finally {
     await chiudi();
   }
@@ -146,10 +145,8 @@ test('bloccato, aperto dal bordo resta aperto anche uscendo, e il foglio si rest
   try {
     // Bloccato si apre già all'avvio dell'app, accanto al foglio.
     await expect.poll(() => aperto(ed), { timeout: 3000 }).toBe(true);
-    await ed.evaluate(() => document.querySelector('.pd-lucchetto') && null);
-    // Chiuso col tasto, si riapre dal bordo.
-    await ed.evaluate(() => window.dispatchEvent(new Event('noop')));
-    await ed.locator('.pd-testa').click({ button: 'right' });
+    // Chiuso dal suo menu, si riapre dal bordo.
+    await ed.locator('.pd-testa').click({ button: 'right', position: { x: 20, y: 10 } });
     await ed.locator('.pd-menu .sn-select-option', { hasText: 'Chiudi il pannello' }).click();
     await expect.poll(() => aperto(ed)).toBe(false);
     puntatore(`move:${xDentro}:${y};wait:150;move:${destra - 1}:${y};wait:40;move:${destra}:${y + 1};wait:800`);
