@@ -79,12 +79,19 @@
       const r = sc.getBoundingClientRect();
       return Math.max(0, Math.round(window.innerWidth - (r.left + sc.clientLeft + sc.clientWidth)));
     }
+    let accanto = 0;
     function posa() {
       const barra = barraDiScorrimento();
       const aiuto = aiutoADestra();
+      accanto = Math.max(0, aiuto - barra);
       html.style.setProperty('--pd-barra', `${barra}px`);
       html.style.setProperty('--pd-destra', `${Math.max(barra, aiuto)}px`);
       html.classList.toggle('pd-accanto', aiuto > barra);
+      spingi();
+    }
+    // Bloccato spinge il foglio fin dove il pannello comincia: accanto all'Aiuto, anche della larghezza dell'Aiuto.
+    function spingi() {
+      html.style.setProperty('--pd-spinta', aperto && opzioni.bloccato ? `${LARGHEZZA + accanto}px` : '0px');
     }
     window.addEventListener('resize', posa);
     try {
