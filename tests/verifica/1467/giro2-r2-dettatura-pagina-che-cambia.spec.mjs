@@ -1,4 +1,4 @@
-// Verifica #1467 giro 2, r2: una dettatura aperta su una pagina che se ne va (si naviga altrove nella stessa scheda) si
+// Verifica #1467 giro 2, r2: una dettatura aperta su una pagina che se ne va (ricaricata, o un sito che va a un'altra pagina nella stessa scheda) si
 // conta quando la pagina se ne va, come la sessione dell'Aiuto e la lettura, non quando la scheda si chiuderà.
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -24,7 +24,7 @@ async function microfonoFinto(page) {
   });
 }
 
-test('r2 la dettatura lasciata nella casella della home si conta quando la scheda va su un sito', async ({ app, openTab, testServer }) => {
+test('r2 la dettatura lasciata nella casella della home si conta quando la home si ricarica', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
@@ -36,7 +36,6 @@ test('r2 la dettatura lasciata nella casella della home si conta quando la sched
     });
     globalThis.SN_PROVIDER_OPENROUTER.transcribe = async () => ({ text: ' che tempo fa domani ', usage: { seconds: 1, costUsd: 0.00001 }, generationId: null });
   });
-  const sito = testServer.html('<title>Meteo</title><p>Il sito del meteo.</p>', { pubblico: true });
   const page = await openTab('filo://newtab/?prova=dettatura-naviga');
   await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
   await microfonoFinto(page);
