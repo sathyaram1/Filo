@@ -2,50 +2,26 @@
 // window.chrome come in Chrome e la richiesta passkey condizionale resta in sospeso; il sito riceve i client hints onesti
 // («Chromium», mai «Google Chrome») insieme al GPC, tranne le pagine di accesso dei provider noti, che il GPC non lo vedono.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
-// Un sito che annota le intestazioni della prima richiesta di pagina.
-async function sitoCheAnnota() {
-  let viste = null;
+// Un sito che annota le intestazioni della prima richiesta di pagina di ogni host (le icone non contano).
+async function sitoCheAnnota(html = '<title>HINTS</title><p>ok</p>') {
+  const viste = new Map();
   const server = createServer((req, res) => {
-    if (!viste) viste = { ...req.headers };
+    const host = String(req.headers.host || '').split(':')[0];
+    if (!viste.has(host) && !/favicon/.test(req.url)) viste.set(host, { ...req.headers });
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end('<title>HINTS</title><p>ok</p>');
+    res.end(html);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   return {
+    port: server.address().port,
     url: `http://127.0.0.1:${server.address().port}/pagina`,
-    viste: () => viste,
+    viste,
     async chiudi() { try { server.closeAllConnections?.(); } catch (_) {} await new Promise((r) => server.close(r)); },
   };
 }
-
-// Le pagine https le serve Filo stesso (niente rete); le intestazioni partite davvero le annota onSendHeaders, che vede
-// il risultato dell'unico onBeforeSendHeaders.
-async function serviHttps(app, pagine) {
-  await app.evaluate(({ session, net }, pg) => {
-    globalThis.__intestazioniPartite = {};
-    const risposta = (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      globalThis.__dalGestore = globalThis.__dalGestore || {};
-      globalThis.__dalGestore[u.hostname + u.pathname] = Object.fromEntries(req.headers);
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    };
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', risposta);
-    session.defaultSession.webRequest.onSendHeaders((d) => {
-      globalThis.__tutte = globalThis.__tutte || [];
-      globalThis.__tutte.push([d.resourceType, d.url]);
-      if (d.resourceType === 'mainFrame') globalThis.__intestazioniPartite[new URL(d.url).hostname] = { ...d.requestHeaders };
-    });
-    globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-  }, pagine);
-}
-const partite = (app) => app.evaluate(() => globalThis.__intestazioniPartite || {});
-const minuscole = (h) => Object.fromEntries(Object.entries(h || {}).map(([k, v]) => [k.toLowerCase(), v]));
 
 test('la pagina vede window.chrome pieno e la richiesta passkey condizionale resta in sospeso finché il sito non la annulla', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<title>CHROME</title><p>ok</p>');
@@ -83,8 +59,8 @@ test('il sito riceve i client hints onesti, con la versione vera di Chromium, e 
   const sito = await sitoCheAnnota();
   try {
     await openTab(sito.url);
-    await expect.poll(() => sito.viste() && sito.viste()['sec-ch-ua'], { timeout: 6_000 }).toMatch(/"Chromium";v="\d+"/);
-    const h = sito.viste();
+    await expect.poll(() => sito.viste.get('127.0.0.1')?.['sec-ch-ua'], { timeout: 6_000 }).toMatch(/"Chromium";v="\d+"/);
+    const h = sito.viste.get('127.0.0.1');
     const maggiore = /Chrome\/(\d+)\./.exec(h['user-agent'] || '')?.[1];
     expect(maggiore).toBeTruthy();
     expect(h['sec-ch-ua']).toContain(`"Chromium";v="${maggiore}"`);
@@ -96,25 +72,35 @@ test('il sito riceve i client hints onesti, con la versione vera di Chromium, e 
   } finally { await sito.chiudi(); }
 });
 
-test('la pagina di accesso di un provider noto non riceve il GPC, né header né proprietà; un sito qualunque sì', async ({ app, openTab }) => {
-  const HTML = '<title>Accedi</title><h1>Accesso</h1>';
-  await serviHttps(app, { 'accounts.google.com/signin/v2/identifier': HTML, 'sito-qualunque.test/pagina': HTML });
-  const normale = await openTab('https://sito-qualunque.test/pagina');
-  const accesso = await openTab('https://accounts.google.com/signin/v2/identifier');
-  await normale.waitForTimeout(2000);
-  console.log('DIAG', JSON.stringify(await app.evaluate(() => ({ gestore: globalThis.__dalGestore, tutte: globalThis.__tutte, partite: globalThis.__intestazioniPartite })), null, 1));
-  console.log('DIAG url', normale.url(), accesso.url());
-  await expect.poll(async () => Object.keys(await partite(app)).length, { timeout: 8_000 }).toBe(2);
-  const viste = await partite(app);
-  const qualunque = minuscole(viste['sito-qualunque.test']);
-  const google = minuscole(viste['accounts.google.com']);
-  expect(qualunque['sec-gpc']).toBe('1');
-  expect(google['sec-gpc']).toBeUndefined();
-  expect(google['sec-ch-ua']).toMatch(/"Chromium";v="\d+"/);
-  expect(google['sec-ch-ua']).not.toContain('Google Chrome');
-  await expect.poll(() => normale.evaluate(() => navigator.globalPrivacyControl === true), { timeout: 6_000 }).toBe(true);
-  await accesso.waitForLoadState('load');
-  await accesso.waitForTimeout(400);
-  expect(await accesso.evaluate(() => ({ gpc: navigator.globalPrivacyControl === true, chrome: !!(window.chrome && window.chrome.runtime) })))
-    .toEqual({ gpc: false, chrome: true });
+// Host di accesso noti (src/shared/authPopup.js) che Electron apre ancora in http: la lista HSTS di Chromium cresce e un
+// host che ci entra si apre solo in https (tests/fingerprint.spec.mjs), quindi la prova usa il primo che risponde.
+const HOST_DI_ACCESSO = ['login.live.com', 'filo.auth0.com', 'filo.b2clogin.com'];
+
+test.describe('pagina di accesso di un provider noto', () => {
+  test.use({ hostInPiu: HOST_DI_ACCESSO });
+
+  test('non riceve il GPC, né come header né come proprietà, mentre un sito qualunque sì', async ({ app, shell, openTab }) => {
+    await app.evaluate(() => globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null }));
+    const sito = await sitoCheAnnota('<title>Accedi</title><h1>Accesso</h1>');
+    try {
+      const normale = await openTab(sito.url);
+      let host = null;
+      for (const h of HOST_DI_ACCESSO) {
+        await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${h}:${sito.port}/login`);
+        if (await expect.poll(() => sito.viste.has(h), { timeout: 3_000 }).toBe(true).then(() => true, () => false)) { host = h; break; }
+      }
+      expect(host, `nessun host di accesso si apre più in http: ${HOST_DI_ACCESSO.join(', ')}`).not.toBeNull();
+      await expect.poll(() => sito.viste.get('127.0.0.1')?.['sec-gpc'], { timeout: 6_000 }).toBe('1');
+      const accessoH = sito.viste.get(host);
+      expect(accessoH['sec-gpc']).toBeUndefined();
+      expect(accessoH['sec-ch-ua']).toMatch(/"Chromium";v="\d+"/);
+      expect(accessoH['sec-ch-ua']).not.toContain('Google Chrome');
+      await expect.poll(() => normale.evaluate(() => navigator.globalPrivacyControl === true), { timeout: 6_000 }).toBe(true);
+      const accesso = await aspettaFinestra(app, (w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } }, `la scheda su ${host} non si trova`);
+      await accesso.waitForLoadState('load').catch(() => {});
+      await accesso.waitForTimeout(400);
+      expect(await accesso.evaluate(() => ({ gpc: navigator.globalPrivacyControl === true, chrome: !!(window.chrome && window.chrome.runtime) })))
+        .toEqual({ gpc: false, chrome: true });
+    } finally { await sito.chiudi(); }
+  });
 });
