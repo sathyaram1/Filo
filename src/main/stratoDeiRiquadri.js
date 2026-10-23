@@ -205,6 +205,8 @@ class StratoDeiRiquadri {
     const s = sender && !sender.strato ? this.strati.get(sender.wc) : null;
     const comando = String((d && d.comando) || '');
     if (!s || !s.pronta || !s.aiuto || !COMANDI_AIUTO.has(comando) || !vivo(s.vista.webContents)) return { ok: false };
+    // Il passo e la sua cornice stanno nel documento principale: un riquadro incorporato non li ha.
+    if ((comando === 'evita' || comando === 'azione') && !principaleDi(sender)) return { ok: false };
     const out = { comando };
     if (comando === 'chiudi') out.davvero = !!d.davvero;
     if (comando === 'evita') {
