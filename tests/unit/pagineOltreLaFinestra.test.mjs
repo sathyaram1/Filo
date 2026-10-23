@@ -50,6 +50,18 @@ test('l\'eccesso nella finestra conta il tetto della risposta, e senza finestra 
   assert.equal(FC.eccessoNellaFinestra({ finestra: f, caratteri: 0, risposta: 1e9 }), 0);
 });
 
+test('prima di mandare il margine è stretto: una richiesta al 93% della finestra non perde pagine', () => {
+  const f = 200000;
+  const caratteri = (f * 0.93 - 16384) * FC.CARATTERI_PER_TOKEN;
+  assert.ok(FC.eccessoNellaFinestra({ finestra: f, caratteri, risposta: 16384 }) > 0, 'col margine dei rifiuti taglierebbe');
+  assert.equal(FC.eccessoNellaFinestra({ finestra: f, caratteri, risposta: 16384, margine: FC.MARGINE_PAGINE }), 0);
+});
+
+test('il rifiuto di Anthropic porta le misure come quello di OpenRouter', () => {
+  const raw = 'OpenRouter 400: {"error":{"message":"Provider returned error","code":400,"metadata":{"raw":"{\\"type\\":\\"error\\",\\"error\\":{\\"type\\":\\"invalid_request_error\\",\\"message\\":\\"prompt is too long: 214263 tokens > 200000 maximum\\"}}","provider_name":"Anthropic"}}}';
+  assert.deepEqual(FC.troppoLungo({ status: 400, message: raw }), { max: 200000, chiesti: 214263 });
+});
+
 test('dopo un rifiuto: con le misure in proporzione, con la sola finestra dalla stima, senza niente null', () => {
   const caratteri = 200000;
   const e = FC.eccessoDopoRifiuto({ max: 32768, chiesti: 65536, caratteri });
