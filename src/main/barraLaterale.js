@@ -376,7 +376,13 @@ class BarraLaterale {
     const vista = this._vista();
     if (!vista) return;
     const [, H] = this.win.getContentSize();
-    const y = Math.max(0, Math.round(this.alto()));
+    // Aperta a schermo intero sotto le schede scese: quando la fila risale la barra resta dov'è, sotto il puntatore (#1343).
+    const altoOra = Math.max(0, Math.round(this.alto()));
+    const schermoIntero = !!this.tabs.contentFullscreen;
+    const c = this.aperta ? this.cimaAperta : null;
+    const ferma = !!c && c.schermoIntero && schermoIntero && altoOra < c.y;
+    const y = ferma ? c.y : altoOra;
+    this.cimaAperta = this.aperta && !ferma ? { y, schermoIntero } : c;
     const largo = this.aperta || this.timer.stringi;
     const chiusa = this._larghezzaChiusa();
     const w = largo ? PANNELLO + OMBRA : chiusa;
