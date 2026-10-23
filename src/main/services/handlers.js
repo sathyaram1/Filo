@@ -6571,6 +6571,8 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
     'con password) ricevi solo',
     'il tipo fra parentesi quadre: decidi sul tipo e sui segnali.',
     '',
+    ...(trigger === 'reopen' ? TRIAGE_RIAPERTURA : []),
+    '',
     'Rispondi SOLO con JSON: {"decisions":[{"i":<indice>,"action":"keep"|"archive",',
     '"reason":"<breve motivo in italiano>"}]} con una voce per OGNI scheda ricevuta.',
   ].join('\n');
