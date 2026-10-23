@@ -106,6 +106,12 @@
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     NO_ALLOWED_HOST: 'opzioni',
     LIMIT_REACHED: 'opzioni',
+    // Errori la cui cura è un altro modello: la frase dice DOVE_ALTRO_MODELLO, il tasto porta lì.
+    NO_TOOL_HOST: 'opzioni',
+    MODEL_UNAVAILABLE: 'opzioni',
+    DATA_POLICY: 'opzioni',
+    NO_PROVIDER_ALLOWED: 'opzioni',
+    ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
     // Il modello di lettura vuole il nome di una voce, o non conosce quello scritto: si scrive in Preferenze.
