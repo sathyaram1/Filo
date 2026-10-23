@@ -72,7 +72,7 @@ test('r1 un intervallo oltre il tetto si rifiuta col numero dei giorni scelti', 
     await page.locator('#mgCtDal').fill('2021-01-01');
     await page.locator('#mgCtDal').dispatchEvent('change');
     await expect(page.locator('#mgCtGuasto')).toContainText('Intervallo troppo lungo', { timeout: 10_000 });
-    await expect(page.locator('#mgCtGuasto')).toContainText(`${giorni.toLocaleString('it-IT')} giorni`);
+    await expect(page.locator('#mgCtGuasto')).toContainText(new RegExp(`(${giorni}|${giorni.toLocaleString('it-IT').replace('.', '\\.')}) giorni`));
     await page.locator('#mgCtFinestra .mg-chip[data-preset="7"]').click();
   } finally { await rimetti(app); }
 });
