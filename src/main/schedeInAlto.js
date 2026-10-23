@@ -52,6 +52,40 @@ class SchedeInAlto {
     }
   }
 
+  // `input-event` vede solo il riquadro principale: sopra un riquadro di un altro sito in cima alla pagina il bordo non
+  // arriverebbe mai (#1343 r2). `before-mouse-event` passa da ogni riquadro, ma con la y del riquadro: un movimento
+  // che il riquadro principale non ripete vale come bordo solo se un riquadro copre davvero la prima riga della pagina.
+  dalRiquadro(wc, input) {
+    if (!input || input.type !== 'mouseMove' || !wc) return;
+    const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
+    if (!sotto || sotto.webContents !== wc || !this._attivo()) return;
+    const prima = this.mossePagina;
+    setImmediate(() => {
+      if (this.mossePagina !== prima || !this._attivo()) return;
+      if (this.visibili) {
+        if (Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
+        return;
+      }
+      const y = Number(input.y);
+      if (!(Number.isFinite(y) && y <= BORDO_PX) || tastoPremuto(input)) { this._ferma('spinta'); return; }
+      if (this.timer.spinta || this.sondaCima) return;
+      const giro = this.mossePagina;
+      this.sondaCima = this._riquadroInCima(wc).then((si) => {
+        this.sondaCima = null;
+        if (!si || this.mossePagina !== giro || this.visibili || this.timer.spinta || !this._attivo()) return;
+        this.timer.spinta = setTimeout(() => { this.timer.spinta = null; this.mostra(); }, this._opzioni().attesaMs);
+      });
+    });
+  }
+
+  _riquadroInCima(wc) {
+    const codice = `[...document.querySelectorAll('iframe,frame,embed,object')].some((f) => {
+      const r = f.getBoundingClientRect(); return r.width > 0 && r.top <= ${BORDO_PX} && r.bottom > ${BORDO_PX}; })`;
+    try {
+      return wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: codice }]).then((v) => v === true, () => false);
+    } catch (_) { return Promise.resolve(false); }
+  }
+
   _dallaShell(input) {
     if (!this.visibili || !input) return;
     if (input.type === 'mouseMove' || input.type === 'mouseDown' || input.type === 'mouseEnter') this._ferma('uscita');

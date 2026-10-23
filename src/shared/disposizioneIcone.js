@@ -31,7 +31,7 @@
     closeTab: { icona: 'close', etichetta: 'menu_close_tab', tipo: 'finestra' },
     newTab: { icona: 'filoLogo', etichetta: 'menu_new_tab', tipo: 'finestra' },
     incognito: { icona: 'incognito', etichetta: 'menu_incognito', tipo: 'finestra' },
-    openOptions: { icona: 'options', etichetta: 'menu_open_options', tipo: 'finestra' },
+    openOptions: { icona: 'models', etichetta: 'menu_open_options', tipo: 'finestra' },
     home: { icona: 'home', etichetta: 'menu_open_home', tipo: 'finestra' },
     editorApp: { icona: 'editor', etichetta: 'menu_open_editor', tipo: 'finestra' },
     feedbackApp: { icona: 'feedback', etichetta: 'menu_open_feedback', tipo: 'finestra', soloOwner: true },
