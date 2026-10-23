@@ -376,6 +376,35 @@ test('un giro di pulizia conta candidate, chiuse e doppie; la scheda riaperta di
   expect(await tutteLeChiavi(app)).not.toMatch(/Ricetta|127\.0\.0\.1|localhost/);
 });
 
+test('la scheda chiusa si conta fra le riaperte da ogni strada: il clic sulla sua voce nella home e la chat che la riapre', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const url = testServer.html('<title>Ricetta</title><p>La ricetta della pasta.</p>', { pubblico: true });
+  await openTab(url);
+  await openTab(url);
+  const prima = await openTab('filo://newtab/?prova=pulizia');
+  const r = await prima.evaluate(() => chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+  expect(r.archived).toBeGreaterThanOrEqual(1);
+  expect(await misura(app, 'riaperte')).toEqual({});
+
+  // Dalla home: il gruppo delle pagine nel filo, e il clic sulla pagina.
+  const home = await openTab('filo://newtab/?prova=riapri');
+  const voce = home.locator(`.dash-pagina[href="${url}"]`).first();
+  await expect(voce).toHaveCount(1, { timeout: 15_000 });
+  await home.locator('.dash-pagine', { has: voce }).first().locator('.dash-pagine-testa').click();
+  await voce.click();
+  await expect.poll(() => misura(app, 'riaperte'), { timeout: 8_000 }).toEqual({ 'duplicato|min10': 1 });
+
+  // Dalla chat: Filo l'ha trovata fra le chiuse e la apre col suo indirizzo.
+  const aperta = await app.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Ricetta' }), url);
+  expect(aperta.executed).toBe(true);
+  await expect.poll(() => misura(app, 'riaperte'), { timeout: 8_000 }).toEqual({ 'duplicato|min10': 2 });
+  // Un indirizzo mai chiuso non è una riaperta.
+  await app.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u, label: 'Altra' }), testServer.html('<p>altra</p>', { pubblico: true }));
+  await new Promise((res) => setTimeout(res, 500));
+  expect(await misura(app, 'riaperte')).toEqual({ 'duplicato|min10': 2 });
+});
+
 // ── La home senza un modello e il suggerimento usato ─────────────────────
 test('la home senza un modello conta il suo motivo all’apertura, e il suggerimento usato il posto, il tipo e l’età', async ({ app, openTab }) => {
   test.setTimeout(60_000);
