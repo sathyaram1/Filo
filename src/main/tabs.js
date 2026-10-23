@@ -1650,15 +1650,28 @@ class TabManager {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
       const esito = this.applyTriageDecisions(cands, [...byIndex.values()]);
-      return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
+      return this._esitoTriage(giudizioMancato ? { ...esito, giudizioMancato: true } : esito, { trigger, valutate: cands.length });
     } finally {
       this._triageRunning = false;
     }
   }
 
+  // §2.3 — l'avviso del giro, se ne va mostrato uno (la regola sta in SN_TAB_TRIAGE.testoEsito).
+  _esitoTriage(esito, { trigger, valutate }) {
+    const T = globalThis.SN_TAB_TRIAGE;
+    const testo = T && T.testoEsito ? T.testoEsito({
+      trigger,
+      valutate,
+      archiviate: esito.archived,
+      riordinate: !!esito.reordered,
+      giudizioMancato: !!esito.giudizioMancato,
+    }) : '';
+    if (testo) this._showTriageToast(testo);
+    return esito;
+  }
+
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
-  // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
-  // `cands` è l'elenco indicizzato passato all'LLM.
+  // riordina cromaticamente i superstiti (§1.3). `cands` è l'elenco indicizzato passato all'LLM.
   applyTriageDecisions(cands, decisions) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
