@@ -129,13 +129,13 @@
     schedeAperte: `^(${alternative(nomi(FASCE_SCHEDE))}[:]${alternative(nomi(FASCE_FINESTRE))})?$`,
     ambienteFinestra: `^(${alternative(nomi(FASCE_LARGHEZZA))}[:]${alternative(SCALE)}[:]${alternative(STATI_FINESTRA)}[:]${alternative(TEMI)})?$`,
   });
-  // I tetti di caratteri delle chiavi unite e dei conti uniti, per misura. Le notifiche hanno posto per tre volte i
-  // tipi di oggi: un avviso nuovo non deve aspettare regole nuove.
+  // I tetti di caratteri delle chiavi unite e dei conti uniti, per misura: il doppio dell'elenco di oggi. Le notifiche
+  // hanno posto per quattro volte i tipi di oggi: un avviso nuovo non deve aspettare regole nuove.
   const TIPI_PREVISTI = 300;
   const TETTI = Object.freeze({
-    chiusuraScheda: [1500, 1000], riordinoAutomatico: [1500, 600], schedaTrascinata: [100, 100], voceMenuScheda: [400, 200],
-    anteprimaScheda: [1500, 600], notifica: [TIPI_PREVISTI * 10 * 54, TIPI_PREVISTI * 10 * 10], downloadAzione: [600, 400],
-    sessioneRipristinata: [600, 400],
+    chiusuraScheda: [2500, 1500], riordinoAutomatico: [1500, 800], schedaTrascinata: [100, 100], voceMenuScheda: [600, 300],
+    anteprimaScheda: [1500, 700], notifica: [TIPI_PREVISTI * 10 * 54, TIPI_PREVISTI * 10 * 10], downloadAzione: [1000, 600],
+    sessioneRipristinata: [700, 400],
   });
 
   // ── L'ora, in memoria ─────────────────────────────────────────────────
