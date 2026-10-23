@@ -1137,6 +1137,36 @@
   // Un'ora senza chiamate ai modelli non ha il secondo documento.
   function senzaChiamate(doc) { return MISURE_CHIAMATE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
+  // Una misura delle attività: le sole combinazioni ammesse, al più TETTO_VOCI_ATTIVITA più la riga «altro».
+  function attivitaPulite(mappa, misura) {
+    const out = {};
+    let specifiche = 0;
+    for (const [k, v] of Object.entries(oggetto(mappa) ? mappa : {})) {
+      if (!intero(v) || v === 0 || !combinazioneValida(misura, k)) continue;
+      let c = k;
+      if (c !== ALTRO && !has(out, c)) { if (specifiche >= TETTO_VOCI_ATTIVITA) c = ALTRO; else specifiche += 1; }
+      out[c] = String(conto((Number(out[c]) || 0) + v));
+    }
+    return out;
+  }
+
+  // Le attività della stessa ora, nel loro documento: stesso pseudonimo, stessa ora, stesso id (#1467).
+  function documentoAttivita({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    return {
+      v: VERSIONE_ATTIVITA,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
+      ...Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, attivitaPulite(d[m], m)])),
+    };
+  }
+  function senzaAttivita(doc) { return MISURE_ATTIVITA.every((m) => !oggetto(doc && doc[m]) || !Object.keys(doc[m]).length); }
+
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
     const d = oggetto(dati) ? dati : {};
