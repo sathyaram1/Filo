@@ -412,6 +412,8 @@
 
     window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
     window.addEventListener('keydown', onInteract, { passive: true, capture: true });
+    window.addEventListener('wheel', onInteract, { passive: true, capture: true });
+    window.addEventListener('touchstart', onInteract, { passive: true, capture: true });
     window.addEventListener('scroll', onScroll, { passive: true });
 
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
