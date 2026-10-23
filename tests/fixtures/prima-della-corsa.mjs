@@ -4,6 +4,7 @@
 import { dirname } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
+import { allineaPerLeProve } from '../../scripts/lib/pacchetti.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
 
