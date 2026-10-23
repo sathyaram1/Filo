@@ -197,3 +197,20 @@ export async function tastieraDi(app, page) {
 // La Page dove sta il pannello Aiuto della scheda (#1509.3): lo strato sopra un sito, la scheda su una pagina di Filo.
 // I suoi locator, i suoi clic e i suoi tasti arrivano al pannello.
 export const paginaDellAiuto = tastieraDi;
+
+// Il popup di conferma chiesto da un riquadro dello strato si disegna nello strato, già fuori dal sito. L'oggetto parla
+// agli hook SN_CONFIRM_UI del suo mondo isolato: gli helper di confirm.mjs lo usano come una pagina di Filo.
+export async function confermaNelloStrato(app, page, { timeout = 10_000 } = {}) {
+  const { expect } = await import('@playwright/test');
+  const strato = await paginaDelloStrato(app, page);
+  const vista = {
+    evaluate: (fn, arg = null) => nelloStrato(app, page, fn, arg),
+    locator: (s) => strato.locator(s),
+    screenshot: (o) => strato.screenshot(o),
+    mouse: strato.mouse,
+    keyboard: strato.keyboard,
+  };
+  await expect.poll(() => vista.evaluate(() => !!(globalThis.SN_CONFIRM_UI && globalThis.SN_CONFIRM_UI._test.state())),
+    { message: 'il popup nello strato non è comparso', timeout }).toBe(true);
+  return vista;
+}

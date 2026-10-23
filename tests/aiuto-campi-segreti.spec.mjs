@@ -47,8 +47,8 @@ async function apriAiuto(app, shell, page) {
 }
 
 async function scriviAllAiuto(aiuto, testo) {
-  await page.fill('.sn-sidebar-input textarea', testo);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await aiuto.fill('.sn-sidebar-input textarea', testo);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 }
 
 // Il testo arrivato al modello, senza l'indirizzo del server di prova e l'immagine della pagina: la porta e il

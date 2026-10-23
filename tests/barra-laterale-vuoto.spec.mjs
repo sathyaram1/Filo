@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu, puntatoreCheSegue } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { nelloStrato } from './helpers/riquadri.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
@@ -202,6 +203,7 @@ test('sopra l\'avviso del sito pericoloso l\'icona Aiuto fa la domanda a Filo su
   await expect.poll(async () => (await schede()).n, { timeout: 8000 }).toBe(prima + 1);
   expect((await schede()).url).toMatch(/^filo:\/\/newtab\//);
   expect(await page.locator('.sn-sidebar').count()).toBe(0);
+  expect(await nelloStrato(app, page, () => document.querySelectorAll('.sn-sidebar').length) || 0, 'Aiuto aperto sotto l\'avviso').toBe(0);
 });
 
 // Il puntatore sull'avviso conta come quello sulla pagina: un clic chiude la barra, uscendoci sopra si chiude.

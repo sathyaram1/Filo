@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SHOTS = 'tests/.shots';
 const DETTO = 'dove si cambia la password';
@@ -91,11 +92,13 @@ async function barraAperta(app) {
 const icona = (barra) => barra.locator('#nav .ico[data-id="help"]');
 const lascia = (app) => app.evaluate(() => { const r = globalThis.__aiuto.rilascia; globalThis.__aiuto.rilascia = null; if (r) r(); return !!r; });
 
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): lì si scrive.
 async function chiedi(app, page, testo) {
-  const ta = page.locator('.sn-sidebar textarea');
+  const strato = await paginaDellAiuto(app, page);
+  const ta = strato.locator('.sn-sidebar textarea');
   await ta.click();
   await ta.fill(testo);
-  await page.keyboard.press('Enter');
+  await strato.keyboard.press('Enter');
   await expect.poll(() => app.evaluate(() => globalThis.__aiuto.chiamate), { timeout: 8_000 }).toBeGreaterThan(0);
 }
 
@@ -115,7 +118,7 @@ test('in cima alla barra: un clic apre l\'Aiuto, il secondo detta nella sua case
   await barra.screenshot({ path: `${SHOTS}/barra-aiuto-chiuso.png` });
 
   await help.click();
-  const aiuto = page.locator('.sn-sidebar');
+  const aiuto = (await paginaDellAiuto(app, page)).locator('.sn-sidebar');
   await expect(aiuto).toBeVisible({ timeout: 8_000 });
   await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
   // La barra resta aperta sotto il puntatore, e l'icona adesso è il microfono.
@@ -153,7 +156,7 @@ test('Aiuto ridotto mentre detta: l\'icona dice «Ferma» e il clic ferma, nella
   const barra = await barraAperta(app);
   const help = icona(barra);
   await help.click();
-  const aiuto = page.locator('.sn-sidebar');
+  const aiuto = (await paginaDellAiuto(app, page)).locator('.sn-sidebar');
   await expect(aiuto).toBeVisible({ timeout: 8_000 });
   await help.click();
   const mic = aiuto.locator('.sn-voce-btn');
@@ -199,7 +202,7 @@ test('Filo risponde ad Aiuto ridotto: la striscia si accende e si spegne aprendo
   const page = await sito(app, openTab, testServer);
   let barra = await barraAperta(app);
   await icona(barra).click();
-  const aiuto = page.locator('.sn-sidebar');
+  const aiuto = (await paginaDellAiuto(app, page)).locator('.sn-sidebar');
   await expect(aiuto).toBeVisible({ timeout: 8_000 });
   await comandaBarra(app, 'chiudi');
   await chiedi(app, page, 'dove si cambia la password?');
@@ -255,7 +258,8 @@ test('chiuso mentre Filo risponde: la risposta non si perde, e riaprendo l\'Aiut
   const barra = await barraAperta(app);
   const help = icona(barra);
   await help.click();
-  const aiuto = page.locator('.sn-sidebar');
+  const strato = await paginaDellAiuto(app, page);
+  const aiuto = strato.locator('.sn-sidebar');
   await expect(aiuto).toBeVisible({ timeout: 8_000 });
   await comandaBarra(app, 'chiudi');
   await chiedi(app, page, 'dove si cambia la password?');
@@ -281,13 +285,13 @@ test('chiuso mentre Filo risponde: la risposta non si perde, e riaprendo l\'Aiut
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   await help.click();
-  await expect(page.locator('.sn-sidebar')).toBeVisible();
-  await expect(page.locator('.sn-sidebar-msg-assistant')).toHaveCount(0);
+  await expect(strato.locator('.sn-sidebar')).toBeVisible();
+  await expect(strato.locator('.sn-sidebar-msg-assistant')).toHaveCount(0);
 
   // Chiuso e poi la pagina cambia: la risposta se ne va con lei, e la striscia si spegne.
   await comandaBarra(app, 'chiudi');
   await chiedi(app, page, 'ancora una cosa');
-  await page.locator('.sn-sidebar-close').click();
+  await strato.locator('.sn-sidebar-close').click();
   await lascia(app);
   await expect(barra.locator('#striscia')).toHaveClass(/\brisposta\b/, { timeout: 8_000 });
   await page.evaluate((u) => { location.href = u; }, testServer.html(SITO));
@@ -304,13 +308,15 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
 
   // Senza modello di dettatura: l'Aiuto si apre, il microfono parte, e l'errore arriva come per gli altri modelli.
   await help.click();
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  const strato = await paginaDellAiuto(app, page);
+  await expect(strato.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
   await help.click();
-  await expect(page.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await expect(strato.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
   await page.waitForTimeout(1500);
   await help.click();
-  await expect(page.locator('.sn-toast').first()).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'pronto');
+  // L'avviso lo mostra chi ha il microfono: l'Aiuto, nello strato.
+  await expect(strato.locator('.sn-toast').first()).toBeVisible({ timeout: 10_000 });
+  await expect(strato.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'pronto');
 
   // Filo spento su questo sito.
   const host = new URL(page.url()).hostname;
@@ -319,13 +325,13 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
   await expect(help).toHaveAttribute('data-sugg', 'Filo è spento su questo sito');
   await help.click({ force: true });
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-sidebar')).toBeVisible();
+  await expect(strato.locator('.sn-sidebar')).toBeVisible();
 
   // L'Aiuto spento in Preferenze: il pannello se ne va e l'icona lo dice.
   await imposta(app, { blocklist: [], featureFlags: { help: false } });
   await expect(help).toHaveAttribute('data-sugg', 'Aiuto spento in Preferenze', { timeout: 8_000 });
   await expect(help).toHaveAttribute('aria-disabled', 'true');
-  await expect(page.locator('.sn-sidebar')).toHaveCount(0);
+  await expect(strato.locator('.sn-sidebar')).toHaveCount(0);
   mkdirSync(SHOTS, { recursive: true });
   await barra.screenshot({ path: `${SHOTS}/barra-aiuto-spento.png` });
 
@@ -350,7 +356,7 @@ test('l\'icona si toglie dalla barra e nel menu del tasto destro fa lo stesso; l
   await expect(nelMenu).toBeVisible({ timeout: 8_000 });
   await expect(nelMenu).toHaveAttribute('aria-label', 'Aiuto');
   await nelMenu.click();
-  const aiuto = page.locator('.sn-sidebar');
+  const aiuto = (await paginaDellAiuto(app, page)).locator('.sn-sidebar');
   await expect(aiuto).toBeVisible({ timeout: 8_000 });
   // Con l'Aiuto aperto la stessa icona è il microfono.
   await page.locator('h1').click({ button: 'right' });

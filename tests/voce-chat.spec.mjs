@@ -8,6 +8,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SHOTS = 'tests/.shots';
 const DETTO = 'che tempo fa domani a Lisbona';
@@ -329,11 +330,14 @@ test('Aiuto su un sito: il microfono c\'è, e un clic fabbricato dal sito non lo
     t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
     t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
   });
-  const mic = page.locator('.sn-sidebar .sn-voce-btn');
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): il sito non trova il microfono.
+  const aiuto = await paginaDellAiuto(app, page);
+  const mic = aiuto.locator('.sn-sidebar .sn-voce-btn');
   await expect(mic).toBeVisible({ timeout: 8_000 });
   await expect(mic).toHaveAttribute('title', /^Parla \(/);
-  // Lo script del sito prova ad accenderlo: niente.
-  await page.evaluate(() => {
+  expect(await page.evaluate(() => document.querySelector('.sn-sidebar .sn-voce-btn'))).toBeNull();
+  // Un clic o un tasto fabbricati da codice non lo accendono, nemmeno nello strato.
+  await aiuto.evaluate(() => {
     const b = document.querySelector('.sn-sidebar .sn-voce-btn');
     b.click();
     b.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -344,6 +348,7 @@ test('Aiuto su un sito: il microfono c\'è, e un clic fabbricato dal sito non lo
   await page.waitForTimeout(500);
   await expect(mic).toHaveAttribute('data-stato', 'pronto');
   await expect(page.locator('.sn-toast', { hasText: 'microfono' })).toHaveCount(0);
+  await expect(aiuto.locator('.sn-toast', { hasText: 'microfono' })).toHaveCount(0);
 });
 
 test('home: «Detta» dal tasto destro nella casella della chat è lo stesso microfono, e la richiesta parte', async ({ app, shell }) => {
@@ -433,7 +438,7 @@ test('Aiuto su un sito che vieta i fogli di stile esterni: il microfono ha il su
       t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
       t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
     });
-    const mic = page.locator('.sn-sidebar .sn-voce-btn');
+    const mic = (await paginaDellAiuto(app, page)).locator('.sn-sidebar .sn-voce-btn');
     await expect(mic).toBeVisible({ timeout: 8_000 });
     // Tondo grande quanto l'invio, col solo microfono: niente croce, niente anello.
     await expect.poll(async () => { const b = await mic.boundingBox(); return [Math.round(b.width), Math.round(b.height)]; }).toEqual([32, 32]);

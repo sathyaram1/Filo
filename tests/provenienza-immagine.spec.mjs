@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import zlib from 'node:zlib';
 import { join } from 'node:path';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const RIGA = '.sn-menu-origine';
 
@@ -364,9 +365,11 @@ async function modelloFinto(app) {
 
 async function chiediAllAiuto(app, page, domanda) {
   await menuDi(page).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
-  await page.fill('.sn-sidebar-input textarea', domanda);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3).
+  const aiuto = await paginaDellAiuto(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  await aiuto.fill('.sn-sidebar-input textarea', domanda);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
   // Il turno dell'Aiuto con la domanda (il correttore mentre si scrive fa i suoi, senza istruzioni di sistema).
   const turno = (_e, d) => globalThis.__turniOrigine.find((t) => t.includes('"role":"system"') && t.includes(d)) || '';
   await expect.poll(() => app.evaluate(turno, domanda), { timeout: 20000 }).not.toBe('');
@@ -568,9 +571,10 @@ test('una domanda qualsiasi all’Aiuto, con l’immagine ripetitiva visibile: F
   await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
   await page.locator('#testo').click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
-  await page.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const aiuto = await paginaDellAiuto(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
   expect(await rispostaPiuLenta(app)).toBeLessThan(1000);
 });
 

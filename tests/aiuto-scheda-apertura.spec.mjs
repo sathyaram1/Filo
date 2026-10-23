@@ -3,7 +3,7 @@
 // Senza il lavoro al modello non arriva nessuna data, e la risposta finta resta senza ora.
 
 import { test, expect } from './helpers/reteFinta.mjs';
-import { nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { nelloStrato, paginaDellAiuto } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA_A = '<title>Pagina A</title><body style="padding:40px;font:16px sans-serif"><h1>Articolo A</h1></body>';
@@ -57,10 +57,14 @@ const schedaDi = (app, url) => app.evaluate(({ BrowserWindow }, u) => {
   return t ? { id: t.id, openedAt: t.openedAt, quando: globalThis.SN_FILO_CONTESTO.quando(Date.parse(t.openedAt)) } : null;
 }, url);
 
-async function chiedi(page, testo) {
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
-  await page.fill('.sn-sidebar-input textarea', testo);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): lì si guarda e si scrive.
+const aiutoDi = (app, page) => paginaDellAiuto(app, page);
+
+async function chiedi(app, page, testo) {
+  const aiuto = await aiutoDi(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', testo);
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 }
 
 const testoDi = (messaggi) => (messaggi || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
@@ -77,11 +81,11 @@ test('Aiuto dal menu della scheda: il primo messaggio porta la data di apertura 
   const a = await schedaDi(app, urlA);
   expect(a && a.quando).toBeTruthy();
   await shell.evaluate((id) => window.filoShell.tabs.help(id), a.id);
-  await expect(pageA.locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
-  await chiedi(pageA, 'quando l\'ho aperta?');
+  await expect((await aiutoDi(app, pageA)).locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
+  await chiedi(app, pageA, 'quando l\'ho aperta?');
 
   // L'utente legge l'ora vera di apertura nella risposta.
-  await expect(pageA.locator('.sn-sidebar-msg-assistant').last()).toContainText(`(${a.quando})`, { timeout: 15_000 });
+  await expect((await aiutoDi(app, pageA)).locator('.sn-sidebar-msg-assistant').last()).toContainText(`(${a.quando})`, { timeout: 15_000 });
 
   const primo = testoDi((await app.evaluate(() => globalThis.__visti))[0]);
   expect(primo).toMatch(new RegExp(`l'utente l'ha aperta (meno di un minuto|\\d+ minut[oi]) fa \\(${a.quando.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`));
@@ -99,22 +103,21 @@ test('dal menu della pagina c\'è la stessa data, e quella scritta dalla pagina 
   await aiutoFinto(app);
   const a = await schedaDi(app, urlA);
 
-  // Il mondo dell'Aiuto prova a dire al main un'altra data di apertura.
-  await nelMondoDiFilo(app, pageA, () => {
+  await pageA.locator('h1').click({ button: 'right' });
+  await expect(menuDi(pageA).locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
+  await menuDi(pageA).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await expect((await aiutoDi(app, pageA)).locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  // Il mondo dell'Aiuto (lo strato sopra la scheda) prova a dire al main un'altra data di apertura.
+  await nelloStrato(app, pageA, () => {
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (msg, ...rest) => {
       if (msg && msg.type === 'ai_request' && msg.payload) msg.payload.schedaApertaIl = '2001-01-01T08:00:00.000Z';
       return orig(msg, ...rest);
     };
   });
+  await chiedi(app, pageA, 'da quanto è aperta questa scheda?');
 
-  await pageA.locator('h1').click({ button: 'right' });
-  await expect(menuDi(pageA).locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
-  await menuDi(pageA).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
-  await expect(pageA.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  await chiedi(pageA, 'da quanto è aperta questa scheda?');
-
-  await expect(pageA.locator('.sn-sidebar-msg-assistant').last()).toContainText(`(${a.quando})`, { timeout: 15_000 });
+  await expect((await aiutoDi(app, pageA)).locator('.sn-sidebar-msg-assistant').last()).toContainText(`(${a.quando})`, { timeout: 15_000 });
   const primo = testoDi((await app.evaluate(() => globalThis.__visti))[0]);
   expect(primo).not.toContain('2001');
 });
@@ -147,10 +150,10 @@ test('dopo un riavvio la scheda ricorda quando era stata aperta', async ({ app, 
   await pageA.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
   await aiutoFinto(app);
   await shell.evaluate((id) => window.filoShell.tabs.help(id), a.id);
-  await expect(pageA.locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
-  await chiedi(pageA, 'quando l\'ho aperta?');
+  await expect((await aiutoDi(app, pageA)).locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
+  await chiedi(app, pageA, 'quando l\'ho aperta?');
 
-  await expect(pageA.locator('.sn-sidebar-msg-assistant').last()).toContainText(`1 giorno e 2 ore fa (${a.quando})`, { timeout: 15_000 });
+  await expect((await aiutoDi(app, pageA)).locator('.sn-sidebar-msg-assistant').last()).toContainText(`1 giorno e 2 ore fa (${a.quando})`, { timeout: 15_000 });
   // La pagina che la scheda mostrava prima del riavvio c'era da tre ore, non da adesso.
   expect(testoDi((await app.evaluate(() => globalThis.__visti))[0])).toContain('La pagina che mostra adesso ci è arrivata dopo, 3 ore fa');
 });
@@ -174,8 +177,8 @@ test('scheda aperta da due ore, pagina raggiunta adesso con un collegamento: l\'
   await pageB.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
   await aiutoFinto(app);
   await shell.evaluate((i) => window.filoShell.tabs.help(i), id);
-  await expect(pageB.locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
-  await chiedi(pageB, 'quando ho aperto questa pagina?');
+  await expect((await aiutoDi(app, pageB)).locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
+  await chiedi(app, pageB, 'quando ho aperto questa pagina?');
   await expect.poll(async () => (await app.evaluate(() => globalThis.__visti)).length, { timeout: 15_000 }).toBeGreaterThan(0);
 
   const primo = testoDi((await app.evaluate(() => globalThis.__visti))[0]);

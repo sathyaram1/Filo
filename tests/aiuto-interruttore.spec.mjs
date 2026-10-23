@@ -8,7 +8,7 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { statoDi } from './helpers/riquadri.mjs';
+import { statoDi, conta } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -109,22 +109,23 @@ test('«spegni l\'Aiuto» lo toglie da tasto destro, linguetta e Alt+H; «riacce
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
   await page.waitForTimeout(600);
-  await expect(page.locator('.sn-sidebar')).toHaveCount(0);
+  // Su un sito il pannello sta nello strato sopra la scheda (#1509.3): non c'è né lì né nella pagina.
+  expect(await conta(app, page, '.sn-sidebar')).toBe(0);
 
   expect((await chiedi(app, 'acceso')).executed).toBe(true);
   await expect.poll(() => vociPagina(page)).toContain('Aiuto');
   await expect.poll(() => linguettaHaAiuto(app, shell), { timeout: 15_000 }).toBe(true);
   await expect.poll(() => vocesulMenuApp(app)).toBe(true);
   await premiAltH(app);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  await expect.poll(async () => !!(await statoDi(app, page, '.sn-sidebar'))?.visibile, { timeout: 8000 }).toBe(true);
 });
 
 test('spento con il pannello aperto, il pannello se ne va', async ({ app, openTab, testServer }) => {
   const page = await apriPagina(openTab, testServer);
   await premiAltH(app);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  await expect.poll(async () => !!(await statoDi(app, page, '.sn-sidebar'))?.visibile, { timeout: 8000 }).toBe(true);
   expect((await chiedi(app, 'spento')).executed).toBe(true);
-  await expect(page.locator('.sn-sidebar')).toHaveCount(0, { timeout: 8000 });
+  await expect.poll(() => conta(app, page, '.sn-sidebar'), { timeout: 8000 }).toBe(0);
 });
 
 test('sotto l\'avviso del sito, da spento Alt+H e la linguetta dicono perché nella cornice', async ({ app, shell, openTab, testServer }) => {

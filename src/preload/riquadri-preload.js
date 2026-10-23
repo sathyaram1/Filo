@@ -131,6 +131,30 @@ const strato = {
   }),
 };
 
+// Il microfono di Filo lo apre la cornice della finestra (#586), come sui siti: qui arrivano solo i campioni.
+const microfoniAperti = new Map();
+ipcRenderer.on('microfono:dati', (_event, d) => {
+  const m = d && microfoniAperti.get(d.id);
+  if (!m) return;
+  if (d.fine) { microfoniAperti.delete(d.id); try { m.suFine(); } catch (_) {} return; }
+  if (d.dati) { try { m.suDati(d.dati instanceof Float32Array ? d.dati : Float32Array.from(d.dati)); } catch (_) {} }
+});
+const microfonoDellaCornice = {
+  async apri({ suDati, suFine } = {}) {
+    let r = null;
+    try { r = await ipcRenderer.invoke('microfono:apri'); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.id) throw Object.assign(new Error('microfono'), { name: (r && r.errore) || 'NotAllowedError' });
+    microfoniAperti.set(r.id, { suDati: suDati || (() => {}), suFine: suFine || (() => {}) });
+    return {
+      rate: r.rate,
+      chiudi: () => {
+        if (!microfoniAperti.delete(r.id)) return;
+        ipcRenderer.invoke('microfono:chiudi', { id: r.id }).catch(() => {});
+      },
+    };
+  },
+};
+
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
@@ -198,6 +222,7 @@ if (IN_STRATO) {
   globalThis.chrome = chromeShim;
   globalThis.self = globalThis;
   globalThis.SN_STRATO_RIQUADRI = Object.freeze({ ...strato, pagina: strato.pagina() });
+  globalThis.SN_MICROFONO_CORNICE = microfonoDellaCornice;
   const consegnaScorciatoia = require('./scorciatoia.js');
   ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => consegnaScorciatoia(broadcastListeners, payload, filoMessage));
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadContentScripts, { once: true });

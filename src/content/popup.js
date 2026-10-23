@@ -1150,6 +1150,7 @@
       toastHostEl = document.createElement('div');
       toastHostEl.className = 'sn-toasts';
       toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
+      toastHostEl.classList.toggle('sn-toasts-accanto-aiuto', pilaAccantoAiuto);
       global.SN_FILO_UI?.mark(toastHostEl);
       document.documentElement.appendChild(toastHostEl);
     }
