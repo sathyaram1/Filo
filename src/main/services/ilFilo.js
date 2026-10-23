@@ -110,7 +110,10 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   async function compattaFile() {
     const lette = [];
     // Di un evento servono solo i campi che decidono cosa copre una cancellazione, non il testo dei messaggi.
-    const sottile = (ev) => ({ id: ev.id, tipo: ev.tipo, ts: ev.ts, chat: ev.chat, url: ev.url, visita: ev.visita, pagine: ev.pagine });
+    const sottile = (ev) => ({
+      id: ev.id, tipo: ev.tipo, ts: ev.ts, chat: ev.chat, url: ev.url, visita: ev.visita, pagine: ev.pagine, parametri: ev.parametri,
+      testo: ev.tipo === E().TIPI.NOTIFICA ? ev.testo : undefined,
+    });
     try {
       await perRiga(fileEventi(), (r, i) => {
         if (!r.trim()) return;
@@ -123,9 +126,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     const tenuti = new Set(E().compatta(lette.filter((x) => x.ev).map((x) => x.ev)));
     // Una riga che questa versione non capisce (una versione più nuova del formato) resta dov'è.
     const restano = new Set(lette.filter((x) => !x.ev || tenuti.has(x.ev)).map((x) => x.i));
-    const tmp = fileEventi() + '.tmp';
-    const fh = await fsp.open(tmp, 'w');
-    try {
+    await scriviIntero(async (fh) => {
       let blocco = '';
       await perRiga(fileEventi(), (r, i) => {
         if (!restano.has(i)) return undefined;
@@ -136,10 +137,30 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         return fh.write(b, null, 'utf8');
       });
       if (blocco) await fh.write(blocco, null, 'utf8');
+    });
+    return lette.length - restano.size;
+  }
+
+  // Il file intero si riscrive solo passando da un temporaneo: chi muore a metà ritrova quello di prima.
+  async function scriviIntero(scrivi) {
+    const tmp = fileEventi() + '.tmp';
+    const fh = await fsp.open(tmp, 'w');
+    try {
+      await scrivi(fh);
       await fh.datasync().catch(() => {});
     } finally { await fh.close(); }
     await rinomina(tmp, fileEventi());
-    return lette.length - restano.size;
+  }
+
+  // Le prove che riusano un'app rimettono il filo com'era all'apertura (tests/helpers/appCondivisa.mjs).
+  function ricomincia(testo) {
+    return inCoda(async () => {
+      await carica();
+      await fsp.mkdir(dir(), { recursive: true });
+      await scriviIntero((fh) => fh.writeFile(String(testo || ''), 'utf8'));
+      normale.stato = await caricaDaDisco();
+      resetIncognito();
+    });
   }
 
   async function caricaDaDisco() {
@@ -204,8 +225,32 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
   }
 
+  // Il registro dei cambi di prima (#867) entra nel filo alla sua ora; la chiave si toglie solo dopo che è su disco.
+  async function migraCambiSalvati() {
+    const D = disco();
+    const KEY = globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS && globalThis.SN_CONST.STORAGE_KEYS.FILO_CAMBI;
+    const chrome = globalThis.chrome;
+    if (!KEY || !chrome || !chrome.storage || !chrome.storage.local) return;
+    const leggi = () => chrome.storage.local.get(KEY);
+    const res = D && D.fuoriDaIncognito ? await D.fuoriDaIncognito(leggi) : await leggi();
+    const lista = res && res[KEY];
+    if (lista === undefined) return;
+    const gia = new Set(E().cambiDi(normale.stato).map((e) => e.id));
+    const eventi = E().daCambiSalvati(lista, { dispositivo: normale.dispositivo, gia });
+    if (eventi.length) {
+      await scriviInCoda(eventi.map(E().riga).join(''));
+      for (const ev of eventi) E().applica(normale.stato, ev);
+    }
+    const togli = async () => {
+      await chrome.storage.local.remove(KEY);
+      if (D && D.flushNow) await D.flushNow();
+    };
+    if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
+  }
+
   async function migraDaStorage() {
     try { await togliRegistroGrezzo(); } catch (e) { console.warn('[Filo] registro grezzo non tolto:', e?.message || e); }
+    try { await migraCambiSalvati(); } catch (e) { console.warn('[Filo] migrazione dei cambi:', e?.message || e); }
     const D = disco();
     const KEY = globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS && globalThis.SN_CONST.STORAGE_KEYS.FILO_CHATS;
     const chrome = globalThis.chrome;
@@ -268,26 +313,32 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     const st = incog ? incognito.stato : normale.stato;
     const visite = new Set(validi.filter((ev) => ev.tipo === E().TIPI.NAVIGAZIONE && !E().coperto(st, ev)).map((ev) => ev.id));
     const daScrivere = validi.filter((ev) => !E().coperto(st, ev, visite));
-    if (!daScrivere.length) return { scritti: [], tolti: 0 };
+    if (!daScrivere.length) return { scritti: [], tolti: 0, pagine: 0 };
     let tolti = 0;
+    let pagine = 0;
     if (incog) {
       const scritti = [];
       for (const ev of daScrivere) {
         const r = E().applica(incognito.stato, ev);
         if (r.nuovo) { incognito.eventi.push(ev); scritti.push(ev); }
         tolti += r.tolti;
+        pagine += r.pagine || 0;
       }
       if (tolti) incognito.eventi = E().compatta(incognito.eventi);
       annunciaPagine(scritti, true);
-      return { scritti, tolti };
+      return { scritti, tolti, pagine };
     }
     const nuovi = daScrivere.filter((ev) => !normale.stato.ids.has(ev.id));
-    if (!nuovi.length) return { scritti: [], tolti: 0 };
+    if (!nuovi.length) return { scritti: [], tolti: 0, pagine: 0 };
     await scriviInCoda(nuovi.map(E().riga).join(''));
-    for (const ev of nuovi) tolti += E().applica(normale.stato, ev).tolti;
+    for (const ev of nuovi) {
+      const r = E().applica(normale.stato, ev);
+      tolti += r.tolti;
+      pagine += r.pagine || 0;
+    }
     annunciaPagine(nuovi, false);
     if (tolti) await compattaFile();
-    return { scritti: nuovi, tolti };
+    return { scritti: nuovi, tolti, pagine };
   }
 
   // Ogni pagina che entra, cambia titolo o se ne va passa di qui, e da qui lo sanno le home aperte: una visita si scrive
@@ -313,6 +364,8 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         incognito: incog,
         chat: (id) => (id ? v.stato.chat.get(id) || null : null),
         tutte: () => [...v.stato.chat.values()],
+        ultimoCambio: () => { const l = v.stato.cambi || []; return l.length ? E().cambiDi({ cambi: [l[l.length - 1]] })[0] : null; },
+        dispositivo: normale.dispositivo || 'sconosciuto',
         evento,
         scrivi: (eventi, o) => scrivi(incog, eventi, o),
       });
@@ -368,6 +421,18 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     return '';
   }
 
+  // I cambi di stato (#867) del filo di chi chiede: l'incognito vede i suoi, mai quelli del disco.
+  async function cambi(opts) {
+    const v = await vista(opts);
+    return E().cambiDi(v.stato);
+  }
+
+  // Azioni, schede, ricerche, download, documenti, timer, avvisi e sistema (#1561), in ordine di arrivo.
+  async function accaduti(filtro, opts) {
+    const v = await vista(opts);
+    return E().accadutiDi(v.stato, filtro || {});
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
@@ -384,7 +449,14 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         url: u.testo, titolo: tt.testo, scheda: scheda == null ? undefined : scheda,
         urlTagliato: u.tagliato || undefined, titoloTagliato: tt.tagliato || undefined,
       }, { autore: 'utente', ts });
-      await t.scrivi([ev]);
+      // Una pagina di risultati è anche una ricerca (#1561): nasce con la sua visita e se ne va con lei.
+      const A = globalThis.SN_FILO_ACCADUTI;
+      const cercato = A && typeof A.ricercaNellIndirizzo === 'function' ? A.ricercaNellIndirizzo(String(url)) : null;
+      const eventi = [ev];
+      if (cercato) {
+        eventi.push(t.evento(E().TIPI.RICERCA, { testo: cercato.testo, dove: 'sito', sito: cercato.sito, visita: ev.id }, { autore: 'utente', ts: ev.ts }));
+      }
+      await t.scrivi(eventi);
       return ev;
     }, opts);
   }
@@ -419,7 +491,8 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
         return { pagine: { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) }, url: periodo.url || null };
       });
-      const { tolti } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
+      // Si dicono le pagine tolte, come la conferma: le azioni e le ricerche che se ne vanno con loro non si contano.
+      const { pagine } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
       // Il ricordo dei campi password va via per sito, e ogni volta si riscrive: un sito una volta sola («Svuota archivio»).
       const siti = new Set();
       for (const v of voci) {
@@ -427,7 +500,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
         if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
       }
-      return tolti;
+      return pagine;
     }, opts);
   }
 
@@ -441,10 +514,13 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     });
   }
 
-  // Gli eventi di un export: entrano quelli con un id che qui non c'è, nell'ordine in cui erano.
+  // Gli eventi di un export: entrano quelli con un id che qui non c'è, nell'ordine in cui erano. I cambi di stato no:
+  // raccontano lo stato di quell'installazione, e annullarne uno qui rimetterebbe valori di là (l'import fa i suoi).
   function importa(testo, opts) {
     return transazione(async (t) => {
-      const { eventi, scartate } = E().analizza(Buffer.isBuffer(testo) ? testo.toString('utf8') : testo);
+      const letti = E().analizza(Buffer.isBuffer(testo) ? testo.toString('utf8') : testo);
+      const eventi = letti.eventi.filter((ev) => ev.tipo !== E().TIPI.CAMBIO);
+      const { scartate } = letti;
       const { scritti } = await t.scrivi(eventi, { scartaInvalidi: true });
       return { aggiunti: scritti.length, scartate };
     }, opts);
@@ -521,9 +597,10 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagine,
+    carica, transazione, chats, chat, perLaCoda, pagine, cambi, accaduti, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagine,
     esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
+    ...(process.env.NODE_ENV === 'test' ? { ricomincia } : {}),
   };
 }
 

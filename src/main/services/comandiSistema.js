@@ -1348,9 +1348,15 @@ async function wifi(q) {
 }
 
 // La porta unica dei due cammini (chat e tasti): stessa richiesta, stesso risultato.
+// Ogni comando (non le letture degli elenchi) entra nel filo da qui, da qualunque strada arrivi (#1561).
+function nelFilo(richiesta, r) {
+  try { require('./accaduti').comandoSistema(richiesta, r); } catch (_) {}
+  return r;
+}
+
 function comanda(richiesta) {
   const q = normalizzaRichiesta(richiesta);
-  if (q.errore) return Promise.resolve({ ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore });
+  if (q.errore) return Promise.resolve(nelFilo(richiesta, { ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore }));
   const esegui = async () => {
     try {
       // Una prova che si è dimenticata il computer finto non cambia il volume o la rete di chi la lancia.
@@ -1364,7 +1370,7 @@ function comanda(richiesta) {
       return fallito('sconosciuto', q);
     }
   };
-  return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui);
+  return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui).then((r) => nelFilo(q, r));
 }
 
 // Il nome vero di una rete o di un dispositivo detto a parole, letto prima di chiedere conferma: { nome, gia } se ce

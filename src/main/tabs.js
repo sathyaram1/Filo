@@ -892,7 +892,8 @@ class TabManager {
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
   // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
   // `rinvia`: la scheda dietro nasce senza caricarsi; la carica la coda della riapertura, o chi la apre (_caricaRinviata).
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null, origine = null, azioneMisurata = null } = {}) {
+  // `idRimessa`: l'id che la scheda aveva prima di chiudere Filo, se nessuna lo porta già.
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null, origine = null, azioneMisurata = null, idRimessa = null } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -948,7 +949,7 @@ class TabManager {
     const pronta = activate && !adotta && !bloccata && restoreScrollPct == null && restoreZoomLevel == null
       ? this.riserva.prendi(url, this._sessionePer(partition))
       : null;
-    const id = pronta ? pronta.id : randomUUID();
+    const id = pronta ? pronta.id : (idRimessa && !idInUso(idRimessa) ? idRimessa : randomUUID());
     const view = pronta ? pronta.vista : this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
 
     const tab = {
@@ -1011,6 +1012,8 @@ class TabManager {
     this.win.contentView.addChildView(view);
     this.tabs.push(tab);
     if (pronta) this._daRiserva(tab, pronta);
+    // Le schede rimesse alla riapertura di Filo non sono aperte adesso: erano già aperte (#1561).
+    if (!this._restoring) this._nelFilo('schedaAperta', tab, { davanti: !!activate });
 
     // setBounds PRIMA di loadURL: con dimensione 0x0 il compositor non alloca
     // un display surface valido e le capturePage successive falliscono.
@@ -1126,6 +1129,11 @@ class TabManager {
     return true;
   }
 
+  // Aperta, chiusa, portata davanti: il filo lo sa da qui, chiunque l'abbia chiesto (#1561).
+  _nelFilo(cosa, tab, opzioni = {}) {
+    try { require('./services/accaduti')[cosa](tab, { ...opzioni, incognito: this.incognito }); } catch (_) {}
+  }
+
   _avvisaSorvegliante(tab, evento, dati = {}) {
     const fn = tab && tab._sorvegliante;
     if (!fn) return;
@@ -1158,6 +1166,7 @@ class TabManager {
     if (idx < 0) return;
     const tab = this.tabs[idx];
     this._avvisaSorvegliante(tab, 'chiusa');
+    this._nelFilo('schedaChiusa', tab);
     // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
     // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
     // acceso con la deroga dell'Esc appesa a una pagina che non esiste più:
@@ -1265,6 +1274,7 @@ class TabManager {
   closeAllTabs() {
     for (const tab of this.tabs) {
       this._avvisaSorvegliante(tab, 'chiusa');
+      this._nelFilo('schedaChiusa', tab);
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
@@ -1343,7 +1353,19 @@ class TabManager {
   // ricreata nella partition dedicata proxy:<tabId> (cookie jar separato dal
   // resto del browser) con il proxy applicato alla sua session; la scelta vive
   // finché vive la tab. `tier` è 'datacenter' (default) o 'residential'.
-  async setTabProxy(id, country, { tier } = {}) {
+  // Instradata entra nel filo da qui, com'è andata, chiunque l'abbia chiesto (#1561): il menu della scheda, la proposta
+  // sulla pagina bloccata, Filo da sé (`daSola`). Non con `conseguenza`: una regola per sito, una scheda riaperta com'era.
+  async setTabProxy(id, country, { tier, daSola, conseguenza = false } = {}) {
+    const r = await this._instradaScheda(id, country, { tier });
+    if (!conseguenza && !(r && r.error === 'no_tab')) {
+      const esito = r && r.ok ? { eseguita: true } : { eseguita: false, errore: (r && r.error) || 'non riuscito' };
+      const paese = (r && r.country) || (typeof country === 'string' ? country : undefined);
+      try { require('./services/accaduti').azioneDalPunto('PROXY_TAB', paese ? { country: paese } : {}, esito, { incognito: this.incognito, daSola }); } catch (_) {}
+    }
+    return r;
+  }
+
+  async _instradaScheda(id, country, { tier } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return { ok: false, error: 'no_tab' };
     let settings = null;
@@ -1387,6 +1409,7 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return { ok: false, error: 'no_tab' };
     if (!tab.proxy) return { ok: true };
+    try { require('./services/accaduti').azioneDalPunto('RIMUOVI_PROXY', { country: tab.proxy.country }, { eseguita: true }, { incognito: this.incognito }); } catch (_) {}
     tab.proxy = null;
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     this._recreateView(tab, tab.url || 'filo://newtab/');
@@ -1431,7 +1454,7 @@ class TabManager {
     if (!code) return false;
     if (tab.proxy && tab.proxy.country === code) return false; // già a posto
     tab.url = url; // setTabProxy ricrea la view su tab.url attraverso l'endpoint
-    this.setTabProxy(tab.id, code, { tier: rule.tier || undefined }).catch(() => {});
+    this.setTabProxy(tab.id, code, { tier: rule.tier || undefined, conseguenza: true }).catch(() => {});
     return true;
   }
 
@@ -1454,7 +1477,7 @@ class TabManager {
       if (t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
       if (Sito.voceSalvata(t.url, [dom]) !== dom) continue;
       if (t.proxy && t.proxy.country === code) continue;
-      try { await this.setTabProxy(t.id, code); } catch (_) {}
+      try { await this.setTabProxy(t.id, code, { conseguenza: true }); } catch (_) {}
     }
     return { ok: true, domain: dom, country: code };
   }
@@ -1734,6 +1757,8 @@ class TabManager {
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
+        // Solo se c'è ancora: chiusa mentre il modello decideva, l'ha già detto chi l'ha chiusa.
+        this._nelFilo('schedaChiusa', tab, { come: 'archiviata', daSola: 'automazione' });
         try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
         ChiusuraConCaselle.chiudi(tab.view.webContents);
         this.tabs.splice(idx, 1);
@@ -1882,6 +1907,7 @@ class TabManager {
     if (cambiata) this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
     this.anteprime.mostrata(tab);
     this.activeId = id;
+    if (cambiata && !this._restoring) this._nelFilo('schedaDavanti', tab);
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
     // grossolana: il content script la raffina con gli eventi veri.
     const now = Date.now();
@@ -3450,6 +3476,7 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
     this._avvisaSorvegliante(tab, 'chiusa');
+    this._nelFilo('schedaChiusa', tab, { come: 'servizio' });
     this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
@@ -3746,7 +3773,7 @@ class TabManager {
       this.win.webContents.send('shell:toast', {
         text: `Sito bloccato: ${label}${perche}`,
         // Una pagina che riprova in continuazione non impila notifiche: finché questa è a schermo resta una.
-        opts: { unica: `sito-bloccato:${label}`, actions: [{ label: 'Apri comunque', openUrl: target, apriComunque: true }] },
+        opts: { unica: `sito-bloccato:${label}`, indirizzo: target, actions: [{ label: 'Apri comunque', openUrl: target, apriComunque: true }] },
       });
     } catch (_) {}
   }
@@ -3835,9 +3862,11 @@ class TabManager {
     // L'ultima volta che l'utente l'ha toccata: alla riapertura la pulizia vede l'inattività vera (#1618). Al minuto,
     // così i gesti non riscrivono la sessione a ogni aggiornamento della barra (#1089).
     const usate = kept.map((t) => (t.lastInteractionAt > 0 ? new Date(Math.floor(t.lastInteractionAt / 60_000) * 60_000).toISOString() : null));
+    // Riaperta, la scheda resta quella di prima anche per il filo (#1561): le sue visite portano questo id.
+    const ids = kept.map((t) => t.id);
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, pagine, usate, activeIndex };
+    return { tabs, colors, aperte, pagine, usate, ids, activeIndex };
   }
 
   _sessionKey() {
@@ -3877,6 +3906,7 @@ class TabManager {
     const aperte = [];
     const pagine = [];
     const usate = [];
+    const ids = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
@@ -3887,6 +3917,7 @@ class TabManager {
         const savedAperte = Array.isArray(saved.aperte) ? saved.aperte : [];
         const savedPagine = Array.isArray(saved.pagine) ? saved.pagine : [];
         const savedUsate = Array.isArray(saved.usate) ? saved.usate : [];
+        const savedIds = Array.isArray(saved.ids) ? saved.ids : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
@@ -3894,6 +3925,7 @@ class TabManager {
             aperte.push(aperturaValida(savedAperte[i]));
             pagine.push(aperturaValida(savedPagine[i]));
             usate.push(aperturaValida(savedUsate[i]));
+            ids.push(idRimettibile(savedIds[i]));
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
@@ -3915,7 +3947,7 @@ class TabManager {
       const perIndice = urls.map((url, i) => {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' } });
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i] });
         const nata = id ? this.tabs.find((t) => t.id === id) : null;
         if (!nata) return null;
         this.visite.giaVista(nata.view.webContents, url);
@@ -4080,6 +4112,19 @@ function leggiEstratto(tab) {
 }
 
 // L'apertura salvata nella sessione, se è una data vera e non nel futuro; sennò la scheda riparte da adesso.
+// L'id salvato di una scheda torna solo se ha la forma di quelli che Filo dà, e nessuna scheda aperta lo porta.
+const ID_SCHEDA = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function idRimettibile(v) {
+  return typeof v === 'string' && ID_SCHEDA.test(v) ? v : null;
+}
+function idInUso(id) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    const tm = w && !w.isDestroyed?.() && w._filoTabs;
+    if (tm && Array.isArray(tm.tabs) && tm.tabs.some((t) => t.id === id)) return true;
+  }
+  return false;
+}
+
 function aperturaValida(v) {
   const t = typeof v === 'string' ? Date.parse(v) : NaN;
   return Number.isFinite(t) && t > 0 && t <= Date.now() + 60_000 ? new Date(t).toISOString() : null;

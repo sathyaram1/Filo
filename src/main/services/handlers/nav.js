@@ -233,11 +233,18 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: `comando shell non consentito: "${command}"` };
     }
     const win = winOf(sender);
-    if (!win) return { ok: false, error: 'nessuna finestra' };
+    // Il comando che l'Aiuto aziona da sé entra nel filo come le azioni della chat (#1561). Le icone della home passano
+    // di qui per un clic dell'utente: è l'Aiuto a dire che il comando è suo.
+    const dellAiuto = msg.assistente === true;
+    const nelFilo = (r) => {
+      if (dellAiuto) { try { ctx.azioneDellAiuto({ type: 'COMANDO_BARRA', comando: command }, { executed: !!r.ok, error: r.error }, sender); } catch (_) {} }
+      return r;
+    };
+    if (!win) return nelFilo({ ok: false, error: 'nessuna finestra' });
     const anchor = isFilo(origin) ? ancoraNellaFinestra(win, sender && sender.wc, msg.anchor) : null;
     try { win.webContents.send('shell:trigger-button', anchor ? { command, anchor } : { command }); }
-    catch (_) { return { ok: false, error: 'invio alla shell fallito' }; }
-    return { ok: true };
+    catch (_) { return nelFilo({ ok: false, error: 'invio alla shell fallito' }); }
+    return nelFilo({ ok: true });
   });
 
   on(MSG.OPEN_INCOGNITO, async () => {

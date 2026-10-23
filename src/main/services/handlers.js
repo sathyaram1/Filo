@@ -2051,7 +2051,7 @@ function fontiDellAiuto(sender) {
 }
 function nuovaConversazioneAiuto(sender) {
   const wc = sender && sender.wc;
-  if (wc) fontiPerAiuto.delete(wc);
+  if (wc) { fontiPerAiuto.delete(wc); chatAiutoPer.delete(wc); }
 }
 function segnaLetturaAiuto(sender, action) {
   const wc = sender && sender.wc;
@@ -2141,12 +2141,65 @@ function ricercaSuAltroComputer(action) {
 
 async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
-  const via = opzioni.assistente ? 'assistente' : 'chat';
-  const res = await Registro.con({ via, raccolti }, () => eseguiAzioneFilo(action, opzioni));
+  // Chi è stato lo dice chi manda (#1561): un tasto della home che usa la porta dell'Aiuto resta un gesto dell'utente.
+  const via = opzioni.via === 'interfaccia' ? 'interfaccia' : (opzioni.assistente ? 'assistente' : 'chat');
+  // `chat`: quello che l'azione fa nascere nel filo (una ricerca) se ne va con la sua chat.
+  const chat = typeof opzioni.chatId === 'string' && opzioni.chatId ? opzioni.chatId : '';
+  // `segnoAzione`: la porta di volume, Wi-Fi e Bluetooth scrive l'azione da sé, come per i tasti della home.
+  const segnoAzione = {};
+  // Quello che l'Aiuto fa se ne va con la sua conversazione, come quello della chat con la sua.
+  const chatNelFilo = chat || (typeof opzioni.chatNelFilo === 'string' && opzioni.chatNelFilo ? opzioni.chatNelFilo : '')
+    || (via === 'assistente' ? chatAiutoDi(opzioni.sender) : '');
+  // Il sito del file scaricato si chiede prima: rinominato, il file non ha più il percorso chiesto.
+  let url = '';
+  try { url = require('./accaduti').indirizzoDelFile(globalThis.SN_FILO_ACCADUTI.parametriAzione(action)); } catch (_) {}
+  const res = await Registro.con({ via, raccolti, segnoAzione, ...(chatNelFilo ? { chat: chatNelFilo } : {}) }, () => eseguiAzioneFilo(action, opzioni));
   // Un «annulla» o Ctrl/Cmd+Z subito dopo disfa quest'azione: i contatori la ricordano coi suoi cambi (#1461).
   if (res && res.executed) contaSe('azioneDiFilo', String((action && action.type) || '').toUpperCase(), raccolti.map((v) => v.id));
-  if (raccolti.length && res && typeof res === 'object') return { ...res, cambi: raccolti };
-  return res;
+  const finale = raccolti.length && res && typeof res === 'object' ? { ...res, cambi: raccolti } : res;
+  if (!segnoAzione.scritta) azioneNelFilo(action, finale, { via, chatId: chatNelFilo, incognito: require('../shim/storage').inIncognito(), url });
+  return finale;
+}
+
+// Ogni azione di Filo entra nel filo con parametri ed esito (#1561), da qui sola: chat, Aiuto e conferme passano da
+// executeFiloAction; le porte dell'Aiuto che non ci passano (ricerca web, documenti, barra) chiamano azioneDellAiuto.
+// Non ferma la risposta: il filo la scrive dopo.
+function azioneNelFilo(action, res, { via, chatId, incognito, url }) {
+  (async () => {
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    let fatto = '';
+    try {
+      if (res && res.executed && Levels && Levels.describeDone) {
+        fatto = String(Levels.describeDone({ ...action, _output: res.output }) || '').split('\n')[0].trim();
+      }
+    } catch (_) {}
+    let segreti = [];
+    try { segreti = (await segretiCustoditi()).map((x) => x.valore); } catch (_) {}
+    await require('./accaduti').azione(action, res, { via, chatId: typeof chatId === 'string' ? chatId : '', fatto, segreti, incognito, url });
+  })().catch((e) => console.warn('[Filo] azione non entrata nel filo:', e?.message || e));
+}
+
+// `res` nella forma di executeFiloAction ({ executed, output, error }), come la stessa azione chiesta alla chat.
+function azioneDellAiuto(action, res, sender) {
+  azioneNelFilo(action, res, { via: 'assistente', chatId: chatAiutoDi(sender), incognito: require('../shim/storage').inIncognito() });
+}
+
+// La conversazione dell'Aiuto che una scheda ha aperta (#1561): la scrive il pannello col primo messaggio, e quello che
+// l'Aiuto fa lì dentro (azioni, ricerche) porta la sua chat, così se ne va con lei. Una pagina nuova ne apre un'altra.
+const chatAiutoPer = new WeakMap();
+const chatAiutoAscoltata = new WeakSet();
+function segnaChatAiuto(sender, id) {
+  const wc = sender && sender.wc;
+  if (!wc || typeof id !== 'string' || !id) return;
+  if (!chatAiutoAscoltata.has(wc)) {
+    chatAiutoAscoltata.add(wc);
+    try { wc.on('did-navigate', () => chatAiutoPer.delete(wc)); } catch (_) {}
+  }
+  chatAiutoPer.set(wc, id);
+}
+function chatAiutoDi(sender) {
+  const wc = sender && sender.wc;
+  return (wc && chatAiutoPer.get(wc)) || '';
 }
 
 // I cinque ingressi della tabella dei permessi e la risposta calcolata, come li contano i contatori (#1461).
@@ -4980,7 +5033,7 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // confermare (#360). In quel caso NON mandiamo anche quella anonima: sarebbero
 // due segnalazioni per lo stesso buco, e quella che l'utente autorizza è più
 // utile (dice cosa aveva chiesto) di quella generica.
-async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
+async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false, chatId = '' }) {
   try {
     if (proposed) return;
     if (Array.isArray(rawActions)
@@ -5018,7 +5071,15 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
     };
-    const spedisci = () => (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce));
+    // Partita davvero (non annullata dall'avviso), entra nel filo come quella chiesta alla chat (#1561).
+    const nelFilo = (r) => {
+      const ok = !!r && r.ok !== false && !r.error;
+      const esito = ok ? { eseguita: true } : { eseguita: false, errore: (r && (r.error || r.errore)) || 'non partita' };
+      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { testo: voce.text }, esito, { daSola: 'filo', chat: chatId }); } catch (_) {}
+      return r;
+    };
+    const spedisci = () => Promise.resolve(Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
+      .then(nelFilo, (e) => { nelFilo({ ok: false, error: e?.message || String(e) }); throw e; });
     const Attesa = require('./autoFeedbackAttesa');
     const win = winOf(sender);
     const biglietto = Attesa.trattieni(spedisci, win);
@@ -6103,7 +6164,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // quella anonima non parte: una sola segnalazione per lo stesso buco. Nemmeno dopo
   // un'azione fermata perché portava fuori un segreto (#810): il «non ho potuto» è voluto.
   const fermata = renderedActions.some((x) => x && x._output && x._output.blocked === 'segreto');
-  if (!fermata) maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
+  if (!fermata) maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal, chatId }).catch(() => {});
   return {
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
     // Note di lavoro e ragionamento strutturato dell'ultimo giro: la scheda li tiene con la
@@ -6527,7 +6588,25 @@ const registry = new Map();
 
 function on(type, fn) {
   if (registry.has(type)) throw new Error(`[handlers] handler duplicato per "${type}"`);
-  registry.set(type, fn);
+  registry.set(type, conSegnoDelGesto(type, fn));
+}
+
+// Un tasto dell'interfaccia che fa quello che fa un'azione del catalogo lascia la stessa azione nel filo (#1561), da
+// qui per tutti: quali sono lo dice src/shared/filoAccaduti.js (GESTI).
+function conSegnoDelGesto(type, fn) {
+  const A = globalThis.SN_FILO_ACCADUTI;
+  if (!A || !A.GESTI || !Object.prototype.hasOwnProperty.call(A.GESTI, type)) return fn;
+  return async (msg, ...resto) => {
+    const res = await fn(msg, ...resto);
+    segnoDelGesto(type, msg, res);
+    return res;
+  };
+}
+function segnoDelGesto(type, msg, res) {
+  try {
+    const g = globalThis.SN_FILO_ACCADUTI.gestoComeAzione(type, msg, res);
+    if (g) azioneNelFilo(g.action, g.res, { via: 'interfaccia', chatId: '', incognito: require('../shim/storage').inIncognito() });
+  } catch (_) {}
 }
 
 const handlerCtx = {
@@ -6574,6 +6653,9 @@ const handlerCtx = {
   ricordaVerdettiArchiviati,
   decisioneAzionePagina,
   segnaLetturaAiuto,
+  azioneDellAiuto,
+  segnaChatAiuto,
+  chatAiutoDi,
   fileScaricato,
   nuovaConversazioneAiuto,
   maybeRunCompactor,
@@ -7501,6 +7583,9 @@ Registro.collega({
   annullato: (ids) => contaSe('cambioAnnullato', ids),
 });
 Registro.avvia();
+// Gli altri accaduti del filo (#1561): i documenti dell'editor si osservano nel salvataggio, il sistema anche a home chiusa.
+require('./accaduti').avvia();
+try { require('./statoSistema').sorveglia(); } catch (_) {}
 
 // Le righe delle conversazioni delle app (#974): la home le richiede, la Cronologia rilegge l'elenco; una tolta perché
 // l'app l'ha cancellata la dice come le chat cancellate. Quanti giorni mostrarne: quelli che la chat ha davanti.

@@ -959,8 +959,9 @@
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
-    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869).
+    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869), e c'è come evento suo (#1561).
     try { global.SN_FILO_PARLA?.segnala({ tipo: 'avviso', testo: entry.text }); } catch (_) {}
+    try { global.SN_ACCADUTI?.notifica(entry); } catch (_) {}
     return entry;
   }
 

@@ -68,11 +68,7 @@ async function modelloFinto(app, giri) {
 const ripristina = (app) => app.evaluate(() => { try { globalThis.__finto_restore?.(); } catch (_) {} });
 
 const impostazioni = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
-const registro = (app) => app.evaluate(async () => {
-  await globalThis.SN_REGISTRO_CAMBI.attesa();
-  const r = await globalThis.chrome.storage.local.get('filo_cambi');
-  return r.filo_cambi || [];
-});
+const registro = (app) => app.evaluate(async () => globalThis.SN_REGISTRO_CAMBI.lista());
 
 async function scrivi(page, testo, risposta) {
   await page.locator('#input').fill(testo);
@@ -346,8 +342,7 @@ test('I — un sito non legge né annulla i cambi: solo le pagine di Filo', asyn
   const r = await app.evaluate(async () => {
     const H = globalThis.__filoHandlers;
     const { MSG } = globalThis.SN_MSG;
-    await globalThis.SN_REGISTRO_CAMBI.attesa();
-    const lista = (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi || [];
+    const lista = await globalThis.SN_REGISTRO_CAMBI.lista();
     const id = lista[lista.length - 1].id;
     const sito = { tab: { url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' };
     const filo = { tab: { url: 'filo://newtab/' }, url: 'filo://newtab/' };

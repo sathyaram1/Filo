@@ -18,7 +18,7 @@ const statoNelMain = (app) => app.evaluate(async ({ BrowserWindow }) => {
     useDefaultModels: s.useDefaultModels,
     openWeightsOnly: s.openWeightsOnly,
     dizionario: raw.sn_personal_dict ?? null,
-    cambi: JSON.stringify(raw.filo_cambi ?? null),
+    cambi: JSON.stringify(await globalThis.SN_REGISTRO_CAMBI.lista()),
     archivio: (await globalThis.SN_ARCHIVED_TABS.list()).length,
     triage: globalThis.SN_TAB_TRIAGE_DECIDE.toString().includes('finto'),
     provider: globalThis.SN_PROVIDERS.completeWithFallback.toString().includes('finto'),

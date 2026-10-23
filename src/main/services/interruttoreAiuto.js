@@ -47,6 +47,10 @@ async function migra({ storage = require('../shim/storage'), registro = require(
   const K = chiavi();
   const dati = await storage.get([K.SETTINGS, K.FILO_CAMBI, SEGNO]);
   if (dati[SEGNO]) return false;
+  // Il registro dei cambi già entrato nel filo (#1561) si legge da lì.
+  if (!Array.isArray(dati[K.FILO_CAMBI]) && typeof registro.lista === 'function') {
+    try { dati[K.FILO_CAMBI] = await registro.lista(); } catch (_) {}
+  }
   const riaccendi = spentoDiSerie(dati);
   const scrittura = { [SEGNO]: true };
   if (riaccendi) {

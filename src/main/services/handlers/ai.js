@@ -990,13 +990,23 @@ module.exports = function register(on, ctx) {
       const parole = (Array.isArray(msg && msg.parole) ? msg.parole : [])
         .filter((x) => typeof x === 'string').join('\n').slice(-200000);
       const u = await controllaUscita({ type: 'CERCA_WEB', query: msg && msg.query }, { sender, parole });
-      if (u.blocca) return { ok: false, blocked: 'segreto', frase: u.frase, results: [] };
+      if (u.blocca) {
+        ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg && msg.query }, { executed: false, output: { blocked: 'segreto' } }, sender);
+        return { ok: false, blocked: 'segreto', frase: u.frase, results: [] };
+      }
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
-      const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      // La ricerca porta la conversazione dell'Aiuto che l'ha chiesta, e se ne va con lei (#1561).
+      const chat = ctx.chatAiutoDi(sender);
+      const cerca = () => WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      const r = await (chat ? require('../registroCambi').con({ chat }, cerca) : cerca());
       segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
+      const results = Array.isArray(r?.results) ? r.results : [];
+      ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg.query },
+        { executed: results.length > 0, output: { search: msg.query, results, provider: r?.provider || '', reason: r?.reason || '' } }, sender);
       return { ok: true, ...r };
     } catch (e) {
+      ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg && msg.query }, { executed: false, output: { error: e.message || String(e) } }, sender);
       return { ok: false, error: e.message || String(e), results: [] };
     }
   });
