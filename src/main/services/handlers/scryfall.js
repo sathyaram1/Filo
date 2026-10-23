@@ -131,6 +131,18 @@ module.exports = function register(on, ctx) {
     return CE.friendly(e, { dataSource: SCRYFALL_SOURCE });
   }
 
+  // Il codice e il rifiuto della chiave dicono alla pagina dove si toglie l'ostacolo: la frase da sola non ci porta (#663).
+  function rimedioDi(e) {
+    const R = globalThis.SN_WALLET;
+    return {
+      ...(e && e.code ? { code: e.code } : {}),
+      ...(R && R.keyRefusalOf && R.keyRefusalOf(e) ? { keyRefused: true } : {}),
+      ...(e && e.reason === 'crediti' ? { reason: 'crediti' } : {}),
+      ...(e && Number(e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {}),
+      ...(e && e.finishReason ? { finishReason: e.finishReason } : {}),
+    };
+  }
+
   // Scryfall che non risponde non è una carta che non esiste, né una query sbagliata: la frase dice quale dei due.
   function scryfallDownText(e) {
     if (Scry.isTimeout && Scry.isTimeout(e)) return e.userText;
