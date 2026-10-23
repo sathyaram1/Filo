@@ -224,7 +224,7 @@ function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', iniziat
 const dip = { richiesta: richiestaDiRete };
 
 // GET per conto della scheda di `sender`. Torna una Response; lancia su schema, rete interna, rimando rifiutato.
-//   credenziali       'omit' (anteprime, llms.txt) o 'include' (i byte di un'immagine, come li chiede la pagina)
+//   credenziali       'omit' (anteprime, llms.txt) o 'include' (i byte di un'immagine, coi cookie che avrebbe la pagina)
 //   conReferer        presenta la pagina come la presenterebbe lei, al massimo l'origine; `politiche` la stringono
 //   redirectAmmesso   (partenza, prossimo) → vero se il rimando si segue
 //   lanSeGiaDiPartenza  un indirizzo di casa in https si legge restando sulla sua origine (vedi safe-fetch.js)
