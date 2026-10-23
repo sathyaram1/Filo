@@ -1173,6 +1173,7 @@
       if (isLast) parts.push('<button class="dk-retry" data-continua="1" title="Continua la risposta da dove si è interrotta">Continua</button>');
     }
     // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
+    if (via) parts.push(via);
     if (m.retryable) parts.push(retry);
     if (m.clearChat) {
       parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
