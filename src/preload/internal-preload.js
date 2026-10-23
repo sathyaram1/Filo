@@ -22,6 +22,15 @@ const IS_FILO_ORIGIN = (() => {
 try { require('../shared/riquadriInArrivo.js'); } catch (e) { console.error('[Filo internal] riquadri in arrivo', e); }
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
+// Un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623); la home la prende da sé, nel suo campo.
+if (IS_FILO_ORIGIN) {
+  try {
+    require('./rilascio-file.js')(window, {
+      pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+      consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+    });
+  } catch (e) { console.error('[Filo internal] rilascio', e); }
+}
 
 let streamCounter = 0;
 
