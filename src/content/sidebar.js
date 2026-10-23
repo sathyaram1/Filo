@@ -389,8 +389,8 @@
   // ---------- Allegati (#1623) ----------
 
   // Le immagini date all'Aiuto: lasciate sulla pagina o sul pannello, incollate. Il pannello sta nel documento del
-  // sito: anteprime e nomi in uno Shadow DOM chiuso. Oltre il tetto non entrano: l'Aiuto non apre file dal disco, e un
-  // percorso lo leggerebbe il sito.
+  // sito: anteprime e nomi in uno Shadow DOM chiuso. Oltre il tetto si rimpiccioliscono: l'Aiuto non apre file dal
+  // disco, e un percorso lo leggerebbe il sito.
   const Allegati = global.SN_CONST.ALLEGATI_CHAT;
   let allegati = { immagini: [] };
   // Da content.js: 'sito' dove Filo è spento (il rilascio resta alla pagina), 'aiuto' con l'Aiuto spento, '' altrimenti.
@@ -468,10 +468,12 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   });
   const byteDi = (dataUrl) => Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
   const blobDa = (dataUrl) => {
-    const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
-    const u = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    return new Blob([u]);
+    try {
+      const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
+      const u = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      return new Blob([u]);
+    } catch (_) { return null; }
   };
   // Oltre il tetto l'immagine si rimpicciolisce finché ci sta: il modello la ridurrebbe comunque, e così entra.
   async function rimpicciolita(blob) {
@@ -552,7 +554,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     for (const im of buone) {
       const nome = typeof im.nome === 'string' ? im.nome : '';
       if (byteDi(im.dataUrl) <= Allegati.tettoImmagineByte) allegati.immagini.push({ dataUrl: im.dataUrl, nome });
-      else await allegaUna(blobDa(im.dataUrl), nome, conti);
+      else {
+        const blob = blobDa(im.dataUrl);
+        if (blob) await allegaUna(blob, nome, conti);
+        else conti.rotte += 1;
+      }
       if (!root) return true;
     }
     allegatiArrivati(conti);
