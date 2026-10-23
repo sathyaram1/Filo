@@ -5687,6 +5687,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         if (turno.fermato) { fermato = true; break; }
         if (await senzaFotoDopoRifiuto(e)) { round--; continue; }
         if (await stringiDopoRifiuto(e)) { round--; continue; }
+        // #1596 — più niente da accorciare: la frase dice cosa può fare l'utente, non «cambia modello».
+        if (e && e.code !== 'TETTO_RISPOSTA' && globalThis.SN_FILO_CONTESTO.troppoLungo(e)) {
+          try { e.code = 'CONTESTO_PIENO'; } catch (_) {}
+        }
         throw e;
       }
       tempiPrima = null;
