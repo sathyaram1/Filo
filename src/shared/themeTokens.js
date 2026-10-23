@@ -352,8 +352,8 @@
     return { clean, rejected };
   }
 
-  // Pochi token toccati sopra la mappa salvata adesso: un valore lo scrive, null o vuoto lo toglie, gli altri restano.
-  // Chi ne ha toccati due non rimanda la sua copia intera, che cancellerebbe quelli cambiati altrove nel frattempo.
+  // Chi ha toccato pochi token manda solo quelli e si posano sulla mappa salvata adesso: la sua copia intera
+  // cancellerebbe quelli cambiati altrove nel frattempo (#1343.1).
   function conModifica(salvati, modifica) {
     const out = { ...(salvati && typeof salvati === 'object' ? salvati : {}) };
     for (const [name, value] of Object.entries(modifica && typeof modifica === 'object' ? modifica : {})) {
