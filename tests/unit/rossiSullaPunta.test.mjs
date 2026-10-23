@@ -99,11 +99,15 @@ describe('rifaiSullaPunta', () => {
   });
 });
 
-const NOME_PASSO = /-\s+name:\s*Controlli falliti - apri un feedback e fermati/;
+// Il cancello rifà i rossi sulla punta senza chiavi e lascia l'esito in file; `avviso-cancello`, con la parola
+// d'ordine, li legge da quei file e apre il feedback (#1139.1). Qui i due passi girano uno dopo l'altro nella stessa
+// cartella, come se il registro fosse passato da una macchina all'altra.
+const PASSO_PUNTA = /-\s+name:\s*I rossi sono gia' verdi sulla punta di main\?\s*\n/;
+const PASSO_AVVISO = /-\s+name:\s*Controlli falliti - apri un feedback\s*\n/;
 
-function scriptDelPasso() {
-  const at = YML.search(NOME_PASSO);
-  assert.ok(at >= 0, 'manca il passo che apre il feedback quando il cancello è rosso');
+function scriptDelPasso(nome) {
+  const at = YML.search(nome);
+  assert.ok(at >= 0, `manca il passo ${nome}: il cancello rosso non diventerebbe un feedback`);
   const righe = YML.slice(at).split(/\n\s{6}-\s+name:/)[0].split('\n');
   const i = righe.findIndex((r) => /^\s*run:\s*\|\s*$/.test(r));
   assert.ok(i >= 0, 'il passo non ha un blocco `run: |`');
