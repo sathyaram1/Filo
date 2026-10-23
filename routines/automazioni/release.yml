@@ -124,23 +124,30 @@ jobs:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         run: node scripts/ultima-suite-verde.mjs
 
-  release:
+  # ─── IL CANCELLO: GLI UNIT TEST, SU UNA MACCHINA SENZA CHIAVI ─────────────
+  # Prima di pubblicare si rifanno gli unit sul commit scelto, e un rosso non
+  # consuma un numero di versione. Le prove possono riscrivere i file che
+  # girano dopo e leggere quello che il lavoro ha in mano, anche dalla memoria
+  # della macchina: qui niente ambiente, sola lettura e credenziali del
+  # checkout lasciate fuori dal disco (#1139.1). Chiavi e scrittura stanno in
+  # `release`, su un'altra macchina; il feedback lo apre `avviso-cancello`.
+  cancello:
     needs: scegli
-    # Solo se `scegli` ha trovato un commit verde piu' nuovo dell'ultima versione;
     # `success()` per esteso: con `scegli` rosso qui non si parte.
     if: ${{ success() && needs.scegli.outputs.sha != '' }}
     runs-on: windows-latest
-    environment: rilascio
+    permissions:
+      contents: read
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
-      version: ${{ steps.bump.outputs.version }}
-      sha: ${{ steps.applica.outputs.sha }}
+      unit: ${{ steps.gate.outcome }}
     steps:
-      - name: Checkout del commit provato dalla suite (con storia e tag completi)
+      - name: Checkout del commit provato dalla suite (con storia e tag completi, senza credenziali)
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.scegli.outputs.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -182,51 +189,97 @@ jobs:
         shell: bash
         run: if [ -f scripts/npm-ci-ritenta.mjs ]; then node scripts/npm-ci-ritenta.mjs; else npm ci; fi
 
-      # ─── CANCELLO PRIMA DELLA PUBBLICAZIONE ──────────────────────────────
-      # Fino al 2026-08-07 questo lavoro prendeva il ramo principale COSI' COM'E'
-      # ogni 6 ore, lo costruiva e lo pubblicava agli utenti SENZA eseguire un
-      # solo test. Qualunque errore — di una routine o di una sessione locale —
-      # arrivava a tutti senza incontrare nessun controllo lungo la strada; e
-      # siccome le modifiche atterrano sul ramo principale una per una, la
-      # fotografia poteva cogliere un lavoro a meta'.
-      #
-      # Gira PRIMA del bump di versione: se e' rosso non si consuma un numero di
-      # versione e non si sporca la storia.
       - name: Controlli automatici (cancello di pubblicazione)
         if: steps.check.outputs.should_release == 'true'
         id: gate
         continue-on-error: true
         shell: bash
-        run: |
-          node scripts/unit-con-riprova.mjs --registro unit.log
-          echo "unit_ok=1" >> "$GITHUB_OUTPUT"
+        run: node scripts/unit-con-riprova.mjs --registro unit.log
 
-      # Rosso = NON si pubblica, e il guasto diventa un feedback in coda: al
-      # prossimo giro una routine lo prende in carico come qualsiasi altro
-      # lavoro, capisce cosa non funziona e lo risolve. Senza questo passo un
-      # fallimento si limiterebbe a bloccare le pubblicazioni in silenzio.
-      - name: Controlli falliti - apri un feedback e fermati
-        if: steps.check.outputs.should_release == 'true' && steps.gate.outcome == 'failure'
+      # Il commit provato e' l'ultimo di main con la suite verde, a volte giorni indietro: un rosso gia' verde sulla
+      # punta non chiede un lavoro (#1185). Rifarlo e' far girare prove, quindi si fa qui; ad `avviso-cancello`
+      # arriva solo l'esito, come file accanto al registro. Nel dubbio il feedback si apre.
+      - name: I rossi sono gia' verdi sulla punta di main?
+        if: steps.gate.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p esiti-cancello
+          cp unit.log esiti-cancello/ 2>/dev/null || true
+          # La copia della punta sta dentro il repo: i suoi test trovano node_modules risalendo.
+          if git fetch --quiet origin main && [ "$(git rev-parse FETCH_HEAD)" != "$(git rev-parse HEAD)" ] \
+            && git worktree add --quiet --detach .punta-main FETCH_HEAD; then
+            git rev-parse --short FETCH_HEAD > esiti-cancello/punta
+            if node .punta-main/scripts/rossi-sulla-punta.mjs unit.log > esiti-cancello/gia-verdi; then
+              : > esiti-cancello/tutti-gia-verdi
+            fi
+            git worktree remove --force .punta-main || true
+          fi
+
+      - name: Conserva il registro del cancello per l'avviso (7 giorni)
+        if: ${{ !cancelled() && steps.gate.outcome == 'failure' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: cancello-registro
+          path: esiti-cancello/
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Rosso = NON si pubblica: `release` parte solo con questo lavoro verde.
+      - name: Controlli falliti - la corsa resta rossa
+        if: ${{ !cancelled() && steps.gate.outcome == 'failure' }}
+        shell: bash
+        run: |
+          echo "::error::Controlli automatici rossi: pubblicazione annullata. Il feedback lo apre il lavoro avviso-cancello."
+          grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: guarda il passo dei controlli)"
+          exit 1
+
+  # Il feedback di un cancello rosso, in un lavoro a parte: la parola d'ordine sta solo qui, nell'ambiente fisso, lontano
+  # da npm ci e dalle prove (lo strumento dell'allarme usa solo moduli di Node). Quello che arriva dal cancello e' un
+  # dato: si legge e si spedisce, non si esegue. Un rosso del cancello diventa un feedback in coda, che una routine
+  # prende al giro dopo: senza, un fallimento bloccherebbe le pubblicazioni in silenzio.
+  avviso-cancello:
+    needs: [scegli, cancello]
+    if: ${{ always() && !cancelled() && needs.cancello.outputs.unit == 'failure' }}
+    runs-on: ubuntu-latest
+    environment: rilascio
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del commit provato (per lo strumento dell'allarme)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.scegli.outputs.sha }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Un registro che manca non ferma l'avviso: il testo lo dice.
+      - name: Registro del cancello
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: cancello-registro
+          path: esiti-cancello
+
+      - name: Controlli falliti - apri un feedback
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         shell: bash
         run: |
-          echo "::error::Controlli automatici rossi: pubblicazione annullata."
-          # Il commit provato e' l'ultimo di main con la suite verde, a volte giorni indietro: se ogni rosso e' gia' verde
-          # sulla punta, il feedback chiederebbe un lavoro fatto e si riaprirebbe a ogni chiusura (#1185). Nel dubbio si apre.
           PROVATO=$(git rev-parse --short HEAD)
-          GIA_VERDI=""
-          # La copia della punta sta dentro il repo: i suoi test trovano node_modules risalendo.
-          if git fetch --quiet origin main && [ "$(git rev-parse FETCH_HEAD)" != "$(git rev-parse HEAD)" ] \
-            && git worktree add --quiet --detach .punta-main FETCH_HEAD; then
-            PUNTA=$(git rev-parse --short FETCH_HEAD)
-            if GIA_VERDI=$(node .punta-main/scripts/rossi-sulla-punta.mjs unit.log); then
-              git worktree remove --force .punta-main || true
-              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con la suite verde."
-              { echo "## Rossi gia' corretti su main"; echo; echo "Rossi su ${PROVATO}, verdi sulla punta ${PUNTA}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-            git worktree remove --force .punta-main || true
+          GIA_VERDI=$(cat esiti-cancello/gia-verdi 2>/dev/null || true)
+          # Lo sha finisce in un'annotazione: dal cancello si prende solo come esadecimale.
+          PUNTA=$(cat esiti-cancello/punta 2>/dev/null | tr -cd '0-9a-f' | head -c 40 || true)
+          if [ -f esiti-cancello/tutti-gia-verdi ] && [ -n "$GIA_VERDI" ]; then
+            echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con la suite verde."
+            { echo "## Rossi gia' corretti su main"; echo; echo "Rossi su ${PROVATO}, verdi sulla punta ${PUNTA}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
           SULLA_PUNTA=""
           if [ -n "$GIA_VERDI" ]; then
@@ -234,26 +287,17 @@ jobs:
           Gia' verdi sulla punta di main, da non correggere: $(echo $GIA_VERDI)"
           fi
           PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti su Windows sul commit ${PROVATO} (il piu nuovo di main con la suite verde, non la punta di main): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. La suite di quel commit aveva gia passato gli stessi test su Windows: se ora sono rossi, di norma il test dipende dai tempi o dalla macchina. Capisci perche e sistemalo; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
-          # I test rossi stanno all'INIZIO del log (una riga «not ok» per
-          # ciascuno), la coda porta solo il riepilogo: prima si elencano
-          # quelli, poi la coda. Un allarme con la sola coda non diceva quali
-          # test erano rossi, e chi lo prendeva doveva rifare tutta la suite.
-          # La riga «not ok» porta il nome del test ma non il file (o, a
-          # seconda della versione di Node, il file ma non il test, rientrata):
-          # si prende con qualunque rientro, e con la riga «location:» che la
-          # segue, che dice file e riga. Senza, con più di cento file di test,
-          # chi prendeva l'allarme cercava il test per nome.
-          # L'elenco ha un tetto (il testo dell'allarme viaggia in un feedback),
-          # ma il taglio si DICE: un elenco mozzato senza avviso fa credere di
-          # avere tutti i rossi, e con un modulo condiviso rotto sono cento.
-          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null || true)
+          # I rossi stanno all'INIZIO del registro (una riga «not ok» ciascuno, con la «location:» che dice file e riga,
+          # a qualunque rientro), la coda porta solo il riepilogo: prima quelli, poi la coda. L'elenco ha un tetto (il
+          # testo viaggia in un feedback), ma il taglio si DICE: con un modulo condiviso rotto i rossi sono cento.
+          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' esiti-cancello/unit.log 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
           N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
           if [ "${N_TUTTE:-0}" -gt 80 ]; then
             ROSSI="${ROSSI}
           … elenco tagliato: altre $((N_TUTTE - 80)) righe di test rossi stanno nel registro di questa esecuzione (Actions)"
           fi
-          TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
+          TAIL=$(tail -c 2500 esiti-cancello/unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
 
           Commit provato: ${PROVATO}, l'ultimo di main con la suite verde.${SULLA_PUNTA}
@@ -264,8 +308,49 @@ jobs:
 
           ${TAIL}"
           # Una chiave per file di test rosso (`unit:<file>`): un guasto gia' in coda non riapre un feedback.
-          node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" --chiavi-unit unit.log || echo "::warning::allarme non consegnato"
-          exit 1
+          # Rosso solo se il feedback non parte: il rosso della corsa lo tiene gia' il cancello.
+          node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" --chiavi-unit esiti-cancello/unit.log \
+            || { echo "::error::Allarme del cancello non consegnato: nessun feedback per questo rosso."; exit 1; }
+
+  release:
+    needs: [scegli, cancello]
+    # Solo col cancello verde, su un commit verde piu' nuovo dell'ultima versione; `success()` per esteso: con
+    # `scegli` o `cancello` rossi qui non si parte.
+    if: ${{ success() && needs.cancello.outputs.should_release == 'true' && needs.cancello.outputs.unit == 'success' }}
+    runs-on: windows-latest
+    environment: rilascio
+    outputs:
+      should_release: ${{ needs.cancello.outputs.should_release }}
+      version: ${{ steps.bump.outputs.version }}
+      sha: ${{ steps.applica.outputs.sha }}
+    steps:
+      - name: Checkout del commit provato dalla suite (con storia e tag completi)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.scegli.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Il commit e' quello provato dal cancello?
+        shell: bash
+        run: |
+          # Senza lo sha scelto il checkout sarebbe caduto sul ramo di
+          # default: si pubblicherebbe codice mai provato.
+          PROVATO="${{ needs.scegli.outputs.sha }}"
+          QUI=$(git rev-parse HEAD)
+          if [ -z "$PROVATO" ] || [ "$QUI" != "$PROVATO" ]; then
+            echo "::error::nessun commit con la suite verde scelto (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
+            exit 1
+          fi
+
+      # Il commit provato dalla suite può essere più vecchio dello script che ritenta: lì resta il `npm ci` semplice.
+      - name: Install dipendenze
+        shell: bash
+        run: if [ -f scripts/npm-ci-ritenta.mjs ]; then node scripts/npm-ci-ritenta.mjs; else npm ci; fi
 
       - name: Incastona le chiavi di default nel build (bake)
         # Chiede al server di sicurezza l'override admin più recente (con una
@@ -286,7 +371,6 @@ jobs:
         # del bump, come l'altro cancello: un giro fermato non deve consumare un
         # numero di versione né lasciare sul ramo principale un "release: vX"
         # che non corrisponde a niente di pubblicato.
-        if: steps.check.outputs.should_release == 'true'
         env:
           # Parola d'ordine che apre SOLO le chiavi di default, e nient'altro.
           # Prima qui c'era il token dell'account robot: una credenziale piena,
@@ -305,7 +389,7 @@ jobs:
       # creare tag: a loro basta il GITHUB_TOKEN.
       - name: Token dell'app di pubblicazione (se configurata)
         id: app
-        if: steps.check.outputs.should_release == 'true' && vars.FILO_PUBLISH_APP_ID != ''
+        if: vars.FILO_PUBLISH_APP_ID != ''
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ vars.FILO_PUBLISH_APP_ID }}
@@ -326,7 +410,6 @@ jobs:
       # i casi diversi da zero il lavoro si ferma: costruire senza sapere quale
       # numero è su `main` pubblicherebbe sopra una release già esistente.
       - name: Chiedi al server il numero della versione nuova
-        if: steps.check.outputs.should_release == 'true'
         id: bump
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
@@ -341,7 +424,6 @@ jobs:
       # manifesto di questo albero, e non si spinge niente. Le fusioni entrate
       # dopo il commit verde escono quando la loro suite e' verde.
       - name: Applica il numero al commit provato (in locale)
-        if: steps.check.outputs.should_release == 'true'
         id: applica
         shell: bash
         run: |
@@ -371,7 +453,6 @@ jobs:
           fi
 
       - name: Build e upload su GitHub Releases (come bozza)
-        if: steps.check.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
@@ -381,7 +462,6 @@ jobs:
       # build.beforePack): senza quel file nell'asar, o con uno vecchio, ogni sito resterebbe senza Filo. La bozza
       # allora non si pubblica. Un commit di prima della sandbox non ha il file da confrontare, e passa.
       - name: Il pacchetto per Windows porta il preload delle pagine web?
-        if: steps.check.outputs.should_release == 'true'
         shell: bash
         run: |
           set -e
@@ -404,7 +484,6 @@ jobs:
       # Si guarda la bozza VERA prima di renderla pubblica: senza l'installer
       # il sito risponde 404, senza latest.yml l'aggiornamento automatico tace.
       - name: I file per Windows sono davvero nella bozza?
-        if: steps.check.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
@@ -431,7 +510,6 @@ jobs:
       # Le impronte entrano nella bozza prima che diventi pubblica: nessuna versione esce senza «Verifica».
       # Lo strumento e' quello di questa corsa: il commit provato puo' essere piu' vecchio di lui.
       - name: Impronte dei file nella sezione Verifica
-        if: steps.check.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
           VERSIONE: ${{ steps.bump.outputs.version }}
@@ -449,7 +527,6 @@ jobs:
         # ORA, a build+upload finiti, cosi' l'auto-update non vede mai una
         # release con asset incompleti. La marchiamo anche come "latest" perche'
         # l'URL .../releases/latest/download/Filo-Setup.exe punti a questa.
-        if: steps.check.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
@@ -459,7 +536,6 @@ jobs:
         run: gh release edit "${{ steps.bump.outputs.version }}" --draft=false --latest --target "${{ steps.applica.outputs.sha }}"
 
       - name: Riepilogo
-        if: steps.check.outputs.should_release == 'true'
         shell: bash
         run: echo "Pubblicata ${{ steps.bump.outputs.version }}"
 
