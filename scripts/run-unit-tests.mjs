@@ -397,10 +397,13 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
     const muta = ultimaFine === null || ora - ultimaFine >= tetto;
     const file = muta ? inCorso.filter((f) => f === primo || ora - partenza.get(f) >= tetto) : [primo];
     for (const f of file) chiusi.add(f);
+    sospetti = chiusiSenzaFine ? [...sospetti, ...file] : file;
     chiusiSenzaFine = true;
     partitiAllaChiusura = partenza.size;
     return { file };
   };
+  giudica.sospetti = () => (chiusiSenzaFine ? [...sospetti] : []);
+  return giudica;
 }
 
 /** Un lavoro fisso per il processore: quanto ci mette dice quanto la macchina è carica adesso. */
