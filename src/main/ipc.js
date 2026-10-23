@@ -250,18 +250,15 @@ function registerIpcHandlers() {
     event.returnValue = si;
   });
 
-  // #1585 — il dizionario del correttore (dizionarioDiFilo.js). Sincroni: il correttore decide i segni mentre li
-  // disegna. `null` finché non è pronto, e la pagina chiede al browser.
-  ipcMain.on('filo:dizionario-sbagliate', (event, parole) => {
-    let out = null;
-    try { out = require('./services/dizionarioDiFilo').sbagliate(parole); } catch (_) {}
-    event.returnValue = out;
-  });
-  ipcMain.on('filo:dizionario-proposte', (event, parola) => {
-    let out = null;
-    try { out = require('./services/dizionarioDiFilo').proposte(parola); } catch (_) {}
-    event.returnValue = out;
-  });
+  // #1585 — il dizionario del correttore (dizionarioDiFilo.js). La pagina chiede sincrona (decide i segni mentre li
+  // disegna) e aspetta il thread del dizionario, il principale no. `null` finché non è pronto: la pagina chiede al browser.
+  const dalDizionario = (event, chiedi) => {
+    let p = null;
+    try { p = chiedi(require('./services/dizionarioDiFilo')); } catch (_) {}
+    Promise.resolve(p).catch(() => null).then((out) => { try { event.returnValue = out ?? null; } catch (_) {} });
+  };
+  ipcMain.on('filo:dizionario-sbagliate', (event, parole) => dalDizionario(event, (D) => D.sbagliate(parole)));
+  ipcMain.on('filo:dizionario-proposte', (event, parola) => dalDizionario(event, (D) => D.proposte(parola)));
 
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
