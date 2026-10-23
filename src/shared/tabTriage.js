@@ -106,11 +106,12 @@
     const riapertura = trigger === 'reopen';
     if (!n && !(riapertura && (valutate > 0 || riordinate))) return '';
     if (n) {
-      const chiuse = giudizioMancato
-        ? `${n} ${n === 1 ? 'doppione chiuso' : 'doppioni chiusi'}`
-        : `${n} ${n === 1 ? 'chiusa' : 'chiuse'}`;
-      const coda = giudizioMancato ? '. Le altre non sono riuscito a valutarle' : '';
-      return `Schede riordinate: ${chiuse}, restano nel filo della home${coda}`;
+      const una = n === 1;
+      if (giudizioMancato) {
+        return `Schede riordinate e ${n} ${una ? 'doppione chiuso, lo' : 'doppioni chiusi, li'} ritrovi nel filo della home. `
+          + 'Le altre non sono riuscito a valutarle';
+      }
+      return `Schede riordinate, ${n} ${una ? 'chiusa. La' : 'chiuse. Le'} ritrovi nel filo della home`;
     }
     if (giudizioMancato) {
       return riordinate
