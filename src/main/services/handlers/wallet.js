@@ -912,23 +912,6 @@ module.exports = function register(on, ctx) {
     tagliaCoda();
     scheduleFlush(30000);
   }
-  /* FINE_FLUSH */
-      log.lastError = String(esito.errore?.message || esito.errore);
-      log.lastErrorAt = new Date().toISOString();
-      if (generazione !== generazioneCoda) {
-        scarta(esito.rimaste.length, 'ricomincia');
-        return;
-      }
-      console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
-      queue.unshift(...esito.rimaste);
-      tagliaCoda();
-      scheduleFlush(30000);
-    } finally {
-      flushing = false;
-      await saveQueue();
-      if (queue.length && !flushTimer) scheduleFlush(5000);
-    }
-  }
 
   // «Ricomincia con un nuovo invito»: le righe in coda sono del portafoglio che si lascia, e nessuna passerebbe più.
   async function svuotaCodaPerRicominciare() {
