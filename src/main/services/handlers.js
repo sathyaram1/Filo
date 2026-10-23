@@ -195,6 +195,16 @@ function testoDelTurnoAutomatico(payload) {
   });
 }
 
+// La cronologia dell'Aiuto viene dalla pagina: un'immagine allegata (#1623) passa solo come data: di un'immagine, mai
+// come indirizzo che il fornitore del modello andrebbe a prendere.
+const IMMAGINE_IN_LINEA = /^data:image\/[a-z0-9.+-]+;base64,/i;
+function storiaAiuto(storia) {
+  if (!Array.isArray(storia)) return [];
+  return storia.map((m) => (m && Array.isArray(m.content)
+    ? { ...m, content: m.content.filter((p) => p && (p.type === 'text' || (p.type === 'image_url' && IMMAGINE_IN_LINEA.test(String(p.image_url && p.image_url.url || ''))))) }
+    : m));
+}
+
 // `sender`: la scheda per conto della quale si legge quello che serve al prompt (l'llms.txt dell'Aiuto).
 async function buildMessages(action, payload, { sender = null } = {}) {
   if (payload && Array.isArray(payload.messages) && payload.messages.length) {
