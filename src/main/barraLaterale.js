@@ -533,10 +533,12 @@ class BarraLaterale {
       let etichetta = I18n ? I18n.t(chiave) : id;
       const sp = dallaPagina && dallaPagina[id];
       if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
+      const ferma = d.tipo === 'pagina' && nav.pagina ? this._motivoAzione(id, nav) : '';
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
-        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
+        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || !!ferma));
+      const motivo = ferma && I18n ? I18n.t(MOTIVI_AZIONI_SPENTE[ferma]) : '';
       const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', riserva });
+      out.push({ id, icona, etichetta, tasto, spenta, motivo, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', riserva });
     }
     return out;
   }
