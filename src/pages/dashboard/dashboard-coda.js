@@ -714,6 +714,7 @@
   }
 
   let attesaCambi = null;
+  let attesaPagine = null;
   function init(deps) {
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
