@@ -1492,7 +1492,12 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
     const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
     // history per l'AI: solo {role, content}, niente metadati UI.
-    const aiHistory = history.map(({ role, content }) => ({ role, content }));
+    const aiHistory = history.map(({ role, content, immagini }) => (immagini && immagini.length
+      ? { role, content: [
+        { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
+        ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
+      ] }
+      : { role, content }));
     return {
       url: location.href,
       title: document.title,
