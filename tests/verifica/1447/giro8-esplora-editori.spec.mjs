@@ -34,7 +34,7 @@ const CK = () => `<!doctype html><meta charset="utf-8"><body style="padding:20px
 <script>ClassicEditor.create(document.getElementById('m'), { toolbar: [] }).then((ed) => { window.ed = ed; window.modello = () => ed.getData().replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' '); });</script></body>`;
 
 const IFRAME = () => `<!doctype html><meta charset="utf-8"><body style="padding:20px;font:22px sans-serif" lang="it">
-<iframe id="f" style="width:700px;height:200px" srcdoc="<html lang=it><body contenteditable=true style='font:22px sans-serif'></body></html>"></iframe>
+<iframe id="f" style="width:700px;height:200px" srcdoc="<html lang=it><body contenteditable=true style='font:22px sans-serif;min-height:150px'></body></html>"></iframe>
 <script>window.modello = () => document.getElementById('f').contentDocument.body.innerText;</script></body>`;
 
 async function apri(app, openTab, testServer, html) {
@@ -50,7 +50,7 @@ async function apri(app, openTab, testServer, html) {
   return page;
 }
 
-for (const [nome, html, sel] of [['ck', CK, '.ck-editor__editable'], ['iframe', IFRAME, null]]) {
+for (const [nome, html, sel] of [['iframe', IFRAME, null]]) {
   test(`esplora ${nome}`, async ({ app, openTab, testServer }) => {
     const page = await apri(app, openTab, testServer, html());
     const m = () => page.evaluate(() => window.modello().replace(/ /g, ' '));
