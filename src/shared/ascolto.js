@@ -127,6 +127,11 @@
 
     const lang = op.lang || navigator.language || 'it-IT';
     const s = { fermata: false, frasi: 0, errore: false, annullata: false, inVolo: false, coda: Promise.resolve(), fine: null };
+    // Per i contatori (#1467): finché ascolta, il main sa cosa contare se la scheda si chiude. `invioSeLasciata`:
+    // l'invio di una dettatura rimasta a metà con delle frasi (di serie nessuno: Detta scrive in un campo).
+    const id = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const inCorso = () => segnaSessione({ frasi: s.frasi, motivo: 'altro', provvisorie: !!op.provvisorie, id },
+      s.frasi > 0 ? op.invioSeLasciata || 'nessuno' : 'nessuno');
     const manda = (seg, interim) => chrome.runtime.sendMessage({
       type: MSG.AI_REQUEST,
       action: ACTIONS.TRANSCRIBE_AUDIO,
