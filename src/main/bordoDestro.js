@@ -206,9 +206,8 @@ class BordoDestro {
     try { return require('electron').screen.getCursorScreenPoint(); } catch (_) { return null; }
   }
 
-  // dove: 'bordo' negli ultimi pixel a destra (la fascia del sistema a finestra non massimizzata, la barra di
-  // scorrimento a finestra piena), 'vicino' a due passi, 'lontano' altrove: sulla fila delle schede (lì ci sono
-  // riduci, ingrandisci e chiudi), oltre la finestra, su un altro schermo. nellaPagina: sopra la scheda.
+  // 'bordo' negli ultimi pixel a destra, 'vicino' a due passi, 'lontano' altrove: la fila delle schede (riduci,
+  // ingrandisci, chiudi), fuori dalla finestra, un altro schermo. nellaPagina: sopra la scheda.
   _puntatore() {
     const via = { dove: 'lontano', punto: null, nellaPagina: false };
     if (!this._guardabile()) return via;
