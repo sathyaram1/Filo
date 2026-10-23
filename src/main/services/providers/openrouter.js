@@ -534,7 +534,7 @@
     if (r) reqBody.reasoning = r;
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal, providerRouting);
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto } = await postChat(reqBody, apiKey, signal, providerRouting);
     if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
 
     const reader = res.body.getReader();
