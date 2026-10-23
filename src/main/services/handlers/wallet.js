@@ -419,9 +419,8 @@ module.exports = function register(on, ctx) {
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
-    // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
-    // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
-    const localCredits = 0;
+    // Al riscatto si entra coi soli crediti d'ingresso (#1138): il conteggio locale non si dichiara, e il server
+    // ignora un `localCredits` scritto da chi chiama la callable da sé (#1519).
     // Chi lo vedeva come saldo deve sentire dove va (#1353): si guarda prima che la chiave personale arrivi.
     const conteggioLocale = W.conteggioLocaleInVista({ hasWallet: Boolean(lastServer && lastServer.hasWallet), keySource: await keySource() });
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
