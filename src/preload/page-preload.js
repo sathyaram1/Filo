@@ -235,22 +235,11 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
-// Diagnosi delle passkey (#1608) e dell'accesso Google (#1616): interruttori dall'ambiente del main, pagine http(s).
-// Il registratore delle passkey solo nel frame principale; window.chrome e i marchi in ogni frame, come in Chrome.
+// Il mondo della pagina come in Chrome (window.chrome pieno, passkey condizionale in sospeso, passkey del telefono dal
+// QR): regole in preload/mondo-chrome.js. In ogni frame http(s), finestrelle di accesso comprese, prima degli script del sito.
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) {
-    const diag = ipcRenderer.sendSync('filo:passkey-diagnosi') || {};
-    const g = Array.isArray(diag.google) ? diag.google : [];
-    if (g.includes('chrome') || g.includes('brands')) {
-      const finto = require('./chrome-finto.js');
-      webFrame.executeJavaScript(finto.buildSource({ chrome: g.includes('chrome'), brands: g.includes('brands'), versione: diag.versione }), false).catch(() => {});
-    }
-    if (!IS_SUBFRAME && diag.attiva) {
-      const { buildSource } = require('./passkey-diagnosi.js');
-      webFrame.executeJavaScript(buildSource(diag), false).catch(() => {});
-    }
-  }
+  if (/^https?:/i.test(loc)) webFrame.executeJavaScript(require('./mondo-chrome.js').buildSource(), false).catch(() => {});
 } catch (_) { /* mai bloccare il caricamento */ }
 
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.

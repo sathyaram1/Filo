@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.246', date: '2026-10-23',
+      features: [],
+      fixes: [
+        'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',
+      ],
+    },
+    {
       version: '0.2.245', date: '2026-10-22',
       features: [],
       fixes: [

@@ -135,15 +135,6 @@ function registerIpcHandlers() {
     }
   });
 
-  // Diagnosi delle passkey (#1608): interruttori dall'ambiente, letti dal preload della pagina. SINCRONO come fp-config.
-  ipcMain.on('filo:passkey-diagnosi', (event) => {
-    const Diag = require('./services/diagGoogle');
-    event.returnValue = {
-      attiva: !!process.env.FILO_PASSKEY_DIAGNOSI, hybrid: process.env.FILO_PASSKEY_HYBRID === '1',
-      cond: Diag.ha('cond'), google: Diag.elenco(), versione: Diag.versioneChromium(),
-    };
-  });
-
   // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
   // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
   ipcMain.on('filo:cookie-wipe', (event, href) => {

@@ -15,7 +15,9 @@
 //                 anche in Privacy senza rinunciare all'isolamento per-sito.
 //
 // Questo modulo si occupa SOLO della parte main-process:
-//   - emette l'header Sec-GPC: 1 sulle sessioni (onBeforeSendHeaders);
+//   - emette l'header Sec-GPC: 1 sulle sessioni (onBeforeSendHeaders), tranne
+//     sulle pagine di accesso dei provider noti (senzaGpc), e completa i client
+//     hints (services/clientHints.js);
 //   - blocca le richieste ai tracker noti (onBeforeRequest);
 //   - risolve la sessione/partizione per ogni navigazione top-level;
 //   - ripulisce i cookie dei tracker (wipe mirato, modalità 'default').
@@ -28,7 +30,7 @@
 const { session } = require('electron');
 const Sito = require('../../shared/stessoSito');
 const Google = require('../../shared/dominiGoogle');
-const Diag = require('./diagGoogle');
+const { completaClientHints } = require('./clientHints');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -217,6 +219,16 @@ function sessioneEffimera(site) {
 
 const gpcState = new WeakMap(); // session → { enabled }
 
+// Le pagine di accesso dei provider noti (la lista dell'esenzione anti-fingerprint) non ricevono il GPC, né l'header
+// né la proprietà in tabs.js: con quel segnale Google respinge l'accesso in un profilo nuovo (#1616). Altrove resta.
+function senzaGpc(href) {
+  try {
+    require('../../shared/authPopup');
+    const A = globalThis.SN_AUTH_POPUP;
+    return !!(A && A.isIdentityAuthSurface(String(href || '')));
+  } catch (_) { return false; }
+}
+
 // Registra (se manca) l'unico listener onBeforeSendHeaders della sessione,
 // SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
@@ -227,9 +239,8 @@ function ensureHeaderHook(ses) {
     gpcState.set(ses, state);
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
-      let headers = details.requestHeaders;
-      if (s && s.enabled && !Diag.gpcSpento(details.url)) headers = { ...headers, 'Sec-GPC': '1' };
-      if (Diag.ha('brands') || Diag.ha('hints')) headers = Diag.marchiChrome(headers, Diag.ha('brands'));
+      const headers = /^(https?|wss?):/i.test(details.url) ? completaClientHints(details.requestHeaders) : { ...details.requestHeaders };
+      if (s && s.enabled && !senzaGpc(details.url)) headers['Sec-GPC'] = '1';
       callback({ requestHeaders: headers });
     });
   }
@@ -841,6 +852,7 @@ module.exports = {
   partitionForTab,
   ensureHeaderHook,
   applyGpc,
+  senzaGpc,
   applyTrackerBlocking,
   coverAdblock,
   ensureRequestHook,
