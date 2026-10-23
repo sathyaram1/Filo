@@ -2,7 +2,7 @@
 // dell'utente (spinta sul bordo, clic, trascinamenti, puntatore dentro o fuori, gesti del vuoto).
 // Nient'altro deve poter chiedere al main: le azioni sono id che il main riconosce, o niente.
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const manda = (canale) => (dati) => ipcRenderer.send(canale, dati == null ? {} : dati);
 
