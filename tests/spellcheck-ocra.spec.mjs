@@ -503,6 +503,8 @@ for (const [nome, html] of [
   ['la conversazione dice l\'anno', PAGINA_ANNO({ dentro: '<div class="chat"><p>Luca: ti ricordi il matrimonio di Marta, nel 2024?</p></div>' })],
   ['il titolo della pagina dice l\'anno', PAGINA_ANNO({ titolo: 'Diario 2024' })],
   ['l\'intestazione sopra il campo dice l\'anno', PAGINA_ANNO({ fuori: '<header><h1>Diario 2024</h1></header>' })],
+  ['la casella del titolo della nota dice l\'anno', PAGINA_ANNO({ dentro: '<input id="titolo" value="Diario 2024" style="font:28px sans-serif;border:0">' })],
+  ['il titolo modificabile della nota dice l\'anno', PAGINA_ANNO({ dentro: '<div contenteditable="true" style="font:28px sans-serif">Diario 2024</div>' })],
 ]) {
   test(`${nome}: una data giusta di quell'anno non si segna, una sbagliata propone il giorno di quell'anno`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
