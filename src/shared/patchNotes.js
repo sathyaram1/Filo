@@ -12,6 +12,7 @@
       version: '0.2.249', date: '2026-10-23',
       features: [
         'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
+        'Se non ricordi un dato, scrivi delle x al suo posto: «l\'America l\'hanno scoperta nel 14xx», «Google ha un p/e di soli xx». Il correttore lo trova e te lo mostra in piccolo sopra le x, e un clic lo mette. Un dato che cambia nel tempo, come un prezzo, lo cerca su Wikipedia o sul web, e col tasto destro vedi da dove viene e di quando è. Si spegne in Opzioni → Altro, alla voce «Segnaposto».',
       ],
       fixes: [],
     },

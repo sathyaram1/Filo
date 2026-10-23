@@ -868,6 +868,8 @@
       case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
       case 'correttore.modelloErrori': return $('correttoreModello').checked;
       case 'correttore.ripetizioni': return $('correttoreRipetizioni').checked;
+      case 'correttore.segnaposti': return $('correttoreSegnaposti').checked;
+      case 'correttore.segnapostiWeb': return $('correttoreSegnapostiWeb').checked;
       case 'correttore.pausaRapidoMs': return tempoCorrettoreDelCampo('pausaRapidoMs');
       case 'correttore.ogniRapidoMs': return tempoCorrettoreDelCampo('ogniRapidoMs');
       case 'correttore.pausaRagionatoMs': return tempoCorrettoreDelCampo('pausaRagionatoMs');
@@ -954,6 +956,8 @@
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
       case 'correttore.ripetizioni': return !(s.correttore && s.correttore.ripetizioni === false);
+      case 'correttore.segnaposti': return !(s.correttore && s.correttore.segnaposti === false);
+      case 'correttore.segnapostiWeb': return !(s.correttore && s.correttore.segnapostiWeb === false);
       case 'correttore.pausaRapidoMs':
       case 'correttore.ogniRapidoMs':
       case 'correttore.pausaRagionatoMs': return tempiCorrettore(s)[k.split('.')[1]];
@@ -1168,6 +1172,8 @@
     const corr = settings.correttore || {};
     if (vuole('correttore.modelloErrori')) $('correttoreModello').checked = corr.modelloErrori !== false;
     if (vuole('correttore.ripetizioni')) $('correttoreRipetizioni').checked = corr.ripetizioni !== false;
+    if (vuole('correttore.segnaposti')) $('correttoreSegnaposti').checked = corr.segnaposti !== false;
+    if (vuole('correttore.segnapostiWeb')) $('correttoreSegnapostiWeb').checked = corr.segnapostiWeb !== false;
     const tempiCorr = tempiCorrettore(settings);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       if (vuole(`correttore.${campo}`)) $(id).value = String(tempiCorr[campo]);
@@ -1847,6 +1853,8 @@
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     $('correttoreModello').addEventListener('change', persist);
     $('correttoreRipetizioni').addEventListener('change', persist);
+    $('correttoreSegnaposti').addEventListener('change', persist);
+    $('correttoreSegnapostiWeb').addEventListener('change', persist);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.

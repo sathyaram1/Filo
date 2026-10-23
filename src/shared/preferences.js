@@ -1122,6 +1122,28 @@
       },
     },
     {
+      scrive: ['correttore.segnaposti'],
+      aiuto: 'true | false (i SEGNAPOSTO del correttore: l\'utente scrive delle x al posto di un dato che non ricorda, «nel 14xx», e Filo lo trova e lo propone sopra le x)',
+      costo: 1,
+      keys: ['segnaposto', 'segnaposti', 'dati mancanti', 'riempi le x', 'xx', 'dato da trovare', 'completa i dati'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { segnaposti: b } }, label: `Segnaposto del correttore → ${b ? 'attivi' : 'spenti'}` };
+      },
+    },
+    {
+      scrive: ['correttore.segnapostiWeb'],
+      aiuto: 'true | false (per un segnaposto con un dato che cambia nel tempo, come prezzi e quotazioni, il correttore cerca anche sul web, circa 0,8 centesimi a ricerca; spento cerca solo su Wikipedia)',
+      costo: 1,
+      keys: ['cerca sul web per i segnaposto', 'ricerca web segnaposto', 'segnaposto sul web', 'segnaposti web'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { segnapostiWeb: b } }, label: `Ricerca sul web per i segnaposto → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
       scrive: ['correttore.pausaRapidoMs'],
       costo: 1,
       aiuto: 'millisecondi 200-5000 (pausa nello scrivere prima del controllo degli errori)',

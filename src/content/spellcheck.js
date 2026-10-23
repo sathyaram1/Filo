@@ -1,6 +1,6 @@
-// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, e la
-// correzione automatica a fine parola (#1447). Le regole senza DOM stanno in correttoreRegole.js, correttoreAutomatica.js
-// e coerenza.js, il menu del tasto destro in content.js.
+// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, la
+// correzione automatica a fine parola (#1447) e i valori dei segnaposti (#1448). Le regole senza DOM stanno in
+// correttoreRegole.js, correttoreAutomatica.js e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
   'use strict';
@@ -23,6 +23,8 @@
   const CONVERSAZIONE_MAX = 1500;
   // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
   const PASSAGGIO_MS = 320;
+  // Il lampo sul valore che Filo ha appena messo al posto delle x: si vede dove è cambiato il testo, poi sfuma.
+  const LAMPO_MS = 900;
   // Oltre, i candidati del codice si ricalcolano a una pausa breve invece che a ogni tasto.
   const LUNGO = 20000;
   const RICALCOLO_LUNGO_MS = 300;
@@ -64,12 +66,16 @@
   function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
   function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
   function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
+  // I segnaposti (#1448) hanno il loro interruttore: con i suggerimenti spenti il controllo ragionato parte lo stesso, solo
+  // dove ci sono delle x da riempire.
+  function segnapostiAttivi() { return !spentoQui() && settings.correttore?.segnaposti !== false && !!Coerenza(); }
+  const ragionatoAttivo = () => suggerimentiAttivi() || segnapostiAttivi();
   function automaticaAttiva() { return !spentoQui() && !!A() && settings.correttore?.automatica !== false; }
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
   }
-  const attivo = () => erroriAttivi() || suggerimentiAttivi() || automaticaAttiva();
+  const attivo = () => erroriAttivi() || suggerimentiAttivi() || segnapostiAttivi() || automaticaAttiva();
 
   // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
   // caselle di una riga. Sul sito dove Filo è spento il browser fa da sé.
@@ -97,6 +103,8 @@
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
     document.addEventListener('visibilitychange', riprendiRimandati);
+    document.addEventListener('pointermove', svegliaValori, { capture: true, passive: true });
+    document.addEventListener('pointerdown', svegliaValori, { capture: true, passive: true });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggiMemorie(); });
     adottaIlFuoco();
 
@@ -131,7 +139,7 @@
     if (!state) { adottaIlFuoco(); return; }
     // Ogni parte si spegne da sola, e le altre restano.
     if (!modelloErrori()) fermaTimer(state, ['timerRapido', 'timerFine']);
-    if (!suggerimentiAttivi()) fermaTimer(state, ['timerRagionato']);
+    if (!ragionatoAttivo()) fermaTimer(state, ['timerRagionato']);
     aggiornaCodice(state);
     // Anche il tema può essere cambiato: i colori dei segni lo leggono dall'overlay.
     syncOverlay(state);
@@ -749,6 +757,8 @@
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
       rimandati: new Set(), inVista: [],
+      // I valori dei segnaposti sopra le x e i lampi dei valori appena messi (#1448), in uno strato che riceve il mouse.
+      valori: null, badge: new Map(), lampi: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
       giudicati: { rapido: new Map(), ragionato: new Map() },
       // La correzione automatica (#1447), sulle posizioni del testo come i segni: le parole corrette da sé, l'ultima
@@ -799,6 +809,7 @@
     fermaTimer(state, ['timerRapido', 'timerFine', 'timerRagionato', 'timerCodice', 'timerPassaggio']);
     state.rimandati.clear();
     if (state.overlay) { state.overlay.remove(); state.overlay = null; }
+    if (state.valori) { state.valori.remove(); state.valori = null; state.badge.clear(); }
     if (state.ro) { try { state.ro.disconnect(); } catch (_) {} state.ro = null; }
     state.attivo = false;
     if (activeEl === el) activeEl = null;
@@ -998,18 +1009,20 @@
     state.inVista = segniInVista(state);
     disegnaSpecchio(state);
     allineaScorrimento(state);
+    disegnaValori(state);
     seguiIlCampo();
     passaggiInCorso(state);
     allineaProposte(state);
   }
 
-  // Un segno che si conferma o sparisce è a metà del suo passaggio: alla fine lo strato si ridisegna senza.
+  // Un segno che si conferma o sparisce, o un lampo, è a metà del suo passaggio: alla fine lo strato si ridisegna senza.
   function passaggiInCorso(state) {
     if (state.timerPassaggio) return;
     const ora = Date.now();
-    const resto = state.inVista.reduce((m, s) => {
-      const da = s.svanisce || s.confermatoAlle || 0;
-      return da && ora - da < PASSAGGIO_MS ? Math.max(m, PASSAGGIO_MS - (ora - da)) : m;
+    const resto = [...state.inVista, ...state.lampi].reduce((m, s) => {
+      const durata = s.lampo ? LAMPO_MS : PASSAGGIO_MS;
+      const da = s.svanisce || s.confermatoAlle || s.lampo || 0;
+      return da && ora - da < durata ? Math.max(m, durata - (ora - da)) : m;
     }, 0);
     if (!resto) return;
     state.timerPassaggio = setTimeout(() => {
@@ -1273,6 +1286,7 @@
       state.ultimaAutomatica = null;
     }
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
+    if (state.lampi.length) state.lampi = riallineaIssues(state.lampi, prima, ora).issues;
     if (state.automatiche.length) state.automatiche = riallineaIssues(state.automatiche, prima, ora).issues;
     if (state.rifiutateQui.length) state.rifiutateQui = riallineaIssues(state.rifiutateQui, prima, ora).issues;
     // Una parola contata che cambia è stata corretta: il suo conto torna indietro.
@@ -1353,6 +1367,9 @@
     const d = testoDaControllare(state.el);
     const Rg = R();
     if (!Rg) { state.codice = []; return false; }
+    // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
+    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
+    const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
     const pareri = erroriAttivi() ? pareriDelTesto(d.testo) : null;
     const errori = pareri ? Rg.senzaSovrapposti([
       ...Rg.erroriFissi(d.testo),
@@ -1361,10 +1378,10 @@
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
-    ]) : [];
+    ]).filter(libero) : [];
     const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
     state.codiceTesto = d.testo;
-    state.codiceT2 = [...errori, ...date];
+    state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
     const scrive = inScritturaNelCampo(state);
     return state.codice.some((c) => c.segno === 'errore' && c.dubbio && !verdetto(state, c) && !state.richiesti.has(Rg.chiaveVerdetto(c))
@@ -1412,6 +1429,7 @@
     const nascosto = (c) => c.attende && modelloErrori();
     const codice = [];
     for (const c of state.codice) {
+      if (c.fonte === 'segnaposto' && !segnapostiAttivi()) continue;
       const v = verdetto(state, c);
       if (!v) { if (!nascosto(c)) codice.push(c); continue; }
       if (v.stato === 'scartato') {
@@ -1423,7 +1441,9 @@
         correzioni: v.correzioni && v.correzioni.length ? v.correzioni : c.correzioni, citazione: v.citazione || c.citazione,
       });
     }
-    const delModello = state.modello.filter((m) => (m.fonte === 'rapido' ? modelloErrori() : suggerimentiAttivi()));
+    const delModello = state.modello
+      .filter((m) => (m.fonte === 'rapido' ? modelloErrori() : (m.tipo === 'segnaposto' ? segnapostiAttivi() : suggerimentiAttivi())))
+      .map(conRicerca);
     const valido = (x) => x.start >= 0 && x.end <= testo.length && x.end > x.start && testo.slice(x.start, x.end) === x.segment;
     const tieni = (x) => valido(x) && !ignorato(state, x, testo)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
@@ -1435,7 +1455,7 @@
     ].filter(tieni);
     return [
       ...(erroriAttivi() ? Rg.senzaSovrapposti(ordina('errore')) : []),
-      ...(suggerimentiAttivi() ? Rg.senzaSovrapposti(ordina('suggerimento')) : []),
+      ...Rg.senzaSovrapposti(ordina('suggerimento').filter((x) => (x.tipo === 'segnaposto' ? segnapostiAttivi() : suggerimentiAttivi()))),
     ];
   }
 
@@ -1477,7 +1497,7 @@
 
   // Il ragionato: a fine frase, sulle frasi chiuse, e dopo la pausa lunga su quello che è cambiato.
   function programmaRagionato(state, { gesto = false, fineFrase = false } = {}) {
-    if (!suggerimentiAttivi()) return;
+    if (!ragionatoAttivo()) return;
     if (!gesto && !state.timerRagionato) return;
     if (state.timerRagionato) clearTimeout(state.timerRagionato);
     state.timerRagionato = setTimeout(() => {
@@ -1560,7 +1580,7 @@
     try { return location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) { return ''; }
   }
 
-  const perche = (c) => c.motivo || (c.fonte === 'dizionario' ? t('spell_perche_dizionario') : '');
+  const perche = (c) => (c.fonte === 'segnaposto' ? 'segnaposto' : c.motivo || (c.fonte === 'dizionario' ? t('spell_perche_dizionario') : ''));
 
   // Una risposta senza righe leggibili che non dice «nessuno» si chiede una volta ancora (#1580, D8).
   async function chiediERipeti(action, payload, opz = {}) {
@@ -1618,7 +1638,7 @@
   }
 
   async function controlloRagionato(state, { fineFrase = false } = {}) {
-    if (!suggerimentiAttivi() || !state.el || !state.el.isConnected) return;
+    if (!ragionatoAttivo() || !state.el || !state.el.isConnected) return;
     if (document.hidden) { state.rimandati.add('ragionato'); return; }
     const Rg = R();
     seguiIlTesto(state);
@@ -1640,12 +1660,17 @@
     const numero = ++state.inviatiRagionato;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
+    // Coi suggerimenti spenti il pezzo si manda solo se ha delle x, e la domanda è soltanto sui segnaposti.
+    const soloSegnaposti = !suggerimentiAttivi();
+    if (soloSegnaposti && !candidati.some((c) => c.fonte === 'segnaposto')) { state.baseRagionato = baseDiPrima; return; }
     const contesto = contestoDelCampo(state.el);
     const payload = {
       prima: '', nuovo: d.testo.slice(g.start, g.end), dopo: '', campo: d.testo, campoDa: g.start, sopra: contesto.prima.slice(-CONVERSAZIONE_MAX),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       contesto,
       ripetizioni: ripetizioniAttive(),
+      segnaposti: segnapostiAttivi(),
+      ...(soloSegnaposti ? { soloSegnaposti: true } : {}),
       luogo: { sito: sitoDellaPagina() },
     };
     const [regioneCampo, nuovoCampo] = d.riporta([{ start: g.start, end: g.end }, g.nuovo]);
@@ -1683,13 +1708,23 @@
     const zona = viaggio && !viaggio.perso ? (viaggio.nuovo === undefined ? viaggio : viaggio.nuovo) : null;
     const nuovo = zona ? { start: d.verso(zona.start), end: d.verso(zona.end) } : null;
     const { segni, giusti } = Rg.segniDaRisposta(raw, d.testo, {
-      tipi: rapido ? ['errore'] : ['errore', 'suggerimento', 'contraddizione'],
+      tipi: rapido ? ['errore'] : [
+        ...(suggerimentiAttivi() ? ['errore', 'suggerimento', 'contraddizione'] : []), ...(segnapostiAttivi() ? ['segnaposto', 'cerca'] : []),
+      ],
       // Una riga che ha perso il tipo: nel ragionato vale il segno che decide l'utente, non un errore.
       senzaTipo: rapido ? 'errore' : 'suggerimento',
       citata: (c) => !!contesto && !!Coerenza() && Coerenza().citazioneNelContesto(c, contesto),
       fonte,
       nuovo: nuovo && nuovo.start >= 0 && nuovo.end > nuovo.start ? nuovo : null,
     });
+    // Ogni segnaposto ha il suo valore («p/e di soli xx» e «p/e di xx»): non diventa il giudizio di un candidato, che
+    // varrebbe per tutte le stesse x del campo. Porta la frase in cui il suo dato è stato deciso (correttoreRegole.stessaFrase).
+    for (const s of segni) {
+      if (s.tipo !== 'segnaposto') continue;
+      const f = Rg.aFrasiIntere(d.testo, s.start, s.end);
+      s.frase = d.testo.slice(f.start, f.end).slice(0, 2000);
+      if (s.cerca) s.cerca = { ...s.cerca, frase: s.frase, chiave: Rg.chiaveRicerca(s.segment, s.cerca) };
+    }
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const ora = Date.now();
     const suo = rapido ? 'errore' : 'suggerimento';
@@ -1701,7 +1736,7 @@
     const nuovi = [];
     const confermati = new Set();
     for (const s of segni) {
-      const c = candidati.find((x) => x.start === s.start && x.end === s.end)
+      const c = s.tipo === 'segnaposto' ? null : candidati.find((x) => x.start === s.start && x.end === s.end)
         || (!rapido && s.segno === 'suggerimento' ? candidati.find((x) => tocca(x, s)) : null);
       if (!c) { nuovi.push({ ...s, confermatoAlle: ora }); continue; }
       confermati.add(Rg.chiaveVerdetto(c));
@@ -1720,12 +1755,42 @@
         if (!confermati.has(k) && !(v && v.stato === 'confermato')) state.verdetti.set(k, { stato: 'scartato', alle: ora, da: fonte });
       }
     }
-    const delCampo = d.riporta(nuovi);
-    const giustiCampo = d.riporta(giusti);
     const giudicato = viaggio && !viaggio.perso ? viaggio : null;
+    // Un segnaposto già deciso: se la rilettura chiede un dato, decide la sua domanda (la stessa lo tiene, un'altra lo
+    // rifà partendo dalle fonti già lette, così parole diverse per lo stesso dato non ripagano la ricerca); se tace, resta
+    // finché la frase è ancora quella (correttoreRegole.stessaFrase). Un «giusto» lo toglie sempre.
+    const fraseDiAdesso = (m) => {
+      const a = d.verso(m.start);
+      const b = d.verso(m.end);
+      if (!(a >= 0 && b > a) || d.testo.slice(a, b) !== m.segment) return null;
+      const f = Rg.aFrasiIntere(d.testo, a, b);
+      return d.testo.slice(f.start, f.end);
+    };
+    const restaSegnaposto = (m) => {
+      if (m.tipo !== 'segnaposto' || !m.frase) return false;
+      const ora = fraseDiAdesso(m);
+      return ora != null && Rg.stessaFrase(m.frase, ora);
+    };
+    const tenuti = new Set();
+    const delCampo = d.riporta(nuovi).filter((n) => {
+      if (n.tipo !== 'segnaposto') return true;
+      const chiesto = n.cerca && state.modello.find((m) => m.fonte === fonte && m.tipo === 'segnaposto' && m.cerca && tocca(m, n));
+      if (chiesto && chiesto.cerca.chiave !== n.cerca.chiave) {
+        const trovato = ricerche.get(chiesto.cerca.chiave)?.stato === 'trovato';
+        n.cerca = { ...n.cerca, prima: trovato || !chiesto.cerca.prima ? { chiave: chiesto.cerca.chiave, domanda: chiesto.cerca.domanda, dove: chiesto.cerca.dove } : chiesto.cerca.prima };
+        return true;
+      }
+      const prima = chiesto || state.modello.find((m) => m.fonte === fonte && m.tipo === 'segnaposto' && tocca(m, n) && restaSegnaposto(m));
+      if (!prima) return true;
+      tenuti.add(prima);
+      return false;
+    });
+    const giustiCampo = d.riporta(giusti);
+    const rinnovato = (m) => giustiCampo.some((n) => tocca(m, n)) || (!tenuti.has(m) && delCampo.some((n) => tocca(m, n)));
     state.modello = state.modello.filter((m) => m.fonte !== fonte
-      || !((giudicato && tocca(m, giudicato)) || delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n))));
+      || (!rinnovato(m) && (tenuti.has(m) || !(giudicato && tocca(m, giudicato)) || restaSegnaposto(m))));
     state.modello.push(...delCampo);
+    avviaRicerche(state);
     const base = rapido ? state.baseRapido : state.baseRagionato;
     const sigla = rapido ? 'r' : 'g';
     if (base === d.testo && !state.inViaggio.some((v) => v.id[0] === sigla)) ricordaGiudicato(state, fonte);
@@ -1754,8 +1819,250 @@
     const segni = riallineaIssues(g.segni.map((x) => ({ ...x })), g.testo, testo).issues;
     state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni];
     state.testo = testo;
+    avviaRicerche(state);
     renderOverlayContent(state);
     return true;
+  }
+
+  // ============================================================================
+  // I segnaposti (#1448)
+  // ============================================================================
+  // Il valore di un segnaposto da cercare, per segnaposto e domanda: lo stesso segnaposto in un campo ripreso, o in un
+  // testo tornato indietro, non ricerca. Una ricerca fallita non resta: «Cerca di nuovo» la rifà.
+  const RICERCHE_MAX = 200;
+  const ricerche = new Map();
+
+  function avviaRicerche(state) {
+    if (!segnapostiAttivi()) return;
+    for (const m of state.modello) if (m.cerca && m.cerca.chiave && !ricerche.has(m.cerca.chiave)) cercaValore(state, m.cerca, m.segment);
+  }
+
+  // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
+  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
+
+  async function cercaValore(state, cerca, pezzo, { suRichiesta = false } = {}) {
+    const k = cerca.chiave;
+    ricerche.set(k, { stato: 'cerca' });
+    while (ricerche.size > RICERCHE_MAX) ricerche.delete(ricerche.keys().next().value);
+    let res = null;
+    try {
+      res = await chiedi(ACTIONS.SPELLCHECK_CONTEXT, {
+        segnaposto: {
+          pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}),
+          ...(cerca.prima ? { giaLette: { domanda: cerca.prima.domanda, dove: cerca.prima.dove } } : {}),
+        },
+      }, { giorno: new Date().toDateString() });
+    } catch (err) {
+      console.warn('[SN] correttore, segnaposto:', err);
+    }
+    const ok = !!(res && res.ok && typeof res.text === 'string');
+    const v = ok ? R().valoreTrovato(res.text) : null;
+    ricerche.set(k, v ? { stato: 'trovato', ...v } : { stato: ok ? 'nessuno' : (NON_PARTITA[res && res.code] || 'errore') });
+    if (res && !res.ok) console.warn('[SN] correttore, segnaposto:', res.code, res.error);
+    if (state.attivo) renderOverlayContent(state);
+    avvisaAscoltatori(state);
+  }
+
+  // Un segno da cercare col suo stato: in ricerca, col valore e la fonte, o senza.
+  function conRicerca(m) {
+    if (!m.cerca) return m;
+    const r = ricerche.get(m.cerca.chiave);
+    if (!r || r.stato === 'cerca') {
+      // Rifatta con un'altra domanda: finché non risponde resta il valore di prima, non i puntini.
+      const p = m.cerca.prima && ricerche.get(m.cerca.prima.chiave);
+      if (p && p.stato === 'trovato') {
+        return { ...m, aggiornando: true, correzioni: [p.valore], motivo: p.motivo, fonteDato: { nome: p.fonte, data: p.data, url: p.url } };
+      }
+      return { ...m, cercando: true };
+    }
+    if (r.stato === 'trovato') {
+      return { ...m, correzioni: [r.valore], motivo: r.motivo, fonteDato: { nome: r.fonte, data: r.data, url: r.url } };
+    }
+    const motivo = { errore: 'spell_segnaposto_errore', delicata: 'spell_segnaposto_delicata', bloccata: 'spell_segnaposto_bloccata' }[r.stato];
+    return {
+      ...m, motivo: t(motivo || 'spell_segnaposto_nessuno'),
+      ricercaFallita: r.stato === 'errore' || r.stato === 'delicata',
+      vocePerCercare: r.stato === 'delicata' ? 'spell_segnaposto_cerca' : 'spell_segnaposto_riprova',
+    };
+  }
+
+  // Col clic di chi scrive: è una richiesta, quindi parte anche da una pagina delicata.
+  function cercaDiNuovo(el, segno) {
+    const state = el && monitored.get(el);
+    if (!state || !segno || !segno.cerca || !segnapostiAttivi()) return;
+    ricerche.delete(segno.cerca.chiave);
+    cercaValore(state, segno.cerca, segno.segment, { suRichiesta: true });
+    renderOverlayContent(state);
+  }
+
+  // Il valore al posto delle x, col lampo che dice dove il testo è cambiato; il cursore resta dove si stava scrivendo,
+  // perché il clic è caduto sul valore, non nel testo. Vero se l'ha messo.
+  function riempi(el, segno) {
+    const state = el && monitored.get(el);
+    const valore = segno && segno.tipo === 'segnaposto' && !segno.cercando && segno.correzioni && segno.correzioni[0];
+    if (!state || !valore) return false;
+    const prima = getEditableText(el);
+    const cursore = cursoreNelCampo(el);
+    applyFix(el, { start: segno.start, end: segno.end }, valore, { expectedSegment: segno.segment, cursor: 'preserve' });
+    if (getEditableText(el) === prima) return false;
+    if (cursore >= 0 && !campoDiTesto(el)) {
+      const dove = cursore >= segno.end ? cursore + valore.length - (segno.end - segno.start) : cursore;
+      try {
+        const r = document.createRange();
+        placeCaretAtOffset(el, dove, r);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } catch (_) {}
+    }
+    seguiIlTesto(state);
+    state.lampi.push({ start: segno.start, end: segno.start + valore.length, lampo: Date.now() });
+    renderOverlayContent(state);
+    return true;
+  }
+
+  // Lo strato dei valori: sopra le x, in piccolo, il valore trovato (o i puntini della ricerca), che si mette con un
+  // clic; e i lampi. Sta fuori dallo specchio, che taglia ai bordi del campo e lascia passare il mouse.
+  function strato(state) {
+    if (state.valori && state.valori.isConnected) return state.valori;
+    const v = document.createElement('div');
+    v.className = 'sn-spell-valori';
+    global.SN_FILO_UI?.mark(v);
+    (radiceDi(state.el) || document.body).appendChild(v);
+    state.valori = v;
+    state.badge.clear();
+    return v;
+  }
+
+  // I riquadri delle righe di [da, a): nello specchio per una casella, sulle parole vere per un campo modificabile.
+  function rettangoliDi(state, da, a) {
+    const radice = campoDiTesto(state.el) ? state.overlay : state.el;
+    if (!radice || a <= da) return [];
+    const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let tot = 0;
+    let iniziato = false;
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const len = n.nodeValue.length;
+      if (!iniziato && da < tot + len) { range.setStart(n, da - tot); iniziato = true; }
+      if (iniziato && a <= tot + len) { range.setEnd(n, a - tot); return [...range.getClientRects()].filter((r) => r.width || r.height); }
+      tot += len;
+    }
+    return [];
+  }
+
+  const dentroAlCampo = (state, r) => {
+    const q = state.riquadro;
+    if (!q) return false;
+    const y = r.top + r.height / 2;
+    const x = r.left + r.width / 2;
+    return y >= q.top && y <= q.top + q.height && x >= q.left && x <= q.left + q.width;
+  };
+
+  function disegnaValori(state) {
+    if (!state.attivo || !state.overlay) {
+      if (state.valori) { state.valori.remove(); state.valori = null; state.badge.clear(); }
+      return;
+    }
+    const ora = Date.now();
+    state.lampi = state.lampi.filter((l) => ora - l.lampo < LAMPO_MS);
+    const testo = getEditableText(state.el);
+    const valori = state.inVista.filter((s) => s.tipo === 'segnaposto' && !s.dubbio && !s.svanisce
+      && (s.cercando || (s.correzioni && s.correzioni[0])));
+    if (!valori.length && !state.lampi.length) {
+      if (state.valori) { state.valori.textContent = ''; state.badge.clear(); }
+      return;
+    }
+    const v = strato(state);
+    v.dataset.snTheme = document.documentElement.dataset.snTheme || '';
+    const corpo = parseFloat(window.getComputedStyle(state.el).fontSize) || 16;
+    v.style.setProperty('--sn-valore-corpo', `${corpo}px`);
+    const usati = new Set();
+    for (const s of valori) {
+      const tr = tratto(testo, s);
+      const r = tr && rettangoliDi(state, tr.a, tr.b)[0];
+      if (!r || !dentroAlCampo(state, r)) continue;
+      const k = `${s.start}:${s.end}`;
+      usati.add(k);
+      let b = state.badge.get(k);
+      if (!b) {
+        b = document.createElement('span');
+        b.className = 'sn-spell-valore';
+        b.setAttribute('role', 'button');
+        // Il clic non toglie il fuoco al campo, che altrimenti si staccherebbe col suo strato.
+        b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!e.isTrusted) return;
+          const vivo = b._snSegno;
+          if (!vivo) return;
+          if (!riempi(state.el, vivo)) { renderOverlayContent(state); return; }
+          // Il valore usato col clic è un uso del correttore, come la correzione scelta dal menu (#969).
+          try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action: ACTIONS.SPELLCHECK_CONTEXT, attesaMs: 0 })).catch(() => {}); } catch (_) {}
+        });
+        state.badge.set(k, b);
+        v.appendChild(b);
+      }
+      b._snSegno = s;
+      b.classList.toggle('sn-cercando', !!s.cercando);
+      const scritto = s.cercando ? '' : s.correzioni[0];
+      if (b.textContent !== scritto) b.textContent = scritto;
+      b.title = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
+      b.style.left = `${r.left + r.width / 2}px`;
+      b._snX = r;
+      b.style.top = `${r.top}px`;
+      b.classList.toggle('sn-sopra-testo', copreIlTesto(state, b, r, tr.a));
+    }
+    for (const [k, b] of state.badge) if (!usati.has(k)) { b.remove(); state.badge.delete(k); }
+    for (const l of v.querySelectorAll('.sn-spell-lampo')) l.remove();
+    for (const l of state.lampi) {
+      for (const r of rettangoliDi(state, l.start, l.end)) {
+        if (!dentroAlCampo(state, r)) continue;
+        const d = document.createElement('span');
+        d.className = 'sn-spell-lampo';
+        d.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;animation-delay:${-(ora - l.lampo)}ms`;
+        v.appendChild(d);
+      }
+    }
+  }
+
+  // Sopra le x di una riga che non è la prima il valore cadrebbe sulle parole della riga prima (#1448): lì resta velato,
+  // lascia il clic al testo e si sveglia (pieno, cliccabile) col puntatore sulle x, finché resta su x o valore.
+  function copreIlTesto(state, b, x, da) {
+    const w = b.offsetWidth;
+    const h = b.offsetHeight;
+    if (!w || !h) return false;
+    const cx = x.left + x.width / 2;
+    const top = x.top - 1 - h;
+    return rettangoliDi(state, Math.max(0, da - 1000), da).some((r) => {
+      const mezzo = r.top + r.height / 2;
+      if (mezzo >= x.top && mezzo <= x.bottom) return false;
+      return r.bottom > top + 1 && r.top < top + h - 1 && r.right > cx - w / 2 && r.left < cx + w / 2;
+    });
+  }
+
+  function svegliaValori(e) {
+    const state = activeEl && monitored.get(activeEl);
+    if (!state || !state.valori) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    const dentro = (r, m) => r && x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
+    for (const b of state.badge.values()) {
+      if (!b.classList.contains('sn-sopra-testo')) continue;
+      const sveglio = dentro(b._snX, 2) || (b.classList.contains('sn-sveglio') && (dentro(b._snX, 4) || dentro(b.getBoundingClientRect(), 4)));
+      b.classList.toggle('sn-sveglio', sveglio);
+    }
+  }
+
+  // Il valore sotto il tasto destro: il menu è quello del suo segnaposto.
+  function valoreSotto(target) {
+    const b = target && target.closest && target.closest('.sn-spell-valore');
+    if (!b || !b._snSegno) return null;
+    const el = activeEl;
+    const state = el && monitored.get(el);
+    if (!state || !state.valori || !state.valori.contains(b)) return null;
+    return { el, segno: b._snSegno };
   }
 
   // ============================================================================
@@ -1823,6 +2130,11 @@
     if (!state || !segno) return;
     esitoSegno(el, segno, 'rifiutata');
     const ig = chiaveIgnora(segno);
+    // Le x di un segnaposto si ignorano con le parole che le precedono: «di soli xx» non spegne «un p/e di xx».
+    if (segno.tipo === 'segnaposto') {
+      const prima = getEditableText(el).slice(Math.max(0, segno.start - 40), segno.start);
+      ig.segment = (/(?:\S+[^\S\n]+){0,2}$/.exec(prima) || [''])[0] + segno.segment;
+    }
     state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
     renderOverlayContent(state);
     const parola = String(segno.segment || '').trim();
@@ -1852,13 +2164,15 @@
     if (state) aggiornaCodice(state);
   }
 
-  // Gli errori confermati che hanno una correzione: «Correggi tutti gli errori» non tocca i candidati né i suggerimenti.
+  // Gli errori confermati che hanno una correzione, e i segnaposti che hanno un valore (#1448): «Correggi tutti gli
+  // errori» non tocca i candidati né gli altri suggerimenti.
   function erroriDaCorreggere(el) {
     const state = el && monitored.get(el);
     if (!state) return [];
     seguiIlTesto(state);
     return segniInVista(state, { ignoraScrittura: true })
-      .filter((s) => s.segno === 'errore' && !s.dubbio && !s.svanisce && Array.isArray(s.correzioni) && s.correzioni.length);
+      .filter((s) => (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && !s.aggiornando)) && !s.dubbio && !s.svanisce
+        && Array.isArray(s.correzioni) && s.correzioni.length);
   }
 
   // Dal fondo all'inizio: ogni correzione lascia al loro posto quelle prima. Quante ne ha fatte.
@@ -1867,7 +2181,8 @@
     let fatte = 0;
     for (const s of lista) {
       const prima = getEditableText(el);
-      correggi(el, s, s.correzioni[0]);
+      if (s.tipo === 'segnaposto') riempi(el, s);
+      else correggi(el, s, s.correzioni[0]);
       if (getEditableText(el) !== prima) fatte++;
     }
     return fatte;
@@ -2529,6 +2844,7 @@
     updateSettings,
     erroriAttivi,
     suggerimentiAttivi,
+    segnapostiAttivi,
     modelloErrori,
     isSupportedEditable,
     findSupportedEditable,
@@ -2542,6 +2858,9 @@
     parolaGiusta,
     erroriDaCorreggere,
     correggiTutti,
+    riempi,
+    cercaDiNuovo,
+    valoreSotto,
     controlloSuRichiesta,
     proposteDelBrowser,
     sbagliataPerIlBrowser,

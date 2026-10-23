@@ -135,6 +135,8 @@
     'correttore.accettiPerImparare': { nome: 'volte che una correzione scelta serve per diventare automatica', valore: numero, livello: 1 },
     'correttore.annulliPerImparare': { nome: 'volte che una correzione annullata serve per non tornare più', valore: numero, livello: 1 },
     'correttore.riscrittePerImparare': { nome: 'volte che una parola scritta uguale serve per non essere più segnata', valore: numero, livello: 1 },
+    'correttore.segnaposti': { nome: 'segnaposto del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.segnapostiWeb': { nome: 'ricerca sul web per i segnaposto', valore: ATTIVA, livello: 1 },
     'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },

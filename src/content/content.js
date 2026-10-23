@@ -1081,8 +1081,14 @@
     // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
     // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
     try {
-      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
+      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi() || SpellCheck.segnapostiAttivi())) {
         const rt = realTarget(e);
+        // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
+        const valore = SpellCheck.valoreSotto(rt);
+        if (valore) {
+          await openSpellMarksMenu(valore.el, { errore: null, suggerimento: valore.segno }, e, sito);
+          return;
+        }
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
@@ -1713,9 +1719,17 @@
         const scrivi = (s) => {
           el.textContent = '';
           const perche = document.createElement('div');
-          const ripiego = s.segno !== 'errore' ? 'spell_ocra_controlla' : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+          const ripiego = s.cercando ? 'spell_segnaposto_cerco' : s.segno !== 'errore' ? 'spell_ocra_controlla'
+            : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
           perche.textContent = s.motivo || I18n.t(ripiego);
           el.appendChild(perche);
+          // La fonte del valore di un segnaposto (#1448), col giorno a cui il dato si riferisce.
+          if (s.fonteDato && s.fonteDato.nome) {
+            const fonte = document.createElement('div');
+            fonte.className = 'sn-menu-segno-citazione';
+            fonte.textContent = I18n.t('spell_segnaposto_fonte', [s.fonteDato.nome, s.fonteDato.data].filter(Boolean).join(', '));
+            el.appendChild(fonte);
+          }
           if (s.citazione) {
             const prova = document.createElement('div');
             prova.className = 'sn-menu-segno-citazione';
@@ -1795,8 +1809,45 @@
     return items;
   }
 
+  // Su un segnaposto (#1448): il valore in cima, un clic; il perché con la fonte e la data; «Ignora». Mentre Filo cerca,
+  // la riga del valore aspetta e si riempie quando la ricerca risponde.
+  function vociSegnaposto(editableEl, sp) {
+    if (!sp.dubbio) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
+    const riga = (s) => {
+      if (s.cercando) return { hidden: false, label: I18n.t('spell_segnaposto_cerco'), loading: true, onClick: null };
+      const v = s.correzioni && s.correzioni[0];
+      return v ? { hidden: false, label: v, loading: false, onClick: () => SpellCheck.riempi(editableEl, s) } : { hidden: true, label: '', loading: false, onClick: null };
+    };
+    const ascolti = [];
+    let staccato = null;
+    const segui = (fn) => {
+      ascolti.push(fn);
+      if (!staccato) staccato = SpellCheck.seguiSegno(editableEl, sp, (nuovo) => { if (nuovo && !nuovo.cercando) for (const f of ascolti) f(nuovo); });
+    };
+    const righe = [
+      {
+        type: 'correction', ...riga(sp), senzaFreccia: true,
+        onMount: (_root, update) => {
+          if (sp.cercando) segui((nuovo) => update(riga(nuovo)));
+          return () => { if (staccato) staccato(); };
+        },
+      },
+      rigaDelPerche(sp, sp.cercando ? segui : null),
+    ];
+    if (sp.fonteDato && sp.fonteDato.url) {
+      righe.push({ type: 'item', label: I18n.t('spell_segnaposto_apri_fonte'), onClick: () => Actions.apriInSchedaNuova(sp.fonteDato.url) });
+    }
+    if (sp.ricercaFallita) righe.push({ type: 'item', label: I18n.t(sp.vocePerCercare || 'spell_segnaposto_riprova'), onClick: () => SpellCheck.cercaDiNuovo(editableEl, sp) });
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sp) },
+      { type: 'separator' },
+    );
+    return righe;
+  }
+
   // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
   function vociSuggerimento(editableEl, sugg) {
+    if (sugg.tipo === 'segnaposto') return vociSegnaposto(editableEl, sugg);
     if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
     const righe = [rigaDelPerche(sugg)];
     for (const c of sugg.correzioni || []) {
@@ -1843,7 +1894,8 @@
     if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
     if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
-    const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
+    const correggibile = (s) => s && !s.dubbio && (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && s.correzioni?.length));
+    const tutti = voceCorreggiTutti(editableEl, 1 + [errore, suggerimento].filter(correggibile).length);
     if (tutti) sopra.push(tutti, { type: 'separator' });
     items.unshift(...sopra);
     conMenuDelSito(items, sito);

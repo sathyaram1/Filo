@@ -237,6 +237,19 @@
       max: 1000,
       default: '240px',
     },
+    // #1448 — il valore trovato per un segnaposto, sopra le x: la sua grandezza rispetto al testo del campo.
+    'correttore.segnaposti.scala': {
+      label: 'Grandezza del valore che il correttore propone sopra un segnaposto, rispetto al testo',
+      type: 'factor',
+      css: '--sn-spell-valore-scala',
+      default: '0.62',
+    },
+    'correttore.segnaposti.velato': {
+      label: 'Quanto si vede il valore di un segnaposto quando copre le parole della riga sopra',
+      type: 'opacity',
+      css: '--sn-spell-valore-velato',
+      default: '0.45',
+    },
     // Il lampo sulla parola che il correttore ha corretto da sé (#1447): uno sfondo caldo che sfuma. Gemelle in spellcheck.css.
     'correttore.lampo.color': {
       label: 'Colore del lampo sulla parola corretta da sé',

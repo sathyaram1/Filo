@@ -1,6 +1,6 @@
-// Le regole del correttore senza DOM (#1446): i candidati che il codice trova da sé, il pezzo nuovo da far giudicare al
-// modello, la sua risposta riga per riga e il segno ritrovato nel testo di adesso. Il disegno, i tempi e le chiamate
-// stanno in spellcheck.js. Prove: tests/unit/correttoreRegole.test.mjs.
+// Le regole del correttore senza DOM (#1446): i candidati che il codice trova da sé (anche i segnaposti, #1448), il pezzo
+// nuovo da far giudicare al modello, la sua risposta riga per riga e il segno ritrovato nel testo di adesso. Il disegno,
+// i tempi e le chiamate stanno in spellcheck.js. Prove: tests/unit/correttoreRegole.test.mjs, correttoreSegnaposti.test.mjs.
 
 (function (global) {
   'use strict';
@@ -155,6 +155,76 @@
       const correzione = comeScritto(parola, giusta);
       out.push(segno(testo, start, end, {
         ...CERTO, fonte: 'fisso', tipo: 'fisso', correzioni: [correzione], motivo: t('spell_fisso', correzione),
+      }));
+    }
+    return out;
+  }
+
+  // ── I segnaposti (#1448): le x scritte al posto di un dato che non si ricorda ──────────────────────────────────
+  // Con le cifre bastano due x in coda («14xx», «3,xx»); da sole, minuscole, servono un numero annunciato prima o
+  // un'unità dopo («di soli xx», «xx euro»). Non lo sono «x te», «3x4», «0x1f», i baci («a domani xx»), «XX secolo».
+  const GRUPPO_X = /(?<![\p{L}\p{N}_@#])[0-9xX]+(?:[.,'’][0-9xX]+)*(?![\p{L}\p{N}_])/gu;
+  const ANNUNCIANO = new Set([
+    'di', 'da', 'a', 'al', 'ai', 'alle', 'nel', 'nei', 'negli', 'del', 'dei', 'degli', 'dal', 'dai', 'il', 'i', 'in',
+    'con', 'per', 'su', 'tra', 'fra', 'verso', 'entro', 'è', "e'", 'era', 'erano', 'sono', 'fu', 'furono', 'sarà', 'circa',
+    'quasi', 'oltre', 'sopra', 'sotto', 'almeno', 'solo', 'soli', 'sola', 'sole', 'appena', 'ben', 'ha', 'hanno', 'aveva',
+    'avevano', 'costa', 'costano', 'costava', 'vale', 'valeva', 'pesa', 'pesava', 'misura', 'misurava', 'conta',
+    'contava', 'supera', 'superava', 'raggiunge', 'toccato', 'pari', 'media', 'quota', 'numero', 'anno', 'nr', 'n',
+    'of', 'is', 'was', 'are', 'were', 'about', 'around', 'over', 'under', 'nearly', 'almost', 'only', 'just', 'at',
+    'by', 'to', 'from', 'has', 'had', 'have', 'costs', 'cost', 'weighs', 'roughly', 'approximately', 'than', 'year',
+    'since', 'until', 'reached', 'hit', 'with', 'average',
+  ]);
+  const UNITA = new Set([
+    'euro', 'eur', 'dollari', 'dollaro', 'dollars', 'dollar', 'usd', 'sterline', 'franchi', 'yen', 'anni', 'anno',
+    'years', 'year', 'mesi', 'months', 'giorni', 'days', 'ore', 'hours', 'minuti', 'minutes', 'secondi', 'seconds',
+    'metri', 'metro', 'm', 'km', 'cm', 'mm', 'kg', 'g', 'grammi', 'chili', 'tonnellate', 'litri', 'l', 'gradi', 'mila',
+    'milioni', 'milione', 'miliardi', 'miliardo', 'million', 'millions', 'billion', 'billions', 'thousand', 'k', 'mln',
+    'mld', 'persone', 'abitanti', 'people', 'inhabitants', 'volte', 'times', 'punti', 'points', 'percento', 'kwh', 'gb',
+    'mb', 'tb', 'ghz', 'cv', 'hp', 'mph', 'pagine', 'pages', 'copie', 'voti', 'votes', 'utenti', 'users', 'dipendenti',
+    'employees', 'morti', 'vittime', 'deaths', 'casi', 'cases', 'ettari', 'piedi', 'feet', 'miglia', 'miles', 'pollici',
+    'inches', 'mq', 'kmq', 'gol', 'goals', 'squadre', 'paesi', 'stati', 'specie',
+  ]);
+  const PAROLA_PRIMA = /(?:^|[^\p{L}\p{N}'’])([\p{L}][\p{L}'’]*)\.? +$/u;
+  const VALUTA_PRIMA = /[$€£¥] ?$/u;
+  const SEGNO_DOPO = /^ ?(?:%|‰|°|[$€£¥])/u;
+  const PAROLA_DOPO = /^ +([\p{L}]+)/u;
+  // Un verbo prima e le cose contate dopo, al plurale: «ha scritto xx sinfonie», «vinse xx scudetti», «released xx albums».
+  // Le due condizioni insieme, perché un saluto («bene xx», «a presto xx») non ha né l'uno né l'altro.
+  const VERBO = /(?:[aiu]t[oaie]|(?:scritt|vint|fatt|pres|mess|lett|dett|vist|pers|spes|cors|chius|apert|prodott|condott|tradott|raccolt|scelt|tolt|rott|compost|dipint|raggiunt|uccis|decis|divis|inclus)[oaie]|[^aeiu]s[ei]|ss[ei]|ò|arono|erono|irono|[^e]ed)$/u;
+  const VERBI_BREVI = new Set(['won', 'wrote', 'sold', 'made', 'built', 'took', 'gave', 'spent', 'lost', 'got', 'fece', 'diede', 'ebbe']);
+  const NON_CONTATE = new Set(['che', 'come', 'bene', 'sempre', 'anche', 'dove', 'mentre', 'oppure', 'grazie', 'baci', 'kisses', 'thanks', 'this', 'his', 'yes', 'xoxo']);
+  const contate = (w) => w.length >= 3 && w === w.toLowerCase() && !NON_CONTATE.has(w) && /[ies]$/.test(w);
+
+  function numeroAttorno(testo, start, end) {
+    const prima = testo.slice(Math.max(0, start - 40), start);
+    if (VALUTA_PRIMA.test(prima)) return true;
+    const p = PAROLA_PRIMA.exec(prima);
+    const parolaPrima = p ? p[1].replace(/’/g, "'").toLowerCase() : '';
+    if (parolaPrima && ANNUNCIANO.has(parolaPrima)) return true;
+    const dopo = testo.slice(end, end + 30);
+    if (SEGNO_DOPO.test(dopo)) return true;
+    const d = PAROLA_DOPO.exec(dopo);
+    if (!d) return false;
+    return UNITA.has(d[1].toLowerCase()) || (((parolaPrima.length >= 4 && VERBO.test(parolaPrima)) || VERBI_BREVI.has(parolaPrima)) && contate(d[1]));
+  }
+
+  function segnaposti(testo) {
+    testo = String(testo ?? '');
+    if (!/x/i.test(testo)) return [];
+    const fuori = zoneEscluse(testo);
+    const out = [];
+    for (const m of testo.matchAll(GRUPPO_X)) {
+      const g = m[0];
+      const start = m.index;
+      const end = start + g.length;
+      if ((g.match(/x/gi) || []).length < 2 || /x\d/i.test(g)) continue;
+      if (fuori.some(([a, b]) => start < b && end > a)) continue;
+      const nudo = g.replace(/[.,'’]/g, '');
+      if (/\d/.test(g)) {
+        if (!/^\d+x+$/i.test(nudo)) continue;
+      } else if (/X/.test(g) || nudo.length > 6 || !numeroAttorno(testo, start, end)) continue;
+      out.push(segno(testo, start, end, {
+        segno: 'suggerimento', fonte: 'segnaposto', tipo: 'segnaposto', motivo: t('spell_segnaposto_forse'),
       }));
     }
     return out;
@@ -370,6 +440,93 @@
     return { da: p, a: pezzo.length - s, sostituto: correzione.slice(p, correzione.length - s) };
   }
 
+  // Le x dentro il pezzo che il modello ha copiato («di soli xx» → «xx»): { da, a } nel pezzo, o null.
+  function xDelPezzo(pezzo) {
+    for (const m of String(pezzo).matchAll(GRUPPO_X)) {
+      if ((m[0].match(/x/gi) || []).length >= 2 && !/x\d/i.test(m[0])) return { da: m.index, a: m.index + m[0].length };
+    }
+    return null;
+  }
+  const DOVE_CERCARE = /^(?:wiki(?::([a-z]{2,3}))?|web)$/;
+
+  // Un segnaposto riempito ([pezzo][valore][motivo][segnaposto]) o da cercare ([pezzo][][ricerca][cerca][dove]): il
+  // segno sta sulle sole x, e una riga che non le ha non è un segnaposto.
+  function segnoDelSegnaposto(r, testo, dove, fonte) {
+    const base = { segno: 'suggerimento', dubbio: false, fonte, tipo: 'segnaposto', citazione: '' };
+    const pezzo = r.pezzo.trim();
+    const pos = posizioniNelTesto(pezzo, testo.slice(dove.start, dove.end));
+    if (r.tipo === 'segnaposto') {
+      const stretto = r.correzione.trim() ? restringi(pezzo, r.correzione.trim()) : null;
+      if (!stretto) return null;
+      const start = dove.start + pos[stretto.da];
+      const end = dove.start + pos[stretto.a];
+      const valore = stretto.sostituto.trim();
+      if (end <= start || !/x/i.test(testo.slice(start, end)) || !valore || /xx/i.test(valore)) return null;
+      return { ...base, start, end, segment: testo.slice(start, end), motivo: corta(r.motivo, MOTIVO_MAX), correzioni: [valore] };
+    }
+    const x = xDelPezzo(pezzo);
+    const dc = DOVE_CERCARE.exec(r.citazione.toLowerCase());
+    const domanda = corta(r.motivo, 200);
+    if (!x || !dc || !domanda) return null;
+    const start = dove.start + pos[x.da];
+    const end = dove.start + pos[x.a];
+    return {
+      ...base, start, end, segment: testo.slice(start, end), motivo: '', correzioni: [],
+      cerca: { domanda, dove: dc[0].startsWith('web') ? 'web' : `wiki:${dc[1] || 'en'}` },
+    };
+  }
+
+  // Lo stesso dato è la stessa ricerca: la chiave è la domanda, non la frase, che cambia a ogni ritocco o pausa a metà e
+  // rifarebbe la ricerca (#1448). Due x della stessa frase con domande diverse restano due ricerche.
+  function chiaveRicerca(segment, cerca) {
+    const domanda = String(cerca?.domanda || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return [String(segment || '').toLowerCase(), domanda, cerca?.dove || ''].join('\u0000');
+  }
+
+  // Quando la rilettura tace su un segnaposto già deciso, il dato resta se la frase è ancora quella, a meno di parole
+  // aggiunte e refusi corretti anche corti («a» → «ha»); se la rilettura chiede, decide la domanda (#1448). Un numero
+  // vale solo uguale: «nel 2020» e «nel 2021» sono due dati.
+  const lontane = (a, b, max) => {
+    if (Math.abs(a.length - b.length) > max) return true;
+    let pp = null;
+    let p = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const c = [i];
+      for (let j = 1; j <= b.length; j++) {
+        c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (pp && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) c[j] = Math.min(c[j], pp[j - 2] + 1);
+      }
+      pp = p;
+      p = c;
+    }
+    return p[b.length] > max;
+  };
+  const paroleDi = (s) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  function stessaFrase(allora, adesso) {
+    const prima = paroleDi(allora);
+    const ora = paroleDi(adesso);
+    if (!prima.length) return false;
+    return prima.every((w, i) => ora.some((u) => u === w
+      || (i === prima.length - 1 && u.startsWith(w))
+      || (!/\d/.test(w) && !/\d/.test(u) && !lontane(w, u, w.length >= 8 ? 2 : 1))));
+  }
+
+  // La risposta della ricerca di un segnaposto, una riga [valore][motivo][fonte][data][indirizzo] che il main ha
+  // ricomposto: { valore, motivo, fonte, data, url }, o null se il dato non si è trovato.
+  function valoreTrovato(raw) {
+    for (const riga of String(raw == null ? '' : raw).split(/\r?\n/)) {
+      const r = riga.trim();
+      if (!r.startsWith('[') || !r.endsWith(']')) continue;
+      const [valore = '', motivo = '', fonte = '', data = '', url = ''] = r.slice(1, -1).split(/\]\s*\[/).map((x) => x.trim());
+      if (!valore || /^nessuno$/i.test(valore) || /^nessuno$/i.test(data) || /xx/i.test(valore)) return null;
+      return {
+        valore: corta(valore, 80), motivo: corta(motivo, MOTIVO_MAX), fonte: corta(fonte, 120), data: corta(data, 40),
+        url: /^https:\/\/[^\s]+$/i.test(url) ? url.slice(0, 500) : '',
+      };
+    }
+    return null;
+  }
+
   // Le tolleranze della lettura valgono anche per il giudizio: una correzione che cambia solo spazi o la forma degli apici
   // è uguale al pezzo, e non è un errore da correggere.
   const formaLetta = (s) => String(s ?? '').replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim();
@@ -392,6 +549,11 @@
       if (!dove) continue;
       if (tipo === 'giusto') { giusti.push(dove); continue; }
       if (tipo === 'contraddizione' && !citata(r.citazione)) continue;
+      if (tipo === 'segnaposto' || tipo === 'cerca') {
+        const s = segnoDelSegnaposto(r, testo, dove, fonte);
+        if (s && !(inScrittura && s.start < inScrittura.end && s.end > inScrittura.start)) segni.push(s);
+        continue;
+      }
       const errore = tipo === 'errore';
       let start = dove.start;
       let end = dove.end;
@@ -433,6 +595,7 @@
   global.SN_CORRETTORE = {
     REGIONE_MAX, TESTO_INTERO_MAX, FISSI, chiudeVirgolette, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
     senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
-    leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO,
+    leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO, segnaposti, xDelPezzo,
+    valoreTrovato, chiaveRicerca, stessaFrase,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
