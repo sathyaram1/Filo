@@ -194,6 +194,13 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
+    // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
+    ta.addEventListener('drop', (e) => {
+      if (!e.isTrusted) return;
+      let testo = '';
+      try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
+      try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
+    });
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();

@@ -1589,6 +1589,12 @@
   }
   // #947 — il documento trovato: un clic lo apre col programma del sistema, il tasto destro ha le azioni di un file,
   // e si trascina nel campo dove si scrive a Filo (o fuori, in un altro programma, col suo percorso).
+  // Un file o una pagina presi da una risposta e lasciati dove nessuno li prende (#1471): il rilascio preso lo conta
+  // chi lo prende.
+  function contaFineTrascinamento(e, origine) {
+    const ev = global.SN_GESTI && global.SN_GESTI.fine(e, origine);
+    if (ev && send) Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, ...ev })).catch(() => {});
+  }
   function bottoneFile(a) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1629,7 +1635,9 @@
       e.dataTransfer.setData('application/x-filo-file', p);
       e.dataTransfer.setData('text/plain', p);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'file_da_chat');
     });
+    btn.addEventListener('dragend', (e) => contaFineTrascinamento(e, 'file_da_chat'));
     menuDelFile(btn, a, { disegna, locale: true });
     return btn;
   }
@@ -1753,7 +1761,9 @@
       e.dataTransfer.setData('text/uri-list', p.url);
       e.dataTransfer.setData('text/plain', p.url);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'pagina_salvata');
     });
+    btn.addEventListener('dragend', (e) => contaFineTrascinamento(e, 'pagina_salvata'));
     const R = window.SN_RINOMINA_UI;
     const apriMenu = (e) => {
       if (!R || typeof R.menu !== 'function') return;

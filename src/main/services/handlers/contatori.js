@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461): crea il servizio, lo mette a disposizione del cancello dei
+// Handler di dominio dei contatori anonimi (#969, #1461, #1471): crea il servizio, lo mette a disposizione del cancello dei
 // modelli, segue le scritture delle impostazioni e riceve i gesti contati nelle pagine. Cosa si conta e quando parte:
 // src/main/services/contatori.js. Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
@@ -132,6 +132,8 @@ module.exports = function register(on, ctx) {
       case 'conferma': ok = contatori.confermaRisposta(testo(m.chiave), testo(m.esito)); break;
       case 'voce-menu-scheda': ok = finestra.voceMenu(testo(m.id)); break;
       case 'notifica': ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true }); break;
+      // I gesti della personalizzazione (#1471): solo quelli che nascono in una pagina, coi campi dei loro elenchi.
+      case 'gesto': ok = C.GESTI_DALLE_PAGINE.includes(testo(m.gesto)) && contatori.gesto(testo(m.gesto), m); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

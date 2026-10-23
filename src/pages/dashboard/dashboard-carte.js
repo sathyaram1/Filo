@@ -76,6 +76,21 @@
     try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
     avviso(testo);
   }
+  // L'uso di una carta (#1471): le mosse le conta il main, che le scrive. La chiave di una carta di sinistra porta l'id
+  // di quello che accade (un download, un timer): il main ne tiene solo il tipo.
+  function contaGesto(gesto, campi) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', gesto, ...campi })).catch(() => {}); } catch (_) {}
+  }
+  const contaUso = (art, come) => contaGesto('carta_home', { carta: art.dataset.chiave, colonna: art.dataset.colonna, come });
+  // Una carta trascinata e lasciata dove nessuno la prende.
+  function contaFine(e) {
+    const ev = global.SN_GESTI && global.SN_GESTI.fine(e, 'carta_home');
+    if (ev) try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, ...ev })).catch(() => {}); } catch (_) {}
+  }
+  function contaRilascio(e, dove) {
+    const ev = global.SN_GESTI && global.SN_GESTI.rilascio(e.dataTransfer, dove);
+    if (ev) try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, ...ev })).catch(() => {}); } catch (_) {}
+  }
   function avviso(testo) {
     let n = document.getElementById('dashFlash');
     if (!n) {
@@ -359,12 +374,13 @@
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       const v = art._carta && art._carta.voci && art._carta.voci[i];
-      if (v) v.fai(b);
+      if (v) { contaUso(art, 'clic'); v.fai(b); }
     });
     // Il tasto destro su un documento parla di quel documento; su «altri…» o «Mostra tutti» vale la carta.
     const menuVoce = (e, x, y) => {
       e.preventDefault();
       e.stopPropagation();
+      contaUso(art, 'tasto_destro');
       const v = art._carta && art._carta.voci && art._carta.voci[i];
       if (!v || v.piano) { apriMenu(x, y, vociMenu(art)); return; }
       const voci = [{ etichetta: `Apri «${v.testo}»`, fai: () => v.fai(b) }];
@@ -560,7 +576,7 @@
     const filo = el('button', 'dash-carta-filo', 'apri nel filo');
     filo.type = 'button';
     filo.title = 'Apri nel filo';
-    filo.addEventListener('click', (e) => { e.stopPropagation(); apriNelFilo(art); });
+    filo.addEventListener('click', (e) => { e.stopPropagation(); contaUso(art, 'clic'); apriNelFilo(art); });
     mani.appendChild(filo);
     if (c.togli) {
       const x = el('button', 'dash-carta-togli', '\u00D7');
@@ -615,24 +631,26 @@
         if (!a) continue;
         const b = el('button', `dash-carta-az ${cls}${a.forte ? ' forte' : ''}`, a.etichetta);
         b.type = 'button';
-        b.addEventListener('click', (e) => { e.stopPropagation(); const cur = art._carta[cls]; if (cur) cur.fai(b); });
+        b.addEventListener('click', (e) => { e.stopPropagation(); const cur = art._carta[cls]; if (cur) { contaUso(art, 'clic'); cur.fai(b); } });
         piede.appendChild(b);
       }
       art.appendChild(piede);
     }
 
-    art.addEventListener('click', () => usaCarta(art));
+    art.addEventListener('click', () => { contaUso(art, 'clic'); usaCarta(art); });
     art.addEventListener('keydown', (e) => {
       if (e.target !== art) return;
-      if (e.key === 'Enter') { e.preventDefault(); usaCarta(art); }
+      if (e.key === 'Enter') { e.preventDefault(); contaUso(art, 'invio'); usaCarta(art); }
       else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
+        contaUso(art, 'tasto_destro');
         const r = art.getBoundingClientRect();
         apriMenu(r.left + 12, r.top + 28, vociMenu(art));
       } else if (e.key === 'Delete' && art._carta.togli) { e.preventDefault(); art._carta.togli(); }
     });
     art.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      contaUso(art, 'tasto_destro');
       apriMenu(e.clientX, e.clientY, vociMenu(art));
     });
     agganciaTrascinamento(art);
@@ -703,9 +721,12 @@
       b.appendChild(el('span', 'dash-altro-nome', v.titolo));
       b.title = v.tolta ? (v.url ? `Apri ${v.titolo}` : 'Rimetti nella home') : `Apri ${v.titolo}`;
       const rimetti = () => muovi(v.sinistra ? { tipo: 'mostra', chiave: v.id } : { tipo: 'aggiungi', carta: v.id });
-      b.addEventListener('click', () => { if (v.url) apri(v.url); else rimetti(); });
+      b.addEventListener('click', () => {
+        if (v.url) { contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'clic' }); apri(v.url); } else rimetti();
+      });
       b.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'tasto_destro' });
         const menu = [];
         if (v.url) menu.push({ etichetta: `Apri ${v.titolo}`, fai: () => apri(v.url) });
         if (v.tolta) menu.push({ etichetta: 'Rimetti nella home', fai: rimetti });
@@ -720,8 +741,9 @@
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('application/x-filo-carta', v.id);
           e.dataTransfer.setData('text/plain', v.titolo);
+          global.SN_GESTI?.marca(e.dataTransfer, 'carta_home');
         });
-        b.addEventListener('dragend', fineTrascinamento);
+        b.addEventListener('dragend', (e) => { contaFine(e); fineTrascinamento(); });
         const piu = el('button', 'dash-altro-rimetti', '+');
         piu.type = 'button';
         piu.title = 'Rimetti nella home';
@@ -837,7 +859,8 @@
     const chiavi = mobili(accadeEl).map((n) => n.dataset.chiave).filter((k) => k !== chiave);
     const at = prima == null ? -1 : chiavi.indexOf(prima);
     if (at < 0) chiavi.push(chiave); else chiavi.splice(at, 0, chiave);
-    return muovi({ tipo: 'ordina-sinistra', ordine: chiavi });
+    // `chiave`: la carta spostata, per i contatori (#1471); la mossa la ignora.
+    return muovi({ tipo: 'ordina-sinistra', ordine: chiavi, chiave });
   }
   function spostaCarta(art, passo) {
     const fratelli = mobili(art.parentNode);
@@ -868,8 +891,9 @@
       e.dataTransfer.setData('application/x-filo-carta', art.dataset.chiave);
       // Nel campo di scrittura del filo arriva quello che la carta dice.
       e.dataTransfer.setData('text/plain', c.stato ? `${c.titolo}: ${c.stato}` : c.titolo);
+      global.SN_GESTI?.marca(e.dataTransfer, 'carta_home');
     });
-    art.addEventListener('dragend', fineTrascinamento);
+    art.addEventListener('dragend', (e) => { contaFine(e); fineTrascinamento(); });
   }
   // Dove va la carta lasciata qui. Sopra un'altra carta ne prende il posto, in qualunque punto la si lasci: chi
   // scende le passa sotto, chi sale o arriva da fuori le passa sopra. Fra due carte decide la metà più vicina.
@@ -912,6 +936,7 @@
     host.addEventListener('drop', (e) => {
       if (!ammessa(host)) return;
       e.preventDefault();
+      contaRilascio(e, 'colonna_home');
       const { chiave, colonna, sinistra } = presa;
       const b = bersaglio(host, e);
       const prima = b.prima ? b.prima.dataset.chiave : null;
@@ -938,6 +963,7 @@
     altroEl.addEventListener('drop', (e) => {
       if (!presa || presa.colonna !== 'destra') return;
       e.preventDefault();
+      contaRilascio(e, 'altro_home');
       const chiave = presa.chiave;
       fineTrascinamento();
       muovi({ tipo: 'togli', carta: chiave });

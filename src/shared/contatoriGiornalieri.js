@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461, #1464, #1466): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1464, #1466, #1471): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
@@ -70,8 +70,14 @@
   const MISURE_MODELLI = Object.freeze(Object.keys(RESTI));
   const MISURE_CHIAMATE = Object.freeze([...MISURE_MODELLI, 'chiamate']);
   const CAMPI_CHIAMATE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_CHIAMATE]);
-  // Tutto quello che un'ora tiene sul disco, nei due documenti.
-  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE]);
+  // Cosa si sposta, si trascina e si rimette (#1471): anche loro in un documento a parte, con lo stesso id dell'ora.
+  const VERSIONE_GESTI = 1;
+  const COLLEZIONE_GESTI = 'contatori-gesti';
+  const MISURE_GESTI = Object.freeze(['icona_spostata', 'disposizione_di_serie', 'altro_del_menu', 'barra_aperta',
+    'suggerimento_letto', 'carta_home', 'riquadro_sistema', 'modulo_editor', 'ripristino', 'annulla_cambio', 'trascinamento']);
+  const CAMPI_GESTI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_GESTI]);
+  // Tutto quello che un'ora tiene sul disco, nei tre documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE, ...MISURE_GESTI]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
@@ -543,6 +549,7 @@
       uso: {}, errori: {}, azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {},
       anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {}, primeVolte: [],
       contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
+      ...Object.fromEntries(MISURE_GESTI.map((k) => [k, {}])),
     };
     for (const k of MISURE_SISTEMA) o[k] = {};
     return o;
@@ -977,6 +984,200 @@
     return !MISURE_SISTEMA.some((k) => pieno(d && d[k]));
   }
 
+  // ── I gesti della personalizzazione (#1471) ─────────────────────────────
+  // Ogni misura è una mappa: per chiave (un'icona, una carta, un'origine…) le voci di elenco chiuso e il loro conto.
+  const ZONE_ICONE = Object.freeze(['primary', 'secondary', 'bar']);
+  // La posa: trascinata, rimessa nel menu dal tasto destro su un'icona della barra, o chiesta a Filo.
+  const VIE_POSA = Object.freeze(['trascina', 'rimessa_nel_menu', 'chat']);
+  const SI_NO = Object.freeze(['si', 'no']);
+  const APERTURE = 'aperture';
+  const MOTIVI_BARRA = Object.freeze(['spinta', 'clic', 'tasto', 'chat', 'trascina']);
+  const ESITI_BARRA = Object.freeze(['azione', 'sistema', 'tasto_destro', 'a_vuoto']);
+  // Le voci fisse in fondo alla barra laterale: hanno il loro nome al passaggio, come le icone.
+  const VOCI_BARRA = Object.freeze(['history', 'apps', 'redteam', 'account', 'settings']);
+  const DOVE_NOME = Object.freeze(['barra', 'menu']);
+  const ESITI_NOME = Object.freeze(['clic', 'via']);
+  const MOSSE_CARTA = Object.freeze(['mostra', 'aggiungi', 'togli', 'ripristina', 'ordina']);
+  const COLONNE_HOME = Object.freeze(['sinistra', 'destra', 'altro']);
+  const GESTI_CARTA = Object.freeze(['clic', 'invio', 'tasto_destro']);
+  // Le carte di sinistra portano l'id di quello che accade (un download, un timer): di loro esce solo il tipo, il pezzo
+  // della chiave prima dei due punti.
+  const TIPI_CARTA_SINISTRA = Object.freeze(['crediti', 'timer', 'download', 'avviso', 'lavoro']);
+  // Il ripristino delle carte com'erano tocca tutte le carte, non una.
+  const TUTTE_LE_CARTE = 'tutte';
+  const VOCI_SISTEMA = Object.freeze(['ora', 'batteria', 'rete', 'bluetooth', 'volume']);
+  const GESTI_SISTEMA = Object.freeze(['clic', 'tasto_destro', 'tastiera', 'trascina_in_chat', 'comando_dato']);
+  // I tipi dei moduli dell'Editor, come MODULE_TYPES di src/pages/editor/editor.js (la sentinella li tiene uguali).
+  const MODULI_EDITOR = Object.freeze(['switch', 'word-count', 'search-replace', 'comment', 'chat', 'bold', 'italic',
+    'underline', 'undo', 'redo', 'text-size', 'align', 'font', 'settings']);
+  const EVENTI_MODULO = Object.freeze(['aggiunto', 'tolto', 'spostato', 'ridimensionato', 'configurato', 'usato',
+    'scorciatoia_si', 'scorciatoia_no']);
+  // Nell'Editor, oltre ai moduli: la griglia ridimensionata (colonne e righe) e la vista delle impostazioni aperta.
+  const GRIGLIA = 'griglia';
+  const VISTA_IMPOSTAZIONI = 'impostazioni';
+  const numeriDa = (a, b) => Object.freeze(Array.from({ length: b - a + 1 }, (_, i) => String(a + i)));
+  const COLONNE_GRIGLIA = numeriDa(3, 12);
+  const RIGHE_GRIGLIA = numeriDa(4, 16);
+  const RIPRISTINI = Object.freeze(['token', 'tutti_token', 'tutte_impostazioni', 'colore_schede', 'tutto_colore_schede',
+    'carte_home', 'avanzate_viste']);
+  const ESITI_RIPRISTINO = Object.freeze(['confermato', 'annullato']);
+  const VIE_CAMBIO = Object.freeze(['chat', 'assistente', 'interfaccia', 'pagina', 'importazione', 'filo', ALTRO]);
+  // Quanto dopo il cambio arriva l'«annulla»: i pochi secondi e chi ci ripensa dopo un'ora.
+  const FASCE_RIPENSAMENTO = Object.freeze([['s10', 10 * 1000], ['m1', 60 * 1000], ['m10', 10 * 60 * 1000],
+    ['h1', 60 * 60 * 1000], ['oltre', Infinity]]);
+  // I cambi che non sono impostazioni, per tipo: la loro chiave porta un dominio o un id, che non esce.
+  const CAMBI_NON_IMPOSTAZIONI = Object.freeze({ timer: 'cambio.timer', proxy: 'cambio.proxy', zoom: 'cambio.zoom' });
+  const ORIGINI_TRASCINA = Object.freeze(['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra',
+    'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine']);
+  const DESTINAZIONI_TRASCINA = Object.freeze(['chat_home', 'chat_aiuto', 'chat_modulo_editor', 'colonna_home', 'altro_home',
+    'barra', 'riga_menu', 'altro_menu', 'striscia_schede', 'griglia_editor', 'campo_feedback', 'nessuna']);
+  const ESITI_TRASCINA = Object.freeze(['posato', 'annullato']);
+  // Quelli che una pagina può mandare: gli altri li conta il main, dove succedono.
+  const GESTI_DALLE_PAGINE = Object.freeze(['altro_del_menu', 'suggerimento_letto', 'carta_home', 'riquadro_sistema',
+    'modulo_editor', 'ripristino', 'trascinamento']);
+
+  // I cataloghi del codice, letti dai moduli che li possiedono.
+  function icone() { const D = global.SN_DISPOSIZIONE_ICONE; return D && oggetto(D.ICONE) ? Object.keys(D.ICONE) : []; }
+  function carte() {
+    const H = global.SN_CARTE_HOME;
+    const ids = H ? [...(H.CARTE || []), ...(H.APP || [])].map((c) => c && c.id).filter(Boolean) : [];
+    return [...ids, ...TIPI_CARTA_SINISTRA, TUTTE_LE_CARTE];
+  }
+  function cartaDi(chiave) {
+    const k = String(chiave == null ? '' : chiave);
+    if (carte().includes(k)) return k;
+    const tipo = k.split(':')[0];
+    return TIPI_CARTA_SINISTRA.includes(tipo) && k.includes(':') ? tipo : '';
+  }
+  // Una mossa della disposizione delle carte, come la scrive il main: da qualunque strada arrivi (trascinata, dal tasto
+  // destro, chiesta a Filo). Il nome scritto a parole si risolve come lo risolve la mossa.
+  const MOSSE_DI_TIPO = Object.freeze({ nascondi: 'togli', togli: 'togli', mostra: 'mostra', aggiungi: 'aggiungi', sposta: 'ordina',
+    'ordina-sinistra': 'ordina', ripristina: 'ripristina' });
+  function cartaDellaMossa(m) {
+    const H = global.SN_CARTE_HOME;
+    if (!oggetto(m) || !has(MOSSE_DI_TIPO, m.tipo) || !H) return null;
+    const mossa = MOSSE_DI_TIPO[m.tipo];
+    if (mossa === 'ripristina') return { carta: TUTTE_LE_CARTE, mossa };
+    const sinistra = ['nascondi', 'mostra', 'ordina-sinistra'].includes(m.tipo);
+    const carta = sinistra ? cartaDi(m.chiave) : (H.IDS.includes(m.carta) ? m.carta : H.risolvi(m.carta));
+    return carta ? { carta, mossa } : null;
+  }
+  function nomiToken() { const T = global.SN_THEME_TOKENS; return T && typeof T.names === 'function' ? T.names() : []; }
+  function parametriColore() {
+    const T = global.SN_TAB_COLOR;
+    return T && Array.isArray(T.IDENTITY_PARAM_META) ? T.IDENTITY_PARAM_META.map((m) => m && m.key).filter(Boolean) : [];
+  }
+
+  // Le voci di una chiave: ogni combinazione dei campi, nell'ordine in cui escono.
+  const combina = (...liste) => liste.reduce((acc, l) => acc.flatMap((a) => l.map((b) => (a ? `${a}|${b}` : b))), ['']);
+  const SOLO_CONTO = Object.freeze(['']);
+  // Per misura: le chiavi ammesse, le voci di ogni chiave, e come un gesto ricevuto diventa chiave e voce.
+  const GESTI = Object.freeze({
+    icona_spostata: { chiavi: icone, voci: () => combina(ZONE_ICONE, ZONE_ICONE, VIE_POSA), di: (d) => [d.icona, [d.da, d.a, d.via]] },
+    altro_del_menu: { chiavi: () => [APERTURE, ...icone()], voci: () => SOLO_CONTO, di: (d) => [d.aperto === true ? APERTURE : d.icona, []] },
+    suggerimento_letto: { chiavi: () => [...icone(), ...VOCI_BARRA], voci: () => combina(DOVE_NOME, ESITI_NOME), di: (d) => [d.icona, [d.dove, d.esito]] },
+    carta_home: {
+      chiavi: carte, voci: () => [...MOSSE_CARTA, ...combina(COLONNE_HOME, GESTI_CARTA)],
+      di: (d) => [cartaDi(d.carta), d.mossa != null ? [d.mossa] : [d.colonna, d.come]],
+    },
+    riquadro_sistema: { chiavi: () => VOCI_SISTEMA, voci: () => GESTI_SISTEMA, di: (d) => [d.voce, [d.come]] },
+    modulo_editor: {
+      chiavi: () => [...MODULI_EDITOR, GRIGLIA, VISTA_IMPOSTAZIONI],
+      voci: (k) => (k === GRIGLIA ? combina(COLONNE_GRIGLIA, RIGHE_GRIGLIA) : k === VISTA_IMPOSTAZIONI ? SOLO_CONTO : EVENTI_MODULO),
+      di: (d) => (d.impostazioni === true ? [VISTA_IMPOSTAZIONI, []] : d.colonne != null ? [GRIGLIA, [d.colonne, d.righe]] : [d.modulo, [d.evento]]),
+    },
+    ripristino: {
+      chiavi: () => RIPRISTINI,
+      voci: (k) => (k === 'token' ? nomiToken() : k === 'colore_schede' ? parametriColore() : k === 'tutte_impostazioni' ? ESITI_RIPRISTINO : SOLO_CONTO),
+      di: (d) => [d.cosa, d.cosa === 'token' ? [d.token] : d.cosa === 'colore_schede' ? [d.parametro] : d.cosa === 'tutte_impostazioni' ? [d.esito] : []],
+    },
+    annulla_cambio: {
+      chiavi: () => [...chiaviImpostazioni(), ALTRO, ...Object.values(CAMBI_NON_IMPOSTAZIONI)],
+      voci: () => combina(VIE_CAMBIO, nomi(FASCE_RIPENSAMENTO)), di: (d) => [d.chiave, [d.via, d.fascia]],
+    },
+    trascinamento: { chiavi: () => ORIGINI_TRASCINA, voci: () => combina(DESTINAZIONI_TRASCINA, ESITI_TRASCINA), di: (d) => [d.da, [d.a, d.esito]] },
+  });
+
+  // Il gesto ricevuto, ridotto a chiave e voce dei suoi elenchi; null se qualcosa ne sta fuori.
+  function voceGesto(misura, dati) {
+    const g = has(GESTI, misura) ? GESTI[misura] : null;
+    if (!g || !oggetto(dati)) return null;
+    const [k, parti] = g.di(dati);
+    if (typeof k !== 'string' || !k || !g.chiavi().includes(k)) return null;
+    if (!parti.every((p) => typeof p === 'string' || Number.isInteger(p))) return null;
+    const voce = parti.map(String).join('|');
+    return g.voci(k).includes(voce) ? { chiave: k, voce } : null;
+  }
+
+  function gestoBarraValido(d) { return oggetto(d) && MOTIVI_BARRA.includes(d.motivo) && ESITI_BARRA.includes(d.esito); }
+
+  // Un'apertura della barra laterale: perché si è aperta, cosa ci si è fatto, quanto è rimasta aperta.
+  function registraBarraAperta(ora, d) {
+    if (!gestoBarraValido(d)) return false;
+    const mappa = normale(ora).barra_aperta;
+    const per = oggetto(mappa[d.motivo]) ? mappa[d.motivo] : {};
+    const m = oggetto(per[d.esito]) ? per[d.esito] : { n: 0, fasce: {} };
+    m.n = conto(m.n) + 1;
+    if (!oggetto(m.fasce)) m.fasce = {};
+    const f = d.apertaMs == null ? '' : fasciaDi(d.apertaMs);
+    if (f) piuUno(m.fasce, f);
+    per[d.esito] = m;
+    mappa[d.motivo] = per;
+    return true;
+  }
+
+  function registraGesto(ora, misura, dati) {
+    if (misura === 'barra_aperta') return registraBarraAperta(ora, dati);
+    const v = voceGesto(misura, dati);
+    if (!v) return false;
+    const mappa = normale(ora)[misura];
+    const per = oggetto(mappa[v.chiave]) ? mappa[v.chiave] : {};
+    piuUno(per, v.voce);
+    mappa[v.chiave] = per;
+    return true;
+  }
+
+  // Per zona, se la disposizione delle icone è quella di serie. L'ora tiene com'era alla sua fine.
+  function disposizioneDiSerie(layout) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    if (!D || !oggetto(D.DEFAULT) || !oggetto(layout)) return null;
+    const out = {};
+    for (const z of ZONE_ICONE) {
+      const a = layout[z];
+      const b = D.DEFAULT[z];
+      if (!Array.isArray(a) || !Array.isArray(b)) return null;
+      out[z] = a.length === b.length && a.every((x, i) => x === b[i]) ? 'si' : 'no';
+    }
+    return out;
+  }
+  function segnaDisposizione(ora, flags) {
+    if (!oggetto(flags) || !ZONE_ICONE.every((z) => SI_NO.includes(flags[z]))) return false;
+    normale(ora).disposizione_di_serie = Object.fromEntries(ZONE_ICONE.map((z) => [z, flags[z]]));
+    return true;
+  }
+
+  function fasciaRipensamento(ms) {
+    const v = Number(ms);
+    return Number.isFinite(v) && v >= 0 ? FASCE_RIPENSAMENTO.find(([, fino]) => v <= fino)[0] : '';
+  }
+
+  // L'«annulla» su un cambio del registro: una voce per impostazione toccata, con la via del cambio e quanto dopo.
+  // L'annullo di un annullo (il «rifai») non è un ripensamento sul cambio.
+  function annullaCambio(e, adesso) {
+    if (!oggetto(e) || e.annulla) return [];
+    const quando = Date.parse(e.agg || e.ts);
+    const fascia = Number.isFinite(quando) ? fasciaRipensamento(Math.max(0, adesso - quando)) : '';
+    if (!fascia) return [];
+    const via = VIE_CAMBIO.includes(e.via) ? e.via : ALTRO;
+    let chiavi;
+    if (e.tipo === 'impostazioni') {
+      chiavi = (Array.isArray(e.cambi) ? e.cambi : []).map((c) => chiaveImpostazione(c && c.chiave)).filter(Boolean);
+    } else {
+      chiavi = [has(CAMBI_NON_IMPOSTAZIONI, e.tipo) ? CAMBI_NON_IMPOSTAZIONI[e.tipo] : ALTRO];
+    }
+    return [...new Set(chiavi)].map((chiave) => ({ chiave, via, fascia }));
+  }
+
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
@@ -1283,6 +1484,99 @@
   // Un'ora senza chiamate ai modelli non ha il secondo documento.
   function senzaChiamate(doc) { return MISURE_CHIAMATE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
+  // I gesti della stessa ora (#1471), nel loro documento: «voce|n» separate da «;», o il solo conto.
+  const campi = (...liste) => liste.map(alternative).join('[|]');
+  const NOME_FORMA = '^[A-Za-z][A-Za-z0-9]{0,39}$';
+  const MODULO_FORMA = '^[a-z][a-z0-9-]{0,39}$';
+  const VOCE_MODULO = `(${alternative(EVENTI_MODULO)}|${campi(COLONNE_GRIGLIA, RIGHE_GRIGLIA)})[|]${N}`;
+  const VOCE_RIPRISTINO = `[a-z][A-Za-z0-9._]{0,59}[|]${N}`;
+  const FORME_GESTI = Object.freeze({
+    icona_spostata: forma(`${campi(ZONE_ICONE, ZONE_ICONE, VIE_POSA)}[|]${N}`),
+    disposizione_di_serie: `^${alternative(SI_NO)}$`,
+    altro_del_menu: CONTO_FORMA,
+    // Per esito: quante aperture, e quanto è rimasta aperta, in fasce.
+    barra_aperta: forma(`${alternative(ESITI_BARRA)}[|]${N}[|]${F7}`),
+    suggerimento_letto: forma(`${campi(DOVE_NOME, ESITI_NOME)}[|]${N}`),
+    carta_home: forma(`(${alternative(MOSSE_CARTA)}|${campi(COLONNE_HOME, GESTI_CARTA)})[|]${N}`),
+    riquadro_sistema: forma(`${alternative(GESTI_SISTEMA)}[|]${N}`),
+    modulo_editor: `^(${N}|${VOCE_MODULO}(;${VOCE_MODULO})*)$`,
+    ripristino: `^(${N}|${VOCE_RIPRISTINO}(;${VOCE_RIPRISTINO})*)$`,
+    annulla_cambio: forma(`${campi(VIE_CAMBIO, nomi(FASCE_RIPENSAMENTO))}[|]${N}`),
+    trascinamento: forma(`${campi(DESTINAZIONI_TRASCINA, ESITI_TRASCINA)}[|]${N}`),
+  });
+  // Le chiavi: l'elenco dove è piccolo e fermo, la forma dove cresce coi cataloghi dell'app.
+  const CHIAVI_GESTI = Object.freeze({
+    icona_spostata: NOME_FORMA, disposizione_di_serie: ZONE_ICONE, altro_del_menu: NOME_FORMA, barra_aperta: MOTIVI_BARRA,
+    suggerimento_letto: NOME_FORMA, carta_home: NOME_FORMA, riquadro_sistema: VOCI_SISTEMA, modulo_editor: MODULO_FORMA,
+    ripristino: RIPRISTINI, annulla_cambio: CHIAVE_IMPOSTAZIONE_FORMA, trascinamento: ORIGINI_TRASCINA,
+  });
+  const GESTI_RE = Object.freeze(Object.fromEntries(MISURE_GESTI.map((c) => [c, re(FORME_GESTI[c])])));
+
+  // Il valore più lungo che una chiave della misura può avere, coi cataloghi di adesso.
+  const F7_MAX = 7 * 9 + 6;
+  function tettoGesto(c) {
+    if (c === 'disposizione_di_serie') return 2;
+    if (c === 'barra_aperta') return ESITI_BARRA.reduce((a, e) => a + e.length + 1 + 9 + 1 + F7_MAX + 1, 0);
+    const g = GESTI[c];
+    const lunga = (v) => (v ? v.length + 1 : 0) + 9 + 1;
+    return Math.max(10, ...g.chiavi().map((k) => g.voci(k).reduce((a, v) => a + lunga(v), 0)));
+  }
+
+  function gestiPuliti(mappa, misura) {
+    const g = GESTI[misura];
+    const out = {};
+    for (const k of g.chiavi()) {
+      const per = oggetto(mappa) && has(mappa, k) ? mappa[k] : null;
+      if (!oggetto(per)) continue;
+      const lista = [];
+      for (const v of g.voci(k)) {
+        const n = has(per, v) ? per[v] : 0;
+        if (intero(n) && n > 0) lista.push(v ? `${v}|${conto(n)}` : String(conto(n)));
+      }
+      if (lista.length) out[k] = lista.join(';');
+    }
+    return out;
+  }
+
+  function barraPulita(mappa) {
+    const out = {};
+    for (const motivo of MOTIVI_BARRA) {
+      const per = oggetto(mappa) && has(mappa, motivo) ? mappa[motivo] : null;
+      if (!oggetto(per)) continue;
+      const lista = [];
+      for (const esito of ESITI_BARRA) {
+        const m = oggetto(per[esito]) ? per[esito] : null;
+        if (!m || !intero(m.n) || m.n === 0) continue;
+        const n = conto(m.n);
+        lista.push(`${esito}|${n}|${fasceIn(m.fasce, NOMI_FASCE, n)}`);
+      }
+      if (lista.length) out[motivo] = lista.join(';');
+    }
+    return out;
+  }
+
+  function disposizionePulita(d) {
+    return oggetto(d) && ZONE_ICONE.every((z) => SI_NO.includes(d[z])) ? Object.fromEntries(ZONE_ICONE.map((z) => [z, d[z]])) : {};
+  }
+
+  function documentoGesti({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    const pulita = (c) => (c === 'barra_aperta' ? barraPulita(d[c]) : c === 'disposizione_di_serie' ? disposizionePulita(d[c]) : gestiPuliti(d[c], c));
+    return {
+      v: VERSIONE_GESTI,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
+      ...Object.fromEntries(MISURE_GESTI.map((c) => [c, pulita(c)])),
+    };
+  }
+  // Un'ora senza gesti né disposizione nota non ha il terzo documento.
+  function senzaGesti(doc) { return MISURE_GESTI.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
+
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
     const d = oggetto(dati) ? dati : {};
@@ -1430,6 +1724,33 @@
     return { ok: true, motivo: '' };
   }
 
+  function validaGesti(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    if (!oggetto(doc)) return no('non è un documento');
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_GESTI.length || !CAMPI_GESTI.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== VERSIONE_GESTI) return no('versione');
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    for (const c of MISURE_GESTI) {
+      const m = doc[c];
+      if (!oggetto(m)) return no(c);
+      const ammesse = CHIAVI_GESTI[c];
+      const tetto = tettoGesto(c);
+      for (const [k, v] of Object.entries(m)) {
+        if (!(Array.isArray(ammesse) ? ammesse.includes(k) : re(ammesse).test(k))) return no(`${c}: chiave ${k}`);
+        if (typeof v !== 'string' || v.length > tetto || !GESTI_RE[c].test(v)) return no(`${c} di ${k}`);
+        if (c !== 'barra_aperta') continue;
+        for (const voce of v.split(';')) {
+          const [, n, f] = voce.split('|');
+          if (somma(fasceLette(f, NOMI_FASCE)) > Number(n)) return no(`fasce di ${k} oltre le aperture`);
+        }
+      }
+    }
+    return { ok: true, motivo: '' };
+  }
+
   function validaTesta(doc) {
     if (!PSEUDONIMO_RE.test(String(doc.pseudonimo))) return 'pseudonimo';
     if (!GIORNO_RE.test(String(doc.giorno)) || doc.mese !== meseDi(doc.giorno)) return 'giorno';
@@ -1525,6 +1846,14 @@
     CAMPI_ORA_V2, MISURE_SISTEMA, PASSI_AVVIO, TIPI_AVVIO, TIPO_PROCESSO_DI, TIPI_PROCESSO, COSE_FINESTRA, SOGLIE_FERMO,
     ORIGINI_ECCEZIONE, NOMI_ECCEZIONE, FASCE_MB, NOMI_MB, FASCE_SCHEDE, NOMI_SCHEDE, CANALI_SINCRONI, ESITI_USCITA, ESITI_LETTURA,
     CODICI_DISCO, CODICI_RINOMINA, FASCE_MB_FILE, EVENTI_STORAGE, ESITI_SESSIONE, EVENTI_AGGIORNAMENTO, SCHEMA_SISTEMA,
+    VERSIONE_GESTI, COLLEZIONE_GESTI, MISURE_GESTI, CAMPI_GESTI, GESTI_DALLE_PAGINE, ZONE_ICONE, VIE_POSA, APERTURE,
+    MOTIVI_BARRA, ESITI_BARRA, VOCI_BARRA, DOVE_NOME, ESITI_NOME, MOSSE_CARTA, COLONNE_HOME, GESTI_CARTA,
+    TIPI_CARTA_SINISTRA, TUTTE_LE_CARTE, VOCI_SISTEMA, GESTI_SISTEMA, MODULI_EDITOR, EVENTI_MODULO, GRIGLIA,
+    VISTA_IMPOSTAZIONI, COLONNE_GRIGLIA, RIGHE_GRIGLIA, RIPRISTINI, ESITI_RIPRISTINO, VIE_CAMBIO, FASCE_RIPENSAMENTO,
+    CAMBI_NON_IMPOSTAZIONI, ORIGINI_TRASCINA, DESTINAZIONI_TRASCINA, ESITI_TRASCINA, FORME_GESTI, CHIAVI_GESTI,
+    chiaviGesto: (c) => (has(GESTI, c) ? GESTI[c].chiavi() : []), vociGesto: (c, k) => (has(GESTI, c) ? GESTI[c].voci(k) : []),
+    cartaDi, cartaDellaMossa, voceGesto, gestoBarraValido, registraGesto, disposizioneDiSerie, segnaDisposizione, annullaCambio, fasciaRipensamento,
+    documentoGesti, senzaGesti, validaGesti, tettoGesto,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,

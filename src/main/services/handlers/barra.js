@@ -20,7 +20,11 @@ module.exports = function register(on, ctx) {
       target: String(msg?.target || ''),
       beforeId: msg?.beforeId ? String(msg.beforeId) : null,
     };
-    const layout = await Layout.posa(drop, { incognito: incognitoDi(sender) });
+    // Da dove viene l'icona, per i contatori (#1471): dalla barra laterale o dal menu stesso. Presa dalla barra,
+    // l'apertura della barra è servita a qualcosa.
+    const origine = msg?.source === 'bar' ? 'icona_barra' : 'icona_menu';
+    const layout = await Layout.posa(drop, { incognito: incognitoDi(sender), origine });
+    if (layout && origine === 'icona_barra') { try { winOf(sender)?._filoTabs?.barra?.iconaPresaFuori(); } catch (_) {} }
     return layout ? { ok: true, layout } : { ok: false, error: 'icona o zona sconosciuta' };
   });
 

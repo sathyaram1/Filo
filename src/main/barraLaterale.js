@@ -132,6 +132,8 @@ class BarraLaterale {
     const giaAperta = this.aperta;
     this.aperta = true;
     if (!giaAperta) this._apertaRicerca();
+    // Il perché dell'apertura, per i contatori (#1471): resta quello del primo gesto anche se poi ne arriva un altro.
+    if (!giaAperta) this.apertura = { motivo, t0: Date.now(), esito: '' };
     if (!giaAperta || motivo === 'tasto') this.motivo = motivo;
     if (!giaAperta) this.dentro = false;
     this.posa();
@@ -150,6 +152,7 @@ class BarraLaterale {
     const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
     if (this.ricerca && !this.ricerca.scelta) this._contaRicerca({ esito: 'vuota' });
     this.ricerca = null;
+    this._contaApertura();
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
@@ -179,6 +182,29 @@ class BarraLaterale {
     this.ricerca.scelta = true;
     this._contaRicerca({ esito: 'scelta', attesaMs: Date.now() - this.ricerca.t0, posizione: posizione > 0 ? posizione : null });
   }
+  // Un'apertura della barra (#1471): perché, cosa ci si è fatto (la prima cosa: un'azione, una voce di sistema, il
+  // tasto destro) e quanto è rimasta aperta. Chiusa senza niente è «a vuoto».
+  _esito(esito) { if (this.apertura && !this.apertura.esito) this.apertura.esito = esito; }
+  // Un'icona portata fuori dalla barra e presa dal menu della pagina: l'apertura è servita a qualcosa.
+  iconaPresaFuori() { this._esito('azione'); }
+  _contaApertura() {
+    this._lettura().via();
+    const a = this.apertura;
+    this.apertura = null;
+    if (a) this._contaGesto('barra_aperta', { motivo: a.motivo, esito: a.esito || 'a_vuoto', apertaMs: Date.now() - a.t0 });
+  }
+  _contaGesto(misura, dati) {
+    try { globalThis.SN_CONTATORI_MAIN?.gesto(misura, dati, { incognito: this._incognito() }); } catch (_) {}
+  }
+  // Il nome comparso su un'icona, e se la si sceglie subito dopo (#1471): la regola dei tempi sta in SN_GESTI.
+  _lettura() {
+    if (!this.letture) {
+      const G = globalThis.SN_GESTI;
+      this.letture = G ? G.lettore((ev) => this._contaGesto('suggerimento_letto', ev)) : { mostrato() {}, clic() {}, via() {} };
+    }
+    return this.letture;
+  }
+
   // Le voci fisse stanno sotto le icone, in quest'ordine (src/renderer/barra.js); il red-team solo se si vede.
   _posizioneFissa(comando) {
     const fisse = ['history', 'apps', 'redteam', 'account', 'settings'].filter((c) => c !== 'redteam' || RedteamGate.visibile());
@@ -613,6 +639,8 @@ class BarraLaterale {
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     if (!d || !this.layout || !this.layout.bar.includes(id)) return;
     if (d.soloOwner && !this._owner()) return;
+    this._lettura().clic(id);
+    this._esito('azione');
     this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
     const tabs = this.tabs;
     const attiva = this._attiva();
@@ -673,6 +701,8 @@ class BarraLaterale {
   sistema(comando, dati) {
     if (!FISSE.has(comando)) return;
     if (comando === 'redteam' && !RedteamGate.visibile()) return;
+    this._lettura().clic(comando);
+    this._esito('sistema');
     this._sceltaRicerca(this._posizioneFissa(comando));
     if (PAGINE_FISSE[comando]) {
       // L'azione della pagina la conta l'apertura della scheda (src/main/tabs.js).
@@ -721,7 +751,7 @@ class BarraLaterale {
       voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);
-        else if (a === 'barra:al-menu') Layout.posa({ id, target: 'secondary', beforeId: null }, { incognito: this._incognito() }).catch(() => {});
+        else if (a === 'barra:al-menu') Layout.posa({ id, target: 'secondary', beforeId: null }, { incognito: this._incognito(), via: 'rimessa_nel_menu' }).catch(() => {});
         else if (a.startsWith('barra:voce:') && scheda) {
           this.tabs.vaiAllaVoce(scheda.id, Number(a.slice('barra:voce:'.length)));
           if (this.motivo === 'tasto') this.chiudi();
@@ -729,6 +759,7 @@ class BarraLaterale {
       };
     }
     if (!voci || !voci.length) return;
+    if (this.aperta && !d.striscia) { this._esito('tasto_destro'); this._lettura().via(); }
     const b = this.vista.getBounds();
     this._nascondiSuggerimento();
     this._ferma('uscita');
@@ -829,10 +860,16 @@ class BarraLaterale {
     const t = testo(dati && dati.testo).slice(0, 300);
     // L'etichetta è della barra aperta: chiusa, la vista si stringe sotto il puntatore senza dirgli che è uscito,
     // e un'etichetta arrivata in ritardo resterebbe sopra la pagina (#1201).
-    if (!t || !this.aperta || !this.vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
+    if (!t || !this.aperta || !this.vista || !this.win || this.win.isDestroyed()) {
+      // Il puntatore ha lasciato l'icona: il nome letto non è diventato un clic. Premuta, invece, il clic arriva dopo.
+      if (dati && dati.lasciato === true) this._lettura().via();
+      this._nascondiSuggerimento();
+      return;
+    }
     const b = this.vista.getBounds();
     this.suggerimento = true;
     try { require('./popup-tooltip').showTooltip(this.win, t, b.x + numero(dati.x, 0, 10000), b.y + numero(dati.y, 0, 10000)); } catch (_) {}
+    if (dati.ridetto !== true) this._lettura().mostrato(testo(dati.id), 'barra');
   }
 
   _nascondiSuggerimento() {
@@ -888,7 +925,8 @@ class BarraLaterale {
       const beforeId = this._primaDi(yLocale(msg.y), id);
       this.mira = null;
       this.trascinamento.posata = true;
-      Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
+      this._esito('azione');
+      Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito(), origine: 'icona_menu' }).catch(() => {});
       return { ok: true };
     }
     if (fase === 'fine') {
@@ -957,6 +995,7 @@ class BarraLaterale {
         break;
       case 'barra:fuori':
         this.dentro = false;
+        this._lettura().via();
         this._nascondiSuggerimento();
         if (this.aperta && (this.motivo !== 'tasto' || !this._haFuoco())) this._programmaUscita();
         break;
@@ -974,7 +1013,14 @@ class BarraLaterale {
         const id = testo(d.id);
         if (!D || !D.noto(id)) break;
         const beforeId = d.beforeId ? testo(d.beforeId) : null;
-        Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
+        this._esito('azione');
+        Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito(), origine: 'icona_barra' }).catch(() => {});
+        break;
+      }
+      // Un'icona presa nella barra e lasciata andare (Esc, gesto interrotto): un trascinamento finito nel vuoto (#1471).
+      case 'barra:annullato': {
+        const D = globalThis.SN_DISPOSIZIONE_ICONE;
+        if (D && D.noto(testo(d.id))) this._contaGesto('trascinamento', { da: 'icona_barra', a: 'nessuna', esito: 'annullato' });
         break;
       }
       case 'barra:trascina-fuori': this._fuori(d); break;
@@ -1043,6 +1089,7 @@ class BarraLaterale {
     }
     this.aperta = false;
     this.motivo = null;
+    this.apertura = null;
     if (rinasci && this.win && !this.win.isDestroyed()) setTimeout(() => this.posa(), 0);
   }
 }
