@@ -114,6 +114,11 @@ function avanti() {
   try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
 }
 
+function schedaAccanto(verso) {
+  const win = finestra();
+  try { win && win._filoTabs.attivaAccanto(verso); } catch (_) {}
+}
+
 function vaiAScrivereUnIndirizzo() {
   const c = schedaAttiva();
   if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
