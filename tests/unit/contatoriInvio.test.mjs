@@ -57,7 +57,7 @@ function banco({ accesi = true, incognito = false, finestra = true, risposta = 2
     fetch: async (url, opt) => {
       if (b.risposta === 'rete') throw new TypeError('fetch failed');
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
-      (url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? chiamate : inviati).push({ url, opt, doc });
+      (url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? chiamate : url.includes(`/${C.COLLEZIONE_ATTIVITA}?`) ? attivita : inviati).push({ url, opt, doc });
       const st = typeof b.risposta === 'function' ? b.risposta(doc) : b.risposta;
       return { ok: st >= 200 && st < 300, status: st, json: async () => ({}) };
     },
