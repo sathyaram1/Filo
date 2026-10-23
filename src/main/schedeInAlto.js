@@ -67,9 +67,11 @@ class SchedeInAlto {
   // arriverebbe mai (#1343 r2). `before-mouse-event` passa da ogni riquadro, ma con la y del riquadro: la y della pagina
   // si ricava dalla posizione sullo schermo meno la cima della pagina sullo schermo (screenY, chiesto una volta).
   dalRiquadro(wc, input) {
-    if (!input || input.type !== 'mouseMove' || !wc) return;
+    if (!input || !wc) return;
     const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
     if (!sotto || sotto.webContents !== wc || !this._attivo()) return;
+    if (input.type === 'mouseDown' || input.type === 'mouseUp') { this._tasto(input.type === 'mouseDown'); return; }
+    if (input.type !== 'mouseMove') return;
     const prima = this.mossePagina;
     setImmediate(() => {
       if (this.mossePagina !== prima || !this._attivo()) return;
