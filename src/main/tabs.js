@@ -1931,9 +1931,12 @@ class TabManager {
   setTabActivity(id, activity, frame = null) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
-    // §2.1 — attività in una scheda qualsiasi vuol dire "Filo è in uso".
-    this._lastAppInteractionAt = Date.now();
-    if (typeof activity.lastInteractionAt === 'number') tab.lastInteractionAt = activity.lastInteractionAt;
+    // Solo un gesto dell'utente dice «Filo è in uso»: scorrimenti e moduli ricontrollati arrivano anche da soli (#1618).
+    if (Number.isFinite(activity.lastInteractionAt) && activity.lastInteractionAt > 0) {
+      const adesso = Date.now();
+      tab.lastInteractionAt = Math.min(activity.lastInteractionAt, adesso);
+      this._lastAppInteractionAt = adesso;
+    }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
     if (typeof activity.formDirty === 'boolean') {
       // Una voce per frame: il «niente» della pagina non cancella il testo di un riquadro.
