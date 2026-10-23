@@ -30,6 +30,7 @@
   const INTRODOTTO = /\b(?:use|usa|utilizza|inserisci|immetti|digita|enter|type)\s+$/i;
   const FORMA_CODICE = /(?<![\w./:€$£-])(?:([A-Z]{1,3}-)?(\d{3,4}(?:[ -]\d{3,4}){1,2}|\d{2}-\d{2}-\d{2})|([A-Z]{1,3}-)?(\d{4,8}))(?![\w/]|[.,:]\d|-\d|\s?(?:€|%|euro\b|eur\b|usd\b))/g;
   const ANNO = /^(?:19|20)\d\d$/;
+  const FINE_DI_UN_NUMERO = /(?:[*•·xX]{2,}[ .-]?|\b(?:termin\w*|finisc\w*|ending|ends?)\s+(?:con|in|with|per)\s+(?:le\s+cifre\s+)?)$/i;
   function codiciVicini(s, out) {
     const righe = s.split('\n');
     const frasi = (riga) => riga.split(/(?<=[.!?;])\s+(?=[A-ZÀ-Ý«"])|[|\t]/);
