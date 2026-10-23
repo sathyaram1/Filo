@@ -4328,7 +4328,7 @@ function pageReadsForPrompt(actions) {
     if (!out.testo) {
       if (totale > 0 && da >= totale) {
         blocks.push(out.lettaInParte || out.scaricataInParte
-          ? `[Della pagina "${indirizzo}" ${avvisoLettaInParte(out, { oltre: true })}]`
+          ? avvisoLettaInParte(out, { indirizzo, oltre: true })
           : `[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
       } else if (out.fonte === 'scheda') {
         blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
