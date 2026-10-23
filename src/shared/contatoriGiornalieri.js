@@ -877,7 +877,9 @@
   }
 
   // Chi aveva chiuso la scheda che si riapre dall'archivio: «manual» è la persona, il resto il giro di pulizia.
-  function chiusaDa(reason) {
+  // '' per una scheda chiusa dalla pagina stessa o da un crash: non l'ha chiusa nessuno dei tre, e non si conta.
+  function chiusaDa(reason, daSola = false) {
+    if (daSola === true) return '';
     const r = String(reason || 'manual');
     return r === 'manual' ? 'persona' : r === 'duplicato' ? 'duplicato' : 'pulizia';
   }
