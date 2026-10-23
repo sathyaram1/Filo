@@ -254,11 +254,13 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  assert.match(ORA, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
-  const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(ORA);
-  assert.ok(ora);
-  for (let h = 0; h < 24; h++) assert.ok(new RegExp(ora[1]).test(String(h).padStart(2, '0')));
-  for (const no of ['24', '7', 'T07', '07 ']) assert.ok(!new RegExp(ora[1]).test(no));
+  for (const testo of [ORA, CHIAMATE]) {
+    assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
+    const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
+    assert.ok(ora);
+    for (let h = 0; h < 24; h++) assert.ok(new RegExp(ora[1]).test(String(h).padStart(2, '0')));
+    for (const no of ['24', '7', 'T07', '07 ']) assert.ok(!new RegExp(ora[1]).test(no));
+  }
   // Il segno del primo documento è di un elenco chiuso: è quello che l'owner legge per contare le copie.
   const primo = /d\.primo in \[([^\]]*)\]/.exec(ORA);
   assert.ok(primo, 'manca l’elenco dei segni del primo documento');
