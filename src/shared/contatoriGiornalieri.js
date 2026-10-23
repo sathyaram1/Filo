@@ -25,9 +25,45 @@
   const NOMI_POSIZIONI = Object.freeze(POSIZIONI.map(([k]) => k));
 
   const CAMPI_GIORNO = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori']);
-  const MISURE = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
+  const MISURE_V2 = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
     'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte']);
-  const CAMPI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE]);
+  const TESTA_ORA = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo']);
+  const CAMPI_V2 = Object.freeze([...TESTA_ORA, ...MISURE_V2]);
+
+  // ── Le chiamate ai modelli (#1464) ────────────────────────────────────────
+  // Misurate al cancello, sul tentativo che ha servito: per funzione e modello, «modello|…|n». Fasce in token da 1024.
+  const K = 1024;
+  const FASCE_CONTESTO = Object.freeze([['t2k', 2 * K], ['t8k', 8 * K], ['t16k', 16 * K], ['t32k', 32 * K], ['t64k', 64 * K],
+    ['t128k', 128 * K], ['oltre', Infinity]]);
+  // «nd»: l'host non dice quanta parte del contesto ha letto dalla cache, o quanto ha ragionato.
+  const ND = 'nd';
+  const FASCE_CACHE = Object.freeze(['zero', 'q25', 'q50', 'q75', 'q100', ND]);
+  const FASCE_RAGIONAMENTO = Object.freeze([['r0', 0], ['r1k', K], ['r4k', 4 * K], ['r16k', 16 * K], ['oltre', Infinity]]);
+  const FASCE_USCITA = Object.freeze([['o256', 256], ['o1k', K], ['o4k', 4 * K], ['o16k', 16 * K], ['oltre', Infinity]]);
+  const FINI = Object.freeze(['stop', 'length', 'tool_calls', 'filtro', 'altro']);
+  const TENTATIVI = Object.freeze(['t1', 't2', 't3', 't4_oltre']);
+  // Il costo detto dal router, quello stimato dal listino delle Opzioni, quello chiesto dopo (voce, dettatura, una
+  // risposta rotta a metà). Si somma in centomillesimi di dollaro.
+  const ORIGINI_SPESA = Object.freeze(['router', 'stima', 'tardiva']);
+  const CENTOMILLESIMI = 100000;
+  const FASCE_CHIAMATE = Object.freeze([['c1', 1], ['c2', 2], ['c3_5', 5], ['c6_12', 12], ['oltre', Infinity]]);
+  // Quando Filo cambia la richiesta per stare nei limiti del modello: la conversazione stretta dopo un rifiuto per
+  // lunghezza e la finestra imparata più piccola del tetto delle Opzioni (la chat), il ragionamento tolto e richiesto.
+  const ADATTAMENTI = Object.freeze(['contesto_stretto', 'finestra_piccola', 'ragionamento_tolto']);
+  const nomi = (fasce) => fasce.map(([k]) => k);
+  // Quello che segue il modello in ogni voce, per misura: l'elenco chiuso intero.
+  const RESTI = Object.freeze({
+    contesto: Object.freeze(nomi(FASCE_CONTESTO)),
+    cache: FASCE_CACHE,
+    ragionamento: Object.freeze([...nomi(FASCE_RAGIONAMENTO), ND]),
+    uscita: Object.freeze(nomi(FASCE_USCITA).flatMap((f) => FINI.map((x) => `${f}|${x}`))),
+    ripieghi: Object.freeze(TENTATIVI.flatMap((t) => [`${t}|si`, `${t}|no`])),
+    spesa: ORIGINI_SPESA,
+    adattamenti: ADATTAMENTI,
+  });
+  const MISURE_MODELLI = Object.freeze(Object.keys(RESTI));
+  const MISURE = Object.freeze([...MISURE_V2, ...MISURE_MODELLI, 'chiamate']);
+  const CAMPI = Object.freeze([...TESTA_ORA, ...MISURE]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
