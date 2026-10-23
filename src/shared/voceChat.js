@@ -196,6 +196,7 @@
       if (giro !== c.giro) return;
       const sessione = await Ascolto.avvia({
         fineDaSola: { silenceMs: tempi.silenceSec * 1000, waitMs: MUTO_MS },
+        invioSeLasciata: 'tenuta',
         suLivello: (v) => {
           if (giro !== c.giro) return;
           // La chat è sparita (l'Aiuto chiuso, il modulo tolto): il microfono non resta acceso per nessuno.
