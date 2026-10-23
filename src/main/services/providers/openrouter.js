@@ -277,6 +277,8 @@
     const detail = await first.res.clone().text().catch(() => '');
     if (!isParamsRefusal(detail)) return first;
     const second = await send(senzaRagionamento, first.keyUsed);
+    // I contatori (#1464) la contano: una richiesta in più, e una risposta senza ragionamento.
+    second.ragionamentoTolto = true;
     if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
     if (!second.keyFallback && first.keyFallback) {
       second.keyFallback = first.keyFallback;
