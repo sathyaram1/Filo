@@ -824,6 +824,32 @@ module.exports = function register(on, ctx) {
     log.lastDiscardReason = dettaglio || motivo;
     log.lastDiscardAt = new Date().toISOString();
     console.warn(`[wallet] registro d'uso: ${n} righe tolte dalla coda (${motivo})${dettaglio ? `: ${dettaglio}` : ''}`);
+    if (scartiLetti) salvaScarti();
+  }
+
+  function salvaScarti() {
+    const { discardedBy, lastDiscardReason, lastDiscardAt } = log;
+    const dato = Object.keys(discardedBy).length ? { discardedBy: { ...discardedBy }, lastDiscardReason, lastDiscardAt } : null;
+    try { Promise.resolve(globalThis.SN_STORAGE.setRaw(SCARTI_KEY, dato)).catch(() => {}); } catch (_) {}
+  }
+
+  // Si sommano a quelli scartati prima della lettura, che altrimenti la lettura cancellerebbe.
+  async function leggiScarti() {
+    let dato = null;
+    try { dato = await globalThis.SN_STORAGE.getRaw(SCARTI_KEY, null); } catch (_) {}
+    const prima = Object.keys(log.discardedBy).length > 0;
+    if (dato && dato.discardedBy && typeof dato.discardedBy === 'object') {
+      for (const [m, v] of Object.entries(dato.discardedBy)) {
+        const n = Math.max(0, Math.floor(Number(v) || 0));
+        if (n) log.discardedBy[m] = (log.discardedBy[m] || 0) + n;
+      }
+      if (!log.lastDiscardAt) {
+        log.lastDiscardReason = String(dato.lastDiscardReason || '');
+        log.lastDiscardAt = dato.lastDiscardAt || null;
+      }
+    }
+    scartiLetti = true;
+    if (prima) salvaScarti();
   }
 
   function tagliaCoda() {
