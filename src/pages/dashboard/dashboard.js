@@ -1763,6 +1763,35 @@
       handleImageFile(e.detail.blob);
     }
   });
+  // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
+  // dal disco. Torna se c'erano file.
+  function fileNelCampo(dt) {
+    const daChat = dt?.getData('application/x-filo-file') || '';
+    if (daChat) addPendingFile(daChat);
+    else if (dt?.files && dt.files.length) for (const f of dt.files) handleDroppedFile(f);
+    else return false;
+    inputEl.focus();
+    return true;
+  }
+  // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
+  // si vede dove andrà a finire.
+  const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
+  const spegniBersaglio = () => inputForm.classList.remove('dash-input-bersaglio');
+  document.addEventListener('dragover', (e) => {
+    if (!portaFile(e.dataTransfer)) return;
+    inputForm.classList.add('dash-input-bersaglio');
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) spegniBersaglio(); });
+  document.addEventListener('dragend', spegniBersaglio);
+  document.addEventListener('drop', (e) => {
+    spegniBersaglio();
+    if (e.defaultPrevented || !portaFile(e.dataTransfer)) return;
+    e.preventDefault();
+    fileNelCampo(e.dataTransfer);
+  });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
   // un'altra scheda) entra nel campo dove sta il cursore. Il dragover qui sopra dice a Chromium che il
