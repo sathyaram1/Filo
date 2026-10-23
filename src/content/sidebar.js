@@ -490,6 +490,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (!msg || !immagini.length) return;
     const box = document.createElement('div');
     box.className = 'sn-sidebar-msg-immagini';
+    if (msg.textContent.trim()) box.classList.add('con-testo');
     const o = ombraDi(box, CSS_ALLEGATI);
     const bolla = document.createElement('div');
     bolla.className = 'bolla';
