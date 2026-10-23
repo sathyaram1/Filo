@@ -246,8 +246,10 @@ test('un file che non è un’immagine, lasciato insieme a una: nell’Aiuto lo 
 // Il modello finto risponde subito e tiene da parte quello che l'Aiuto gli manda.
 const AGENTE = () => {
   globalThis.__richieste = [];
+  globalThis.__nelFilo = [];
   const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
   chrome.runtime.sendMessage = (m, ...r) => {
+    if (m && m.type === globalThis.SN_MSG.MSG.FILO_CONVERSAZIONE_APP) globalThis.__nelFilo.push(...m.messaggi);
     if (m && m.type === globalThis.SN_MSG.MSG.AI_REQUEST && m.action === globalThis.SN_CONST.ACTIONS.HELP) {
       globalThis.__richieste.push(m.payload);
       return Promise.resolve({ ok: true, text: '{"text":"È un quadratino rosso.","status":"done"}' });
