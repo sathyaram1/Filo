@@ -147,7 +147,13 @@
       const pulita = noto(app, id) ? pulisciConfig(app, id, grezza[id]) : {};
       if (Object.keys(pulita).length) config[id] = pulita;
     }
-    return { ...s, config: { ...config, ...s.config }, migrato: true };
+    const finale = { ...config, ...s.config };
+    // Le scorciatoie valgono per gli strumenti nel pannello: chi ne aveva data una a un vecchio modulo lo ritrova lì.
+    const elementi = s.elementi.slice();
+    for (const e of catalogo(app).elementi) {
+      if (config[e.id] && finale[e.id] && finale[e.id].shortcut && !elementi.includes(e.id)) elementi.push(e.id);
+    }
+    return { ...s, elementi, config: finale, migrato: true };
   }
 
   function migra(app, stato, collezione) {
