@@ -449,9 +449,40 @@ function crea(dip = {}) {
   function attivita(misura, info, { incognito = null } = {}) {
     try {
       if (!C.chiaveAttivita(misura, info) || (incognito == null ? inIncognito() : incognito)) return false;
-      conta((ora) => C.registraAttivita(ora, misura, info), { incognito }).catch(() => {});
+      const p = conta((ora) => C.registraAttivita(ora, misura, info), { incognito }).catch(() => {});
+      inVolo.add(p);
+      p.finally(() => inVolo.delete(p));
       return true;
     } catch (_) { return false; }
+  }
+
+  // Le attività ancora aperte in una pagina (una sessione dell'Aiuto, una lettura, una dettatura in attesa d'invio),
+  // con quello che conterebbero se finissero adesso: chiudere una scheda, una finestra o Filo non dà alla pagina
+  // nessun evento, e allora le conta il main (`chiudiInCorso`, `congeda`). Chiave: «pagina|cosa|id».
+  const inCorso = new Map();
+  const inVolo = new Set();
+  const TETTO_IN_CORSO = 500;
+  function apertaInCorso(chiave, misura, info) {
+    if (!C.chiaveAttivita(misura, info) || inIncognito()) { inCorso.delete(chiave); return false; }
+    if (!inCorso.has(chiave) && inCorso.size >= TETTO_IN_CORSO) inCorso.delete(inCorso.keys().next().value);
+    inCorso.set(chiave, { misura, info });
+    return true;
+  }
+  // La pagina l'ha chiusa lei, e conta da sé: quella in attesa non vale più.
+  function finitaInCorso(chiave) { inCorso.delete(chiave); }
+  // La pagina se n'è andata senza dirlo: si contano le sue, com'erano all'ultimo aggiornamento.
+  function chiudiInCorso(prefisso) {
+    for (const [k, v] of [...inCorso]) {
+      if (!k.startsWith(prefisso)) continue;
+      inCorso.delete(k);
+      attivita(v.misura, v.info, { incognito: false });
+    }
+  }
+  // Filo che si chiude: le attività aperte si contano, e lo stato va sul disco prima dell'uscita. Null: niente da fare.
+  function congeda() {
+    chiudiInCorso('');
+    if (!inVolo.size && !timerSalva) return null;
+    return Promise.all([...inVolo]).then(() => salva(), () => salva());
   }
 
   // Una riga di memoria corretta dalla persona: `riga` è quella di SN_FILO_MEMORY.descriviRiga, col modulo e la data.
