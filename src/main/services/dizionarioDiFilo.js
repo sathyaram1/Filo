@@ -117,11 +117,21 @@ function avviaSeAtteso() {
 
 const byte = (s) => Buffer.byteLength(s, 'utf8');
 
-// Come Chromium con più lingue: sbagliata solo se nessuna la conosce.
+// I file italiani conoscono solo l'apostrofo dritto; quello tipografico è la stessa parola.
+const normale = (parola) => (typeof parola === 'string' ? parola.replace(/’/g, "'") : '');
+const conosciuta = (p) => motori.some(({ h }) => h.testSpelling(p));
+const VOCALI_ELISE = ['a', 'e', 'i', 'o'];
+
+// Come Chromium con più lingue: sbagliata solo se nessuna la conosce. Con l'apostrofo in fondo è giusta se lo è senza
+// («va'», «be'», «dell'») o se è un'elisione, cioè la parola intera meno la vocale finale («sant'», «quell'»).
 function sbagliataGia(parola) {
-  const p = typeof parola === 'string' ? parola : '';
+  const p = normale(parola);
   if (!p.trim() || byte(p) > PAROLA_MAX_BYTE) return false;
-  try { return motori.every(({ h }) => !h.testSpelling(p)); } catch (_) { return false; }
+  try {
+    if (conosciuta(p)) return false;
+    const radice = /^(.*\p{L})'$/u.exec(p)?.[1];
+    return !radice || !(conosciuta(radice) || VOCALI_ELISE.some((v) => conosciuta(radice + v)));
+  } catch (_) { return false; }
 }
 
 /** Per ogni parola, se nessuna lingua la conosce; `null` finché il dizionario non è pronto (o non si è caricato). */
