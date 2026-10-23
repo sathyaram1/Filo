@@ -651,13 +651,14 @@ test('in fondo alla corsa l\'appeso che resta dopo una chiusura si chiude da sol
 // #1573: chiuso il file fermo, una corsa che non finiva lo stesso si chiudeva con «non è andato avanti niente».
 test('chiusa la corsa senza file in corso, la tenevano ferma i chiusi dopo i quali nessun file è finito da sé', () => {
   const g = guardiaPerFile(1000);
-  assert.equal(g([{ via: 'a' }, {}, { via: 'b' }], 500), null);
+  assert.equal(g([{ via: 'a' }, {}], 0), null);
+  assert.equal(g([{ via: 'b' }], 600), null);
   assert.deepEqual(g.sospetti(), [], 'niente chiuso');
-  assert.deepEqual(g([], 1500), { file: ['a'] });
-  assert.equal(g([{ fine: 'a' }], 1600), null);
+  assert.deepEqual(g([], 1000), { file: ['a'] });
+  assert.equal(g([{ fine: 'a' }], 1100), null);
   assert.deepEqual(g.sospetti(), ['a'], 'chiuso a, non è finito niente da sé: la corsa la tiene ferma lui');
-  assert.deepEqual(g([], 2600), { file: ['b'] });
-  assert.equal(g([{ fine: 'b' }], 2700), null);
+  assert.deepEqual(g([], 2100), { file: ['b'] });
+  assert.equal(g([{ fine: 'b' }], 2200), null);
   assert.deepEqual(g.sospetti(), ['a', 'b'], 'chiuso anche b, e ancora niente è finito da sé: tutti e due');
 
   const h = guardiaPerFile(1000);
