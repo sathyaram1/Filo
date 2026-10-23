@@ -121,6 +121,8 @@ test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei l
   await indietro(app, 7 * ORA);
   await app.evaluate(async ({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs._autoArchiveTick());
   expect(await app.evaluate(() => globalThis.__chiamate)).toBe(1);
+  // La pila nella shell è il modello nascosto: l'avviso che si vede sta nella vista sopra la pagina.
+  const shell = await avvisi();
   const avviso = shell.locator('.shell-notif-msg', { hasText: 'La pulizia automatica non è riuscita a valutare le schede' });
   await expect(avviso).toBeVisible({ timeout: 5_000 });
   await expect(avviso).toContainText('crediti di Filo sono finiti');
