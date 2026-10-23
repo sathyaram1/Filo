@@ -6,6 +6,7 @@ const { webContents: WebContents } = require('electron');
 const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const { percorsoDelPreload } = require('./preloadPacchetto');
+const { zoomDaTasto, rotellaZoom } = require('./tabs/tabZoom');
 
 const INDIRIZZO = 'filo://riquadri/riquadri.html';
 const PRELOAD = 'src/preload/riquadri-preload.js';
