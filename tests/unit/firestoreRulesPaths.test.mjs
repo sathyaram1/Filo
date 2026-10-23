@@ -57,6 +57,9 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   'contatori-gesti':
     'i gesti della personalizzazione di un’ora dei contatori (#1471), accanto all’ora e con lo stesso id: stesse ' +
     'ragioni e stessa forma chiusa (numeri, fasce e nomi dei cataloghi del codice), a sola creazione e letti solo dall’admin.',
+  'contatori-navigazione':
+    'la navigazione di un’ora dei contatori (#1469), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
+    'numeri sotto chiavi di elenchi chiusi (codici di rete, fonti, paesi, servizi), mai un sito o un nome di file.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

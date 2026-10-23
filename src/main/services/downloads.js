@@ -507,6 +507,26 @@ function contaNonRiuscito(rec) {
   try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.erroreVisto('avviso:download_failed', { incognito: !!scopeOf(rec) }); } catch (_) {}
 }
 
+// I contatori (#1469): come è finito, quanto pesava e quanto è durato, in fasce; dei programmi solo la classe.
+// Mai il nome, l'estensione o il sito.
+function contaNav(rec, scegli) {
+  try {
+    const N = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.NAV;
+    const M = globalThis.SN_CONTATORI_MAIN;
+    if (N && M) M.navigazione(scegli(N), { incognito: !!scopeOf(rec) });
+  } catch (_) {}
+}
+function contaFine(rec) {
+  const ms = Date.parse(rec.endedAt || '') - Date.parse(rec.startedAt || '');
+  const byte = Math.max(Number(rec.totalBytes) || 0, Number(rec.receivedBytes) || 0);
+  contaNav(rec, (N) => N.scaricamento(rec.state, byte, ms));
+}
+function contaProgramma(rec, evento) {
+  let classe = 'programma';
+  try { if (ESE().eImmagineDisco(rec.filename)) classe = 'immagine_disco'; } catch (_) {}
+  contaNav(rec, (N) => N.programma(classe, evento));
+}
+
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
@@ -540,6 +560,7 @@ function notifyDownloadStarted(webContents, info = null) {
 // che la barra apre sopra la pagina: un avviso della barra nell'area pagina
 // resterebbe sotto la vista nativa, invisibile. Solo la finestra da cui parte.
 function chiediNellaFinestra(webContents, rec) {
+  contaProgramma(rec, 'domanda');
   try {
     const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
     const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
@@ -571,6 +592,7 @@ function completa(rec) {
       persist();
       broadcast('error', rec);
       contaNonRiuscito(rec);
+      contaFine(rec);
       shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
       return;
     }
@@ -580,6 +602,7 @@ function completa(rec) {
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
   broadcast('done', rec);
+  contaFine(rec);
   if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
@@ -794,6 +817,7 @@ function onWillDownload(item, webContents, scope = '') {
       rec.state = state === 'cancelled' ? 'cancelled' : 'interrupted';
       persist();
       broadcast('error', rec);
+      contaFine(rec);
       if (rec.state !== 'cancelled') {
         contaNonRiuscito(rec);
         shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
@@ -868,6 +892,7 @@ function finalizeManual(rec, state, savePath) {
   rec.state = state;
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
+  contaFine(rec);
   // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
   return marca;
 }
@@ -1057,6 +1082,7 @@ function confirmDownload(id, allow, scope = '') {
   if (!rec || rec.state !== 'pending') {
     return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
   }
+  contaProgramma(rec, allow ? 'scaricato' : 'rifiutato');
   // «Salva immagine come»: i byte e il file li muove chi l'ha chiesto, che aspetta questa risposta (#1311).
   const manual = liveManual.get(id);
   if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, items: listRecords(scope) }; }
@@ -1075,6 +1101,7 @@ function confirmDownload(id, allow, scope = '') {
     rec.endedAt = new Date().toISOString();
     persist();
     broadcast('error', rec);
+    contaFine(rec);
     return { ok: true, items: listRecords(scope) };
   }
   if (rec._arrivato) { completa(rec); return { ok: true, items: listRecords(scope) }; }
@@ -1120,8 +1147,11 @@ function openFile(id, opts, scope = '') {
       parti = ESE().partiApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
       title = ESE().titoloApri(rec.filename);
     } catch (_) {}
+    contaProgramma(rec, 'conferma');
     return { ok: false, needsConfirm: true, exe: true, title, text, parti };
   }
+  // Aperto col sì alla domanda di prima: un «no» non arriva fin qui (si chiude, o si apre la cartella).
+  if (rec.exe && opts && opts.confirmed && chiedeConferma(rec.site, rec.siteUncertain, servitoDi(rec))) contaProgramma(rec, 'aperto');
   try {
     const r = electron().shell.openPath(rec.savePath);
     // openPath ritorna una stringa d'errore (non vuota) se non riesce.

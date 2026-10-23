@@ -15,6 +15,7 @@ const geoBlockMethods = {
     let host = '';
     try { host = new URL(url).hostname; } catch (_) {}
     tab.geoBlock = { url, host, source, detail, at: Date.now() };
+    this._contaNavigazione((N) => N.geoRilevato(source));
     GeoBlock.emitDetected({ tabId: tab.id, url, host, source, detail, at: tab.geoBlock.at });
     // Il livello decisionale vive nello stesso TabManager che possiede il tab, quindi si chiama
     // diretto; il registro onDetected resta per i consumatori esterni. Mai bloccante.
@@ -56,6 +57,7 @@ const geoBlockMethods = {
     } catch (_) {}
 
     const decision = GeoBlockRules.decideGeoAction({ flaggedDangerous, hasLoginCookies, proxyConfigured, stage });
+    this._contaNavigazione((N) => N.geoDecisione(decision.reason));
 
     // Paese di destinazione: ultima location usata, altrimenti default, altrimenti USA.
     const p = (settings && settings.proxy) || {};
@@ -192,6 +194,7 @@ const geoBlockMethods = {
     this.proxyAvailable()
       .then((ok) => (ok ? classify(input) : null))
       .then((res) => {
+        this._contaNavigazione((N) => N.geoClasse(res));
         if (!res || res.skipped) return;
         if (!res.route || !res.route.proxy) return; // solo geo_block agisce
         const wc = tab.view && tab.view.webContents;

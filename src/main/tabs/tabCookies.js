@@ -196,15 +196,19 @@ const cookieMethods = {
       return { ok: true };
     }
     const prev = tab.cookieOutcome && tab.cookieOutcome.site === site ? tab.cookieOutcome : { site, rejected: false, hidden: false };
+    // I contatori (#1469): una volta per esito, scheda e sito, come lo vede la scheda; mai il sito.
+    const conta = () => this._contaNavigazione((N) => N.banner(outcome));
     if (outcome === 'unconfirmed') {
       forgetRejected(this, site);
-      tab.cookieOutcome = { ...prev, rejected: false };
+      if (!prev.unconfirmed) conta();
+      tab.cookieOutcome = { ...prev, rejected: false, unconfirmed: true };
       this._broadcast();
       return { ok: true };
     }
     rememberOutcome(this, site, outcome);
     if (prev[outcome]) { tab.cookieOutcome = prev; return { ok: true }; }
-    tab.cookieOutcome = { ...prev, [outcome]: true };
+    conta();
+    tab.cookieOutcome = { ...prev, [outcome]: true, ...(outcome === 'rejected' ? { unconfirmed: false } : {}) };
     this._broadcast();
     return { ok: true };
   },
