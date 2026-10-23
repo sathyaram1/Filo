@@ -185,6 +185,17 @@ const dopoUnClic = (azione) => `<!doctype html><meta charset="utf-8"><title>Prov
 PAGINE['/schermi'] = dopoUnClic("window.getScreenDetails().then(() => m('schermi:letti'), (e) => m('schermi:' + e.name));");
 PAGINE['/presenza'] = dopoUnClic("IdleDetector.requestPermission().then((x) => m('presenza:' + x), (e) => m('presenza:' + e.name));");
 PAGINE['/font'] = dopoUnClic("window.queryLocalFonts().then((f) => m('font:' + (f.length ? 'letti' : 'vuoti')), (e) => m('font:' + e.name));");
+// Una pagina qualsiasi che legge l'elenco dei dispositivi: i nomi (uguali in ogni sito) arrivano solo col sì (#1524).
+PAGINE['/dispositivi'] = `<!doctype html><meta charset="utf-8"><title>Dispositivi</title>
+<button id="b" style="position:fixed;top:200px;left:200px">Microfono</button>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  const nomi = () => navigator.mediaDevices.enumerateDevices().then((l) => [...new Set(l.filter((d) => d.label).map((d) => d.kind))].sort().join(',') || 'nessuno');
+  const stato = (name) => navigator.permissions.query({ name }).then((s) => s.state, (e) => e.name);
+  Promise.all([nomi(), stato('microphone'), stato('midi')]).then(([n, mic, midi]) => m('prima:' + n + '/' + mic + '/' + midi));
+  document.getElementById('b').addEventListener('click', () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { s.getTracks().forEach((t) => t.stop()); return nomi().then((n) => m('dopo:' + n)); }, (e) => m('mic:' + e.name)));
+</script>`;
 PAGINE['/spazio'] = dopoUnClic("navigator.storage.persist().then((x) => m('spazio:' + x), (e) => m('spazio:' + e.name));");
 // Un sito che carica foto (#1069): l'utente gli dà la cartella da leggere, e al clic su «Carica» il sito prova a scriverci.
 PAGINE['/cartella'] = `<!doctype html><meta charset="utf-8"><title>Carica foto</title>
@@ -757,7 +768,6 @@ test('le risposte date restano dopo aver riaperto Filo, e dalla pagina Sicurezza
 for (const [via, dopo, domanda] of [
   ['/schermi', 'schermi:letti', 'vuole usare tutti i tuoi schermi'],
   ['/presenza', 'presenza:granted', 'vuole sapere quando sei al computer'],
-  ['/font', 'font:letti', null],
   ['/spazio', 'spazio:true', null],
 ]) {
   test(`dopo un clic sulla pagina, ${via.slice(1)}: ${domanda ? 'Filo chiede e col sì la pagina funziona' : 'passa come in Chrome'}`, async () => {
@@ -778,6 +788,37 @@ for (const [via, dopo, domanda] of [
     if (!domanda) await expect(barra()).toBeHidden();
   });
 }
+
+// L'elenco dei font installati rivela i programmi ed è uguale in ogni sito: Electron non lo fa chiedere, quindi niente (#1524).
+test('i font del computer: dopo un clic sulla pagina il sito non legge l\'elenco, e nessuna domanda', async () => {
+  test.setTimeout(60_000);
+  await apri('/font');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/font'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.waitForLoadState('domcontentloaded');
+  await pagina.locator('#b').click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['font:vuoti']);
+  await expect(barra()).toBeHidden();
+});
+
+test('i nomi di microfoni e uscite audio il sito li legge solo dopo Consenti al microfono; la fotocamera resta senza', async () => {
+  test.setTimeout(60_000);
+  await apri('/dispositivi');
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['prima:nessuno/prompt/prompt']);
+  await expect(barra()).toBeHidden();
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/dispositivi'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.locator('#b').click();
+  await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+  const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+  await expect(si).toBeEnabled({ timeout: 5_000 });
+  await si.click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['prima:nessuno/prompt/prompt', 'dopo:audioinput,audiooutput']);
+
+  await pagina.reload();
+  await expect.poll(() => esiti.length, { timeout: 10_000 }).toBe(3);
+  expect(esiti[2], 'il sì ricordato vale alla pagina dopo').toBe('prima:audioinput,audiooutput/granted/prompt');
+});
 
 test('le risposte ricordate le legge e le toglie solo una pagina di Filo, non un sito visitato', async () => {
   const out = await app.evaluate(async () => {

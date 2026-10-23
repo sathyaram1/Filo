@@ -5,10 +5,10 @@
 const SCRITTURA = 'filo:scrittura';
 const SCRITTURA_FINE = 'filo:scrittura-fine';
 const SCRITTURA_NIENTE = 'filo:scrittura-niente';
-// Fotocamera, microfono e posizione Chromium li dice concessi finché l'utente non ha detto no (il controllo è solo sì o
-// no): se il sì c'è davvero lo sa il main, e il preload lo dice annullando questo evento (#1057).
+// Fotocamera, microfono, posizione e MIDI Chromium li dice concessi finché l'utente non ha detto no (il controllo è solo
+// sì o no): se il sì c'è davvero lo sa il main, e il preload lo dice annullando questo evento (#1057).
 const SI_DATO = 'filo:permesso-si:';
-const PARTI_LETTE = { camera: 'video', microphone: 'audio', geolocation: 'posizione' };
+const PARTI_LETTE = { camera: 'video', microphone: 'audio', geolocation: 'posizione', midi: 'strumenti' };
 
 // Un'espressione che vale la funzione da applicare a ogni finestra: la pagina e i riquadri vuoti che si crea, che
 // leggono e chiedono come lei (#1057).
