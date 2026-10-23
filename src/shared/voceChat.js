@@ -166,6 +166,7 @@
       imposta('avvio');
       c.toccato = false;
       c.preso = false;
+      c.perche = '';
       if (document.activeElement !== campo) caretInFondo(campo);
       c.lasciato = campo.value;
       c.daSolo = await impostazioneFresca();
