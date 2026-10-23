@@ -64,6 +64,21 @@ test('DIMENTICA nasconde (costo 1, si rimette dal quaderno); il «per sempre» �
   assert.ok(d.split('\n')[0].length < 70, 'la prima riga fa da bottone: resta corta');
 });
 
+test('DIMENTICA: il popup di una riga sola parla al singolare fino in fondo, anche nel «per sempre» (#592.23)', () => {
+  const una = AL.describe({ type: 'DIMENTICA', _righe: ['L’utente non beve caffè.'] });
+  assert.ok(una.includes('questa riga'));
+  assert.ok(una.includes('Non entrerà più nelle conversazioni. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.'), una);
+  assert.ok(!/entreranno|ritrovi nascoste|rimetterle/.test(una), una);
+  const unaPerSempre = AL.describe({ type: 'DIMENTICA', _righe: ['x'], per_sempre: true });
+  assert.ok(unaPerSempre.includes('Non entrerà più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.'), unaPerSempre);
+  assert.ok(!unaPerSempre.includes('entreranno'), unaPerSempre);
+  const due = AL.describe({ type: 'DIMENTICA', _righe: ['a', 'b'] });
+  assert.ok(due.includes('queste 2 righe'));
+  assert.ok(due.includes('Non entreranno più nelle conversazioni. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.'), due);
+  const duePerSempre = AL.describe({ type: 'DIMENTICA', _righe: ['a', 'b'], per_sempre: true });
+  assert.ok(duePerSempre.includes('Non entreranno più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.'), duePerSempre);
+});
+
 test('NAVIGA con flag anti-esfiltrazione sale a costo 2', () => {
   // Il flag `_exfil` lo inietta il main (taint-match in urlExfil.js), mai l'LLM:
   // un link che porta fuori dati sensibili deve chiedere conferma, non aprirsi.
