@@ -54,7 +54,8 @@ function crea(dip = {}) {
     if (!c.finestre) return;
     if (visto.ora === ora && c.schede <= visto.schede && c.finestre <= visto.finestre) return;
     visto = { ora, schede: Math.max(c.schede, visto.ora === ora ? visto.schede : 0), finestre: Math.max(c.finestre, visto.ora === ora ? visto.finestre : 0) };
-    scrivi(() => true);
+    // I numeri di adesso: quando la scrittura arriva, una scheda può essere già stata chiusa.
+    scrivi((o) => F.registraSchede(o, c.schede, c.finestre));
   }
 
   // Le finestre cambiano stato senza che si conti niente: lo stato nuovo entra nell'ora con una scrittura vuota.
