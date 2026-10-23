@@ -253,11 +253,12 @@ async function iconaDi(p) {
   return foglio();
 }
 
-async function trascina(wc, chiave) {
+// `da`: il webContents dove è partito il trascinamento (lo strato dei riquadri sopra la scheda, o la scheda).
+async function trascina(wc, chiave, da = wc) {
   const p = percorsoDi(wc, chiave);
   if (!p || !esiste(p)) return nonCe;
   try {
-    wc.startDrag({ file: p, icon: await iconaDi(p) });
+    da.startDrag({ file: p, icon: await iconaDi(p) });
     return { ok: true };
   } catch (_) {
     return { ok: false, frase: 'Non sono riuscito a prendere il file: aprilo dalla sua cartella e trascinalo da lì' };

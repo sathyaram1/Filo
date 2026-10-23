@@ -127,7 +127,8 @@ module.exports = function register(on, ctx) {
       cartella: msg.cartella,
       origine,
       avanzamento: (fatti, totali) => {
-        try { (sender.frame || wc).send('filo:broadcast', { type: MSG.AIUTO_DOCUMENTI_AVANZAMENTO, fatti, totali }); } catch (_) {}
+        // Dall'Aiuto nello strato sopra il sito (#1509.3) l'avanzamento va a lui, non alla pagina.
+        try { (sender.strato || sender.frame || wc).send('filo:broadcast', { type: MSG.AIUTO_DOCUMENTI_AVANZAMENTO, fatti, totali }); } catch (_) {}
       },
     });
     if (r.ok) {
@@ -140,7 +141,8 @@ module.exports = function register(on, ctx) {
   on(MSG.AIUTO_DOCUMENTI_FERMA, daScheda(async (_msg, _sender, wc) => ({ ok: AiutoDoc.ferma(wc) })));
   on(MSG.AIUTO_APRI_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.apri(wc, msg.chiave)));
   on(MSG.AIUTO_MOSTRA_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.mostra(wc, msg.chiave)));
-  on(MSG.AIUTO_TRASCINA_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.trascina(wc, msg.chiave)));
+  // Il trascinamento parte dove l'utente ha preso il bottone: lo strato, se l'Aiuto sta lì.
+  on(MSG.AIUTO_TRASCINA_FILE, daScheda(async (msg, sender, wc) => AiutoDoc.trascina(wc, msg.chiave, sender.strato || wc)));
   on(MSG.DOCUMENTI_SCEGLI_CARTELLA, soloFilo(async (msg, sender) => {
     const { dialog, BrowserWindow } = electron();
     const win = (sender && sender.win) || BrowserWindow.getFocusedWindow() || undefined;
