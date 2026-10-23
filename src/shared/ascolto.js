@@ -225,8 +225,8 @@
     esito.contata = true;
     try {
       const r = chrome.runtime.sendMessage({
-        type: global.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'dettatura', motivo: esito.motivo, frasi: esito.frasi, invio,
-        provvisorie: !!esito.provvisorie,
+        type: global.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'dettatura', motivo: esito.motivo, frasi: esito.frasi,
+        invio: String(invio || ''), provvisorie: !!esito.provvisorie,
       });
       if (r && typeof r.catch === 'function') r.catch(() => {});
     } catch (_) {}
