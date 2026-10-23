@@ -759,7 +759,10 @@ function registerIpcHandlers() {
   ipcMain.handle('window:toggle-maximize', (event) => {
     const win = winFor(event);
     if (win) {
-      if (win.isMaximized()) win.unmaximize(); else win.maximize();
+      // A schermo intero il quadrato (scoperto con le schede dal bordo alto) non ha niente da massimizzare: ne esce.
+      const tabs = win._filoTabs;
+      if (tabs && tabs.contentFullscreen) tabs.setContentFullscreen(false);
+      else if (win.isMaximized()) win.unmaximize(); else win.maximize();
     }
     return { ok: true };
   });
