@@ -785,6 +785,7 @@
       const r = state.el.getBoundingClientRect();
       const u = state.riquadro;
       if (!u || r.left !== u.left || r.top !== u.top || r.width !== u.width || r.height !== u.height) syncOverlay(state);
+      else if (++state.fotogrammi % RITAGLIO_OGNI === 0) ritaglia(state);
       requestAnimationFrame(giro);
     };
     requestAnimationFrame(giro);
