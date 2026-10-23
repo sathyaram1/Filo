@@ -268,7 +268,7 @@
   const DOPO_PASSWORD = /^(?:\d+|confirm\w*|again|repeat|new|old|current|plain\w*|clear|raw|value)$/;
   function tipoDiNome(nome) {
     const parti = nome.split(/[_.:\s-]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean).map((p) => p.toLowerCase());
-    const pw = parti.findIndex((p) => PAROLA_CHIAVE.test(p) || /(?:password|passwd|passphrase)$/.test(p));
+    const pw = parti.findIndex((p) => PAROLA_CHIAVE.test(p.replace(/\d+$/, '')) || /(?:password|passwd|passphrase)\d*$/.test(p));
     if (pw >= 0 && parti.slice(pw + 1).every((p) => DOPO_PASSWORD.test(p))) return 'password';
     if (parti.some((p, i) => /^(?:secrets?|tokens?|credentials?)$/.test(p) || /(?:secret|token|apikey)$/.test(p)
       || (/^keys?$/.test(p) && i > 0 && QUALIFICA_CHIAVE.test(parti[i - 1])))) return 'segreto';
@@ -331,7 +331,8 @@
     for (const m of s.matchAll(COPPIA_UTENTE)) if (/[A-Za-z]/.test(m[1])) out.push({ valore: m[1], regola: 'password' });
     for (const riga of s.split('\n')) {
       if (CON_UTENTE.test(riga)) {
-        for (const m of riga.matchAll(OPZIONE_PASSWORD)) if (/[A-Za-z]/.test(m[2])) out.push({ valore: m[2], regola: 'password' });
+        // Solo con la forma di una password: in «mysql -u root -p mydb» dopo «-p» c'è il database.
+        for (const m of riga.matchAll(OPZIONE_PASSWORD)) if (FORMA_FORTE(m[2])) out.push({ valore: m[2], regola: 'password' });
       }
       for (const m of riga.matchAll(SOLO_REDIS)) out.push({ valore: m[2], regola: 'password' });
     }
@@ -343,7 +344,8 @@
   const TOKEN_TELEGRAM = /(?<![\w-])\d{8,10}:AA[A-Za-z0-9_-]{30,40}(?![\w-])/g;
   function chiaviInChiaro(s, out) {
     passwordDiComando(s, out);
-    for (const m of s.matchAll(CORPO_PEM)) out.push({ valore: m[1].replace(/^(?:\s|(?:\\r)?\\n)+/, ''), regola: 'chiave' });
+    // Col ritorno a capo in testa: dentro un JSON la «n» di «\n» toccherebbe il corpo, e il segnaposto cerca una parola intera.
+    for (const m of s.matchAll(CORPO_PEM)) out.push({ valore: m[1], regola: 'chiave' });
     for (const m of s.matchAll(TOKEN_TELEGRAM)) out.push({ valore: m[0], regola: 'token' });
     for (const m of s.matchAll(SEGRETO_ACCANTO)) {
       const v = formaDiSegreto(m[1].replace(/[.»”"']+$/, ''));

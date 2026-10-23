@@ -319,3 +319,37 @@ test('il telefono a cui parte il codice, il numero dell\'assistenza e la data di
   assert.equal(P.oscura('Il codice di verifica è 482 913'), `Il codice di verifica è ${S}`);
   assert.equal(P.oscura('Password: casa mia al mare 2019'), `Password: ${S}`);
 });
+
+test('il corpo di una chiave privata, la password di una riga di comando, un webhook e i codici di recupero non escono', () => {
+  const pem = (tipo, corpo) => `-----BEGIN ${tipo}PRIVATE KEY-----\n${corpo}\n-----END ${tipo}PRIVATE KEY-----`;
+  const segreti = {
+    [pem('OPENSSH ', 'b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACDkBvTqjD8mY3Jv5nQ2sXkzT7a9yH0b1fLqW3eR5cN4w')]: 'QyNTUxOQAAACDkBvTqjD8mY3Jv5nQ2sXkzT7a9yH0b1fLqW3eR5cN4w',
+    [pem('RSA ', 'MIIEpAIBAAKCAQEAx5mT2rXyQ4pQe9yLk3Vv8pZq1wF8aB2cD3eF4gH5iJ6kL7mN8oP9')]: 'MIIEpAIBAAKCAQEAx5mT2rXyQ4pQe9yLk3Vv8pZq1wF8aB2cD3eF4gH5iJ6kL7mN8oP9',
+    [pem('EC ', 'MHcCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY/PuoAoGCCqGSM49AwEHoUQDQgAE')]: 'MHcCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY',
+    '{"private_key": "-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\\nabcd1234EFGH\\n-----END PRIVATE KEY-----\\n"}': 'abcd1234EFGH',
+    'docker login -u mario -p Faro7Blu2024 registry.example.com': 'Faro7Blu2024',
+    'curl -u mario:Ponte9Grigio https://api.example.com/v1': 'Ponte9Grigio',
+    'smbclient //server/share -U mario%Girasole2024': 'Girasole2024',
+    'sqlcmd -S server -U sa -P Girasole2024': 'Girasole2024',
+    'redis-cli -a Girasole2024': 'Girasole2024',
+    'Webhook: https://discord.com/api/webhooks/123456789012345678/abcDEFghiJKLmnoPQRstuVWXyz1234567890abcdEFGH': 'abcDEFghiJKLmnoPQRstuVWXyz1234567890abcdEFGH',
+    'Il mio token di Telegram bot: 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw': 'AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw',
+    'Recovery codes\nKeep these somewhere safe.\n\n3f9a1-b2c7d\n8e4d0-a6f15\nc1b7e-90d2a\n77d3f-1e0b9\n4a2b1-9c8d7\n0e1f2-3a4b5\nDownload': '0e1f2-3a4b5',
+  };
+  for (const [t, s] of Object.entries(segreti)) assert.ok(!P.oscura(t).includes(s), t);
+  for (const t of ['docker run -u 1000:1000 -p 8080:80 nginx', 'ssh -l mario -p 2222 host.example.com', 'mysql -u root -p mydb',
+    'mkdir -p dir2 && cp -a src2 dst', 'https://github.com/x/y/settings/hooks/12345678']) assert.equal(P.oscura(t), t, t);
+  assert.ok(P.oscura('Recovery codes\n3f9a1-b2c7d\n8e4d0-a6f15\nKeep these in a safe place.').includes('Keep these in a safe place.'));
+});
+
+test('le etichette, i tempi e il codice accanto a una chiave password e le cifre finali di un telefono restano', () => {
+  for (const t of ['"password_label": "Inserisci la password",\n"forgot_password": "Password dimenticata?",\n"password_hint": "Almeno otto caratteri"',
+    'password_reset_timeout: 3600\ncache_ttl: 3600', 'def login(username: str, password: str) -> bool:\n    password = input("Password: ")',
+    'interface User { email: string; password: string }', 'password = getpass.getpass()',
+    'Abbiamo inviato un codice al numero che termina con 4567.', 'Abbiamo inviato un codice di verifica al ***4567']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  for (const [t, s] of Object.entries({ 'password_confirmation: Girasole2024': 'Girasole2024', 'password2 = "Nuvola2023x"': 'Nuvola2023x',
+    'Codice di verifica: 482913. Inviato al numero che termina con 4567': '482913' })) assert.ok(!P.oscura(t).includes(s), t);
+  assert.ok(P.oscura('Codice di verifica: 482913. Inviato al numero che termina con 4567').endsWith('termina con 4567'));
+});
