@@ -579,14 +579,17 @@
     const v = { ...box };
     let vuoto = false;
     const radiceDoc = document.documentElement;
-    for (let p = genitoreDi(el); p && !vuoto; p = genitoreDi(p)) {
+    // Chi è posato in assoluto non lo taglia un antenato statico fino al suo contenitore; chi è fissato, nessuno.
+    let fuga = window.getComputedStyle(el).position;
+    for (let p = fuga === 'fixed' ? null : genitoreDi(el); p && !vuoto; p = genitoreDi(p)) {
       // L'overflow di html e body taglia la finestra, che taglia già lo strato.
       if (p === radiceDoc || p === document.body) break;
       let cs;
       try { cs = window.getComputedStyle(p); } catch (_) { break; }
+      const posato = cs.position !== 'static';
       const x = cs.overflowX !== 'visible';
       const y = cs.overflowY !== 'visible';
-      if (x || y) {
+      if ((x || y) && (fuga !== 'absolute' || posato)) {
         const q = p.getBoundingClientRect();
         const l = q.left + p.clientLeft;
         const t = q.top + p.clientTop;
@@ -595,6 +598,7 @@
         vuoto = v.r <= v.l || v.b <= v.t;
       }
       if (cs.position === 'fixed') break;
+      if (posato) fuga = cs.position;
     }
     const coperti = vuoto ? [] : copertiSuiSegni(state, v, u.top + u.height);
     let clip = '';
