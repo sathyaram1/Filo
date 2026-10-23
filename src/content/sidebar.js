@@ -388,31 +388,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 .bolla img { width: auto; height: auto; max-width: 100%; max-height: 160px; }
 `;
 
-  function nAllegati(a = allegati) { return a.immagini.length + a.grandi.length; }
-
   function disegnaAllegati() {
     const host = root && root.querySelector('.sn-sidebar-allegati');
     if (!host) return;
-    host.hidden = !nAllegati();
+    host.hidden = !allegati.immagini.length;
     const o = ombraDi(host, CSS_ALLEGATI);
     for (const n of Array.from(o.childNodes)) if (n.localName !== 'style') n.remove();
     const riga = document.createElement('div');
     riga.className = 'riga';
-    const togli = (lista, voce) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'togli';
-      b.textContent = '×';
-      b.title = 'Togli';
-      b.setAttribute('aria-label', 'Togli dal messaggio');
-      b.addEventListener('click', (e) => {
-        if (!gestoVero(e)) return;
-        allegati[lista] = allegati[lista].filter((x) => x !== voce);
-        disegnaAllegati();
-        root?.querySelector('.sn-sidebar-input textarea')?.focus();
-      });
-      return b;
-    };
     for (const im of allegati.immagini) {
       const v = document.createElement('div');
       v.className = 'voce';
@@ -420,16 +403,19 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       const img = document.createElement('img');
       img.src = im.dataUrl;
       img.alt = im.nome || 'Immagine allegata';
-      v.append(img, togli('immagini', im));
-      riga.appendChild(v);
-    }
-    for (const g of allegati.grandi) {
-      const v = document.createElement('div');
-      v.className = 'voce file';
-      v.title = 'Oltre i 4 MB: Filo non la vede';
-      const nome = document.createElement('span');
-      nome.textContent = g.nome || 'Immagine';
-      v.append(nome, togli('grandi', g));
+      const togli = document.createElement('button');
+      togli.type = 'button';
+      togli.className = 'togli';
+      togli.textContent = '×';
+      togli.title = 'Togli';
+      togli.setAttribute('aria-label', 'Togli dal messaggio');
+      togli.addEventListener('click', (e) => {
+        if (!gestoVero(e)) return;
+        allegati.immagini = allegati.immagini.filter((x) => x !== im);
+        disegnaAllegati();
+        root?.querySelector('.sn-sidebar-input textarea')?.focus();
+      });
+      v.append(img, togli);
       riga.appendChild(v);
     }
     o.appendChild(riga);
