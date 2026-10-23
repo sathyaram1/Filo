@@ -591,7 +591,7 @@ module.exports = function register(on, ctx) {
     if (out && out.ok) {
       await markPending({ done: true });
       await setNotice('entry', W.entryNoticeText({ credits: out.credits, conteggioLocale: out.conteggioLocale }), { invitesLocked: out.invitesLocked });
-    } else if (out && out.status === 'network_cap') {
+    } else if (out && W.riscattoDaRiprovare(out.status)) {
       // L'invito resta in attesa e si riprova al prossimo avvio, ma chi l'ha scaricato apposta deve sapere perché non è entrato.
       await setNotice('failed', out.message);
     }
