@@ -218,6 +218,15 @@ module.exports = function register(on, ctx) {
       const pct = typeof scroll === 'number' ? scroll : null;
       // Per il giudizio sui siti la riapertura è di Filo: la chiedono solo le sue pagine (#814).
       const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
+      // Chi l'aveva chiusa e quanto fa (#1467): una scheda chiusa dalla pulizia e riaperta subito è un suo errore.
+      if (id && voce) {
+        const chiusa = Date.parse(voce.closedAt);
+        try {
+          globalThis.SN_CONTATORI_MAIN?.attivita('riaperte', {
+            chiusaDa: globalThis.SN_CONTATORI.chiusaDa(voce.reason), etaMs: Number.isFinite(chiusa) ? Math.max(0, Date.now() - chiusa) : null,
+          }, { incognito: !!win._filoIncognito });
+        } catch (_) {}
+      }
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
