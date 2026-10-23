@@ -273,6 +273,9 @@
     box.hidden = false;
     const note = $('walletNote');
     note.hidden = true;
+    const registro = W.registroScartateTesto(w.usageLog && w.usageLog.discardedBy);
+    $('usageLogNote').textContent = registro;
+    $('usageLogNote').hidden = !registro;
     // Senza nessuna chiave (né personale, né propria, né di fabbrica) il
     // conteggio locale non compra niente: saldo, ricarica a mezzanotte e
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
