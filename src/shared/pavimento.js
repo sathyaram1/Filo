@@ -205,7 +205,7 @@
       const v = m[1].trim();
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
-      if (INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p))) continue;
+      if (INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p))) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
     }
   }
