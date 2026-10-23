@@ -4640,12 +4640,6 @@ const LEGACY_CONTINUE_NUDGE =
   + 'usando questi dati (link ESATTI presi dai risultati, numeri presi dal testo), senza ripetere '
   + 'le stesse azioni. Se il compito è finito, rispondi senza eseguire altro.';
 
-// L'esito di UNA azione, come risposta allo strumento che il modello ha
-// chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
-// riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
-// conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
-// esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
-// e un modello che la ritenta lo farebbe comparire due volte.
 // I nomi delle schede li scrivono i siti: tornano recintati, coi perché di Filo fuori dal recinto.
 const PERCHE_RESTA_APERTA = {
   testo: 'Lasciate aperte perché hanno del testo scritto e non ancora inviato',
