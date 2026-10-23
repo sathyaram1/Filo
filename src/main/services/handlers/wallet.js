@@ -785,10 +785,10 @@ module.exports = function register(on, ctx) {
   // ── Registro d'uso ────────────────────────────────────────────────────────
   // Le righe si accodano e si scrivono a gruppi (una commit Firestore ogni
   // pochi secondi): una chat con strumenti fa più chiamate al turno, e una
-  // scrittura per chiamata sarebbe rumore. Se la scrittura fallisce si
-  // ritenta al giro dopo; la coda non cresce oltre un tetto largo, e oltre si
-  // perde il più vecchio dicendolo nel log (una riga persa la trova la
-  // riconciliazione, non è un segreto).
+  // scrittura per chiamata sarebbe rumore. Un guasto passeggero si ritenta al
+  // giro dopo; una riga che il server rifiuta esce dalla coda (#1601). Ogni
+  // riga che esce senza arrivare, anche oltre il tetto largo della coda, si
+  // conta per motivo (`scarta`).
   //
   // La coda sta anche su disco (#629): le righe ancora da scrivere alla
   // chiusura di Filo ripartono all'avvio dopo, invece di sparire con il
