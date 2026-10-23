@@ -1632,7 +1632,13 @@ class TabManager {
           const r = await decide({ tabs: input, trigger });
           decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
           giudizioMancato = false;
-        } catch (_) { decisions = []; }
+        } catch (e) {
+          decisions = [];
+          // Nel registro, o un giudizio mai arrivato si confonde con un «tieni tutto» voluto (#349).
+          console.warn(`[Filo] riordino delle schede (${trigger}): il modello non ha deciso:`, e?.message || e);
+        }
+      } else {
+        console.warn(`[Filo] riordino delle schede (${trigger}): manca chi decide, chiudo solo i doppioni`);
       }
 
       // I duplicati vincono sempre su un "tieni" dell'LLM.
