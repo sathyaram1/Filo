@@ -152,7 +152,10 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
       + `${e.compito ? ` · compito ${visibile(e.compito.stato || '')}` : ''}`);
   }
   if (x.notePerAgenti) righe.push('', 'Note per gli agenti', rientro(x.notePerAgenti));
-  if (x.stato === 'aperta') righe.push('', `Per rispondere: node scripts/domanda.mjs rispondi ${visibile(x.id || 'D-n')} --scelta N | --testo "…"`);
+  if (x.stato === 'aperta') {
+    righe.push('', `Per rispondere: node scripts/domanda.mjs rispondi ${visibile(x.id || 'D-n')} --scelta N [--testo "…"] | --testo "…"`
+      + ' (senza --scelta solo parole: nessuna azione)');
+  }
   return righe.join('\n');
 }
 
