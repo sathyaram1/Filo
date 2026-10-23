@@ -958,7 +958,7 @@ module.exports = function register(on, ctx) {
     if (!row) return;
     try { globalThis.SN_AVVISO_CREDITI_MAIN?.registraConsumo({ action, credits: row.credits, usage }); } catch (_) {}
     queue.push(row);
-    if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    tagliaCoda();
     await saveQueue();
     scheduleFlush(3000);
   }
