@@ -126,6 +126,25 @@ test('tre pagine da 60.000 token con un modello a finestra piccola: arriva la ri
   expect(nuove.length, `al secondo turno viste ${viste2}, al primo ${viste1}`).toBeGreaterThan(0);
 });
 
+test('con la finestra del modello già nota dal listino, le pagine si tagliano prima di mandare: nessun rifiuto, e l\'avviso c\'è', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await openTab(NEWTAB);
+  await tre(app, testServer);
+  await stub(app, PIANO_TRE);
+  await app.evaluate(() => {
+    const rq = process.mainModule.require;
+    const L = rq(rq('node:path').join(process.cwd(), 'src/main/services/costoModelli.js'));
+    L.listino = async () => ({});
+    L.finestra = () => (globalThis.__g.base ? Math.floor((globalThis.__g.base + 45000) / 3.5) : null);
+  });
+  await chiedi(page, 'cerca i sentieri delle dolomiti e leggimi le guide');
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA_UNO' });
+  await expect(bolla).toBeVisible({ timeout: 40_000 });
+  await expect(bolla).toContainText(/ho lasciato fuori|ho tenuto solo l'inizio/);
+  console.log('MISURE4', JSON.stringify(await app.evaluate(() => ({ rifiuti: globalThis.__g.rifiuti, base: globalThis.__g.base, car: globalThis.__g.chiamate.map((c) => c.car) }))));
+  expect(await app.evaluate(() => globalThis.__g.rifiuti)).toBe(0);
+});
+
 test('il rifiuto senza misure (solo «input troppo lungo»): la risposta arriva lo stesso, con l\'avviso', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   const page = await openTab(NEWTAB);
