@@ -84,6 +84,19 @@ test('la migrazione porta dai vecchi moduli cosa conta il conteggio e le scorcia
   assert.equal(P.migraConfig('editor', scelta, config).config['word-count'].count, 'paragraphs', 'quello che l\'utente ha già scelto vince');
 });
 
+test('uno strumento fuori dalla partenza con una scorciatoia sul vecchio modulo entra nel pannello, così il tasto funziona ancora', () => {
+  const collezione = { activeId: 'a', files: [{ id: 'a', modules: [
+    { type: 'undo', data: { shortcut: 'Ctrl+Shift+2' } },
+    { type: 'bold', data: { shortcut: 'Ctrl+G' } },
+    { type: 'italic', data: {} },
+  ] }] };
+  const migrato = P.migra('editor', null, collezione);
+  assert.deepEqual(migrato.elementi, ['word-count', 'search-replace', 'comment', 'undo', 'bold'], 'in fondo, nell\'ordine del catalogo; senza scorciatoia resta fuori');
+  assert.equal(migrato.config.bold.shortcut, 'Ctrl+G');
+  const tolto = P.togli('editor', P.normalizza('editor', null), 'comment');
+  assert.ok(!P.migra('editor', tolto, { activeId: 'a', files: [{ id: 'a', modules: [{ type: 'comment', data: {} }] }] }).elementi.includes('comment'), 'senza scorciatoia non rientra chi l\'utente aveva tolto');
+});
+
 test('chi parla con Filo nomina uno strumento a parole', () => {
   assert.equal(P.risolvi('editor', 'grassetto'), 'bold');
   assert.equal(P.risolvi('editor', 'il Conteggio'), 'word-count');
