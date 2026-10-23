@@ -97,9 +97,13 @@ class SchedeInAlto {
     else this._ferma('spinta');
   }
 
+  _cursore() {
+    return require('electron').screen.getCursorScreenPoint();
+  }
+
   _puntatoreSulBordo() {
     try {
-      const p = require('electron').screen.getCursorScreenPoint();
+      const p = this._cursore();
       const cb = this.win.getContentBounds();
       const sotto = this.tabs.vistaSottoIlVuoto();
       const v = sotto ? sotto.getBounds() : { x: 0, y: 0, width: cb.width };
