@@ -1702,7 +1702,6 @@ class TabManager {
       const CE = globalThis.SN_CHAT_ERRORS;
       perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
     } catch (_) {}
-    console.warn(`[Filo] pulizia delle schede (${trigger}) senza giudizio del modello:`, errore ? (errore.message || errore) : 'nessuna funzione di giudizio');
     if (this._giudizioMancatoDetto === perche) return;
     this._giudizioMancatoDetto = perche;
     const testo = `La pulizia automatica non è riuscita a valutare le schede.${perche ? ` ${perche}` : ''}`;
