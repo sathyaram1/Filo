@@ -507,40 +507,55 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     else if (collapsed) expand({ ai: false });
     return true;
   }
-  function allegatiArrivati({ grandi = 0, rotte = 0 } = {}) {
+  // Quello che non entra lo si dice, tutto in un avviso: nessun file lasciato sparisce in silenzio.
+  function allegatiArrivati({ grandi = 0, rotte = 0, altri = 0 } = {}) {
     disegnaAllegati();
-    if (grandi) Popup?.showToast?.(Allegati.fraseTroppoGrandiAiuto(grandi));
-    else if (rotte) Popup?.showToast?.(Allegati.fraseIlleggibili(rotte));
+    const frasi = [];
+    if (grandi) frasi.push(Allegati.fraseTroppoGrandiAiuto(grandi));
+    if (rotte) frasi.push(Allegati.fraseIlleggibili(rotte));
+    if (altri) frasi.push(Allegati.fraseNonImmaginiAiuto(altri));
+    if (frasi.length) Popup?.showToast?.(frasi.join(' '));
     try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
   }
+  const conta = (n) => Math.max(0, Math.floor(Number(n) || 0));
 
-  // Torna se l'Aiuto le ha prese (anche solo per dire perché non entrano).
+  async function allegaUna(blob, nome, conti) {
+    const dataUrl = blob.size > Allegati.tettoImmagineByte ? await rimpicciolita(blob) : await leggiImmagine(blob);
+    if (dataUrl) allegati.immagini.push({ dataUrl, nome });
+    else conti.rotte += 1;
+  }
+
+  // Tutti i file lasciati: le immagini entrano, degli altri si dice che all'Aiuto non vanno. Torna se l'Aiuto le ha
+  // prese (anche solo per dire perché non entrano).
   async function allega(files) {
-    const lista = Array.from(files || []).filter((f) => f && /^image\//i.test(f.type || ''));
+    const tutti = Array.from(files || []).filter(Boolean);
+    const lista = tutti.filter((f) => /^image\//i.test(f.type || ''));
     if (!lista.length) return false;
     const pronto = pannelloPerAllegati();
     if (!pronto) return pronto === null;
-    let grandi = 0;
-    let rotte = 0;
+    const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
     for (const f of lista) {
-      if (f.size > Allegati.tettoImmagineByte) { grandi += 1; continue; }
-      const dataUrl = await leggiImmagine(f);
+      if (f.size > Allegati.tettoLetturaByte) { conti.grandi += 1; continue; }
+      await allegaUna(f, f.name || '', conti);
       if (!root) return true;
-      if (dataUrl) allegati.immagini.push({ dataUrl, nome: f.name || '' });
-      else rotte += 1;
     }
-    allegatiArrivati({ grandi, rotte });
+    allegatiArrivati(conti);
     return true;
   }
 
-  // Dal main (CHAT_ALLEGA): le immagini lasciate sulla fila delle schede o sulla barra, già lette e misurate.
-  function allegaDaFuori({ immagini = [], grandi = 0 } = {}) {
+  // Dal main (CHAT_ALLEGA): le immagini lasciate sulla fila delle schede, sulla barra o in un riquadro, già lette.
+  async function allegaDaFuori({ immagini = [], grandi = 0, altri = 0 } = {}) {
     const buone = (Array.isArray(immagini) ? immagini : []).filter((im) => im && /^data:image\//i.test(String(im.dataUrl || '')));
-    const fuori = Math.max(0, Math.floor(Number(grandi) || 0));
-    if (!buone.length && !fuori) return false;
+    const conti = { grandi: conta(grandi), rotte: 0, altri: conta(altri) };
+    if (!buone.length && !conti.grandi && !conti.altri) return false;
     if (!pannelloPerAllegati()) return false;
-    for (const im of buone) allegati.immagini.push({ dataUrl: im.dataUrl, nome: typeof im.nome === 'string' ? im.nome : '' });
-    allegatiArrivati({ grandi: fuori });
+    for (const im of buone) {
+      const nome = typeof im.nome === 'string' ? im.nome : '';
+      if (byteDi(im.dataUrl) <= Allegati.tettoImmagineByte) allegati.immagini.push({ dataUrl: im.dataUrl, nome });
+      else await allegaUna(blobDa(im.dataUrl), nome, conti);
+      if (!root) return true;
+    }
+    allegatiArrivati(conti);
     return true;
   }
 
