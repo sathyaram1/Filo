@@ -477,4 +477,11 @@ function stratoDellaPagina(wc) {
   return null;
 }
 
-module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, ancoraNellaVista, INDIRIZZO, TIPI };
+// AIUTO_ALLA_PAGINA: solo uno strato chiede, e solo alla sua pagina.
+function aiutoAllaPagina(stratoWc, op, args) {
+  const r = stratoWc ? perVista.get(stratoWc) : null;
+  if (!r || !vivo(r.s.wc)) return Promise.resolve({ ok: false });
+  return r.strato._allaPagina(r.s, String(op || ''), args);
+}
+
+module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, aiutoAllaPagina, ancoraNellaVista, INDIRIZZO, TIPI, OP_PAGINA };
