@@ -11,8 +11,7 @@
     'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp',
   ]);
 
-  // Documenti passivi per MIME esplicito, da tenere uguale a storage.rules.
-  // NIENTE text/html, application/xhtml+xml, text/xml.
+  // Documenti passivi per MIME esplicito. NIENTE text/html, application/xhtml+xml, text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
     // Col tipo esplicito perché il deposito li accetta: senza, la riga di comando mandava
