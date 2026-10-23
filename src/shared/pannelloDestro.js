@@ -1,6 +1,6 @@
 // Il pannello di destra di un'app di Filo, nella sua pagina (#1433): striscia sul bordo, elementi scelti, «+» col
 // catalogo, trascinamenti, lucchetto. Gli elementi li disegna l'app; quali sono e come li conserva il main.
-// Regole: patterns/a-sinistra-filo-a-destra-l-app.md
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 (function (global) {
   'use strict';

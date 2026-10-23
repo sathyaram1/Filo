@@ -1,6 +1,6 @@
 // Gli elementi dei pannelli di destra delle app di Filo, letti e scritti da UN posto: la pagina manda la mossa, il main
 // la mette in fila dietro la precedente e annuncia il risultato a tutte le pagine di Filo aperte.
-// Regole: patterns/a-sinistra-filo-a-destra-l-app.md
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const { BrowserWindow } = require('electron');
 const storage = require('../shim/storage');

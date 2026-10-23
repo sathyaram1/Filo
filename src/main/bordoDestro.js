@@ -1,6 +1,6 @@
 // Il bordo destro delle pagine di Filo che hanno un pannello (#1433): la sosta del puntatore, la striscia che si
 // accende mentre aspetta, il tasto e la chiusura di chi se ne va senza entrare. Il pannello lo disegna la pagina.
-// Regole: patterns/a-sinistra-filo-a-destra-l-app.md
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 // Le stesse misure della barra di sinistra (barraLaterale.js): la fascia del sistema e la zona di chi si avvicina.
 const BORDO = 5;

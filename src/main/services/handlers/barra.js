@@ -1,6 +1,6 @@
 // Handler della barra laterale (#871: azioni della pagina, Aiuto, risposte da leggere; aperti ai siti, non leggono
 // dati né la disposizione delle icone) e del pannello di destra delle app (#1433: solo pagine di Filo).
-// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md, patterns/a-sinistra-filo-a-destra-l-app.md
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const RisposteInAttesa = require('../../risposteInAttesa');
 const Pannelli = require('../pannelliApp');
