@@ -1554,6 +1554,7 @@
     inVolo += 1;
     try { await turno(op); } finally {
       inVolo -= 1;
+      segnaSessione();
       // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
       if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
     }
