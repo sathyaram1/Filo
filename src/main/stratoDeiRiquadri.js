@@ -15,6 +15,8 @@ const TESTO_MAX = 4 * 1024 * 1024;
 // Un ultimo punto del puntatore sulla scheda vale come ancora di una risposta chiesta da un riquadro incorporato.
 const PUNTATORE_MS = 15000;
 const ID_MAX = 80;
+// Uno strato rimasto vuoto resta pronto per il riquadro dopo, poi se ne va: ogni strato è un processo.
+const VUOTO_MS = 60000;
 
 // Le viste vive, per webContents: chi parla da qui parla come la pagina sotto (src/main/ipc.js, senderInfo).
 const perVista = new Map();
@@ -71,14 +73,26 @@ class StratoDeiRiquadri {
     if (pesa(dati) > DATI_MAX_BYTE) return { ok: false, error: 'troppo', limite: DATI_MAX_BYTE };
     const s = this._strato(wc);
     if (!s) return { ok: false };
+    clearTimeout(s.timerVuoto);
     const id = `r${++this.seq}`;
     const richiesta = { id, tipo, dati: this._datiPuliti(tipo, dati, sender, wc), pagina: this._pagina(wc) };
     if (tipo === 'modifica') s.inPagina.set(id, sender.frame || null);
     // Chi apre un riquadro scrive lì: la tastiera va allo strato appena c'è.
     s.vuoleTastiera = true;
-    if (s.pronta) this._manda(s, 'riquadri:apri', richiesta);
+    if (s.pronta) this._consegna(s, richiesta);
     else s.coda.push(richiesta);
     return { ok: true, id };
+  }
+
+  // Il riquadro si posa sulle misure della finestra dello strato: prima di aprirlo lo strato prende quelle della pagina,
+  // o una risposta nata in uno strato largo zero sceglierebbe il lato sbagliato e non lo cambierebbe più.
+  _consegna(s, richiesta) {
+    const b = this._area(s.wc);
+    if (b) {
+      s.vista.setBounds(b);
+      this._inCima(s);
+    }
+    this._manda(s, 'riquadri:apri', { ...richiesta, misura: b ? { w: b.width, h: b.height } : null });
   }
 
   _datiPuliti(tipo, dati, sender, wc) {
@@ -120,6 +134,8 @@ class StratoDeiRiquadri {
       s.riquadri = Math.max(0, Math.min(1000, Number(d && d.riquadri) || 0));
       s.modale = !!(d && d.modale);
       if (!s.aperti && prima) this._restituisci(s);
+      clearTimeout(s.timerVuoto);
+      if (!s.aperti) s.timerVuoto = setTimeout(() => { if (!s.aperti && this.strati.get(s.wc) === s) this._butta(s); }, VUOTO_MS);
       this.posa();
       return;
     }
@@ -226,6 +242,18 @@ class StratoDeiRiquadri {
     return s && s.visibile && this._haTastiera(s) ? s.vista.webContents : null;
   }
 
+  // Quello che l'utente vede sopra la pagina: i gesti del vuoto delle viste più in alto vanno qui, non alla pagina.
+  vistaSopra(wc) {
+    const s = this.strati.get(wc);
+    return s && s.visibile ? s.vista : null;
+  }
+
+  // Con un riquadro che copre la pagina (feedback, Modifica, red-team) la tastiera che torna alla scheda va a lui.
+  tastieraPer(wc) {
+    const s = this.strati.get(wc);
+    return s && s.visibile && s.modale && vivo(s.vista.webContents) ? s.vista.webContents : null;
+  }
+
   stato(wc) {
     const s = this.strati.get(wc);
     if (!s) return null;
@@ -309,13 +337,14 @@ class StratoDeiRiquadri {
       // I px dello strato devono essere quelli della scheda: uno zoom rimasto sull'host «riquadri» li sposterebbe.
       try { v.setZoomFactor(1); } catch (_) {}
       s.pronta = true;
-      for (const r of s.coda.splice(0)) this._manda(s, 'riquadri:apri', r);
+      for (const r of s.coda.splice(0)) this._consegna(s, r);
       this.posa();
     });
     v.on('zoom-changed', () => { try { v.setZoomFactor(1); } catch (_) {} });
     v.on('render-process-gone', () => this._butta(s));
     // Carica FUORI dalla finestra (ci entra alla prima posa): dentro si prenderebbe la tastiera di chi scrive.
-    v.loadURL(INDIRIZZO);
+    // L'ancora dice di quale pagina è: con più schede gli strati sono uguali.
+    v.loadURL(`${INDIRIZZO}#${wc.id}`);
     return s;
   }
 
@@ -326,6 +355,7 @@ class StratoDeiRiquadri {
   }
 
   _butta(s) {
+    clearTimeout(s.timerVuoto);
     if (this.strati.get(s.wc) === s) this.strati.delete(s.wc);
     const aveva = s.visibile && this._haTastiera(s);
     s.visibile = false;
@@ -344,11 +374,10 @@ function paginaDelloStrato(wc) {
   return { wc: r.s.wc, win: r.strato.win };
 }
 
-// Ogni strato vivo, con la pagina sotto: le spinte che vanno alla pagina vanno anche a lui, ritagliate per lei.
-function stratiVivi() {
-  const out = [];
-  for (const [wc, r] of perVista) if (vivo(wc) && vivo(r.s.wc) && r.s.pronta) out.push({ wc, pagina: r.s.wc, win: r.strato.win });
-  return out;
+// Lo strato pronto sopra una pagina: le spinte che vanno alla pagina vanno anche a lui, ritagliate per lei.
+function stratoDellaPagina(wc) {
+  for (const [v, r] of perVista) if (r.s.wc === wc && r.s.pronta && vivo(v)) return v;
+  return null;
 }
 
-module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratiVivi, ancoraNellaVista, INDIRIZZO, TIPI };
+module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, ancoraNellaVista, INDIRIZZO, TIPI };

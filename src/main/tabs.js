@@ -54,6 +54,7 @@ const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 const { AvvisoSchermoPieno, partiDellAvviso } = require('./avvisoSchermoPieno');
 const { PropostaEmail } = require('./propostaEmail');
+const { StratoDeiRiquadri } = require('./stratoDeiRiquadri');
 const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
 const SchedeChiuse = require('./tabs/schedeChiuse');
@@ -483,6 +484,17 @@ class TabManager {
       },
       scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url } : null; },
       barra: () => this.barra || null,
+    });
+    // I riquadri di Filo sopra un sito (#1509.1): subito sopra la loro scheda, sotto avvisi, conferme, barra e menu.
+    this.riquadri = new StratoDeiRiquadri(window, {
+      area: (wc) => {
+        const t = schedaDavanti();
+        if (!t || !t.view || t.view.webContents !== wc || this._attivaNascosta) return null;
+        if (this.avvisoSito && this.avvisoSito.coperta() === t) return null;
+        return t.view.getBounds();
+      },
+      sopraA: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return (t && t.view) || null; },
+      scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url, title: t.title } : null; },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
@@ -2223,14 +2235,15 @@ class TabManager {
     if (!tab) return null;
     const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    return domanda || avviso || tab.view || null;
+    const riquadri = this.riquadri ? this.riquadri.vistaSopra(tab.view.webContents) : null;
+    return domanda || avviso || riquadri || tab.view || null;
   }
 
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
     const avviso = this.avvisoSito.coperta() === tab ? this.avvisoSito.webContents() : null;
-    const dest = avviso || tab.view.webContents;
+    const dest = avviso || this.riquadri.tastieraPer(tab.view.webContents) || tab.view.webContents;
     const col = require('electron').webContents.getFocusedWebContents();
     if (col === this.win.webContents || col === dest) return;
     try { dest.focus(); } catch (_) {}
@@ -2616,6 +2629,7 @@ class TabManager {
     this._attivaNascosta = !visible;
     if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
     this.avvisoSito.nascondi(!visible);
+    this.riquadri.posa();
     this.schermoPieno.posa();
     this.propostaEmail.posa();
     this.strato.posa();
@@ -2655,6 +2669,7 @@ class TabManager {
     this.riserva.posa();
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
+    this.riquadri.posa();
     this.avvisi.posa();
     this.schermoPieno.posa();
     this.propostaEmail.posa();
@@ -2863,6 +2878,11 @@ class TabManager {
       }
       // Con l'email proposta sotto un campo, frecce, Invio ed Esc scelgono o la chiudono prima della pagina e della modalità.
       if (this.propostaEmail.tasto(wc, input)) {
+        event.preventDefault();
+        return;
+      }
+      // Un riquadro di Filo aperto sopra la pagina si chiude prima della modalità, come quando stava nel documento.
+      if (this.riquadri.tasto(wc, input)) {
         event.preventDefault();
         return;
       }
@@ -3629,6 +3649,18 @@ class TabManager {
   // La finestrella è una pagina del sito come una scheda: il suo menu del tasto destro sta nel suo strato (#1054), mai
   // nel documento, che è proprio quello dove si incollano le password.
   _stratoNellaFinestrella(win, pwc) {
+    // Anche i riquadri di Filo (#1509.1): fuori dal documento dove si scrive la password.
+    const riquadri = new StratoDeiRiquadri(win, {
+      area: (wc) => {
+        if (wc !== pwc || win.isDestroyed()) return null;
+        const [width, height] = win.getContentSize();
+        return { x: 0, y: 0, width, height };
+      },
+      scheda: (wc) => (wc === pwc && !pwc.isDestroyed() ? { id: `finestrella-${pwc.id}`, url: pwc.getURL(), title: pwc.getTitle() } : null),
+    });
+    win._filoRiquadri = riquadri;
+    win.on('resize', () => riquadri.posa());
+    pwc.on('before-input-event', (e, input) => { if (riquadri.tasto(pwc, input)) e.preventDefault(); });
     const strato = new StratoDelMenu(win, {
       schedaAttiva: () => (pwc.isDestroyed() ? null : pwc),
       area: () => {

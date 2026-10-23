@@ -7340,6 +7340,7 @@ const handlerCtx = {
 require('./handlers/nav')(on, handlerCtx);
 require('./handlers/barra')(on, handlerCtx);
 require('./handlers/stratoMenu')(on, handlerCtx); // #1054 — il menu del tasto destro nello strato sopra la scheda
+require('./handlers/riquadri')(on, handlerCtx); // #1509.1 — i riquadri di Filo su un sito nello strato sopra la scheda
 require('./handlers/tabs')(on, handlerCtx);
 require('./handlers/storage')(on, handlerCtx);
 require('./handlers/pages')(on, handlerCtx);

@@ -23,9 +23,10 @@ test('il feedback aperto su un sito: scritto, selezionato tutto e copiato, il si
   const p = await testServer.openReady(openTab, pagina);
   await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
   await expect.poll(() => statoDi(app, p, '.sn-fb-text')).not.toBeNull();
-  await scrivi(app, p, '.sn-fb-text', SEGRETO);
-  await p.keyboard.press('ControlOrMeta+A');
-  await p.keyboard.press('ControlOrMeta+C');
+  const strato = await scrivi(app, p, '.sn-fb-text', SEGRETO);
+  expect((await statoDi(app, p, '.sn-fb-text')).valore).toBe(SEGRETO);
+  await strato.keyboard.press('ControlOrMeta+A');
+  await strato.keyboard.press('ControlOrMeta+C');
   await p.waitForTimeout(400);
   const letti = await p.evaluate(() => window.__letti.join(' | '));
   expect(letti).not.toContain('zibaldone');

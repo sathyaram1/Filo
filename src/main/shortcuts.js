@@ -135,6 +135,9 @@ function dispatchOra(command, window) {
     try {
       const frame = wc._filoActiveFrame;
       if (frame && !frame.detached) target = frame;
+      // Con la tastiera nei riquadri sopra la pagina (#1509.1) la selezione è la loro.
+      const strato = tm.riquadri && tm.riquadri.conTastiera(wc);
+      if (strato) target = strato;
     } catch (_) { target = wc; }
   }
   try { target.send('shortcut:triggered', { command }); } catch (_) {
