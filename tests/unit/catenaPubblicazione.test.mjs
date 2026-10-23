@@ -97,9 +97,116 @@ describe('i segreti si leggono solo dentro l\'ambiente rilascio', () => {
     const rel = WORKFLOW.find((w) => w.nome === 'release.yml');
     assert.ok(rel, 'manca release.yml');
     const per = Object.fromEntries(jobs(rel.testo).map((j) => [j.nome, ambiente(j.testo)]));
-    for (const n of ['scegli', 'release', 'release-mac', 'release-linux']) {
+    for (const n of ['scegli', 'avviso-cancello', 'release', 'release-mac', 'release-linux']) {
       assert.equal(per[n], AMBIENTE, `il job ${n} di release.yml deve stare nell'ambiente ${AMBIENTE}`);
     }
+  });
+});
+
+// #1139.1: le prove sono codice che nessuna fusione legge per intero. Dove girano possono riscrivere i file che girano
+// dopo e leggere quello che il job ha in mano, anche dalla memoria della macchina: lì niente segreti, niente ambiente,
+// niente scrittura. Chiavi e scrittura stanno in un job che le prove non le fa girare.
+const PROVE = /unit-con-riprova|run-unit-tests|rossi-sulla-punta|unit-fusione-azione|playwright test|\bnpm (?:run )?test\b|node --test\b/;
+
+/** Le righe di permesso che un job vede: le sue se le dichiara, se no quelle del workflow; null se non le dichiara nessuno. */
+function permessi(testoWorkflow, testoJob) {
+  const blocco = (testo, rientro) => {
+    const righe = senzaCommenti(testo).split('\n');
+    const i = righe.findIndex((r) => new RegExp(`^ {${rientro}}permissions:`).test(r));
+    if (i < 0) return null;
+    const subito = righe[i].replace(/^\s*permissions:/, '').replace(/\s+#.*$/, '').trim();
+    if (subito) return [subito];
+    const sotto = [];
+    for (const r of righe.slice(i + 1)) {
+      if (!new RegExp(`^ {${rientro + 2}}\\S`).test(r)) break;
+      sotto.push(r.replace(/\s+#.*$/, '').trim());
+    }
+    return sotto;
+  };
+  return blocco(testoJob, 4) ?? blocco(testoWorkflow.split(/^jobs:\s*$/m)[0], 0);
+}
+
+function proveScoperte(testo) {
+  return jobs(testo).filter((j) => PROVE.test(senzaCommenti(j.testo))).flatMap((j) => {
+    const problemi = [];
+    const s = [...new Set(segreti(j.testo))];
+    if (s.length) problemi.push(`legge ${s.join(', ')}`);
+    if (ambiente(j.testo) !== null) problemi.push(`sta nell'ambiente «${ambiente(j.testo)}»`);
+    const p = permessi(testo, j.testo);
+    if (!p) problemi.push('non dichiara permessi, e il predefinito del repo può scrivere');
+    else if (p.some((x) => /\bwrite\b|write-all/.test(x))) problemi.push(`può scrivere (${p.join(', ')})`);
+    return problemi.map((x) => `${j.nome} fa girare prove e ${x}`);
+  });
+}
+
+describe('le prove girano dove non ci sono chiavi né permessi di scrittura', () => {
+  for (const { nome, testo } of WORKFLOW) {
+    test(`${nome}: chi fa girare prove non ha segreti, ambiente né scrittura`, () => {
+      assert.deepEqual(proveScoperte(testo), [],
+        `in ${nome} una prova potrebbe riscrivere quello che gira dopo con le chiavi, o leggerle: le prove vanno in un job a parte`);
+    });
+  }
+
+  test('la regola riconosce il cancello che girava accanto alle chiavi', () => {
+    const wf = (cima, lavoro) => `on: workflow_dispatch\n${cima}jobs:\n  lavoro:\n    runs-on: windows-latest\n${lavoro}    steps:\n      - name: x\n        run: node scripts/unit-con-riprova.mjs --registro unit.log\n`;
+    const SCRIVE = 'permissions:\n  contents: write            # pubblicare\n';
+    assert.equal(proveScoperte(wf(SCRIVE, '    environment: rilascio\n')).length, 2, 'ambiente e scrittura ereditata');
+    assert.equal(proveScoperte(wf(SCRIVE, '')).length, 1, 'la scrittura ereditata dal workflow');
+    assert.equal(proveScoperte(wf('', '')).length, 1, 'senza permessi dichiarati vale il predefinito del repo');
+    assert.deepEqual(proveScoperte(wf(SCRIVE, '    permissions:\n      contents: read\n')), [], 'i permessi del job valgono su quelli del workflow');
+    assert.deepEqual(proveScoperte(wf('', '    permissions: write-all\n')).length, 1);
+    assert.equal(proveScoperte(wf('permissions:\n  contents: read\n', '    env:\n      K: ${{ secrets.FILO_BUILD_PASSPHRASE }}\n')).length, 1, 'un segreto nel job');
+    assert.deepEqual(proveScoperte(wf('permissions:\n  contents: read\n', '')), []);
+  });
+
+  describe('release.yml: gli unit del cancello stanno in un job a parte', () => {
+    const rel = WORKFLOW.find((w) => w.nome === 'release.yml');
+    const per = Object.fromEntries(jobs(rel.testo).map((j) => [j.nome, j.testo]));
+    const condizione = (n) => (senzaCommenti(per[n]).match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
+    const passiDi = (n) => senzaCommenti(per[n].slice(per[n].search(/^ {4}steps:/m)));
+
+    test('il cancello rifà gli unit e i rossi sulla punta, in sola lettura e senza credenziali sul disco', () => {
+      assert.ok(per.cancello, 'manca il job `cancello`: gli unit tornerebbero accanto alle chiavi');
+      assert.match(per.cancello, /node scripts\/unit-con-riprova\.mjs --registro unit\.log/);
+      assert.match(per.cancello, /rossi-sulla-punta\.mjs/);
+      assert.deepEqual(permessi(rel.testo, per.cancello), ['contents: read']);
+      const checkout = passiDi('cancello').split(/\n(?= {6}- )/).filter((p) => /uses:\s*actions\/checkout@/.test(p));
+      assert.ok(checkout.length >= 1);
+      for (const p of checkout) {
+        assert.match(p, /persist-credentials:\s*false/, 'il token del checkout resterebbe nella configurazione di git, leggibile dalle prove');
+      }
+    });
+
+    test('si pubblica solo col cancello verde', () => {
+      const se = condizione('release');
+      assert.match(per.release, /^ {4}needs:\s*\[[^\]]*\bcancello\b/m);
+      const corsa = (cancello, outputs) => ({ needs: { scegli: { result: 'success', outputs: { sha: 'a'.repeat(40) } }, cancello: { result: cancello, outputs } } });
+      assert.equal(valutaCondizione(se, corsa('success', { should_release: 'true', unit: 'success' })), true);
+      assert.equal(valutaCondizione(se, corsa('success', { should_release: 'true', unit: 'failure' })), false, 'unit rossi tollerati: si pubblicherebbe');
+      assert.equal(valutaCondizione(se, corsa('failure', { should_release: 'true', unit: 'failure' })), false);
+      assert.equal(valutaCondizione(se, corsa('success', { should_release: 'false', unit: 'skipped' })), false, 'niente di nuovo: niente numero di versione');
+      assert.equal(valutaCondizione(se, corsa('skipped', {})), false);
+    });
+
+    test('il feedback del cancello rosso lo apre un job con la parola d\'ordine ma senza installazione né prove', () => {
+      const se = condizione('avviso-cancello');
+      const corsa = (result, unit, cancellata = false) => ({ cancellata, needs: { scegli: { result: 'success', outputs: {} }, cancello: { result, outputs: { unit } } } });
+      assert.equal(valutaCondizione(se, corsa('failure', 'failure')), true, 'un cancello rosso senza feedback ferma le pubblicazioni in silenzio');
+      assert.equal(valutaCondizione(se, corsa('success', 'success')), false);
+      assert.equal(valutaCondizione(se, corsa('failure', 'skipped')), false, 'npm ci rosso: gli unit non sono partiti');
+      assert.equal(valutaCondizione(se, corsa('failure', 'failure', true)), false);
+      assert.match(per['avviso-cancello'], /secrets\.FILO_BUILD_PASSPHRASE/);
+      assert.match(passiDi('avviso-cancello'), /build-alarm\.mjs [^\n]*--chiavi-unit esiti-cancello\/unit\.log/);
+      assert.doesNotMatch(passiDi('avviso-cancello'), /npm-ci-ritenta|^\s*(?:run:\s*)?(?:npm|npx|yarn|pnpm)\s/m,
+        'chi legge la parola d\'ordine non esegue dipendenze');
+    });
+
+    test('quello che esce dal cancello non entra nei comandi dei job con le chiavi', () => {
+      for (const [n, testo] of Object.entries(per)) {
+        if (!segreti(testo).length) continue;
+        assert.doesNotMatch(passiDi(n), /needs\.cancello\.outputs/, `${n}: un'uscita del job delle prove scritta in un comando diventa codice`);
+      }
+    });
   });
 });
 
