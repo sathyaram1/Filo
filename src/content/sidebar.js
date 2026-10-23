@@ -299,7 +299,7 @@
 
   // ---------- Lo stato per la barra laterale (#1432) ----------
 
-  const CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false });
+  const CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false, angolo: false });
   // Nel documento di un sito: il pannello sta nello strato, e qui c'è lo stato che lui manda.
   const facciata = { attiva: false, vivo: false, stato: CHIUSO };
   const inFacciata = () => !nelloStrato && !root && facciata.attiva;
@@ -311,6 +311,8 @@
       pannello: !visibile ? 'chiuso' : collapsed ? 'ridotto' : 'aperto',
       voce: visibile ? statoVoce : 'pronto',
       nonLetta: apertoQui() && nonLetta,
+      // Nel suo angolo in basso a destra: gli avvisi della pagina sotto gli si mettono a sinistra (#845).
+      angolo: visibile && !root.dataset.spostata,
     };
   }
 
@@ -322,6 +324,7 @@
       const firma = JSON.stringify(s);
       if (firma !== statoDetto) { statoDetto = firma; chiediSotto('stato', s); }
     }
+    if (!nelloStrato) { try { Popup?.accantoAllAiuto?.(inFacciata() && facciata.stato.angolo); } catch (_) {} }
     if (typeof ascoltaCambi !== 'function') return;
     try { ascoltaCambi(stato()); } catch (_) {}
   }
@@ -333,6 +336,7 @@
       pannello: ['chiuso', 'ridotto', 'aperto'].includes(s.pannello) ? s.pannello : 'chiuso',
       voce: typeof s.voce === 'string' && s.voce.length <= 40 ? s.voce : 'pronto',
       nonLetta: !!s.nonLetta,
+      angolo: !!s.angolo,
     };
     facciata.vivo = !!s.vivo;
     if (facciata.vivo) facciata.attiva = true;
@@ -484,6 +488,7 @@
       root.style.right = 'auto';
       root.style.top = 'auto';
       root.dataset.spostata = '1';
+      cambiato();
       e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
@@ -526,6 +531,7 @@
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
     root.dataset.spostata = '1';
+    cambiato();
   }
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
