@@ -224,12 +224,13 @@
       return { s, chain };
     }
 
-    async function settleChain(s, action, chain, r) {
+    async function settleChain(s, action, chain, r, m = MUTO) {
       const res = r || {};
       const provider = res.provider || (chain[0] && chain[0].provider);
       const model = res.model || (chain[0] && chain[0].model);
       const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
+      m.chiamata(chiamataDi(res, model, { tentativo: res.tentativo, spesa: spesaDi(s, model, res.usage) }));
       return { ...res, provider, model, servedBy, violation, costEur };
     }
 
