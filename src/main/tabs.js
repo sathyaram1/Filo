@@ -1729,11 +1729,9 @@ class TabManager {
     return { reordered };
   }
 
-  _showTriageToast(_n) {
+  _showTriageToast(text) {
     try {
-      this.win.webContents.send('shell:toast', {
-        text: 'Schede riordinate. Quelle chiuse restano nel filo della home',
-      });
+      this.win.webContents.send('shell:toast', { text, opts: { unica: 'riordino-schede' } });
     } catch (_) {}
   }
 
