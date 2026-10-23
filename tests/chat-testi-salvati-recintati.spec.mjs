@@ -327,6 +327,7 @@ const stradeLezione = {
   'lezione confermata nel popup: «voce 1» arriva al modello come segnaposto da non dire all\'utente': { testo: 'Te lo segno.' },
   'lezione da sola, il turno si chiude sul popup: confermata, «voce 1» arriva al turno dopo come segnaposto': { testo: '' },
 };
+const DOMANDA_DOPO = 'puoi non chiedere conferma per cosa tu debba ricordarti?';
 for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) test(nome, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -338,28 +339,33 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   const lezione = 'L\'utente è lo sviluppatore di Filo.';
   const rivedeEsito = !!testoDelGiro;
 
-  await app.evaluate(async (_e, { lezione, apreChat, testoDelGiro, rivedeEsito }) => {
+  // Il finto risponde a COSA ha davanti, non al numero della chiamata (#1337.3): quando #1130 ha tolto un giro, la
+  // risposta contata arrivava con il testo sbagliato e la prova la dava per mancante.
+  await app.evaluate(async (_e, { lezione, apreChat, testoDelGiro, domandaDopo }) => {
     globalThis.__calls = [];
     const finto = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       if (!String(messages[0]?.content || '').startsWith(apreChat)) {
         return { ...base, text: 'NULLA DA IMPARARE', toolCalls: [], finishReason: 'stop' };
       }
-      const n = globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
-      if (n === 1) {
+      globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
+      const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''));
+      const t = messages.some((m) => m.role === 'user' && testo(m).includes(domandaDopo)) ? 'Va bene.'
+        : messages.some((m) => m.role === 'tool' && m.tool_call_id === 'l1') ? 'Me lo segno, se mi dai l\'OK.'
+          : null;
+      if (!t) {
         try { if (testoDelGiro) onDelta && onDelta(testoDelGiro); } catch (_) {}
         return {
           ...base, text: testoDelGiro, finishReason: 'tool_calls',
           toolCalls: [{ id: 'l1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: lezione }) }],
         };
       }
-      const t = rivedeEsito && n === 2 ? 'Me lo segno, se mi dai l\'OK.' : 'Va bene.';
       try { onDelta && onDelta(t); } catch (_) {}
       return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
-  }, { lezione, apreChat: APRE_CHAT, testoDelGiro, rivedeEsito });
+  }, { lezione, apreChat: APRE_CHAT, testoDelGiro, domandaDopo: DOMANDA_DOPO });
 
   await page.locator('#input').fill('ricordati che sviluppo Filo');
   await page.locator('#sendBtn').click();
@@ -374,9 +380,10 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   // #1446.2 — i passi dell'utente: visto il ✓ in chat scrive subito, e sotto il secondo messaggio arriva la risposta
   // a lui, non un pezzo del turno della lezione.
   await expect(page.locator('.dash-bubble-filo', { hasText: '✓ Ricordato' })).toBeVisible({ timeout: 5_000 });
-  await page.locator('#input').fill('puoi non chiedere conferma per cosa tu debba ricordarti?');
+  await page.locator('#input').fill(DOMANDA_DOPO);
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Va bene.' }), 'la risposta al messaggio dopo l\'OK non compare')
+    .toBeVisible({ timeout: 15_000 });
   const bolle = await page.locator('.dash-bubble').evaluateAll((els) => els.map((b) => ({
     utente: b.classList.contains('dash-bubble-user'), testo: b.textContent,
   })));
@@ -392,7 +399,8 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   }), { timeout: 5_000 }).toContain('sviluppatore di Filo');
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  expect(calls).toHaveLength(rivedeEsito ? 3 : 2);
+  expect(calls, rivedeEsito ? 'col testo scritto insieme il modello rivede l\'esito «in attesa»' : 'la lezione da sola chiude il turno sul popup')
+    .toHaveLength(rivedeEsito ? 3 : 2);
   const nota = /«voce 1» è un segnaposto tuo[^\n]*l'utente non lo vede da nessuna parte[^\n]*non scriverlo mai/;
   if (rivedeEsito) {
     // Nell'esito «in attesa»: il modello sa che nel popup l'utente legge il testo vero.
