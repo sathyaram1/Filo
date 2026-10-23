@@ -163,13 +163,16 @@ function parteFingerprint(seed) {
     var oRead = proto.readPixels, oParam = proto.getParameter;
     var dbh = gOPD(proto, 'drawingBufferHeight');
     var dbhGet = dbh && dbh.get;
+    var Q = [1, 1, 1, 1, 1, 1, 0, gl2 ? 1 : 0];
     var nf = function readPixels(x, y, width, height, format, type, pixels, dstOffset) {
-      R(oRead, this, arguments);
+      var a = numeri(arguments, Q);
+      R(oRead, this, a);
       try {
+        x = a[0]; y = a[1]; format = a[4]; type = a[5]; pixels = a[6]; dstOffset = a[7];
         if (format !== 0x1908 || type !== 0x1401) return;
         var tipo = R(tagTA, pixels, []);
         if (tipo !== 'Uint8Array' && tipo !== 'Uint8ClampedArray') return;
-        var w = width | 0, h = height | 0;
+        var w = a[2] | 0, h = a[3] | 0;
         var align = (R(oParam, this, [0x0D05]) | 0) || 4;
         var rowLen = 0, skipR = 0, skipP = 0;
         if (gl2) {
