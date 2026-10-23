@@ -45,6 +45,12 @@ ha funzionato e cosa fare**.
   dopo (#663, #828.1); le chat delle pagine di Filo (home, Editor, mazzi) fanno
   lo stesso coi loro tasti. Sentinella: `tests/unit/rimedioOvunque.test.mjs`,
   prove per superficie in `tests/rimedio-ovunque.spec.mjs`.
+- **Una risposta che non arriva non si richiede da sola.** Un riquadro che chiede
+  quando si disegna (il «Parere di Filo» dei mazzi) ricorda l'esito mancato col suo
+  perché e lo mostra col tasto del rimedio e «Riprova»; senza, ogni ridisegno
+  rifaceva la richiesta, centinaia al secondo coi crediti finiti (#1344.1). Anche
+  una risposta riuscita ma senza la parte chiesta è un esito mancato, e «Riprova»
+  salta la cache, che ridarebbe la stessa risposta.
 - **Dove:** chat della home (`src/pages/dashboard/dashboard.js` +
   `src/main/services/handlers/filo.js`), chat dei mazzi
   (`src/main/services/handlers/scryfall.js`), assistente laterale
