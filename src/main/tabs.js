@@ -1576,7 +1576,7 @@ class TabManager {
         title: t.title,
         ageMin: t.openedAt ? Math.round((now - new Date(t.openedAt).getTime()) / 60000) : null,
         idleMin: t.lastInteractionAt ? Math.round((now - t.lastInteractionAt) / 60000) : null,
-        scrollPct: typeof t.scrollPct === 'number' ? t.scrollPct : null,
+        scrollPct: typeof t.scrollPct === 'number' && !t._scrollIgnoto ? t.scrollPct : null,
         formDirty: !!t.formDirty,
         audible: !!t.audible,
         coOpenUrls: this.tabs
