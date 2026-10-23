@@ -185,6 +185,15 @@ await prova('le chiamate senza una misura', () => { const { spesa, ...senza } = 
 await prova('le chiamate sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${'c'.repeat(20)}_2026-10-14_11`), CHIAMATE)));
 await prova('le chiamate nella collezione delle ore', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), CHIAMATE)));
 await prova('un anonimo legge le chiamate', () => assertFails(getDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`))));
+await prova('un’attività con un testo come combinazione', () => conAttivita({ aiuto: { 'cerca il volo per Roma': '1' } }));
+await prova('un’attività con un indirizzo dentro la combinazione', () => conAttivita({ suggerimenti: { 'NAVIGA|1|ora|https://mario.it': '1' } }));
+await prova('un’attività col conto scritto a parole', () => conAttivita({ dettatura: { 'finito|f1|da_sola|no': '1 volta' } }));
+await prova('un’attività col conto come mappa', () => conAttivita({ home: { generata: { n: 1, nota: 'ciao' } } }));
+await prova('le attività con un campo dell’ora', () => conAttivita({ uso: {} }));
+await prova('le attività senza una misura', () => { const { lettura, ...senza } = ATTIVITA; return assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), senza)); });
+await prova('le attività sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${'c'.repeat(20)}_2026-10-14_11`), ATTIVITA)));
+await prova('le attività nella collezione delle chiamate', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), ATTIVITA)));
+await prova('un anonimo legge le attività', () => assertFails(getDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`))));
 await prova('una prima volta che è un testo', () => rifiuta({ primeVolte: ['help', 'appunti di mario'] }));
 await prova('le prime volte come stringa', () => rifiuta({ primeVolte: 'help' }));
 await prova('un’ora che non esiste', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14_24`), conCampo({ ora: '24' }))));
