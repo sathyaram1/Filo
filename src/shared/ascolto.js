@@ -218,8 +218,22 @@
     return sessione;
   }
 
+  // Una sessione si conta una volta (#1467), da chi sa che fine ha fatto il testo: `invio` dall'elenco dei contatori
+  // (SN_CONTATORI.INVII_DETTATURA). Escono il motivo, quante frasi e l'invio, mai le parole.
+  function contaSessione(esito, invio) {
+    if (!esito || esito.contata) return;
+    esito.contata = true;
+    try {
+      const r = chrome.runtime.sendMessage({
+        type: global.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'dettatura', motivo: esito.motivo, frasi: esito.frasi, invio,
+        provvisorie: !!esito.provvisorie,
+      });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+
   global.SN_ASCOLTO = {
-    avvia, supportato, fraseMicrofono, fraseTrascrizione,
+    avvia, supportato, fraseMicrofono, fraseTrascrizione, contaSessione,
     attiva: () => attiva,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
