@@ -1,6 +1,6 @@
-// Handler di dominio dei contatori anonimi (#969, #1461): crea il servizio, lo mette a disposizione del cancello dei
-// modelli, segue le scritture delle impostazioni e riceve i gesti contati nelle pagine. Cosa si conta e quando parte:
-// src/main/services/contatori.js. Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
+// Handler di dominio dei contatori anonimi (#969, #1461, #1462): crea il servizio, segue le impostazioni, riceve i gesti
+// contati nelle pagine e dà all'owner le somme, mai sotto le cinque copie. Cosa si conta: src/main/services/contatori.js.
+// Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
 const { soloFilo } = require('./origine');
 const auth = require('../../auth/google-auth');
@@ -148,15 +148,13 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  const somme = Somme.crea();
-  globalThis.SN_CONTATORI_SOMME = somme;
   on(MSG.CONTATORI_SOMME, soloFilo(async (msg) => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
     const m = msg && typeof msg === 'object' ? msg : {};
     try {
       return {
         ok: true,
-        somme: await somme.somme({
+        somme: await contatori.somme({
           idToken: await auth.getIdToken(), dal: testo(m.dal), al: testo(m.al), app: testo(m.app), os: testo(m.os), forza: m.forza === true,
         }),
       };

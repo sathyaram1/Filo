@@ -1,6 +1,6 @@
 // Le somme della scheda Contatori di Gestione (#1462): dai documenti di Firestore escono solo somme, una cella con meno
 // di cinque copie esce senza numero (anche a cavallo di due mesi, quando lo pseudonimo cambia), e la lettura chiede solo
-// i campi che somma, pagina dopo pagina. Il servizio vero: src/main/services/contatoriSomme.js.
+// i campi che somma, pagina dopo pagina. Le somme: src/main/services/contatoriSomme.js; la lettura: contatori.js.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +14,7 @@ for (const f of ['constants', 'tasti', 'i18n', 'modelUsage', 'wallet', 'capabili
   require(join(ROOT, 'src', 'shared', `${f}.js`));
 }
 const S = require(join(ROOT, 'src', 'main', 'services', 'contatoriSomme.js'));
+const Servizio = require(join(ROOT, 'src', 'main', 'services', 'contatori.js'));
 const C = globalThis.SN_CONTATORI;
 const BASE = 'https://firestore.test/v1/projects/p/databases/(default)/documents';
 
@@ -232,7 +233,7 @@ test('una finestra lunga passa alle settimane e poi ai mesi; la settimana porta 
 function servizio(pagine, { stato = 200 } = {}) {
   const chieste = [];
   let t = 1_000_000;
-  const s = S.crea({
+  const s = Servizio.crea({
     contatori: C,
     rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
     adesso: () => t,

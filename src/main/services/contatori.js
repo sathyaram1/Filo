@@ -6,6 +6,7 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const Somme = require('./contatoriSomme');
 
 const CHIAVE = 'contatoriGiornalieri';
 // Il segno dell'uscita (#1466): «aperta» all'avvio, «chiusa» con la durata della chiusura all'ultimo istante, letto
@@ -30,6 +31,9 @@ const INTERVISTA_FERMA_MS = 24 * 60 * 60 * 1000;
 // La lettura dell'owner: mille pseudonimi a pagina, e duecento pagine prima di dire «almeno».
 const PAGINA_LETTURA = 1000;
 const TETTO_PAGINE = 200;
+// Le ore nuove arrivano ogni ora: la stessa richiesta delle somme vale dieci minuti, «Rileggi» la rifà subito.
+const LETTURA_VALE_MS = 10 * 60 * 1000;
+const LETTURE_TENUTE = 4;
 
 const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} });
 const AZIONE_MUTA = Object.freeze({ visto() {}, fine() {}, scheda() {} });
@@ -1186,7 +1190,7 @@ function crea(dip = {}) {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura,
-    controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
+    controlla, avvia, seguiImpostazioni, installazioni, somme, accesi, letto, salva,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,
     avvioProcesso, secondaIstanza, inizioChiusura, tettoChiusura, fineChiusura, perLaChiusura, salvaSubito,
     leggiFermo, sonno, avviaFermo, fermaFermo,
