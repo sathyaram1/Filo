@@ -64,7 +64,7 @@ function elencoDopo(testo, etichetta) {
   assert.ok(m, `non trovo l'elenco dopo «${etichetta}»`);
   return stringhe(m[1]);
 }
-const FUNZIONI_REGOLE = elencoDopo(B, 'function funzioniContate\\(\\)');
+const FUNZIONI_REGOLE = elencoDopo(TUTTO, 'function funzioniContate\\(\\)');
 const unite = (forma) => `^(${forma.slice(1, -1)}(#${forma.slice(1, -1)})*)?$`;
 
 // Le misure dell'ora come le controllano le regole: chiuse(d.x, elenco, tetto, valori) o aForma(d.x, chiavi, tettoChiavi, tetto, valori).
