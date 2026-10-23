@@ -292,8 +292,6 @@ module.exports = {
   ricordaPoliticaDocumento,
   politicaDocumento,
   paginaDi,
-  origineDellaPagina,
-  iniziatorePer,
   stessoSitoWeb,
   _dip: dip,
 };
