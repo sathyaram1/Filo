@@ -2138,5 +2138,17 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è
     // `percorsoRaccoglibile`, ed è quella la porta che vale.
     renderFeedbackPrompt, percorsoRaccoglibile, puntoRisposta,
+    // Le anteprime stanno in un'ombra chiusa: cosa c'è nella casella, e dove sta la × di una per un clic vero.
+    allegati: () => allegati.immagini.map((im) => ({ nome: im.nome, byte: im.dataUrl.length })),
+    puntoTogli: (i) => {
+      const host = root && root.querySelector('.sn-sidebar-allegati');
+      const o = host && ombre.get(host);
+      const b = o && o.querySelectorAll('.togli')[i];
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    },
+    immaginiNelleBolle: () => Array.from(root ? root.querySelectorAll('.sn-sidebar-msg-user') : [])
+      .map((m) => { const box = m.querySelector('.sn-sidebar-msg-immagini'); const o = box && ombre.get(box); return o ? o.querySelectorAll('img').length : 0; }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
