@@ -70,8 +70,14 @@ module.exports = function register(on, ctx) {
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
     // Da un sito passa solo la voce della dettatura scelta dal menu; qualunque
     // altro campo (chiavi, proxy, protezioni, spesa, stile) rifiuta la richiesta.
-    const incoming = msg.settings;
+    let incoming = msg.settings;
     if (!scritturaImpostazioniAmmessa(incoming, origin)) return vietato;
+    // Le Preferenze mandano solo i token toccati: si posano sulla mappa salvata adesso, senza che la pagina la rilegga
+    // prima di spedire (#1343.1).
+    if (msg.tokenModifica === true && incoming && incoming.themeTokens && typeof incoming.themeTokens === 'object') {
+      const salvati = (await Storage.getSettings()).themeTokens;
+      incoming = { ...incoming, themeTokens: globalThis.SN_THEME_TOKENS.conModifica(salvati, incoming.themeTokens) };
+    }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.

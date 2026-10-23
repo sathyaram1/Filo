@@ -352,6 +352,17 @@
     return { clean, rejected };
   }
 
+  // Chi ha toccato pochi token manda solo quelli e si posano sulla mappa salvata adesso: la sua copia intera
+  // cancellerebbe quelli cambiati altrove nel frattempo (#1343.1).
+  function conModifica(salvati, modifica) {
+    const out = { ...(salvati && typeof salvati === 'object' ? salvati : {}) };
+    for (const [name, value] of Object.entries(modifica && typeof modifica === 'object' ? modifica : {})) {
+      if (value == null || value === '') delete out[name];
+      else out[name] = value;
+    }
+    return out;
+  }
+
   // risoluzione della gerarchia (per la UI delle preferenze e gli unit test)
   function defaultValue(name, theme) {
     const t = TOKENS[name];
@@ -524,6 +535,7 @@
     scrollBehavior,
     FACTOR_MAX,
     sanitize,
+    conModifica,
     defaultValue,
     effectiveValue,
     toRgbTriplet,
