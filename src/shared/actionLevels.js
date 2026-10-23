@@ -982,7 +982,7 @@
     // sa già fare l'assistente di pagina. Tutti costo 1: azionare un controllo
     // della finestra è benigno e completamente reversibile (uno schermo intero si
     // toglie, un menu si richiude). "close" è ESCLUSO di proposito: l'AI non
-    // chiude finestra né schede.
+    // chiude la finestra; le schede le chiude CHIUDI_SCHEDE.
     COMANDO_FINESTRA: {
       costo: 1,
       campo: null,
