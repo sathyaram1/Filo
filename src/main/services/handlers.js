@@ -5734,7 +5734,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       } catch (e) {
         if (turno.fermato) { fermato = true; break; }
         if (await senzaFotoDopoRifiuto(e)) { round--; continue; }
-        if (await stringiDopoRifiuto(e)) { round--; continue; }
+        if (await stringiDopoRifiuto(e)) {
+          contaSe('adattamento', ACTIONS.FILO_CHAT, (e && e.model) || modelloPrimo, 'contesto_stretto');
+          round--;
+          continue;
+        }
         throw e;
       }
       tempiPrima = null;
