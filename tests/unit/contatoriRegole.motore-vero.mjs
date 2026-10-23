@@ -146,6 +146,11 @@ C.registraChiamata(datiBuoni, 'help', { modello: 'deepseek/deepseek-v4-flash', i
 C.registraChiamate(datiBuoni, 'help', 2);
 const CHIAMATE = C.documentoChiamate({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
 const COLL_CHIAMATE = C.COLLEZIONE_CHIAMATE;
+C.registraAttivita(datiBuoni, 'dettatura', { motivo: 'finito', frasi: 2, invio: 'da_sola' });
+C.registraAttivita(datiBuoni, 'riaperte', { chiusaDa: 'pulizia', etaMs: 120000 });
+const ATTIVITA = C.documentoAttivita({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
+const COLL_ATTIVITA = C.COLLEZIONE_ATTIVITA;
+const conAttivita = (patch) => assertFails(setDoc(doc(anon, `${COLL_ATTIVITA}/${idBuono}`), { ...ATTIVITA, ...patch }));
 const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
