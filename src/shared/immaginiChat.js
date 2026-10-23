@@ -65,20 +65,19 @@
     return c.toDataURL(tipo, 0.85);
   }
 
-  // Torna il data: da mandare, o '' se l'immagine non si apre. Entro il tetto e in un formato letto resta com'è;
-  // un altro formato diventa PNG (tiene la trasparenza di un logo); oltre il tetto si rimpicciolisce in JPEG finché ci sta.
+  // Torna il data: da mandare, o '' se l'immagine non si apre (anche un file rovinato col nome giusto: il modello
+  // lo rifiuterebbe). Entro il tetto e in un formato letto resta com'è; un altro formato diventa PNG (tiene la
+  // trasparenza di un logo); oltre il tetto si rimpicciolisce in JPEG finché ci sta.
   async function perLaChat(blob) {
     if (!blob) return '';
     const tetto = tetti().tettoImmagineByte || 4 * 1024 * 1024;
     const lato = tetti().latoRimpicciolita || 2048;
-    if (blob.size <= tetto) {
-      const url = await comeDataUrl(blob);
-      if (LETTA.test(url)) return url;
-    }
     const im = await apri(blob);
     if (!im) return '';
     try {
       if (blob.size <= tetto) {
+        const url = await comeDataUrl(blob);
+        if (LETTA.test(url)) return url;
         const url = disegna(im, Math.min(lato, Math.max(im.w, im.h)), 'image/png');
         if (LETTA.test(url) && byteDi(url) <= tetto) return url;
       }
