@@ -1232,6 +1232,7 @@
     disegnaSpecchio(state);
     allineaScorrimento(state);
     disegnaValori(state);
+    ritaglia(state);
     seguiIlCampo();
     passaggiInCorso(state);
     allineaProposte(state);
