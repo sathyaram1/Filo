@@ -36,8 +36,8 @@ test('ogni misura va nella sua fascia, e quella senza dato non entra', () => {
   C.registraChiamata(ora, 'tts', { modello: 'openai/gpt-4o-mini-tts', ingresso: null, uscita: null, spesa: { usd: 0.0002, origine: 'router' } });
   const d = doc(ora);
   assert.deepEqual(voci(d, 'contesto', 'filo-chat'), [`${M}|t2k|1`, `${M}|t8k|1`, `${M}|oltre|1`, `${M}|t16k|2`]);
-  assert.deepEqual(voci(d, 'cache', 'filo-chat'), [`${M}|zero|1`, `${M}|q50|1`, `${M}|q100|1`, `${M}|nd|1`, `${M}|q75|0`.replace('q75|0', 'q50|1')].slice(0, 4).concat([]), 'q50 due volte si somma');
-  assert.deepEqual(C.leggiModelli('cache', d.cache['filo-chat']).map((x) => [x.resto, x.n]), [['zero', 1], ['q50', 2], ['q100', 1], ['nd', 1]]);
+  assert.deepEqual(C.leggiModelli('cache', d.cache['filo-chat']).map((x) => [x.resto, x.n]), [['zero', 1], ['q50', 2], ['q100', 1], ['nd', 1]],
+    'uno zero detto, un quarto e un capello, tutto, non detto, metà');
   assert.deepEqual(C.leggiModelli('ragionamento', d.ragionamento['filo-chat']).map((x) => [x.resto, x.n]), [['r0', 1], ['r4k', 1], ['nd', 1]],
     'il ragionamento entra solo quando la risposta lo porta (anche come «non detto»)');
   assert.deepEqual(C.leggiModelli('uscita', d.uscita['filo-chat']).map((x) => [x.resto, x.n]),
