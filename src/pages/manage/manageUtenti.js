@@ -167,13 +167,71 @@
     if (!r.detail.hidden) caricaScheda(r).catch(() => {});
   }
 
+  // ── Chi ha fatto entrare chi (#1519) ───────────────────────────────────────
+  // Sotto chi dà inviti stanno le persone entrate coi suoi codici, e la sua colonna dice quante e in quanto tempo:
+  // un tester che ne fa entrare tre in un'ora si vede a colpo d'occhio. Il numero apre le persone contate.
+  const CELLA_INVITATI = 8;
+  const LIVELLI_VISTI = 6;
+  const invitatiLetti = new Map();
+
+  function scriviAlbero(r, nodo) {
+    r.tr.classList.toggle('is-invitato', nodo.livello > 0);
+    if (nodo.livello > 0) r.tr.style.setProperty('--livello', String(Math.min(nodo.livello, LIVELLI_VISTI)));
+    else r.tr.style.removeProperty('--livello');
+    r.invitati = nodo.invitati;
+    const cella = r.celle[CELLA_INVITATI];
+    const inv = nodo.invitati;
+    if (!inv) { cella.replaceChildren(); r.bottoneInvitati = null; return; }
+    // Il pulsante resta lo stesso nodo fra una rilettura e l'altra: si riscrive solo il testo.
+    let b = r.bottoneInvitati;
+    if (!b) {
+      b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-wallet-invitati-btn';
+      b.addEventListener('click', (ev) => { ev.stopPropagation(); scegliInvitati(r.u.pseudonym); });
+      b.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); });
+      b.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        apriMenu(vociInvitati(r), ev.clientX, ev.clientY, r);
+      });
+      r.bottoneInvitati = b;
+      cella.replaceChildren(b);
+    }
+    b.textContent = W.invitatiTesto(inv);
+    const quando = inv.primo && inv.ultimo && inv.n > 1
+      ? `, il primo ${formatDateTime(inv.primo)} e l’ultimo ${formatDateTime(inv.ultimo)}`
+      : (inv.primo ? `, ${formatDateTime(inv.primo)}` : '');
+    b.title = `${inv.n === 1 ? 'Una persona è entrata' : `${formatInt(inv.n)} persone sono entrate`} coi suoi codici${quando}. Clic per vedere solo ${inv.n === 1 ? 'lei' : 'loro'}.`;
+    b.setAttribute('aria-pressed', filtro && filtro.invitante === r.u.pseudonym ? 'true' : 'false');
+  }
+
+  function vociInvitati(r) {
+    const inv = r.invitati;
+    if (!inv) return [];
+    const acceso = Boolean(filtro && filtro.invitante === r.u.pseudonym);
+    return [
+      [acceso ? 'Mostra tutte le persone' : (inv.n === 1 ? 'Mostra la persona che ha fatto entrare' : `Mostra le ${formatInt(inv.n)} persone che ha fatto entrare`),
+        () => scegliInvitati(r.u.pseudonym)],
+      ['Copia il numero', () => copia(String(inv.n))],
+    ];
+  }
+
+  function scegliInvitati(pseudonym) {
+    if (filtro && filtro.invitante === pseudonym) togliFiltro();
+    else { filtro = { invitante: pseudonym }; applicaFiltro(); }
+  }
+
   function aggiornaRighe(tbody, users) {
     const elenco = [];
     const viste = new Map();
-    for (const u of users) {
+    invitatiLetti.clear();
+    for (const nodo of W.personeInAlbero(users)) {
+      const u = nodo.u;
       const n = viste.get(u.pseudonym) || 0;
       viste.set(u.pseudonym, n + 1);
-      elenco.push({ chiave: n ? `${u.pseudonym}#${n}` : String(u.pseudonym), u });
+      if (!n && nodo.invitati) invitatiLetti.set(u.pseudonym, nodo.invitati.pseudonimi);
+      elenco.push({ chiave: n ? `${u.pseudonym}#${n}` : String(u.pseudonym), u, nodo });
     }
     const chiavi = new Set(elenco.map((e) => e.chiave));
     // Prima via chi non c'è più, così le righe che restano non si spostano: una riga spostata perde il fuoco.
