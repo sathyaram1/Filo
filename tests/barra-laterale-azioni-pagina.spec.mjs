@@ -79,21 +79,21 @@ test('trascinandole si riordinano, sul cassetto vanno in «Altro…», e col tas
   expect((await statoBarra(app)).bar).not.toContain('share');
   await expect(barra.locator('#nav .ico[data-id="share"]')).toHaveCount(0);
 
-  // Riaperto «Altro…», il tasto destro la riporta in vista, in fondo.
+  // Riaperto «Altro…», il tasto destro la riporta in vista, in fondo. Il menu a comparsa è una finestra sua: la
+  // scelta si fa dal main, con le voci che quel menu mostrerebbe.
   await barra.locator('#nav [data-altro]').click();
+  await app.evaluate(({ BrowserWindow }) => {
+    const b = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.barra;
+    const vero = b._apriMenu.bind(b);
+    globalThis.__vociBarra = new Promise((res) => {
+      b._apriMenu = (voci, x, y, scegli) => { b._apriMenu = vero; res(voci.map((v) => v.label)); scegli('barra:in-vista'); };
+    });
+  });
   await barra.locator('#nav .ico.riserva[data-id="share"]').click({ button: 'right' });
-  const scelta = app.evaluate(({ BrowserWindow }) => new Promise((res) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    const b = w._filoTabs.barra;
-    const prima = b._apriMenu.bind(b);
-    b._apriMenu = (voci, x, y, scegli) => { b._apriMenu = prima; res(voci.map((v) => v.label)); scegli('barra:in-vista'); };
-  }));
-  // Il menu è già stato chiesto dal clic: si rifà, con la scelta intercettata.
-  await barra.locator('#nav .ico.riserva[data-id="share"]').click({ button: 'right' });
-  expect(await scelta).toContain('Porta fra le icone in vista');
+  expect(await app.evaluate(() => globalThis.__vociBarra)).toContain('Porta fra le icone in vista');
   await expect.poll(async () => (await statoBarra(app)).bar.at(-1)).toBe('share');
 
-  // Dopo un riavvio della barra resta tutto dov'è: lo legge dal disco.
+  // Sul disco c'è quello che si vede, senza più la riga del tasto destro.
   const salvato = await app.evaluate(async () => (await globalThis.chrome.storage.local.get('sn_icon_layout')).sn_icon_layout);
   expect(salvato.bar.slice(0, 3)).toEqual(['help', 'qrCode', 'back']);
   expect(salvato.bar.at(-1)).toBe('share');
