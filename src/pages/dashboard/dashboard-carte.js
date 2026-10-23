@@ -466,7 +466,7 @@
     const tutti = dati.suggerimenti.filter((s) => s && s.text && s.carta !== 'crediti')
       .sort((a, b) => (b.importance || 0) - (a.importance || 0));
     const visibili = dati.tuttiSuggerimenti ? tutti : tutti.slice(0, SUGGERIMENTI_VISIBILI);
-    const voci = visibili.map((s) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b), filo: `Ti suggerisco: ${s.text}` }));
+    const voci = visibili.map((s, i) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b, i + 1), filo: `Ti suggerisco: ${s.text}` }));
     if (tutti.length > SUGGERIMENTI_VISIBILI) {
       voci.push({
         testo: dati.tuttiSuggerimenti ? 'Mostra meno' : `Mostra tutti (${tutti.length})`, piano: true,
