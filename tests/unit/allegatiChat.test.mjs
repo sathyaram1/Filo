@@ -48,10 +48,13 @@ test('#1298: oltre il tetto un’immagine non sparisce in silenzio, la frase dic
   assert.equal(ALLEGATI_CHAT.tettoImmagineByte, 4 * 1024 * 1024);
   assert.match(ALLEGATI_CHAT.fraseTroppoGrandi(1), /^L’immagine supera i 4 MB.*trascinala da lì/);
   assert.match(ALLEGATI_CHAT.fraseTroppoGrandi(3), /^3 immagini superano i 4 MB/);
-  assert.match(ALLEGATI_CHAT.fraseTroppoGrandiAiuto(2), /^2 immagini superano i 4 MB: l’Aiuto non le può vedere/);
+  assert.match(ALLEGATI_CHAT.fraseTroppoGrandiAiuto(2), /^2 immagini superano i 64 MB: l’Aiuto non le può vedere/);
+  assert.ok(ALLEGATI_CHAT.tettoLetturaByte > ALLEGATI_CHAT.tettoImmagineByte);
+  assert.match(ALLEGATI_CHAT.fraseNonImmaginiAiuto(1), /^Un file non è un’immagine/);
+  assert.match(ALLEGATI_CHAT.fraseNonImmaginiAiuto(2), /^2 file non sono immagini/);
 });
 
-test('dalla fila delle schede: il main legge solo immagini vere dal disco, e oltre il tetto il percorso va solo alla home', async () => {
+test('dalla fila delle schede: il main legge solo immagini dal disco; oltre il tetto la home ha il percorso e l’Aiuto l’immagine da rimpicciolire; gli altri file non spariscono', async () => {
   const dir = cartellaTemporanea('filo-allegati-');
   try {
     const piccola = join(dir, 'piccola.png');
@@ -68,16 +71,19 @@ test('dalla fila delle schede: il main legge solo immagini vere dal disco, e olt
       { nome: 'mancante.png', percorso: join(dir, 'mancante.png') },
       { nome: 'da finestra.png', dataUrl: DATA },
       { nome: 'html', dataUrl: 'data:text/html;base64,PGI+' },
+      { nome: 'senza percorso.pdf', altro: true },
     ];
     const casa = await prepara(voci, { casa: true });
     assert.deepEqual(casa.immagini.map((i) => i.nome), ['piccola.png', 'da finestra.png']);
     assert.equal(casa.immagini[0].dataUrl, DATA);
     assert.equal(casa.immagini[0].percorso, piccola);
-    assert.deepEqual(casa.file, [grande]);
+    assert.deepEqual(casa.file, [grande, testo]);
     assert.equal(casa.grandi, 0);
     const aiuto = await prepara(voci, { casa: false });
     assert.deepEqual(aiuto.file, []);
-    assert.equal(aiuto.grandi, 1);
+    assert.deepEqual(aiuto.immagini.map((i) => [i.nome, i.percorso]), [['piccola.png', ''], ['grande.jpg', ''], ['da finestra.png', '']]);
+    assert.equal(aiuto.grandi, 0);
+    assert.equal(aiuto.altri, 2);
     const enorme = `data:image/png;base64,${'A'.repeat(Math.ceil(ALLEGATI_CHAT.tettoImmagineByte * 4 / 3) + 8)}`;
     assert.equal((await prepara([{ dataUrl: enorme }], { casa: true })).grandi, 1);
   } finally {

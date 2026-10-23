@@ -16,13 +16,15 @@
     } catch (_) { ok(''); }
   });
 
-  // Dal disco basta il percorso; un'immagine senza file (da un'altra finestra) la si legge qui.
+  // Dal disco basta il percorso; un'immagine senza file (da un'altra finestra) la si legge qui. Gli altri file
+  // lasciati insieme viaggiano anche loro: la chat che li riceve dice cosa ne fa, nessuno sparisce in silenzio.
   async function voci(files, percorsoDi) {
     const out = [];
-    for (const f of Array.from(files || []).filter((x) => /^image\//i.test(x.type || ''))) {
+    for (const f of Array.from(files || [])) {
       let percorso = '';
       try { percorso = percorsoDi(f) || ''; } catch (_) { percorso = ''; }
       if (percorso) out.push({ nome: f.name || '', percorso });
+      else if (!/^image\//i.test(f.type || '')) out.push({ nome: f.name || '', altro: true });
       else {
         const dataUrl = await leggi(f);
         if (dataUrl) out.push({ nome: f.name || '', dataUrl });
