@@ -689,7 +689,6 @@
       if (/^[0-9a-f]{16}$/.test(raw)) walletPseudonym = raw;
     } catch (_) {}
 
-    const nowIso = new Date().toISOString();
     const doc = {
       fields: {
         text: toFsValue(encText),
