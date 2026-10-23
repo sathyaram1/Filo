@@ -115,8 +115,8 @@
   function close({ davvero = false } = {}) {
     if (!root) return;
     if (!davvero && inVolo > 0) { if (!nascosto) nascondi(); return; }
-    Highlight.clear();
-    try { Highlight.clearForceHover?.(); } catch (_) {}
+    Pagina.pulisci({ hover: true }).catch(() => {});
+    evidenziato = null;
     if (docClickHandler) {
       document.removeEventListener('mousedown', docClickHandler, true);
       docClickHandler = null;
