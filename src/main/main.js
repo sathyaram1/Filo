@@ -123,10 +123,12 @@ function apriInvito(code) {
   // Senza finestra (avvio a freddo: l'apertura è ancora a metà) l'invito
   // aspetta lì e parte appena la finestra c'è.
   if (!mainWindow) { invitoInAttesa = { code }; return true; }
-  try { revealWindow(mainWindow); } catch (_) {}
+  // Con la principale chiusa e Filo acceso (Mac, o un'altra finestra aperta) ne nasce una: Crediti si apre lì.
+  const win = mostraFinestraNormale();
+  if (!win) return true;
   // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
   // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
-  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, mainWindow); } catch (_) {}
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, win); } catch (_) {}
   return true;
 }
 
