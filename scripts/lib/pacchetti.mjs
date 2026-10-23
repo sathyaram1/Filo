@@ -93,13 +93,41 @@ export function npmInstall(radice) {
   return { codice: r.status === null ? 1 : r.status, errore: r.error ? String(r.error.message || r.error) : '' };
 }
 
+// Fuori da node_modules: crearlo per il blocco cambierebbe da dove un worktree risolve i pacchetti.
+const fileBlocco = (radice, cartella) => join(cartella, `filo-pacchetti-${createHash('sha1').update(resolve(radice)).digest('hex').slice(0, 16)}.lock`);
+
+function prendiBlocco(f, ora) {
+  try { closeSync(openSync(f, 'wx')); return true; } catch (e) { if (!e || e.code !== 'EEXIST') throw e; }
+  // Più vecchio del tetto: è di un avvio morto a metà.
+  try { if (ora() - statSync(f).mtimeMs <= TETTO_INSTALLAZIONE_MS) return false; } catch (_) { /* appena tolto */ }
+  rmSync(f, { force: true });
+  try { closeSync(openSync(f, 'wx')); return true; } catch (_) { return false; }
+}
+
+const dormi = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 /** `{ esito, mancanti }`, esito fra allineati, installati, rimandati e non riuscita. Non lancia mai. */
 export function allineaPacchetti(radice, {
   installa = npmInstall, inUso = electronInUso, log = console.log, prefisso = '[pacchetti]', opzioni,
+  cartellaBlocchi = tmpdir(), ora = Date.now, attendi = dormi,
 } = {}) {
+  let blocco = '';
   try {
-    const mancanti = pacchettiDaInstallare(radice, opzioni);
+    let mancanti = pacchettiDaInstallare(radice, opzioni);
     if (!mancanti.length) return { esito: 'allineati', mancanti };
+    // Due avvii in fretta (il doppio clic) non devono installare insieme nello stesso node_modules.
+    const f = fileBlocco(radice, cartellaBlocchi);
+    if (!prendiBlocco(f, ora)) {
+      log(`${prefisso} Un altro avvio sta installando i pacchetti: aspetto che finisca.`);
+      for (const fine = ora() + TETTO_INSTALLAZIONE_MS; existsSync(f) && ora() < fine;) attendi(500);
+      mancanti = pacchettiDaInstallare(radice, opzioni);
+      if (!mancanti.length) return { esito: 'allineati', mancanti };
+      if (!prendiBlocco(f, ora)) {
+        log(`${prefisso} Mancano ${descrivi(mancanti)}, e l'altro avvio non ha ancora finito: Filo parte lo stesso.`);
+        return { esito: 'rimandati', mancanti };
+      }
+    }
+    blocco = f;
     const base = baseDeiPacchetti(radice);
     // Senza un node_modules suo, npm installa in `radice` e l'Electron della cartella sopra resta com'è.
     const suoElectron = base === resolve(radice) && mancanti.some((v) => v.percorso === PERCORSO_ELECTRON);
