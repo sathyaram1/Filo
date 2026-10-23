@@ -2986,6 +2986,16 @@
     };
   }
 
+  // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
+  const AVVISO_SCHERMO_PIENO_LIMITI = Object.freeze({ durataMs: Object.freeze([1000, 10000]) });
+  function opzioniAvvisoSchermoPieno(v) {
+    const o = v && typeof v === 'object' ? v : {};
+    const n = Math.round(Number(o.durataMs));
+    const [min, max] = AVVISO_SCHERMO_PIENO_LIMITI.durataMs;
+    const buono = Number.isFinite(n) && o.durataMs !== null && o.durataMs !== '' && typeof o.durataMs !== 'boolean';
+    return { durataMs: buono ? Math.max(min, Math.min(max, n)) : DEFAULT_SETTINGS.avvisoSchermoPieno.durataMs };
+  }
+
   // Tetto di una lezione, contato come lo stile: una regola su come comportarsi
   // ci sta larga, un testo che nessuno rilegge nel popup no (#592).
   const LESSON_MAX = 800;
