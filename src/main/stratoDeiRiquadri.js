@@ -173,6 +173,62 @@ class StratoDeiRiquadri {
     if (canale === 'riquadri:vuoto') s.vuoto.inoltra(d);
   }
 
+  // L'Aiuto nello strato chiede alla pagina sotto (#1509.3): la domanda va al suo frame principale, che risponde con
+  // AIUTO_ESITO. Una pagina che non risponde (andata via, ferma) dà un esito mancato, mai un'attesa senza fine.
+  _allaPagina(s, op, args) {
+    if (!Object.prototype.hasOwnProperty.call(OP_PAGINA, op) || !vivo(s.wc)) return Promise.resolve({ ok: false });
+    if (pesa(args) > DATI_MAX_BYTE) return Promise.resolve({ ok: false, error: 'troppo', limite: DATI_MAX_BYTE });
+    const rid = `a${++this.seq}`;
+    return new Promise((fatto) => {
+      let timer = null;
+      const chiudi = (r) => { if (!s.attese.delete(rid)) return; clearTimeout(timer); fatto(r); };
+      s.attese.set(rid, chiudi);
+      timer = setTimeout(() => chiudi({ ok: false, error: 'tempo' }), OP_PAGINA[op]);
+      try { s.wc.send('filo:broadcast', { type: msg().AIUTO_DALLO_STRATO, rid, op, args: args == null ? {} : args }); } catch (_) { chiudi({ ok: false }); }
+    });
+  }
+
+  // AIUTO_ESITO dal frame principale della pagina.
+  esitoDallaPagina(sender, d) {
+    const s = sender && this.strati.get(sender.wc);
+    let principale = false;
+    try { principale = !sender.frame || !sender.frame.parent; } catch (_) { principale = false; }
+    const rid = String((d && d.rid) || '');
+    if (!s || !principale || !rid || rid.length > ID_MAX || !s.attese.has(rid)) return { ok: false };
+    if (pesa(d.esito) > DATI_MAX_BYTE) { s.attese.get(rid)({ ok: false, error: 'troppo', limite: DATI_MAX_BYTE }); return { ok: false }; }
+    s.attese.get(rid)({ ok: true, esito: d.esito === undefined ? null : d.esito });
+    return { ok: true };
+  }
+
+  // AIUTO_ALLO_STRATO dalla pagina: l'icona Aiuto premuta di nuovo, l'Aiuto spento, il passo evidenziato che la
+  // cornice deve scoprire, il gesto dell'utente sul passo indicato. Senza un Aiuto vivo nello strato non va da nessuna parte.
+  comandoAiuto(sender, d) {
+    const s = sender && !sender.strato ? this.strati.get(sender.wc) : null;
+    const comando = String((d && d.comando) || '');
+    if (!s || !s.pronta || !s.aiuto || !COMANDI_AIUTO.has(comando) || !vivo(s.vista.webContents)) return { ok: false };
+    const out = { comando };
+    if (comando === 'chiudi') out.davvero = !!d.davvero;
+    if (comando === 'evita') {
+      let zoom = 1;
+      try { zoom = s.wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+      const r = {};
+      for (const k of ['left', 'top', 'right', 'bottom']) {
+        const v = numero(d.rect && d.rect[k]);
+        if (v === undefined) return { ok: false };
+        r[k] = v * zoom;
+      }
+      out.rect = r;
+    }
+    if (comando === 'azione') {
+      out.id = Math.max(0, Math.min(1e9, Math.round(Number(d.id) || 0)));
+      out.etichetta = String(d.etichetta == null ? '' : d.etichetta);
+      out.daUrl = String(d.daUrl == null ? '' : d.daUrl);
+      if (pesa(out) > DATI_MAX_BYTE) return { ok: false };
+    }
+    this._manda(s, 'riquadri:aiuto', out);
+    return { ok: true };
+  }
+
   // Chiamata dal layout: lo strato si vede solo sopra la sua pagina, quando è davanti e ha qualcosa aperto.
   posa() {
     if (!this.win || this.win.isDestroyed()) return;
