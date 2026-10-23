@@ -276,6 +276,10 @@ test('siDato: sì solo dopo Consenti, per quel sito e per quella parte', () => {
   assert.equal(Permessi.siDato(ses, 'https://altro.example/', 'audio'), false, 'un altro sito');
   assert.equal(Permessi.siDato(ses, 'about:blank', 'audio'), false);
   assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'appunti'), false, 'solo le parti lette dalla pagina');
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'strumenti'), false, 'il MIDI resta da chiedere');
+  chiedi(ses, wc, 'midiSysex');
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'strumenti'), true, 'dopo Consenti agli strumenti');
 });
 
 // Ogni nome che Electron può mandare ai gestori ha una regola: un nome nuovo, qui, è un rosso e non un no silenzioso.
