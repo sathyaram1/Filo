@@ -224,7 +224,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     test('la credenziale sta solo in `avviso`, nell\'ambiente fisso, e lì il codice non si installa', () => {
       assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
       assert.match(allarmeUnit.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
-      assert.match(senzaCommenti(job('release')), /secrets\.FILO_BUILD_PASSPHRASE/, 'il cancello unit usa FILO_BUILD_PASSPHRASE');
+      assert.match(senzaCommenti(job('avviso-cancello')), /secrets\.FILO_BUILD_PASSPHRASE/, 'il feedback del cancello unit usa FILO_BUILD_PASSPHRASE');
       assert.match(avvisoJob, /^ {4}environment:\s*rilascio\s*$/m, 'la parola si legge solo nell\'ambiente `rilascio`, scritto fisso');
       for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob]]) {
         assert.doesNotMatch(testo, /secrets\.|environment:/, `\`${nome}\` fa girare il codice provato: niente segreti né ambiente`);
