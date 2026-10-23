@@ -1667,6 +1667,7 @@ class TabManager {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
       const esito = this.applyTriageDecisions(cands, [...byIndex.values()]);
+      contaGiro(esito.archived, dupIdx.size, giudizioMancato);
       return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
     } finally {
       this._triageRunning = false;
