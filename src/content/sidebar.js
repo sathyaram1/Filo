@@ -91,7 +91,7 @@
     if (!s || s.contata) return;
     try { Popup?.conta?.({ misura: 'in-corso', cosa: 'aiuto', ...datiSessione(s) }); } catch (_) {}
   }
-  try { window.addEventListener('pagehide', () => { if (isOpen()) contaSessione(); }); } catch (_) {}
+  try { window.addEventListener('pagehide', () => contaSessione()); } catch (_) {}
   // Cap difensivo: il prompt dice «max 2» ma l'AI può insistere; le ricerche oltre il
   // limite si ignorano in silenzio.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
