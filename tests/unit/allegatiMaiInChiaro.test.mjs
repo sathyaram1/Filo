@@ -32,6 +32,7 @@ import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { PUNTI_DI_CARICAMENTO, chiCaricaNelDeposito } from '../helpers/puntiDiCaricamento.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
