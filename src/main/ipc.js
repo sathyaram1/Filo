@@ -250,6 +250,19 @@ function registerIpcHandlers() {
     event.returnValue = si;
   });
 
+  // #1585 — il dizionario del correttore (dizionarioDiFilo.js). Sincroni: il correttore decide i segni mentre li
+  // disegna. `null` finché non è pronto, e la pagina chiede al browser.
+  ipcMain.on('filo:dizionario-sbagliate', (event, parole) => {
+    let out = null;
+    try { out = require('./services/dizionarioDiFilo').sbagliate(parole); } catch (_) {}
+    event.returnValue = out;
+  });
+  ipcMain.on('filo:dizionario-proposte', (event, parola) => {
+    let out = null;
+    try { out = require('./services/dizionarioDiFilo').proposte(parola); } catch (_) {}
+    event.returnValue = out;
+  });
+
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
     try { MenuDiRiserva.chiesto(event, richiesta); } catch (_) {}
