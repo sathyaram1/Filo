@@ -158,7 +158,7 @@
   }
 
   function apri(context) {
-    if (isOpen()) { mostra(); return; }
+    if (apertoQui()) { mostra(); return; }
     if (root) close({ davvero: true });
     facciata.attiva = false;
     history = [];
