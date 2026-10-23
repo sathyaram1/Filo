@@ -7,12 +7,13 @@ import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 
 const OPZIONI = 'filo://options/options.html';
+const HOME = 'filo://newtab/';
 const ERRORE = 'filo://error/error.html?url=https%3A%2F%2Fbanca.example%2F&code=-105&desc=Chiama+il+numero+verde';
 
 let rinvii;
 test.beforeAll(async () => {
   rinvii = createServer((req, res) => {
-    const verso = { '/errore': ERRORE, '/opzioni': OPZIONI }[req.url.split('?')[0]];
+    const verso = { '/errore': ERRORE, '/opzioni': OPZIONI, '/home': HOME }[req.url.split('?')[0]];
     if (!verso) { res.writeHead(404); res.end(); return; }
     res.writeHead(302, { Location: verso });
     res.end();
@@ -177,4 +178,32 @@ setTimeout(function(){ window.open(${JSON.stringify(ERRORE)}); }, 400);</script>
   }, [OPZIONI, MSG.FILE_NOME_STATO]);
   expect(risposte.dallaFinestrella && risposte.dallaFinestrella.code, JSON.stringify(risposte.dallaFinestrella)).toBe('forbidden');
   expect(risposte.dallaScheda && risposte.dallaScheda.ok, 'la stessa pagina in una scheda di Filo risponde').toBe(true);
+});
+
+// La home nuda è l'unica pagina di Filo che un sito può chiedere: arriva come home vera, anche da un rinvio del server.
+test('un rinvio del server verso la home la apre come home vera di Filo', async ({ app, openTab, testServer }) => {
+  const sito = testServer.html(`<title>Va a casa</title><script>setTimeout(function(){ location.href = ${JSON.stringify(rinvio('home'))}; }, 200)</script>`);
+  await openTab(sito);
+  const ultima = () => app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const t = tm.tabs[tm.tabs.length - 1];
+    let servizi = '';
+    try { servizi = await t.view.webContents.executeJavaScript('typeof (window.chrome && chrome.runtime && chrome.runtime.sendMessage)'); } catch (_) {}
+    return { vista: t.view.webContents.getURL(), interna: t.isInternal, servizi };
+  });
+  await expect.poll(async () => (await ultima()).vista, { timeout: 8000 }).toBe(HOME);
+  await expect.poll(ultima, { message: 'la home è una scheda di Filo, coi suoi servizi', timeout: 8000 })
+    .toEqual({ vista: HOME, interna: true, servizi: 'function' });
+});
+
+test('la finestrella di accesso non arriva nemmeno sulla home di Filo', async ({ app, openTab, testServer }) => {
+  await servi(app, {
+    'accounts.google.com/o/oauth2/v2/auth': `<title>Accedi</title><h1>Accesso</h1><script>setTimeout(function(){ location.href = ${JSON.stringify(HOME)}; }, 200);</script>`,
+  });
+  const page = await testServer.openReady(openTab, `<title>Negozio</title><button id="b" style="width:220px;height:60px"
+  onclick="window.open(${JSON.stringify(GOOGLE).replace(/"/g, '&quot;')},'login','width=420,height=520')">Accedi con…</button>`);
+  await page.click('#b');
+  await expect.poll(() => finestrella(app), { timeout: 8000 }).toEqual([GOOGLE]);
+  await new Promise((r) => setTimeout(r, 2000));
+  expect(await finestrella(app), 'la finestrella resta sull’accesso').toEqual([GOOGLE]);
 });
