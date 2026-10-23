@@ -5277,9 +5277,25 @@
     server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
     rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
     all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
+    // Il salto vale per la versione che verifica e audit hanno letto (#1040.1): niente fusione e niente richiesta.
+    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto: non si fonde e non si chiede il via libera. Rimandala in lavorazione, così il giro nuovo li legge.', giroNuovo: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza non si fonde. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
   };
 
+  // Un esito che chiede un giro nuovo resta per pratica: la rilettura dopo l'esito ridisegna il pannello e
+  // riproporrebbe il salto. Vale finché stato e audit sono quelli su cui il server ha risposto.
+  const esitiSalta = new Map();
+  function firmaSalta(fb) {
+    const n = MR.normalizeStatus(fb);
+    const l4 = (fb && fb.livelli && fb.livelli.l4) || {};
+    return `${n.status}|${n.statusReason || ''}|${l4.esito || ''}|${l4.at || ''}`;
+  }
+
   function pannelloSaltaAudit(fb) {
+    const fermo = esitiSalta.get(fb._id);
+    const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', { releasedVersion });
+    if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
+    if (fermo) esitiSalta.delete(fb._id);
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const btn = document.createElement('button');
