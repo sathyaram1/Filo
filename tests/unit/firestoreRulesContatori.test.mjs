@@ -107,15 +107,21 @@ test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   }
   assert.ok(per('write').length === 0, 'una `write` scavalcherebbe il no a update e delete');
   assert.equal(per('create').length, 1);
-  assert.equal(per('create')[0].cond, 'contatoriGiorno(request.resource.data) || contatoriOra(request.resource.data)');
+  assert.equal(per('create')[0].cond,
+    'contatoriGiorno(request.resource.data) || contatoriOraV2(request.resource.data) || contatoriOra(request.resource.data)');
 });
 
-test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; i giorni di prima tengono la loro forma', () => {
-  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI]);
-  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI]);
+test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; le ore e i giorni delle copie vecchie tengono la loro forma', () => {
+  assert.deepEqual(elencoDopo(ORA_V3, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI]);
+  assert.deepEqual(elencoDopo(ORA_V3, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI]);
+  assert.match(ORA_V3, new RegExp(`&& d\\.v == ${C.VERSIONE} && testaOra\\(d\\) && misureOra\\(d\\) && misureChiamate\\(d\\)$`));
+  // Le copie di Filo di prima di #1464 mandano ancora la v2: stessa testa e stesse misure, senza le chiamate.
+  assert.deepEqual(elencoDopo(ORA_V2, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_V2]);
+  assert.deepEqual(elencoDopo(ORA_V2, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_V2]);
+  assert.match(ORA_V2, new RegExp(`&& d\\.v == ${C.VERSIONE_V2} && testaOra\\(d\\) && misureOra\\(d\\)$`));
+  assert.deepEqual(C.CAMPI.slice(0, C.CAMPI_V2.length), [...C.CAMPI_V2], 'la v3 è la v2 più le misure delle chiamate');
   assert.deepEqual(elencoDopo(GIORNO, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_GIORNO]);
   assert.deepEqual(elencoDopo(GIORNO, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_GIORNO]);
-  assert.equal(Number(/d\.v == (\d+)/.exec(ORA)[1]), C.VERSIONE);
   assert.equal(Number(/d\.v == (\d+)/.exec(GIORNO)[1]), C.VERSIONE_GIORNO);
   const ora = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.243', os: 'win', dati: C.oraVuota() });
   assert.deepEqual(Object.keys(ora), [...C.CAMPI]);
