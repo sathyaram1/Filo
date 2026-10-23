@@ -61,7 +61,7 @@ test('home: un’immagine lasciata fuori dal campo entra in anteprima, e mentre 
   await expect(page.locator('#input')).toBeFocused();
 });
 
-test('home: più immagini insieme entrano tutte; oltre i 4 MB col percorso entra il file, senza percorso lo si dice', async ({ app, shell }) => {
+test('home: più immagini insieme entrano tutte; oltre i 4 MB col percorso entra il file, senza percorso rimpicciolita', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await home(app);
   const piccole = immaginiSulDisco(3);
@@ -72,14 +72,75 @@ test('home: più immagini insieme entrano tutte; oltre i 4 MB col percorso entra
   await lascia(page, [grande], { x: 120, y: 120 });
   await expect(page.locator('#imgPreviews .dash-file-chip')).toHaveText(/grande\.png/, { timeout: 5_000 });
 
-  // #1298 — incollata, l'immagine grande non ha un percorso: prima spariva senza dire niente.
-  await page.evaluate((n) => {
+  // #1298 — incollata, una foto vera oltre i 4 MB non ha un percorso: entra rimpicciolita, come nell'Aiuto (#1623 giro 4).
+  const b64 = await app.evaluate(({ nativeImage }) => {
+    const w = 1800, h = 1200, px = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < px.length; i++) px[i] = (i % 4 === 3) ? 255 : (Math.random() * 256) | 0;
+    return nativeImage.createFromBitmap(px, { width: w, height: h }).toPNG().toString('base64');
+  });
+  expect(Buffer.from(b64, 'base64').length).toBeGreaterThan(4 * 1024 * 1024);
+  await page.evaluate((dati) => {
     const dt = new DataTransfer();
-    dt.items.add(new File([new Uint8Array(n)], 'incollata.png', { type: 'image/png' }));
+    dt.items.add(new File([Uint8Array.from(atob(dati), (c) => c.charCodeAt(0))], 'incollata.png', { type: 'image/png' }));
     document.getElementById('inputForm').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-  }, PNG_GRANDE.length);
-  await expect(page.locator('.sn-toast').filter({ hasText: 'supera i 4 MB' })).toBeVisible({ timeout: 5_000 });
-  await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(3);
+  }, b64);
+  await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(4, { timeout: 10_000 });
+  const ultima = await page.locator('#imgPreviews .dash-img-preview img').nth(3).getAttribute('src');
+  expect(ultima.slice(0, 23)).toBe('data:image/jpeg;base64,');
+  expect(Math.floor((ultima.length - 23) * 3 / 4)).toBeLessThanOrEqual(4 * 1024 * 1024);
+  await expect(page.locator('.sn-toast')).toHaveCount(0);
+});
+
+test('un’immagine in un formato che il modello non legge (SVG) entra come PNG, nella home e nell’Aiuto', async ({ app, shell, openTab, testServer }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const casa = await home(app);
+  const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><rect width="120" height="80" fill="#c45a3c"/></svg>');
+  const [logo] = immaginiSulDisco(1, { byte: SVG, nome: () => 'logo.svg' });
+  await lascia(casa, [logo], { x: 120, y: 120 });
+  await expect(casa.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
+  expect((await casa.locator('#imgPreview img').getAttribute('src')).slice(0, 22)).toBe('data:image/png;base64,');
+  await expect(casa.locator('#imgPreview')).toHaveAttribute('title', logo);
+
+  const page = await testServer.openReady(openTab, SITO);
+  await nelMondoDiFilo(app, page, AGENTE);
+  await lascia(page, [logo]);
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
+  await page.keyboard.type('cos’è?');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
+  const [p] = await nelMondoDiFilo(app, page, () => globalThis.__richieste);
+  const immagini = p.history.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((c) => c.type === 'image_url');
+  expect(immagini.map((c) => c.image_url.url.slice(0, 22))).toEqual(['data:image/png;base64,']);
+});
+
+test('Aiuto: una richiesta con un’immagine rifiutata dal fornitore non blocca le domande dopo, e lo si dice', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SITO);
+  await nelMondoDiFilo(app, page, () => {
+    globalThis.__richieste = [];
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...r) => {
+      if (m && m.type === globalThis.SN_MSG.MSG.AI_REQUEST && m.action === globalThis.SN_CONST.ACTIONS.HELP) {
+        globalThis.__richieste.push(m.payload);
+        return Promise.resolve(globalThis.__richieste.length === 1
+          ? { ok: false, error: 'Invalid image', status: 400 }
+          : { ok: true, text: '{"text":"Eccomi.","status":"done"}' });
+      }
+      return orig(m, ...r);
+    };
+    return 1;
+  });
+  const foto = immaginiSulDisco(1);
+  await lascia(page, foto);
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 8_000 }).toBe(1);
+  await page.keyboard.type('cos’è?');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBe(1);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-toast'))?.testo || '', { timeout: 5_000 }).toMatch(/partono senza l’immagine/);
+  await page.keyboard.type('e adesso?');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBe(2);
+  const secondo = await nelMondoDiFilo(app, page, () => globalThis.__richieste[1]);
+  expect(secondo.history.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((c) => c.type === 'image_url')).toEqual([]);
 });
 
 test('sito che il rilascio non lo gestisce: l’immagine entra nell’Aiuto già allegata, col fuoco nella casella', async ({ app, openTab, testServer }) => {

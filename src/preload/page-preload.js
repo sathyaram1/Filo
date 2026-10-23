@@ -884,6 +884,7 @@ function loadScripts() {
   // tab): in un riquadro descriverebbero il rettangolo sbagliato e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
+  try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo CS] immaginiChat', e); } // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina

@@ -1713,28 +1713,38 @@
     percorsiImmagini.clear();
     renderImagePreviews();
   }
-  // Oltre il tetto e senza un percorso l'immagine non entra, e lo si dice una volta per gesto (#1298).
-  let troppoGrandi = 0;
-  function avvisaTroppoGrandi(n = 1) {
-    const prima = troppoGrandi;
-    troppoGrandi += n;
-    if (prima) return;
+  // Quello che non entra lo si dice, in un avviso per gesto (#1298).
+  const nonEntrate = { grandi: 0, rotte: 0 };
+  let avvisoInArrivo = false;
+  function avvisaNonEntrate(tipo, n = 1) {
+    nonEntrate[tipo] += n;
+    if (avvisoInArrivo) return;
+    avvisoInArrivo = true;
     setTimeout(() => {
-      const n = troppoGrandi;
-      troppoGrandi = 0;
-      try { window.SN_POPUP?.showToast?.(self.SN_CONST.ALLEGATI_CHAT.fraseTroppoGrandi(n)); } catch (_) {}
-    }, 0);
+      const A = self.SN_CONST.ALLEGATI_CHAT;
+      const frasi = [];
+      if (nonEntrate.grandi) frasi.push(A.fraseTroppoGrandi(nonEntrate.grandi));
+      if (nonEntrate.rotte) frasi.push(A.fraseIlleggibili(nonEntrate.rotte));
+      nonEntrate.grandi = 0;
+      nonEntrate.rotte = 0;
+      avvisoInArrivo = false;
+      try { window.SN_POPUP?.showToast?.(frasi.join(' ')); } catch (_) {}
+    }, 250);
   }
+  // Oltre il tetto un'immagine dal disco entra come file col suo percorso; senza percorso, o in un formato che il
+  // modello non legge, si ridisegna come nell'Aiuto (#1623). In fila, così le anteprime tengono l'ordine del gesto.
+  let immaginiInFila = Promise.resolve();
   function handleImageFile(file, percorso = '') {
-    if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > self.SN_CONST.ALLEGATI_CHAT.tettoImmagineByte) {
-      if (percorso) addPendingFile(percorso);
-      else avvisaTroppoGrandi();
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => addPendingImage(reader.result, percorso);
-    reader.readAsDataURL(file);
+    if (!file || !String(file.type || '').startsWith('image/')) return;
+    const A = self.SN_CONST.ALLEGATI_CHAT;
+    if (file.size > A.tettoImmagineByte && percorso) { addPendingFile(percorso); return; }
+    if (file.size > A.tettoLetturaByte) { avvisaNonEntrate('grandi'); return; }
+    const pronta = Promise.resolve(window.SN_IMMAGINI_CHAT?.perLaChat(file)).catch(() => '');
+    immaginiInFila = immaginiInFila.then(() => pronta).then((url) => {
+      if (url) addPendingImage(url, percorso);
+      else if (percorso) addPendingFile(percorso);
+      else avvisaNonEntrate('rotte');
+    });
   }
   // Un file dal disco: le immagini si vedono (e il modello le guarda), gli altri entrano col loro percorso.
   function handleDroppedFile(file) {
@@ -2008,10 +2018,12 @@
     } else if (msg?.type === MSG.CHAT_ALLEGA && msg.dove === 'casa') {
       // Le immagini lasciate sulla fila delle schede o sulla barra (#1623), già lette dal main.
       for (const im of Array.isArray(msg.immagini) ? msg.immagini : []) {
-        if (im && /^data:image\//i.test(String(im.dataUrl || ''))) addPendingImage(im.dataUrl, typeof im.percorso === 'string' ? im.percorso : '');
+        if (im && /^data:image\//i.test(String(im.dataUrl || ''))) {
+          handleImageFile(window.SN_IMMAGINI_CHAT?.blobDa(im.dataUrl), typeof im.percorso === 'string' ? im.percorso : '');
+        }
       }
       for (const p of Array.isArray(msg.file) ? msg.file : []) if (typeof p === 'string') addPendingFile(p);
-      if (Number(msg.grandi) > 0) avvisaTroppoGrandi(Math.floor(Number(msg.grandi)));
+      if (Number(msg.grandi) > 0) avvisaNonEntrate('grandi', Math.floor(Number(msg.grandi)));
       inputEl.focus();
     } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;

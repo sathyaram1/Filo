@@ -15,7 +15,7 @@
       ],
       fixes: [
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
-        'Un\'immagine oltre i 4 MB incollata nella chat della home non sparisce più senza dire niente: un avviso ti dice di trascinarla dal computer, così entra come file.',
+        'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
       ],
     },
     {

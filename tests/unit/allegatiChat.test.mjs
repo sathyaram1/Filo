@@ -44,11 +44,12 @@ test('il modello sa che le immagini le ha allegate l’utente e non sono la pagi
   assert.match(PROMPTS.soloAllegatiAiuto(), /senza scrivere niente/);
 });
 
-test('#1298: oltre il tetto un’immagine non sparisce in silenzio, la frase dice cosa fare', () => {
+test('#1298: un’immagine che non entra non sparisce in silenzio, e una rifiutata lascia proseguire', () => {
   assert.equal(ALLEGATI_CHAT.tettoImmagineByte, 4 * 1024 * 1024);
-  assert.match(ALLEGATI_CHAT.fraseTroppoGrandi(1), /^L’immagine supera i 4 MB.*trascinala da lì/);
-  assert.match(ALLEGATI_CHAT.fraseTroppoGrandi(3), /^3 immagini superano i 4 MB/);
-  assert.match(ALLEGATI_CHAT.fraseTroppoGrandiAiuto(2), /^2 immagini superano i 64 MB: l’Aiuto non le può vedere/);
+  assert.equal(ALLEGATI_CHAT.fraseTroppoGrandi(1), 'L’immagine supera i 64 MB e non è entrata.');
+  assert.match(ALLEGATI_CHAT.fraseTroppoGrandi(3), /^3 immagini superano i 64 MB/);
+  assert.match(ALLEGATI_CHAT.fraseImmaginiTolte(1), /le prossime domande partono senza l’immagine/);
+  assert.match(ALLEGATI_CHAT.fraseImmaginiTolte(2), /senza le 2 immagini/);
   assert.ok(ALLEGATI_CHAT.tettoLetturaByte > ALLEGATI_CHAT.tettoImmagineByte);
   assert.match(ALLEGATI_CHAT.fraseNonImmaginiAiuto(1), /^Un file non è un’immagine/);
   assert.match(ALLEGATI_CHAT.fraseNonImmaginiAiuto(2), /^2 file non sono immagini/);
@@ -91,8 +92,10 @@ test('dalla fila delle schede: il main legge solo immagini dal disco; oltre il t
     assert.deepEqual(aiuto.immagini.map((i) => [i.nome, i.percorso]), [['piccola.png', ''], ['grande.jpg', ''], ['da finestra.png', '']]);
     assert.equal(aiuto.grandi, 0);
     assert.equal(aiuto.altri, 2);
-    const enorme = `data:image/png;base64,${'A'.repeat(Math.ceil(ALLEGATI_CHAT.tettoImmagineByte * 4 / 3) + 8)}`;
-    assert.equal((await prepara([{ dataUrl: enorme }], { casa: true })).grandi, 1);
+    // Senza percorso, oltre i 4 MB, anche la home riceve l'immagine e la rimpicciolisce (#1623 giro 4).
+    const grandeInLinea = `data:image/png;base64,${'A'.repeat(Math.ceil(ALLEGATI_CHAT.tettoImmagineByte * 4 / 3) + 8)}`;
+    const inCasa = await prepara([{ nome: 'copiata.png', dataUrl: grandeInLinea }], { casa: true });
+    assert.deepEqual([inCasa.immagini.map((i) => i.nome), inCasa.grandi], [['copiata.png'], 0]);
   } finally {
     togliCartella(dir);
   }

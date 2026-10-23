@@ -34,8 +34,12 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
 - **Nell'Aiuto niente percorsi.** Il pannello sta nel documento del sito: anteprime in uno Shadow DOM chiuso, e oltre
   i 4 MB l'immagine si rimpicciolisce finché ci sta (l'Aiuto non apre file dal disco, e il percorso lo leggerebbe il
   sito); solo oltre il tetto di lettura non entra, e lo dice un avviso. Nella home oltre il tetto entra come file col
-  suo percorso; senza percorso lo dice un avviso (#1298). Tetti e frasi stanno in `ALLEGATI_CHAT`
+  suo percorso; senza percorso si rimpicciolisce come nell'Aiuto (#1298). Tetti e frasi stanno in `ALLEGATI_CHAT`
   (`src/shared/constants.js`).
+- **Al modello solo formati che legge tutti.** PNG, JPEG, WebP e GIF passano come sono; SVG, BMP, AVIF e gli altri si
+  ridisegnano in PNG, prima di entrare, in ogni strada della home e dell'Aiuto (`src/shared/immaginiChat.js`). Una
+  richiesta rifiutata dal fornitore toglie le immagini dalla cronologia dell'Aiuto, e lo dice: restando, ogni domanda
+  dopo fallirebbe uguale (#1623, giro 4).
 - **Nessun file sparisce in silenzio.** Alla chat arrivano tutti i file lasciati insieme a un'immagine: la home prende
   gli altri col percorso, l'Aiuto dice in un avviso che non sono immagini.
 - **Le immagini restano nel turno.** Nell'Aiuto stanno nella cronologia, così i passi che fa da solo le vedono ancora;

@@ -21,7 +21,7 @@ const byteDi = (dataUrl) => Math.floor((dataUrl.length - dataUrl.indexOf(',') - 
 
 // `voci`: [{ nome, percorso }] dal disco, [{ nome, dataUrl }] per le immagini senza file (da un'altra finestra),
 // [{ nome, altro: true }] per un file che non è un'immagine e non ha percorso. Sopra il tetto un file entra col
-// percorso nella home, che lo sa aprire; all'Aiuto va l'immagine intera, che la rimpicciolisce lui. Un file che non è
+// percorso nella home, che lo sa aprire; all'Aiuto, o senza percorso, va l'immagine intera, e la chat la rimpicciolisce. Un file che non è
 // un'immagine nella home entra col percorso come lasciato lì; all'Aiuto si conta, e il conto diventa un avviso.
 async function prepara(voci, { casa }) {
   const immagini = [];
@@ -57,7 +57,7 @@ async function prepara(voci, { casa }) {
     const dataUrl = v && typeof v.dataUrl === 'string' ? v.dataUrl : '';
     if (!IN_LINEA.test(dataUrl)) continue;
     const byte = byteDi(dataUrl);
-    if (byte > tetto() && (casa || byte > tettoLettura())) grandi += 1;
+    if (byte > tettoLettura()) grandi += 1;
     else immagini.push({ dataUrl, nome, percorso: '' });
   }
   return { immagini, file, grandi, altri };

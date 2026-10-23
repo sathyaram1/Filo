@@ -291,6 +291,7 @@ function loadContentScripts() {
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
   // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'));
+  safe(path.join(SHARED, 'immaginiChat.js')); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   safe(path.join(SHARED, 'contenutoEsterno.js')); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.

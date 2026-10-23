@@ -458,47 +458,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     o.appendChild(riga);
   }
 
-  const leggiImmagine = (f) => new Promise((ok) => {
-    try {
-      const r = new FileReader();
-      r.onload = () => ok(typeof r.result === 'string' && /^data:image\//i.test(r.result) ? r.result : null);
-      r.onerror = () => ok(null);
-      r.readAsDataURL(f);
-    } catch (_) { ok(null); }
-  });
-  const byteDi = (dataUrl) => Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
-  const blobDa = (dataUrl) => {
-    try {
-      const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
-      const u = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-      return new Blob([u]);
-    } catch (_) { return null; }
-  };
-  // Oltre il tetto l'immagine si rimpicciolisce finché ci sta: il modello la ridurrebbe comunque, e così entra.
-  async function rimpicciolita(blob) {
-    let bmp = null;
-    try { bmp = await createImageBitmap(blob); } catch (_) { return null; }
-    try {
-      for (let lato = Allegati.latoRimpicciolita; lato >= 256; lato = Math.floor(lato * 0.7)) {
-        const k = Math.min(1, lato / Math.max(bmp.width, bmp.height));
-        const c = document.createElement('canvas');
-        c.width = Math.max(1, Math.round(bmp.width * k));
-        c.height = Math.max(1, Math.round(bmp.height * k));
-        const g = c.getContext('2d');
-        g.fillStyle = '#fff';
-        g.fillRect(0, 0, c.width, c.height);
-        g.drawImage(bmp, 0, 0, c.width, c.height);
-        const url = c.toDataURL('image/jpeg', 0.85);
-        if (/^data:image\/jpeg;base64,/.test(url) && byteDi(url) <= Allegati.tettoImmagineByte) return url;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    } finally {
-      try { bmp.close(); } catch (_) {}
-    }
-  }
+  const Immagini = global.SN_IMMAGINI_CHAT;
 
   // Il pannello pronto a ricevere: false dove Filo è spento, null con l'Aiuto spento (e lo si dice).
   function pannelloPerAllegati() {
@@ -513,16 +473,25 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   function allegatiArrivati({ grandi = 0, rotte = 0, altri = 0 } = {}) {
     disegnaAllegati();
     const frasi = [];
-    if (grandi) frasi.push(Allegati.fraseTroppoGrandiAiuto(grandi));
+    if (grandi) frasi.push(Allegati.fraseTroppoGrandi(grandi));
     if (rotte) frasi.push(Allegati.fraseIlleggibili(rotte));
     if (altri) frasi.push(Allegati.fraseNonImmaginiAiuto(altri));
     if (frasi.length) Popup?.showToast?.(frasi.join(' '));
     try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
   }
   const conta = (n) => Math.max(0, Math.floor(Number(n) || 0));
+  const RIFIUTO = new Set([400, 413, 415, 422]);
+  function togliImmaginiDallaStoria() {
+    let n = 0;
+    for (const m of history) {
+      if (m && Array.isArray(m.immagini) && m.immagini.length) { n += m.immagini.length; delete m.immagini; }
+    }
+    return n;
+  }
 
+  // Ogni strada passa da qui: oltre il tetto o in un formato che il modello non legge, l'immagine si ridisegna.
   async function allegaUna(blob, nome, conti) {
-    const dataUrl = blob.size > Allegati.tettoImmagineByte ? await rimpicciolita(blob) : await leggiImmagine(blob);
+    const dataUrl = blob && Immagini ? await Immagini.perLaChat(blob) : '';
     if (dataUrl) allegati.immagini.push({ dataUrl, nome });
     else conti.rotte += 1;
   }
@@ -552,13 +521,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (!buone.length && !conti.grandi && !conti.altri) return false;
     if (!pannelloPerAllegati()) return false;
     for (const im of buone) {
-      const nome = typeof im.nome === 'string' ? im.nome : '';
-      if (byteDi(im.dataUrl) <= Allegati.tettoImmagineByte) allegati.immagini.push({ dataUrl: im.dataUrl, nome });
-      else {
-        const blob = blobDa(im.dataUrl);
-        if (blob) await allegaUna(blob, nome, conti);
-        else conti.rotte += 1;
-      }
+      await allegaUna(Immagini?.blobDa(im.dataUrl), typeof im.nome === 'string' ? im.nome : '', conti);
       if (!root) return true;
     }
     allegatiArrivati(conti);
@@ -2156,6 +2119,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
       mostraRimedio(assistantEl, err);
+      // Rifiutata una richiesta con immagini in cronologia: restando, ogni domanda dopo fallirebbe uguale.
+      if (RIFIUTO.has(Number(err && err.status))) {
+        const tolte = togliImmaginiDallaStoria();
+        if (tolte) Popup?.showToast?.(Allegati.fraseImmaginiTolte(tolte));
+      }
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });

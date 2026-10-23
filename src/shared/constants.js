@@ -3051,11 +3051,11 @@
     tettoLetturaByte: 64 * 1024 * 1024,
     latoRimpicciolita: 2048,
     fraseTroppoGrandi: (n) => (quante(n) > 1
-      ? `${quante(n)} immagini superano i 4 MB e non sono entrate. Salvale sul computer e trascinale da lì: entreranno come file.`
-      : 'L’immagine supera i 4 MB e non è entrata. Salvala sul computer e trascinala da lì: entrerà come file.'),
-    fraseTroppoGrandiAiuto: (n) => (quante(n) > 1
-      ? `${quante(n)} immagini superano i 64 MB: l’Aiuto non le può vedere.`
-      : 'L’immagine supera i 64 MB: l’Aiuto non la può vedere.'),
+      ? `${quante(n)} immagini superano i 64 MB e non sono entrate.`
+      : 'L’immagine supera i 64 MB e non è entrata.'),
+    fraseImmaginiTolte: (n) => (quante(n) > 1
+      ? `La richiesta non è stata accettata: le prossime domande partono senza le ${quante(n)} immagini.`
+      : 'La richiesta non è stata accettata: le prossime domande partono senza l’immagine.'),
     fraseIlleggibili: (n) => (quante(n) > 1 ? `${quante(n)} immagini non si sono aperte.` : 'L’immagine non si è aperta.'),
     fraseNonImmaginiAiuto: (n) => (quante(n) > 1
       ? `${quante(n)} file non sono immagini e non sono entrati: all’Aiuto si danno solo immagini.`
