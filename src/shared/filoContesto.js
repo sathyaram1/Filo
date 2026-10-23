@@ -565,6 +565,65 @@
     return Math.max(minimo, resta);
   }
 
+  // I caratteri da togliere perché la richiesta (strumenti compresi) stia nella finestra insieme al tetto della risposta,
+  // che il fornitore conta dentro: 0 se ci sta o se la finestra non si sa.
+  function eccessoNellaFinestra({ finestra = null, caratteri = 0, risposta = 0 } = {}) {
+    const f = Number(finestra);
+    if (!Number.isFinite(f) || f <= 0) return 0;
+    const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+    return Math.max(0, Math.ceil((Number(caratteri) || 0) - (f * MARGINE_FINESTRA - riserva) * CARATTERI_PER_TOKEN));
+  }
+
+  // Dopo un rifiuto per finestra, i caratteri da togliere: in proporzione con le due misure, dalla stima con la sola
+  // finestra; null se il rifiuto non dice abbastanza (chi taglia dimezza).
+  function eccessoDopoRifiuto({ max = null, chiesti = null, caratteri = 0, risposta = 0 } = {}) {
+    const c = Math.max(0, Number(caratteri) || 0);
+    if (max && chiesti && chiesti > max && c > 0) return Math.ceil(c - c * (max / chiesti) * MARGINE_FINESTRA);
+    const stimato = max ? eccessoNellaFinestra({ finestra: max, caratteri: c, risposta }) : 0;
+    return stimato > 0 ? stimato : null;
+  }
+
+  // #1596 — quanto resta, in caratteri, di ogni pagina letta nel turno perché insieme stiano nella finestra. `pagine`:
+  // le lunghezze nell'ordine in cui tenerle. Le prime restano intere, la prima che non ci sta resta a metà se ne avanza
+  // il minimo, le altre scendono a 0 (titolo e indirizzo, che costano PESO_RIMANDO ciascuna).
+  const PAGINA_MIN = 4000;
+  const PESO_RIMANDO = 800;
+  function pagineDaTenere(pagine, eccesso) {
+    const lunghe = (Array.isArray(pagine) ? pagine : []).map((n) => Math.max(0, Math.floor(Number(n) || 0)));
+    const e = Math.max(0, Math.ceil(Number(eccesso) || 0));
+    if (!e) return lunghe;
+    let resta = lunghe.reduce((s, n) => s + n, 0) - e - PESO_RIMANDO * lunghe.length;
+    return lunghe.map((n) => {
+      if (n <= resta) { resta -= n; return n; }
+      if (resta < PAGINA_MIN) return 0;
+      const tenuti = resta;
+      resta = 0;
+      return tenuti;
+    });
+  }
+
+  // La riga sotto la risposta sulle pagine rimaste fuori (#1596): `pagine` è [{ url, parziale }]. Nomina i siti e non i
+  // titoli, perché la frase resta fra le parole di Filo e un titolo lo scrive chi possiede la pagina.
+  function sitoDi(url) {
+    try { return new URL(String(url || '')).hostname.replace(/^www\./, ''); } catch (_) { return ''; }
+  }
+  function elencoSiti(lista) {
+    const siti = [...new Set(lista.map((p) => sitoDi(p.url)).filter(Boolean))];
+    if (!siti.length) return '';
+    return ` (${siti.length === 1 ? siti[0] : `${siti.slice(0, -1).join(', ')} e ${siti[siti.length - 1]}`})`;
+  }
+  function frasePagineLasciate(pagine) {
+    const lista = (Array.isArray(pagine) ? pagine : []).filter((p) => p && typeof p === 'object');
+    if (!lista.length) return '';
+    const fuori = lista.filter((p) => !p.parziale);
+    const meta = lista.filter((p) => p.parziale);
+    const parti = [];
+    if (fuori.length) parti.push(`ho lasciato fuori ${fuori.length === 1 ? 'una pagina letta' : `${fuori.length} pagine lette`}${elencoSiti(fuori)}`);
+    if (meta.length) parti.push(`${meta.length === 1 ? 'di una pagina' : `di ${meta.length} pagine`}${elencoSiti(meta)} ho tenuto solo l'inizio`);
+    const piu = lista.length > 1;
+    return `Per stare nella memoria del modello ${parti.join(' e ')}: se ${piu ? 'ti servono, chiedimi di rileggerle' : 'ti serve, chiedimi di rileggerla'}.`;
+  }
+
   // Quello che il modello ha già davanti dall'archivio: i pezzi ripescati nei turni prima e le conversazioni rilette
   // per intero. Non si ripescano di nuovo (#868.1): le copie si accumulavano a ogni messaggio sullo stesso argomento.
   function giaDavanti(azioni) {
