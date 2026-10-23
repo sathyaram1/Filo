@@ -5362,6 +5362,21 @@
     return box;
   }
 
+  // Il salto non c'è più da proporre: prima cosa è successo, poi la strada, sotto e non dove stava il salto, così
+  // un clic in più sul punto di prima non rimanda la pratica.
+  function pannelloSaltoFermo(fb, m, azione) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.id = 'mgL4StradeEsito';
+    esito.setAttribute('role', 'status');
+    esito.dataset.kind = m.kind;
+    esito.textContent = m.text;
+    box.append(esito, tastoStrada(fb, { ...STRADE_FUSIONE.rimanda, id: 'mgL4RimandaBtn', azione }));
+    return box;
+  }
+
   mgSideClose.addEventListener('click', closeSidebar);
 
   // Titolo: per l'OWNER il MODELLO reale che ha emesso il verdetto; per i non-owner
