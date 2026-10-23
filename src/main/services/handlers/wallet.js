@@ -1053,6 +1053,13 @@ module.exports = function register(on, ctx) {
     senzaRipiego, conRipiegoDetto,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
+    // …e il riavvio per la coda del registro: la si rilegge dal disco come all'avvio.
+    rileggiCodaPerTest: async () => {
+      if (process.env.NODE_ENV !== 'test') return;
+      queue.length = 0;
+      queueLoaded = false;
+      await loadQueue();
+    },
   };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la
