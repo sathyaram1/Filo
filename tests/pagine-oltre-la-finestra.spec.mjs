@@ -128,6 +128,7 @@ for (const caso of [
     await expect(bolla).toContainText('Per stare nella memoria del modello');
     await expect(bolla).toContainText(/chiedimi di rileggerl[ae]/);
     await expect(bolla).toContainText('127.0.0.1');
+    console.log('MISURE', JSON.stringify(await app.evaluate(() => globalThis.__misure)));
     caso.rifiuti(await app.evaluate(() => globalThis.__rifiutate));
 
     // Al modello le pagine tolte arrivano come rimando: titolo e indirizzo, nessun testo inventabile.
