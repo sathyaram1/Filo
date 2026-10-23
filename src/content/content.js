@@ -2490,7 +2490,7 @@
     }
     // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
     if (msg?.type === MSG.CHAT_ALLEGA) {
-      if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Sidebar?.allegaDaFuori?.(msg); } catch (_) {} }
+      if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Promise.resolve(Sidebar?.allegaDaFuori?.(msg)).catch(() => {}); } catch (_) {} }
       return;
     }
     if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
