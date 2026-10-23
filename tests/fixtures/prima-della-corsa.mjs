@@ -11,6 +11,8 @@ import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
 export default function primaDellaCorsa(config) {
   const radice = config?.configFile ? dirname(config.configFile) : null;
   assicuraMotore(radice ? { radice } : {});
+  // Una libreria nuova del lock arriva prima degli spec che la usano (#1572).
+  if (radice) allineaPerLeProve(radice, { prefisso: '[prove]' });
   return preparaLaCorsa(radice);
 }
 
