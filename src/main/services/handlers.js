@@ -6243,13 +6243,19 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const caratteriTratto = conTratto ? FC.caratteriDi(payloadBase.filoTratto) : 0;
     const conRiletture = riletture.length > 0 && stretteRiletture < 3;
     const caratteriRiletture = riletture.reduce((n, y) => n + lunghezzaDi(y), 0);
+    // #1596 — le pagine del turno sono arrivate dopo una richiesta che ci stava: se accorciarle basta, si accorciano
+    // loro e la conversazione resta. Senza misure si dimezzano.
+    const pagine = caratteriPagine();
+    const eccesso = pagine ? FC.eccessoDopoRifiuto({ ...rifiuto, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat }) : null;
+    const accorciaPagine = () => pagine > 0 && lasciaFuoriPagine(eccesso ?? Math.ceil(pagine / 2));
+    if ((eccesso == null || eccesso <= pagine) && accorciaPagine()) return true;
     // Si stringe prima la parte più grossa; se non si stringe più, l'altra.
     const prima = conRiletture && caratteriRiletture >= caratteriTratto ? 'riletture' : 'tratto';
     for (const parte of prima === 'riletture' ? ['riletture', 'tratto'] : ['tratto', 'riletture']) {
       if (parte === 'riletture' && conRiletture && await stringiRiletture(rifiuto, caratteri)) { stretteRiletture++; return true; }
       if (parte === 'tratto' && conTratto && await stringiTratto(rifiuto, caratteri, caratteriTratto)) return true;
     }
-    return false;
+    return accorciaPagine();
   };
   // Un modello che non prende immagini (o non tante) rifiutava anche le domande senza: quelle dei turni passati
   // lasciano il posto alla nota e lo stesso giro riparte. Vale per i turni dopo con quel modello (#1166).
