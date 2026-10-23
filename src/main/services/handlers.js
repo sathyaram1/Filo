@@ -4314,7 +4314,12 @@ function pageReadsForPrompt(actions) {
     if (!out || !('pageRead' in out)) continue;
     const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.url || out.pageRead || ''), 500));
     if (!out.ok) {
-      blocks.push(`[Pagina "${indirizzo}" non letta: ${E.perCanaleSistema(out.dettaglio || 'lettura non riuscita')}. ${consiglioPaginaNonLetta(out)}]`);
+      const dettaglio = E.perCanaleSistema(out.dettaglio || 'lettura non riuscita');
+      blocks.push(out.schedaNonRisponde
+        ? `[Pagina "${indirizzo}" non letta: la scheda aperta non ha risposto in tempo (forse è troppo grande, o è ancora `
+          + `occupata) e scaricarla non è riuscito (${dettaglio}). Puoi riprovare una volta; se non basta dillo all'utente, `
+          + 'senza inventare il contenuto e senza concludere che la pagina non ha il dato.]'
+        : `[Pagina "${indirizzo}" non letta: ${dettaglio}. ${consiglioPaginaNonLetta(out)}]`);
       continue;
     }
     const totale = Number(out.totale) || 0;
@@ -4322,7 +4327,9 @@ function pageReadsForPrompt(actions) {
     const fino = Number(out.fino) || 0;
     if (!out.testo) {
       if (totale > 0 && da >= totale) {
-        blocks.push(`[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+        blocks.push(out.lettaInParte || out.scaricataInParte
+          ? `[Della pagina "${indirizzo}" ${avvisoLettaInParte(out, { oltre: true })}]`
+          : `[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
       } else if (out.fonte === 'scheda') {
         blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
           + 'dillo all\'utente e non inventare il contenuto.]');
