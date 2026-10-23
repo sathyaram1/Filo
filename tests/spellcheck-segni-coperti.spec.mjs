@@ -66,6 +66,41 @@ const riga = (page) => page.evaluate(() => {
 });
 const BARRA = { x: 0, y: 0, width: 800, height: 90 };
 
+test('un menu a tendina della pagina sopra una parte del campo: lì i segni non si vedono, sul resto sì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;font:16px sans-serif;background:#fff">
+    <main style="padding:40px 20px;position:relative">${TA}
+    <ul id="tendina" style="display:none;position:absolute;left:20px;top:40px;width:110px;height:140px;margin:0;padding:0;background:${SFONDO};list-style:none"><li>&nbsp;</li></ul>
+    </main></body>`;
+  const page = await apri(app, openTab, testServer, html);
+  const tendina = await page.evaluate(() => {
+    const t = document.getElementById('tendina');
+    t.style.display = 'block';
+    const r = t.getBoundingClientRect();
+    return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+  });
+  await expect.poll(() => caldi(app, page, tendina), { timeout: 3000 }).toBe(0);
+  const resto = await riga(page);
+  expect(await caldi(app, page, { ...resto, x: tendina.x + tendina.width + 4, width: resto.width - tendina.width - 8 }),
+    'fuori dalla tendina i segni restano').toBeGreaterThan(20);
+  await page.screenshot({ path: 'tests/.shots/1115-2-tendina.png' }).catch(() => {});
+
+  // La tendina si chiude: tornano anche i segni che copriva.
+  await page.evaluate(() => { document.getElementById('tendina').style.display = 'none'; });
+  await expect.poll(() => caldi(app, page, { ...tendina, height: 40 }), { timeout: 3000 }).toBeGreaterThan(5);
+});
+
+test('un campo posato fuori da un riquadro che taglia ma non è il suo contenitore: i segni si vedono', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;font:16px sans-serif;background:#fff">
+    <div style="overflow:hidden;width:200px;height:30px;margin:20px">
+      <div style="position:absolute;left:20px;top:150px">${TA}</div>
+    </div></body>`;
+  const page = await apri(app, openTab, testServer, html);
+  await page.waitForTimeout(300);
+  expect(await caldi(app, page, await riga(page))).toBeGreaterThan(20);
+});
+
 for (const [nome, campo] of [['casella di testo', TA], ['campo modificabile', CE]]) {
   test(`${nome} sotto un'intestazione fissa: i segni restano sotto con la parola`, async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
