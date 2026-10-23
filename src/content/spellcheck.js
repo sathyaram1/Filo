@@ -20,6 +20,9 @@
   const PRIMA_MAX = 4000;
   // Il testo sopra il campo che resta al main, dove si cerca chi chiede una password (correttoreRiservati.js).
   const CONVERSAZIONE_MAX = 1500;
+  // La pagina intorno al campo in cui si cercano gli anni detti, per le date senza anno.
+  const INTORNO_MAX = 1500;
+  const INTORNO_MS = 1500;
   // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
   const PASSAGGIO_MS = 320;
   // Oltre, i candidati del codice si ricalcolano a una pausa breve invece che a ogni tasto.
