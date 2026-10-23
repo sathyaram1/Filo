@@ -471,6 +471,8 @@ class TabManager {
         const t = this.tabs.find((x) => x.view && x.view.webContents === wc);
         return !!t && (this.barra.tasto(input) || this.tastoDelBrowser(input, t));
       },
+      // L'Aiuto nello strato (#1509.3) sale sopra la pila degli avvisi della barra come nella pagina.
+      pronta: (v, wc) => this.avvisi.nelloStrato(v, wc),
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
