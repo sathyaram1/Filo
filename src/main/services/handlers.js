@@ -6166,6 +6166,50 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     return stretta;
   };
+  // #1596 — le pagine lette in questo turno fra i messaggi per il modello: { x, i, giro, coda, round, ordine }. Quando
+  // insieme non stanno nella finestra restano le ultime chieste (nell'ordine delle chiamate), le altre si accorciano o
+  // lasciano titolo e indirizzo, e la risposta lo dice.
+  const pagineLette = [];
+  const pagineVive = () => pagineLette.filter((p) => p.x.res.output.tenuti !== 0);
+  const caratteriPagine = () => pagineVive().reduce((n, p) => n + lunghezzaDi(p), 0);
+  const caratteriStrumenti = () => { try { return tools ? JSON.stringify(tools).length : 0; } catch (_) { return 0; } };
+  const lasciaFuoriPagine = (eccesso) => {
+    const vive = pagineVive().sort((a, b) => b.round - a.round || a.ordine - b.ordine);
+    const tenere = globalThis.SN_FILO_CONTESTO.pagineDaTenere(vive.map(lunghezzaDi), eccesso);
+    let stretta = false;
+    vive.forEach((p, k) => {
+      const prima = lunghezzaDi(p);
+      if (tenere[k] >= prima) return;
+      const o = p.x.res.output;
+      const visibile = Number.isFinite(o.tenuti) ? o.tenuti : String(o.testo || '').length;
+      const resta = tenere[k] ? visibile - (prima - tenere[k]) : 0;
+      // Sotto il minimo un pezzo di pagina non serve al modello: resta il rimando.
+      o.tenuti = resta >= globalThis.SN_FILO_CONTESTO.PAGINA_MIN / 2 ? resta : 0;
+      threadMessages[p.i] = Tools.toolMessage(p.x.action._callId, `${toolResultText(p.x, p.giro)}${p.coda}`);
+      stretta = true;
+    });
+    return stretta;
+  };
+  // Con la finestra nota le pagine si accorciano prima di mandare: niente rifiuto da aspettare. Solo quando a sforare
+  // sono loro; se il resto da solo non ci sta, decide il rifiuto.
+  const pagineNellaFinestra = async () => {
+    const totale = caratteriPagine();
+    if (!totale) return;
+    const finestra = await finestraNota();
+    if (!finestra) return;
+    let caratteri = 0;
+    try { caratteri = globalThis.SN_FILO_CONTESTO.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) { return; }
+    const eccesso = globalThis.SN_FILO_CONTESTO.eccessoNellaFinestra({ finestra, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat });
+    if (eccesso > 0 && eccesso <= totale) lasciaFuoriPagine(eccesso);
+  };
+  // Le pagine rimaste fuori a fine turno, per la frase sotto la risposta: non quelle rilette poi per intero.
+  const pagineLasciate = () => {
+    const chiave = (o) => `${o.url || o.pageRead || ''}|${Number(o.da) || 0}`;
+    const intere = new Set(pagineLette.filter((p) => !Number.isFinite(p.x.res.output.tenuti)).map((p) => chiave(p.x.res.output)));
+    return pagineLette.map((p) => p.x.res.output)
+      .filter((o) => Number.isFinite(o.tenuti) && !intere.has(chiave(o)))
+      .map((o) => ({ url: o.url || o.pageRead || '', parziale: o.tenuti > 0 }));
+  };
   // Il modello della chat rifiuta una richiesta più lunga della sua finestra: il tratto si stringe quanto dice il
   // rifiuto e si rifà lo stesso giro. Il tetto che ha funzionato vale per i turni dopo con quel modello.
   let strette = 0;
