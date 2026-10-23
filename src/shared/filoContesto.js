@@ -570,12 +570,15 @@
 
   // I caratteri da togliere perché la richiesta (strumenti compresi) stia nella finestra insieme al tetto della risposta,
   // che il fornitore conta dentro: 0 se ci sta o se la finestra non si sa.
-  function eccessoNellaFinestra({ finestra = null, caratteri = 0, risposta = 0 } = {}) {
+  function eccessoNellaFinestra({ finestra = null, caratteri = 0, risposta = 0, margine = MARGINE_FINESTRA } = {}) {
     const f = Number(finestra);
     if (!Number.isFinite(f) || f <= 0) return 0;
     const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
-    return Math.max(0, Math.ceil((Number(caratteri) || 0) - (f * MARGINE_FINESTRA - riserva) * CARATTERI_PER_TOKEN));
+    return Math.max(0, Math.ceil((Number(caratteri) || 0) - (f * margine - riserva) * CARATTERI_PER_TOKEN));
   }
+  // Le pagine si accorciano prima di mandare con un margine stretto: sbagliare la stima costa un rifiuto, che non si
+  // paga e porta le misure; un margine largo toglierebbe al modello pagine che ci stavano.
+  const MARGINE_PAGINE = 0.95;
 
   // Dopo un rifiuto per finestra, i caratteri da togliere: in proporzione con le due misure, dalla stima con la sola
   // finestra; null se il rifiuto non dice abbastanza (chi taglia dimezza).
