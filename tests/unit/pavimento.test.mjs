@@ -283,3 +283,39 @@ test('dopo «Password:» resta la frase che dice dove trovarla o come sceglierla
   ]) assert.equal(P.oscura(t), t, t);
   assert.equal(P.oscura('Password: casa mia al mare 2019'), `Password: ${S}`);
 });
+
+test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
+  const segreti = {
+    'PGPASSWORD=Girasole2024': 'Girasole2024',
+    'dbpassword: Girasole2024': 'Girasole2024',
+    'SECRET_KEY=django-insecure-8h3k2j4h5g6f7d8s9a0': 'django-insecure-8h3k2j4h5g6f7d8s9a0',
+    'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+    'api_key=8f14e45fceea167a5a36dedd4bea2543': '8f14e45fceea167a5a36dedd4bea2543',
+    'client_secret=GOCSPX-1a2B3c4D5e6F7g8H9i0J': 'GOCSPX-1a2B3c4D5e6F7g8H9i0J',
+    '"apiKey": "8f14e45fceea167a5a36dedd4bea2543"': '8f14e45fceea167a5a36dedd4bea2543',
+    'token: 8f14e45fceea167a5a36dedd4bea2543': '8f14e45fceea167a5a36dedd4bea2543',
+    'Chiave API: 8f14e45fceea167a5a36dedd4bea2543': '8f14e45fceea167a5a36dedd4bea2543',
+    'Chiave API\n8f14e45fceea167a5a36dedd4bea2543\nCopia': '8f14e45fceea167a5a36dedd4bea2543',
+    'Secret key\nCopia\nsk9f8e7d6c5b4a3210zz': 'sk9f8e7d6c5b4a3210zz',
+    'Authorization: Basic bWFyaW86R2lyYXNvbGUyMDI0': 'bWFyaW86R2lyYXNvbGUyMDI0',
+    '<add key="Password" value="Girasole2024"/>': 'Girasole2024',
+    'sshpass -p Girasole2024 ssh mario@host': 'Girasole2024',
+    'mysql -u root -pGirasole2024 db': 'Girasole2024',
+  };
+  for (const [t, s] of Object.entries(segreti)) assert.ok(!P.oscura(t).includes(s), t);
+  for (const t of ['max_tokens: 4096', 'token_type: bearer', 'tokenizer: cl100k_base', 'primary_key: user_id',
+    'Segreto: lo sai solo tu', 'mysql -h localhost -p mydb', 'Apri https://x.it/reset?token=a8F3kL0pQ2zX9vB7&lang=it']) {
+    assert.ok(P.oscura(t).includes(t.split(/[:=\n ]/).pop()), t);
+  }
+});
+
+test('il telefono a cui parte il codice, il numero dell\'assistenza e la data di una password restano', () => {
+  for (const t of ['Ti abbiamo inviato un codice di verifica al numero +39 333 1234567',
+    'Ti abbiamo inviato un codice di verifica al +39 333 123 4567',
+    'Codice di verifica\n\nNon hai ricevuto il codice? Chiama 02 4829 1736',
+    'Password ultima modifica: 12 mar 2024', 'Password: modificata 2 mesi fa', 'Password: scade tra 30 giorni']) {
+    assert.equal(P.oscura(t), t);
+  }
+  assert.equal(P.oscura('Il codice di verifica è 482 913'), `Il codice di verifica è ${S}`);
+  assert.equal(P.oscura('Password: casa mia al mare 2019'), `Password: ${S}`);
+});

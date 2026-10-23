@@ -56,7 +56,7 @@
             if (/^\d\d-/.test(v) && !forte) continue;
             if (!nome && !(m[1] || m[3] || INTRODOTTO.test(z.slice(0, m.index)))) continue;
             // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice.
-            if (/(?:\+|\d)[ .]?$/.test(z.slice(0, m.index)) || /^[ .]\d/.test(z.slice(m.index + m[0].length))) continue;
+            if (/(?:\+|\d)[ .]?$/.test(z.slice(0, m.index))) continue;
             out.push({ valore: v, regola: 'codice' });
           }
         }
@@ -220,7 +220,7 @@
   // segreto (secret, token, «api_key», «Chiave API») annuncia il valore. Per i segreti conta solo un valore con la forma
   // di una credenziale (vedi formaDiSegreto): «max_tokens: 4096» e «token_type: bearer» restano.
   const PAROLA_CHIAVE = /^(?:password|passwd|pwd|pass|passphrase|passcode)$/i;
-  const CHIAVE = /(?<![\w$.-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,256})"|'([^'\n]{1,256})'|([^\s,;"'`<>(){}[\]]{1,256}))/gd;
+  const CHIAVE = /(?<![\w$.?&-])(["']?)([A-Za-z_][\w.-]{0,60})\1[ \t]*(=>|:(?!:)|=(?![=>~]))[ \t]*(?:"([^"\n]{1,256})"|'([^'\n]{1,256})'|([^\s,;"'`<>(){}[\]]{1,256}))/gd;
   const ELEMENTO = /<([A-Za-z_][\w.:-]{0,60})>([^<\n]{1,256})<\/\1>/gd;
   const ADD_KEY = /<add\b[^>\n]*?\bkey\s*=\s*"([^"\n]{1,60})"[^>\n]*?\bvalue\s*=\s*"([^"\n]{1,256})"/gid;
   const SEGNAPOSTO_DI_TIPO = /^(?:string|text|null|none|nil|undefined|true|false|required|optional|secret|changeit|\*+|x+|\.+|<[^>]*>)$/i;
@@ -253,8 +253,8 @@
       const [, virgolette, nome, sep, dq, sq, nudo] = m;
       const tipo = tipoDiNome(nome);
       if (!tipo) continue;
-      const composta = nome !== nome.replace(/[_.-]|(?<=[a-z0-9])(?=[A-Z])/g, '');
-      if (tipo === 'password' && !virgolette && !composta && sep === ':' && nudo !== undefined) continue;
+      // «Password: deve…» è testo, e lo guardano le regole sopra; «dbpassword: …», «db_password: …» sono configurazione.
+      if (tipo === 'password' && !virgolette && PAROLA_CHIAVE.test(nome) && sep === ':' && nudo !== undefined) continue;
       const g = dq !== undefined ? 4 : sq !== undefined ? 5 : 6;
       const v = valorePerNome(nome, m[g]);
       if (v) out.push({ ...alPosto(v, m.indices[g][0], m[g]), regola: tipo === 'password' ? 'password' : 'chiave' });
@@ -272,7 +272,7 @@
   const ETICHETTA_SEGRETO = '\\b(?:chiave\\s+(?:api|segreta|privata|di\\s+accesso|d[\'’]accesso|di\\s+licenza|personale)'
     + '|(?:api|secret|private|access|client|license|licence|subscription)[ \\t_-]?key|client[ \\t_-]?secret|secret|segreto'
     + '|(?:access|api|auth|personal\\s+access|refresh|bearer)[ \\t_-]?token|token(?:\\s+(?:di\\s+accesso|api|personale|segreto))?)\\b';
-  const SEGRETO_ACCANTO = new RegExp(`${ETICHETTA_SEGRETO}(?:[ \\t]+\\([^)\\n]{0,24}\\))?[ \\t]*(?:[:=]|[-–—→](?=[ \\t]))[ \\t]*["'«“]?([^\\s"'»”,;<>]{12,256})`, 'gi');
+  const SEGRETO_ACCANTO = new RegExp(`(?<![?&#/=.\\w-])${ETICHETTA_SEGRETO}(?:[ \\t]+\\([^)\\n]{0,24}\\))?[ \\t]*(?:[:=]|[-–—→](?=[ \\t]))[ \\t]*["'«“]?([^\\s"'»”,;<>&]{12,256})`, 'gi');
   const SEGRETO_SOLO = new RegExp(`^[ \\t]*${ETICHETTA_SEGRETO}[ \\t]*:?[ \\t]*$`, 'i');
   const BASIC = /\bAuthorization\s*:\s*Basic\s+([A-Za-z0-9+/]{8,}={0,2})/gi;
   const RIGA_DI_COMANDO = /\bsshpass\s+-p\s*(?:'([^'\n]+)'|"([^"\n]+)"|(\S+))|\b(?:mysql|mysqldump|mysqladmin|mariadb)\b[^\n]*?\s-p(?:'([^'\n]+)'|"([^"\n]+)"|([^\s'"]+))/gi;
@@ -290,7 +290,10 @@
     for (const m of s.matchAll(BASIC)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(RIGA_DI_COMANDO)) {
       const v = m.slice(1).find((x) => x !== undefined);
-      if (v && v.length >= 3) out.push({ valore: v, regola: 'password' });
+      if (!v || v.length < 3) continue;
+      out.push({ valore: v, regola: 'password' });
+      // Incollata a «-p» la password non è una parola a sé, e il segnaposto la cerca come parola intera (vedi oscura).
+      if (m[6] !== undefined) out.push({ valore: `-p${v}`, regola: 'password' });
     }
   }
 
