@@ -4660,7 +4660,7 @@ function esitoChiusuraPerModello(action, o) {
   const restano = Array.isArray(action._restano) ? action._restano : [];
   const gruppi = Object.keys(PERCHE_RESTA_APERTA).map((p) => {
     const nomi = restano.filter((x) => x.perche === p).map((x) => `- ${E.neutralizza(String(x.nome || ''), { unaRiga: true })}`);
-    return nomi.length ? `Restano aperte perché ${PERCHE_RESTA_APERTA[p]}:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: nomi.join('\n') })}` : '';
+    return nomi.length ? `${PERCHE_RESTA_APERTA[p]}:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: nomi.join('\n') })}` : '';
   }).filter(Boolean);
   const insiste = restano.some((x) => x.perche === 'testo' || x.perche === 'sempre')
     ? '\nSe l\'utente vuole chiudere anche quelle col testo o dei siti sempre aperti, chiudile col loro numero.' : '';
