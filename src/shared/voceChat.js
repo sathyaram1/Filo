@@ -360,7 +360,10 @@
     function ferma() {
       c.giro++;
       smetti();
-      esitoDellAttesa('annullata');
+      // Il testo resta nella casella della chat nascosta: si conta quando parte, o quando la chat se ne va.
+      const e = c.inAttesa;
+      c.inAttesa = null;
+      if (e) lasciaInCasella(e, false);
       if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
       if (c.stato !== 'pronto') imposta('pronto');
     }
@@ -369,8 +372,10 @@
       c.giro++;
       smetti();
       esitoDellAttesa('annullata');
+      chiudiDettate('tenuta');
       if (c.sessione) { c.sessione.ferma('altro'); c.sessione = null; }
       campo.removeEventListener('input', suInput);
+      document.removeEventListener('click', suClic, true);
       doveTasti.removeEventListener('keydown', suTasto);
       b.remove();
       controlli.delete(c);
