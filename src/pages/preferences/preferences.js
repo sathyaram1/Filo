@@ -157,6 +157,10 @@
   const tokenDaSalvare = new Set();
   const tokenInCorso = new Set();
   let tokenAzzeraTutti = false;
+  // Un token spedito resta di questa pagina finché il main non risponde: l'eco di un cambio partito prima (il tema
+  // toccato subito dopo, la chat) lo cancellava mentre si rileggeva la memoria, e il colore non si salvava (#1343.1).
+  const tokenInViaggio = new Map();
+  let giriToken = 0;
 
   async function persistTokens() {
     const biglietto = caselle.spedita('token');
@@ -164,7 +168,12 @@
     const tutti = tokenAzzeraTutti;
     tokenDaSalvare.clear();
     tokenAzzeraTutti = false;
+    const giro = ++giriToken;
+    const inViaggio = tutti && Tokens ? Tokens.names() : nomi;
+    for (const name of inViaggio) tokenInViaggio.set(name, giro);
+    const miei = {};
     for (const name of nomi) {
+      if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) miei[name] = currentOverrides[name];
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
       if (v === '' || !Tokens || Tokens.validate(name, v)) tokenInCorso.delete(name);
@@ -172,11 +181,8 @@
     let next = {};
     if (!tutti) {
       const fresh = await Storage.getSettings().catch(() => null);
-      next = { ...((fresh && fresh.themeTokens) || {}) };
-      for (const name of nomi) {
-        if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) next[name] = currentOverrides[name];
-        else delete next[name];
-      }
+      next = { ...((fresh && fresh.themeTokens) || {}), ...miei };
+      for (const name of nomi) if (!Object.prototype.hasOwnProperty.call(miei, name)) delete next[name];
     }
     currentOverrides = { ...next };
     for (const name of tokenInCorso) {
@@ -184,7 +190,10 @@
       const v = input ? input.value.trim() : '';
       if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
     }
-    chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } }); } catch (_) {}
+    for (const name of inViaggio) if (tokenInViaggio.get(name) === giro) tokenInViaggio.delete(name);
+    if (r && r.ok && r.settings) riallineaToken(r.settings.themeTokens);
     if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
   }
 
