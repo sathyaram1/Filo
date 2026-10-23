@@ -19,17 +19,21 @@
 // sulla macchina di chi la riga l'ha scritta.
 //
 // Senza il fix è ROSSO tre volte: `allow read: if true`, `allow write` senza
-// `resource == null`, nessun vincolo sul nome.
+// `resource == null`, nessun vincolo sul nome. Senza #1518 è rosso sul tipo
+// (una lista di tipi in chiaro), sull'estensione libera e sui metadati.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
-import '../../src/shared/feedbackAttachTypes.js';
+import '../../src/shared/feedbackPublicKey.js';
+import '../../src/shared/feedbackCrypto.js';
 import '../../src/shared/feedback.js';
-import { mimeDiAllegato } from '../../scripts/claude-feedback.mjs';
+import { PUNTI_DI_CARICAMENTO } from '../helpers/puntiDiCaricamento.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
