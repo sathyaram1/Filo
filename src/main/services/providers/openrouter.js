@@ -1103,7 +1103,8 @@
       usage: {
         promptTokens: num(usage.input_tokens != null ? usage.input_tokens : usage.prompt_tokens),
         completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
-        cachedPromptTokens: 0,
+        cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
         keySource, keyFallback,
       },
