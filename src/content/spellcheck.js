@@ -1816,10 +1816,29 @@
     const ora = Date.now();
     if (state.intorno && ora - state.intorno.t < INTORNO_MS) return state.intorno.v;
     const c = contestoDelCampo(state.el, { intorno: INTORNO_MAX });
-    let titolo = '';
-    try { titolo = radiceDi(state.el) ? '' : String(document.title || ''); } catch (_) {}
+    const titolo = radiceDi(state.el) ? '' : titoliSopra(state.el);
     state.intorno = { t: ora, v: { prima: c.prima, dopo: c.dopo, titolo } };
     return state.intorno.v;
+  }
+
+  // Il titolo della pagina e l'ultima intestazione prima del campo, anche fuori dal contenitore del contesto.
+  function titoliSopra(el) {
+    const pezzi = [];
+    try {
+      pezzi.push(String(document.title || '').slice(0, 300));
+      let cima = el;
+      for (let i = 0; i < 32; i++) { const h = cima.getRootNode && cima.getRootNode().host; if (!h) break; cima = h; }
+      const UI = global.SN_FILO_UI;
+      let h1 = null;
+      let altra = null;
+      for (const h of document.querySelectorAll('h1, h2, h3, [role="heading"]')) {
+        if (!(h.compareDocumentPosition(cima) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        if (UI && UI.inside(h)) continue;
+        if (h.tagName === 'H1') h1 = h; else altra = h;
+      }
+      for (const h of [h1, altra]) if (h) pezzi.push(String(h.textContent || '').slice(0, 300));
+    } catch (_) {}
+    return pezzi.join('\n');
   }
 
   // ============================================================================
