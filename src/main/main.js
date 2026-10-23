@@ -488,16 +488,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Single instance: la seconda apertura ridà focus all'esistente.
+// Single instance: la seconda apertura porta davanti la finestra normale, e la rifà se Filo è rimasto acceso senza.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
+    // Prima che l'avvio abbia la sua finestra non si crea niente: la farà l'avvio.
+    if (mainWindow) mostraFinestraNormale();
     // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
     // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
     // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
