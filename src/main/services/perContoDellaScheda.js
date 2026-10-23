@@ -68,6 +68,40 @@ function paginaDi(sender) {
   return f || String((sender && (sender.url || (sender.tab && sender.tab.url))) || '');
 }
 
+// ── cookie ─────────────────────────────────────────────────────────────────
+
+// Per i cookie http e https sono due siti; fuori dal web nessuno.
+function sitoWeb(indirizzo) {
+  let u;
+  try { u = new URL(String(indirizzo || '')); } catch (_) { return ''; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+  const s = Sito.sitoDi(u.href);
+  return s ? `${u.protocol}//${s}` : '';
+}
+
+function stessoSitoWeb(a, b) {
+  const s = sitoWeb(a);
+  return !!s && s === sitoWeb(b);
+}
+
+// L'origine del documento che chiede, se lui e tutti i suoi antenati stanno su un sito solo; '' altrimenti: lì Chromium
+// tratta ogni richiesta del documento come partita da un altro sito.
+function origineDellaPagina(sender) {
+  const origini = [];
+  try {
+    for (let f = sender && sender.frame, i = 0; f && i < 64; f = f.parent, i++) origini.push(String(f.origin || f.url || ''));
+  } catch (_) { return ''; }
+  origini.push(String((sender && (sender.url || (sender.tab && sender.tab.url))) || ''));
+  if (!origini.every((o) => stessoSitoWeb(o, origini[0]))) return '';
+  try { return new URL(origini[0]).origin; } catch (_) { return ''; }
+}
+
+// Con un iniziatore Chromium sceglie i cookie come per la pagina (SameSite): a un altro sito vanno solo quelli che lui
+// concede alle richieste altrui. Per un file di un altro sito l'iniziatore è opaco, come dentro un riquadro sandbox.
+function iniziatorePer(origine, url) {
+  return origine && stessoSitoWeb(origine, url) ? origine : 'null';
+}
+
 // ── rete interna ───────────────────────────────────────────────────────────
 
 const ATTESA_PROXY_MS = 3000;
