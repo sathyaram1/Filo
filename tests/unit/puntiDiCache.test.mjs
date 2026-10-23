@@ -110,6 +110,70 @@ test('le altre funzioni non hanno piano: un prompt che cambia tutto pagherebbe s
   assert.equal(FC.pianoDellaCache(ACTIONS.FILO_CHAT, []), null);
 });
 
+// #1580 — il correttore: le regole nel system, uguali a ogni chiamata, il testo che cambia nel messaggio dell'utente.
+// Le stesse richieste che compone il main (handlers.js, rami SPELLCHECK_SEMANTIC e SPELLCHECK_CONTEXT).
+const richiestaRapida = (nuovo) => [
+  { role: 'system', content: PROMPTS.spellcheckErroriSistema() },
+  { role: 'user', content: PROMPTS.spellcheckErrori({ prima: 'Caro Marco,', nuovo, luogo: { sito: 'mail.example' } }) },
+];
+const richiestaRagionata = (nuovo) => [
+  { role: 'system', content: PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: true }) },
+  { role: 'user', content: PROMPTS.spellcheckSuggerimenti({ nuovo, oggi: new Date(2026, 9, 21) }) },
+];
+
+test('correttore: un punto sul system dei due controlli, uguale da una chiamata all\'altra', () => {
+  for (const [action, richiesta] of [[ACTIONS.SPELLCHECK_SEMANTIC, richiestaRapida], [ACTIONS.SPELLCHECK_CONTEXT, richiestaRagionata]]) {
+    const uno = richiesta('vado con Zanzottera');
+    const due = richiesta('vado con Zanzottera al mare');
+    assert.deepEqual(FC.pianoDellaCache(action, uno), { punti: [{ indice: 0 }] }, action);
+    assert.equal(uno[0].content, due[0].content, `${action}: il system cambia col testo`);
+    assert.ok(!uno[0].content.includes('Zanzottera') && uno[1].content.includes('Zanzottera'), `${action}: il testo sta nel messaggio dell'utente`);
+  }
+  assert.equal(FC.pianoDellaCache(ACTIONS.SPELLCHECK_SEMANTIC, [{ role: 'user', content: 'solo testo' }]), null);
+});
+
+// Sotto il minimo di Haiku 5.5 (512 token) il punto non mette niente in cache: la parte fissa deve starci sopra con
+// margine. Il prompt di #1446 (circa 1.900 caratteri, ~490 token) restava sotto. 4,5 caratteri a token è il caso peggiore.
+test('correttore: la parte fissa supera i 512 token che Haiku 5.5 mette in cache', () => {
+  for (const [nome, testo] of [
+    ['rapido', PROMPTS.spellcheckErroriSistema()],
+    ['ragionato', PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: true })],
+    ['ragionato senza ripetizioni', PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: false })],
+  ]) assert.ok(testo.length / 4.5 > 512, `${nome}: ${testo.length} caratteri`);
+});
+
+test('correttore: col modello Anthropic il system parte col cache_control, con un modello aperto no', async () => {
+  for (const [action, msgs] of [[ACTIONS.SPELLCHECK_SEMANTIC, richiestaRapida('oggi sonno andato')], [ACTIONS.SPELLCHECK_CONTEXT, richiestaRagionata('Ci vediamo martedì.')]]) {
+    const cache = FC.pianoDellaCache(action, msgs);
+    const risposta = () => ({ ok: true, status: 200, json: async () => ({ provider: 'Anthropic', choices: [{ message: { content: '[][][][nessuno]' } }], usage: {} }) });
+    const [claude] = await corpiDi(() => OR.complete({ apiKey: 'k', model: HAIKU, messages: msgs, cache }), [risposta()]);
+    assert.deepEqual(claude.messages[0].content, [{ type: 'text', text: msgs[0].content, cache_control: { type: 'ephemeral' } }], action);
+    assert.equal(claude.messages[1].content, msgs[1].content, `${action}: il testo che cambia resta fuori dalla cache`);
+    const [aperto] = await corpiDi(() => OR.complete({ apiKey: 'k', model: APERTO, messages: msgs, cache }), [risposta()]);
+    assert.deepEqual(aperto.messages, msgs);
+    assert.ok(!JSON.stringify(aperto).includes('cache_control'), action);
+  }
+});
+
+test('correttore: il cancello passa il piano della cache anche ai due controlli', async () => {
+  let visto = null;
+  const prima = globalThis.SN_PROVIDERS;
+  globalThis.SN_PROVIDERS = {
+    ...prima,
+    completeWithFallback: async ({ attempts, cache }) => { visto = cache; return { text: 'ok', provider: attempts[0].provider, model: attempts[0].model, usage: {} }; },
+  };
+  try {
+    const gate = globalThis.SN_MODEL_GATE.create({
+      getSettings: async () => ({}),
+      buildChain: () => [{ provider: 'openrouter', apiKey: 'k', model: HAIKU }],
+      modelFor: () => 'haiku',
+      costs: { isOverLimit: async () => false, record: async () => 0 },
+    });
+    await gate.complete({ action: ACTIONS.SPELLCHECK_SEMANTIC, messages: richiestaRapida('oggi sonno andato') });
+  } finally { globalThis.SN_PROVIDERS = prima; }
+  assert.deepEqual(visto, { punti: [{ indice: 0 }] });
+});
+
 function sse(events) {
   const enc = new TextEncoder();
   return new ReadableStream({

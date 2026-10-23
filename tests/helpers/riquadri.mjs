@@ -27,7 +27,17 @@ export async function nelMondoDiFilo(app, page, fn, arg = null, frame = null) {
 const sessioni = new WeakMap();
 const ATTESA_MONDO_MS = 10_000;
 async function nelRiquadro(page, frame, code) {
+  // I content script di un riquadro arrivano dopo il suo load: il mondo si aspetta qualche secondo prima di dirlo assente.
   const scelta = async () => {
+    const fine = Date.now() + 5000;
+    for (;;) {
+      const m = await cerca();
+      if (m) return m;
+      if (Date.now() > fine) throw new Error(`nelMondoDiFilo: nessun mondo di Filo nel riquadro ${frame.url()}`);
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  };
+  const cerca = async () => {
     for (const da of [frame, page]) {
       let s = null;
       try { s = await page.context().newCDPSession(da); } catch (_) { continue; }
@@ -43,7 +53,7 @@ async function nelRiquadro(page, frame, code) {
       }
       await s.detach().catch(() => {});
     }
-    throw new Error(`nelMondoDiFilo: nessun mondo di Filo nel riquadro ${frame.url()}`);
+    return null;
   };
   let m = sessioni.get(frame);
   // Nel riquadro Filo si monta al primo tocco, dopo il frame, e expect.poll non riprova una funzione che lancia:

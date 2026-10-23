@@ -21,6 +21,7 @@ const deps = {
   chiediSi: (wc, richiesta) => require('../confermeSopraPagina').chiediDalMain(wc, richiesta),
   cerca: (cosa, opzioni) => require('./documentiIndice').cerca(cosa, opzioni),
   doveSta: (p) => require('./documentiIndice').doveSta(p),
+  cartellaChiesta: (c) => require('./documentiIndice').cartellaChiesta(c),
 };
 function configura(d) { Object.assign(deps, d || {}); }
 
@@ -57,16 +58,17 @@ function hostDi(origine) {
   try { return new URL(String(origine || '')).hostname; } catch (_) { return ''; }
 }
 
-// Perché la cartella esce dal perimetro di lettura ('' se ci sta): il costo di CERCA_DOCUMENTI in chat, e il suo motivo.
-function fuoriPerimetro(cartella) {
+// Perché la cartella esce dal perimetro di lettura ('' se ci sta): il costo di CERCA_DOCUMENTI in chat, e il suo motivo,
+// misurati sulla cartella che l'indice leggerà (`risolta`: '' per una di serie, #1499).
+function fuoriPerimetro(cartella, risolta) {
   if (!cartella) return '';
   const L = globalThis.SN_ACTION_LEVELS;
   const C = globalThis.SN_CMD_CLASSIFY;
   if (!L || !C) return 'non si sa dove legge';
   const win = process.platform === 'win32';
   const perimetro = { home: os.homedir(), win, maiuscole: win || process.platform === 'darwin' };
-  if (!(L.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _perimetro: perimetro }) > 0)) return '';
-  return C.fuoriPerimetro(cartella, perimetro) || 'non si sa dove legge';
+  if (!(L.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _cartella: risolta, _perimetro: perimetro }) > 0)) return '';
+  return C.fuoriPerimetro(risolta || cartella, perimetro) || 'non si sa dove legge';
 }
 
 function domanda({ cosa, cartella, host, perche }) {
@@ -105,9 +107,17 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
   const q = unaRiga(cosa, COSA_MAX);
   if (!q) return { ok: false, errore: 'vuota' };
   const c = String(cartella == null ? '' : cartella).trim().slice(0, CARTELLA_MAX);
-  const perche = fuoriPerimetro(c);
-  const sito = !daFilo(origine);
+  let ch = null;
+  if (c) { try { ch = await deps.cartellaChiesta(c); } catch (_) { ch = null; } }
   const s = statoDi(wc);
+  // Una cartella su un altro computer non si cerca (#1499): lo si dice senza chiedere un sì che non porterebbe a niente.
+  if (ch && ch.rete) {
+    s.dati = { cercato: q, risultati: [], indice: indicePerLaPagina(null), fermata: false, cartellaMancante: '', cartellaDiRete: c };
+    return { ok: true, cercato: q, candidati: [], indice: s.dati.indice, fermata: false, cartellaMancante: '', cartellaDiRete: unaRiga(c, 200) };
+  }
+  // Senza la cartella risolta vale la regola sul nome scritto.
+  const perche = fuoriPerimetro(c, ch ? (ch.serie ? '' : ch.percorso) : undefined);
+  const sito = !daFilo(origine);
   if (sito || perche) {
     // Una domanda alla volta per scheda: chi ne chiede altre mentre una aspetta non accoda popup all'utente.
     if (s.chiede) return { ok: false, errore: 'in attesa' };

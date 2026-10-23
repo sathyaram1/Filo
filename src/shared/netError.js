@@ -1,25 +1,14 @@
-// Pagina d'errore di rete (filo://error/) — logica pura condivisa.
-//
-// Quando una navigazione fallisce (dominio inesistente, server giù, offline)
-// o il renderer di una scheda muore, il main carica la pagina interna
-// filo://error/error.html al posto del frame bianco di Chromium. Questo modulo
-// è la SINGOLA fonte di verità per:
-//   - costruire/leggere l'URL della pagina d'errore (roundtrip main ↔ pagina);
-//   - tradurre il codice errore Chromium in un messaggio per l'utente (IT);
-//   - decidere quali fallimenti meritano la pagina (shouldShowErrorPage).
-//
-// Usato dal main (tabs.js, via loader) e dalla pagina stessa
-// (src/pages/error/error.js, via <script src="filo://shared/netError.js">).
-// Pattern IIFE su globalThis come tutti gli shared/*.
+// Pagina d'errore di rete (filo://error/): fonte unica per costruire e leggere il suo URL,
+// tradurre il codice Chromium in un messaggio italiano e decidere quali fallimenti la
+// meritano. La usano il main (tabs.js) e la pagina stessa.
 
 (function (global) {
   'use strict';
 
   const ERROR_PAGE_URL = 'filo://error/error.html';
 
-  // Codice speciale (non-Chromium) usato quando il renderer della scheda muore
-  // (render-process-gone): non è un errore di rete ma la scheda resta bianca
-  // allo stesso modo, quindi passa dalla stessa pagina.
+  // Codice speciale non-Chromium per il renderer morto (render-process-gone): non è un
+  // errore di rete, ma la scheda resta bianca allo stesso modo.
   const CRASH_CODE = 'crash';
 
   // La scheda sta su un sito della lista dei siti bloccati (#590): stessa pagina, con
@@ -35,7 +24,6 @@
     return proto === 'http:' || proto === 'https:' || proto === 'filo:';
   }
 
-  // true se `url` è la pagina d'errore interna (con o senza query).
   function isErrorPageUrl(url) {
     return String(url || '').startsWith(ERROR_PAGE_URL);
   }
@@ -82,11 +70,8 @@
     return (p && p.target) || null;
   }
 
-  // Il fallimento di `failedUrl` con `code` merita la pagina d'errore?
-  //   - -3 (ERR_ABORTED) NO: navigazione annullata (stop, redirect, nostra
-  //     _recreateView) — non è un errore da mostrare;
-  //   - la pagina d'errore stessa NO (mai loop);
-  //   - solo main frame (il chiamante passa isMainFrame).
+  // -3 (ERR_ABORTED) no: una navigazione annullata non è un errore da mostrare, e la pagina
+  // d'errore stessa no, per non entrare in loop. Solo main frame (lo passa il chiamante).
   function shouldShowErrorPage({ code, failedUrl, isMainFrame }) {
     if (isMainFrame === false) return false;
     const n = Number(code);
@@ -97,9 +82,8 @@
     return isRetriableTarget(u);
   }
 
-  // Traduzione codice Chromium → messaggio per l'utente (titolo + suggerimento).
-  // `offline: true` marca gli errori "sei senza rete": la pagina si ri-tenta da
-  // sola quando la connessione torna (evento `online`).
+  // `offline: true` marca gli errori «sei senza rete»: la pagina si ri-tenta da sola
+  // quando la connessione torna (evento `online`).
   const KNOWN = {
     '-105': { title: 'Impossibile trovare questo sito', hint: 'Controlla che l’indirizzo sia scritto correttamente: potrebbe esserci un refuso nel nome del sito.' }, // ERR_NAME_NOT_RESOLVED
     '-137': { title: 'Impossibile trovare questo sito', hint: 'La ricerca del nome del sito è fallita. Controlla l’indirizzo e la connessione.' }, // ERR_NAME_RESOLUTION_FAILED

@@ -1,11 +1,6 @@
 // Helper PKCE (RFC 7636) per il login OAuth desktop.
-//
-// Le app native non possono custodire un client secret: PKCE lega la richiesta
-// di autorizzazione allo scambio del codice tramite un segreto generato al
-// volo (`code_verifier`), così un codice intercettato è inutilizzabile senza
-// il verifier che non lascia mai il processo main.
-//
-// Pure functions, nessuna dipendenza Electron → testabili in isolamento.
+// Un'app nativa non può custodire un secret: il code_verifier non lascia il processo main,
+// così un codice intercettato è inutilizzabile. Funzioni pure, testabili senza Electron.
 
 const crypto = require('node:crypto');
 
@@ -36,7 +31,6 @@ function createState() {
   return base64url(crypto.randomBytes(24));
 }
 
-// Crea l'insieme completo di parametri per una nuova richiesta di login.
 function createPkce() {
   const verifier = createVerifier();
   return {

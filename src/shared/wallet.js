@@ -1,27 +1,19 @@
-// Crediti sul server e chiave personale — la logica PURA condivisa fra main e
-// pagine (feedback #598). Niente rete, niente Electron: gli unit test la
-// caricano così com'è.
-//
-// - riconoscere «crediti finiti» in un errore del provider (402), che NON si
-//   ritenta: OpenRouter rifiuta finché il tetto non sale;
-// - la riga del registro d'uso, con i soli campi che le regole Firestore
-//   accettano (hasOnly): una riga con un campo in più viene rifiutata, e un
-//   registro che non si scrive è un abuso agli occhi della riconciliazione;
-// - il testo che spiega all'utente cosa fare, in base a come sta usando Filo.
+// Crediti sul server e chiave personale, logica PURA condivisa fra main e pagine (#598).
+// Un 402 del provider è «crediti finiti» e NON si ritenta; la riga del registro d'uso porta
+// SOLO i campi che le regole Firestore accettano: uno in più la fa rifiutare.
 
 (function (global) {
   'use strict';
 
-  // I campi di una riga del registro, nell'ordine. Sono gli stessi elencati
-  // nelle regole Firestore (wallet-usage): cambiarli qui senza cambiarli lì
-  // fa rifiutare ogni riga.
+  // Gli stessi campi elencati nelle regole Firestore (wallet-usage): cambiarli qui senza
+  // cambiarli lì fa rifiutare ogni riga.
   const USAGE_FIELDS = Object.freeze([
     'pseudonym', 'at', 'action', 'model', 'servedBy',
     'promptTokens', 'completionTokens', 'costUsd', 'credits',
   ]);
 
-  // 402 dal servizio AI = il tetto della chiave è esaurito (o l'account non ha
-  // credito). Con la chiave personale vuol dire «crediti finiti».
+  // 402 dal servizio AI = tetto della chiave esaurito; con la chiave personale vuol dire
+  // «crediti finiti».
   function isOutOfCredits(err) {
     if (!err) return false;
     const st = Number(err.status);
@@ -46,23 +38,80 @@
     return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
-  // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
-  // ISO UTC: il server confronta per intervallo di tempo.
+  // I tetti di lunghezza della stessa regola: un nome di modello più lungo farebbe rifiutare la
+  // riga intera, accorciato arriva. Sentinella in tests/unit/wallet.test.mjs.
+  const USAGE_LIMITS = Object.freeze({ at: 40, action: 80, model: 200, servedBy: 100 });
+
+  // Scarta tutto ciò che non è nel contratto. `at` è ISO UTC: il server confronta per
+  // intervallo di tempo.
   function usageRow({ pseudonym, at, action, model, servedBy, usage, costUsd, credits } = {}) {
     if (!pseudonym) return null;
     const u = usage || {};
     const usd = Number(costUsd != null ? costUsd : u.costUsd);
+    const L = USAGE_LIMITS;
     return {
       pseudonym: String(pseudonym),
-      at: at || new Date().toISOString(),
-      action: String(action || ''),
-      model: String(model || ''),
-      servedBy: String(servedBy || ''),
+      at: String(at || new Date().toISOString()).slice(0, L.at),
+      action: String(action || '').slice(0, L.action),
+      model: String(model || '').slice(0, L.model),
+      servedBy: String(servedBy || '').slice(0, L.servedBy),
       promptTokens: Math.max(0, Math.floor(Number(u.promptTokens) || 0)),
       completionTokens: Math.max(0, Math.floor(Number(u.completionTokens) || 0)),
       costUsd: Number.isFinite(usd) && usd > 0 ? usd : 0,
       credits: Math.max(0, Number(credits) || 0),
     };
+  }
+
+  // La regola o il contenuto rifiutano la riga, e ritentarla non la fa mai passare (#1601). Una chiave API
+  // ruotata o bloccata risponde con gli stessi codici ma vale per tutte le righe: è un guasto, si ritenta.
+  function rifiutoDellaRigaUso(status, testo) {
+    const t = String(testo || '');
+    return (status === 403 && /insufficient permissions/i.test(t)) || (status === 400 && !/api.?key/i.test(t));
+  }
+
+  // Il commit di Firestore è atomico: una riga che la regola rifiuta respinge tutto il lotto (#1601).
+  // Al rifiuto il lotto si divide a metà finché la riga cattiva resta sola, e le buone passano.
+  // `commit(righe)` dà { ok: true } o { ok: false, motivo } per un rifiuto, e lancia per un guasto
+  // passeggero: allora ci si ferma, e ciò che non è stato né scritto né rifiutato sta in `rimaste`.
+  async function scriviIsolando(righe, commit) {
+    const esito = { scritte: [], rifiutate: [], rimaste: [], errore: null };
+    const daFare = righe && righe.length ? [righe.slice()] : [];
+    while (daFare.length) {
+      const lotto = daFare.shift();
+      let r;
+      try { r = await commit(lotto); } catch (e) {
+        esito.errore = e;
+        esito.rimaste = [lotto, ...daFare].flat();
+        return esito;
+      }
+      if (r && r.ok) esito.scritte.push(...lotto);
+      else if (lotto.length === 1) esito.rifiutate.push({ riga: lotto[0], motivo: String((r && r.motivo) || '') });
+      else {
+        const meta = Math.ceil(lotto.length / 2);
+        daFare.unshift(lotto.slice(0, meta), lotto.slice(meta));
+      }
+    }
+    return esito;
+  }
+
+  // Le righe del registro uscite dalla coda senza arrivare al server, dette alla pagina Crediti.
+  // `perMotivo`: { rifiutata, altra_identita, ricomincia, coda_piena } → quante. '' se nessuna.
+  const SCARTATE_MOTIVI = Object.freeze({
+    rifiutata: ['rifiutato dal server', 'rifiutati dal server'],
+    altra_identita: ['di un portafoglio di prima', 'di un portafoglio di prima'],
+    ricomincia: ['tolto ricominciando con un nuovo invito', 'tolti ricominciando con un nuovo invito'],
+    coda_piena: ['perso perché ce n\'erano troppi in attesa', 'persi perché ce n\'erano troppi in attesa'],
+  });
+  function registroScartateTesto(perMotivo) {
+    const voci = Object.keys(SCARTATE_MOTIVI)
+      .map((m) => [m, Math.max(0, Math.floor(Number(perMotivo && perMotivo[m]) || 0))])
+      .filter(([, n]) => n > 0);
+    const tot = voci.reduce((s, [, n]) => s + n, 0);
+    if (!tot) return '';
+    const testa = tot === 1 ? 'Un consumo non è stato registrato' : `${tot} consumi non sono stati registrati`;
+    const frase = (m, n) => SCARTATE_MOTIVI[m][n === 1 ? 0 : 1];
+    if (voci.length === 1) return `${testa}: ${frase(voci[0][0], tot)}.`;
+    return `${testa}: ${voci.map(([m, n]) => `${n} ${frase(m, n)}`).join(', ')}.`;
   }
 
   // Il messaggio per l'utente quando la chiamata è stata rifiutata per crediti.
@@ -263,13 +312,8 @@
     return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
-  // Il codice dentro quello che l'utente incolla. Il codice arriva per
-  // messaggio e si ricopia com'è, spesso con la riga intorno («Codice:
-  // ABCD-EFGH», «il tuo invito è abcd efgh»): se il testo, ripulito, non è un
-  // codice, si cerca dentro un blocco di otto caratteri (anche quattro più
-  // quattro) staccato dal resto. Se non c'è, torna il testo com'era: sarà il
-  // server a dire «non esiste». Un testo che è già un codice passa com'è (il
-  // server tollera trattini, spazi e minuscole).
+  // Il codice si ricopia con la riga intorno («Codice: ABCD-EFGH»): se il testo ripulito non
+  // è un codice si cerca un blocco di otto caratteri staccato; se non c'è, torna com'era.
   function extractCode(raw) {
     const s = String(raw || '').trim();
     const norm = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -888,7 +932,7 @@
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, USAGE_LIMITS, rifiutoDellaRigaUso, scriviIsolando, registroScartateTesto, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,

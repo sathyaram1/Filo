@@ -372,4 +372,4 @@ function chiediDalMain(wc, richiesta) {
   return c ? c.chiedi(wc, null, { ...richiesta, scriveva: false, campo: false }) : Promise.resolve(false);
 }
 
-module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci, seguiTema };
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci, seguiTema, temaDi };

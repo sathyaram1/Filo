@@ -1,18 +1,6 @@
-// Pannello "Invia attacco" del canale Red-team (spec §8.1).
-// Aperto dalla voce di menu tasto destro omonima, da QUALSIASI pagina. Modella
-// la sua UX sul flusso feedback (src/content/feedback.js): un overlay con un box
-// trascinabile, sopra un velo leggero della pagina.
-//
-// Due campi SEPARATI (spec §8.1):
-//   1. Testo dell'attacco — il prompt che tenta di ingannare i giudici.
-//   2. Descrizione — spiega cosa fa l'attacco; va al giudice di validità, NON
-//      ai 4 giudici del panel.
-// Più un bottone d'invio che mostra il costo (50 crediti). Se l'utente non è
-// loggato → invito ad accedere; se i crediti non bastano → bottone disabilitato
-// con messaggio.
-//
-// Il backend NON è ancora deployato: MSG.REDTEAM_SUBMIT torna { status:'error' }
-// dal vivo → il pannello mostra un messaggio amichevole e NON crasha mai.
+// Pannello «Invia attacco» del canale Red-team (spec §8.1), dal tasto destro su una pagina.
+// Due campi separati: l'attacco va ai 4 giudici, la descrizione solo al giudice di validità.
+// Il backend può mancare: un REDTEAM_SUBMIT in errore diventa un messaggio, non un crash.
 
 (function (global) {
   'use strict';
@@ -44,8 +32,7 @@
     activeRoot = null;
   }
 
-  // Traduce lo status di REDTEAM_SUBMIT in un messaggio chiaro per l'utente.
-  // Esposta (e pura) per i test: vedi tests/redteam-attack.spec.mjs.
+  // Pura ed esposta apposta per i test (tests/redteam-attack.spec.mjs).
   function submitStatusMessage(res) {
     const r = res || {};
     switch (r.status) {
@@ -78,7 +65,6 @@
     root.className = 'sn-rt-overlay';
     global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    // Box trascinabile, due campi separati + bottone d'invio col costo.
     root.innerHTML = `
       <div class="sn-rt-modal" role="dialog" aria-modal="true" aria-label="Invia attacco red-team">
         <div class="sn-rt-drag" title="Trascina per spostare il box"><span class="sn-rt-grip"></span></div>
@@ -136,7 +122,6 @@
     function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
-      // Crediti insufficienti noti → disabilita con messaggio (spec §8.1 punto 4).
       if (signedIn && balance != null && balance < COST) {
         sendBtn.disabled = true;
         setStatus(`Crediti insufficienti: hai ${balance}, ne servono ${COST}.`, 'err');
@@ -151,7 +136,7 @@
       if (daInput && statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
     }
 
-    // ---- bozze persistenti (sopravvivono a chiusura/riapertura) ----
+    // Bozze persistenti: sopravvivono a chiusura e riapertura.
     let saveTimer = null;
     function saveDraft() {
       if (!DRAFT_ATTACK_KEY) return;
@@ -182,7 +167,6 @@
       }).catch(() => {});
     } catch (_) {}
 
-    // ---- stato auth + saldo crediti ----
     (async function loadAuthAndBalance() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
@@ -201,8 +185,6 @@
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
       if (!signedIn) {
-        // Invito a loggarsi: prova ad aprire il flusso login del main; se non
-        // c'è, almeno spiega cosa fare.
         setStatus('Accedi al tuo account per inviare un attacco.', 'err');
         try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
         return;
@@ -232,7 +214,6 @@
         close();
         return;
       }
-      // Non ok: mostra il messaggio, riabilita.
       setStatus(msg.text, 'err');
       if (msg.needLogin) {
         try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
@@ -244,10 +225,8 @@
 
     cancelBtn.addEventListener('click', () => close());
 
-    // Esc chiude.
     root.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
-    // ---- posizione iniziale + trascinamento (come feedback.js) ----
     function centerModal() {
       const w = modal.offsetWidth || 520;
       modal.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';

@@ -82,10 +82,9 @@ test('due invocazioni con lo stesso biglietto accendono UN battito solo', () => 
   }
 });
 
-test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', () => {
-  // Il marcatore sta per essere sovrascritto: se il battito del biglietto
-  // precedente non lo si spegne adesso, resta vivo e IRRAGGIUNGIBILE — nessuno
-  // sa più che processo sia — a tenere in piedi un semaforo che non serve.
+test('biglietto nuovo col battito vivo di un altro qui: rifiuta, non uccide e non sovrascrive (#1480)', () => {
+  // Il battito vivo di un altro biglietto nella stessa cartella è un worker che lavora ancora (D-90): spegnerlo gli
+  // toglieva il semaforo, e il marcatore sovrascritto lo rendeva irraggiungibile.
   const casa = casaFinta();
   const uccisi = [];
   const killVero = process.kill.bind(process);
@@ -95,11 +94,30 @@ test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', 
     const finto = () => { avvii += 1; return { pid: 4242 + avvii, unref() {} }; };
     startBeat(casa, 'b-1', { spawnImpl: finto, alive: () => true });
     const r = startBeat(casa, 'b-2', { spawnImpl: finto, alive: () => true });
-    assert.equal(r.started, true);
-    assert.equal(avvii, 2);
-    assert.deepEqual(uccisi, [4243], 'il battito del biglietto vecchio va spento prima di perderne le tracce');
+    assert.equal(r.started, false);
+    assert.equal(r.why, 'altro_vivo');
+    assert.equal(r.pid, 4243);
+    assert.equal(avvii, 1);
+    assert.deepEqual(uccisi, [], 'il battito di chi lavora ancora non si spegne');
+    assert.equal(readBeat(casa).ticket, 'b-1', 'il marcatore resta di chi lavora');
   } finally {
     process.kill = killVero;
+    togliCartella(casa);
+  }
+});
+
+test('biglietto nuovo dopo un battito spento: si riaccende sul nuovo', () => {
+  const casa = casaFinta();
+  try {
+    let avvii = 0;
+    const finto = () => { avvii += 1; return { pid: 4242 + avvii, unref() {} }; };
+    let vivo = true;
+    startBeat(casa, 'b-1', { spawnImpl: finto, alive: () => vivo });
+    vivo = false;
+    const r = startBeat(casa, 'b-2', { spawnImpl: finto, alive: () => vivo });
+    assert.equal(r.started, true);
+    assert.equal(readBeat(casa).ticket, 'b-2');
+  } finally {
     togliCartella(casa);
   }
 });
@@ -144,9 +162,10 @@ test('worker in parallelo (#1157): il battito nominato da un marcatore di un\'AL
     assert.equal(readBeat(a).pid, 6001);
     assert.equal(readBeat(b).pid, 6002);
 
-    // Nella stessa cartella, invece, un biglietto nuovo spegne ancora quello vecchio.
-    startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
-    assert.deepEqual(uccisi, [6002]);
+    // Nella stessa cartella un biglietto nuovo davanti a un battito vivo si ferma, senza spegnerlo (#1480).
+    const r2 = startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
+    assert.equal(r2.why, 'altro_vivo');
+    assert.deepEqual(uccisi, []);
   } finally {
     process.kill = killVero;
     togliCartella(a);

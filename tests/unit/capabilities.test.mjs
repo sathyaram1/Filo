@@ -194,6 +194,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_DECIDI_PAGINA: 'autonomy-levels',
     FILO_AIUTO_NUOVO: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    FILO_CONFIRM_RIFIUTATA: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',

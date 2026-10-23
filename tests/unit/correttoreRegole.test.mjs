@@ -1,5 +1,6 @@
-// #1446 — le regole del correttore senza DOM: i candidati del codice, il pezzo nuovo da giudicare (mai la parola che si
-// sta scrivendo), la risposta [pezzo][correzione][motivo][tipo] e il segno ritrovato nel testo di adesso.
+// #1446 e #1580 — le regole del correttore senza DOM: i candidati del codice (pieni i sicuri, in attesa del modello le
+// parole maiuscole o in altri alfabeti), il pezzo nuovo da giudicare (mai la parola che si sta scrivendo), il campo
+// intero per il ragionato, la risposta [pezzo][correzione][motivo][tipo] letta con tolleranza e ritrovata nel testo.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,8 +18,18 @@ test('le parole che il dizionario non conosce sono candidati, ma non dentro indi
   const c = C.candidatiDizionario(testo, { sbagliata: (w) => sbagliate.has(w) });
   assert.deepEqual(segnati(testo, c), ['quseta', 'Zanzottera']);
   assert.equal(c[1].start, testo.lastIndexOf('Zanzottera'));
-  assert.ok(c.every((x) => x.dubbio && x.segno === 'errore' && x.fonte === 'dizionario'));
+  assert.ok(c.every((x) => x.dubbio && !x.certo && x.segno === 'errore' && x.fonte === 'dizionario'));
   assert.deepEqual(C.candidatiDizionario(testo, { sbagliata: (w) => sbagliate.has(w), nota: (w) => w === 'quseta' }).map((x) => x.segment), ['Zanzottera']);
+});
+
+test('sbiadito subito solo sulle parole minuscole in alfabeto latino; maiuscole e altri alfabeti aspettano il modello', () => {
+  const testo = 'quseta Roma NASA iPhone perchéé Москва καλημέρα l’amerika èèè';
+  const c = C.candidatiDizionario(testo, { sbagliata: () => true });
+  const attende = Object.fromEntries(c.map((x) => [x.segment, !!x.attende]));
+  assert.deepEqual(attende, {
+    quseta: false, Roma: true, NASA: true, iPhone: true, perchéé: false, Москва: true, καλημέρα: true, 'l’amerika': false, èèè: false,
+  });
+  assert.ok(c.every((x) => x.dubbio), 'tutti partono verso il modello come candidati');
 });
 
 test('il dizionario riceve l\'apostrofo dritto: «l’America» si chiede come «l\'America»', () => {
@@ -32,6 +43,7 @@ test('«il il» e «di di» sono ripetizioni, «quasi quasi», «piano piano», 
   const r = C.ripetizioni(testo);
   assert.deepEqual(r.map((x) => x.segment), [' il', ' di', ' the']);
   assert.deepEqual(r[0].correzioni, ['']);
+  assert.ok(r.every((x) => !x.dubbio && x.certo), 'una ripetizione ha il segno pieno subito (#1580, D5)');
   const corretto = testo.slice(0, r[0].start) + r[0].correzioni[0] + testo.slice(r[0].end);
   assert.ok(corretto.startsWith('Ho visto il cane'));
   assert.deepEqual(C.ripetizioni('il\n\nil cane'), [], 'un a capo non è uno spazio fra due parole di fila');
@@ -41,7 +53,7 @@ test('gli errori fissi hanno la loro correzione nella forma scritta', () => {
   const testo = "Qual'è il motivo? Un pò di pazienza, PERCHÈ e' tardi. Non sò. Vieni quì";
   const f = C.erroriFissi(testo);
   assert.deepEqual(f.map((x) => [x.segment, x.correzioni[0]]), [["Qual'è", 'Qual è'], ['pò', "po'"], ['PERCHÈ', 'PERCHÉ'], ["e'", 'è'], ['quì', 'qui']]);
-  assert.ok(f.every((x) => x.dubbio && x.fonte === 'fisso'));
+  assert.ok(f.every((x) => !x.dubbio && x.certo && x.fonte === 'fisso'), 'un errore fisso ha il segno pieno subito (#1580, D5)');
   assert.deepEqual(C.erroriFissi('vai su www.pò.it'), []);
 });
 
@@ -81,12 +93,29 @@ test('un testo lunghissimo si giudica a tratti: il resto resta nuovo per il giro
   assert.equal(g2.start, g.end);
 });
 
-test('a fine frase il controllo ragionato giudica le frasi chiuse, non quella aperta', () => {
+test('il ragionato rilegge il campo intero; a fine frase le sole frasi chiuse, e la frase aperta resta al giro dopo', () => {
   const testo = 'Ci vediamo martedì. Porto io i biglietti. E poi andiamo';
-  const g = C.frasiDaGiudicare('', testo, { finoA: C.ultimaFineFrase(testo, testo.length) });
+  const g = C.testoDaRileggere('', testo, { finoA: C.ultimaFineFrase(testo, testo.length) });
   assert.equal(testo.slice(g.start, g.end), 'Ci vediamo martedì. Porto io i biglietti.');
-  const g2 = C.frasiDaGiudicare(g.base, testo + ' al cinema.', {});
-  assert.equal((testo + ' al cinema.').slice(g2.start, g2.end), 'E poi andiamo al cinema.');
+  const dopo = `${testo} al cinema.`;
+  const g2 = C.testoDaRileggere(g.base, dopo, {});
+  assert.equal(dopo.slice(g2.start, g2.end), dopo, 'il giro dopo rilegge tutto, non solo la frase nuova');
+  assert.equal(dopo.slice(g2.nuovo.start, g2.nuovo.end).trim(), 'E poi andiamo al cinema.', 'il testo nuovo resta noto');
+  assert.equal(C.testoDaRileggere(g2.base, dopo, {}), null, 'niente di cambiato, niente da rileggere');
+  assert.equal(C.testoDaRileggere('', 'Ancora niente di chiuso', { finoA: 0 }), null);
+});
+
+test('oltre 12.000 caratteri il ragionato rilegge l\'ultima parte, o quella che comincia col cambio se sta tutto prima', () => {
+  const frase = 'Questa è una frase di prova. ';
+  const testo = frase.repeat(1000);
+  const g = C.testoDaRileggere('', testo, {});
+  assert.ok(g.end - g.start <= C.TESTO_INTERO_MAX && g.end - g.start > C.TESTO_INTERO_MAX - 100);
+  assert.equal(g.end, testo.length, 'un testo incollato intero: l\'ultima parte');
+  assert.ok(!(/\p{L}/u.test(testo[g.start - 1]) && /\p{L}/u.test(testo[g.start])), 'il taglio non spezza una parola');
+  const cambiato = `Questa è una frasse di prova. ${testo.slice(frase.length)}`;
+  const g2 = C.testoDaRileggere(testo, cambiato, {});
+  assert.equal(g2.start, 0, 'il cambio all\'inizio di un testo lungo si rilegge');
+  assert.ok(g2.end - g2.start <= C.TESTO_INTERO_MAX);
 });
 
 test('la risposta riga per riga: il pezzo si ritrova una volta sola e il segno sta su ciò che cambia', () => {
@@ -96,6 +125,57 @@ test('la risposta riga per riga: il pezzo si ritrova una volta sola e il segno s
   assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [['sonno', 'sono'], ['la', 'lo']]);
   assert.equal(segni[0].motivo, 'verbo essere');
   assert.ok(segni.every((s) => !s.dubbio && s.segno === 'errore'));
+});
+
+test('una riga a tre campi vale errore; se il terzo è un tipo, è il motivo che manca', () => {
+  const testo = 'oggi sonno andato con Zanzottera';
+  const r = C.segniDaRisposta('[oggi sonno andato][oggi sono andato][verbo essere]\n[Zanzottera][][giusto]', testo);
+  assert.deepEqual(r.segni.map((s) => [s.segment, s.correzioni[0], s.segno, s.motivo]), [['sonno', 'sono', 'errore', 'verbo essere']]);
+  assert.deepEqual(r.giusti, [{ start: 22, end: 32 }]);
+  const ragionato = C.segniDaRisposta('[sonno andato][][frase rotta]', testo, { tipi: ['errore', 'suggerimento'], senzaTipo: 'suggerimento' });
+  assert.deepEqual(ragionato.segni.map((s) => [s.segment, s.segno]), [['sonno andato', 'suggerimento']]);
+  assert.deepEqual(C.leggiRighe('[][][nessuno]').map((x) => x.tipo), ['nessuno']);
+});
+
+test('il pezzo si ritrova a meno di spazi multipli e di apostrofi dritti o curvi, e il segno sta sulla parola giusta', () => {
+  const testo = 'Ieri  sonno   andato da un’amika';
+  const { segni } = C.segniDaRisposta("[Ieri sonno andato][Ieri sono andato][verbo][errore]\n[un'amika][un'amica][refuso][errore]", testo);
+  assert.deepEqual(segni.map((s) => [s.segment, s.correzioni[0]]), [['sonno', 'sono'], ['un’amika', "un'amica"]]);
+  assert.equal(segni[0].start, testo.indexOf('sonno'));
+});
+
+// Quello che fa «Correggi» su ogni errore della risposta: il pezzo segnato prende la prima correzione.
+const corretto = (testo, raw) => C.segniDaRisposta(raw, testo).segni.filter((s) => s.segno === 'errore' && s.correzioni.length)
+  .reduceRight((t, s) => t.slice(0, s.start) + s.correzioni[0] + t.slice(s.end), testo);
+
+test('una correzione che cambia solo spazi o apostrofi non è un errore, e nessuna correzione ristretta cancella parole', () => {
+  const spazi = "[l'altro  giorno][l'altro giorno][spazio doppio][errore]";
+  for (const testo of ["ieri l'altro  giorno ho visto Marco", "ieri l'altro giorno ho visto Marco"]) {
+    assert.deepEqual(C.segniDaRisposta(spazi, testo).segni, [], testo);
+  }
+  assert.deepEqual(C.segniDaRisposta("[l’altro giorno][l'altro giorno][apostrofo][errore]", "ieri l'altro giorno").segni, []);
+  // Ristretta ai soli spazi, la correzione vale per il pezzo intero: «a  b» diventa «a x b», non «x».
+  assert.equal(corretto('a  b c', '[a  b][a x b][manca x][errore]'), 'a x b c');
+  assert.equal(corretto('io penso dire di sì', '[penso dire][penso di dire][manca «di»][errore]'), 'io penso di dire di sì');
+});
+
+test('un pezzo ripetuto vale nell\'occorrenza che tocca il testo nuovo di quella chiamata', () => {
+  const testo = 'ho sonno, ma oggi sonno andato al mare';
+  const nuovo = { start: testo.indexOf('oggi'), end: testo.length };
+  const { segni } = C.segniDaRisposta('[sonno][sono][verbo essere][errore]', testo, { nuovo });
+  assert.deepEqual(segni.map((s) => s.start), [testo.lastIndexOf('sonno')]);
+  assert.deepEqual(C.segniDaRisposta('[sonno][sono][x][errore]', 'sonno e sonno', { nuovo: { start: 0, end: 13 } }).segni, [],
+    'due occorrenze nel testo nuovo: non si sa quale');
+  assert.deepEqual(C.segniDaRisposta('[sono][x][y][errore]', 'persono sono', {}).segni.map((s) => s.start), [8], 'a parole intere');
+});
+
+test('si ripete solo una risposta senza righe leggibili che non dice «nessuno»', () => {
+  assert.equal(C.senzaRighe(''), true);
+  assert.equal(C.senzaRighe('Ecco gli errori che ho trovato:'), true);
+  assert.equal(C.senzaRighe('[][][][nessuno]'), false);
+  assert.equal(C.senzaRighe('Nessun errore.'), false);
+  assert.equal(C.senzaRighe('NIENTE'), false, 'la risposta vuota del prompt del banco');
+  assert.equal(C.senzaRighe('[sonno][sono][verbo]'), false);
 });
 
 test('un pezzo che compare due volte, o che non c\'è più, si scarta', () => {

@@ -9,15 +9,66 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.246', date: '2026-10-23',
-      features: [],
+      version: '0.2.249', date: '2026-10-23',
+      features: [
+        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
+        'Se non ricordi un dato, scrivi delle x al suo posto: «l\'America l\'hanno scoperta nel 14xx», «Google ha un p/e di soli xx». Il correttore lo trova e te lo mostra in piccolo sopra le x, e un clic lo mette. Un dato che cambia nel tempo, come un prezzo, lo cerca su Wikipedia o sul web, e col tasto destro vedi da dove viene e di quando è. Si spegne in Opzioni → Altro, alla voce «Segnaposto».',
+      ],
       fixes: [
+        'La pulizia automatica delle schede archivia davvero quelle che non tocchi da ore. Prima una pagina che si ricaricava o scorreva da sola, come una chat, faceva sembrare Filo sempre in uso, e alla riapertura ogni scheda risultava appena usata. Se la pulizia non riesce a valutare le schede, per esempio coi crediti finiti, un avviso ti dice perché.',
         'L\'accesso con Google e con gli altri provider funziona anche in un Filo appena installato, e una passkey salvata sul telefono si usa col QR.',
       ],
     },
     {
-      version: '0.2.245', date: '2026-10-22',
+      version: '0.2.248', date: '2026-10-23',
+      features: [
+        'Ctrl+Tab porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima scheda si riparte dalla prima. Su Mac si premono col tasto Control.',
+        'Nell\'intervista di benvenuto Filo ti chiede se può mandare i contatori anonimi, solo numeri senza contenuto che gli servono a migliorare: rispondi con Sì o No. Con il No non parte niente, nemmeno quello che aveva già contato. Lo cambi quando vuoi in Preferenze o chiedendolo a Filo.',
+      ],
+      fixes: [
+        'Se la chiave personale salvata sul computer non è più quella del tuo portafoglio, la pagina Crediti te lo dice, e con «Richiedi una nuova chiave» i consumi tornano a registrarsi. Un consumo che il server non accetta non blocca più tutti quelli dopo, e Crediti dice quanti non sono stati registrati.',
+        'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
+        'Il tasto che apre Crediti, Opzioni o Preferenze c\'è anche nell\'avviso di «Leggi», in quello della descrizione di un\'immagine copiata e sotto una ricerca dei mazzi il cui controllo delle carte non è partito. Nell\'Editor «Rigenera titolo» e «Rigenera riassunto», quando non riescono, dicono perché e portano dove si rimedia. «Leggi» coi crediti finiti dice che sono finiti, non più che la voce non è disponibile.',
+        'Negli elenchi di siti delle impostazioni, un nome con uno spazio che non è un sito, come «studio rossi», l\'avviso lo riporta intero anche se sulla stessa riga hai scritto un altro sito. Prima lo spezzava in «studio» e «rossi». Anche la chat ti risponde che «studio rossi» non è un dominio, in un pezzo solo. Un indirizzo intero incollato con un altro sito accanto, sulla stessa riga, li aggiunge tutti e due: prima il secondo spariva.',
+        'Quando un errore chiede di scegliere un altro modello, manda in Opzioni → Modelli per azione e ha il tasto per andarci. Prima nominava una pagina che solo chi gestisce Filo ha. Un\'immagine copiata la cui descrizione non può arrivare, per esempio coi crediti finiti, nella cronologia degli appunti non resta più su «Descrizione…».',
+        'Quando Filo scarica da solo un\'immagine di un altro sito, per descriverla, copiarla, salvarla o leggerla nell\'Aiuto, a quel sito manda solo i cookie che manderebbe la pagina. Prima mandava anche quelli del tuo accesso, che il sito tiene per quando lo apri tu. Vale anche per l\'icona delle schede.',
+        'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
+        'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
+      ],
+    },
+    {
+      version: '0.2.247', date: '2026-10-22',
+      features: [
+        'Quando un sito si prende lo schermo intero, come il pulsante di un video, in alto compare per qualche secondo il suo nome vero con «Esc per uscire». Così sai chi hai davanti anche quando la pagina copre tutto lo schermo. Torna portando il mouse sul bordo alto, e quanto resta lo scegli in Preferenze, nelle impostazioni avanzate.',
+      ],
+      fixes: [
+        'Su Windows il correttore segna subito le parole italiane che non esistono, come «andatto», anche col controllo del modello spento. Prima lì le trovava solo il modello, e a modello spento restavano senza segno.',
+        'Il bottone di un file che Filo ti trova in chat porta sempre il nome vero del file. Il nome che gli dà Filo, come «Bolletta della luce», sta accanto, più piano.',
+        'Nell\'Editor la chat del documento legge tutto il documento, non più solo l\'inizio, e lo stesso fanno il titolo e il riassunto automatici. Prima, su un testo lungo, la chat rispondeva come se il resto non esistesse. Se il documento supera i 350.000 caratteri, o è più lungo di quanto regge il modello che hai scelto, Filo legge l\'inizio e sotto la risposta ti dice quanta parte ha letto.',
+        'Incollare un testo lungo nell\'Editor non blocca più la pagina: anche mille righe entrano in un attimo.',
+        'Il motore che apre le pagine web ha le ultime correzioni di sicurezza, più di cento in due settimane.',
+        'Se una risposta arriva da un fornitore che Filo esclude, te lo dice un avviso sulla pagina, anche senza «Solo modelli a pesi aperti», e «Segnala» apre il feedback già scritto. Nella Cronologia AI quella richiesta resta segnata e la trovi cercando il nome del fornitore.',
+        'Su Windows e Mac i file che scarichi con Filo, anche con «Salva immagine come», risultano arrivati da Internet, come da qualunque browser. Se apri un programma fuori da Filo il sistema ti avvisa prima, e Office apre i documenti in Visualizzazione protetta. «Salva immagine come» ti propone anche il nome vero del file, lo stesso che poi trovi fra i download.',
+        'Le pubblicità dei video che si possono saltare Filo le salta anche quando il video suona in una scheda che non stai guardando, o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.',
+        'Un sito vede i nomi dei tuoi microfoni, fotocamere e casse solo dopo che gli hai consentito il microfono o la fotocamera, come in Chrome, e l\'elenco dei font installati sul computer non lo legge più. Prima bastava aprire la pagina, o un clic, e uno script di tracciamento poteva riconoscerti da quei nomi su ogni sito, anche in incognito.',
+        'Un colore che scrivi nelle Preferenze resta anche se subito dopo cambi il tema o chiudi la scheda. Prima a volte tornava quello di prima.',
+      ],
+    },
+    {
+      version: '0.2.246', date: '2026-10-22',
       features: [],
+      fixes: [
+        'Il correttore segna subito, col segno pieno, gli errori che non hanno bisogno di conferma: «qual\'è», «il il», una data col giorno della settimana sbagliato. Una parola con la maiuscola che non conosce, quasi sempre un nome, non la segna più finché il controllo non dice che è sbagliata. I suggerimenti guardano tutto quello che hai scritto nel campo, non solo l\'ultima frase.',
+        'Se arrivano più di cinque avvisi insieme in basso a destra, quelli in più non spariscono più. Aspettano dietro un «+3» in cima alla pila: un clic li mostra tutti, e da lì li chiudi anche tutti insieme. Quando gli altri se ne vanno, entrano da soli.',
+        'Una scheda non si allarga più fino a prendere mezza barra in alto, nemmeno quella aperta accanto a schede dal titolo lungo. Arriva al massimo a 240 pixel, e il titolo intero lo leggi passandoci sopra col mouse. Il massimo lo cambi in Preferenze, nelle impostazioni avanzate, o chiedendo a Filo «schede più larghe».',
+        'Se chiedi «portami alla home» mentre sei già nella home, Filo non ti promette più di svuotarla. Ti dice che sei già lì, e il bottone sotto la risposta chiude la conversazione: quello che vi siete detti resta nella home.',
+      ],
+    },
+    {
+      version: '0.2.245', date: '2026-10-22',
+      features: [
+        'Col tasto destro su un\'immagine fatta con ChatGPT, Firefly o Bing prima del 2026, Filo ora ti dice che è generata con l\'AI e chi lo dichiara, per esempio OpenAI. Prima diceva solo che chi l\'aveva firmata non era riconosciuto. Lo stesso se lo chiedi in chat.',
+      ],
       fixes: [
         'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
         'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',
@@ -914,9 +965,6 @@
     },
     {
       version: '0.2.160', date: '2026-07-24',
-      // NB: la ricerca "a senso" della dashboard di gestione aveva una voce qui,
-      // rimossa: quella pagina è riservata all'owner, quindi per l'utente comune
-      // era il racconto di una funzione che non può nemmeno aprire.
       fixes: [
         'Salvare un’immagine da una pagina web ora funziona davvero: con «Salva immagine come…» dal clic destro il file viene scaricato e si apre la finestra per scegliere dove metterlo, con una conferma a salvataggio riuscito. Prima, per le immagini ospitate su un sito diverso da quello della pagina (cioè quasi tutte), la scheda abbandonava la pagina e mostrava solo l’immagine, senza scaricare nulla. Ora vengono salvate anche le immagini dei siti che le proteggono dal collegamento esterno, e se il download non riesce (immagine irraggiungibile o connessione interrotta) te lo dice invece di restare in silenzio.',
         'Sull’avviso a schermo intero «Sito pericoloso», il pulsante «Torna indietro» ora ti fa davvero uscire dal sito anche quando l’avviso compare in una scheda appena aperta (senza una pagina precedente su cui tornare). Prima, in quel caso, premere «Torna indietro» aveva lo stesso effetto di confermare il sito: veniva marcato come sicuro per quella scheda, così se lo stesso dominio si ripresentava (per un redirect o un link) l’avviso di pericolo non compariva più.',
@@ -1461,9 +1509,8 @@
     return 0;
   }
 
-  // Note delle versioni STRETTAMENTE successive a `lastSeen` (escluso), fino a
-  // `current` incluso. Se `lastSeen` è nullo/assente → tutte (primo avvio non
-  // mostra nulla a sorpresa: lo decide il chiamante). Ordinate dalla più recente.
+  // Note delle versioni successive a `lastSeen` (escluso) fino a `current` incluso, dalla più
+  // recente. `lastSeen` assente → tutte, e sta al chiamante non mostrarle al primo avvio.
   function since(lastSeen, current = latestVersion()) {
     return NOTES
       .filter((n) => cmpVersion(n.version, current) <= 0

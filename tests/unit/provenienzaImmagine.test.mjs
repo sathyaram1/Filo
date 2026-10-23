@@ -387,6 +387,32 @@ test('un ingrediente la cui impronta non è quella firmata non racconta la stori
   assert.notEqual(r.origine, 'ai');
 });
 
+// #946.1: un file vero di ChatGPT (2025) mette l'immagine generata come unico componente del passo finale, firmato
+// dallo stesso certificato. È generata, non modificata; con l'elenco provvisorio OpenAI è riconosciuta.
+test('un’immagine vera di ChatGPT è generata con l’AI, e con l’elenco provvisorio la dichiara OpenAI', () => {
+  const byte = ufficiale('chatgpt-2025-vera.png');
+  const provvisorio = { ancore: P.ancoreDaPem(ufficiale('elenco-provvisorio-truepic.pem').toString('utf8')), ammessi: [] };
+  const r = P.analizza(byte, { ancore: ANCORE, provvisorio });
+  assert.equal(r.origine, 'ai');
+  assert.equal(r.dichiarante, 'OpenAI');
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.match(P.frase(r), /^Generata con l’AI secondo OpenAI/);
+  assert.equal(conElenco(byte).origine, 'ai', 'anche senza elenco provvisorio');
+});
+
+test('un componente resta «modificata» se non è tutta l’immagine', () => {
+  const { pezzoUnico } = P._interni;
+  const firma = (fp) => ({ certificati: [{ fingerprint256: fp }] });
+  const genitore = (tuttiIngredienti, azioni = [], fp = 'A') => ({ firma: firma(fp), letto: { tuttiIngredienti, azioni } });
+  assert.equal(pezzoUnico(genitore(1), firma('A')), true, 'come ChatGPT: un solo componente, stesso certificato');
+  assert.equal(pezzoUnico(genitore(1, ['c2pa.converted']), firma('A')), true);
+  assert.equal(pezzoUnico(genitore(2), firma('A')), false, 'un secondo ingrediente è un montaggio');
+  assert.equal(pezzoUnico(genitore(1, ['c2pa.placed']), firma('A')), false, 'una lavorazione dichiarata');
+  assert.equal(pezzoUnico(genitore(1, ['c2pa.edited']), firma('A')), false);
+  assert.equal(pezzoUnico(genitore(1), firma('B')), false, 'un altro firmatario');
+  assert.equal(pezzoUnico(null, firma('A')), false);
+});
+
 // ── Certificato scaduto dopo la firma: decide la marca temporale (#946) ──────────
 // Chi firma con certificati di breve durata (le fotocamere dei telefoni) conta
 // sulla marca: dice che la firma è stata fatta quando il certificato valeva.
@@ -434,6 +460,85 @@ test('una marca riconosciuta non vale se la firma del manifesto non è quella ma
 test('senza elenco delle autorità di marcatura, un certificato scaduto resta scaduto', () => {
   const r = P.analizza(pngFirmato({ ...scaduto(), marca: { tsa: tsa(), ora: new Date(Date.now() - 5 * GIORNO) } }), { ancore: ANCORE });
   assert.ok(r.avvisi.includes('certificato_scaduto'));
+});
+
+// ── L'elenco provvisorio del C2PA, solo per le firme di prima del congelamento (#946.1) ──
+// Le immagini di ChatGPT, Firefly e Bing di prima del programma ufficiale arrivano a
+// un'autorità che sta solo lì (Truepic, Microsoft, Adobe G2): senza, non direbbero mai chi le ha fatte.
+
+const RADICE_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'RootCA', ca: true, da: new Date('2021-12-09'), a: new Date('2036-12-05') });
+const INTERMEDIA_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'WebClaimSigningCA', ca: true, emittente: RADICE_PROVV, da: new Date('2022-01-01'), a: new Date('2032-01-01') });
+const PROVV = { ancore: P.ancoreDaPem(elencoPem(RADICE_PROVV)), ammessi: [] };
+const PRIMA = new Date(P.CONGELAMENTO_PROVVISORIO - 200 * GIORNO);
+const DOPO = new Date(P.CONGELAMENTO_PROVVISORIO + 10 * GIORNO);
+const daOpenAi = (altro = {}) => ({
+  cert: certificato({ organizzazione: 'OpenAI', nomeComune: 'Truepic Lens CLI in DALL·E', emittente: INTERMEDIA_PROVV, da: PRIMA, a: new Date(Date.now() + 100 * GIORNO), ...altro }),
+  catena: [INTERMEDIA_PROVV],
+});
+const conProvvisorio = (byte, provvisorio = PROVV) => P.analizza(byte, { ancore: ANCORE, ancoreTsa: ANCORE_TSA, provvisorio });
+
+test('firma di prima del congelamento che arriva solo all’elenco provvisorio: dice chi l’ha fatta, e da quale elenco', () => {
+  const r = conProvvisorio(pngFirmato(daOpenAi()));
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.equal(P.frase(r), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate. Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.');
+  const n = P.notaPerModello(r);
+  assert.match(n.etichetta, /lo dichiara OpenAI.*elenco provvisorio/);
+  // Senza l'elenco provvisorio la stessa immagine resta fuori dall'elenco ufficiale, come prima.
+  assert.match(P.frase(conElenco(pngFirmato(daOpenAi()))), /non è nell’elenco ufficiale/);
+});
+
+test('chi sta nell’elenco ufficiale non prende la frase del provvisorio', () => {
+  const r = conProvvisorio(pngFirmato(firmatario()));
+  assert.equal(r.firmatario, 'riconosciuto');
+  assert.equal(P.frase(r), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
+});
+
+test('firma di dopo il congelamento: l’elenco provvisorio non la riconosce', () => {
+  const casi = {
+    'certificato nato dopo, senza marca': pngFirmato(daOpenAi({ da: DOPO })),
+    'marca dopo il congelamento': pngFirmato({ ...daOpenAi(), marca: { tsa: tsa(), ora: DOPO } }),
+  };
+  for (const [caso, byte] of Object.entries(casi)) {
+    const r = conProvvisorio(byte);
+    assert.equal(r.firmatario, 'sconosciuto', caso);
+    assert.match(P.frase(r), /non è nell’elenco ufficiale/, caso);
+  }
+});
+
+test('l’ora della firma la dice la marca, anche se il certificato è nato prima', () => {
+  const r = conProvvisorio(pngFirmato({ ...daOpenAi(), marca: { tsa: tsa(), ora: new Date(P.CONGELAMENTO_PROVVISORIO - 30 * GIORNO) } }));
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.deepEqual(r.avvisi, []);
+});
+
+test('certificato scaduto, marcato prima del congelamento da un’autorità dell’elenco provvisorio: in regola', () => {
+  const RADICE_TSA_PROVV = certificato({ organizzazione: 'DigiCert', nomeComune: 'TimeStamping CA', ca: true, da: new Date('2022-03-23'), a: new Date('2037-03-22') });
+  const provvisorio = { ancore: P.ancoreDaPem(elencoPem(RADICE_PROVV, RADICE_TSA_PROVV)), ammessi: [] };
+  const byte = pngFirmato({
+    ...daOpenAi({ da: new Date(P.CONGELAMENTO_PROVVISORIO - 400 * GIORNO), a: new Date(P.CONGELAMENTO_PROVVISORIO - 30 * GIORNO) }),
+    marca: { tsa: tsa(RADICE_TSA_PROVV), ora: new Date(P.CONGELAMENTO_PROVVISORIO - 200 * GIORNO) },
+  });
+  const r = conProvvisorio(byte, provvisorio);
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.deepEqual(r.avvisi, []);
+  assert.equal(P.frase(r), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate. Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.');
+  // La stessa marca non vale per chi passa dall'elenco ufficiale: le sue autorità di marcatura sono le ufficiali.
+  assert.ok(conProvvisorio(pngFirmato({ ...scaduto(), marca: { tsa: tsa(RADICE_TSA_PROVV), ora: new Date(Date.now() - 5 * GIORNO) } }), provvisorio).avvisi.includes('certificato_scaduto'));
+});
+
+test('un firmatario ammesso per nome nell’elenco provvisorio vale col suo certificato esatto, non con un altro uguale', () => {
+  const ammesso = certificato({ organizzazione: 'Stability AI Ltd', nomeComune: 'Stability', da: PRIMA });
+  const provvisorio = { ancore: [], ammessi: P.ammessiDaPem(elencoPem(ammesso)) };
+  const r = conProvvisorio(pngFirmato({ cert: ammesso }), provvisorio);
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.match(P.frase(r), /lo dichiara Stability AI nelle credenziali firmate\. Il firmatario è riconosciuto dall’elenco provvisorio/);
+  const sosia = certificato({ organizzazione: 'Stability AI Ltd', nomeComune: 'Stability', da: PRIMA });
+  assert.equal(conProvvisorio(pngFirmato({ cert: sosia }), provvisorio).firmatario, 'sconosciuto');
+});
+
+test('un’autorità dell’elenco provvisorio non è un firmatario ammesso, e viceversa', () => {
+  assert.equal(P.ammessiDaPem(elencoPem(RADICE_PROVV)).length, 0);
+  assert.equal(P.ancoreDaPem(elencoPem(certificato({ da: PRIMA }))).length, 0);
 });
 
 // ── Un file costruito apposta (#946) ──────────────────────────────────────────

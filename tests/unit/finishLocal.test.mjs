@@ -109,6 +109,15 @@ describe('quali spec lanciare', () => {
       assert.ok(out.includes('tests/editor-chat'), out.join(','));
     });
 
+    // #600.1: il costo di «dimentica» cambiò nel registro (#872) e lo spec dell'autonomia arrivò rosso su main.
+    test('il registro dei costi delle azioni porta lo spec dell’autonomia, che ne prova le conseguenze', () => {
+      const conAutonomia = [...tracked, 'tests/autonomia.spec.mjs'];
+      assert.ok(specsForChangedFiles(['src/shared/actionLevels.js'], conAutonomia).includes('tests/autonomia'));
+      assert.ok(!specsForChangedFiles(['src/shared/actionLevels.js'], tracked).includes('tests/autonomia'),
+        'con l’elenco non si inventa uno spec che non c’è');
+      assert.deepEqual(specsForChangedFiles(['src/shared/constructor.js', 'src/shared/toString.js'], conAutonomia), []);
+    });
+
     test('le prove dei giri (tests/verifica) non entrano per prefisso, e con l’elenco non si inventano nomi', () => {
       assert.deepEqual(specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked), []);
     });
@@ -250,7 +259,7 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
     // Meglio 5 secondi di errore chiaro che 15 minuti di controlli seguiti da
     // un conflitto. lastIndexOf: si guarda la CHIAMATA, non la definizione.
     const guardia = SORGENTE.lastIndexOf('behindMainStop(');
-    const controlli = SORGENTE.indexOf("'test:unit'");
+    const controlli = SORGENTE.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
     assert.ok(guardia > 0 && controlli > 0);
     assert.ok(guardia < controlli, 'il conflitto di fusione va scoperto prima di pagare i controlli');
   });
@@ -548,7 +557,7 @@ test('--check: un unit rosso del ramo non salta gli spec delle aree, e l\'esito 
   assert.match(finish.messaggio, /tests\/unit\/x\.test\.mjs › rotto/, 'si dice quale test ha rotto il ramo');
 
   const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
-  const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+  const unit = codice.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
   const spec = codice.indexOf('runSpecsALotti(blocking');
   assert.ok(unit > 0 && spec > unit, 'gli spec delle aree vengono dopo gli unit');
   const fraIDue = codice.slice(unit, spec);
@@ -582,6 +591,12 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
       }
     }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M } }).messaggio, /fusione con main cccccccc/);
+    // #1580.1: chi aveva riprovato il rosso sulla base del ramo lo trovava rosso «su main da solo» e credeva sbagliato questo messaggio.
+    const vecchio = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, baseRamo: 'b'.repeat(40) } }).messaggio;
+    assert.match(vecchio, /non sono del ramo, proseguo\. Il ramo parte da main bbbbbbbb, più vecchio: [^\n]*su main da solo si usa cccccccc, non la base del ramo\./);
+    for (const prova of [{ esito: 'verde', mainSha: M }, { esito: 'verde', mainSha: M, contenuto: true }, { esito: 'rosso_anche_su_main', mainSha: M, baseRamo: 'b'.repeat(40) }]) {
+      assert.doesNotMatch(esitoUnitDelRamo({ checkOnly: false, prova }).messaggio, /parte da main/, JSON.stringify(prova));
+    }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'rosso_anche_su_main', mainSha: M } }).messaggio, /anche su main da solo/);
     const instabili = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, instabili: ['tests/unit/a.test.mjs › lento'] } });
     assert.match(instabili.messaggio, /tests\/unit\/a\.test\.mjs › lento/, 'gli instabili si nominano');
@@ -611,10 +626,10 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
 
   test('il rosso del ramo da solo passa dalla prova sul ramo vero, anche quando contiene già main', () => {
     const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
-    const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+    const unit = codice.indexOf("'run-unit-tests.mjs')], 'Controlli di logica'");
     const esito = codice.indexOf('esitoUnitDelRamo({ checkOnly, prova })', unit);
     assert.ok(unit > 0 && esito > unit);
-    assert.match(codice.slice(unit, esito), /const puntaProvata = git\(\['rev-parse', 'HEAD'\]\)\.out;\s*const prova = provaUnitSullaFusione\(\{ root: ROOT, punta: puntaProvata, ancheContenuto: true \}\);/);
+    assert.match(codice.slice(unit, esito), /const puntaProvata = shaProvato;\s*const prova = provaUnitSullaFusione\(\{ root: ROOT, punta: puntaProvata, ancheContenuto: true \}\);/);
     assert.match(codice.slice(esito, codice.indexOf('runSpecsALotti(blocking', esito)), /unitRossi = esito\.rosso;/);
   });
 });

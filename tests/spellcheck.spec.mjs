@@ -178,7 +178,8 @@ test.describe('spellcheck-autocorrect-multiword', () => {
       return document.getElementById('dictList')?.querySelectorAll('.sn-spell-word').length === 2;
     }, null, { timeout: 4_000 });
 
-    const words = await page.locator('#dictList .sn-spell-word').allTextContents();
+    // Le parole imparate si cambiano scrivendoci (#1447): ogni riga è una casella.
+    const words = await page.locator('#dictList .sn-spell-word').evaluateAll((els) => els.map((el) => el.value));
     const set = new Set(words);
     expect(set.has('New')).toBe(true);
     expect(set.has('York')).toBe(true);
@@ -874,7 +875,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     // ASSERISCE IL SUCCESSO: la parola in lista deve essere "iPhone" (casing preservato)
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
-    await expect(wordSpans.first()).toHaveText('iPhone');
+    await expect(wordSpans.first()).toHaveValue('iPhone');
   });
 
   test('dizionario personale dedup case-insensitive: aggiungere "iphone" dopo "iPhone" non crea duplicati', async ({ openTab }) => {
@@ -896,7 +897,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
     // Il casing originale ("iPhone") deve essere preservato
-    await expect(wordSpans.first()).toHaveText('iPhone');
+    await expect(wordSpans.first()).toHaveValue('iPhone');
   });
 
   // ---------------------------------------------------------------------------
@@ -986,7 +987,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     // ASSERISCE IL SUCCESSO 2: nessun duplicato aggiunto (resta una sola parola)
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
-    await expect(wordSpans.first()).toHaveText('casa');
+    await expect(wordSpans.first()).toHaveValue('casa');
 
     // ASSERISCE IL SUCCESSO 3: l'input NON viene ingoiato in silenzio — il testo
     // digitato resta visibile così l'utente capisce cosa è successo.
@@ -1135,12 +1136,16 @@ test.describe('spellcheck-segni-restano', () => {
       globalThis.__scan = 0;
       const finto = async ({ messages }) => {
         const t = JSON.stringify(messages);
-        if (t.includes('Sei il controllo rapido di un correttore')) {
+        if (t.includes('Sei il controllo rapido')) {
           globalThis.__scan += 1;
           const parole = [...new Set(t.match(/xq[a-z]+\d+/g) || [])];
+          // Come un modello vero conferma i refusi fra i candidati (ciiao, staii): uno taciuto sarebbe giusto (#1580).
+          const candidati = [...String(messages[messages.length - 1].content).matchAll(/^\[([^\]\n]+)\]/gm)]
+            .map((m) => m[1]).filter((w) => !parole.includes(w));
           // `__trattieni`: la risposta aspetta che la prova la lasci andare, come un modello lento.
           if (globalThis.__trattieni) await new Promise((ok) => globalThis.__rilascia.push(ok));
-          return { text: parole.map((w) => `[${w}][y][x][errore]`).join('\n') || '[][][][nessuno]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+          const righe = [...parole.map((w) => `[${w}][y][x][errore]`), ...candidati.map((w) => `[${w}][${w.replace(/(.)\1/g, '$1')}][refuso][errore]`)];
+          return { text: righe.join('\n') || 'NIENTE', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
         }
         // «Correggi» nel riquadro Modifica, sulla prima riga della prova del rosso.
         if (t.includes('Correggi eventuali errori')) return { text: 'ciao amico mio', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };

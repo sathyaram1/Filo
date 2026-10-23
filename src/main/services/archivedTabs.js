@@ -113,9 +113,7 @@
       coOpenUrls: insieme.map((x) => x.testo),
       ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
-      // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
-      // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
-      // la tab rinasce proxata sulla stessa location.
+      // Proxy alla chiusura: riaprendo dalla cronologia la tab rinasce sulla stessa location.
       proxy: meta.proxy && meta.proxy.country
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
@@ -161,7 +159,7 @@
     return d.tutti();
   }
 
-  // Cancellazione multipla (§5 pulizia retroattiva). Ritorna { removed, remaining }.
+  // Cancellazione multipla (§5 pulizia retroattiva).
   async function removeMany(ids) {
     if (Disco.inIncognito()) return { removed: 0, remaining: 0 };
     const d = await apri();

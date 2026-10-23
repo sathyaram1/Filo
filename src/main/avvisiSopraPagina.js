@@ -8,6 +8,7 @@ const { VuotoDellaVista } = require('./vuotoDellaVista');
 
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 const AZIONE = /^(chiudi|\d{1,2})$/;
+const PILA = /^(apri|riduci|chiudi-tutti)$/;
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
@@ -23,6 +24,8 @@ function pulisci(stato) {
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
       chiusa: c.chiusa === true,
     }));
+  const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
+  const aperta = !!(stato && stato.aperta === true);
   const vars = {};
   const dati = stato && stato.tema && stato.tema.vars;
   if (dati && typeof dati === 'object') {
@@ -30,7 +33,7 @@ function pulisci(stato) {
       if (NOME_VAR.test(k) && typeof v === 'string') vars[k] = v;
     }
   }
-  return { carte, tema: { vars } };
+  return { carte, altre, aperta, tema: { vars } };
 }
 
 class AvvisiSopraPagina {
@@ -46,7 +49,7 @@ class AvvisiSopraPagina {
     this.schedaAttiva = schedaAttiva;
     this.vista = null;
     this.pronta = false;
-    this.stato = { carte: [], tema: { vars: {} } };
+    this.stato = { carte: [], altre: 0, aperta: false, tema: { vars: {} } };
     this.misura = { w: 0, h: 0 };
     this.altezza = 0;
     this.riserve = new WeakMap();
@@ -151,22 +154,46 @@ class AvvisiSopraPagina {
   }
 
   // Tasto destro su una carta: le sue azioni e la chiusura, nel menu di Filo; la scelta fa quello che fa il pulsante.
+  // Sui comandi della pila («+N», Riduci) le stesse due strade della pila intera.
   _menu(d) {
+    if (!this.vista || !this.win || this.win.isDestroyed()) return;
     const id = testo(d && d.id);
-    const carta = this.stato.carte.find((c) => c.id === id && !c.chiusa);
-    if (!carta || !this.vista || !this.win || this.win.isDestroyed()) return;
+    const pila = !!(d && d.pila === true);
+    const carta = pila ? null : this.stato.carte.find((c) => c.id === id && !c.chiusa);
+    const quante = this.stato.carte.filter((c) => !c.chiusa).length + this.stato.altre;
+    if (pila ? quante < 2 : !carta) return;
     this._nascondiSuggerimento();
-    const voci = carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label);
-    if (voci.length) voci.push({ type: 'separator' });
-    voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
+    const voci = [];
+    if (pila) {
+      voci.push(this.stato.aperta
+        ? { label: 'Riduci', action: 'avvisi:riduci' }
+        : { label: 'Mostra tutti', action: 'avvisi:apri' });
+    } else {
+      voci.push(...carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label));
+      if (voci.length) voci.push({ type: 'separator' });
+      voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
+    }
+    if (quante > 1) voci.push({ label: 'Chiudi tutti', action: 'avvisi:chiudi-tutti' });
     const b = this.vista.getBounds();
     const { showPopupMenu } = require('./popup-menu');
     showPopupMenu(this.win, voci, b.x + coord(d.x), b.y + coord(d.y), (scelta) => {
-      const m = /^@action:avviso:(chiudi|\d{1,2})$/.exec(testo(scelta));
-      if (!m || this.win.isDestroyed()) return;
+      if (this.win.isDestroyed()) return;
+      const s = testo(scelta);
+      const comando = /^@action:avvisi:([a-z-]+)$/.exec(s);
+      if (comando) { this._pila(comando[1]); return; }
+      const m = /^@action:avviso:(chiudi|\d{1,2})$/.exec(s);
+      if (!m || !carta) return;
       try { this.win.webContents.send('avvisi:azione', { id, azione: m[1] }); } catch (_) {}
       this.restituisciTastiera();
     });
+  }
+
+  // I comandi della pila intera li esegue la shell, che ne tiene il modello.
+  _pila(azione) {
+    const a = testo(azione);
+    if (!PILA.test(a) || !this.win || this.win.isDestroyed()) return;
+    try { this.win.webContents.send('avvisi:pila', { azione: a }); } catch (_) {}
+    this.restituisciTastiera();
   }
 
   // Il puntatore sopra le carte ferma i loro tempi: li tiene la shell.
@@ -245,6 +272,8 @@ class AvvisiSopraPagina {
         this._mostraSuggerimento(dati);
       } else if (canale === 'avvisi:inoltra') {
         this.vuoto.inoltra(dati);
+      } else if (canale === 'avvisi:pila') {
+        this._pila(dati && dati.azione);
       } else if (canale === 'avvisi:menu') {
         this._menu(dati);
       } else if (canale === 'avvisi:sopra') {

@@ -57,7 +57,12 @@ async function giroOra(subito) {
   const testo = String((r && r.message) || '').trim();
   if (!testo) return r || null;
   const chat = corrente ? corrente.id : require('node:crypto').randomUUID();
-  const scritta = await Chats.append(chat, { role: 'filo', text: testo, spontaneo: true, motivi, esterno: ESTERNO, ...(fondi ? { fonde: true } : {}) });
+  // I verdetti dei suoi collegamenti restano con la frase: riaperta, chi chiedeva l'OK lo chiede ancora (#1505).
+  const verdetti = {
+    ...(Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length ? { linkDaConfermare: r.linkDaConfermare } : {}),
+    ...(r.senzaVerdetto ? { senzaVerdetto: true } : {}),
+  };
+  const scritta = await Chats.append(chat, { role: 'filo', text: testo, spontaneo: true, motivi, esterno: ESTERNO, ...verdetti, ...(fondi ? { fonde: true } : {}) });
   const i = scritta ? scritta.messages.length - 1 : 0;
   const m = scritta && scritta.messages[i];
   app.annuncia({ chat, i, ts: (m && m.ts) || new Date().toISOString(), testo, fuso: fondi });

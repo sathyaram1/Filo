@@ -497,6 +497,17 @@ class StratoDelMenu {
         if (dati.destro && Date.now() - this.clicAlle <= GESTO_MS) this._rigiocaDestro(sotto, dati.destro);
         return;
       }
+      // Le ricerche nel menu e nella cronologia degli appunti, per i contatori (#1461): solo numeri ed esiti, per la
+      // finestra di questo strato. Lo strato nomina solo questi due pannelli.
+      if (canale === 'strato:conta') {
+        const d = dati && typeof dati === 'object' ? dati : {};
+        const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+        const pannello = d.pannello === 'tasto-destro' ? 'tasto-destro' : 'incolla';
+        try {
+          globalThis.SN_CONTATORI_MAIN?.ricerca(pannello, { esito: String(d.esito || ''), attesaMs: n(d.attesaMs), posizione: n(d.posizione) }, { incognito: !!(this.win && this.win._filoIncognito) });
+        } catch (_) {}
+        return;
+      }
       if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera|rotella)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
     });
     try { wc.ipc.handle('strato:barra', (_e, dati) => this._versoLaBarra(dati)); } catch (_) {}

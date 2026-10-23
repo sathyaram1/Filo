@@ -598,12 +598,20 @@
   }
 
   // Dove la richiesta della chat smette di ripetersi (SPEC-CONTESTO § La richiesta): fine della parte fissa del system,
-  // fine del tratto, ultimo messaggio. Solo la chat: un prompt che cambia a ogni chiamata pagherebbe scritture mai rilette.
-  // `caratteri` divide il testo del messaggio e il punto va sulla prima parte. Sentinella: tests/unit/puntiDiCache.test.mjs.
-  // `durata`: quella della parte fissa ('5m' o '1h', da tetti().cache); assente o non valida vale quella di serie.
+  // fine del tratto, ultimo messaggio. Solo la chat e il correttore: un prompt che cambia a ogni chiamata pagherebbe
+  // scritture mai rilette. `caratteri` divide il testo del messaggio e il punto va sulla prima parte. Sentinella:
+  // tests/unit/puntiDiCache.test.mjs. `durata`: quella della parte fissa della chat ('5m' o '1h', da tetti().cache);
+  // assente o non valida vale quella di serie.
   function pianoDellaCache(action, messages, { durata } = {}) {
     const C = global.SN_CONST;
-    if (!C || !C.ACTIONS || action !== C.ACTIONS.FILO_CHAT || !Array.isArray(messages) || !messages.length) return null;
+    if (!C || !C.ACTIONS || !Array.isArray(messages) || !messages.length) return null;
+    // Il correttore (#1580): le regole nel system, uguali a ogni chiamata; il testo che cambia sta dopo. Cinque minuti
+    // bastano a chi scrive, e la durata della chat è una scelta sulla chat.
+    if (action === C.ACTIONS.SPELLCHECK_SEMANTIC || action === C.ACTIONS.SPELLCHECK_CONTEXT) {
+      const sys = messages[0];
+      return sys && sys.role === 'system' && haTesto(sys) && messages.length > 1 ? { punti: [{ indice: 0 }] } : null;
+    }
+    if (action !== C.ACTIONS.FILO_CHAT) return null;
     const punti = [];
     const sys = messages[0];
     const lunga = (durataIn(durata) || TETTI_DI_SERIE.cache) === '1h' ? { durata: '1h' } : {};

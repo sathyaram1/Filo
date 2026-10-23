@@ -25,6 +25,10 @@
 
   const PASSO_MS = 250;
   const PASSO_NASCOSTI_MS = 1000;
+  // Una pagina nascosta (scheda dietro, finestra ridotta o coperta) non disegna e l'animazione non parte, ma l'audio
+  // della pubblicità si sente: lì i «Salta» si cercano nel DOM, al passo che Chromium concede ai timer nascosti.
+  const VEGLIA_MS = 1000;
+  const SELETTORE = SALTA.join(',');
   // Un clic che non ha effetto non si ripete a raffica: i tentativi si diradano fino a uno ogni dieci secondi.
   const ATTESE_MS = [500, 1000, 1500, 2500, 5000, 10000];
   const TENTATIVI = 12;
@@ -42,6 +46,7 @@
   let adottato = null;
   const seguiti = new Map();
   let timer = null;
+  let veglia = null;
   let premuto = false;
   const inCima = window.top === window;
   // Il nome con cui questo frame si presenta alla pagina sopra: pubblico, la pagina lo vede; lega le domande del main.
@@ -79,7 +84,10 @@
     }
     seguiti.clear();
     if (timer) { clearTimeout(timer); timer = null; }
+    if (veglia) { clearTimeout(veglia); veglia = null; }
   }
+
+  const nascosta = () => document.visibilityState === 'hidden';
 
   function premibile(el) {
     if (!el || !el.isConnected || el.disabled) return false;
@@ -96,7 +104,9 @@
   }
 
   // Il clic vero sposterebbe il fuoco da un campo in cui si scrive, o romperebbe un trascinamento: si aspetta.
+  // In una pagina nascosta nessuno scrive né trascina, e il fuoco rimasto in un campo non ferma il «Salta».
   function utenteOccupato() {
+    if (nascosta()) return false;
     if (premuto) return true;
     const ct = global.SN_CAMPO_TESTO;
     try { return !!(ct && ct.scriveQui(document) !== false); } catch (_) { return false; }
@@ -118,14 +128,56 @@
   // Rifiuti del main che non passano: qui il clic vero non arriverà, si torna al clic dello script.
   const RIFIUTI_FERMI = new Set(['forbidden', 'off']);
 
+  // Una pagina nascosta col «Salta» fuori dalla vista (si leggevano i commenti) nessuno la guarda: la si porta sul
+  // pulsante per il clic vero e la si rimette com'era appena il clic è arrivato (#1494). Torna la funzione che rimette.
+  const RIMETTI_MS = 10000;
+  // Una sola rimessa alla volta: un secondo tentativo prima del clic segnerebbe come «com'era» la pagina già spostata.
+  let rimettiInAttesa = null;
+  function portaInVista(el) {
+    if (rimettiInAttesa) {
+      try { el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); } catch (_) {}
+      return rimettiInAttesa;
+    }
+    const posti = [];
+    for (let n = el.parentElement; n; n = n.parentElement) posti.push([n, n.scrollLeft, n.scrollTop]);
+    const se = document.scrollingElement;
+    if (se && !posti.some((p) => p[0] === se)) posti.push([se, se.scrollLeft, se.scrollTop]);
+    try { el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); } catch (_) { return null; }
+    let fatto = false;
+    let timer = null;
+    const rimetti = () => {
+      if (fatto) return;
+      fatto = true;
+      rimettiInAttesa = null;
+      clearTimeout(timer);
+      window.removeEventListener('click', suClic, true);
+      for (const [n, l, t] of posti) {
+        if (n.scrollLeft !== l || n.scrollTop !== t) { try { n.scrollTo({ left: l, top: t, behavior: 'instant' }); } catch (_) {} }
+      }
+    };
+    // Rimessa prima che il clic arrivi, la pagina lo riceverebbe in un altro punto: si aspetta il clic, o a lungo.
+    function suClic(e) { if (e.isTrusted && e.target instanceof Node && el.contains(e.target)) setTimeout(rimetti, 0); }
+    window.addEventListener('click', suClic, true);
+    timer = setTimeout(rimetti, RIMETTI_MS);
+    rimettiInAttesa = rimetti;
+    return rimetti;
+  }
+
   // false = per ora non si preme: il tentativo non si conta e si riguarda al giro dopo.
   // Un «Salta» coperto o fuori dalla vista (si sta leggendo più giù) prende un clic dello script, poi si aspetta di vederlo.
   function premi(el, s) {
     if (clicVero && !s.finto) {
       if (utenteOccupato()) return false;
-      const p = centro(el);
+      let p = centro(el);
+      let rimetti = null;
+      if (!p && nascosta()) {
+        rimetti = portaInVista(el);
+        p = rimetti && centro(el);
+        if (!p && rimetti) { rimetti(); rimetti = null; }
+      }
       if (p) {
         send({ type: T_CLICK, x: p.x, y: p.y, tag: mioTag }, (r) => {
+          if (rimetti && !(r && r.ok)) rimetti();
           if (!r || (!r.ok && RIFIUTI_FERMI.has(r.code))) s.finto = true;
           else if (r.code === 'ignoto') presentati();
         });
@@ -173,12 +225,33 @@
     giro();
   }
 
+  function segui(el) {
+    if (!seguiti.has(el)) seguiti.set(el, { visto: Date.now(), visibile: false, tentativi: 0, prossimo: 0, finto: false });
+  }
+
   function suAnimazione(e) {
     if (!attivo || e.animationName !== ANIM) return;
     const el = e.target;
     if (!el || el.nodeType !== 1) return;
-    if (!seguiti.has(el)) seguiti.set(el, { visto: Date.now(), visibile: false, tentativi: 0, prossimo: 0, finto: false });
+    segui(el);
     giro();
+  }
+
+  // Solo i «Salta» che il lettore mostra: uno spento che tiene nel DOM non va seguito a ogni giro.
+  function vegliaNascosta() {
+    if (veglia) { clearTimeout(veglia); veglia = null; }
+    if (!attivo || !nascosta()) return;
+    veglia = setTimeout(() => {
+      veglia = null;
+      let nuovi = 0;
+      try {
+        for (const el of document.querySelectorAll(SELETTORE)) {
+          if (!seguiti.has(el) && premibile(el)) { segui(el); nuovi++; }
+        }
+      } catch (_) {}
+      if (nuovi) giro();
+      vegliaNascosta();
+    }, VEGLIA_MS);
   }
 
   // Il lettore incorporato si presenta alla pagina sopra, e ogni frame intermedio fa lo stesso col suo: così ciascuno
@@ -206,6 +279,7 @@
   // Un elemento del sito messo sopra al riquadro non deve ricevere il clic vero: allora niente.
   function dove(q) {
     if (!attivo) return { code: 'off' };
+    if (nascosta()) return { code: 'nascosta' };
     if (utenteOccupato()) return { code: 'occupato' };
     let f = null;
     let visto = false;
@@ -243,8 +317,7 @@
     attivo = !!(r && r.ok && r.enabled);
     clicVero = attivo && !!r.clicVero;
     if (clicVero) presentati();
-    if (attivo) metti();
-    else togli();
+    if (attivo) { metti(); vegliaNascosta(); } else togli();
   }
 
   function carica() {
@@ -259,7 +332,10 @@
     window.addEventListener('blur', () => { premuto = false; });
     window.addEventListener('message', suMessaggio);
     // Tornando sulla pagina (finestra ridotta a icona e riaperta) si riprova subito, anche dove i tentativi erano finiti.
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') riprova(); });
+    document.addEventListener('visibilitychange', () => {
+      vegliaNascosta();
+      if (document.visibilityState === 'visible') riprova();
+    });
     chrome.runtime.onMessage.addListener((m) => {
       if (m && m.type === T_UPDATE) carica();
       else if (m && m.type === T_WHERE && typeof m.id === 'string') send({ type: T_HERE, id: m.id, ...dove(m) });
@@ -268,5 +344,5 @@
 
   carica();
 
-  global.SN_AD_SKIP = { SALTA, _stato: () => ({ attivo, clicVero, seguiti: seguiti.size }) };
+  global.SN_AD_SKIP = { SALTA, _stato: () => ({ attivo, clicVero, seguiti: seguiti.size, veglia: !!veglia }) };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

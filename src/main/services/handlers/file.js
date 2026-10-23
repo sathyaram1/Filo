@@ -39,22 +39,24 @@ module.exports = function register(on, ctx) {
 
   const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
   // Un percorso relativo non ha una cartella a cui riferirsi: si accetta intero, o con ~ per la cartella personale.
+  // null: porta a un altro computer, e il disco non si tocca (#1499).
   function percorsoDi(msg, sender) {
     if (msg && msg.downloadId) return DL().percorsoDi(msg.downloadId, ambito(sender));
-    const p = msg && typeof msg.percorso === 'string' ? msg.percorso.trim() : '';
-    if (!p || (!path.isAbsolute(p) && !/^~([\\/]|$)/.test(p))) return '';
-    return require('../documentRead').normalizePath(p);
+    return require('../documentRead').percorsoDelFile(msg && msg.percorso);
   }
   const nonTrovato = () => ({ ok: false, errore: 'non_trovato', frase: 'Il file non c’è più: forse è stato spostato o cancellato' });
+  const senza = (p) => (p === null
+    ? { ok: false, errore: 'rete', frase: 'Il file sta su un altro computer della rete: Filo apre solo i file di questo computer' }
+    : nonTrovato());
 
   on(MSG.FILE_NOME_STATO, soloFilo(async () => ({ ok: true, disponibile: await disponibile() })));
   on(MSG.FILE_NOME_PROPONI, soloFilo(async (msg, sender) => {
     const p = percorsoDi(msg, sender);
-    return p ? NomiFile.proponi(p) : nonTrovato();
+    return p ? NomiFile.proponi(p) : senza(p);
   }));
   on(MSG.FILE_RINOMINA, soloFilo(async (msg, sender) => {
     const p = percorsoDi(msg, sender);
-    return p ? NomiFile.rinomina(p, msg.nome) : nonTrovato();
+    return p ? NomiFile.rinomina(p, msg.nome) : senza(p);
   }));
   on(MSG.FILE_RIMETTI_NOMI, soloFilo(async (msg) => {
     const coppie = (Array.isArray(msg.coppie) ? msg.coppie : [])
@@ -74,10 +76,12 @@ module.exports = function register(on, ctx) {
   const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
   on(MSG.FILE_APRI, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
-    if (!p || !esiste(p)) return nonTrovato();
+    if (!p) return senza(p);
+    // Il tipo si guarda sul nome, prima di chiedere niente al disco.
     if (!apribile(p)) {
       return { ok: false, errore: 'tipo', frase: 'Da qui Filo apre solo documenti e immagini: questo file aprilo dalla sua cartella' };
     }
+    if (!esiste(p)) return nonTrovato();
     try {
       const errore = await electron().shell.openPath(p);
       return errore ? { ok: false, errore: 'sistema', frase: 'Il computer non ha un programma per aprire questo file' } : { ok: true };
@@ -87,7 +91,7 @@ module.exports = function register(on, ctx) {
   }));
   on(MSG.FILE_MOSTRA_CARTELLA, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
-    if (!p) return nonTrovato();
+    if (!p) return senza(p);
     if (esiste(p)) { try { electron().shell.showItemInFolder(p); return { ok: true }; } catch (_) {} }
     // Il file non c'è più ma la cartella sì: la si mostra, non la si apre. Su Mac aprire una cartella .app lancia il
     // programma, e il percorso può averlo scritto un modello.

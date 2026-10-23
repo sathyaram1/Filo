@@ -60,6 +60,12 @@ classe che la segnalazione non nominava; un difetto in qualcosa che il ramo ha
 aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
 suo: non si disfa il lavoro fatto).
 
+«C'era già su `main`» si prova su `origin/main` appena scaricato
+(`git fetch origin main`), non sulla base del ramo: main può averlo corretto
+dopo che il ramo è partito, e allora non è un rilievo. Ci rientra un test di
+logica rosso sul ramo che il controllo di fine lavoro trova verde sulla fusione
+con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
+
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
 resta un 3. Il giro continua per i rilievi interni; un vicino può essere
 corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
@@ -88,7 +94,8 @@ prodotto o di gusto. Un difetto non chiede decisioni.
 Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
 gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
-contesto. L'esito lo leggi prima di registrare. La suite intera (`npm test`)
+contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
+sia finito. La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se

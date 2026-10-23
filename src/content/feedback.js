@@ -1,10 +1,6 @@
-// Modale "Invia feedback" per l'alpha test.
-// Aperta dalla voce di menu omonima. Permette:
-//   - testo libero (persistito tra aperture e riavvii)
-//   - annotare lo schermo a mano libera (disegno) e allegare lo screenshot
-//     annotato in un colpo solo (il pulsante "Annota e allega" fa da toggle)
-//   - incollare/trascinare immagini (Ctrl+V o drop ovunque dentro il box)
-// Invio → upload immagini su Firebase Storage + record su Firestore.
+// Modale «Invia feedback»: testo persistito fra aperture, annotazione a mano libera,
+// immagini incollate o trascinate, altri allegati dal selettore.
+// Immagini e record vanno a Firebase instradati dal main (il perché è più sotto).
 
 (function (global) {
   'use strict';
@@ -13,16 +9,15 @@
   const Popup = global.SN_POPUP;
   const Feedback = global.SN_FEEDBACK;
   const Icons = global.SN_ICONS || {};
-  // Allowlist condivisa dei tipi di allegato (stessa lista di storage.rules).
+  // Allowlist condivisa dei tipi di allegato: decide qui, prima della cifratura.
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
-  // Testo del rifiuto quando un file non è tra i tipi ammessi (immagini raster,
-  // PDF, testo, markdown, CSV, JSON). Vale sia per "Allega" sia per drag & drop.
+  // Vale sia per «Allega» sia per il drag & drop.
   const ATTACH_REJECT_MSG =
     'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
-  // Classifica un file secondo l'allowlist condivisa. Fallback prudente se il
-  // modulo shared non fosse caricato: consenti solo le immagini raster note.
+  // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
+  // raster note.
   function classifyAttachment(file) {
     if (AttachTypes && typeof AttachTypes.classify === 'function') {
       return AttachTypes.classify(file);
@@ -41,9 +36,8 @@
   let activeStack = null;
   let clientIdCache = null;
 
-  // Avvisa la shell (barra in alto di Filo) che si entra/esce dalla modalità
-  // annotazione, così l'ombra copre TUTTO Filo e non solo l'area pagina dove
-  // vive questo content script.
+  // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
+  // pagina.
   function setShellDim(on) {
     try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_ANNOTATE, on: !!on }); } catch (_) {}
   }
@@ -93,9 +87,8 @@
     return null;
   }
 
-  // Converte un dataUrl in un object URL (blob:) per aggirare le CSP delle pagine
-  // ospitanti che bloccano img-src data:. L'object URL va revocato quando l'immagine
-  // viene rimossa.
+  // Object URL invece di dataUrl perché le CSP delle pagine ospiti bloccano img-src data:. Va
+  // revocato quando l'immagine viene rimossa.
   function dataUrlToBlobUrl(dataUrl) {
     try {
       const m = /^data:([^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
@@ -151,7 +144,6 @@
       const ty = Math.max(26, window.innerHeight - 64);
       const GOLD = '#e0a93f';
 
-      // Etichetta "+N" che sale e svanisce sopra l'origine.
       const label = document.createElement('div');
       label.className = 'sn-fb-credit-label';
       label.textContent = `+${n}`;
@@ -218,10 +210,8 @@
     root.className = 'sn-fb-overlay';
     global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    // Layout richiesto dall'utente: solo il box per scrivere + 4 bottoni
-    // (Allega, Chiudi, Invia, e "Cancella disegno" che compare solo quando c'è
-    // qualcosa da cancellare). Si può trascinare/incollare/allegare immagini e
-    // disegnare a mano libera su TUTTA l'app (pagina + barra in alto).
+    // Solo il box e quattro bottoni; «Cancella disegno» c'è solo quando c'è qualcosa da
+    // cancellare.
     root.innerHTML = `
       <canvas class="sn-fb-canvas"></canvas>
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
@@ -242,16 +232,13 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
-    // Entra in modalità annotazione: oscura anche la barra in alto di Filo.
     setShellDim(true);
-    // Se la pagina viene abbandonata (navigazione o chiusura tab) senza passare
-    // da close(), il content script muore ma il velo della shell resterebbe
-    // appeso: avvisiamo esplicitamente di toglierlo.
+    // Abbandonando la pagina senza close() il content script muore e il velo della shell resterebbe
+    // appeso: va chiesto di toglierlo.
     window.addEventListener('pagehide', () => setShellDim(false), { once: true });
     Popup?.attachZoomCompensation?.(root);
-    // Partecipa allo stacking dei popup: sopra ai box aperti prima, sotto a
-    // quelli aperti dopo. Il menu contestuale (right-click) ha un proprio
-    // z-index più alto, quindi resta sempre visibile sopra il modale.
+    // Stacking dei popup: sopra i box aperti prima, sotto quelli dopo. Il menu del tasto destro ha
+    // z-index più alto e resta sempre sopra.
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-fb-modal');
@@ -266,7 +253,6 @@
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
 
-    // stato locale: data URLs delle immagini incollate/trascinate
     const images = [];
     const MAX_IMAGES = 5;
     // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
@@ -274,12 +260,8 @@
     const MAX_FILES = 5;
     const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
 
-    // Anti-duplicati (#370): id STABILE di questa composizione. Tutti i tentativi
-    // di invio della stessa bozza condividono l'id, così se un invio va in timeout
-    // lato UI ma riesce comunque sul server, ripremere "Invia" NON crea un
-    // duplicato (il server rifiuta un secondo doc con lo stesso id). Cambia solo
-    // quando l'utente modifica il contenuto (testo o allegati): un messaggio
-    // diverso è un feedback diverso e deve poter essere inviato a parte.
+    // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
+    // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
     function newSubmissionId() {
       try {
         if (global.crypto?.randomUUID) return global.crypto.randomUUID();
@@ -289,7 +271,6 @@
     let submissionId = newSubmissionId();
     function bumpSubmissionId() { submissionId = newSubmissionId(); }
 
-    // ---- bozza di testo persistente ----
     let saveTimer = null;
     function saveDraft() {
       if (!DRAFT_KEY) return;
@@ -300,7 +281,7 @@
       try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
     }
     textEl.addEventListener('input', () => {
-      // Contenuto cambiato → nuova composizione (id di invio fresco).
+      // Contenuto cambiato → composizione nuova, id di invio fresco.
       bumpSubmissionId();
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
@@ -322,13 +303,12 @@
       }).catch(() => {});
     } catch (_) {}
 
-    // ---- disegno (annotazione a mano libera sullo schermo) ----
     const ctx = canvas.getContext('2d');
     const strokes = []; // [{ color, width, points: [{x,y}] }] in coordinate viewport CSS
     let drawing = false;
     let curStroke = null;
-    // C'è un disegno sulla barra in alto di Filo (shell)? La barra vive in un
-    // altro processo: lo sappiamo via broadcast FEEDBACK_DRAW_STATE.
+    // La barra in alto vive in un altro processo: se ci si è disegnato sopra lo sappiamo solo via
+    // broadcast FEEDBACK_DRAW_STATE.
     let topbarHasDrawing = false;
 
     function sizeCanvas() {
@@ -355,19 +335,16 @@
         ctx.lineWidth = s.width;
         ctx.beginPath();
         s.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-        // Un singolo punto: disegna un puntino.
+        // Un punto solo: il micro-scostamento disegna un puntino invece di niente.
         if (s.points.length === 1) { ctx.lineTo(s.points[0].x + 0.1, s.points[0].y + 0.1); }
         ctx.stroke();
       }
     }
     function hasPageDrawing() { return strokes.some((s) => s.points.length > 0); }
-    // C'è un disegno da cancellare ovunque nell'app? (pagina O barra in alto)
     function hasAnyDrawing() { return hasPageDrawing() || topbarHasDrawing; }
 
-    // Il bottone è sempre presente: di default "Allega screenshot" (premuto =
-    // selezionato → all'invio si allega lo scatto della pagina anche senza
-    // disegnare). Appena si disegna diventa "Cancella" (stesso colore selezionato)
-    // e cliccarlo cancella il disegno.
+    // Un bottone, due stati: «Allega screenshot» (all'invio si allega lo scatto anche senza
+    // disegnare), e appena si disegna diventa «Cancella».
     let shotArmed = false;
     function updateClearBtn() {
       const drawing = hasAnyDrawing();
@@ -394,8 +371,6 @@
       if (!drawing) return;
       drawing = false;
       curStroke = null;
-      // Appena c'è un disegno, all'invio allegheremo automaticamente lo
-      // screenshot annotato (niente più toggle): basta che ci sia un tratto.
       refreshClear();
     }
     canvas.addEventListener('pointerup', endStroke);
@@ -403,27 +378,25 @@
     window.addEventListener('resize', sizeCanvas);
     sizeCanvas();
 
-    // "Cancella disegno": pulisce i tratti sulla pagina E quelli sulla barra in
-    // alto di Filo (che vivono nella shell), così un solo bottone cancella tutto.
+    // «Cancella disegno» pulisce i tratti della pagina E quelli della barra in alto, che vivono
+    // nella shell: un bottone solo cancella tutto.
     clearBtn.addEventListener('click', () => {
       if (hasAnyDrawing()) {
-        // Stato "Cancella": pulisce i tratti (pagina + barra in alto) e disarma.
         strokes.length = 0;
         redraw();
         try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_CLEAR_DRAW }); } catch (_) {}
         topbarHasDrawing = false;
         shotArmed = false;
       } else {
-        // Stato "Allega screenshot": toggle dell'allega-screenshot.
         shotArmed = !shotArmed;
       }
       updateClearBtn();
     });
 
-    // La shell ci dice se c'è (o non c'è più) un disegno sulla barra in alto,
-    // così "Cancella disegno" compare anche quando si è disegnato SOLO lassù.
+    // La shell dice se c'è o non c'è più un disegno sulla barra, così «Cancella disegno» compare
+    // anche quando si è disegnato SOLO lassù.
     function onBroadcast(message) {
-      // Auto-rimozione quando il box non è più questo (chiuso/riaperto).
+      // Auto-rimozione quando il box non è più questo (chiuso e riaperto).
       if (activeRoot !== root) {
         try { chrome.runtime.onMessage.removeListener(onBroadcast); } catch (_) {}
         return;
@@ -460,15 +433,13 @@
         wrap.appendChild(xBtn);
         thumbsEl.appendChild(wrap);
       });
-      // Allegati non-immagine: una "pillola" con icona, nome e dimensione.
       files.forEach((f, i) => {
         const chip = document.createElement('div');
         chip.className = 'sn-fb-file-chip';
         chip.title = f.name;
         const ic = document.createElement('span');
         ic.className = 'sn-fb-file-ic';
-        // Icona documento in linea (coerente con lo stile a tratto di Filo):
-        // non esiste un'icona 'file' nel set condiviso.
+        // Icona documento in linea: nel set condiviso non c'è un'icona 'file'.
         ic.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
         const nameEl = document.createElement('span');
         nameEl.className = 'sn-fb-file-name';
@@ -498,8 +469,8 @@
     }
 
     async function addImageFromBlob(blob) {
-      // Solo immagini raster note: esclude image/svg+xml (documento attivo) e
-      // qualsiasi altro tipo che si spacci per immagine.
+      // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
+      // tipo che si spacci per immagine.
       if (!blob || classifyAttachment(blob) !== 'image') return;
       if (images.length >= MAX_IMAGES) {
         statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`;
@@ -516,13 +487,10 @@
       renderThumbs();
     }
 
-    // Smista un file: le immagini seguono il percorso esistente (anteprima +
-    // annotazione), gli altri tipi (pdf, txt, md, json…) diventano allegati.
     async function addAttachment(file) {
       if (!file) return;
-      // Gate condiviso: stesso filtro per "Allega" e per drag & drop. L'attributo
-      // `accept` del picker NON vincola il drop (né la scelta "Tutti i file"),
-      // quindi la whitelist va applicata qui, sul tipo reale del file.
+      // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
+      // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
       if (!kind) {
         statusEl.textContent = ATTACH_REJECT_MSG;
@@ -549,7 +517,6 @@
       renderThumbs();
     }
 
-    // Compone lo screenshot della tab con sopra i tratti disegnati, in scala.
     function composeAnnotated(shotDataUrl) {
       return new Promise((resolve) => {
         const img = new Image();
@@ -584,10 +551,8 @@
       });
     }
 
-    // Impila lo scatto annotato della barra in alto (shell) SOPRA lo screenshot
-    // della pagina: il risultato è un'unica immagine di tutta l'app Filo con
-    // sopra i tratti disegnati sia sulla pagina sia sulla barra. Se manca lo
-    // scatto della barra, ritorna lo screenshot della sola pagina (fallback).
+    // Impila lo scatto della barra sopra quello della pagina: un'unica immagine di tutta l'app coi
+    // tratti di entrambe; senza, resta la sola pagina.
     function stackTopbar(pageDataUrl, topbarDataUrl) {
       return new Promise((resolve) => {
         if (!topbarDataUrl) { resolve(pageDataUrl); return; }
@@ -615,10 +580,8 @@
       });
     }
 
-    // Chiusura (il bottone "Chiudi" sostituisce la vecchia × e "Annulla")
     cancelBtn.addEventListener('click', close);
-    // Niente chiusura su click backdrop: si chiude solo con × o Annulla
-    // (Esc resta disponibile come scorciatoia).
+    // Il click sul velo non chiude: si esce solo dal bottone o con Esc.
     function closeLightbox(lb) {
       const im = lb.querySelector('img');
       if (im) { try { URL.revokeObjectURL(im.src); } catch (_) {} }
@@ -647,8 +610,7 @@
           closeLightbox(lb);
           return;
         }
-        // Evita che lo stesso ESC inneschi anche la chiusura del topmost
-        // gestita dal modulo Popup.
+        // Evita che lo stesso ESC inneschi anche la chiusura del topmost gestita dal modulo Popup.
         e.stopImmediatePropagation();
         close();
         document.removeEventListener('keydown', onKey, true);
@@ -669,7 +631,7 @@
       }
     });
 
-    // Accetta immagini incollate via tasto destro (custom event da content.js)
+    // Immagini incollate col tasto destro: evento su misura da content.js.
     modal.addEventListener('filo:paste-image', async (e) => {
       if (!global.SN_FILO_UI?.veroONostro?.(e)) return;
       if (e.detail?.blob) {
@@ -678,8 +640,7 @@
       }
     });
 
-    // Drag & drop: si può trascinare un'immagine OVUNQUE dentro il box (niente
-    // più riquadro dedicato).
+    // Si può trascinare un'immagine OVUNQUE dentro il box, non in un riquadro dedicato.
     ['dragenter', 'dragover'].forEach((ev) => modal.addEventListener(ev, (e) => {
       e.preventDefault(); modal.classList.add('sn-fb-drop-hover');
     }));
@@ -706,8 +667,6 @@
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
       const text = textEl.value.trim();
-      // Allega lo screenshot quando c'è un disegno (annotato) OPPURE quando
-      // l'utente ha premuto "Allega screenshot" (scatto della pagina senza disegno).
       const wantShot = shotArmed || hasAnyDrawing();
       if (!text && images.length === 0 && files.length === 0 && !wantShot) {
         statusEl.textContent = 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.';
@@ -718,13 +677,13 @@
       statusEl.textContent = 'Invio in corso…';
       try {
         const clientId = await getClientId();
-        // S1.F2.2: hash deterministico del clientId per il match C5 sulla macchina utente.
-        // Il main process userà questo hash per il confronto (la macchina non ha la privata).
+        // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
+        // che qui non ha la chiave privata.
         const clientIdHash = await (async () => {
           try {
             const H = global.SN_FEEDBACK_CLIENT_ID_HASH;
             if (H && H.hashClientId) return await H.hashClientId(clientId);
-            // Fallback: WebCrypto diretto (il modulo potrebbe non essere caricato nel preload)
+            // Fallback: WebCrypto diretto, il modulo potrebbe non essere caricato nel preload.
             const enc = new TextEncoder();
             const buf = enc.encode(String(clientId || ''));
             const hashBuf = await global.crypto.subtle.digest('SHA-256', buf);
@@ -734,16 +693,13 @@
             return hex;
           } catch (_) { return ''; }
         })();
-        // Costruisce la lista immagini: incollate/trascinate/allegate + (se c'è
-        // un disegno) lo screenshot di tutta l'app con sopra l'annotazione.
         const outImages = images.slice();
         if (wantShot) {
-          // Nascondiamo l'overlay (box + ombra) per non includerlo nello scatto.
+          // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
           const shot = await captureScreenshot();
-          // Scatto annotato della barra in alto di Filo (vive nella shell): lo
-          // chiediamo solo se ci si ha disegnato sopra.
+          // Lo scatto annotato della barra in alto si chiede solo se ci si ha disegnato sopra.
           let topbarShot = null;
           if (topbarHasDrawing) {
             try {
@@ -763,19 +719,18 @@
             statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
           }
         }
-        // Routing via main process: la CSP della pagina ospite blocca fetch
-        // diretti verso firestore/firebasestorage dal preload. Il main usa
-        // undici (Node) e non è soggetto alla CSP della pagina.
+        // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
+        // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
         const payload = {
           text,
           url: location.href,
           title: document.title,
           userAgent: navigator.userAgent,
           clientId,
-          clientIdHash, // S1.F2.2: hash deterministico in chiaro per match C5
+          clientIdHash,
           images: outImages,
-          files: files.slice(), // allegati non-immagine (pdf, txt, md, json…)
-          submissionId, // #370: id stabile → il server deduplica i re-invii
+          files: files.slice(),
+          submissionId,
         };
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) {
@@ -823,9 +778,8 @@
       }
     });
 
-    // ---- posizione iniziale + trascinamento ----
-    // Centra orizzontalmente con `left` INTERO (niente translateX(-50%): su
-    // display HiDPI cadrebbe su un pixel frazionario → testo sfocato).
+    // Centra orizzontalmente con `left` INTERO: translateX(-50%) su display HiDPI cadrebbe su un
+    // pixel frazionario e sfocherebbe il testo.
     function centerModal() {
       const w = modal.offsetWidth || 540;
       modal.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';

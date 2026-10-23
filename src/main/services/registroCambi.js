@@ -17,6 +17,8 @@ const app = {
   aggiornaRegoleProxy: () => {},
   zoomSu: null,
   annuncia: () => {},
+  // Un annullo riuscito, con l'id chiesto e quello dell'evento trovato: lo contano i contatori (#1461).
+  annullato: () => {},
 };
 function collega(f) { Object.assign(app, f || {}); }
 
@@ -235,6 +237,7 @@ async function annullaOra(id, prov = {}) {
     if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });
   });
   if (!riuscito) return { ok: false, motivo: 'la pagina di quel sito non è aperta', id: e.id };
+  try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean)); } catch (_) {}
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
 }
 

@@ -505,6 +505,7 @@ test('il suggerimento della home che porta fuori un numero scritto in chat chied
       return { ...base, text: JSON.stringify({ message: 'Ciao', suggestions: [
         { icon: 'link', text: 'Offerte per te', action: { type: 'NAVIGA', url: LINK } },
         { icon: 'link', text: 'Meteo', action: { type: 'NAVIGA', url: 'https://meteo.example/oggi' } },
+        { icon: 'link', text: 'Video', action: { type: 'NAVIGA', url: 'https://www.youtube.com/' } },
       ] }) };
     };
   }, LINK);
@@ -516,8 +517,11 @@ test('il suggerimento della home che porta fuori un numero scritto in chat chied
   const sugg = (home && home.suggestions) || [];
   const offerte = sugg.find((s) => s.text === 'Offerte per te');
   const meteo = sugg.find((s) => s.text === 'Meteo');
+  const video = sugg.find((s) => s.text === 'Video');
   expect(offerte && offerte.chiedeOk).toContain('dato che hai scritto in chat');
-  expect(meteo && meteo.chiedeOk).toBeFalsy();
+  // La home legge testo di altri (#1505): un indirizzo scritto dal modello chiede l'OK; la home di un sito comune no.
+  expect(meteo && meteo.chiedeOk).toContain('non compare da nessuna parte');
+  expect(video && video.chiedeOk).toBeFalsy();
   const r = await app.evaluate((_e, LINK) => globalThis.__filoHandlers.handleMessage(
     { type: globalThis.SN_MSG.MSG.FILO_APRI_PROPOSTA, url: LINK, parole: [] },
     { url: 'filo://newtab/' },
@@ -863,6 +867,24 @@ test('un modello della chat con la finestra più piccola di tre giorni di filo r
   const [, secondo] = await app.evaluate(() => globalThis.__accettate);
   expect(secondo).toContain('domanda 19.5');
   expect(secondo).toContain('ci sei?');
+  // I contatori (#1464): una conversazione stretta dopo il rifiuto, e il turno dopo partito dalla finestra imparata.
+  const adattamenti = () => app.evaluate(async () => {
+    const s = await globalThis.SN_CONTATORI_MAIN.letto();
+    const conti = {};
+    for (const ora of Object.values(s.ore || {})) {
+      for (const [k, n] of Object.entries((ora.adattamenti || {})['filo-chat'] || {})) {
+        const [modello, tipo] = k.split('|');
+        conti[tipo] = (conti[tipo] || 0) + n;
+        conti.modelli = [...new Set([...(conti.modelli || []), modello])];
+      }
+    }
+    return conti;
+  });
+  await expect.poll(async () => (await adattamenti()).finestra_piccola || 0, { timeout: 5_000 }).toBe(1);
+  const a = await adattamenti();
+  expect(a.contesto_stretto).toBe(1);
+  expect(a.modelli, 'il modello della chat, col suo nome del router').toHaveLength(1);
+  expect(a.modelli[0]).not.toBe('altro');
 });
 
 // #1301 — il ricordo automatico non accumula copie e non nomina due volte la stessa conversazione.

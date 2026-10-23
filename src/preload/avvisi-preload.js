@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('avvisi', {
   // Testo vuoto lo nasconde.
   suggerimento: (testo, x, y) => ipcRenderer.send('avvisi:suggerimento', { testo: testo || '', x, y }),
   menu: (id, x, y) => ipcRenderer.send('avvisi:menu', { id, x, y }),
+  // «+N», Riduci, Chiudi tutti: i comandi della pila intera, e il loro tasto destro.
+  pila: (azione) => ipcRenderer.send('avvisi:pila', { azione }),
+  menuPila: (x, y) => ipcRenderer.send('avvisi:menu', { pila: true, x, y }),
   sopra: (on) => ipcRenderer.send('avvisi:sopra', { sopra: !!on }),
   inoltra: (gesto) => ipcRenderer.send('avvisi:inoltra', gesto),
   onCursore: (fn) => {

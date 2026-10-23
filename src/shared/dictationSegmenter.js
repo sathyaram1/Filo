@@ -19,8 +19,7 @@
 (function (global) {
   'use strict';
 
-  // Ricampiona un buffer float32 mono da `fromRate` a `toRate` facendo la
-  // media dei campioni coperti: per la voce a 16 kHz è più che sufficiente.
+  // Media dei campioni coperti: per la voce a 16 kHz è più che sufficiente.
   function downsample(samples, fromRate, toRate) {
     if (!samples || !samples.length) return new Float32Array(0);
     if (!fromRate || !toRate || fromRate === toRate) return Float32Array.from(samples);
@@ -46,7 +45,7 @@
     return out;
   }
 
-  // WAV PCM 16-bit mono. Ritorna un Uint8Array (intestazione + campioni).
+  // WAV PCM 16-bit mono: intestazione più campioni, in un Uint8Array.
   function pcm16ToWav(int16, sampleRate) {
     const n = int16.length * 2;
     const buffer = new ArrayBuffer(44 + n);
@@ -63,7 +62,7 @@
     return new Uint8Array(buffer);
   }
 
-  // Base64 di un Uint8Array, in pagina (btoa) o in Node (Buffer).
+  // Base64 in pagina (btoa) o in Node (Buffer).
   function bytesToBase64(bytes) {
     if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
       return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
@@ -90,15 +89,8 @@
     return out;
   }
 
-  // Segmentatore. Opzioni (tutte in millisecondi salvo sampleRate):
-  //   sampleRate      frequenza dei campioni che riceve push()
-  //   frameMs         granularità dell'analisi (energia calcolata per blocco)
-  //   interimEveryMs  ogni quanto parlato mandare una trascrizione provvisoria
-  //   silenceMs       pausa che chiude uno spezzone
-  //   minSpeechMs     sotto questa quantità di voce lo spezzone si butta
-  //   maxSegmentMs    oltre questa durata lo spezzone si chiude comunque
-  //   leadMs          silenzio tenuto PRIMA della prima parola (attacco pulito)
-  //   onInterim/onFinal({ samples, sampleRate, ms, speechMs })
+  // Le opzioni sono in millisecondi, salvo `sampleRate`.
+  // `leadMs` è il silenzio tenuto prima della prima parola, per un attacco pulito.
   function createSegmenter(opts) {
     const o = Object.assign({
       sampleRate: 16000, frameMs: 50, interimEveryMs: 1200, silenceMs: 700,
@@ -115,9 +107,8 @@
     let silenceRun = 0;
     let sinceInterim = 0;
     let interimDirty = false;            // voce nuova dopo l'ultima provvisoria
-    // Rumore di fondo: media mobile dell'energia dei blocchi senza voce. Parte
-    // bassa (una stanza silenziosa) e si adatta; la soglia sta sopra di un
-    // margine fisso, così un ventilatore non diventa "parlato".
+    // Rumore di fondo: media mobile dei blocchi senza voce, parte bassa e si adatta.
+    // La soglia sta sopra di un margine fisso: un ventilatore non deve diventare «parlato».
     let noise = 0.004;
     const emitted = { interim: 0, final: 0 };
     // Su tutta la registrazione, non sullo spezzone: dicono quando chi parla ha finito.
@@ -158,8 +149,7 @@
       if (o.onInterim) o.onInterim(seg);
     }
 
-    // Tiene solo la coda dello spezzone (gli ultimi `ms`), quando finora è
-    // stato solo silenzio: non serve mandare al modello secondi di niente.
+    // Dopo solo silenzio si tiene la sola coda: al modello non servono secondi di niente.
     function trimToTail(ms) {
       const keep = Math.round(o.sampleRate * ms / 1000);
       if (total <= keep) return;
@@ -197,7 +187,7 @@
       if (hadSpeech && interimDirty && sinceInterim >= o.interimEveryMs) emitInterim();
     }
 
-    // Riceve campioni float32 mono a `sampleRate`.
+    // Campioni float32 mono a `sampleRate`.
     function push(samples) {
       if (!samples || !samples.length) return;
       const merged = new Float32Array(pending.length + samples.length);
