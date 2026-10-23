@@ -413,10 +413,6 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
   }
 
-  // Ogni strada che toglie pagine passa di qui, e da qui lo sanno le home aperte.
-  const pagineTolte = new Set();
-  function suPagineTolte(fn) { if (typeof fn === 'function') pagineTolte.add(fn); }
-
   function cancella(periodi, opts, { schedeChiuse = true } = {}) {
     return transazione(async (t) => {
       const voci = periodi.map((periodo) => {
