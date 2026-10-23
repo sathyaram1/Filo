@@ -1713,9 +1713,23 @@
     percorsiImmagini.clear();
     renderImagePreviews();
   }
+  // Oltre il tetto e senza un percorso l'immagine non entra, e lo si dice una volta per gesto (#1298).
+  let troppoGrandi = 0;
+  function avvisaTroppoGrandi() {
+    if (troppoGrandi++) return;
+    setTimeout(() => {
+      const n = troppoGrandi;
+      troppoGrandi = 0;
+      try { window.SN_POPUP?.showToast?.(self.SN_CONST.ALLEGATI_CHAT.fraseTroppoGrandi(n)); } catch (_) {}
+    }, 0);
+  }
   function handleImageFile(file, percorso = '') {
     if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) { if (percorso) addPendingFile(percorso); return; }
+    if (file.size > self.SN_CONST.ALLEGATI_CHAT.tettoImmagineByte) {
+      if (percorso) addPendingFile(percorso);
+      else avvisaTroppoGrandi();
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => addPendingImage(reader.result, percorso);
     reader.readAsDataURL(file);
