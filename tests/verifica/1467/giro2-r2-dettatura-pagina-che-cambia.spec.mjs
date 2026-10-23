@@ -49,8 +49,7 @@ test('r2 la dettatura lasciata nella casella della home si conta quando la sched
   await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
   expect(await misura(app, 'dettatura')).toEqual({});
 
-  // La persona lascia perdere e va sul sito, nella stessa scheda.
-  await page.evaluate((u) => { location.href = u; }, sito);
-  await page.waitForURL(sito);
+  // La persona lascia perdere e ricarica la home, nella stessa scheda.
+  await page.reload();
   await expect.poll(async () => Object.keys(await misura(app, 'dettatura')), { timeout: 8_000 }).toEqual([expect.stringMatching(/\|tenuta\|/)]);
 });
