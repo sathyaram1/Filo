@@ -313,7 +313,14 @@
       // composedPath()[0] vede oltre lo shadow DOM; controlliamo anche
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
-      if (isEditable(target) || isEditable(document.activeElement)) return;
+      if (isEditable(target) || isEditable(document.activeElement)) {
+        // In un campo vuoto non c'è niente da disfare: subito dopo un'azione di Filo (chiesta in chat, col cursore
+        // rimasto nella casella) è lei che si vuole annullare (#1461). Il campo resta suo: niente indietro.
+        if (campoVuoto(isEditable(target) ? target : document.activeElement)) {
+          chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'tasto-annulla' }).catch(() => {});
+        }
+        return;
+      }
       // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
       if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
@@ -321,7 +328,8 @@
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
       e.preventDefault();
       e.stopPropagation();
-      chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
+      // `daAnnulla`: subito dopo un'azione di Filo è anche il suo annullo, per i contatori (#1461).
+      chrome.runtime.sendMessage({ type: MSG.NAV_BACK, daAnnulla: true }).catch(() => {});
     }, { capture: true });
 
     // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
@@ -1034,6 +1042,7 @@
     if (!sito) return;
     items.unshift({
       type: 'split',
+      azione: 'site-own-menu',
       label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
       onClick: () => apriMenuDelSito(sito),
       arrowTitle: I18n.t('menu_del_sito_scelta'),
@@ -1608,6 +1617,12 @@
     return !!(self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.campoDiTesto(el));
   }
 
+  function campoVuoto(el) {
+    if (!el) return false;
+    const v = 'value' in el && typeof el.value === 'string' ? el.value : el.textContent;
+    return typeof v === 'string' && v.trim() === '';
+  }
+
   // Menu correzione: rosso = parola sotto il cursore, blu = errore contestuale.
 
   function getInputSelectionInfo(target) {
@@ -1645,7 +1660,8 @@
 
   // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
   // `parola`: il segno è una parola sola, e allora si può aggiungere al dizionario o correggere da sé d'ora in poi.
-  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true) {
+  // `esito`: chi tiene la proposta per i contatori sa cosa ne ha fatto la persona (#1461).
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true, esito = () => {}) {
     const items = [];
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
@@ -1654,9 +1670,10 @@
       seen.add(v.toLowerCase());
       items.push({
         label: v,
-        onClick: () => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, {
-          expectedSegment: wordCtx.word,
-        }),
+        onClick: () => {
+          esito('accettata');
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, { expectedSegment: wordCtx.word });
+        },
       });
       if (items.length >= 4) break;
     }
@@ -1665,6 +1682,7 @@
       items.push({
         label: I18n.t('spell_add_dict'),
         onClick: () => {
+          esito('rifiutata');
           SpellCheck.addToDictionary(wordCtx.word);
           Popup.showToast(I18n.t('toast_added_to_dict'));
         },
@@ -1674,6 +1692,7 @@
       items.push({
         label: I18n.t('spell_autocorrect'),
         onClick: async () => {
+          esito('accettata');
           await SpellCheck.setAutocorrect(wordCtx.word, correction);
           SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction, { expectedSegment: wordCtx.word });
           Popup.showToast(I18n.t('toast_autocorrect_saved'));
@@ -1731,7 +1750,8 @@
         label: c === undefined ? '' : etichetta(s, c),
         loading: false,
         onClick: c === undefined ? null : () => SpellCheck.correggi(editableEl, s, c),
-        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment)),
+        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment),
+          (e) => SpellCheck.esitoSegno?.(editableEl, s, e)),
       };
     };
     const ascolti = [];
@@ -1829,11 +1849,17 @@
     let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
     if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
     let updateCorrection = null;
-    const applyAt = (corr) => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    // La proposta del menu, per i contatori (#1461): chi l'ha fatta, e cosa ne ha fatto la persona.
+    const chiave = `${wordCtx.word}|${wordCtx.start}`;
+    const esito = (e) => SpellCheck.esitoProposta?.(editableEl, 'ortografia', chiave, e);
+    const applyAt = (corr) => {
+      esito('accettata');
+      return SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    };
     const riga = (corr, alts) => ({
       hidden: !corr, label: corr || '', loading: false,
       onClick: corr ? () => applyAt(corr) : null,
-      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || []),
+      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || [], true, esito),
     });
     let mostrata = native[0] || '';
     items.unshift(
@@ -1841,18 +1867,24 @@
       { type: 'separator', hidden: !mostrata },
     );
     conMenuDelSito(items, sito);
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+    // Chiuso senza una scelta: la proposta è ignorata. Dopo, perché il clic che lo chiude arriva prima di chiuderlo.
+    Menu.open({
+      x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true,
+      alChiudere: () => setTimeout(() => esito('ignorata'), 1500),
+    });
+    if (mostrata) SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, 'nativo');
 
-    const mostra = (corr, alts) => {
+    const mostra = (corr, alts, modello = 'nativo') => {
       if (!updateCorrection || !corr || corr === wordCtx.word) return;
       mostrata = corr;
       updateCorrection(riga(corr, alts));
+      SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, modello);
     };
     if (!mostrata) {
       SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => { if (!mostrata && sugg?.length) mostra(sugg[0], sugg.slice(1)); });
     }
-    const esito = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
-    if (esito && esito.errore && esito.correzione) mostra(esito.correzione, native.filter((p) => p !== esito.correzione));
+    const giudizio = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
+    if (giudizio && giudizio.errore && giudizio.correzione) mostra(giudizio.correzione, native.filter((p) => p !== giudizio.correzione), giudizio.modello);
   }
 
   function buildFeedbackItem() {
@@ -1875,6 +1907,7 @@
     if (!self.SN_NOMI_SITO.daScritto(host)) return null;
     return {
       type: 'item',
+      azione: 'filo-off-on-site',
       label: I18n.t('menu_spegni_filo'),
       onClick: () => {
         try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
@@ -2046,15 +2079,17 @@
   // l'immagine è anche un link non partono due box AI a ogni apertura.
   function buildImageActionItems(imgEl) {
     return [
-      { type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
-      { type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
       {
         type: 'item',
+        azione: 'copy-download-image',
         label: I18n.t('menu_copy_image_link'),
         onClick: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
       },
       {
         type: 'item',
+        azione: 'search-image',
         label: I18n.t('menu_search_image'),
         onClick: () => Actions.searchImageOnWeb(imgEl),
       },
@@ -2088,6 +2123,7 @@
     if (Actions.isDownloadableLink(linkEl)) {
       out.push({
         type: 'item',
+        azione: 'download-progress',
         label: I18n.t('menu_save_file'),
         onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
       });
@@ -2095,16 +2131,19 @@
     out.push(
       {
         type: 'item',
+        azione: 'share-copy-link',
         label: I18n.t('menu_copy_link'),
         onClick: () => Actions.copyUrlToClipboard(indirizzo),
       },
       {
         type: 'item',
+        azione: 'save-link',
         label: I18n.t('menu_save_link_for_later'),
         onClick: () => Actions.saveLink(linkEl),
       },
       {
         type: 'item',
+        azione: 'share-copy-link',
         label: I18n.t('menu_share_link'),
         onClick: () => Actions.shareLink(linkEl),
       },
@@ -2135,8 +2174,8 @@
     const items = [];
 
     if (selInfo && editable) {
-      items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
@@ -2152,10 +2191,11 @@
     }
 
     if (selInfo) {
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       if (selInfo.segreto) return items;
       items.push({
         type: 'item',
+        azione: 'search-web',
         label: I18n.t('menu_search_text'),
         onClick: () => Actions.searchTextOnWeb(selInfo.selection),
       });
@@ -2495,10 +2535,10 @@
     if (command === 'explain-selection') {
       // La spiegazione breve è già inline nel menu: la scorciatoia apre l'approfondimento.
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchor);
-      else Popup.showToast(I18n.t('err_no_selection'));
+      else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      else Popup.showToast(I18n.t('err_no_selection'));
+      else Popup.toastErrore('err_no_selection');
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {

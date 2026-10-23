@@ -121,9 +121,11 @@ function wireWindowCommon(win, tabs) {
   //   · scorrimento orizzontale a due dita su Mac → swipe (l'utente lo accende
   //     nelle impostazioni di sistema; se è spento l'evento non arriva e basta).
   // Dove andare lo decide tabs.navigaCronologia: senza cronologia è un no-op.
+  // Indietro e avanti da qui sono la stessa azione contata della barra e dei tasti (#1461).
+  const naviga = (verso) => require('./services/azioniContate').azione('navigate-back-forward', () => tabs.navigaCronologia(verso), { incognito: !!win._filoIncognito });
   win.on('app-command', (event, comando) => {
-    if (comando === 'browser-backward') tabs.navigaCronologia('indietro');
-    else if (comando === 'browser-forward') tabs.navigaCronologia('avanti');
+    if (comando === 'browser-backward') naviga('indietro');
+    else if (comando === 'browser-forward') naviga('avanti');
     else return;
     // Senza questo Windows lascia agire anche il comportamento di serie.
     try { event.preventDefault(); } catch (_) {}
@@ -131,12 +133,25 @@ function wireWindowCommon(win, tabs) {
   // La direzione è quella delle dita: si spinge la pagina a destra per tornare
   // indietro, come in ogni browser su Mac.
   win.on('swipe', (event, direzione) => {
-    if (direzione === 'right') tabs.navigaCronologia('indietro');
-    else if (direzione === 'left') tabs.navigaCronologia('avanti');
+    if (direzione === 'right') naviga('indietro');
+    else if (direzione === 'left') naviga('avanti');
   });
 }
 
+// Il tempo di avvio di Filo (#1461): dall'inizio del processo alla finestra visibile, e alla prima scheda caricata.
+// Solo la prima finestra del processo: le altre si aprono a Filo già avviato.
+let avvioContato = false;
+function misuraAvvio() {
+  if (avvioContato) return null;
+  avvioContato = true;
+  try {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    return C ? C.azione('avvio', { t0: Date.now() - process.uptime() * 1000, incognito: false }) : null;
+  } catch (_) { return null; }
+}
+
 function createMainWindow() {
+  const avvio = misuraAvvio();
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -175,6 +190,13 @@ function createMainWindow() {
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
     revealWindow(win);
+    if (avvio) {
+      avvio.visto();
+      const davanti = tabs.tabs.find((t) => t.id === tabs.activeId);
+      const wc = davanti && davanti.view && davanti.view.webContents;
+      if (wc && !wc.isDestroyed() && wc.isLoading()) avvio.scheda(wc);
+      else avvio.fine();
+    }
   });
 
   return win;
@@ -228,7 +250,7 @@ function createIncognitoWindow() {
   // lo stesso overlay in RAM.
   win.on('closed', () => {
     try { require('./services/downloads').forgetScope(partition); } catch (_) {}
-    const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
+    const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito && w._filoTabs);
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
       try { require('./services/ilFilo').resetIncognito(); } catch (_) {}

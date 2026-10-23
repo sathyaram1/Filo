@@ -752,7 +752,7 @@ async function statoAggiornamento() {
   };
 }
 
-function mandaAvviso(testo, { pulsante = true, tentativi = 10 } = {}) {
+function mandaAvviso(testo, { pulsante = true, tentativi = 10, errore = '' } = {}) {
   let dette = 0;
   try {
     const { BrowserWindow } = require('electron');
@@ -769,13 +769,14 @@ function mandaAvviso(testo, { pulsante = true, tentativi = 10 } = {}) {
       } catch (_) {}
     }
   } catch (_) {}
-  if (!dette && tentativi > 0) setTimeout(() => mandaAvviso(testo, { pulsante, tentativi: tentativi - 1 }), 3000);
+  if (dette && errore) { try { globalThis.SN_CONTATORI_MAIN?.erroreVisto(`avviso:${errore}`); } catch (_) {} }
+  if (!dette && tentativi > 0) setTimeout(() => mandaAvviso(testo, { pulsante, tentativi: tentativi - 1, errore }), 3000);
 }
 
 // Il pulsante della home non ha un avviso suo che dica il fallimento: lo dice la barra.
 async function riavviaDallaHome() {
   const r = await riavviaEAggiorna();
-  if (r && r.ok === false && r.frase) mandaAvviso(r.frase, { pulsante: false, tentativi: 0 });
+  if (r && r.ok === false && r.frase) mandaAvviso(r.frase, { pulsante: false, tentativi: 0, errore: 'aggiornamento_non_avviato' });
   return r;
 }
 

@@ -582,6 +582,12 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
       }
     }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M } }).messaggio, /fusione con main cccccccc/);
+    // #1580.1: chi aveva riprovato il rosso sulla base del ramo lo trovava rosso «su main da solo» e credeva sbagliato questo messaggio.
+    const vecchio = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, baseRamo: 'b'.repeat(40) } }).messaggio;
+    assert.match(vecchio, /non sono del ramo, proseguo\. Il ramo parte da main bbbbbbbb, più vecchio: [^\n]*su main da solo si usa cccccccc, non la base del ramo\./);
+    for (const prova of [{ esito: 'verde', mainSha: M }, { esito: 'verde', mainSha: M, contenuto: true }, { esito: 'rosso_anche_su_main', mainSha: M, baseRamo: 'b'.repeat(40) }]) {
+      assert.doesNotMatch(esitoUnitDelRamo({ checkOnly: false, prova }).messaggio, /parte da main/, JSON.stringify(prova));
+    }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'rosso_anche_su_main', mainSha: M } }).messaggio, /anche su main da solo/);
     const instabili = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, instabili: ['tests/unit/a.test.mjs › lento'] } });
     assert.match(instabili.messaggio, /tests\/unit\/a\.test\.mjs › lento/, 'gli instabili si nominano');

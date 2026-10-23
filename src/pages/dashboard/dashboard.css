@@ -1714,6 +1714,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 /* La scelta dell'autonomia nell'intervista (#1188): i livelli come pillole con le tacche di una carica, piene fino
    al livello; sotto, la frase del livello su cui si passa (o di quello scelto). */
 .dash-autonomia-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+/* La scelta dei contatori nell'intervista (#1461): Sì e No, con le pillole dell'autonomia. */
+.dash-contatori-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.dash-contatori-voci { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livelli { display: flex; flex-wrap: wrap; gap: 8px; }
 .dash-autonomia-livello {
   display: inline-flex;

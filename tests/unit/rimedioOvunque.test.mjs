@@ -52,7 +52,8 @@ test('descrizione delle immagini, «Leggi», titolo e riassunto dell\'Editor e f
   assert.match(leggi('src/content/actions.js'), /showToast\(message, \{[^}]*rimedio:/);
   // Ogni avviso col perché della voce del modello porta il tasto: anche la chiave rifiutata, non solo i codici.
   const tts = leggi('src/content/tts.js');
-  const avvisi = tts.match(/showToast\(I18n\.t\('tts_model_fallback_reason'[^\n]*/g) || [];
+  // toastErrore è lo showToast contato dei contatori anonimi (#1461).
+  const avvisi = tts.match(/(?:showToast\(I18n\.t\(|toastErrore\()'tts_model_fallback_reason'[^\n]*/g) || [];
   assert.ok(avvisi.length >= 2, 'mancano gli avvisi col perché');
   for (const a of avvisi) assert.match(a, /rimedio \}/, a);
   assert.match(leggi('src/main/services/handlers/ai.js'), /keyRefused \? \{ keyRefused: true/);

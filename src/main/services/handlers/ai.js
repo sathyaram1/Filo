@@ -142,6 +142,7 @@ module.exports = function register(on, ctx) {
     const frase = I18n ? I18n.t(`toast_tetto_${fermo.gruppo}`, fermo.tetto) : `${fermo.gruppo}: ${fermo.tetto}`;
     if (fermo.primo) {
       try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
+      try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:tetto_automatiche'); } catch (_) {}
     }
     return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
   }
@@ -188,6 +189,8 @@ module.exports = function register(on, ctx) {
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
     const Cont = globalThis.SN_CONTATORI_MAIN;
     const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
+    // `anticipo`: la risposta preparata prima che la persona la chieda è pronta; se la apre lo dice la pagina (#1461).
+    if (msg && msg.anticipo === true && r && typeof r.text === 'string' && Cont && Cont.anticipoPronto) Cont.anticipoPronto(msg.action);
     if (lettura) await lettura;
     return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
   });

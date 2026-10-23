@@ -12,13 +12,16 @@
       version: '0.2.248', date: '2026-10-23',
       features: [
         'Ctrl+Tab porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima scheda si riparte dalla prima. Su Mac si premono col tasto Control.',
+        'Nell\'intervista di benvenuto Filo ti chiede se può mandare i contatori anonimi, solo numeri senza contenuto che gli servono a migliorare: rispondi con Sì o No. Con il No non parte niente, nemmeno quello che aveva già contato. Lo cambi quando vuoi in Preferenze o chiedendolo a Filo.',
       ],
       fixes: [
         'Quando riapri Filo, i feed, le ricerche finite e le pagine che non tocchi da ore o da giorni vanno nel filo della home. Prima restavano quasi sempre aperte. La barra si riordina per colore anche quando non si chiude niente, e un avviso dice com\'è andata: quante schede ha chiuso, che servivano tutte o che non è riuscito a valutarle.',
+        'Se la chiave personale salvata sul computer non è più quella del tuo portafoglio, la pagina Crediti te lo dice, e con «Richiedi una nuova chiave» i consumi tornano a registrarsi. Un consumo che il server non accetta non blocca più tutti quelli dopo, e Crediti dice quanti non sono stati registrati.',
         'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
         'Il tasto che apre Crediti, Opzioni o Preferenze c\'è anche nell\'avviso di «Leggi», in quello della descrizione di un\'immagine copiata e sotto una ricerca dei mazzi il cui controllo delle carte non è partito. Nell\'Editor «Rigenera titolo» e «Rigenera riassunto», quando non riescono, dicono perché e portano dove si rimedia. «Leggi» coi crediti finiti dice che sono finiti, non più che la voce non è disponibile.',
         'Negli elenchi di siti delle impostazioni, un nome con uno spazio che non è un sito, come «studio rossi», l\'avviso lo riporta intero anche se sulla stessa riga hai scritto un altro sito. Prima lo spezzava in «studio» e «rossi». Anche la chat ti risponde che «studio rossi» non è un dominio, in un pezzo solo. Un indirizzo intero incollato con un altro sito accanto, sulla stessa riga, li aggiunge tutti e due: prima il secondo spariva.',
         'Quando un errore chiede di scegliere un altro modello, manda in Opzioni → Modelli per azione e ha il tasto per andarci. Prima nominava una pagina che solo chi gestisce Filo ha. Un\'immagine copiata la cui descrizione non può arrivare, per esempio coi crediti finiti, nella cronologia degli appunti non resta più su «Descrizione…».',
+        'Quando Filo scarica da solo un\'immagine di un altro sito, per descriverla, copiarla, salvarla o leggerla nell\'Aiuto, a quel sito manda solo i cookie che manderebbe la pagina. Prima mandava anche quelli del tuo accesso, che il sito tiene per quando lo apri tu. Vale anche per l\'icona delle schede.',
         'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
         'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
       ],
@@ -33,6 +36,7 @@
         'Il bottone di un file che Filo ti trova in chat porta sempre il nome vero del file. Il nome che gli dà Filo, come «Bolletta della luce», sta accanto, più piano.',
         'Nell\'Editor la chat del documento legge tutto il documento, non più solo l\'inizio, e lo stesso fanno il titolo e il riassunto automatici. Prima, su un testo lungo, la chat rispondeva come se il resto non esistesse. Se il documento supera i 350.000 caratteri, o è più lungo di quanto regge il modello che hai scelto, Filo legge l\'inizio e sotto la risposta ti dice quanta parte ha letto.',
         'Incollare un testo lungo nell\'Editor non blocca più la pagina: anche mille righe entrano in un attimo.',
+        'Il motore che apre le pagine web ha le ultime correzioni di sicurezza, più di cento in due settimane.',
         'Se una risposta arriva da un fornitore che Filo esclude, te lo dice un avviso sulla pagina, anche senza «Solo modelli a pesi aperti», e «Segnala» apre il feedback già scritto. Nella Cronologia AI quella richiesta resta segnata e la trovi cercando il nome del fornitore.',
         'Su Windows e Mac i file che scarichi con Filo, anche con «Salva immagine come», risultano arrivati da Internet, come da qualunque browser. Se apri un programma fuori da Filo il sistema ti avvisa prima, e Office apre i documenti in Visualizzazione protetta. «Salva immagine come» ti propone anche il nome vero del file, lo stesso che poi trovi fra i download.',
         'Le pubblicità dei video che si possono saltare Filo le salta anche quando il video suona in una scheda che non stai guardando, o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.',
@@ -52,7 +56,9 @@
     },
     {
       version: '0.2.245', date: '2026-10-22',
-      features: [],
+      features: [
+        'Col tasto destro su un\'immagine fatta con ChatGPT, Firefly o Bing prima del 2026, Filo ora ti dice che è generata con l\'AI e chi lo dichiara, per esempio OpenAI. Prima diceva solo che chi l\'aveva firmata non era riconosciuto. Lo stesso se lo chiedi in chat.',
+      ],
       fixes: [
         'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
         'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',

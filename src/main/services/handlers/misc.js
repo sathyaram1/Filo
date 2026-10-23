@@ -421,7 +421,7 @@ module.exports = function register(on, ctx) {
     if (!P) return { ok: false, error: 'controllo non disponibile' };
     try {
       const res = await require('../firmatariC2pa').analizzaImmagine(byte);
-      const forte = res.prova === 'firmata' && res.firmatario === 'riconosciuto';
+      const forte = res.prova === 'firmata' && (res.firmatario === 'riconosciuto' || res.firmatario === 'provvisorio');
       return { ok: true, frase: P.frase(res), forte, ...res };
     } catch (e) {
       return { ok: false, error: e?.message || 'controllo fallito' };
@@ -581,6 +581,7 @@ module.exports = function register(on, ctx) {
             duration: 6000,
           });
         } catch (_) {}
+        try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:allegati_non_caricati'); } catch (_) {}
       },
       // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
@@ -595,7 +596,7 @@ module.exports = function register(on, ctx) {
       // cornice della finestra, dove resta finché non la si chiude.
       onGiveUp: (item, motivo) => {
         try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
-        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'));
+        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'), { errore: 'segnalazione_non_partita' });
       },
       // Dopo un giorno di soli tentativi la coda rinuncia: nell'elenco locale non resta «in partenza».
       onScaduta: (item) => {

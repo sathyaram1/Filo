@@ -61,6 +61,17 @@ async function staScrivendo(wc) {
   }
 }
 
+const SORGENTE_CAMPO_VUOTO = `(() => {
+  let a = document.activeElement;
+  while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+  if (!a) return false;
+  const v = typeof a.value === 'string' ? a.value : a.textContent;
+  return typeof v === 'string' && v.trim() === '';
+})()`;
+async function campoVuoto(wc) {
+  try { return (await wc.executeJavaScript(SORGENTE_CAMPO_VUOTO, false)) === true; } catch (_) { return false; }
+}
+
 // Le Preferenze stanno registrando una scorciatoia (#842): su Mac la barra vede il tasto prima della pagina, che
 // deve poterlo rifiutare col perché invece di vedere aprirsi una scheda. Il tasto le arriva com'è stato premuto.
 function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
@@ -81,47 +92,57 @@ function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
 
 // ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
 
-function nuovaScheda() {
-  const win = finestra();
-  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+// Ogni voce è un'azione contata (#1461), con lo stesso id della scorciatoia che la fa nelle pagine.
+function contata(azione, fn) {
+  return (...args) => {
+    const win = finestra();
+    return require('./services/azioniContate').azione(azione, () => fn(...args), { incognito: !!(win && win._filoIncognito) });
+  };
 }
 
-function chiudiScheda() {
+const nuovaScheda = contata('new-tab', () => {
+  const win = finestra();
+  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+});
+
+const chiudiScheda = contata('close-tab', () => {
   const c = schedaAttiva();
   try { c && c.tabs.closeTab(c.tab.id); } catch (_) {}
-}
+});
 
 function chiudiFinestra() {
   const win = finestra();
   try { win && win.close(); } catch (_) {}
 }
 
-function ricarica() {
+const ricarica = contata('reload', () => {
   const c = schedaAttiva();
   try { c && c.tabs.reload(c.tab.id); } catch (_) {}
-}
+});
 
 // Indietro e avanti passano dalla stessa porta di tutte le altre strade
 // (scorciatoia, tasti laterali del mouse, swipe): se non c'è dove andare non
 // succede niente.
-function indietro() {
+const indietro = contata('navigate-back-forward', () => {
   const c = schedaAttiva();
   try { c && c.tabs.navigaCronologia('indietro', c.tab.id); } catch (_) {}
-}
+});
 
-function avanti() {
+const avanti = contata('navigate-back-forward', () => {
   const c = schedaAttiva();
   try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
-}
+});
 
-function vaiAScrivereUnIndirizzo() {
+const vaiAScrivereUnIndirizzo = contata('address-bar', () => {
   const c = schedaAttiva();
   if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
-  nuovaScheda();
-}
+  const win = finestra();
+  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+});
 
 // Stessa porta di Ctrl+rotella (src/preload/wheel-zoom.js): lo zoom è della
 // PAGINA, e le pagine che zoomano da sé restano escluse anche da qui.
+// Lo zoom si conta dove si registra, la raffica finita (src/main/tabs.js): da qui, dalla tastiera e dalla rotella.
 function zoom(verso) {
   const c = schedaAttiva();
   if (!c) return;
@@ -129,12 +150,13 @@ function zoom(verso) {
 }
 
 // Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
-function schermoIntero(_voce, _finestra, evento) {
+const schermoIntero = contata('fullscreen', (_voce, _finestra, evento) => {
   const win = finestra();
   if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
-}
+});
 
+// La barra laterale e l'Aiuto si contano dove arrivano tutte le loro strade: la barra che si apre, il comando.
 function barraLaterale() {
   const win = finestra();
   try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
@@ -145,9 +167,9 @@ function apriPagina(url) {
   try { win && win._filoTabs.openTab(url, { origine: { tipo: 'filo' } }); } catch (_) {}
 }
 
-function finestraIncognito() {
+const finestraIncognito = contata('incognito', () => {
   try { require('./window').createIncognitoWindow(); } catch (_) {}
-}
+});
 
 function assistenteLaterale() {
   try { require('./shortcuts').dispatch('open-help-sidebar', finestra()); } catch (_) {}
@@ -158,9 +180,20 @@ function assistenteLaterale() {
 async function annulla() {
   const wc = contenutoAFuoco();
   if (!wc) return;
-  if (await staScrivendo(wc)) { try { wc.undo(); } catch (_) {} return; }
+  const win = finestra();
+  const incognito = !!(win && win._filoIncognito);
+  if (await staScrivendo(wc)) {
+    // Un campo vuoto non ha niente da disfare: è l'azione di Filo appena fatta (src/content/content.js, stessa regola).
+    if (await campoVuoto(wc)) { try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.tastoAnnulla({ incognito }); } catch (_) {} }
+    try { wc.undo(); } catch (_) {}
+    return;
+  }
+  // Subito dopo un'azione di Filo, Ctrl/Cmd+Z è un «annulla» per lei (#1461); ed è comunque un indietro.
+  try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.tastoAnnulla({ incognito }); } catch (_) {}
   const c = schedaAttiva();
-  try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
+  require('./services/azioniContate').azione('navigate-back-forward', () => {
+    try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
+  }, { incognito });
 }
 
 // Solo mentre si scrive: fuori da un campo Filo non ha un "avanti" su questo

@@ -49,6 +49,13 @@ function unUsoContato(action, fn) {
   const C = globalThis.SN_CONTATORI_MAIN;
   return C && typeof C.unUso === 'function' ? C.unUso(action, fn) : fn();
 }
+// Gli altri conti (#1461): un contatore rotto o non ancora creato non ferma niente.
+function contaSe(metodo, ...args) {
+  try {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    return C && typeof C[metodo] === 'function' ? C[metodo](...args) : undefined;
+  } catch (_) { return undefined; }
+}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -604,6 +611,9 @@ function avvisaFuoriPolitica(settings, why, servedBy, model, action) {
   }
   const segnala = I18n.t('segnala_fuori_politica', actionLabelForSettings(action), model || '—', servedBy);
   try { broadcastToTabs({ type: MSG.SHOW_TOAST, text, duration: 8000, segnala }); } catch (_) {}
+  if (why !== 'not-producer' && settings && settings.openWeightsOnly === true) {
+    try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:pesi_aperti_violati'); } catch (_) {}
+  }
 }
 
 // ─── Dettatura ───────────────────────────────────────────────────────────────
@@ -2094,7 +2104,19 @@ async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
   const ing = { costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false };
   const d = decisioneAutonomia(ing, { sender, assistente: true, impostazioni });
-  return { risposta: d.risposta, digita: d.digita, perche: d.perche, ...(d.risposta === 'no' ? { no: fraseNo(ing, d, sender).breve } : {}) };
+  // I contatori (#1461): la risposta calcolata e, quando chiede, quello che sceglie la persona nel box della pagina.
+  const contati = ingressiContati(ing, d, { origine: 'chat', dentroPerimetro: true });
+  let conferma = '';
+  if (d.risposta === 'si') contaSe('confermaDecisa', 'AZIONE_PAGINA', contati, 'automatica');
+  else if (d.risposta === 'no') contaSe('confermaDecisa', 'AZIONE_PAGINA', contati, 'negata');
+  else {
+    conferma = `pagina:${require('node:crypto').randomBytes(8).toString('hex')}`;
+    contaSe('confermaChiesta', conferma, 'AZIONE_PAGINA', contati);
+  }
+  return {
+    risposta: d.risposta, digita: d.digita, perche: d.perche, ...(conferma ? { conferma } : {}),
+    ...(d.risposta === 'no' ? { no: fraseNo(ing, d, sender).breve } : {}),
+  };
 }
 
 // Il testo di un «no» lo dà SN_AUTONOMIA.fraseNo: breve per il diario, intero per il modello, con la strada che resta.
@@ -2117,8 +2139,18 @@ async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
   const via = opzioni.assistente ? 'assistente' : 'chat';
   const res = await Registro.con({ via, raccolti }, () => eseguiAzioneFilo(action, opzioni));
+  // Un «annulla» o Ctrl/Cmd+Z subito dopo disfa quest'azione: i contatori la ricordano coi suoi cambi (#1461).
+  if (res && res.executed) contaSe('azioneDiFilo', String((action && action.type) || '').toUpperCase(), raccolti.map((v) => v.id));
   if (raccolti.length && res && typeof res === 'object') return { ...res, cambi: raccolti };
   return res;
+}
+
+// I cinque ingressi della tabella dei permessi e la risposta calcolata, come li contano i contatori (#1461).
+function ingressiContati(ing, decisione, { origine, dentroPerimetro }) {
+  return {
+    livello: decisione.livello, stato: decisione.stato && decisione.stato.stato, costo: ing.costo,
+    perimetro: dentroPerimetro ? 'dentro' : 'fuori', origine, risposta: decisione.risposta,
+  };
 }
 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
@@ -2498,7 +2530,10 @@ async function eseguiAzioneFilo(action, {
   // L'indirizzo scritto dal modello si conferma con un OK (decisione su D-20): aprire o leggere una pagina si disfa,
   // e il riquadro da digitare direbbe il contrario.
   if (action._nonCompare && decisione.digita) decisione = { ...decisione, digita: false };
+  const perimetroDentro = dentroPerimetro && ing.dentroPerimetro;
+  const contati = ingressiContati(ing, decisione, { origine, dentroPerimetro: perimetroDentro });
   if (decisione.risposta === 'no') {
+    if (!soloConferma) contaSe('confermaDecisa', type, contati, 'negata');
     const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
   }
@@ -2536,6 +2571,7 @@ async function eseguiAzioneFilo(action, {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    contaSe('confermaChiesta', pendingConfirmKey(sender, action), type, contati);
     if (type === 'INVIA_FEEDBACK') ricordaSegnalazione(sender, action, compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni }));
     return sospesa();
   }
@@ -2549,6 +2585,12 @@ async function eseguiAzioneFilo(action, {
       console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
       return { executed: false, kept: false, rejected: true };
     }
+    contaSe('confermaRisposta', pendingConfirmKey(sender, action), 'approvata', { tipo: type, info: contati });
+  }
+  if (!soloConferma && !confirmed) {
+    if (!daChiedere) contaSe('confermaDecisa', type, contati, 'automatica');
+    // Il pannello chiede lui: la risposta della persona arriva da lì (dashboard-attivita.js, `chiediSecondoRegola`).
+    else if (hasBespokeConfirm) contaSe('confermaChiesta', `pannello:${type}`, type, contati);
   }
 
   try {
@@ -2710,11 +2752,19 @@ async function eseguiAzioneFilo(action, {
         // Finché è a schermo senza risposta la voce non si spunta e l'intervista non si chiude, anche da un'altra
         // azione dello stesso turno: chiusa, la scelta sparirebbe con la chat. La regola sta nello stato dell'intervista.
         const sceltaAutonomia = truthy(action.autonomia);
-        const inSospeso = sceltaAutonomia || Onboarding.autonomiaInSospeso(state);
+        // #1461 — la scelta dei contatori anonimi segue la stessa regola: si mostra, la fa l'utente, poi si spunta.
+        const sceltaContatori = !sceltaAutonomia && truthy(action.contatori);
+        const autonomiaSospesa = sceltaAutonomia || Onboarding.autonomiaInSospeso(state);
+        const contatoriSospesi = sceltaContatori || Onboarding.contatoriInSospeso(state);
+        const inSospeso = autonomiaSospesa || contatoriSospesi;
         const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
-          .filter((x) => !(inSospeso && String(x || '').trim().toLowerCase() === 'autonomia'));
+          .filter((x) => {
+            const id = String(x || '').trim().toLowerCase();
+            return !(autonomiaSospesa && id === 'autonomia') && !(contatoriSospesi && id === 'contatori');
+          });
         const spuntato = Onboarding.tick(state, ids).state;
-        const ticked = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato) : spuntato;
+        const ticked = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato)
+          : (sceltaContatori ? Onboarding.mostraSceltaContatori(spuntato) : spuntato);
         // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
         // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
         // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
@@ -2723,6 +2773,11 @@ async function eseguiAzioneFilo(action, {
           ? Onboarding.close(ticked)
           : ticked;
         await saveOnboarding(next);
+        if (sceltaContatori) {
+          let attivi = true;
+          try { attivi = !(((await Storage.getSettings()) || {}).contatori?.attivi === false); } catch (_) {}
+          return { executed: true, kept: true, output: { sceltaContatori: true, attivi } };
+        }
         if (!sceltaAutonomia) return { executed: true, kept: false };
         let livello = '';
         try { livello = globalThis.SN_AUTONOMIA.livelloAttivo(((await Storage.getSettings()) || {}).autonomia?.livello); } catch (_) {}
@@ -3624,10 +3679,57 @@ async function eseguiAzioneFilo(action, {
 
 // Ogni scrittura dello stato dell'intervista viene ANNUNCIATA a tutte le schede: di schede
 // nuove se ne aprono quante si vuole, e senza annuncio la seconda resterebbe indietro.
-async function saveOnboarding(state) {
+// `via`: come si è chiusa, quando è questa scrittura a chiuderla («Salta», una frase di stop, il tetto degli scambi).
+async function saveOnboarding(state, { via = '' } = {}) {
+  let prima = null;
+  try { prima = await FiloMem.getOnboarding(); } catch (_) {}
   const next = await FiloMem.setOnboarding(state);
+  contaIntervista(prima, next, via);
   try { broadcastToTabs({ type: MSG.FILO_ONBOARDING_UPDATED, onboarding: next }); } catch (_) {}
   return next;
+}
+
+// L'intervista per i contatori (#1461): le voci spuntate, come si è chiusa e, chiusa a metà, il passo dove si è fermata.
+// Le scelte (autonomia, contatori) si leggono dalle impostazioni a fine turno, quando la voce è spuntata: col clic o a
+// parole, è la stessa scelta, e nello stesso turno il modello può spuntare prima di applicare.
+const SCELTE_INTERVISTA = ['autonomia', 'contatori'];
+const scelteDaContare = new Set();
+function contaIntervista(prima, dopo, via) {
+  try {
+    if (!Onboarding || !dopo) return;
+    const gia = new Set((prima && Array.isArray(prima.ticked)) ? prima.ticked : []);
+    for (const id of Array.isArray(dopo.ticked) ? dopo.ticked : []) {
+      if (gia.has(id)) continue;
+      contaSe('intervista', id, 'spuntata');
+      if (SCELTE_INTERVISTA.includes(id)) scelteDaContare.add(id);
+    }
+    const passo = Onboarding.ITEM_IDS.find((id) => !(dopo.ticked || []).includes(id));
+    if ((prima && prima.done) || !dopo.done) {
+      // Aperta: il passo dove si trova, per chi la lascia lì senza chiuderla (contato dopo un giorno di fermo).
+      if (!dopo.done) contaSe('intervistaToccata', passo || 'chiusura', false);
+      return;
+    }
+    if (Onboarding.isComplete(dopo)) contaSe('intervista', 'chiusura', 'completa');
+    else {
+      contaSe('intervista', 'chiusura', 'anticipata');
+      if (passo) contaSe('intervistaAbbandonata', passo);
+    }
+    if (via) contaSe('intervista', 'chiusura', via);
+    contaSe('intervistaToccata', '', true);
+  } catch (_) {}
+}
+
+async function contaScelteIntervista() {
+  if (!scelteDaContare.size) return;
+  const ids = [...scelteDaContare];
+  scelteDaContare.clear();
+  let s = {};
+  try { s = (await Storage.getSettings()) || {}; } catch (_) { return; }
+  // Spenti, il No non esce: non esce niente.
+  if (ids.includes('contatori') && !(s.contatori && s.contatori.attivi === false)) contaSe('intervista', 'contatori', 'si');
+  if (ids.includes('autonomia') && globalThis.SN_AUTONOMIA) {
+    contaSe('intervista', 'autonomia', globalThis.SN_AUTONOMIA.livelloAttivo(s.autonomia && s.autonomia.livello));
+  }
 }
 
 // Un turno rimasto a metà riparte da solo, ma con due schede nuove ripartirebbe due volte:
@@ -4764,6 +4866,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
       + 'conversazione»: lo scambio resta nella home e il suo messaggio dopo ne comincia una nuova. Non promettergli che la '
       + 'home si svuota o si ricarica.';
   }
+  if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaContatori) {
+    return `Sotto la tua risposta l'utente vede Sì e No dei contatori anonimi (adesso sono ${res.output.attivi ? 'accesi' : 'spenti'}) `
+      + `e sceglie lui con un clic: la scelta ti arriva come suo messaggio. Non dire di averli cambiati tu.${doveStaIlTesto(giro)}`;
+  }
   if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
     const A = globalThis.SN_AUTONOMIA;
     const ora = A ? A.infoLivello(res.output.livello).nome : '';
@@ -5218,7 +5324,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // appena fatto, e a quella risponde il modello (vedi `isExitRequest`).
     const bye = Onboarding.CLOSING_MESSAGE;
     const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye, congedo: true }));
-    await saveOnboarding(closed);
+    await saveOnboarding(closed, { via: 'uscita' });
     // Il congedo è l'ultima cosa che l'utente legge dell'accoglienza: finisce
     // in archivio come ogni altra battuta. Questo turno esce di qui e non
     // passa dal salvataggio della risposta più in basso.
@@ -5957,10 +6063,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         role: 'filo', text: textReply,
         ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}),
         ...(renderedActions.some((x) => x && x._output && x._output.sceltaAutonomia) ? { autonomia: true } : {}),
+        ...(renderedActions.some((x) => x && x._output && x._output.sceltaContatori) ? { contatori: true } : {}),
       });
     }
-    if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
-    await saveOnboarding(after);
+    const tetto = !after.done && Onboarding.shouldForceClose(after);
+    if (tetto) after = Onboarding.close(after);
+    await saveOnboarding(after, { via: tetto ? 'tetto' : '' });
+    await contaScelteIntervista();
     onboardingClosed = !!after.done;
     if (!internal) releaseOnboardingResume();
   }
@@ -6443,6 +6552,7 @@ const handlerCtx = {
   seguitoFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
+  chiaveConferma: pendingConfirmKey,
   controllaUscita,
   apriDaFilo,
   sitoDaConfermare,
@@ -7400,6 +7510,7 @@ Registro.collega({
     return false;
   },
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
+  annullato: (ids) => contaSe('cambioAnnullato', ids),
 });
 Registro.avvia();
 

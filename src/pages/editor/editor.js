@@ -336,6 +336,15 @@
   const documentoAlSicuro = window.SN_CASELLE.crea();
   documentoAlSicuro.registra('doc', () => save(false));
 
+  // Gli errori che si leggono nell'Editor si contano per tipo, mai col testo (#1461).
+  function contaErroreVisto(ev) {
+    try {
+      const r = chrome.runtime.sendMessage({ type: globalThis.SN_MSG.MSG.CONTATORI_EVENTO, ...ev });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+  const contaModello = (r) => contaErroreVisto({ misura: 'errore-modello', code: String((r && (r.code || r.errorCode)) || ''), status: Number(r && r.status) || 0 });
+
   function save(flash) {
     documentoAlSicuro.spedita('doc');
     try {
@@ -347,6 +356,7 @@
       if (flash) setTimeout(() => { if (!dirty) saveStateEl.textContent = ''; }, 1500);
     } catch (e) {
       saveStateEl.textContent = 'Errore';
+      contaErroreVisto({ misura: 'avviso', chiave: 'editor_non_salvato' });
       console.error('[Filo editor] save', e);
     }
   }
@@ -1065,13 +1075,13 @@
     try {
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) { if (!auto) avvisoNonGenerato('il titolo', r); return false; }
+      if (rawText == null) { if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
       const ok = applyGeneratedTitle(id, rawText);
-      if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
+      if (!ok && !auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); showEditorToast('Non sono riuscito a generare il titolo.'); }
       if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
     } catch (e) {
-      if (!auto) avvisoNonGenerato('il titolo', { error: e && e.message, code: e && e.code });
+      if (!auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); avvisoNonGenerato('il titolo', { error: e && e.message, code: e && e.code }); }
       return false;
     } finally {
       if (docSwitchBtn) docSwitchBtn.classList.remove('ed-doc-generating');
@@ -1876,7 +1886,20 @@
       setHover(vis[i]);
     };
 
+    // La ricerca fra i font, per i contatori (#1461): dall'apertura alla scelta, la posizione del font, o niente.
+    let ricerca = null;
+    const contaRicerca = (ev) => {
+      try {
+        const r = chrome.runtime.sendMessage({ type: globalThis.SN_MSG.MSG.CONTATORI_EVENTO, misura: 'ricerca', pannello: 'font', ...ev });
+        if (r && typeof r.catch === 'function') r.catch(() => {});
+      } catch (_) {}
+    };
     function choose(val) {
+      if (val && ricerca) {
+        const i = visibleOptions().findIndex((o) => o.dataset.value === val);
+        contaRicerca({ esito: 'scelta', attesaMs: Date.now() - ricerca.t0, posizione: i >= 0 ? i + 1 : null });
+        ricerca.scelto = true;
+      }
       if (val) {
         sel.value = val;
         sel.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1928,9 +1951,13 @@
         window.visualViewport.addEventListener('scroll', riposa);
       }
       setTimeout(() => search.focus(), 0);
+      ricerca = { t0: Date.now(), scelto: false };
+      contaRicerca({ esito: 'aperta' });
     }
     function close() {
       if (pop.hidden) return;
+      if (ricerca && !ricerca.scelto) contaRicerca({ esito: 'vuota' });
+      ricerca = null;
       pop.hidden = true;
       wrap.classList.remove('sn-open');
       button.setAttribute('aria-expanded', 'false');
@@ -3529,6 +3556,7 @@
     // Perché il turno non è riuscito, in italiano: la regola sta in
     // SN_CHAT_ERRORS, come per ogni altra chat di Filo (#663).
     const erroreInChat = (res, ripiego) => {
+      contaModello(res);
       const CE = window.SN_CHAT_ERRORS;
       if (!CE) return 'Errore: ' + ((res && res.error) || ripiego);
       return CE.sentence(CE.fromResponse(res, ripiego));

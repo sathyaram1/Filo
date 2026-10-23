@@ -537,3 +537,92 @@ test('nel benvenuto il blocco di attività non dice «Non partita» sotto la sce
   await page.waitForTimeout(2000);
   expect(await secondo.textContent()).not.toContain('Non partita');
 });
+
+// #1461 — i contatori anonimi si scelgono nell'intervista: Sì o No sotto la domanda di Filo, e il clic è la risposta.
+// Il No spegne e butta quello che era già contato: non parte niente, nemmeno la scelta.
+const DOMANDA_CONTATORI = {
+  text: 'Ultima cosa: posso mandare numeri senza contenuto per migliorare? Scegli qui sotto.',
+  actions: [{ type: 'ONBOARDING', contatori: true, spunta: ['contatori'] }],
+};
+const contatoriAccesi = (app) => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => !(s.contatori && s.contatori.attivi === false)));
+const statoContatori = (app) => app.evaluate(() => globalThis.SN_CONTATORI_MAIN.letto());
+
+async function chiediContatori(page, app) {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const O = globalThis.SN_ONBOARDING;
+    await M.setOnboarding(O.tick(await M.getOnboarding(), O.ITEM_IDS.filter((id) => id !== 'contatori')).state);
+    // Qualcosa già contato prima della domanda.
+    globalThis.SN_CONTATORI_MAIN.azione('reload').fine();
+  });
+  await queueChat(app, DOMANDA_CONTATORI);
+  await page.locator('#input').fill('va bene, andiamo avanti');
+  await page.locator('#sendBtn').click();
+  const scelta = page.locator('.dash-bubble-filo .dash-contatori-scelta');
+  await expect(scelta).toBeVisible({ timeout: 30_000 });
+  return scelta;
+}
+
+test('nel benvenuto i contatori si scelgono con Sì o No, e il No li spegne e butta quello che c’era', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervista(app, shell);
+  const scelta = await chiediContatori(page, app);
+  const voci = scelta.locator('.dash-contatori-voce');
+  await expect(voci).toHaveText(['Sì', 'No']);
+  await expect(scelta.locator('.dash-contatori-voce.scelto'), 'accesi di serie').toHaveText('Sì');
+  // A schermo e senza risposta: la voce non si spunta e l'intervista non si chiude.
+  expect((await onbState(app)).done).toBe(false);
+  expect((await onbState(app)).ticked).not.toContain('contatori');
+  expect(Object.keys((await statoContatori(app)).ore).length).toBeGreaterThan(0);
+  await voci.filter({ hasText: 'No' }).hover();
+  await page.screenshot({ path: 'tests/.shots/1461-scelta-contatori-chiaro.png' }).catch(() => {});
+
+  await queueChat(app, { text: 'Va bene, non mando niente. Buon lavoro.', actions: [{ type: 'ONBOARDING', spunta: ['contatori'] }] });
+  await voci.filter({ hasText: 'No' }).click();
+  await expect.poll(() => contatoriAccesi(app), { timeout: 10_000 }).toBe(false);
+  await expect(bolleUtente(page).last()).toHaveText('No, non mandare niente.');
+  await expect(scelta.locator('.dash-contatori-voce.scelto')).toHaveText('No');
+  await expect.poll(async () => Object.keys((await statoContatori(app)).ore).length, { timeout: 8_000 }).toBe(0);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
+  expect((await onbState(app)).ticked).toContain('contatori');
+  expect(Object.keys((await statoContatori(app)).ore), 'spenti, nemmeno la fine dell’intervista si conta').toEqual([]);
+});
+
+test('nel benvenuto il Sì lascia accesi i contatori e la scelta si conta, come la fine dell’intervista', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervista(app, shell);
+  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { theme: 'dark' } }));
+  const scelta = await chiediContatori(page, app);
+  await page.screenshot({ path: 'tests/.shots/1461-scelta-contatori-scuro.png' }).catch(() => {});
+  await queueChat(app, { text: 'Grazie, mi aiuta a migliorare. Buon lavoro.', actions: [{ type: 'ONBOARDING', spunta: ['contatori'] }] });
+  await scelta.locator('.dash-contatori-voce', { hasText: 'Sì' }).click();
+  await expect(bolleUtente(page).last()).toHaveText('Sì, manda i numeri.');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
+  expect(await contatoriAccesi(app)).toBe(true);
+  const ore = Object.values((await statoContatori(app)).ore);
+  const intervista = ore.reduce((tot, o) => {
+    for (const [passo, scelte] of Object.entries(o.intervista || {})) for (const [k, n] of Object.entries(scelte)) tot[`${passo}|${k}`] = (tot[`${passo}|${k}`] || 0) + n;
+    return tot;
+  }, {});
+  expect(intervista).toMatchObject({ 'contatori|si': 1, 'contatori|spuntata': 1, 'chiusura|completa': 1 });
+});
+
+test('nel benvenuto la scelta dei contatori detta a parole si conta come quella col clic', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervista(app, shell);
+  await chiediContatori(page, app);
+  // Risponde scrivendo: Filo applica quello che ha detto e spunta la voce nello stesso turno.
+  await queueChat(app, {
+    text: 'Perfetto, li lascio accesi. Buon lavoro.',
+    actions: [{ type: 'ONBOARDING', spunta: ['contatori'] }, { type: 'IMPOSTA_PREFERENZA', chiave: 'contatori', valore: true }],
+  });
+  await page.locator('#input').fill('sì, mandali pure');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
+  expect(await contatoriAccesi(app)).toBe(true);
+  const intervista = {};
+  for (const o of Object.values((await statoContatori(app)).ore)) {
+    for (const [passo, scelte] of Object.entries(o.intervista || {})) for (const [k, n] of Object.entries(scelte)) intervista[`${passo}|${k}`] = (intervista[`${passo}|${k}`] || 0) + n;
+  }
+  expect(intervista).toMatchObject({ 'contatori|si': 1, 'contatori|spuntata': 1, 'chiusura|completa': 1 });
+});

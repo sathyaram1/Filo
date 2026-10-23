@@ -753,7 +753,11 @@ try {
     return stratoMenu;
   };
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
-  globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
+  // `azione`: l'azione del menu che apre (#1461), misurata dal main fino alla pagina caricata.
+  globalThis.SN_APERTURA_SCELTA = (url, azione) => {
+    const a = azione && typeof azione === 'object' ? { id: String(azione.id || ''), t0: Number(azione.t0) } : null;
+    try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || ''), a); } catch (_) {}
+  };
 } catch (_) {}
 
 // Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede

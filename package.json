@@ -8,7 +8,7 @@
   "scripts": {
     "prestart": "node scripts/prestart.mjs",
     "start": "electron .",
-    "predev": "git -c user.email=claude@local -c user.name=claude-local pull --rebase --autostash origin main || git rebase --abort || echo \"[predev] git pull saltato\"",
+    "predev": "node scripts/prestart.mjs",
     "dev": "electron . --enable-logging",
     "test:smoke": "node tests/smoke.mjs",
     "test:unit": "node scripts/run-unit-tests.mjs",
@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "electron": "^44.7.0",
+    "electron": "^44.9.3",
     "electron-builder": "^25.1.8",
     "typescript": "^5.9.3"
   },

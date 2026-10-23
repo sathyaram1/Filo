@@ -591,6 +591,7 @@ const REGOLE_ALTRE_CHIAVI = {
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  walletUsageLog: 'stato',
   // I contatori di questa copia di Filo (#969): portati su un'altra, la stessa copia conterebbe due volte.
   contatoriGiornalieri: 'stato',
   // Il diario dei crediti spesi su questa copia: lo tiene in memoria chi avvisa, e il backup non lo riavvolge.

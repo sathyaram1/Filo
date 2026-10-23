@@ -1,13 +1,15 @@
-// Le regole Firestore dei contatori giornalieri (#969), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
-// firestoreRulesContatori.test.mjs; questo è l'altra metà: il documento che l'app spedisce davvero (il servizio
-// src/main/services/contatori.js, con la sua chiamata REST) passa, uno manomesso no, e la lettura è dell'admin.
+// firestoreRulesContatori.test.mjs; questo è l'altra metà: l'ora che l'app spedisce davvero (il servizio
+// src/main/services/contatori.js, con la sua chiamata REST) passa, e il giorno delle copie vecchie anche; uno
+// manomesso no, e la lettura è dell'admin.
 //
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
+// Esito atteso: 46 righe verdi, uscita 0 (#1461, 2026-10-21).
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection } from 'firebase/firestore';
@@ -21,9 +23,9 @@ const PROGETTO = 'filo-prova-969';
 const BASE = `http://127.0.0.1:8089/v1/projects/${PROGETTO}/databases/(default)/documents`;
 
 const require = createRequire(join(REPO, 'package.json'));
-require(join(REPO, 'src/shared/constants.js'));
-require(join(REPO, 'src/shared/modelUsage.js'));
-require(join(REPO, 'src/shared/contatoriGiornalieri.js'));
+for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLevels', 'autonomia', 'onboarding', 'cambi', 'contatoriGiornalieri']) {
+  require(join(REPO, `src/shared/${f}.js`));
+}
 const Servizio = require(join(REPO, 'src/main/services/contatori.js'));
 const C = globalThis.SN_CONTATORI;
 
@@ -74,25 +76,36 @@ function servizio(ore, impostazioni = { contatori: { attivi: true } }) {
 
 const IERI = new Date(2026, 9, 15, 10, 0, 0).getTime();
 const GIORNO = 24 * 60 * 60 * 1000;
+const ORA = 60 * 60 * 1000;
 const A = globalThis.SN_CONST.ACTIONS;
 
 console.log('\n— quello che l’app spedisce davvero —');
-await prova('il giorno chiuso parte e il server lo accetta', async () => {
+await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', async () => {
   const { s, disco, sposta } = servizio(IERI);
   const h = s.apri(A.FILO_CHAT); sposta(800); h.visto(); h.fine(true);
   const e = s.apri(A.EXPLAIN);
   e.errore(Object.assign(new Error('OpenRouter 402: Insufficient credits'), { status: 402 }), { modello: 'deepseek/deepseek-v4-pro', host: 'DeepInfra' });
   e.fine(false);
-  await new Promise((r) => setTimeout(r, 20));
-  sposta(GIORNO);
+  s.azione('new-tab').fine();
+  s.impostazioniCambiate({ theme: 'light' }, { theme: 'dark' }, { via: 'mano' });
+  s.ricerca('cerca-filo', { esito: 'scelta', attesaMs: 900, posizione: 2 });
+  s.proposta('ortografia', 'deepseek/deepseek-v4-flash', 'accettata');
+  s.confermaDecisa('NAVIGA', { livello: 'default', stato: 'pulito', costo: 1, perimetro: 'dentro', origine: 'chat', risposta: 'si' }, 'automatica');
+  s.annullatoInPagina('correzione');
+  s.anticipoPronto(A.EXPLAIN);
+  s.chiesto(A.EXPLAIN);
+  s.erroreVisto('crash:scheda:oom');
+  s.intervista('autonomia', 'default');
+  await new Promise((r) => setTimeout(r, 30));
+  sposta(ORA);
   const esito = await s.controlla();
   vero(esito === 'inviati', `esito ${esito}, errore ${JSON.stringify(disco.get(Servizio.CHIAVE)?.errore)}`);
 });
-await prova('rispedito, lo stesso giorno non si riscrive (create sì, update no) e l’app lo dà per arrivato', async () => {
+await prova('rispedita, la stessa ora non si riscrive (create sì, update no) e l’app la dà per arrivata', async () => {
   const { s, sposta } = servizio(IERI);
   s.apri(A.FILO_CHAT).fine(true);
   await new Promise((r) => setTimeout(r, 20));
-  sposta(GIORNO);
+  sposta(ORA);
   const esito = await s.controlla();
   vero(esito === 'inviati', `esito ${esito}`);
 });
@@ -113,50 +126,82 @@ await prova('chi non è admin non legge', async () => {
 
 const anon = env.unauthenticatedContext().firestore();
 const owner = env.authenticatedContext('owner', { email: 'owner@filo.it', email_verified: true }).firestore();
-const BUONO = C.documento({
-  pseudonimo: 'c'.repeat(20), giorno: '2026-10-14', app: '0.2.243', os: 'mac',
-  dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} },
-});
+const datiBuoni = C.oraVuota();
+C.registraUso(datiBuoni, 'help', { visto: 1500, fine: 3000 });
+C.registraAzione(datiBuoni, 'reload', { visto: 100, fine: 900 });
+const BUONO = C.documento({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
 const idBuono = C.idDocumento(BUONO);
+const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
 const conCampo = (patch) => ({ ...BUONO, ...patch });
-await prova('un campo in più (testo libero)', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ nota: 'ciao' }))));
-await prova('una funzione fuori elenco', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { 'mario rossi': '1;0,0,0,0,0,0,0' } }))));
-await prova('un uso che è una mappa con testo dentro', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: { n: 1, fasce: {}, nota: 'testo libero' } } }))));
-await prova('un uso che è una lista con dentro la stringa giusta', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: ['1;0,0,0,0,0,0,0'] } }))));
-await prova('un uso che è un numero', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: 1 } }))));
-await prova('un uso con testo in coda', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: '1;0,0,0,0,0,0,0 testo libero' } }))));
-await prova('un errore col testo libero al posto del modello', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { help: 'Scrivi a mario.rossi@gmail.com|H|rete|1' } }))));
-await prova('un errore che è una lista di mappe', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { help: [{ modello: 'a', host: 'b', tipo: 'rete', n: 1, nota: 'x'.repeat(5000) }] } }))));
-await prova('errori oltre il tetto di lunghezza', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { help: Array.from({ length: 3500 }, (_, i) => `${'m'.repeat(120)}|${'H'.repeat(48)}|fornitore|${i + 1}`).join(';') } }))));
-await prova('un errore sotto una funzione fuori elenco', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { 'via roma 1': [] } }))));
-await prova('uno pseudonimo che non è uno pseudonimo', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/mario_2026-10-14`), conCampo({ pseudonimo: 'mario' }))));
-await prova('un id che non è pseudonimo più giorno', () => assertFails(setDoc(doc(anon, 'contatori-giornalieri/qualsiasi'), BUONO)));
-await prova('un mese che non è quello del giorno', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ mese: '2026-09' }))));
-await prova('un sistema fuori elenco', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ os: 'Windows 11 di Mario' }))));
-await prova('una versione dell’app che è testo', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ app: 'ciao mamma' }))));
-await prova('un campo mancante', () => { const { os, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
-await prova('un anonimo legge un giorno', () => assertFails(getDoc(doc(anon, `contatori-giornalieri/${C.idDocumento({ pseudonimo: 'ab'.repeat(9) + '01', giorno: '2026-10-15' })}`))));
+const rifiuta = (patch) => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo(patch)));
+await prova('un campo in più (testo libero)', () => rifiuta({ nota: 'ciao' }));
+await prova('una funzione fuori elenco', () => rifiuta({ uso: { 'mario rossi': '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0' } }));
+await prova('un uso nella forma dei giorni di prima', () => rifiuta({ uso: { help: '1;0,0,0,0,0,0,0' } }));
+await prova('un uso che è una mappa con testo dentro', () => rifiuta({ uso: { help: { n: 1, fasce: {}, nota: 'testo libero' } } }));
+await prova('un uso che è una lista con dentro la stringa giusta', () => rifiuta({ uso: { help: ['1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0'] } }));
+await prova('un uso che è un numero', () => rifiuta({ uso: { help: 1 } }));
+await prova('un uso con testo in coda', () => rifiuta({ uso: { help: '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0 testo libero' } }));
+await prova('un errore col testo libero al posto del modello', () => rifiuta({ errori: { help: 'Scrivi a mario.rossi@gmail.com|H|rete|1' } }));
+await prova('errori oltre il tetto di lunghezza', () => rifiuta({ errori: { help: Array.from({ length: 2500 }, (_, i) => `${'m'.repeat(120)}|${'H'.repeat(48)}|fornitore|${i + 1}`).join(';') } }));
+await prova('un’azione con uno spazio (un testo) come chiave', () => rifiuta({ azioni: { 'cerca mario rossi': '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0' } }));
+await prova('un’impostazione col valore scritto da chi usa Filo', () => rifiuta({ impostazioni: { theme: 'il mio tema preferito|mano|1' } }));
+await prova('un’impostazione con un indirizzo come chiave', () => rifiuta({ impostazioni: { 'https://mario.it': 'cambiato|mano|1' } }));
+await prova('un pannello fuori elenco', () => rifiuta({ ricerche: { 'la barra di mario': '1;0,0,0,0,0,0,0;0,0,0,0,0,0;0' } }));
+await prova('un tipo del correttore fuori elenco (una parola)', () => rifiuta({ correttore: { perchè: 'altro|1,0,0,0' } }));
+await prova('una conferma con un esito inventato', () => rifiuta({ conferme: { NAVIGA: 'default|pulito|1|dentro|chat|si|forse|1' } }));
+await prova('un annullo con una parola accanto al numero', () => rifiuta({ annullati: { NAVIGA: '1 volta' } }));
+await prova('un anticipo sotto una funzione fuori elenco', () => rifiuta({ anticipi: { 'via roma 1': '1;0' } }));
+await prova('un errore visto col testo dell’avviso', () => rifiuta({ erroriVisti: { 'impossibile salvare relazione.pdf': '1' } }));
+await prova('una scelta dell’intervista scritta a parole', () => rifiuta({ intervista: { profilo: 'faccio il medico|1' } }));
+await prova('una prima volta che è un testo', () => rifiuta({ primeVolte: ['help', 'appunti di mario'] }));
+await prova('le prime volte come stringa', () => rifiuta({ primeVolte: 'help' }));
+await prova('un’ora che non esiste', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14_24`), conCampo({ ora: '24' }))));
+await prova('uno pseudonimo che non è uno pseudonimo', () => assertFails(setDoc(doc(anon, 'contatori-giornalieri/mario_2026-10-14_10'), conCampo({ pseudonimo: 'mario' }))));
+await prova('un id che non è pseudonimo, giorno e ora', () => assertFails(setDoc(doc(anon, 'contatori-giornalieri/qualsiasi'), BUONO)));
+await prova('un’ora col suo id da giorno', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14`), BUONO)));
+await prova('un mese che non è quello del giorno', () => rifiuta({ mese: '2026-09' }));
+await prova('un sistema fuori elenco', () => rifiuta({ os: 'Windows 11 di Mario' }));
+await prova('un segno di primo documento fuori elenco', () => rifiuta({ primo: 'mario' }));
+await prova('senza il segno di primo documento', () => { const { primo, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
+await prova('una versione dell’app che è testo', () => rifiuta({ app: 'ciao mamma' }));
+await prova('un campo mancante', () => { const { intervista, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
+await prova('un giorno di prima con un campo dell’ora', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), { ...GIORNO_VECCHIO, azioni: {} })));
+await prova('un anonimo legge un’ora', () => assertFails(getDoc(doc(anon, `contatori-giornalieri/${idBuono}`))));
 await prova('un anonimo elenca la collezione', () => assertFails(getDocs(collection(anon, 'contatori-giornalieri'))));
 
 console.log('\n— quello che si deve poter fare, e poi più —');
-await prova('un anonimo crea il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
-await prova('il giorno più carico che l’app costruisce (ogni funzione, ogni fascia, cinquanta errori lunghi) passa', () => {
-  const dati = C.giornoVuoto();
+await prova('un anonimo crea la sua ora', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
+await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
+await prova('l’ora più carica che l’app costruisce (ogni funzione, azione, impostazione e scelta, ai tetti) passa', () => {
+  const dati = C.oraVuota();
+  const modello = (i) => `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`;
   for (const f of C.funzioni()) {
-    for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraUso(dati, f, ms);
-    for (let i = 0; i < 60; i++) C.registraErrore(dati, f, { modello: `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`, host: 'H'.repeat(48), tipo: C.ERRORI[i % 6] });
+    for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraUso(dati, f, { visto: ms, fine: ms, ripetuta: true });
+    for (let i = 0; i < 40; i++) C.registraErrore(dati, f, { modello: modello(i), host: 'H'.repeat(48), tipo: C.ERRORI[i % 6] });
+    C.registraAnticipo(dati, f, 'preparato'); C.registraChiesto(dati, f); C.registraPrimaVolta(dati, f);
   }
-  const pieno = C.documento({ pseudonimo: 'd'.repeat(20), giorno: '2026-10-14', app: '0.2.243', os: 'linux', dati });
+  for (const a of C.azioni()) { C.registraAzione(dati, a, { visto: 10, fine: 99999 }); C.registraPrimaVolta(dati, a); }
+  for (const k of C.chiaviImpostazioni()) for (const via of C.VIE) C.registraImpostazione(dati, k, true, via);
+  for (const p of C.PANNELLI) C.registraRicerca(dati, p, { esito: 'scelta', attesaMs: 100, posizione: 4 });
+  for (const t of C.TIPI_PROPOSTA) for (let i = 0; i < 60; i++) C.registraProposta(dati, t, modello(i), 'mostrata');
+  for (const t of C.tipiAzione()) {
+    for (const risposta of C.RISPOSTE) for (const esito of C.ESITI_CONFERMA) C.registraConferma(dati, t, { livello: 'yolo', stato: 'contaminato', costo: 3, perimetro: 'fuori', origine: 'automazione', risposta, esito });
+    C.registraAnnullato(dati, t);
+  }
+  for (const d of C.DOVE_CRASH) for (const m of C.MOTIVI_CRASH) C.registraErroreVisto(dati, `crash:${d}:${m}`);
+  for (const t of C.TIPI_ERRORE_VISTO) C.registraErroreVisto(dati, `chat:${t}`);
+  for (const p of C.passiIntervista()) for (const sc of C.SCELTE_INTERVISTA) C.registraIntervista(dati, p, sc);
+  const pieno = C.documento({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '0.2.243', os: 'linux', dati });
   vero(C.valida(pieno).ok, C.valida(pieno).motivo);
   return assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(pieno)}`), pieno));
 });
-await prova('ma non lo riscrive', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
-await prova('né lo aggiorna', () => assertFails(updateDoc(doc(anon, `contatori-giornalieri/${idBuono}`), { os: 'linux' })));
-await prova('né lo cancella', () => assertFails(deleteDoc(doc(anon, `contatori-giornalieri/${idBuono}`))));
-await prova('l’admin lo legge', () => assertSucceeds(getDoc(doc(owner, `contatori-giornalieri/${idBuono}`))));
-await prova('nemmeno l’admin lo cancella', () => assertFails(deleteDoc(doc(owner, `contatori-giornalieri/${idBuono}`))));
+await prova('ma non la riscrive', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
+await prova('né la aggiorna', () => assertFails(updateDoc(doc(anon, `contatori-giornalieri/${idBuono}`), { os: 'linux' })));
+await prova('né la cancella', () => assertFails(deleteDoc(doc(anon, `contatori-giornalieri/${idBuono}`))));
+await prova('l’admin la legge', () => assertSucceeds(getDoc(doc(owner, `contatori-giornalieri/${idBuono}`))));
+await prova('nemmeno l’admin la cancella', () => assertFails(deleteDoc(doc(owner, `contatori-giornalieri/${idBuono}`))));
 
 console.log(`\n${ok} ok, ${ko} falliti`);
 await env.cleanup();

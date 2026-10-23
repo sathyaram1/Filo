@@ -18,6 +18,7 @@ const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
+const AzioniContate = require('./services/azioniContate');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
@@ -212,8 +213,8 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').schermoVecchio(event.sender, event.senderFrame);
     event.returnValue = true;
   });
-  ipcMain.on('filo:apertura-scelta', (event, url) => {
-    require('./services/permessiPagine').aperturaScelta(event.sender, url);
+  ipcMain.on('filo:apertura-scelta', (event, url, azione) => {
+    require('./services/permessiPagine').aperturaScelta(event.sender, url, azione);
     event.returnValue = true;
   });
   // #965 — il clic su un link «scarica» verso un file da avviso: vero se l'avviso lo ferma prima che parta.
@@ -502,17 +503,21 @@ function registerIpcHandlers() {
     }
     return BrowserWindow.fromWebContents(wc) || BrowserWindow.getAllWindows()[0];
   };
+  // I gesti della barra delle schede sono azioni contate (#1461): fino alla pagina visibile e caricata.
+  const gesto = (win, azione, fn) => AzioniContate.azione(azione, fn, { incognito: !!(win && win._filoIncognito) });
   ipcMain.handle('tabs:open', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
     // Per il giudizio sui siti «aperta da Filo» lo dice solo la barra di Filo.
     const daShell = Boolean(finestraDellaBarra(event.sender));
-    const id = win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
+    const apri = () => win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
+    // Una pagina di Filo la conta l'apertura della scheda, da qualunque strada (src/main/tabs.js).
+    const id = !url || url === 'filo://newtab/' ? gesto(win, 'new-tab', apri) : apri();
     return { ok: true, id };
   });
   ipcMain.handle('tabs:close', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.closeTab(id);
+    if (win?._filoTabs) gesto(win, 'close-tab', () => win._filoTabs.closeTab(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:activate', (event, { id }) => {
@@ -522,12 +527,12 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('tabs:navigate', (event, { id, url }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.navigate(id, url);
+    if (win?._filoTabs) gesto(win, 'address-bar', () => win._filoTabs.navigate(id, url));
     return { ok: true };
   });
   ipcMain.handle('tabs:move', (event, { id, toIndex } = {}) => {
     const win = winFor(event);
-    const moved = win?._filoTabs ? win._filoTabs.moveTab(id, toIndex) : false;
+    const moved = win?._filoTabs ? gesto(win, 'reorder-tabs', () => win._filoTabs.moveTab(id, toIndex)) : false;
     return { ok: true, moved };
   });
   ipcMain.handle('tabs:reserve-top', (event, { px }) => {
@@ -544,17 +549,17 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('tabs:back', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.goBack(id);
+    if (win?._filoTabs) gesto(win, 'navigate-back-forward', () => win._filoTabs.goBack(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:forward', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.goForward(id);
+    if (win?._filoTabs) gesto(win, 'navigate-back-forward', () => win._filoTabs.goForward(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:reload', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.reload(id);
+    if (win?._filoTabs) gesto(win, 'reload', () => win._filoTabs.reload(id));
     return { ok: true };
   });
   // `muted` assente = toggle.
@@ -574,7 +579,7 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.openHelp(id);
+    if (win?._filoTabs) gesto(win, 'help-sidebar', () => win._filoTabs.openHelp(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:set-active-visible', (event, { visible } = {}) => {

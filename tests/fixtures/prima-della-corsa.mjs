@@ -4,6 +4,7 @@
 import { dirname } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
+import { allineaPerLeProve } from '../../scripts/lib/pacchetti.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -11,6 +12,8 @@ import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
 export default function primaDellaCorsa(config) {
   const radice = config?.configFile ? dirname(config.configFile) : null;
   assicuraMotore(radice ? { radice } : {});
+  // Una libreria nuova del lock arriva prima degli spec che la usano (#1572).
+  if (radice) allineaPerLeProve(radice, { prefisso: '[prove]' });
   return preparaLaCorsa(radice);
 }
 

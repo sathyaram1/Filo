@@ -23,6 +23,7 @@ const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
+const AzioniContate = require('./services/azioniContate');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -882,7 +883,7 @@ class TabManager {
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
   // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
   // `rinvia`: la scheda dietro nasce senza caricarsi; la carica la coda della riapertura, o chi la apre (_caricaRinviata).
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null, origine = null } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null, origine = null, azioneMisurata = null } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -890,6 +891,20 @@ class TabManager {
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
     // Un indirizzo nudo («sito.com/pagina», come a volte lo manda il modello) caricato così resta bianco.
     else if (typeof url === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(url.trim())) url = normalizeUrl(url);
+
+    // Aprire una pagina di Filo è un'azione contata da qualunque strada ci si arrivi (#1461): menu, carte, barra dei
+    // menu, link. Chi l'ha già aperta come gesto suo la misura lui; il ripristino apre dietro e non è un gesto.
+    // Una voce del menu che apre una scheda (Cerca, Cerca l'immagine) finisce con la pagina caricata, non col clic.
+    if (azioneMisurata && !AzioniContate.inCorso()) {
+      const opzioni = { ...arguments[1], azioneMisurata: null };
+      return AzioniContate.azione(azioneMisurata.id, () => this.openTab(url, opzioni), { incognito: this.incognito, t0: azioneMisurata.t0 });
+    }
+    const C = globalThis.SN_CONTATORI;
+    const azionePagina = activate && !adotta && C && !AzioniContate.inCorso() ? C.azioneDiPagina(url) : '';
+    if (azionePagina) {
+      const opzioni = arguments[1];
+      return AzioniContate.azione(azionePagina, () => this.openTab(url, opzioni), { incognito: this.incognito });
+    }
 
     // #252 — solo per le aperture in primo piano volute dall'utente: chi chiede
     // una copia (Duplica) o apre in sottofondo vuole una scheda vera.
@@ -1012,13 +1027,17 @@ class TabManager {
     if (rinviata) tab._rinviata = true;
     else if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
     // `invio`: i dati di un modulo da mandare con l'apertura (un invio fermato dall'avviso e confermato, #965).
-    else if (!adotta && !pronta) view.webContents.loadURL(url, invio && Array.isArray(invio.data) ? {
-      postData: invio.data,
-      extraHeaders: `Content-Type: ${invio.contentType || 'application/x-www-form-urlencoded'}${invio.boundary ? `; boundary=${invio.boundary}` : ''}`,
-    } : undefined);
+    else if (!adotta && !pronta) {
+      AzioniContate.scheda(view.webContents);
+      view.webContents.loadURL(url, invio && Array.isArray(invio.data) ? {
+        postData: invio.data,
+        extraHeaders: `Content-Type: ${invio.contentType || 'application/x-www-form-urlencoded'}${invio.boundary ? `; boundary=${invio.boundary}` : ''}`,
+      } : undefined);
+    }
     // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
     if (adotta) {
       const wc = view.webContents;
+      AzioniContate.scheda(wc);
       wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id); }));
     }
     if (activate) {
@@ -1754,9 +1773,10 @@ class TabManager {
     const giro = (tab._giroIcona || 0) + 1;
     tab._giroIcona = giro;
     const vivo = () => tab._giroIcona === giro && !!tab.view && tab.view.webContents === wc && !wc.isDestroyed();
-    let interna = false;
-    try { interna = /^filo:/i.test(wc.getURL() || ''); } catch (_) {}
-    IconaScheda.iconaPer(wc.session, lista, { interna, vivo }).then(({ url, dato }) => {
+    let pagina = '';
+    try { pagina = wc.getURL() || ''; } catch (_) {}
+    const interna = /^filo:/i.test(pagina);
+    IconaScheda.iconaPer(wc.session, lista, { interna, vivo, pagina }).then(({ url, dato }) => {
       if (!vivo()) return;
       if (url) tab.faviconUrl = url;
       try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
@@ -1995,6 +2015,7 @@ class TabManager {
     } else {
       tab.view.webContents.loadURL(target);
     }
+    AzioniContate.scheda(tab.view.webContents);
     // #152 — DOPO il caricamento normale, mai prima: senza fornitore resta la
     // connessione diretta già caricata, invece di una scheda appesa.
     this._maybeApplyDomainRule(tab, target);
@@ -2082,6 +2103,7 @@ class TabManager {
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
     tab._passoStoria = true;
+    AzioniContate.scheda(tab.view.webContents);
     if (tab.view.webContents.navigationHistory?.canGoBack()) {
       tab.view.webContents.navigationHistory.goBack();
     } else if (tab.view.webContents.canGoBack?.()) {
@@ -2138,7 +2160,7 @@ class TabManager {
       if (idx != null) {
         const target = this.tabs[idx];
         if (target) {
-          this.activate(target.id);
+          AzioniContate.azione('switch-tab-by-number', () => this.activate(target.id), { incognito: !!this.win._filoIncognito });
           return true;
         }
       }
@@ -2159,7 +2181,7 @@ class TabManager {
     if (input.type === 'keyDown') {
       const verso = comandoNavigazione(input);
       if (verso) {
-        this.navigaCronologia(verso, tab.id);
+        AzioniContate.azione('navigate-back-forward', () => this.navigaCronologia(verso, tab.id), { incognito: !!this.win._filoIncognito });
         return true;
       }
     }
@@ -2177,12 +2199,13 @@ class TabManager {
     // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
     if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
       const k = String(input.key || '').toLowerCase();
-      if (k === 't') { this.openTab('filo://newtab/'); return true; }
-      if (k === 'w') { this.closeTab(tab.id); return true; }
+      const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
+      if (k === 't') return conta('new-tab', () => this.openTab('filo://newtab/'));
+      if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id));
       // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
       // Ctrl+L apre la home di Filo, esattamente come nella shell.
-      if (k === 'l') { this.navigate(tab.id, 'filo://newtab/'); return true; }
-      if (k === 'r') { this.reload(tab.id); return true; }
+      if (k === 'l') return conta('address-bar', () => this.navigate(tab.id, 'filo://newtab/'));
+      if (k === 'r') return conta('reload', () => this.reload(tab.id));
     }
     return false;
   }
@@ -2272,6 +2295,7 @@ class TabManager {
     const meta = this._vocePassoStoria(tab, 1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
     tab._passoStoria = true;
+    AzioniContate.scheda(tab.view.webContents);
     if (tab.view.webContents.navigationHistory?.canGoForward()) {
       tab.view.webContents.navigationHistory.goForward();
     } else if (tab.view.webContents.canGoForward?.()) {
@@ -2301,6 +2325,7 @@ class TabManager {
       return;
     }
     if (this._maybeBlockNavigation(tab, target || current)) return;
+    AzioniContate.scheda(tab.view.webContents);
     if (target) {
       try { tab.view.webContents.loadURL(target); } catch (_) {}
       return;
@@ -2488,6 +2513,8 @@ class TabManager {
           { host: ospiteDelloZoom(tab.url), prima: d.prima, dopo: d.dopo },
           { incognito: !!this.incognito },
         ));
+        // Una raffica di zoom è un'azione contata (#1461): dal menu, dai tasti o dalla rotella, a effetto immediato.
+        AzioniContate.azione('page-zoom', () => {}, { incognito: !!this.incognito });
       });
     } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
@@ -2649,6 +2676,7 @@ class TabManager {
       // Per l'utente la scheda resta SUL sito fallito: la pagina d'errore è la
       // faccia del fallimento, non una destinazione.
       tab.url = failed;
+      this._erroreVisto(`rete:${Math.trunc(Number(code)) || 0}`);
       try {
         if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc, { altroPaese: !!tab.proxy }));
       } catch (_) {}
@@ -3019,6 +3047,7 @@ class TabManager {
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Si legge prima che la finestra la spenda (perUnaFinestra).
       const scelta = tab.isInternal === false && Permessi.sceltaDallUtente(wc, url);
+      const azioneMisurata = Permessi.azioneDellApertura(wc, url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
       const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
       // Una finestra senza barra dell'indirizzo la apre solo il clic, anche a blocco spento: da sola la pagina
@@ -3046,6 +3075,7 @@ class TabManager {
         apriComunque: this._siteAllowedIn(tab, url),
         permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
         daGesto,
+        azioneMisurata,
         origine: tab.isInternal ? { tipo: 'filo' } : { tipo: 'link', da: tab._urlNavigato || wc.getURL(), gesto: daGesto || scelta, daScheda: tab.id },
       };
       // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
@@ -3166,6 +3196,8 @@ class TabManager {
   // `origine`: la scheda da cui nasce il popup. Il suo «Apri comunque» vale anche qui (#590).
   _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
+    // Nata da una finestra in incognito, è incognito anche lei: il suo IPC resta in memoria e i contatori non la vedono.
+    if (this.incognito) win._filoIncognito = true;
     const pwc = win.webContents;
     // Senza barra dell'indirizzo il titolo è l'unico posto dove si legge il sito: lo scrive Filo, mai la pagina (#1066).
     const mostraSito = () => {
@@ -3594,7 +3626,13 @@ class TabManager {
     if (!tab._pagineBloccate) tab._pagineBloccate = new Set();
     tab._pagineBloccate.add(indirizzoCanonico(url));
     tab.url = url;
+    this._erroreVisto('rete:bloccato');
     try { tab.view.webContents.loadURL(NE.buildUrl(url, NE.BLOCKED_CODE, decision.reason)); } catch (_) {}
+  }
+
+  // La pagina d'errore che la persona vede è un errore visto (#1461): il codice di Chromium, un numero, mai l'indirizzo.
+  _erroreVisto(tipo) {
+    try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.erroreVisto(tipo, { incognito: !!this.win._filoIncognito }); } catch (_) {}
   }
 
   // Il salto da una pagina «Sito bloccato» messa dal main al suo sito è il suo «Apri comunque»:

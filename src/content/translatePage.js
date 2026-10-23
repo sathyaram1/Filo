@@ -337,7 +337,7 @@
         return;
       case 'failed':
         // Il motivo nomina dove si rimedia (crediti, modello): l'avviso porta il tasto per andarci (#663).
-        Popup.showToast(I18n.t('toast_page_translate_failed', result.reason), { duration: 7000, rimedio: result.errore });
+        Popup.toastErrore('toast_page_translate_failed', { duration: 7000, rimedio: result.errore }, result.reason);
         return;
       case 'stopped':
         Popup.showToast(
