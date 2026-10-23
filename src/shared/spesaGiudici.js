@@ -118,7 +118,7 @@
   }
 
   global.SN_SPESA_GIUDICI = Object.freeze({
-    CAMPI, DOC_SPESA, MOTIVI, REGOLE, REGOLE_CAMPO,
+    CAMPI, DOC_SPESA, REGOLE, REGOLE_CAMPO,
     leggiImpostazioni, valida, giorno, prossimoGiornoMs, spesaDiOggi, usd, rigaSpesa,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : self);
