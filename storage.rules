@@ -102,26 +102,12 @@ service firebase.storage {
     // in laboratorio non si riusciva a misurare (il motore degli emulatori al
     // database quella domanda non la gira).
 
-    // Tipi PASSIVI, allowlist esplicita, allineata a
-    // src/shared/feedbackAttachTypes.js.
-    // ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-    // attivi (`text/html` con script, `image/svg+xml`), eseguibili nel dominio
-    // di Google Storage quando chi fa triage apre il link.
-    function tipoPassivo() {
-      return request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
-        || request.resource.contentType == 'text/plain'
-        || request.resource.contentType == 'text/markdown'
-        || request.resource.contentType == 'text/csv'
-        || request.resource.contentType == 'application/pdf'
-        || request.resource.contentType == 'application/json'
-        // `.tsv` e `.yaml`: li dichiara così `npm run feedback:apri` (scripts/
-        // claude-feedback.mjs), che diceva di usare "la stessa allowlist" e non
-        // era vero — un allegato .yaml partiva dall'app e veniva respinto qui.
-        // Sono passivi quanto il CSV: il browser li scarica, non li esegue.
-        || request.resource.contentType == 'text/tab-separated-values'
-        || request.resource.contentType == 'application/x-yaml'
-        // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
-        || request.resource.contentType == 'application/octet-stream';
+    // Solo il tipo dei blob cifrati (#1518). Con la lista dei tipi «passivi» chiunque, senza
+    // mandare un feedback, ci metteva byte qualunque come octet-stream o un testo in chiaro, e
+    // si portava via un link che non scade sul dominio di Google. Tipo ed estensione sono
+    // quelli di `SN_FEEDBACK.attachmentPath` (src/shared/feedback.js): la sentinella li confronta.
+    function soloCifrato() {
+      return request.resource.contentType == 'application/octet-stream';
     }
 
     // Il tetto è il limite del client (4 MB per allegato, misurato sul file
