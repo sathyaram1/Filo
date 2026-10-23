@@ -814,15 +814,6 @@
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  // Etichetta breve (≤4 parole) per descrivere un'azione utente: va al modello, quindi passa da
-  // `nomeElemento`, che non legge mai il valore di un campo segreto (#810.7).
-  function describeElementBriefly(el) {
-    if (!el) return '';
-    const raw = (() => { try { return Extract?.nomeElemento?.(el) || ''; } catch (_) { return ''; } })();
-    if (!raw) return el.tagName.toLowerCase();
-    return raw.split(' ').slice(0, 4).join(' ');
-  }
-
   function parseAssistantOutput(text) {
     // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
     const salvato = String(text || '').includes('{') ? globalThis.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(text, ['text']) : null;
