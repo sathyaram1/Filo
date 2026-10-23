@@ -297,7 +297,7 @@
         col.style.height = `${Math.max(3, Math.round((c.n / max) * 100))}%`;
         col.title = `${nome(i)}: ${copieTesto(c.n)}`;
       }
-      col.setAttribute(apribile ? 'aria-label' : 'aria-label', col.title);
+      col.setAttribute('aria-label', col.title);
       if (!apribile) col.setAttribute('role', 'img');
       if (eScelta(i)) { col.classList.add('mg-ct-col--scelta'); col.setAttribute('aria-pressed', 'true'); }
       if (apribile) col.addEventListener('click', () => clic(i));
@@ -476,7 +476,7 @@
     let andamento = null;
     const apriChiudi = () => {
       const ora = aperta === chiave ? '' : chiave;
-      const prima = tbody.closest('#mgCtBlocchi').querySelector('.mg-ct-andamento');
+      const prima = el.blocchi.querySelector('.mg-ct-andamento');
       if (prima) {
         const suaRiga = prima.previousElementSibling;
         if (suaRiga) { suaRiga.classList.remove('mg-ct-riga--aperta'); suaRiga.setAttribute('aria-expanded', 'false'); }
