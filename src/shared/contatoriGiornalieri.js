@@ -181,8 +181,12 @@
   const ERRORE_VISTO_FORMA = '^[a-z0-9_:.-]{1,80}$';
   const PASSO_FORMA = '^[a-z0-9_-]{1,30}$';
   // Le misure delle chiamate: «modello|resto|n», col resto dal suo elenco chiuso; le chiamate per uso in cinque fasce.
-  const restoForma = (campo) => alternative(RESTI[campo].map((r) => r.replace(/\|/g, '[|]')));
-  const FORME_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, forma(`${MOD}[|]${restoForma(c)}[|]${N}`)])));
+  const RESTI_FORMA = Object.freeze({
+    contesto: alternative(RESTI.contesto), cache: alternative(RESTI.cache), ragionamento: alternative(RESTI.ragionamento),
+    uscita: `${alternative(nomi(FASCE_USCITA))}[|]${alternative(FINI)}`, ripieghi: `${alternative(TENTATIVI)}[|](si|no)`,
+    spesa: alternative(RESTI.spesa), adattamenti: alternative(RESTI.adattamenti),
+  });
+  const FORME_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, forma(`${MOD}[|]${RESTI_FORMA[c]}[|]${N}`)])));
   const CHIAMATE_FORMA = `^${N}(,${N}){4}$`;
 
   const re = (s) => new RegExp(s);
