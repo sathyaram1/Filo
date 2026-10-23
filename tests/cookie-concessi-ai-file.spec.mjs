@@ -92,7 +92,7 @@ test('la foto di un altro sito, letta da tasto destro, Copia, Salva e Aiuto, por
     expect(sito.dalMain('/foto.png').length).toBeGreaterThan(prima);
 
     prima = sito.dalMain('/foto.png').length;
-    await nelMondoDiFilo(app, paginaHost, 'SN_SIDEBAR.open(); 1');
+    await nelMondoDiFilo(app, new URL(page.url()).hostname, 'SN_SIDEBAR.open(); 1');
     await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
     await page.fill('.sn-sidebar-input textarea', 'cosa mostra la foto?');
     await page.press('.sn-sidebar-input textarea', 'Enter');
