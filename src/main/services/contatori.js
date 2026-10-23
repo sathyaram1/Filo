@@ -653,8 +653,8 @@ function crea(dip = {}) {
         delete mappa[k];
         continue;
       }
-      const chiamate = giorno ? null : documentoAccanto(k, C.documentoChiamate({ ...base, chiave: k }), C.senzaChiamate, C.validaChiamate);
-      const attivita = giorno ? null : documentoAccanto(k, C.documentoAttivita({ ...base, chiave: k }), C.senzaAttivita, C.validaAttivita);
+      const chiamate = giorno ? null : documentoAccanto(k, 'le chiamate', C.documentoChiamate({ ...base, chiave: k }), C.senzaChiamate, C.validaChiamate);
+      const attivita = giorno ? null : documentoAccanto(k, 'le attività', C.documentoAttivita({ ...base, chiave: k }), C.senzaAttivita, C.validaAttivita);
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
       // L'ora è arrivata: il suo segno di primo documento vale anche se i documenti accanto partono al giro dopo, e
