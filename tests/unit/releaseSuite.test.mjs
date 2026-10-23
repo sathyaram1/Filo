@@ -483,6 +483,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
 
 describe('release.yml: si pubblica il commit più nuovo di main con la suite verde', () => {
   const release = () => senzaCommenti(job('release'));
+  const cancello = () => senzaCommenti(job('cancello'));
   const scegli = senzaCommenti(job('scegli'));
 
   test('la suite non gira più qui, e `solo_suite` non c\'è più', () => {
