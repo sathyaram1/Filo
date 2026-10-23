@@ -64,7 +64,6 @@ test('r1 un webhook, la password di una riga di comando e i codici di recupero n
   test.setTimeout(90_000);
   const mandato = await leggiInChat(fx, 'Note di installazione', `<h1>Note di installazione</h1>
     <pre>APP_NAME=gestionale
-SLACK_WEBHOOK_URL=${WEBHOOK}
 docker login -u mario -p Faro7Blu2024 registry.example.com
 curl -u mario:Ponte9Grigio https://api.example.com/v1/stato</pre>
     <h2>Codici di recupero</h2>
