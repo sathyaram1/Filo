@@ -126,6 +126,7 @@ test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei l
   const avviso = shell.locator('.shell-notif-msg', { hasText: 'La pulizia automatica non è riuscita a valutare le schede' });
   await expect(avviso).toBeVisible({ timeout: 5_000 });
   await expect(avviso).toContainText('crediti di Filo sono finiti');
+  await expect(avviso.locator('xpath=..').locator('.shell-notif-action')).toHaveText(['Apri Crediti']);
   expect((await app.evaluate(() => globalThis.__avvisi)).some((r) => /pulizia delle schede \(idle\).*402/.test(r))).toBe(true);
   mkdirSync(SHOTS, { recursive: true });
   await shell.screenshot({ path: join(SHOTS, 'pulizia-giudizio-mancato.png') });
