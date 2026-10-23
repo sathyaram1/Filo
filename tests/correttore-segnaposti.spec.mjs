@@ -112,6 +112,34 @@ for (const campo of ['#ta', '#ce']) {
   });
 }
 
+test('sopra le parole della riga prima il valore è velato e il clic va al testo; col puntatore sulle x si sveglia e si mette', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { ragionato: { '14xx': [COLOMBO] } });
+  const scritto = "Ieri sera a cena parlavamo di storia con gli amici di sempre, e ricordavo che l'America l'hanno scoperta nel 14xx. ";
+  await page.locator('#ta').click();
+  await page.keyboard.type(scritto);
+  const v = valore(page, '1492');
+  await expect(v).toBeVisible({ timeout: 8000 });
+  const x = await riquadroDelSegno(ocra(page, '14xx'));
+  const ta = await page.locator('#ta').boundingBox();
+  expect(x.y - ta.y).toBeGreaterThan(40);
+  await expect(v).toHaveClass(/sn-sopra-testo/);
+  const sopra = await v.boundingBox();
+  // Il clic sulla parola della riga prima, dove sta il valore velato, mette lì il cursore e non scrive il valore.
+  await page.mouse.move(sopra.x + sopra.width / 2, sopra.y - 30);
+  await page.mouse.click(sopra.x + sopra.width / 2, sopra.y + sopra.height / 2);
+  await page.waitForTimeout(300);
+  const stato = await page.locator('#ta').evaluate((el) => ({ testo: el.value, cursore: el.selectionStart }));
+  expect(stato.testo).toBe(scritto);
+  expect(stato.cursore).toBeLessThan(scritto.indexOf('ricordavo'));
+  // Dalle x il puntatore sale sul valore, che si è svegliato: un clic lo mette.
+  await page.mouse.move(x.x + x.width / 2, x.y + x.height / 2);
+  await expect(v).toHaveClass(/sn-sveglio/);
+  await page.mouse.move(sopra.x + sopra.width / 2, sopra.y + sopra.height / 2, { steps: 4 });
+  await v.click({ trial: true });
+  await page.mouse.click(sopra.x + sopra.width / 2, sopra.y + sopra.height / 2);
+  await expect(page.locator('#ta')).toHaveValue(scritto.replace('14xx', '1492'));
+});
+
 test('«x te», «3x4» e i baci non hanno segni, e non arrivano al modello come segnaposti', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
