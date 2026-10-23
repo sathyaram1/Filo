@@ -5289,7 +5289,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
   // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
-  const { stateText, attese: attesePrimaDelModello } = await FiloState.assemble({ creditiFreschi: true, soloSiti: onbActive });
+  const { state: statoDelTurno, stateText, attese: attesePrimaDelModello } = await FiloState.assemble({
+    creditiFreschi: true, soloSiti: onbActive, finestra: winOf(sender)?.id ?? null, schedaChat: sender?.tab?.id ?? null,
+  });
+  // I numeri delle schede che il modello vede valgono per tutto il turno: CHIUDI_SCHEDE li legge da qui (#413).
+  const schedeViste = ((statoDelTurno && statoDelTurno.tabs) || []).map((t) => t.id);
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
