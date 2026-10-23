@@ -1649,14 +1649,29 @@ class TabManager {
       const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
       let decisions = [];
       let giudizioMancato = true;
+      let errore = null;
       if (typeof decide === 'function') {
+        let tetto = null;
         try {
-          const input = await this._gatherTriageInput(cands);
-          const r = await decide({ tabs: input, trigger });
-          decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
+          const giudizio = (async () => {
+            const input = await this._gatherTriageInput(cands);
+            const r = await decide({ tabs: input, trigger });
+            if (!Array.isArray(r && r.decisions)) throw erroreDiPulizia('Il modello ha risposto senza dire quali schede tenere. Riprova, o scegli un altro modello in Opzioni → Modelli per azione.');
+            return r.decisions;
+          })();
+          const scaduto = new Promise((_, no) => {
+            tetto = setTimeout(() => no(erroreDiPulizia('Il modello non ha risposto in tempo. Riprova più tardi.')), GIUDIZIO_TETTO_MS);
+          });
+          decisions = await Promise.race([giudizio, scaduto]);
           giudizioMancato = false;
-        } catch (_) { decisions = []; }
+        } catch (e) {
+          decisions = [];
+          errore = e;
+        } finally {
+          clearTimeout(tetto);
+        }
       }
+      if (trigger !== 'manual') this._dichiaraGiudizio(giudizioMancato, errore, trigger);
 
       // I duplicati vincono sempre su un "tieni" dell'LLM.
       const byIndex = new Map();
