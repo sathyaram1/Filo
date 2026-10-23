@@ -69,13 +69,15 @@ test.beforeAll(async () => {
 });
 
 const T_ATTESA_RETE = 'primo avvio dal link: se dalla connessione sono già entrati in tre, la home dice perché e quando riprovare';
+const T_ATTESA_INVITANTE = 'primo avvio dal link: se coi codici di chi ha invitato sono già entrati in tre, la home dice perché e quando riprovare';
 const T_ATTESA_SENZA_GOOGLE = 'primo avvio dal link senza Google: il benvenuto non promette inviti da dare e dice dove collegarlo';
 
 test.beforeEach(({}, testInfo) => {
   redeemed = false; linked = false; rifiuto = null; inAttesa = null; giaUsato = false;
   // L'invito in attesa si chiede all'avvio: va pronto prima che la fixture lanci Filo.
-  if (testInfo.title === T_ATTESA_RETE || testInfo.title === T_ATTESA_SENZA_GOOGLE) inAttesa = { status: 'ok', code: 'ABCD-EFGH' };
+  if ([T_ATTESA_RETE, T_ATTESA_SENZA_GOOGLE, T_ATTESA_INVITANTE].includes(testInfo.title)) inAttesa = { status: 'ok', code: 'ABCD-EFGH' };
   if (testInfo.title === T_ATTESA_RETE) rifiuto = { status: 'network_cap', reopensAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), cap: 3, hours: 24 };
+  if (testInfo.title === T_ATTESA_INVITANTE) rifiuto = { status: 'inviter_cap', reopensAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), cap: 3, hours: 24 };
 });
 
 async function home(app) {
@@ -208,6 +210,18 @@ test('i rifiuti nuovi del riscatto si spiegano: invito di chi non ha Google, tro
   await expect(msg).toContainText(ora);
   await expect(msg).toContainText('Il tuo codice resta valido');
   await expect(page.locator('#redeemForm')).toBeVisible();
+
+  // #1519 — il tetto per chi dà inviti: la frase dice di chi sono i codici e l'ora, e il modulo resta lì.
+  const riapreInvitante = new Date(Date.now() + 5 * 60 * 60 * 1000);
+  rifiuto = { status: 'inviter_cap', reopensAt: riapreInvitante.toISOString(), cap: 3, hours: 24 };
+  await page.click('#redeemBtn');
+  await expect(msg).toContainText('Con gli inviti di chi ti ha mandato questo codice sono già entrate 3 persone nelle ultime 24 ore');
+  const oraInvitante = await page.evaluate((iso) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }), riapreInvitante.toISOString());
+  await expect(msg).toContainText(oraInvitante);
+  await expect(msg).toContainText('Il tuo codice resta valido');
+  await expect(msg).toHaveClass(/is-error/);
+  await expect(page.locator('#redeemForm')).toBeVisible();
+  await scatto(page, '1519-tetto-invitante');
 });
 
 test(T_ATTESA_RETE, async ({ app, openTab }) => {
@@ -219,6 +233,18 @@ test(T_ATTESA_RETE, async ({ app, openTab }) => {
   expect(detto).toContain('Il tuo codice resta valido');
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+});
+
+// #1519 — l'invito resta in attesa per il prossimo avvio, e chi l'ha scaricato apposta sa perché non è entrato.
+test(T_ATTESA_INVITANTE, async ({ app }) => {
+  const h = await home(app);
+  expect(h, 'la home è aperta all\'avvio').toBeTruthy();
+  await expect(h.locator(CONFIRM_HOST)).toBeVisible({ timeout: 40000 });
+  const detto = await confirmText(h);
+  expect(detto).toContain('Con gli inviti di chi ti ha mandato questo codice sono già entrate 3 persone nelle ultime 24 ore');
+  expect(detto).toContain('Il tuo codice resta valido');
+  const segno = await app.evaluate(async () => globalThis.SN_STORAGE.getRaw('walletPendingInvite', null));
+  expect(segno && segno.done).toBe(false);
 });
 
 test(T_ATTESA_SENZA_GOOGLE, async ({ app }) => {

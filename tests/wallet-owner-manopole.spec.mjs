@@ -77,6 +77,7 @@ function configDiPartenza() {
     rewardFeedbackClosed: 50,
     invitesRemaining: 9,
     redeemsPerNetwork: 3,
+    redeemsPerInviter: 3,
     redeemsPerNetworkHours: 24,
     eurUsd: 1.17,
     totalLimitUsd: 4.2,
@@ -259,13 +260,17 @@ test('le manopole si salvano davvero, un numero storto non arriva al server e «
   const page = await apriOwner(app);
 
   // Ci sono tutte, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(11, { timeout: 15_000 });
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(12, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
   // #1120 — il tetto degli ingressi dalla stessa connessione e la sua finestra.
   await expect(page.locator('#knob-redeemsPerNetwork')).toHaveValue('3');
   await expect(page.locator('#knob-redeemsPerNetworkHours')).toHaveValue('24');
+  // #1519 — il tetto per chi dà inviti sta fra i due, e si salva da solo.
+  await expect(page.locator('#knob-redeemsPerInviter')).toHaveValue('3');
+  expect(await page.$$eval('#ownerKnobs .sn-manopola', (rr) => rr.map((r) => r.dataset.chiave).slice(-3)))
+    .toEqual(['redeemsPerNetwork', 'redeemsPerInviter', 'redeemsPerNetworkHours']);
   await expect(page.locator('#knob-rewardSentPerDay')).toHaveValue('5');
 
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -330,6 +335,17 @@ test('le manopole si salvano davvero, un numero storto non arriva al server e «
   await page.click('#knob-invitesMaxUses-salva');
   await expect(msgUsi).toHaveText('Persone per invito: almeno 1.');
   expect(patch.length).toBe(2);
+
+  // #1519 — a zero il tetto per chi dà inviti si spegne: zero è un valore buono, e parte solo lui.
+  const prima = patch.length;
+  await page.fill('#knob-redeemsPerInviter', '0');
+  await page.click('#knob-redeemsPerInviter-salva');
+  await expect(page.locator('#knob-redeemsPerInviter-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.slice(prima).map((x) => x.valori)).toEqual([{ redeemsPerInviter: 0 }]);
+  expect(configDoc.redeemsPerInviter).toBe(0);
+  await page.fill('#knob-redeemsPerInviter', '3');
+  await page.click('#knob-redeemsPerInviter-salva');
+  await expect.poll(() => configDoc.redeemsPerInviter, { timeout: 10_000 }).toBe(3);
 });
 
 // #854 — gli ingressi con invito erano un numero in sola lettura: per aprire Filo a più persone l'owner
@@ -554,7 +570,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 12, null, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -598,7 +614,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 12, null, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
@@ -740,7 +756,7 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     await ricaricaSu(page, 'utenti');
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 11;
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 12;
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);
