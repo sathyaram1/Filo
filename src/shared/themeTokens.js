@@ -244,6 +244,12 @@
       css: '--sn-spell-valore-scala',
       default: '0.62',
     },
+    'correttore.segnaposti.velato': {
+      label: 'Quanto si vede il valore di un segnaposto quando copre le parole della riga sopra',
+      type: 'opacity',
+      css: '--sn-spell-valore-velato',
+      default: '0.45',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
