@@ -178,7 +178,7 @@ test('le chiamate di un uso (#1464): i numeri di ognuna subito, quante sono alla
 });
 
 test('le chiamate in incognito e a contatori spenti non si contano, nemmeno la spesa che arriva dopo (#1464)', async () => {
-  const b = banco({ incognito: true });
+  const b = banco({ incognito: true, finestra: false });
   const h = b.s.apri(A.FILO_CHAT);
   h.chiamata({ modello: 'a/b', ingresso: 1000, spesa: { usd: 1, origine: 'router' } });
   h.fine(true);
