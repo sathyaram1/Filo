@@ -30,6 +30,7 @@ function blocco(collezione) {
 }
 const B = blocco(C.COLLEZIONE);
 const BC = blocco(C.COLLEZIONE_CHIAMATE);
+const BA = blocco(C.COLLEZIONE_ATTIVITA);
 // Le funzioni che le ore e le loro chiamate condividono stanno fra l'intestazione dei contatori e il blocco delle ore.
 const CONDIVISE = (() => {
   const a = RULES.indexOf('    // ── I contatori anonimi');

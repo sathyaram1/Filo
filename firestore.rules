@@ -1057,6 +1057,49 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Le attività dei contatori (#1467) ────────────────────────────────────
+    //
+    // Per ogni ora di contatori che ne ha, quello che Filo fa da solo o a metà con la persona: le sessioni dell'Aiuto,
+    // le ricerche web, le dettature, le letture ad alta voce, le lezioni e la compattazione, le righe di memoria
+    // corrette, i giri di pulizia e le schede riaperte, la home e i suggerimenti usati. Per misura una mappa
+    // «combinazione → n»: la combinazione è fatta di nomi da elenchi chiusi uniti da «|», e qui ne sta l'elenco (per il
+    // tipo d'azione di un suggerimento, che cresce col registro delle azioni, la forma). Stesso pseudonimo, stessa ora e
+    // stesso id dell'ora; sola creazione, senza login, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-attivita/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriAttivita(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'aiuto', 'ricercaWeb', 'dettatura', 'lettura', 'lezioni', 'compattazioni', 'memoria', 'pulizia', 'riaperte', 'home', 'suggerimenti'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'aiuto', 'ricercaWeb', 'dettatura', 'lettura', 'lezioni', 'compattazioni', 'memoria', 'pulizia', 'riaperte', 'home', 'suggerimenti'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.aiuto, '^(((fatto|chiusa_prima|tetto_passi|errore)[|](p0|p1|p2_5|p6_20|oltre)[|](p0|p1|p2_5|p6_20|oltre)[|](n0|n1|n2_oltre)[|](n0|n1|n2_oltre)|altro)(#((fatto|chiusa_prima|tetto_passi|errore)[|](p0|p1|p2_5|p6_20|oltre)[|](p0|p1|p2_5|p6_20|oltre)[|](n0|n1|n2_oltre)[|](n0|n1|n2_oltre)|altro))*)?$', 4343, 1010)
+          && conti(d.ricercaWeb, '^(((chat|aiuto)[|](tavily|duckduckgo|nessuno)[|](si|no)[|](r0|r1_2|r3_5|oltre)|(aiuto)[|](al_tetto)|altro)(#((chat|aiuto)[|](tavily|duckduckgo|nessuno)[|](si|no)[|](r0|r1_2|r3_5|oltre)|(aiuto)[|](al_tetto)|altro))*)?$', 2626, 1010)
+          && conti(d.dettatura, '^(((utente|finito|muto|tempo|errore|altro|annulla)[|](f0|f1|f2_5|oltre)[|](da_sola|cambiata|tenuta|annullata|a_mano|nessuno)[|](si|no)|altro)(#((utente|finito|muto|tempo|errore|altro|annulla)[|](f0|f1|f2_5|oltre)[|](da_sola|cambiata|tenuta|annullata|a_mano|nessuno)[|](si|no)|altro))*)?$', 2727, 1010)
+          && conti(d.lettura, '^(((modello|browser|mista)[|](nessuno|no_api_key|limit_reached|no_model_for_action|no_open_weights_model|no_allowed_host|tts_voice_required|tts_voice_unknown|chiave_rifiutata|no_tts_model|altro)[|](q25|q50|q75|q100|fine)|altro)(#((modello|browser|mista)[|](nessuno|no_api_key|limit_reached|no_model_for_action|no_open_weights_model|no_allowed_host|tts_voice_required|tts_voice_unknown|chiave_rifiutata|no_tts_model|altro)[|](q25|q50|q75|q100|fine)|altro))*)?$', 3535, 1010)
+          && conti(d.lezioni, '^(((nulla)|(l0|l1|l2_3|oltre)[|](l0|l1|l2_3|oltre)|altro)(#((nulla)|(l0|l1|l2_3|oltre)[|](l0|l1|l2_3|oltre)|altro))*)?$', 1212, 1010)
+          && conti(d.compattazioni, '^(((nessuna|applicata|rimandata)[|](r0|r1|r2_5|oltre)|altro)(#((nessuna|applicata|rimandata)[|](r0|r1|r2_5|oltre)|altro))*)?$', 1616, 1010)
+          && conti(d.memoria, '^(((quaderno|chat)[|](togli|correggi|ripristina|svuota)[|](profilo|preferenze|espansioni|lezione|tutte)[|](giorno|settimana|mese|oltre|nd)|altro)(#((quaderno|chat)[|](togli|correggi|ripristina|svuota)[|](profilo|preferenze|espansioni|lezione|tutte)[|](giorno|settimana|mese|oltre|nd)|altro))*)?$', 4141, 1010)
+          && conti(d.pulizia, '^(((idle|reopen|manual)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](si|no)|altro)(#((idle|reopen|manual)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](si|no)|altro))*)?$', 2828, 1010)
+          && conti(d.riaperte, '^(((pulizia|duplicato|persona)[|](min10|ora|giorno|oltre)|altro)(#((pulizia|duplicato|persona)[|](min10|ora|giorno|oltre)|altro))*)?$', 1717, 1010)
+          && conti(d.home, '^(((generata|senza_ai_chiave|senza_ai_pesi_aperti|senza_ai_modelli)|altro)(#((generata|senza_ai_chiave|senza_ai_pesi_aperti|senza_ai_modelli)|altro))*)?$', 2121, 1010)
+          && conti(d.suggerimenti, '^(([A-Za-z][A-Za-z0-9_-]{0,39}[|](1|2|3|4_oltre)[|](ora|giorno|oltre|nd)|altro)(#([A-Za-z][A-Za-z0-9_-]{0,39}[|](1|2|3|4_oltre)[|](ora|giorno|oltre|nd)|altro))*)?$', 5656, 1010);
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriAttivita(request.resource.data);
+      allow update, delete: if false;
+    }
+
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
     // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
     // Campi non enumerati, come gli altri config/*: aggiungerne uno non
