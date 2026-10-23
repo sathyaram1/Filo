@@ -193,6 +193,35 @@ test('una dettatura in chat conta il motivo della chiusura, le frasi e che fine 
   expect(await tutteLeChiavi(app)).not.toMatch(/Lisbona|tempo fa/);
 });
 
+// ── La lettura ad alta voce ──────────────────────────────────────────────
+test('una lettura fermata conta la voce, il perché del ripiego e fin dove è arrivata', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => typeof window.SN_TTS?.readAloud === 'function', null, { timeout: 8000 });
+  const TESTO = 'Il gatto dorme sul divano. Fuori piove da stamattina, e la casa è silenziosa.';
+
+  // La voce del modello (l'audio di prova, muto): letta per un attimo e fermata.
+  await app.evaluate(() => { globalThis.__filoTestTtsCanned = true; });
+  await page.evaluate((t) => { window.SN_TTS.readAloud(t); }, TESTO);
+  await expect.poll(() => page.evaluate(() => window.SN_TTS.ttsBusy()), { timeout: 8_000 }).toBe(true);
+  await page.evaluate(() => window.SN_TTS.stopReading());
+  await expect.poll(async () => Object.keys(await misura(app, 'lettura')), { timeout: 5_000 }).toHaveLength(1);
+  expect(Object.keys(await misura(app, 'lettura'))[0]).toMatch(/^modello\|nessuno\|q(25|50|75|100)$/);
+
+  // Senza un modello per la voce: il sistema legge, e si conta perché.
+  await app.evaluate(async () => {
+    globalThis.__filoTestTtsCanned = false;
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' } });
+  });
+  await page.evaluate((t) => { window.SN_TTS.readAloud(t); }, TESTO);
+  await page.waitForTimeout(800);
+  await page.evaluate(() => window.SN_TTS.stopReading());
+  await expect.poll(async () => Object.keys(await misura(app, 'lettura')).filter((k) => k.startsWith('browser|')), { timeout: 5_000 }).toHaveLength(1);
+  const ripiego = Object.keys(await misura(app, 'lettura')).find((k) => k.startsWith('browser|'));
+  expect(ripiego.split('|')[1], 'il motivo del ripiego, dall’elenco').not.toBe('nessuno');
+  expect(await tutteLeChiavi(app)).not.toMatch(/gatto|divano/);
+});
+
 // ── Lezioni, riordino e quaderno ────────────────────────────────────────
 async function memoriaFinta(app) {
   await app.evaluate(async () => {
