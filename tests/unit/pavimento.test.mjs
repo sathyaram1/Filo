@@ -224,8 +224,30 @@ test('vicino alla parola «password» restano i nomi di prodotto, gli utenti, gl
   assert.ok(!P.oscura('Password per il wifi (chiedila a Mario se non va): Faro#Blu55').includes('Faro#Blu55'));
 });
 
-test('una password che è una parola si toglie intera, non dentro le altre parole', () => {
-  assert.equal(P.oscura('Password del wifi: casa\nLa casalinga ha le chiavi di casa.'), `Password del wifi: ${S}\nLa casalinga ha le chiavi di ${S}.`);
+// Una parola senza la forma di una password si toglie solo al posto del valore: altrove nella pagina è una parola.
+test('una password che è una parola si toglie al suo posto, non dentro le altre parole né nel resto della pagina', () => {
+  assert.equal(P.oscura('Password del wifi: casa\nLa casalinga ha le chiavi di casa.'), `Password del wifi: ${S}\nLa casalinga ha le chiavi di casa.`);
+  assert.equal(P.oscura('Password: Girasole2024\nRicorda: Girasole2024 vale anche per la posta.'), `Password: ${S}\nRicorda: ${S} vale anche per la posta.`);
+  assert.equal(P.oscura('Impostazioni\nPassword\nNotifiche\n\nScegli quali Notifiche ricevere.'), `Impostazioni\nPassword\n${S}\n\nScegli quali Notifiche ricevere.`);
+  assert.equal(P.oscura('Password: Attiva\nAttiva le notifiche'), `Password: ${S}\nAttiva le notifiche`);
+});
+
+// La pagina dell'account: la password a puntini è già coperta, e sotto «Modifica» viene il campo dopo.
+test('oltre i puntini e i bottoni sotto «Password» conta solo la forma di una password: il campo dopo resta', () => {
+  const quante = (t, p) => t.split(p).length - 1;
+  for (const [t, campo] of [
+    ['Nome\nMario Rossi\nModifica\nPassword\n••••••••\nModifica\nTelefono\n+39 333 1234567\nModifica\n\nAggiungi un Telefono di riserva', 'Telefono'],
+    ['Email\nPassword\nModifica\nNotifiche\nAttive', 'Notifiche'],
+    ['Email\nPassword\nMostra\nRicordami\nAccedi', 'Ricordami'],
+  ]) assert.equal(quante(P.oscura(t), campo), quante(t, campo), t);
+  assert.ok(!P.oscura('Password\n••••••••\nCopia\nGirasole2024').includes('Girasole2024'));
+});
+
+// Una tabella nome-valore: la riga «Password | x» non è un'intestazione, e le righe sotto sono altri campi.
+test('in una tabella nome-valore si toglie solo il valore della password, le etichette sotto restano', () => {
+  assert.equal(P.oscura('Utente\tmario\nPassword\tGirasole2024\nServer\timap.esempio.it\nPorta\t993'), `Utente\tmario\nPassword\t${S}\nServer\timap.esempio.it\nPorta\t993`);
+  assert.equal(P.oscura('| Utente | mario |\n| Password | Girasole2024 |\n| Porta | 993 |'), `| Utente | mario |\n| Password | ${S} |\n| Porta | 993 |`);
+  assert.equal(P.oscura('| Utente | Password |\n|---|---|\n| mario | tramonto |\nIl tramonto è bello'), `| Utente | Password |\n|---|---|\n| mario | ${S} |\nIl tramonto è bello`);
 });
 
 // Nei file di configurazione il posto del valore è dopo la chiave che si chiama password, anche dentro un nome composto.
