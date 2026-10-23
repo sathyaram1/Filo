@@ -881,6 +881,7 @@
         quanti.focus();
         quanti.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
       }],
+      ...vociInvitati(r).slice(0, 1),
     ], x, y, r);
   }
 
