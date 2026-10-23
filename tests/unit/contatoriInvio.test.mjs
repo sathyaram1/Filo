@@ -254,7 +254,7 @@ test('le attività di un’ora partono accanto all’ora, con lo stesso id; un�
     v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac',
     aiuto: { 'fatto|p2_5|p1|n0|n0': '1' }, ricercaWeb: { 'chat|duckduckgo|si|r3_5': '1' }, dettatura: {}, lettura: {}, lezioni: {},
     compattazioni: {}, memoria: { 'quaderno|togli|profilo|settimana': '1', 'chat|svuota|tutte|nd': '1' },
-    pulizia: { 'idle|s6_20|s1|s1|no': '1' }, riaperte: {}, home: {}, suggerimenti: {},
+    pulizia: { 'idle|s6_20|s2_5|s1|no': '1' }, riaperte: {}, home: {}, suggerimenti: {},
   });
   assert.equal(C.validaAttivita(b.attivita[0].doc).ok, true);
   // Un'ora con un solo uso e nessuna attività: niente terzo documento.
