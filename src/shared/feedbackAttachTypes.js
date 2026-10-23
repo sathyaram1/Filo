@@ -14,8 +14,8 @@
   // Documenti passivi per MIME esplicito. NIENTE text/html, application/xhtml+xml, text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
-    // Col tipo esplicito perché il deposito li accetta: senza, la riga di comando mandava
-    // quello che una persona non poteva allegare (#582).
+    // Col tipo esplicito perché la riga di comando li dichiara così: senza, mandava quello
+    // che una persona non poteva allegare (#582).
     'text/tab-separated-values', 'application/x-yaml',
   ]);
 
