@@ -213,7 +213,8 @@
     for (let i = 0, o = 0; i < righe.length; o += righe[i].length + 1, i++) inizi.push(o);
     for (let i = 0; i < righe.length; i++) {
       for (const m of righe[i].matchAll(AL_POSTO)) {
-        if (!DA_SOLA.test(m[2])) continue;
+        // Una parentesi attaccata («password = input(…)») è una chiamata nel codice, non una nota dopo il valore.
+        if (!DA_SOLA.test(m[2]) || m[2].startsWith('(')) continue;
         const v = valorePassword(m[1]);
         if (v) out.push(alPosto(v, inizi[i] + m.indices[1][0], m[1]));
       }
@@ -337,12 +338,12 @@
   }
   // Una chiave privata ha intestazione e coda fisse: si toglie il corpo che segue l'intestazione, qualunque sia il formato
   // (OpenSSH, RSA, EC, cifrata), anche coi ritorni a capo scritti come «\n» dentro un JSON.
-  const CORPO_PEM = /-----BEGIN (?:[A-Z0-9]+ ){0,4}PRIVATE KEY-----((?:(?:\r?\n|\\r?\\n)[A-Za-z-]{1,20}:[^\n\\]{0,200}){0,4}(?:(?:\r?\n|\\r?\\n|[ \t]){1,8}[A-Za-z0-9+/=]{4,})+)/g;
-  // Il token di un bot Telegram ha la sua forma: l'id del bot, i due punti, trentacinque caratteri.
-  const TOKEN_TELEGRAM = /(?<![\w-])\d{8,10}:[A-Za-z0-9_-]{35}(?![\w-])/g;
+  const CORPO_PEM = /-----BEGIN (?:[A-Z0-9]+ ){0,4}PRIVATE KEY-----((?:(?:\r?\n|(?:\\r)?\\n)[A-Za-z-]{1,20}:[^\n\\]{0,200}){0,4}(?:(?:\r?\n|(?:\\r)?\\n|[ \t]){1,8}[A-Za-z0-9+/=]{4,})+)/g;
+  // Il token di un bot Telegram ha la sua forma: l'id del bot, i due punti, «AA» e una trentina di caratteri.
+  const TOKEN_TELEGRAM = /(?<![\w-])\d{8,10}:AA[A-Za-z0-9_-]{30,40}(?![\w-])/g;
   function chiaviInChiaro(s, out) {
     passwordDiComando(s, out);
-    for (const m of s.matchAll(CORPO_PEM)) out.push({ valore: m[1].replace(/^(?:\s|\\r?\\n)+/, ''), regola: 'chiave' });
+    for (const m of s.matchAll(CORPO_PEM)) out.push({ valore: m[1].replace(/^(?:\s|(?:\\r)?\\n)+/, ''), regola: 'chiave' });
     for (const m of s.matchAll(TOKEN_TELEGRAM)) out.push({ valore: m[0], regola: 'token' });
     for (const m of s.matchAll(SEGRETO_ACCANTO)) {
       const v = formaDiSegreto(m[1].replace(/[.»”"']+$/, ''));
