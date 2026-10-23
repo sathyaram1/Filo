@@ -377,11 +377,6 @@
 .riga { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 10px 2px; }
 .voce { position: relative; display: inline-flex; }
 img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display: block; }
-.file {
-  display: inline-flex; align-items: center; max-width: 220px; height: 48px; box-sizing: border-box; padding: 0 12px;
-  border: 1px solid var(--sn-border); border-radius: 8px; color: var(--sn-fg); font-size: 12px;
-}
-.file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .togli {
   all: unset; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1;
