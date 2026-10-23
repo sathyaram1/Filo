@@ -841,6 +841,14 @@
       },
     },
     {
+      scrive: ['avvisoSchermoPieno.durataMs'],
+      costo: 1,
+      aiuto: 'millisecondi 1000-10000 (quanto resta l\'avviso col nome del sito quando una pagina va a schermo intero; non si spegne)',
+      keys: ['avviso_schermo_pieno', 'avviso schermo pieno', 'avviso schermo intero', 'avviso a schermo intero',
+        'durata avviso schermo intero', 'avviso del sito a schermo intero', 'esc per uscire'],
+      build(v) { return msAvvisoSchermoPieno(v); },
+    },
+    {
       scrive: ['terminal.enabled'],
       aiuto: 'true | false',
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
