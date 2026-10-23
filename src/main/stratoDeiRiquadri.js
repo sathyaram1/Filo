@@ -423,6 +423,7 @@ class StratoDeiRiquadri {
       // I px dello strato devono essere quelli della scheda: uno zoom rimasto sull'host «riquadri» li sposterebbe.
       try { v.setZoomFactor(1); } catch (_) {}
       s.pronta = true;
+      try { this.suPronta(v, wc); } catch (_) {}
       for (const r of s.coda.splice(0)) this._consegna(s, r);
       this.posa();
     });
