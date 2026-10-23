@@ -14,6 +14,7 @@
       fixes: [
         'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
         'Il tasto che apre Crediti, Opzioni o Preferenze c\'è anche nell\'avviso di «Leggi», in quello della descrizione di un\'immagine copiata e sotto una ricerca dei mazzi il cui controllo delle carte non è partito. Nell\'Editor «Rigenera titolo» e «Rigenera riassunto», quando non riescono, dicono perché e portano dove si rimedia. «Leggi» coi crediti finiti dice che sono finiti, non più che la voce non è disponibile.',
+        'Negli elenchi di siti delle impostazioni, un nome con uno spazio che non è un sito, come «studio rossi», l\'avviso lo riporta intero anche se sulla stessa riga hai scritto un altro sito. Prima lo spezzava in «studio» e «rossi». Anche la chat ti risponde che «studio rossi» non è un sito, in un pezzo solo.',
         'Quando un errore chiede di scegliere un altro modello, manda in Opzioni → Modelli per azione e ha il tasto per andarci. Prima nominava una pagina che solo chi gestisce Filo ha. Un\'immagine copiata la cui descrizione non può arrivare, per esempio coi crediti finiti, nella cronologia degli appunti non resta più su «Descrizione…».',
       ],
     },
