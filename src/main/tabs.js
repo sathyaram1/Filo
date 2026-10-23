@@ -2812,6 +2812,7 @@ class TabManager {
       // Il colore campionato (§1.1) muore con la pagina; quello identità (§1.2)
       // dipende dal DOMINIO, quindi su un host già visto si riapplica subito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
+      tab._identitaNota = !!cachedIdentity;
       tab._moduli = null;
       this._dopoInvio(tab, url, httpResponseCode);
       tab._improntePrima = [...(tab._impronte ? tab._impronte.values() : [])].flat().slice(-50);
