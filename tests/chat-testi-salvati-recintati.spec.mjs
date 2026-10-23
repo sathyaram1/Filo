@@ -327,6 +327,7 @@ const stradeLezione = {
   'lezione confermata nel popup: «voce 1» arriva al modello come segnaposto da non dire all\'utente': { testo: 'Te lo segno.' },
   'lezione da sola, il turno si chiude sul popup: confermata, «voce 1» arriva al turno dopo come segnaposto': { testo: '' },
 };
+const DOMANDA_DOPO = 'puoi non chiedere conferma per cosa tu debba ricordarti?';
 for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) test(nome, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
