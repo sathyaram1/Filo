@@ -97,6 +97,15 @@ test('una riga che il server rifiuta non ferma le altre: il lotto si divide finc
   assert.deepEqual(await W.scriviIsolando([], commit), { scritte: [], rifiutate: [], rimaste: [], errore: null });
 });
 
+test('rifiuto della riga o guasto: la regola che dice no sì, la chiave API ruotata o la rete no', () => {
+  const regola = '{ "error": { "code": 403, "message": "Missing or insufficient permissions.", "status": "PERMISSION_DENIED" } }';
+  assert.equal(W.rifiutoDellaRigaUso(403, regola), true);
+  assert.equal(W.rifiutoDellaRigaUso(400, '{ "error": { "code": 400, "message": "Invalid value at \'writes[0].update.fields[1].value\'", "status": "INVALID_ARGUMENT" } }'), true);
+  assert.equal(W.rifiutoDellaRigaUso(400, '{ "error": { "code": 400, "message": "API key not valid. Please pass a valid API key.", "status": "INVALID_ARGUMENT" } }'), false);
+  assert.equal(W.rifiutoDellaRigaUso(403, '{ "error": { "code": 403, "message": "Requests to this API firestore.googleapis.com method google.firestore.v1.Firestore.Commit are blocked.", "status": "PERMISSION_DENIED", "details": [{ "reason": "API_KEY_SERVICE_BLOCKED" }] } }'), false);
+  for (const st of [401, 404, 429, 500, 503]) assert.equal(W.rifiutoDellaRigaUso(st, regola), false, `${st}`);
+});
+
 test('un guasto passeggero a metà ferma gli invii e tiene tutto ciò che non è passato, nell\'ordine', async () => {
   const righe = ['a', 'CATTIVA', 'b', 'c'].map((id) => ({ id }));
   let n = 0;
