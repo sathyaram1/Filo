@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { paginaDelloStrato } from './helpers/riquadri.mjs';
+import * as Gesti from './helpers/gestiVeri.mjs';
 
 const DOMANDA = 'zibaldone-segreto-15093 del mio conto';
 const RISPOSTA = 'Risposta-riservata-15093 sul tuo conto.';
@@ -108,7 +109,7 @@ test('Aiuto su un sito: la domanda scritta, selezionata e copiata e la risposta 
   await expect(strato.locator('.sn-sidebar')).toHaveCount(0);
 });
 
-test('Aiuto su un sito: il passo indicato sta sulla pagina, il clic dell\'utente lì fa andare avanti, e il pannello si sposta di lato', async ({ app, shell, openTab, testServer }) => {
+test('Aiuto su un sito: Filo apre la sezione sulla pagina, il passo indicato sta lì e il clic dell\'utente fa andare avanti', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app, [
     { text: 'Apro la sezione.', highlight: { selector: '#altro', action: 'reveal' }, status: 'continue' },
@@ -157,4 +158,42 @@ test('Aiuto su un sito: un pannello sopra il passo si sposta di lato', async ({ 
     const p = await strato.locator('.sn-sidebar').boundingBox();
     return b.x + b.width <= p.x || b.x >= p.x + p.width;
   }, { timeout: 15_000 }).toBe(true);
+});
+
+// Lo strato copre la pagina solo dove ci sono i riquadri (la cornice, #1509.3): con l'Aiuto aperto un trascinamento
+// sulla pagina arriva alla pagina, e il pannello si sposta e si scrive con i gesti veri del sistema.
+test('con l\'Aiuto aperto un trascinamento sulla pagina arriva alla pagina', async ({ app, shell, openTab, testServer }) => {
+  test.skip(!Gesti.disponibili(), 'servono un display X e XTest (lo schermo virtuale delle prove su Linux)');
+  test.setTimeout(90_000);
+  const sito = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"><title>Trascina</title></head>
+    <body style="margin:0;padding:40px;font:16px sans-serif">
+    <div id="sorgente" draggable="true" style="width:120px;height:60px;background:#c55;color:#fff">Trascinami</div>
+    <div id="meta" style="margin-top:80px;width:300px;height:120px;border:3px dashed #555">Qui</div>
+    <script>window.__lasciati = [];
+      document.getElementById('sorgente').addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', 'ciao'));
+      const m = document.getElementById('meta');
+      m.addEventListener('dragover', (e) => e.preventDefault());
+      m.addEventListener('drop', (e) => { e.preventDefault(); window.__lasciati.push(e.dataTransfer.getData('text/plain')); });
+    </script></body></html>`);
+  await Gesti.finestraASchermo(app);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const strato = await paginaDelloStrato(app, sito);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
+
+  // Il pannello si sposta dalla testata, anche oltre la sua cornice di prima.
+  const prima = await strato.locator('.sn-sidebar').boundingBox();
+  const testata = await Gesti.sulloSchermo(app, sito, strato, '.sn-sidebar-title');
+  Gesti.trascina(testata, { x: testata.x - 300, y: testata.y });
+  await expect.poll(async () => (await strato.locator('.sn-sidebar').boundingBox()).x).toBeLessThan(prima.x - 200);
+
+  // Si scrive nella casella coi tasti veri: la tastiera è dello strato.
+  const casella = await Gesti.sulloSchermo(app, sito, strato, '.sn-sidebar-input textarea');
+  Gesti.trascina(casella, casella);
+  Gesti.scrivi('ciaofilo');
+  await expect(strato.locator('.sn-sidebar-input textarea')).toHaveValue('ciaofilo');
+
+  // Il trascinamento fra due punti della pagina, fuori dal pannello: la pagina lo riceve e lo lascia cadere.
+  Gesti.trascina(await Gesti.sulloSchermo(app, sito, sito, '#sorgente'), await Gesti.sulloSchermo(app, sito, sito, '#meta'));
+  await expect.poll(() => sito.evaluate(() => window.__lasciati)).toEqual(['ciao']);
 });

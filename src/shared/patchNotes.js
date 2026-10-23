@@ -21,6 +21,7 @@
         'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
         'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
         'Su un sito, quello che scrivi o selezioni nella spiegazione, nella traduzione, nella Modifica e nel feedback di Filo non lo legge più il sito, nemmeno cercandolo nella pagina. Questi riquadri ora stanno sopra la pagina, fuori dal sito.',
+        'Anche l\'Aiuto su un sito ora sta sopra la pagina: le domande che gli scrivi e le sue risposte il sito non le legge più, nemmeno se le selezioni o le copi.',
       ],
     },
     {

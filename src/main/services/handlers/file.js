@@ -109,7 +109,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...(await Indice.dimentica(p)) };
   }));
 
-  // #947.3 — l'Aiuto di una scheda: aperti ai siti, perché l'Aiuto vive nella pagina. Il sì e le chiavi li tiene
+  // #947.3 — l'Aiuto di una scheda: aperti ai siti, perché l'Aiuto parla come la pagina. Il sì e le chiavi li tiene
   // aiutoDocumenti; qui solo la porta: una scheda, e dal suo documento principale (un riquadro è un altro sito).
   const AiutoDoc = require('../aiutoDocumenti');
   const daScheda = (fn) => async (msg, sender) => {

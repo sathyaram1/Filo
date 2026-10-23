@@ -359,7 +359,7 @@
     // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
     // { percorso } → { ok, tolta, documenti }
     DOCUMENTI_DIMENTICA: 'documenti_dimentica',
-    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
+    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto parla come la pagina: su un sito
     // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
     // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
     // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
