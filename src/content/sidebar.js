@@ -178,6 +178,7 @@
       </div>
       <div class="sn-sidebar-conv"></div>
       <div class="sn-sidebar-meta"></div>
+      <div class="sn-sidebar-allegati" hidden></div>
       <form class="sn-sidebar-input" autocomplete="off">
         <textarea rows="1" placeholder="Dimmi cosa vuoi fare sulla pagina…"></textarea>
         <button type="submit">↵</button>
