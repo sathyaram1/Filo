@@ -8,6 +8,23 @@ function parteFingerprint(seed) {
   return `
   var SEED = ${seed >>> 0} >>> 0;
 
+  // Dimensioni, pixel e canali si leggono coi getter nativi presi all'avvio: una proprietà riscritta dalla pagina
+  // per un istante (larghezza 0, canali 0) farebbe saltare il rumore. I getter valgono anche sugli oggetti dei riquadri.
+  function gget(P, n) { var d = P && gOPD(P, n); return d && d.get; }
+  var idP = typeof ImageData === 'function' && ImageData.prototype;
+  var idData = gget(idP, 'data'), idW = gget(idP, 'width'), idH = gget(idP, 'height'), idCS = gget(idP, 'colorSpace');
+  var taLen = gget(getProto(Uint8Array.prototype), 'length'), pThen = Promise.prototype.then;
+  var abP = typeof AudioBuffer === 'function' && AudioBuffer.prototype;
+  var abCh = gget(abP, 'numberOfChannels'), abData = abP && abP.getChannelData;
+
+  // Gli argomenti numerici si convertono una volta sola, prima del nativo: un valueOf che risponde diverso alla
+  // seconda lettura darebbe alla guardia un'altra regione. Senza prototipo: nessun setter della pagina sugli indici.
+  function numeri(args, quali) {
+    var a = { __proto__: null, length: args.length };
+    for (var i = 0; i < args.length; i++) a[i] = quali[i] ? +args[i] : args[i];
+    return a;
+  }
+
   function ph(x, y) {
     var h = (SEED ^ imul(x | 0, 374761393) ^ imul(y | 0, 668265263)) >>> 0;
     h = imul(h ^ (h >>> 15), 2246822519) >>> 0;
