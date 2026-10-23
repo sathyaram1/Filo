@@ -3339,7 +3339,9 @@ async function eseguiAzioneFilo(action, {
         if (!rigaDaCorreggere || !l.testo) {
           return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
         }
+        const com = await FiloMem.descriviRiga(rigaDaCorreggere.via);
         const ok = await FiloMem.editLine(rigaDaCorreggere.via, l.testo);
+        if (ok) { try { globalThis.SN_CONTATORI_MAIN?.memoriaCorretta('chat', 'correggi', com); } catch (_) {} }
         return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
       }
       case 'TOGLI_CHAT': {
