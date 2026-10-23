@@ -1656,7 +1656,7 @@ class TabManager {
           const giudizio = (async () => {
             const input = await this._gatherTriageInput(cands);
             const r = await decide({ tabs: input, trigger });
-            if (!Array.isArray(r && r.decisions)) throw erroreDiPulizia('Il modello ha risposto senza dire quali schede tenere. Riprova, o scegli un altro modello in Opzioni → Modelli per azione.');
+            if (!Array.isArray(r && r.decisions)) throw erroreDiPulizia('Il modello ha risposto senza dire quali schede tenere. Riprova, o scegli un altro modello in Opzioni → Modelli per azione.', 'ALTRO_MODELLO');
             return r.decisions;
           })();
           giudizio.catch(() => {});
