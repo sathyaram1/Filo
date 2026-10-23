@@ -115,7 +115,14 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   che lì c'è Filo; chi è già preparato lo sa la guardia, i test guardano il
   rumore (`tests/helpers/guardia.mjs`). **Ciò che il preambolo usa dopo l'avvio si prende all'avvio**
   (`Reflect.apply`, `Object.*`, descrittori senza prototipo): un riquadro si
-  prepara quando la pagina ha già riscritto quello che voleva. Quali riquadri
+  prepara quando la pagina ha già riscritto quello che voleva. Vale anche per
+  ciò che la guardia legge dopo il nativo: dimensioni, canali e `then` coi
+  getter presi all'avvio, gli argomenti numerici convertiti una volta sola prima
+  del nativo; un valore riscritto per un istante (larghezza 0, un `valueOf` che
+  cambia risposta) farebbe saltare il rumore. **Non tutte le finestre sono
+  HTML**: un riquadro XML o SVG della stessa origine ha le sue copie native, e
+  lì `createElement` non dà un canvas e `tagName` resta minuscolo; la guardia
+  usa il namespace esplicito e il nome locale. Quali riquadri
   con un documento loro la ricevono lo decide il main dalla catena dei frame
   (`configForFrames`), mai dall'indirizzo che il riquadro dichiara.
 
