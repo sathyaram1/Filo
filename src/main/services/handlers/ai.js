@@ -410,7 +410,7 @@ module.exports = function register(on, ctx) {
       } catch (e) {
         // Nessun modello di sintesi configurato: si legge col browser, ma il motivo vero passa al
         // content script, così l'avviso dice cosa manca invece di un codice interno.
-        return ttsFallback(e?.message || 'no_tts_model', e?.code);
+        return ttsFallback(e?.message || 'no_tts_model', e?.code, e);
       }
       const Voices = globalThis.SN_TTS_VOICES;
       const ttsPrefs = (settings && settings.tts) || {};
