@@ -108,6 +108,51 @@
     const dopo = intero.slice(fine, fine + 80).split(FINE_FRASE)[0];
     return INDIZIO_ANNO.test(prima) || INDIZIO_ANNO.test(dopo) || ANNO_ATTACCATO.test(dopo);
   }
+  // Gli anni che dice la pagina intorno a una data senza anno (un'altra riga del campo, la conversazione, il titolo):
+  // giusta in uno di loro non si segna, e il più vicino entro ANNO_VICINO è la prima lettura proposta (#1115.2).
+  const ANNO_VICINO = 600;
+  const ANNO_DETTO = /(?<![\p{L}\p{N}.,€$£])(1[6-9]\d\d|2[01]\d\d)(?!\p{N}|[.,]\p{N}|\s*(?:[€$£%‰]|(?:euro|eur|usd|dollari|dollars?|sterline|km|kg|mq|metri|persone|people|pagine|pages|parole|words)(?!\p{L})))/giu;
+  const ANNO_APOSTROFO = /(?<![\p{L}\p{N}])['’‘](\d\d)(?![\p{N}%])/gu;
+  const QUANTI = { a: 1, an: 1, one: 1, un: 1, uno: 1, due: 2, two: 2, tre: 3, three: 3, quattro: 4, four: 4, cinque: 5,
+    five: 5, sei: 6, six: 6, sette: 7, seven: 7, otto: 8, eight: 8, nove: 9, nine: 9, dieci: 10, ten: 10 };
+  const ANNO_RELATIVO = [
+    [/(?<!\p{L})(?:l['’]anno (?:scorso|passato)|lo scorso anno|last year)(?!\p{L})/giu, () => -1],
+    [/(?<!\p{L})(?:l['’]anno prossimo|il prossimo anno|next year)(?!\p{L})/giu, () => 1],
+    [new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2}|${Object.keys(QUANTI).join('|')})\\s+(?:ann[oi]\\s+fa|years?\\s+ago)(?!\\p{L})`, 'giu'),
+      (m) => -(QUANTI[m[1].toLowerCase()] || Number(m[1]))],
+  ];
+  function anniIn(s, oggi) {
+    const out = [];
+    if (typeof s !== 'string' || !s) return out;
+    const y = oggi.getFullYear();
+    const metti = (anno, m) => out.push({ anno, da: m.index, fine: m.index + m[0].length });
+    for (const m of s.matchAll(ANNO_DETTO)) if (Number(m[1]) <= y + 50) metti(Number(m[1]), m);
+    for (const m of s.matchAll(ANNO_APOSTROFO)) metti(2000 + Number(m[1]) <= y + 10 ? 2000 + Number(m[1]) : 1900 + Number(m[1]), m);
+    for (const [re, quanti] of ANNO_RELATIVO) for (const m of s.matchAll(re)) metti(y + quanti(m), m);
+    return out;
+  }
+  // `intorno`: { prima, dopo, titolo }, il testo della pagina subito prima e subito dopo il campo e il titolo della pagina.
+  function anniDetti(testo, intorno, oggi) {
+    const c = intorno && typeof intorno === 'object' ? intorno : {};
+    const prima = typeof c.prima === 'string' ? c.prima : '';
+    return {
+      campo: anniIn(testo, oggi),
+      prima: anniIn(prima, oggi).map((x) => ({ anno: x.anno, lontano: prima.length - x.fine })),
+      dopo: anniIn(c.dopo, oggi).map((x) => ({ anno: x.anno, lontano: x.da })),
+      titolo: anniIn(c.titolo, oggi).map((x) => x.anno),
+    };
+  }
+  // Dal più vicino alla data [inizio, fine) di un campo lungo `lunghezza`; il titolo sta al limite del vicino.
+  function anniVicini(detti, inizio, fine, lunghezza) {
+    if (!detti) return [];
+    return [
+      ...detti.campo.filter((x) => x.fine <= inizio || x.da >= fine)
+        .map((x) => ({ anno: x.anno, dist: x.fine <= inizio ? inizio - x.fine : x.da - fine })),
+      ...detti.prima.map((x) => ({ anno: x.anno, dist: x.lontano + inizio })),
+      ...detti.dopo.map((x) => ({ anno: x.anno, dist: x.lontano + lunghezza - fine })),
+      ...detti.titolo.map((anno) => ({ anno, dist: ANNO_VICINO })),
+    ].sort((p, q) => p.dist - q.dist);
+  }
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const alternative = (liste) => liste.flat(2).filter(Boolean).sort((a, b) => b.length - a.length).map(esc).join('|');
 
