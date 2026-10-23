@@ -792,7 +792,7 @@
   function tipiSuggerimento() { return [...tipiAzione(), 'CHAT', ALTRO]; }
   function tipoSuggerimento(t) {
     const s = String(t || '').toUpperCase();
-    return s !== 'ALTRO' && tipiSuggerimento().includes(s) ? s : ALTRO;
+    return tipiSuggerimento().includes(s) ? s : ALTRO;
   }
   const elencoParte = (d) => (d === TIPO_SUGGERIMENTO ? tipiSuggerimento() : d);
 
