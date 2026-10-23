@@ -606,8 +606,7 @@ Della sicurezza di Filo si occupa il maintainer del progetto, **Sathyaram
 Pontillo**. Le segnalazioni arrivano a lui.
 
 Se pensi di aver trovato una vulnerabilità, **non scriverla in pubblico**, per
-esempio in una issue, in un commento su GitHub o in un feedback pubblico.
-Questi canali restano privati:
+esempio in una issue o in un commento su GitHub. Questi canali restano privati:
 
 - l'**email** a Sathyaram Pontillo,
   [hello@filo.red](mailto:hello@filo.red);
