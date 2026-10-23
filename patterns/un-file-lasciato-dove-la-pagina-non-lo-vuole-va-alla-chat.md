@@ -18,6 +18,8 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
   dragover lì. Il preload ascolta in cattura e aggiunge, mentre l'evento scende, un ascolto in bolla su `window` che
   arriva dopo quelli della pagina: solo se nessuno l'ha cancellato lo cancella lui e se lo segna. Al drop, se il
   dragover era suo, ferma l'evento prima della pagina: i file erano per la chat, e la pagina non li vede.
+  Un campo prende il rilascio da sé senza che la pagina cancelli niente (il campo file lo carica, un editor lo
+  scrive): sopra un campo Filo non si mette in mezzo, o un sito con un semplice `<input type="file">` lo perde.
   Codice: `src/preload/rilascio-file.js`, montato da `page-preload.js` in ogni frame e da `internal-preload.js`. Un
   riquadro incorporato non ha il pannello: legge le immagini e le manda al main, che le gira al frame principale della
   sua scheda senza mai leggere un percorso per conto di un sito.
