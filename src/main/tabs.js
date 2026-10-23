@@ -1698,14 +1698,17 @@ class TabManager {
     console.warn(`[Filo] pulizia delle schede (${trigger}) senza giudizio del modello:`, errore ? (errore.message || errore) : 'nessuna funzione di giudizio');
     if (trigger === 'manual') return;
     let perche = '';
+    let pagina = null;
     try {
       const CE = globalThis.SN_CHAT_ERRORS;
       perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
+      pagina = errore && CE ? CE.rimedioPagina(errore) : null;
     } catch (_) {}
     if (this._giudizioMancatoDetto === perche) return;
     this._giudizioMancatoDetto = perche;
     const testo = `La pulizia automatica non è riuscita a valutare le schede.${perche ? ` ${perche}` : ''}`;
-    try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata' } }); } catch (_) {}
+    const actions = pagina ? [{ label: pagina.label, openUrl: pagina.url }] : [];
+    try { this.win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 0, unica: 'pulizia-schede-mancata', actions } }); } catch (_) {}
   }
 
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
