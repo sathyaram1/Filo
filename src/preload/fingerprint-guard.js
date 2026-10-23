@@ -75,12 +75,14 @@ function parteFingerprint(seed) {
   function patchGet(proto) {
     var o = proto && proto.getImageData;
     if (!o) return null;
+    var Q = [1, 1, 1, 1];
     proto.getImageData = mask(function getImageData(sx, sy, sw, sh) {
-      var img = R(o, this, arguments);
+      var a = numeri(arguments, Q);
+      var img = R(o, this, a);
       try {
-        var x0 = (sx | 0) + ((sw | 0) < 0 ? (sw | 0) : 0);
-        var y0 = (sy | 0) + ((sh | 0) < 0 ? (sh | 0) : 0);
-        perturb(img.data, img.width, img.height, x0, y0);
+        var x0 = (a[0] | 0) + ((a[2] | 0) < 0 ? (a[2] | 0) : 0);
+        var y0 = (a[1] | 0) + ((a[3] | 0) < 0 ? (a[3] | 0) : 0);
+        perturb(R(idData, img, []), R(idW, img, []), R(idH, img, []), x0, y0);
       } catch (e) {}
       return img;
     }, o, 'getImageData');
