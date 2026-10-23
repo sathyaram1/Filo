@@ -67,10 +67,11 @@
   const NOME_SEGRETO = /^(?:access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|api[_-]?key|apikey|key|secret|client[_-]?secret|password|passwd|pwd|pass|otp|sig|signature|x-amz-signature|x-amz-credential|x-amz-security-token|session[_-]?id|sessionid|sid|auth|ticket|code)$/i;
   const NOME_CORTO = /^(?:password|passwd|pwd|pass|otp)$/i;
   const INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`)\]]+/gi;
-  // Le password accanto a un'etichetta. La regola generale è la forma (vicinoEtichetta): qualunque disposizione, un pezzo
-  // con lettere e cifre o simboli vicino all'etichetta si toglie. Le regole di disposizione qui sotto prendono le parole
-  // senza quella forma («Password: hunter», la cella, la colonna), e lì un falso allarme toglierebbe la parola da tutto il
-  // messaggio: l'etichetta sta in testa alla riga o alla cella, senza congiunzioni («un campo password o carta: …» resta).
+  // Le password accanto a un'etichetta. La regola generale è il posto del valore (alPostoDelValore): dopo il separatore o
+  // il verbo che chiude l'etichetta, subito dopo di lei, sulla riga sotto. Mai il resto della riga: «la password di
+  // Office365», un nome utente, un indirizzo di campo o una riga di codice vicini all'etichetta non sono il valore.
+  // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
+  // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
   // Le etichette: anche la password del wifi del router, il codice di accesso e sei lingue straniere.
   const ETICHETTA = '\\b(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
     + '|chiave\\s+(?:di\\s+)?(?:rete|sicurezza(?:\\s+di\\s+rete)?|wi-?fi|wpa2?|wlan)|(?:wpa[23]?(?:-psk)?|wi-?fi|wlan|network|security)\\s+key'
