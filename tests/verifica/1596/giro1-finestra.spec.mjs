@@ -109,6 +109,7 @@ test('tre pagine da 60.000 token con un modello a finestra piccola: arriva la ri
   await expect(bolla).toContainText(/chiedimi di rileggerl/);
   await page.screenshot({ path: 'tests/.shots/verifica-1596-avviso.png' });
   const g1 = await app.evaluate(() => ({ rifiuti: globalThis.__g.rifiuti, n: globalThis.__g.chiamate.length }));
+  console.log('MISURE3', JSON.stringify(await app.evaluate(() => ({ base: globalThis.__g.base, car: globalThis.__g.chiamate.map((c) => c.car) }))));
   expect(g1.rifiuti).toBeGreaterThan(0);
   const testo1 = await bolla.innerText();
   const viste1 = (/viste=([^\s]+)/.exec(testo1) || [])[1] || '';
