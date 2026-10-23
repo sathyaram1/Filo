@@ -59,15 +59,13 @@ async function uploadImage(buffer) {
   if (!CRYPTO.isEncryptedBytes(sealed)) {
     throw new Error('cifratura non riuscita: lo screenshot non risulta cifrato');
   }
-  // Il contenuto cifrato è opaco: viaggia come octet-stream (è il tipo che
-  // storage.rules ammette per i blob cifrati) e la dashboard ne indovina il
-  // formato dai primi byte dopo averlo decifrato.
-  const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
-  const name = `${COLLECTION}/agent_${Date.now()}_${randomUUID()}.${ext}`;
+  // Il contenuto cifrato è opaco: la dashboard ne indovina il formato dai primi
+  // byte dopo averlo decifrato.
+  const name = FB.attachmentPath('agent');
   const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
+    headers: { 'Content-Type': FB.ATTACHMENT_CONTENT_TYPE },
     body: sealed,
   });
   if (!res.ok) throw new Error(`upload storage ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
