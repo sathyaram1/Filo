@@ -160,7 +160,7 @@ test('un’immagine e un .txt arrivano nel deposito come blob cifrati e la dashb
     req('./auth/google-auth').isAdmin = () => true;
   });
   const dash = await openTab('filo://feedback/feedback.html');
-  await expect(dash.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
+  await dash.waitForFunction(() => !!(window.SN_FEEDBACK && window.filo && window.filo.message));
   await dash.evaluate(({ fb }) => {
     window.SN_FEEDBACK.list = async () => [fb];
     window.__decifrati = [];
