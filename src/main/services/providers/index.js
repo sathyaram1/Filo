@@ -171,13 +171,18 @@
             if (tipo !== 'rete' || !onReset) return false;
             try { onReset({ failed: a.provider, next: a.provider }); } catch (_) {}
             emitted = false;
+            ricominciata = true;
             return true;
           },
           signal,
         );
-        return { ...r, provider: a.provider, model: aModel, ...(broken.length ? { brokenAttempts: broken } : {}) };
+        return {
+          ...r, provider: a.provider, model: aModel, tentativo: i + 1, ricominciata: ricominciata || broken.length > 0,
+          ...(broken.length ? { brokenAttempts: broken } : {}),
+        };
       } catch (err) {
         lastErr = err;
+        if (emitted) ricominciata = true;
         // Porta le chiavi usate: non enumerabile, un errore si stampa e si serializza.
         if (broken.length && err && typeof err === 'object') Object.defineProperty(err, 'brokenAttempts', { value: broken, enumerable: false, configurable: true });
         tentativoFallito(onTentativoFallito, err, aModel);
