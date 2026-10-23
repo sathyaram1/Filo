@@ -1,7 +1,7 @@
 // Esplorazione: messaggio scritto subito dopo il sì nel riquadro della lezione, a diverse distanze.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { livelloAutonomia } from '../../helpers/autonomia.mjs';
-import { clickConfirm, CONFIRM_HOST, scrollConfirmToEnd } from '../../helpers/confirm.mjs';
+import { aspettaConfermaPronta, mouseClickConfirm, CONFIRM_HOST, scrollConfirmToEnd } from '../../helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const APRE_CHAT = 'Sei Filo, un assistente personale. L\'utente interagisce';
@@ -16,7 +16,7 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-for (const testo of ['Te lo segno.', '']) for (const attesa of [0, 300, 1500]) test(`esplora testo=${JSON.stringify(testo)} attesa=${attesa}`, async ({ app, shell }) => {
+for (const testo of ['']) for (const attesa of [0]) test(`esplora testo=${JSON.stringify(testo)} attesa=${attesa}`, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -42,6 +42,7 @@ for (const testo of ['Te lo segno.', '']) for (const attesa of [0, 300, 1500]) t
         try { if (testo) onDelta && onDelta(testo); } catch (_) {}
         return { ...base, text: testo, finishReason: 'tool_calls', toolCalls: [{ id: 'l1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: 'L\'utente è lo sviluppatore di Filo.' }) }] };
       }
+      await new Promise((r) => setTimeout(r, 2500));
       const last = [...messages].reverse().find((m) => m.role === 'user');
       const t = /conferma/.test(String(last?.content || '')) ? 'RISPOSTA ALLA SECONDA' : `risposta n${n}`;
       try { onDelta && onDelta(t); } catch (_) {}
@@ -56,13 +57,16 @@ for (const testo of ['Te lo segno.', '']) for (const attesa of [0, 300, 1500]) t
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
   await scrollConfirmToEnd(page);
   const t0 = Date.now();
-  await clickConfirm(page, 'ok');
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0, { timeout: 5_000 });
+  await aspettaConfermaPronta(page);
   if (attesa) await page.waitForTimeout(attesa);
   const tSend = Date.now();
-  await page.locator('#input').fill('puoi non chiedere conferma per cosa tu debba ricordarti?');
-  await page.locator('#sendBtn').click();
-  await page.waitForTimeout(6000);
+  await page.locator('#input').click();
+  await page.keyboard.type('puoi non chiedere conferma?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(9000);
+  const popup = await page.locator(CONFIRM_HOST).count();
+  const mem = await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()).includes('sviluppatore'));
+  console.log('POPUP', popup, 'MEM', mem);
   const bolle = await page.locator('.dash-bubble').evaluateAll((els) => els.map((b) => `${b.classList.contains('dash-bubble-user') ? 'U' : 'F'}: ${b.textContent.slice(0, 80)}`));
   const tt = await app.evaluate(() => globalThis.__t);
   console.log(JSON.stringify({ testo, attesa, sendAfterClick: tSend - t0, calls: tt.map(([n, t]) => [n, t - t0]), bolle }, null, 1));
