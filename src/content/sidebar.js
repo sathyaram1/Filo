@@ -439,14 +439,18 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return true; }
     if (!isOpen() || nascosto) open();
     else if (collapsed) expand({ ai: false });
-    let fuori = 0;
+    let grandi = 0;
+    let rotte = 0;
     for (const f of lista) {
-      const dataUrl = f.size > Allegati.tettoImmagineByte ? null : await leggiImmagine(f);
-      if (dataUrl && root) allegati.immagini.push({ dataUrl, nome: f.name || '' });
-      else fuori += 1;
+      if (f.size > Allegati.tettoImmagineByte) { grandi += 1; continue; }
+      const dataUrl = await leggiImmagine(f);
+      if (!root) return true;
+      if (dataUrl) allegati.immagini.push({ dataUrl, nome: f.name || '' });
+      else rotte += 1;
     }
     disegnaAllegati();
-    if (fuori) Popup?.showToast?.(Allegati.fraseTroppoGrandiAiuto(fuori));
+    if (grandi) Popup?.showToast?.(Allegati.fraseTroppoGrandiAiuto(grandi));
+    else if (rotte) Popup?.showToast?.(Allegati.fraseIlleggibili(rotte));
     try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
     return true;
   }
