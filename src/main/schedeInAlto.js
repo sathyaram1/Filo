@@ -144,7 +144,7 @@ class SchedeInAlto {
 
   _programmaUscita() {
     if (this.timer.uscita) return;
-    this.timer.uscita = setTimeout(() => { this.timer.uscita = null; this.nascondi(); }, this._opzioni().uscitaMs);
+    this.timer.uscita = setTimeout(() => { this.timer.uscita = null; if (!this.premuto) this.nascondi(); }, this._opzioni().uscitaMs);
   }
 
   _ferma(nome) {
