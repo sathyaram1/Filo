@@ -44,8 +44,9 @@ test('chi butta la vista stacca il vuoto dalla pagina', () => {
   const vuoto = new VuotoDellaVista({ vista: () => v, scheda: () => p, canale: 'prova:cursore' });
   vuoto.inoltra({ tipo: 'mouseMove', x: 10, y: 10 });
   assert.equal(p.webContents.listenerCount('cursor-changed'), 1);
+  const prima = v.webContents.mandati.length;
   vuoto.stacca();
   assert.equal(p.webContents.listenerCount('cursor-changed'), 0);
   p.webContents.emit('cursor-changed', {}, 'hand');
-  assert.equal(v.webContents.mandati.length, 0);
+  assert.equal(v.webContents.mandati.length, prima);
 });

@@ -3,7 +3,7 @@
 // nello strato sopra la scheda. Regola: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, nelloStrato, statoDi, scrivi, clicca, conta, paginaDelloStrato, tastoSullaScheda } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'zibaldone-segreto-1509 del mio conto';
@@ -255,4 +255,88 @@ test('la prima risposta su una parola in un riquadro incorporato si apre accanto
   const pop = await statoDi(app, p, '.sn-popup');
   expect(pop.left <= box.x + box.width && pop.right >= box.x, `risposta a x=${Math.round(pop.left)}…${Math.round(pop.right)}, parola a x=${Math.round(box.x)}`).toBe(true);
   expect(Math.min(Math.abs(pop.top - (box.y + box.height)), Math.abs(pop.bottom - box.y))).toBeLessThan(250);
+});
+
+// Il mouse vero arriva allo strato, che sta sopra la pagina: come lo manda il sistema.
+const sulloStrato = (app, eventi) => app.evaluate(({ webContents }, ev) => {
+  const f = webContents.getAllWebContents().find((w) => String(w.getURL()).startsWith('filo://riquadri/'));
+  for (const e of ev) f.sendInputEvent(e);
+}, eventi);
+
+test('con la risposta aperta un clic su un collegamento della pagina la apre, e Filo resta vivo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelloFinto(app);
+  const dest = testServer.html('<h1>altrove</h1>');
+  const p = await testServer.openReady(openTab, pagina(`<p><a id="vai" href="${dest}" style="font-size:30px">vai</a></p>`));
+  await traduzioneConLaTastiera(app, p);
+  // Un errore non preso nel processo principale aprirebbe la sua finestra e bloccherebbe Filo: qui si annota.
+  await app.evaluate(() => {
+    globalThis.__errori1509 = [];
+    process.prependListener('uncaughtException', (e) => { globalThis.__errori1509.push(String((e && e.stack) || e).slice(0, 400)); });
+  });
+  const b = await p.locator('#vai').boundingBox();
+  const x = Math.round(b.x + 10);
+  const y = Math.round(b.y + 10);
+  await sulloStrato(app, [
+    { type: 'mouseMove', x, y },
+    { type: 'mouseDown', x, y, button: 'left', clickCount: 1 },
+    { type: 'mouseUp', x, y, button: 'left', clickCount: 1 },
+  ]);
+  await expect.poll(() => p.url(), { timeout: 10_000 }).toBe(dest);
+  await p.mouse.move(20, 20);
+  await p.mouse.move(60, 80);
+  await p.waitForTimeout(800);
+  expect(await app.evaluate(() => globalThis.__errori1509)).toEqual([]);
+});
+
+test('con la risposta aperta il dito scorre la pagina, e un trascinamento sul vuoto cade sulla pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelloFinto(app);
+  const p = await testServer.openReady(openTab, pagina('<div style="height:4000px"></div>'));
+  await traduzioneConLaTastiera(app, p);
+  const strato = await paginaDelloStrato(app, p);
+  const cdp = await strato.context().newCDPSession(strato);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 700, y: 600 }] });
+  for (let i = 1; i <= 10; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 700, y: 600 - i * 30 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => p.evaluate(() => scrollY)).toBeGreaterThan(100);
+  expect(await conta(app, p, '.sn-popup')).toBe(1);
+
+  // Un file trascinato sul vuoto: lo strato si toglie e il rilascio va alla pagina; il mouse sulla pagina lo rimette.
+  const visibile = () => app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.view?.webContents?.getURL() === u);
+    return w._filoTabs.riquadri.stato(t.view.webContents).visibile;
+  }, p.url());
+  expect(await visibile()).toBe(true);
+  await cdp.send('Input.dispatchDragEvent', { type: 'dragEnter', x: 700, y: 500, data: { items: [{ mimeType: 'text/plain', data: 'un file' }], dragOperationsMask: 1 } });
+  await expect.poll(visibile).toBe(false);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w._filoTabs.tabs.find((x) => x.view?.webContents?.getURL() === u).view.webContents.sendInputEvent({ type: 'mouseMove', x: 650, y: 450 });
+  }, p.url());
+  await expect.poll(visibile).toBe(true);
+  expect(await conta(app, p, '.sn-popup')).toBe(1);
+});
+
+test('feedback su un sito: se l\'invio con lo screenshot non riesce, la tastiera resta al feedback', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const p = await testServer.openReady(openTab, pagina('<input id="campo">'));
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.show(); w.focus();
+    w._filoTabs.tabs.find((t) => t.view?.webContents?.getURL() === u).view.webContents.focus();
+  }, p.url());
+  await nelMondoDiFilo(app, p, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => conta(app, p, '.sn-fb-overlay')).toBe(1);
+  await nelloStrato(app, p, () => {
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...r) => (m && m.type === 'submit_feedback' ? Promise.resolve({ ok: false, error: 'rete giù' }) : orig(m, ...r));
+  });
+  await clicca(app, p, '.sn-fb-text');
+  await clicca(app, p, '.sn-fb-clear');
+  await clicca(app, p, '.sn-fb-send');
+  await expect.poll(async () => (await statoDi(app, p, '.sn-fb-status'))?.testo || '').toContain('rete giù');
+  await expect.poll(() => app.evaluate(({ webContents }) => String(webContents.getFocusedWebContents()?.getURL() || '')))
+    .toMatch(/^filo:\/\/riquadri\//);
 });
