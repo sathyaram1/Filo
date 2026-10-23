@@ -312,3 +312,17 @@ test('la risposta d’errore del main porta il rifiuto della chiave già deciso'
   const quante = (ipc.match(/keyRefused:/g) || []).length;
   assert.ok(quante >= 2, `il rifiuto della chiave manca su un canale d'errore (trovato ${quante} volte su 2)`);
 });
+
+// #1344.1: il modello di lettura che vuole il nome di una voce, o non conosce quello scritto, manda alla sezione della
+// lettura nelle Preferenze; l'ancora deve esistere nella pagina.
+test('una voce da scrivere porta alla sezione «Lettura ad alta voce» delle Preferenze', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const code of ['TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN']) {
+    assert.equal(CE.rimedio(code), 'voce');
+    const p = CE.rimedioPagina({ code });
+    assert.equal(p.url, 'filo://preferences/preferences.html#sec-lettura');
+    assert.equal(p.label, 'Apri Preferenze');
+  }
+  const html = readFileSync(new URL('../../src/pages/preferences/preferences.html', import.meta.url), 'utf8');
+  assert.match(html, /<section id="sec-lettura">\s*<h2>Lettura ad alta voce<\/h2>/);
+});

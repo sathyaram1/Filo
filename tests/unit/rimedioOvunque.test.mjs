@@ -43,3 +43,27 @@ test('gli avvisi che compongono la frase da sé passano la risposta d\'errore pe
   assert.match(leggi('src/main/services/handlers/wallet.js'), /type: MSG\.SHOW_TOAST, text: text\.charAt[^\n]*rimedio:/);
   assert.match(leggi('src/content/content.js'), /rimedio: msg\.rimedio/);
 });
+
+// #1344.1: le strade che dicevano dove si rimedia senza portarci.
+test('descrizione delle immagini, «Leggi», titolo e riassunto dell\'Editor e filtro dei mazzi passano la risposta per il tasto', () => {
+  assert.match(leggi('src/content/actions.js'), /warnModelConfigOnce\(res\.error, res\)/);
+  assert.match(leggi('src/content/actions.js'), /showToast\(message, \{[^}]*rimedio:/);
+  // Ogni avviso col perché della voce del modello porta il tasto: anche la chiave rifiutata, non solo i codici.
+  const tts = leggi('src/content/tts.js');
+  const avvisi = tts.match(/showToast\(I18n\.t\('tts_model_fallback_reason'[^\n]*/g) || [];
+  assert.ok(avvisi.length >= 2, 'mancano gli avvisi col perché');
+  for (const a of avvisi) assert.match(a, /rimedio \}/, a);
+  assert.match(leggi('src/main/services/handlers/ai.js'), /keyRefused \? \{ keyRefused: true/);
+  const editor = leggi('src/pages/editor/editor.js');
+  assert.doesNotMatch(editor, /catch \([^)]*\) \{\s*if \([^)]*\) showEditorToast\('Non sono riuscito a generare il (titolo|riassunto)\.'\)/);
+  assert.match(editor, /avvisoNonGenerato\('il titolo', r\)/);
+  assert.match(editor, /avvisoNonGenerato\('il riassunto', r\)/);
+  assert.match(leggi('src/main/services/handlers/scryfall.js'), /\.\.\.\(rimedio \? \{ rimedio \} : \{\}\)/);
+});
+
+test('il «Parere di Filo» mancato non si richiede da solo, e il main dice perché manca', () => {
+  const pagina = leggi('src/pages/decks/decks.js');
+  assert.match(pagina, /!opinionsByCard\.has\(id\) && !opinionPending\.has\(id\) && !opinionErrors\.has\(id\)/);
+  assert.match(pagina, /if \(!op && !pending && !errore\) requestOpinions/);
+  assert.match(leggi('src/main/services/handlers/decks.js'), /mancanti\[id\] = cards\[id\] \? SENZA_PARERE : SENZA_DATI/);
+});
