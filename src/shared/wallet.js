@@ -62,6 +62,13 @@
     };
   }
 
+  // La regola o il contenuto rifiutano la riga, e ritentarla non la fa mai passare (#1601). Una chiave API
+  // ruotata o bloccata risponde con gli stessi codici ma vale per tutte le righe: è un guasto, si ritenta.
+  function rifiutoDellaRigaUso(status, testo) {
+    const t = String(testo || '');
+    return (status === 403 && /insufficient permissions/i.test(t)) || (status === 400 && !/api.?key/i.test(t));
+  }
+
   // Il commit di Firestore è atomico: una riga che la regola rifiuta respinge tutto il lotto (#1601).
   // Al rifiuto il lotto si divide a metà finché la riga cattiva resta sola, e le buone passano.
   // `commit(righe)` dà { ok: true } o { ok: false, motivo } per un rifiuto, e lancia per un guasto
