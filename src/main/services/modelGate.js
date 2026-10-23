@@ -374,6 +374,7 @@
       const later = !servedBy && Boolean(r.generationId);
       const costNow = carriesCost(usage) || (!later && Boolean(usage));
       const costEur = costNow ? await recordCost(s, action, a.provider, a.model, usage) : 0;
+      m.chiamata(chiamataDi(r, r.model || a.model, { spesa: costNow ? spesaDi(s, a.model, usage) : null }));
       if (later) {
         auditLater({
           s, action, provider: a.provider, model: a.model,
@@ -383,6 +384,7 @@
           withCost: !costNow,
           keySource: r.keySource || (usage && usage.keySource) || '',
           onServedBy: onLateServedBy,
+          m,
         });
       }
       return { ...r, servedBy, violation, costEur };
