@@ -325,3 +325,26 @@ test('un collegamento della spiegazione del tasto destro nella home, mai giudica
   await page.waitForTimeout(500);
   expect(await apertoVerso(app, LINK_RACCOLTA), 'annullato: non si apre').toBe(false);
 });
+
+test('in una pagina di Filo il tasto centrale su un collegamento di un modello mai giudicato chiede l\'OK come il clic', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  // La riga che la pagina dei feedback disegna per una risposta di Filo: stesso disegnatore delle chat, nessun verdetto.
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForFunction(() => !!window.SN_MARKDOWN);
+  await page.evaluate((link) => {
+    const d = document.createElement('div');
+    d.className = 'filo-md';
+    d.id = 'riga-1505';
+    d.innerHTML = window.SN_MARKDOWN.render(`Ecco [il riepilogo](${link}).`);
+    document.body.prepend(d);
+  }, LINK_RACCOLTA);
+  const a = page.locator('#riga-1505 a.filo-md-link');
+  await expect(a).toBeVisible();
+  await a.click({ button: 'middle' });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+  await expect.poll(() => confirmText(page)).toContain('non ho potuto controllare prima di mostrartelo');
+  await clickConfirm(page, 'cancel');
+  await page.waitForTimeout(500);
+  expect(await apertoVerso(app, LINK_RACCOLTA), 'annullato: non si apre').toBe(false);
+  expect(arrivateA(rete, RACCOLTA)).toEqual([]);
+});
