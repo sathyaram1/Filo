@@ -114,7 +114,7 @@ export async function apriFiloSenzaPlaywright({ args = [], env = {} } = {}) {
 
   async function chiudi() {
     try { await Promise.race([evaluate(({ app }) => { setTimeout(() => app.quit(), 0); return true; }), scadenza(2000, 'quit')]); } catch (_) {}
-    try { sock.close(); } catch (_) {}
+    ispettore.chiudi();
     await Promise.race([morto, new Promise((ok) => setTimeout(ok, 5000).unref?.())]);
     ammazza();
     togliCartella(userData);
