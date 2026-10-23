@@ -186,7 +186,12 @@ test('A2 — un byte nullo nell\'etichetta non arriva nel diario, e il colore ti
 
   // Il colore ha la sua riga E il controllo per aggiustare la tinta: una riga
   // nel diario non deve mai mangiarsi un bottone che porta da qualche parte.
-  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Aspetto' })).toHaveCount(1);
+  const aspetto = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Aspetto' });
+  await expect(aspetto).toHaveCount(1);
+  // Col nome che il dettaglio ha nelle Preferenze, non con quello interno del token.
+  await expect(aspetto).toContainText(/colore d.accento/i);
+  await expect(aspetto).toContainText('#3a7d44');
+  await expect(aspetto).not.toContainText(/\baccent\b/);
   await expect(page.locator('.dash-bubble-filo .dash-action-btn')).toHaveCount(1);
 
   await restore(app, '__fakeA2');
