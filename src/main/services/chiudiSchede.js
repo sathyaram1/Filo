@@ -1,5 +1,5 @@
 // Quali schede chiude CHIUDI_SCHEDE (#413): i numeri dell'elenco che il modello aveva davanti, un sito, o tutte tranne
-// alcune. Logica pura sulle schede che riceve, senza Electron: chiude il TabManager. Prove: tests/unit/chiudiSchede.test.mjs.
+// alcune. Logica pura sulle schede che riceve, senza Electron: chiude il TabManager. Regole: tests/unit/chiudiSchede.test.mjs.
 
 function eventi() {
   if (!globalThis.SN_FILO_EVENTI) require('../../shared/filoEventi.js');
