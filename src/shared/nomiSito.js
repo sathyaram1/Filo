@@ -106,24 +106,25 @@
 
   // Una riga coi siti incollati di fila («a.it, b.com», «a.it b.com»): un pezzo per sito, e quello che sta fra due siti
   // in un pezzo solo com'era scritto, perché l'avviso lo ridica intero («studio rossi», non «studio» e «rossi»).
-  // Una riga che è già un sito (un indirizzo con virgole nei parametri) resta una; le parole di `salta` (le «e» della
+  // Un indirizzo con virgole nei parametri, solo sulla riga, resta uno; con un altro sito accanto
+  // («https://mail.google.com/x, bbc.co.uk») si divide, o il secondo sparirebbe. Le parole di `salta` (le «e» della
   // chat) separano due pezzi e non ne fanno parte.
   function pezziDi(riga, salta) {
     const intera = String(riga == null ? '' : riga).trim();
     if (!intera) return [];
-    if (daScritto(intera)) return [intera];
     const out = [];
+    let siti = 0;
     let da = -1;
     let a = -1;
     const chiudi = () => { if (da >= 0) out.push(intera.slice(da, a)); da = -1; };
     for (const m of intera.matchAll(/[^\s,;]+/g)) {
-      if (daScritto(m[0])) { chiudi(); out.push(m[0]); continue; }
+      if (daScritto(m[0])) { chiudi(); out.push(m[0]); siti++; continue; }
       if (salta && salta.has(m[0].toLowerCase())) { chiudi(); continue; }
       if (da < 0) da = m.index;
       a = m.index + m[0].length;
     }
     chiudi();
-    return out;
+    return siti <= 1 && daScritto(intera) ? [intera] : out;
   }
 
   // Un elenco scritto a righe: i siti validi (ridotti, senza doppioni) e le righe scartate così com'erano, per dirle;
