@@ -213,6 +213,12 @@
       e.preventDefault();
       allega(files);
     });
+    // «Incolla» del tasto destro e della cronologia degli appunti: l'evento lo manda Filo (src/content/actions.js).
+    form.addEventListener('filo:paste-image', (e) => {
+      if (!global.SN_FILO_UI?.veroONostro?.(e) || !e.detail?.blob) return;
+      e.preventDefault();
+      allega([e.detail.blob]);
+    });
     const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
     for (const tipo of ['dragenter', 'dragover']) {
       root.addEventListener(tipo, (e) => {
