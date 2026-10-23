@@ -279,6 +279,7 @@
     u.onboundary = (e) => {
       if (!sessionAlive(s)) return;
       s.letti = Math.max(s.letti || 0, baseChar + (e.charIndex || 0));
+      segnaLettura(s);
       if (!readTokens.length || (e.name && e.name !== 'word')) return;
       setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
     };
