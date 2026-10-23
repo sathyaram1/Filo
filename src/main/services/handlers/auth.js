@@ -753,6 +753,28 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Il tetto di spesa dei giudici per i non fidati (#1515): tocca SOLO i campi che riceve.
+  on(MSG.AUTOMATION_JUDGE_BUDGET_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return Object.assign({ ok: true }, await Defaults.getJudgeBudget(idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+  on(MSG.AUTOMATION_JUDGE_BUDGET_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const patch = {};
+      for (const k of ['tettoUsd', 'maxCaratteri']) if (msg && msg[k] !== undefined) patch[k] = msg[k];
+      return Object.assign({ ok: true }, await Defaults.setJudgeBudget(patch, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
