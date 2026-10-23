@@ -92,8 +92,9 @@ function parteFingerprint(seed) {
   function family(CanvasCtor, CtxCtor, make) {
     var cp = CanvasCtor && CanvasCtor.prototype, xp = CtxCtor && CtxCtor.prototype;
     if (!cp || !xp || !xp.getImageData) return null;
-    var F = { __proto__: null, put: xp.putImageData, draw: xp.drawImage, make: make, getCtx: track(cp), get: patchGet(xp) };
-    return F.getCtx ? F : null;
+    var F = { __proto__: null, put: xp.putImageData, draw: xp.drawImage, make: make, getCtx: track(cp), get: patchGet(xp),
+      w: gget(cp, 'width'), h: gget(cp, 'height') };
+    return F.getCtx && F.w && F.h ? F : null;
   }
 
   // Si esporta una copia rumorosa, mai il canvas della pagina: i suoi pixel non cambiano nemmeno per
