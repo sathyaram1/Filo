@@ -1602,7 +1602,8 @@ class TabManager {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
       const cands = this._triageCandidates();
-      if (!cands.length) return { archived: 0 };
+      // Niente da giudicare non vuol dire niente da fare: alla riapertura la barra si riordina comunque (#349).
+      if (!cands.length) return this._esitoTriage(this.applyTriageDecisions([], []), { trigger, valutate: 0 });
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
