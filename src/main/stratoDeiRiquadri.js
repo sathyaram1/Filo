@@ -404,7 +404,7 @@ class StratoDeiRiquadri {
     const c = this.strati.get(wc);
     if (c && vivo(c.vista.webContents)) return c;
     if (c) this._butta(c);
-    const { WebContentsView } = require('electron');
+    const { WebContentsView, View } = require('electron');
     const vista = new WebContentsView({
       webPreferences: {
         // Come le schede web: i riquadri nel mondo isolato, in sandbox; la pagina dello strato non ha né Node né lo shim.
@@ -419,12 +419,18 @@ class StratoDeiRiquadri {
     vista.setBackgroundColor('#00000000');
     vista.setVisible(false);
     vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    const cornice = new View();
+    cornice.setVisible(false);
+    cornice.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    cornice.addChildView(vista);
     const s = {
-      wc, vista, pronta: false, coda: [], aperti: 0, riquadri: 0, modale: false, visibile: false,
-      vuoleTastiera: false, inPagina: new Map(), aiuto: false, attese: new Map(),
+      wc, vista, cornice, pronta: false, coda: [], aperti: 0, riquadri: 0, modale: false, visibile: false,
+      vuoleTastiera: false, inPagina: new Map(), aiuto: false, attese: new Map(), zona: null,
     };
+    // Chi rigira i gesti di un vuoto allo strato conta in px della finestra, non della cornice.
+    s.perIlVuoto = { webContents: vista.webContents, getBounds: () => this._bordiVista(s) };
     s.vuoto = new VuotoDellaVista({
-      vista: () => s.vista,
+      vista: () => s.perIlVuoto,
       scheda: () => (vivo(s.wc) ? this._vistaDellaPagina(s.wc) : null),
       canale: 'riquadri:cursore',
       primaDelClic: () => this._restituisci(s),
@@ -493,7 +499,7 @@ class StratoDeiRiquadri {
     s.visibile = false;
     const v = s.vista;
     try { perVista.delete(v.webContents); } catch (_) {}
-    try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(v); } catch (_) {}
+    try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(s.cornice); } catch (_) {}
     try { if (vivo(v.webContents)) v.webContents.close(); } catch (_) {}
     if (aveva) this._restituisci(s, { forza: true });
   }

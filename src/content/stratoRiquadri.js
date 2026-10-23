@@ -78,6 +78,37 @@
     return false;
   }
 
+  // La zona dove c'è qualcosa (#1509.3): fuori dalla sua cornice la pagina riceve i gesti veri, trascinamenti e file
+  // compresi, che il vuoto non sa rigirare. Solo pannello e risposte hanno una scatola sicura; con qualunque altro
+  // pezzo (un modale, il menu, una conferma) la zona è la scheda intera (null). Il margine tiene dentro l'ombra.
+  const SCATOLE = '.sn-sidebar, .sn-popup';
+  const MARGINE = 32;
+  const IGNORATI = /^(HEAD|BODY|SCRIPT|STYLE|LINK|META|TEMPLATE)$/;
+  function sparito(el) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none') return true;
+    if (cs.display === 'contents') return !el.firstChild && !global.SN_FILO_UI?.ombraDi?.(el);
+    return !aSchermo(el);
+  }
+  function zona() {
+    let u = null;
+    for (const el of [...document.documentElement.children, ...(document.body ? document.body.children : [])]) {
+      if (IGNORATI.test(el.tagName)) continue;
+      if (!el.matches(SCATOLE)) {
+        if (sparito(el)) continue;
+        return null;
+      }
+      if (!visibile(el)) continue;
+      const r = el.getBoundingClientRect();
+      u = u ? { l: Math.min(u.l, r.left), t: Math.min(u.t, r.top), r: Math.max(u.r, r.right), b: Math.max(u.b, r.bottom) }
+        : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    }
+    if (!u) return null;
+    const x = Math.max(0, Math.floor(u.l - MARGINE));
+    const y = Math.max(0, Math.floor(u.t - MARGINE));
+    return { x, y, width: Math.min(innerWidth, Math.ceil(u.r + MARGINE)) - x, height: Math.min(innerHeight, Math.ceil(u.b + MARGINE)) - y };
+  }
+
   let detto = '';
   function riferisci() {
     const pezzi = [...document.documentElement.children].filter((el) => el !== document.head && el !== document.body);
@@ -86,10 +117,11 @@
     const modale = [...document.querySelectorAll(MODALI)].some(visibile);
     // Un Aiuto nascosto mentre Filo risponde tiene vivo lo strato: la risposta resta da aprire.
     const aiuto = !!global.SN_SIDEBAR?.isOpen?.();
-    const firma = `${aperti}|${riquadri}|${modale}|${aiuto}`;
+    const z = zona();
+    const firma = `${aperti}|${riquadri}|${modale}|${aiuto}|${z ? `${z.x},${z.y},${z.width},${z.height}` : ''}`;
     if (firma === detto) return;
     detto = firma;
-    S.stato({ aperti, riquadri, modale, aiuto });
+    S.stato({ aperti, riquadri, modale, aiuto, zona: z });
   }
   let inCoda = false;
   const presto = () => {
@@ -101,6 +133,7 @@
   // Un'animazione che finisce (la chiusura di un avviso) non muta niente: si ricontrolla anche dopo.
   document.addEventListener('animationend', presto, true);
   document.addEventListener('transitionend', presto, true);
+  window.addEventListener('resize', presto);
 
   // Fuori dai riquadri lo strato è della pagina sotto: clic, rotella e trascinamenti le tornano (src/renderer/vuoto.js).
   try {
@@ -115,7 +148,8 @@
         const t = e.target;
         return !!t && t !== document.documentElement && t !== document.body;
       },
-      versoLaPagina: () => false,
+      // Uscire dalla cornice dentro la scheda è entrare nella pagina, che da lì riceve i gesti veri.
+      versoLaPagina: (e) => e.clientX > 0 && e.clientY > 0 && e.clientX < innerWidth - 1 && e.clientY < innerHeight - 1,
     });
   } catch (e) { console.error('[Filo riquadri] vuoto', e); }
 
