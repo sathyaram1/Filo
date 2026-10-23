@@ -180,6 +180,14 @@ test('un numero che non è un anno, intorno, non cambia il controllo', () => {
     'Luca: l\'80% dice di sì', 'Luca: versione 1.2024', 'Luca: ho fatto 2024 km']) {
     assert.deepEqual(dateIntorno('certo, mercoledì 9 ottobre', { prima }).map((s) => s.perche), ['Il 9 ottobre 2026 è venerdì.'], prima);
   }
+  // L'anno dei diritti o l'inizio e la fine di un periodo non sono l'anno della data: l'errore di quest'anno si segna.
+  for (const intorno of [{ dopo: 'Trattoria da Mario, via Roma 3. © 2024 Tutti i diritti riservati.' }, { dopo: '(c) 2024 Mario' },
+    { dopo: 'Copyright 2024' }, { dopo: '© 2015-2024 Mario' }, { prima: 'Cucina di casa dal 2024, con i piatti della nonna.' },
+    { prima: 'Aperti since 2024' }, { prima: 'stagione 2023/2024' }, { prima: 'dal 2019 fino al 2024' }]) {
+    assert.deepEqual(dateIntorno('vorrei un tavolo per mercoledì 9 ottobre', intorno).map((s) => s.perche), ['Il 9 ottobre 2026 è venerdì.'], JSON.stringify(intorno));
+  }
+  assert.deepEqual(dateIntorno('vorrei un tavolo per giovedì 9 ottobre', { prima: 'Cucina di casa dal 1999.' }).map((s) => s.perche),
+    ['Il 9 ottobre 2026 è venerdì.']);
   // Senza pagina intorno, o con l'anno di oggi detto vicino, tutto come prima.
   assert.deepEqual(dateIntorno('ci vediamo giovedì 23 ottobre', { prima: 'Luca: 22/10/2026 alle 18:40' }).map((s) => s.perche),
     ['Il 23 ottobre 2026 è venerdì.']);
