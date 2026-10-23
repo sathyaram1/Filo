@@ -24,8 +24,9 @@ async function icona(app, id) {
 async function foto(app, nome) {
   mkdirSync('tests/.shots', { recursive: true });
   const b64 = await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    return (await w.webContents.capturePage()).toPNG().toString('base64');
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    const t = tm.tabs.find((x) => x.id === tm.activeId);
+    return (await t.view.webContents.capturePage()).toPNG().toString('base64');
   });
   writeFileSync(`tests/.shots/g13-${nome}.png`, Buffer.from(b64, 'base64'));
 }
