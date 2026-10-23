@@ -176,7 +176,7 @@ test('una data sbagliata anche nell\'anno detto intorno si segna con quell\'anno
 });
 
 test('un numero che non è un anno, intorno, non cambia il controllo', () => {
-  for (const prima of ['Luca: costa 2024 euro', 'Luca: sono 2024€', 'Luca: siamo a 1800 metri', 'Luca: tel 3332024123',
+  for (const prima of ['Luca: costa 2024 euro', 'Luca: sono 2024€', 'Luca: sono € 2024', 'Luca: siamo a 1800 metri', 'Luca: tel 3332024123',
     'Luca: l\'80% dice di sì', 'Luca: versione 1.2024', 'Luca: ho fatto 2024 km']) {
     assert.deepEqual(dateIntorno('certo, mercoledì 9 ottobre', { prima }).map((s) => s.perche), ['Il 9 ottobre 2026 è venerdì.'], prima);
   }
