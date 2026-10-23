@@ -451,7 +451,9 @@
     img.alt = '';
     img.onerror = () => { img.remove(); generica(); };
     ico.appendChild(img);
-    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
+    // Un suggerimento scritto da un modello che ha letto testo di altri prende l'icona solo dalle copie, mai dal sito,
+    // che saprebbe dell'indirizzo prima di ogni clic (#1505). Una pagina salvata dall'utente (home senza modello) no.
+    d.iconaDelSito(s.action.url, { soloCopie: s.daSalvate !== true }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 

@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
+    executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
@@ -145,7 +145,7 @@ module.exports = function register(on, ctx) {
         const da = schedaDi(tm, sender);
         if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
       },
-      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true,
+      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true, proposta: msg.proposta === true,
     });
     return { ok: true, ...r };
   });
@@ -160,8 +160,9 @@ module.exports = function register(on, ctx) {
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    // Il menu del tasto destro su un collegamento della chat di Filo vale quanto il clic: senza verdetto chiede l'OK.
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true, proposta: avvisato && msg.proposta === true,
       apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender), gesto }); },
     });
     return { ok: true, ...r, avvisato };
@@ -392,6 +393,8 @@ module.exports = function register(on, ctx) {
     const chat = await FiloChats.get(msg.id);
     // Riaperta (anche dopo un riavvio), la chat torna a dire cosa aveva letto da fuori prima di ogni clic (#810).
     try { ricordaLettoInChat([], (chat && chat.messages) || []); } catch (_) {}
+    // …e i verdetti dei suoi collegamenti (#1505): chi chiedeva l'OK lo chiede ancora, i giudicati si aprono.
+    try { ricordaVerdettiArchiviati((chat && chat.messages) || []); } catch (_) {}
     let conFoto = chat;
     try { conFoto = global.SN_CONTESTO_FILO ? global.SN_CONTESTO_FILO.conFotoInMemoria(chat) : chat; } catch (_) {}
     return { ok: true, chat: conFoto };
@@ -458,9 +461,11 @@ module.exports = function register(on, ctx) {
     // Una finestra guardata dopo l'OK (#778): ne resta il nome, che toStoredMessage accorcia.
     const guardate = role === 'filo' && actions.some((a) => a.type === 'VEDI_SCHERMO')
       ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
+    // Una riga di Filo scritta dalla pagina non è passata dal giudizio dei collegamenti (#1505): riaperta, non ne ha.
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
       ...(guardate.length ? { guardate } : {}), ...(role === 'filo' && msg.tardiva === true ? { tardiva: true } : {}),
+      ...(role === 'filo' ? { senzaVerdetto: true } : {}),
     });
     return { ok: true };
   });
@@ -552,6 +557,8 @@ module.exports = function register(on, ctx) {
   const isoO = (x) => (typeof x === 'string' && !Number.isNaN(Date.parse(x)) ? x : null);
   on(MSG.FILO_CODA, soloFilo(async (msg) => {
     const r = await Coda.pezzo({ prima: isoO(msg.prima), fino: isoO(msg.fino), dopo: isoO(msg.dopo), quanti: Number(msg.quanti) || undefined });
+    // Le frasi di Filo che la home disegna ritrovano i verdetti dei loro collegamenti, anche dopo un riavvio (#1505).
+    try { ricordaVerdettiArchiviati((r.elementi || []).filter((e) => e && e.k === 'msg')); } catch (_) {}
     // L'incognito non saluta: il saluto sta nel filo di disco, che da lì non si vede.
     if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
     return { ok: true, ...r };

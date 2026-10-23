@@ -917,12 +917,15 @@
   }
 
   // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  // Senza una risposta della porta il testo non esce (#1505): un errore vale come fermato.
+  const CAMPO_SENZA_PORTA = 'non ho scritto nel campo: il controllo dei dati in uscita non ha funzionato, e senza quel controllo non lascio uscire niente';
   async function campoFermato(testo) {
     if (!String(testo || '').trim()) return '';
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
-      return r && r.blocca ? String(r.frase || '') : '';
-    } catch (_) { return ''; }
+      if (!r || r.ok !== true) return CAMPO_SENZA_PORTA;
+      return r.blocca ? String(r.frase || CAMPO_SENZA_PORTA) : '';
+    } catch (_) { return CAMPO_SENZA_PORTA; }
   }
 
   async function runFiloAction(action, { etichetta = '' } = {}) {

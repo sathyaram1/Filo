@@ -11,6 +11,7 @@ import {
   PARTI, FINESTRA_PARTE_TARDIVA_MS, partiDaCampi, parteTardiva, partiServerInSospeso,
 } from '../../scripts/lib/parti-lavoro.mjs';
 import { classifyOwnerMerge, messageForOwnerMerge, askServerMerge } from '../../scripts/lib/owner-merge.mjs';
+import { newWorkBranch } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ORA = Date.parse('2026-10-03T10:00:00Z');
@@ -138,7 +139,7 @@ test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?,
   const corpo = m[1].replace(/\s+/g, ' ');
   assert.match(corpo, /!\('localMerges' in d\)/);
   assert.match(corpo, /keys\(\)\.hasOnly\(\['app', 'server', 'solo', 'ramo'\]\)/);
-  assert.match(corpo, /d\.localMerges\.ramo is string && d\.localMerges\.ramo\.size\(\) <= 200 && d\.localMerges\.ramo\.matches\('\^claude\//);
+  assert.match(corpo, /d\.localMerges\.ramo is string && d\.localMerges\.ramo\.size\(\) <= 200 && d\.localMerges\.ramo\.matches\('\^/);
   assert.match(corpo, /d\.localMerges\.solo in \['app', 'server'\]/);
   assert.match(corpo, /d\.localMerges\.app is int && d\.localMerges\.app > 0/);
   assert.match(corpo, /d\.localMerges\.server is int && d\.localMerges\.server > 0/);
@@ -149,4 +150,21 @@ test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?,
   assert.equal(conCampo.length, 1, 'un solo ramo nomina localMerges');
   assert.match(conCampo[0], /^isAdmin\(\)/);
   assert.match(conCampo[0], /localMergesValido\(request\.resource\.data\)/);
+});
+
+// Il cancello delle routine scrive nelle parti il ramo del lavoro, `worker/<id>-<ora>`: le regole controllano le parti
+// a ogni update dell'owner, e un nome fuori forma rendeva la pratica chiusa immobile da Gestione (#1336.1).
+test('regole: il ramo delle parti ha la forma dei rami delle sessioni locali e di quelli delle routine', () => {
+  const rules = readFileSync(join(ROOT, 'firestore.rules'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  const corpo = /function localMergesValido\(d\) \{([\s\S]*?)\n\s*\}/.exec(rules)[1];
+  const forma = /d\.localMerges\.ramo\.matches\('([^']+)'\)/.exec(corpo);
+  assert.ok(forma, 'vincolo sul nome del ramo non trovato');
+  // `matches` delle regole vuole la stringa intera, come un'espressione ancorata.
+  const passa = (r) => new RegExp(`^(?:${forma[1]})$`).test(r);
+  const routine = newWorkBranch('iVNEfxYql13VQmk9ARAN', Date.parse('2026-10-18T16:49:01Z'));
+  assert.equal(routine, 'worker/iVNEfxYql13VQmk9ARAN-20261018T164901Z');
+  for (const r of [routine, newWorkBranch('a.b_c-d'), 'claude/lavoro', 'claude/x/y']) assert.ok(passa(r), r);
+  for (const r of ['main', 'feature/x', 'worker/', 'claude/', 'worker/a b', 'worker/a;rm', 'refs/heads/claude/x', 'origin/worker/x']) {
+    assert.ok(!passa(r), r);
+  }
 });

@@ -1,110 +1,127 @@
-// Il dizionario con cui il correttore sa quali parole non conosce (#1585): Hunspell in WebAssembly, sulle stesse sorgenti
-// in Windows, Mac e Linux. Non sceglie le lingue (spellLanguages.js) e non disegna segni. Perché non quello del browser:
-// patterns/il-dizionario-del-correttore-e-di-filo.md; regole: tests/unit/dizionarioDiFilo.test.mjs.
+// Il dizionario con cui il correttore sa quali parole non conosce (#1585), col motore (dizionarioMotore.js) in un thread:
+// caricarlo tiene la CPU per un decimo di secondo, e il processo principale non deve fermarsi. Non sceglie i segni.
+// Perché non quello del browser: patterns/il-dizionario-del-correttore-e-di-filo.md; tests/unit/dizionarioDiFilo.test.mjs.
 
 'use strict';
 
-const fs = require('node:fs');
-const path = require('node:path');
+const { Worker } = require('node:worker_threads');
+const Motore = require('./dizionarioMotore');
 
-const SORGENTI = path.join(__dirname, '..', '..', '..', 'assets', 'dizionari', 'sorgenti');
+const MOTORE = require.resolve('./dizionarioMotore');
+// La pagina che chiede resta ferma finché non ha la risposta: oltre, risponde il browser.
+const RISPOSTA_MAX_MS = 5000;
+// Un caricamento vero sta sotto il secondo: oltre, il thread è bloccato e il dizionario si carica nel processo.
+const CARICA_MAX_MS = 60_000;
 
-// I limiti di Chromium (hunspell_engine.cc, spellcheck_common.h), in byte UTF-8: oltre, la parola è giusta e senza proposte.
-const PAROLA_MAX_BYTE = 64;
-const PROPOSTE_PAROLA_MAX_BYTE = 24;
-const PROPOSTE_MAX = 5;
-// Il correttore ricorda al più tante parole per pagina (spellcheck.js): una richiesta più grossa non viene da lui.
-const RICHIESTA_MAX = 20000;
-
-const dalPacchetto = (nome) => {
-  const dir = path.dirname(require.resolve(nome));
-  return { aff: path.join(dir, 'index.aff'), dic: path.join(dir, 'index.dic') };
-};
-
-// In ordine alfabetico, come la lista del browser: per «en-AU» vince «en-GB».
-const SORGENTI_DI = Object.freeze({
-  'en-GB': () => dalPacchetto('dictionary-en-gb'),
-  'en-US': () => dalPacchetto('dictionary-en'),
-  'it-IT': () => ({
-    aff: path.join(SORGENTI, 'it_IT.aff'),
-    dic: path.join(SORGENTI, 'it_IT.dic'),
-    delta: path.join(SORGENTI, 'it_IT.dic_delta'),
-  }),
+const CORPO_THREAD = `
+const { parentPort, workerData } = require('node:worker_threads');
+require(workerData.motore).carica(workerData.lingue).then((m) => {
+  parentPort.on('message', ({ id, tipo, dato }) => {
+    let res = null;
+    try { res = tipo === 'proposte' ? m.proposte(dato) : m.sbagliate(dato); } catch (_) {}
+    parentPort.postMessage({ id, res });
+  });
+  parentPort.postMessage({ pronto: { lingue: m.lingue, errori: m.errori } });
 });
-const LINGUE = Object.freeze(Object.keys(SORGENTI_DI));
-
-// ISO-8859-15 è il Latin-1 con otto caratteri cambiati; i file italiani sono così, e restano com'erano (GPL).
-const LATIN9 = { 0xa4: '€', 0xa6: 'Š', 0xa8: 'š', 0xb4: 'Ž', 0xb8: 'ž', 0xbc: 'Œ', 0xbd: 'œ', 0xbe: 'Ÿ' };
-function decodifica(buf, codifica) {
-  const c = String(codifica || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  let s;
-  if (c === 'UTF8') s = buf.toString('utf8');
-  else if (c === 'ISO88591' || c === 'ISO885915') {
-    s = buf.toString('latin1');
-    if (c === 'ISO885915') s = s.replace(/[\xa4\xa6\xa8\xb4\xb8\xbc\xbd\xbe]/g, (x) => LATIN9[x.charCodeAt(0)]);
-  } else throw new Error(`codifica del dizionario non gestita: ${codifica}`);
-  return s.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
-}
-
-// Il motore parla UTF-8: affissi e parole si convertono, e la riga SET lo dice. Il delta sono le parole che Chromium
-// aggiunge al suo .bdic (una per riga, senza affissi).
-function testiDi(lingua) {
-  const f = SORGENTI_DI[lingua]();
-  const affGrezzo = fs.readFileSync(f.aff);
-  const codifica = (/^SET[ \t]+(\S+)/m.exec(affGrezzo.toString('latin1')) || [])[1] || 'ISO8859-1';
-  const aff = decodifica(affGrezzo, codifica).replace(/^SET[ \t]+\S+/m, 'SET UTF-8');
-  let dic = decodifica(fs.readFileSync(f.dic), codifica);
-  if (f.delta) {
-    const parole = decodifica(fs.readFileSync(f.delta), 'UTF-8').split('\n').map((r) => r.trim()).filter(Boolean);
-    dic = `${dic.replace(/\n*$/, '\n')}${parole.join('\n')}\n`;
-  }
-  return { aff, dic };
-}
+`;
 
 function scegli(locale) {
   if (!globalThis.SN_SPELL_LANG) require('../../shared/spellLanguages.js');
-  return globalThis.SN_SPELL_LANG.select(LINGUE, locale, LINGUE);
+  return globalThis.SN_SPELL_LANG.select(Motore.LINGUE, locale, Motore.LINGUE);
 }
 
-const stato = { fase: 'spento', lingue: [], errori: [] };
-let motori = [];
+const stato = { fase: 'spento', lingue: [], errori: [], dove: '' };
+// (tipo, dato) → Promise della risposta, finché il dizionario è pronto.
+let chiedi = null;
 let promessa = null;
 let programmato = null;
+let atteso = null;
 
-// `dopoMs`: all'avvio si carica quando la finestra c'è già (sono un'ottantina di millisecondi del processo principale);
-// una domanda arrivata prima lo fa partire subito.
+// Il dizionario si è perso (il thread è morto): la prossima domanda lo ricarica, e intanto risponde il browser.
+function perso(motivo) {
+  chiedi = null;
+  promessa = null;
+  stato.fase = 'spento';
+  stato.lingue = [];
+  stato.errori.push(motivo);
+}
+
+// Risolve quando il thread ha caricato quello che poteva; rifiuta se non parte o muore prima.
+function nelThread(lingue) {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(CORPO_THREAD, { eval: true, workerData: { motore: MOTORE, lingue } });
+    const attese = new Map();
+    let prossimo = 1;
+    let pronto = false;
+    let finito = false;
+    const limite = setTimeout(() => { w.terminate().catch(() => {}); }, CARICA_MAX_MS);
+    const domanda = (tipo, dato) => new Promise((ok) => {
+      if (finito) { ok(null); return; }
+      const id = prossimo++;
+      const timer = setTimeout(() => { attese.delete(id); ok(null); }, RISPOSTA_MAX_MS);
+      attese.set(id, { ok, timer });
+      try { w.postMessage({ id, tipo, dato }); } catch (_) { clearTimeout(timer); attese.delete(id); ok(null); }
+    });
+    const fine = (motivo) => {
+      if (finito) return;
+      finito = true;
+      clearTimeout(limite);
+      for (const a of attese.values()) { clearTimeout(a.timer); a.ok(null); }
+      attese.clear();
+      if (!pronto) reject(new Error(motivo));
+      else if (chiedi === domanda) perso(motivo);
+    };
+    w.on('message', (msg) => {
+      if (msg && msg.pronto) {
+        clearTimeout(limite);
+        pronto = true;
+        if (!msg.pronto.lingue.length) w.terminate().catch(() => {});
+        resolve({ lingue: msg.pronto.lingue, errori: msg.pronto.errori, chiedi: domanda });
+        return;
+      }
+      const a = msg && attese.get(msg.id);
+      if (!a) return;
+      attese.delete(msg.id);
+      clearTimeout(a.timer);
+      a.ok(msg.res ?? null);
+    });
+    w.on('error', (e) => fine(`thread: ${e?.message || e}`));
+    w.on('exit', () => fine('thread chiuso'));
+    // Dopo gli ascoltatori: aggiungerli riaggancia il thread al ciclo e Filo non uscirebbe più.
+    w.unref();
+  });
+}
+
+// `dopoMs`: all'avvio si carica quando la finestra c'è già; una domanda arrivata prima lo fa partire subito.
 function prepara({ locale = '', dopoMs = 0 } = {}) {
   if (promessa) return promessa;
   if (dopoMs > 0) {
     if (!programmato) {
-      programmato = { locale, timer: setTimeout(() => prepara({ locale }), dopoMs) };
-      programmato.timer.unref?.();
+      atteso = { locale };
+      programmato = setTimeout(avviaSeAtteso, dopoMs);
+      programmato.unref?.();
     }
     return null;
   }
-  if (programmato) { clearTimeout(programmato.timer); programmato = null; }
+  atteso = { locale };
+  clearTimeout(programmato);
+  programmato = null;
   stato.fase = 'in caricamento';
   promessa = (async () => {
-    let crea;
-    try {
-      ({ createHunspellFromStrings: crea } = await import('hunspell-wasm'));
-    } catch (e) {
-      stato.errori.push(`motore: ${e?.message || e}`);
+    const lingue = scegli(locale);
+    let r = await nelThread(lingue).catch((e) => ({ lingue: [], errori: [e.message] }));
+    stato.errori.push(...r.errori);
+    stato.dove = 'thread';
+    if (!r.lingue.length) {
+      // Senza il thread il motore si carica qui: meglio il processo fermo un decimo di secondo che nessun dizionario.
+      const m = await Motore.carica(lingue);
+      stato.errori.push(...m.errori);
+      r = { lingue: m.lingue, chiedi: async (tipo, dato) => (tipo === 'proposte' ? m.proposte(dato) : m.sbagliate(dato)) };
+      stato.dove = 'processo';
     }
-    const pronti = [];
-    if (crea) {
-      for (const lingua of scegli(locale)) {
-        try {
-          const { aff, dic } = testiDi(lingua);
-          pronti.push({ lingua, h: await crea(aff, dic) });
-        } catch (e) {
-          stato.errori.push(`${lingua}: ${e?.message || e}`);
-        }
-      }
-    }
-    motori = pronti;
-    stato.lingue = pronti.map((m) => m.lingua);
-    stato.fase = pronti.length ? 'pronto' : 'guasto';
+    chiedi = r.lingue.length ? r.chiedi : null;
+    stato.lingue = r.lingue.slice();
+    stato.fase = r.lingue.length ? 'pronto' : 'guasto';
     if (stato.errori.length) console.warn('[Filo] dizionario del correttore:', stato.errori.join('; '));
     return stato.fase === 'pronto';
   })();
@@ -112,57 +129,27 @@ function prepara({ locale = '', dopoMs = 0 } = {}) {
 }
 
 function avviaSeAtteso() {
-  if (!promessa && programmato) prepara({ locale: programmato.locale });
+  if (!promessa && atteso) prepara({ locale: atteso.locale });
 }
 
-const byte = (s) => Buffer.byteLength(s, 'utf8');
-
-// I file italiani conoscono solo l'apostrofo dritto; quello tipografico è la stessa parola.
-const normale = (parola) => (typeof parola === 'string' ? parola.replace(/’/g, "'") : '');
-const conosciuta = (p) => motori.some(({ h }) => h.testSpelling(p));
-const VOCALI_ELISE = ['a', 'e', 'i', 'o'];
-
-// Come Chromium con più lingue: sbagliata solo se nessuna la conosce. Con l'apostrofo in fondo è giusta se lo è senza
-// («va'», «be'», «dell'») o se è un'elisione, cioè la parola intera meno la vocale finale («sant'», «quell'»).
-function sbagliataGia(parola) {
-  const p = normale(parola);
-  if (!p.trim() || byte(p) > PAROLA_MAX_BYTE) return false;
-  try {
-    if (conosciuta(p)) return false;
-    const radice = /^(.*\p{L})'$/u.exec(p)?.[1];
-    return !radice || !(conosciuta(radice) || VOCALI_ELISE.some((v) => conosciuta(radice + v)));
-  } catch (_) { return false; }
+function domanda(tipo, dato) {
+  if (!chiedi) { avviaSeAtteso(); return Promise.resolve(null); }
+  return chiedi(tipo, dato);
 }
 
 /** Per ogni parola, se nessuna lingua la conosce; `null` finché il dizionario non è pronto (o non si è caricato). */
 function sbagliate(parole) {
-  if (!Array.isArray(parole) || parole.length > RICHIESTA_MAX) return null;
-  if (!motori.length) { avviaSeAtteso(); return null; }
-  return parole.map(sbagliataGia);
+  if (!Array.isArray(parole) || parole.length > Motore.RICHIESTA_MAX) return Promise.resolve(null);
+  return domanda('sbagliate', parole);
 }
 
 /** Le correzioni, alternate fra le lingue come fa Chromium; `null` finché il dizionario non è pronto. */
 function proposte(parola) {
-  if (!motori.length) { avviaSeAtteso(); return null; }
-  const p = normale(parola);
-  if (!p.trim() || byte(p) > PROPOSTE_PAROLA_MAX_BYTE || !sbagliataGia(p)) return [];
-  const liste = [];
-  try {
-    for (const { h } of motori) liste.push(h.getSpellingSuggestions(p).slice(0, PROPOSTE_MAX));
-  } catch (_) { return []; }
-  const out = [];
-  const lunga = Math.max(0, ...liste.map((l) => l.length));
-  for (let i = 0; i < lunga && out.length < PROPOSTE_MAX; i++) {
-    for (const l of liste) {
-      if (i < l.length && !out.includes(l[i])) out.push(l[i]);
-      if (out.length >= PROPOSTE_MAX) break;
-    }
-  }
-  return out;
+  return domanda('proposte', parola);
 }
 
 function descrivi() {
-  return { fase: stato.fase, lingue: stato.lingue.slice(), errori: stato.errori.slice() };
+  return { fase: stato.fase, lingue: stato.lingue.slice(), errori: stato.errori.slice(), dove: stato.dove };
 }
 
-module.exports = { prepara, sbagliate, proposte, stato: descrivi, scegli, testiDi, decodifica, LINGUE };
+module.exports = { prepara, sbagliate, proposte, stato: descrivi, scegli, LINGUE: Motore.LINGUE };

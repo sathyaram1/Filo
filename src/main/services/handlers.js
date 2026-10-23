@@ -10,6 +10,7 @@ const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./reso
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
+const VerdettiUscite = require('./verdettiUscite');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
@@ -1509,7 +1510,11 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
+// Non lancia mai: su un guasto torna un blocco con `regola: 'guasto'` (#1505, verdettiUscite.js).
+const controllaUscita = VerdettiUscite.chiudiAGuasto(giudicaUscita, {
+  avvisa: (e) => console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e),
+});
+async function giudicaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
@@ -1657,35 +1662,18 @@ async function ricercaNelSito(action, { provenienza, contesto = null, parole = '
 const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
 
 // #868.6 — un collegamento che un modello scrive, cliccato, chiede lo stesso OK che chiederebbe se lo aprisse lui. Il
-// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova qui.
-const LINK_DA_CONFERMARE = new Map(); // chiave del link → motivo
-const MAX_LINK_DA_CONFERMARE = 5000;
-const chiaveLinkUscita = (url) => {
-  const raw = String(url || '').trim();
-  try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
-};
-function indirizzoWebAperto(grezzo) {
-  try {
-    const u = new URL(String(typeof grezzo === 'string' ? grezzo : '').trim());
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
-  } catch (_) { return ''; }
+// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova
+// nel registro di verdettiUscite.js, che vale anche per icona e anteprima (#1505).
+const sitoDaConfermare = (url) => VerdettiUscite.sitoDaConfermare(url);
+// Prima del clic (icona, anteprima) un indirizzo si contatta solo se al clic si aprirebbe senza OK (#1505). Da una pagina
+// di Filo decide il registro; da un sito, per un collegamento non suo (`delSito` falso), anche la decisione di apriDaFilo.
+async function contattabilePrimaDelClic(url, { sender = null, daFilo = false, proposta = false, delSito = false, porta = null } = {}) {
+  if (!VerdettiUscite.contattabile(url, { proposta: daFilo && proposta })) return false;
+  if (daFilo || delSito) return true;
+  const u = porta || await controllaUscita({ type: 'NAVIGA', url }, { sender });
+  return !u.blocca && !(await exfilChiedeOk(String(url || ''), u, { wc: sender?.wc || null, pagina: paginaDi(sender?.wc) || sender?.url || '' }));
 }
-function segnaLinkDaConfermare(url, motivo) {
-  const k = chiaveLinkUscita(url);
-  LINK_DA_CONFERMARE.delete(k);
-  LINK_DA_CONFERMARE.set(k, String(motivo || ''));
-  while (LINK_DA_CONFERMARE.size > MAX_LINK_DA_CONFERMARE) LINK_DA_CONFERMARE.delete(LINK_DA_CONFERMARE.keys().next().value);
-}
-// Un sito con un collegamento in attesa di OK: la sua icona non si chiede alla rete, il dato può stare nel nome (#848).
-function sitoDaConfermare(url) {
-  let host = '';
-  try { host = new URL(String(url || '')).host.toLowerCase(); } catch (_) { return false; }
-  if (!host) return false;
-  for (const k of LINK_DA_CONFERMARE.keys()) {
-    try { if (new URL(k).host.toLowerCase() === host) return true; } catch (_) {}
-  }
-  return false;
-}
+const ricordaVerdettiArchiviati = (messages) => VerdettiUscite.ricordaArchiviati(messages, indirizziCliccabili);
 // Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
 const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
 
@@ -1705,62 +1693,52 @@ function indirizziCliccabili(testo) {
 }
 // I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
 // `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
+// Il giudizio sta in verdettiUscite.js (giudica): una porta guasta o un collegamento oltre il tetto chiedono l'OK.
 async function linkCheChiedonoOk(testo, { sender = null, contesto = null, provenienza = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
-  const out = [];
-  const visti = new Set();
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
-  for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
-    // Si giudica l'indirizzo che il browser aprirà: «https:sito/…» o con le barre rovesciate è lo stesso indirizzo web.
-    const url = indirizzoWebAperto(grezzo);
-    if (!url) continue;
-    const k = chiaveLinkUscita(url);
-    if (visti.has(k) || visti.size >= 200) continue;
-    visti.add(k);
-    let u = null;
-    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }); } catch (_) { u = null; }
-    if (!u || u.blocca || (!u.exfil && !u.nonCompare)) continue;
-    if (u.nonCompare) u = { ...u, reason: u.datiReason || 'ha scritto Filo e che non compare da nessuna parte' };
-    let chiede = sempre;
-    if (!chiede && Levels) {
+  return VerdettiUscite.giudica([...indirizzi, ...indirizziCliccabili(testo)], {
+    porta: (url) => controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }),
+    chiede: async (url, u) => {
+      if (sempre || !Levels) return true;
       if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
       const verdetto = u.nonCompare ? { _nonCompare: true } : { _exfil: true };
       const ing = Levels.ingressi({ type: 'NAVIGA', url, ...verdetto, _exfilReason: u.reason }, { richiesta, impostazioni });
-      chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
-    }
-    if (!chiede) continue;
-    segnaLinkDaConfermare(url, u.reason);
-    out.push({ url, motivo: u.reason });
-  }
-  return out;
+      return !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+    },
+  });
 }
 
-async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false } = {}) {
+function paginaDi(wc) {
+  try { return wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { return ''; }
+}
+
+// Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente in un collegamento di Filo chiede l'OK come per
+// NAVIGA. La stessa domanda la fa l'anteprima prima del clic (contattabilePrimaDelClic).
+async function exfilChiedeOk(indirizzo, u, { wc = null, pagina = '' } = {}) {
+  if (!u || !u.exfil || !/^https?:/i.test(pagina) || !/^https?:/i.test(indirizzo)) return false;
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  let impostazioni = {};
+  try { impostazioni = await Storage.getSettings(); } catch (_) {}
+  const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
+  return !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+}
+
+// `proposta`: il collegamento l'ha scritto un modello in una pagina di Filo (src/shared/filoMarkdown.js): se non ha un
+// verdetto, perché la risposta si è interrotta o nessuno l'ha giudicato, chiede l'OK (#1505).
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false, proposta = false } = {}) {
   const indirizzo = String(url || '').trim();
-  let pagina = '';
-  try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
-  let u = { blocca: false };
-  try {
-    u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
-  } catch (e) {
-    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
-  }
+  const pagina = paginaDi(wc);
+  const u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
   if (u.blocca) {
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
-  // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente nel link chiede l'OK come per NAVIGA.
   const daSito = /^https?:/i.test(pagina);
-  const k = chiaveLinkUscita(indirizzo);
-  const motivo = LINK_DA_CONFERMARE.get(k) ?? (chiedi ? String(chiedi) : '') ?? '';
-  let daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi);
-  if (!daChiedere && daSito && u.exfil && /^https?:/i.test(indirizzo)) {
-    const Levels = globalThis.SN_ACTION_LEVELS;
-    let impostazioni = {};
-    try { impostazioni = await Storage.getSettings(); } catch (_) {}
-    const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
-    daChiedere = !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
-  }
+  const k = VerdettiUscite.chiave(indirizzo);
+  const v = /^https?:/i.test(indirizzo) ? VerdettiUscite.alClic(indirizzo, { chiedi, proposta }) : { daChiedere: false, motivo: '' };
+  const motivo = v.motivo;
+  const daChiedere = v.daChiedere || await exfilChiedeOk(indirizzo, u, { wc, pagina });
   if (daChiedere) {
     const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
     const ok = confermato && (!chiesti || chiesti.delete(k));
@@ -2265,24 +2243,21 @@ async function eseguiAzioneFilo(action, {
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
-  try {
-    const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
-    if (u.blocca) {
-      const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
-      return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
+  // La porta non lancia: un suo guasto arriva qui come blocco e l'azione non parte (#1505).
+  const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
+  if (u.blocca) {
+    const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
+    return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...(u.regola === 'guasto' ? { guasto: true } : {}), ...comando } };
+  }
+  if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
+  if (u.nonCompare) {
+    action._nonCompare = true;
+    if (u.datiReason) action._exfilReason = u.datiReason;
+    // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
+    // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
+    if (!confirmed && !u.insiste && !soloConferma) {
+      return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
     }
-    if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
-    if (u.nonCompare) {
-      action._nonCompare = true;
-      if (u.datiReason) action._exfilReason = u.datiReason;
-      // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
-      // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
-      if (!confirmed && !u.insiste && !soloConferma) {
-        return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
-      }
-    }
-  } catch (e) {
-    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
 
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
@@ -4604,6 +4579,11 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
+  if (res.output && res.output.blocked === 'segreto' && res.output.guasto) {
+    return `Azione ${type} NON eseguita: ${res.output.frase}. Non contiene per forza un segreto: il controllo non ha `
+      + 'risposto, e senza di lui niente esce. Non riprovare con un\'altra azione che porta fuori le stesse cose. Di\' '
+      + 'all\'utente in una riga che non l\'hai fatto e perché.';
+  }
   if (res.output && res.output.blocked === 'segreto') {
     return `Azione ${type} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
       + 'È un blocco fisso di Filo: nessuna conferma e nessun livello lo sblocca. Non riprovare in un\'altra forma '
@@ -5591,7 +5571,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const giaScritta = unisciTesti(risposta);
     if (!chatId || (!successe.length && !giaScritta)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
@@ -5892,12 +5873,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
   // I collegamenti della risposta che il modello non avrebbe potuto aprire senza un OK lo chiedono anche al clic (#868.6).
   let linkDaConfermare = [];
+  // Senza giudizio i collegamenti della frase restano senza verdetto anche riaperta: al clic chiedono l'OK (#1505).
+  let senzaVerdetto = false;
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
       sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
       indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
     });
-  } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
+  } catch (e) {
+    senzaVerdetto = true;
+    console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e);
+  }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
@@ -5912,6 +5898,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         role: 'filo', text: textReply, actions: successe,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
         ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
+        ...(senzaVerdetto ? { senzaVerdetto } : {}),
         ...(cambi.length ? { cambi } : {}),
       },
       { onboarding: onbActive },
@@ -6181,11 +6168,13 @@ function ordinaCome(sx, layout) {
   }, layout);
 }
 
+// `daSalvate`: l'indirizzo l'ha salvato l'utente, non l'ha scritto un modello: la carta può chiedere l'icona al sito.
 function savedSuggestions(saved) {
   return saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
+    daSalvate: true,
   }));
 }
 
@@ -6251,22 +6240,46 @@ async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
         .filter((s) => s.text);
     }
   }
-  // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): la home
-  // chiede l'icona del sito appena lo mostra, prima di ogni clic, e al clic deve dire cosa ha fermato.
+  // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): al clic la home
+  // deve dire cosa ha fermato. La porta guarda la home come un compito che ha letto testo di altri (#1505).
+  const casa = contestoDellaHome(inputs);
   for (let i = 0; i < suggestions.length; i++) {
-    let u = null;
-    try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
+    const u = suggestions[i].action ? await controllaUscita(suggestions[i].action, casa) : null;
     if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
-    // La home legge titoli di pagine e frasi di Filo, cioè testo di altri: un indirizzo con un dato dell'utente chiede l'OK.
+    // Un indirizzo con un dato dell'utente, o composto dal modello, chiede l'OK al clic; un controllo mancato pure.
     const a = suggestions[i].action;
     const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
     if (!/^https?:/i.test(url)) continue;
     let chiede = [];
-    try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
+    try {
+      chiede = await linkCheChiedonoOk('', { ...casa, sempre: true, indirizzi: [url] });
+    } catch (_) { chiede = [{ motivo: VerdettiUscite.MOTIVI.guasto }]; }
     if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
+  // I collegamenti del messaggio di Filo nella home hanno lo stesso giudizio dei suggerimenti.
+  let linkDaConfermare = [];
+  let senzaVerdetto = false;
+  if (message) {
+    try { linkDaConfermare = await linkCheChiedonoOk(message, { ...casa, sempre: true }); } catch (_) { senzaVerdetto = true; }
+  }
   await FiloMem.setDashboardCache({ message: message || cached?.message || '', suggestions, signature: inputs.signature });
-  return { message, suggestions, ts: new Date().toISOString() };
+  return { message, suggestions, ts: new Date().toISOString(), ...(linkDaConfermare.length ? { linkDaConfermare } : {}), ...(senzaVerdetto ? { senzaVerdetto } : {}) };
+}
+
+// La home legge testo di altri (titoli di schede e di pagine salvate, notifiche, conversazioni, cose successe): per la
+// porta è un compito contaminato (#1505). Un indirizzo che compare in schede, salvate o cronologia si apre; uno composto
+// dal modello chiede l'OK, e un codice letto lì non esce. `parole` = quello che l'utente ha scritto, che può uscire.
+function contestoDellaHome(inputs) {
+  const p = (inputs && inputs.payload) || {};
+  const letto = ['stato', 'notifiche', 'salvati', 'appunti', 'lezioni', 'eventi']
+    .map((k) => (typeof p[k] === 'string' ? p[k] : '')).filter((t) => t.trim()).join('\n');
+  const provenienza = PageRead.contestoChat();
+  PageRead.annotaLink(provenienza, ((inputs && inputs.saved) || []).map((x) => x && x.url).filter(Boolean).join('\n'));
+  return {
+    contesto: [{ type: 'LETTURA_HOME', _output: { daFuori: [{ testo: letto || '(la home non ha letto niente)', fonte: 'da ciò che legge la home' }] } }],
+    provenienza,
+    parole: (inputs && inputs.parole) || '',
+  };
 }
 
 function schedeWebAperte() {
@@ -6406,9 +6419,11 @@ const handlerCtx = {
   controllaUscita,
   apriDaFilo,
   sitoDaConfermare,
+  contattabilePrimaDelClic,
   SCHEMI_USCITA,
   ricordaLettoDallAiuto,
   ricordaLettoInChat,
+  ricordaVerdettiArchiviati,
   decisioneAzionePagina,
   segnaLetturaAiuto,
   fileScaricato,

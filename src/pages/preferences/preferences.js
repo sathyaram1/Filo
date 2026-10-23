@@ -151,40 +151,40 @@
     Bootstrap.applyThemeTokens(currentOverrides);
   }
 
-  // La mappa dei token si salva intera: si parte da quella in memoria adesso e
-  // ci si applicano solo i token toccati qui, o un colore chiesto a Filo con la
-  // pagina aperta sparirebbe al primo ritocco (#592).
+  // Si mandano solo i token toccati qui e il main li posa sulla mappa salvata: un colore chiesto a Filo con la pagina
+  // aperta resta al primo ritocco (#592), e il salvataggio parte subito, prima che la scheda si chiuda (#1343.1).
   const tokenDaSalvare = new Set();
   const tokenInCorso = new Set();
   let tokenAzzeraTutti = false;
+  // Un token spedito resta di questa pagina finché il main non risponde: l'eco di un cambio partito prima (il tema
+  // toccato subito dopo, la chat) lo riporterebbe indietro nel campo.
+  const tokenInViaggio = new Map();
+  let giriToken = 0;
 
   async function persistTokens() {
     const biglietto = caselle.spedita('token');
-    const nomi = [...tokenDaSalvare];
     const tutti = tokenAzzeraTutti;
+    const nomi = tutti && Tokens ? Tokens.names() : [...tokenDaSalvare];
     tokenDaSalvare.clear();
     tokenAzzeraTutti = false;
+    if (!nomi.length) return;
+    const giro = ++giriToken;
+    const modifica = {};
     for (const name of nomi) {
+      tokenInViaggio.set(name, giro);
+      modifica[name] = Object.prototype.hasOwnProperty.call(currentOverrides, name) ? currentOverrides[name] : null;
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
       if (v === '' || !Tokens || Tokens.validate(name, v)) tokenInCorso.delete(name);
     }
-    let next = {};
-    if (!tutti) {
-      const fresh = await Storage.getSettings().catch(() => null);
-      next = { ...((fresh && fresh.themeTokens) || {}) };
-      for (const name of nomi) {
-        if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) next[name] = currentOverrides[name];
-        else delete next[name];
-      }
-    }
-    currentOverrides = { ...next };
-    for (const name of tokenInCorso) {
-      const input = $(`tok-${name}`);
-      const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
-    }
-    chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
+    // «Ripristina tutti» sostituisce la mappa: se ne vanno anche i token che questa pagina non conosce.
+    const msg = tutti
+      ? { type: MSG.UPDATE_SETTINGS, settings: { themeTokens: {} } }
+      : { type: MSG.UPDATE_SETTINGS, settings: { themeTokens: modifica }, tokenModifica: true };
+    let r = null;
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    for (const name of nomi) if (tokenInViaggio.get(name) === giro) tokenInViaggio.delete(name);
+    if (r && r.ok && r.settings) riallineaToken(r.settings.themeTokens);
     if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
   }
 
@@ -194,13 +194,14 @@
     if (!Tokens) return;
     const salvati = mappa || {};
     const nomi = new Set([...Object.keys(currentOverrides), ...Object.keys(salvati)]);
+    const mio = (name) => tokenInCorso.has(name) || tokenDaSalvare.has(name) || tokenInViaggio.has(name);
     for (const name of nomi) {
-      if (tokenInCorso.has(name) || tokenDaSalvare.has(name)) continue;
+      if (mio(name)) continue;
       if (Object.prototype.hasOwnProperty.call(salvati, name)) currentOverrides[name] = salvati[name];
       else delete currentOverrides[name];
     }
     for (const name of Tokens.names()) {
-      if (!tokenInCorso.has(name) && !tokenDaSalvare.has(name)) renderTokenRow(name);
+      if (!mio(name)) renderTokenRow(name);
     }
   }
 

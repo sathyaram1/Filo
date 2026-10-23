@@ -17,10 +17,12 @@
   // guardiano, che vede la frase intera. Qui restano i marchi del codice
   // MONOUSO, che nessuno usa per il cancello di casa (#536): il nome del codice col suo senso, anche oltre un
   // complemento («codice di sicurezza monouso») o una parola («two-factor authentication code»).
-  const NOME_CODICE = '(?:codic\\w*|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
-  const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w+|temporary|monouso|usa\\s+e\\s+getta|recovery'
+  // Ogni ripetizione ha un tetto: su un token di milioni di caratteri una regex senza tetto finiva la pila e
+  // la porta delle uscite si fermava (#1505). Prova: tests/unit/usciteSegreti.test.mjs.
+  const NOME_CODICE = '(?:codic\\w{0,20}|chiav[ei]|passwords?|passphrases?|passcodes?|codes?|pins?)';
+  const SENSO_MONOUSO = '(?:recupero|ripristino|backup|temporane\\w{1,20}|temporary|monouso|usa\\s+e\\s+getta|recovery'
     + '|one[\\s-]?time|single[\\s-]?use|(?:a|in)\\s+due\\s+(?:fattori|passaggi)|two[\\s-]?(?:factor|step))';
-  const PAROLA = "[\\wÀ-ÿ'’-]+";
+  const PAROLA = "[\\wÀ-ÿ'’-]{1,64}";
   const MARCHI_MONOUSO = new RegExp(
     '(?:\\b(?:otp|mfa|2fa)\\b(?:\\s+(?:codes?|codice|pin))?'
     + `|\\b${NOME_CODICE}(?:\\s+(?:di|da|per)\\s+${PAROLA})?\\s+(?:di\\s+|da\\s+)?${SENSO_MONOUSO}\\b`
@@ -52,18 +54,23 @@
 
   // Le chiavi si riconoscono dal prefisso che il loro emittente ci mette
   // apposta: cercare «stringa lunga e casuale» prenderebbe mezzo web.
+  // Una chiave vera sta in poche centinaia di caratteri: il corpo si legge fino a MAX_TOKEN, e il gruppo dopo dice
+  // che il token prosegue. Lì il testo è costruito apposta e chi controlla un'uscita lo tratta da saturo.
+  const MAX_TOKEN = 1024;
   const FORME_CHIAVE = [
-    /\bsk-[A-Za-z0-9_-]{16,}/,
-    /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}/,
-    /\bgh[pousr]_[A-Za-z0-9]{20,}/,
-    /\bgithub_pat_[A-Za-z0-9_]{20,}/,
-    /\bxox[baprs]-[A-Za-z0-9-]{10,}/,
-    /\bAIza[A-Za-z0-9_-]{20,}/,
-    /\bAKIA[A-Z0-9]{12,}/,
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-    // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
-    new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n(?=[A-Za-z0-9+/])){20,}`),
-  ];
+    ['\\bsk-', '[A-Za-z0-9_-]', 16],
+    ['\\b(?:sk|pk|rk)_(?:live|test)_', '[A-Za-z0-9]', 10],
+    ['\\bgh[pousr]_', '[A-Za-z0-9]', 20],
+    ['\\bgithub_pat_', '[A-Za-z0-9_]', 20],
+    ['\\bxox[baprs]-', '[A-Za-z0-9-]', 10],
+    ['\\bAIza', '[A-Za-z0-9_-]', 20],
+    ['\\bAKIA', '[A-Z0-9]', 12],
+  ].map(([testa, corpo, min]) => new RegExp(`${testa}${corpo}{${min},${MAX_TOKEN}}(${corpo})?`))
+    .concat([
+      /-----BEGIN [A-Z ]{0,64}PRIVATE KEY-----/,
+      // Le righe di un PEM vanno a capo ogni 64 caratteri: la chiave resta una.
+      new RegExp(`\\b(?:${INIZI_PKCS8.join('|')})(?:[A-Za-z0-9+/]|\\r?\\n(?=[A-Za-z0-9+/])){20,}`),
+    ]);
 
   // Il pezzo che ogni chiave dello stesso tipo ha uguale: dice di che tipo è, non quale. Di un JWT lo sono intestazione e
   // dichiarazioni (l'emittente e la chiave di firma sono quelli di tutti): il segreto è la firma.
@@ -415,16 +422,21 @@
   }
 
   // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
-  // testo ne aveva più del tetto, e chi controlla un'uscita lì guarda la presenza dei suoi pezzi (urlExfil.js).
+  // testo ne aveva più del tetto, o una chiave più lunga di MAX_TOKEN, e chi controlla un'uscita lì guarda la presenza
+  // dei suoi pezzi (urlExfil.js).
   function segretiNelTesto(testoLetto) {
     const s = testo(testoLetto);
     const out = raccolta();
     const fine = () => Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
     if (!s.trim()) return fine();
+    let oltre = false;
     for (const re of FORME_CHIAVE) {
       const g = new RegExp(re.source, 'g');
       let m;
-      while ((m = g.exec(s)) && !out.saturo) out.push({ valore: m[0], regola: 'chiave' });
+      while ((m = g.exec(s)) && !out.saturo) {
+        if (m[1]) oltre = true;
+        out.push({ valore: m[1] ? m[0].slice(0, -m[1].length) : m[0], regola: 'chiave' });
+      }
     }
     codiciVicini(s, out);
     for (const m of s.match(IBAN_RE) || []) {
@@ -433,6 +445,7 @@
     for (const m of s.match(CARTA_RE) || []) {
       if (cartaValida(m)) out.push({ valore: m.replace(/[\s-]/g, ''), regola: 'carta' });
     }
+    if (oltre) out.saturo = true;
     return fine();
   }
 

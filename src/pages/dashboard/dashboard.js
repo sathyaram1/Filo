@@ -644,7 +644,8 @@
     return '';
   }
   async function apriProposta(url, vicino = null, chiedi = '') {
-    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url) };
+    const proposta = self.SN_MARKDOWN ? self.SN_MARKDOWN.scrittoDaUnModello(vicino) : !!(vicino && vicino.closest && vicino.closest('[data-filo-verdetti]'));
+    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url), proposta };
     let r = null;
     try { r = await send(msg); } catch (_) {}
     if (r && r.conferma) {
@@ -817,6 +818,8 @@
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
+    // I collegamenti di una frase di Filo hanno il verdetto della porta: senza, il clic e il tasto destro chiedono l'OK (#1505).
+    if (role !== 'user') div.dataset.filoVerdetti = '1';
     if (pending) div.classList.add('dash-bubble-pending');
     // L'ora la usa chi mette al loro posto nel tempo le righe delle altre app (dashboard-righe.js).
     div.dataset.ts = new Date().toISOString();
@@ -964,6 +967,7 @@
       if (!streamBubble) {
         streamBubble = document.createElement('div');
         streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+        streamBubble.dataset.filoVerdetti = '1';
         bubblesEl.appendChild(streamBubble);
       }
       return streamBubble;
