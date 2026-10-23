@@ -197,10 +197,37 @@
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
-      if (!text) return;
+      if (!text && !allegati.immagini.length) return;
+      const immagini = allegati.immagini;
       ta.value = '';
-      submit({ userMessage: text });
+      allegati = { immagini: [] };
+      disegnaAllegati();
+      submit({ userMessage: text, immagini });
     };
+    // Ctrl+V di un'immagine e un'immagine lasciata sul pannello entrano come quelle lasciate sulla pagina: solo dall'utente.
+    ta.addEventListener('paste', (e) => {
+      if (!e.isTrusted) return;
+      const files = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === 'file' && /^image\//i.test(it.type || ''))
+        .map((it) => it.getAsFile()).filter(Boolean);
+      if (!files.length) return;
+      e.preventDefault();
+      allega(files);
+    });
+    const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
+    for (const tipo of ['dragenter', 'dragover']) {
+      root.addEventListener(tipo, (e) => {
+        if (!e.isTrusted || !conImmagini(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+      });
+    }
+    root.addEventListener('drop', (e) => {
+      if (!e.isTrusted || !conImmagini(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      allega(e.dataTransfer.files);
+    });
     form.addEventListener('submit', (e) => e.preventDefault());
     form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
       e.preventDefault();
