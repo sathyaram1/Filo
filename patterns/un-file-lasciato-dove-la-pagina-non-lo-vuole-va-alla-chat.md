@@ -18,7 +18,9 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
   dragover lì. Il preload ascolta in cattura e aggiunge, mentre l'evento scende, un ascolto in bolla su `window` che
   arriva dopo quelli della pagina: solo se nessuno l'ha cancellato lo cancella lui e se lo segna. Al drop, se il
   dragover era suo, ferma l'evento prima della pagina: i file erano per la chat, e la pagina non li vede.
-  Codice: `src/preload/rilascio-file.js`, montato da `page-preload.js` (frame principale) e da `internal-preload.js`.
+  Codice: `src/preload/rilascio-file.js`, montato da `page-preload.js` in ogni frame e da `internal-preload.js`. Un
+  riquadro incorporato non ha il pannello: legge le immagini e le manda al main, che le gira al frame principale della
+  sua scheda senza mai leggere un percorso per conto di un sito.
 - **Solo eventi veri.** Un rilascio fabbricato dallo script della pagina (`isTrusted` falso) non arriva all'Aiuto, e
   nemmeno un incolla: [Un pezzo di Filo dentro un sito ubbidisce solo all'utente](un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md).
   Non si passa da una navigazione a `file://`: una pagina potrebbe chiederla da sé, il dragover no.
