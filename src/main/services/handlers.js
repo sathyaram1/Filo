@@ -996,16 +996,22 @@ async function maybeRunCompactor() {
     const text = (r?.text || '').trim();
     const versione = meta.versione || 0;
     let applicata;
-    if (!text || /^NESSUNA MODIFICA/i.test(text)) {
+    const nessuna = !text || /^NESSUNA MODIFICA/i.test(text);
+    let nonRimesse = 0;
+    if (nessuna) {
       applicata = await FiloMem.applicaCompattazione({ patch: {}, usate: buf, versione });
     } else {
       const letto = Q.leggiCompattatore(FiloMem.parseCompactorOutput(text), {
         rif, meta, tolte: meta.nascoste, ora: inizio,
       });
+      nonRimesse = letto.scartate.length;
       if (letto.scartate.length) console.warn(`[Filo] compattatore: ${letto.scartate.length} righe tolte dall'utente non rimesse`);
       applicata = await FiloMem.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, versione });
     }
     if (!applicata) console.warn('[Filo] compattatore: l\'utente ha cambiato la memoria mentre lavorava, riparte al giro dopo');
+    try {
+      globalThis.SN_CONTATORI_MAIN?.attivita('compattazioni', { esito: !applicata ? 'rimandata' : nessuna ? 'nessuna' : 'applicata', nonRimesse });
+    } catch (_) {}
     return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
