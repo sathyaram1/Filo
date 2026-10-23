@@ -419,7 +419,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
   test('prova il commit della spinta, con lo stesso comando e lo stesso Node del cancello', () => {
     assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
     assert.match(lavoro, /fetch-depth:\s*0/, 'come il cancello di pubblicazione, che prova con la storia intera');
-    const cancello = passi(senzaCommenti(job('release'))).find((p) => p.id === 'gate');
+    const cancello = passi(senzaCommenti(job('cancello'))).find((p) => p.id === 'gate');
     const comando = 'node scripts/unit-con-riprova.mjs --registro unit.log';
     assert.ok(cancello.corpo.includes(comando), 'il cancello di pubblicazione è cambiato: questo lavoro va allineato');
     assert.ok(unit?.corpo.includes(comando));
