@@ -229,9 +229,13 @@
   const ADD_KEY = /<add\b[^>\n]*?\bkey\s*=\s*"([^"\n]{1,60})"[^>\n]*?\bvalue\s*=\s*"([^"\n]{1,256})"/gid;
   const SEGNAPOSTO_DI_TIPO = /^(?:string|text|null|none|nil|undefined|true|false|required|optional|secret|changeit|\*+|x+|\.+|<[^>]*>)$/i;
   const QUALIFICA_CHIAVE = /^(?:api|secret|private|access|auth|client|app|master|signing|encryption|license|licence|account|service|subscription|webhook|session)$/;
+  // Dopo la parola password il nome dice di che password si tratta solo con una conferma o un indice
+  // («password_confirmation», «password2»); altrimenti ne descrive una proprietà («password_label», «password_reset_timeout»).
+  const DOPO_PASSWORD = /^(?:\d+|confirm\w*|again|repeat|new|old|current|plain\w*|clear|raw|value)$/;
   function tipoDiNome(nome) {
     const parti = nome.split(/[_.:\s-]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean).map((p) => p.toLowerCase());
-    if (parti.some((p) => PAROLA_CHIAVE.test(p) || /(?:password|passwd|passphrase)$/.test(p))) return 'password';
+    const pw = parti.findIndex((p) => PAROLA_CHIAVE.test(p) || /(?:password|passwd|passphrase)$/.test(p));
+    if (pw >= 0) return parti.slice(pw + 1).every((p) => DOPO_PASSWORD.test(p)) ? 'password' : '';
     if (parti.some((p, i) => /^(?:secrets?|tokens?|credentials?)$/.test(p) || /(?:secret|token|apikey)$/.test(p)
       || (/^keys?$/.test(p) && i > 0 && QUALIFICA_CHIAVE.test(parti[i - 1])))) return 'segreto';
     return '';
