@@ -917,6 +917,7 @@ module.exports = function register(on, ctx) {
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      try { globalThis.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da: 'aiuto', ...globalThis.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
       segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       return { ok: true, ...r };
     } catch (e) {
