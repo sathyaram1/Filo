@@ -236,7 +236,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, ORA]) {
+  for (const testo of [GIORNO, ORA, CHIAMATE]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
