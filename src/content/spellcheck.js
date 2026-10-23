@@ -1738,7 +1738,8 @@
     return el.ownerDocument.body || el.ownerDocument.documentElement;
   }
 
-  function contestoDelCampo(el, { soloPrima = 0 } = {}) {
+  // `intorno`: solo i primi caratteri prima e dopo il campo, per le date (intornoDelCampo).
+  function contestoDelCampo(el, { soloPrima = 0, intorno = 0 } = {}) {
     const vuoto = { prima: '', dopo: '', troncato: false };
     // Nei riquadri di Filo intorno c'è Filo, non la pagina.
     if (!el || radiceDi(el)) return vuoto;
