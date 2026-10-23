@@ -318,6 +318,7 @@
     function ferma() {
       c.giro++;
       smetti();
+      esitoDellAttesa('annullata');
       if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
       if (c.stato !== 'pronto') imposta('pronto');
     }
@@ -325,6 +326,7 @@
     function scollega() {
       c.giro++;
       smetti();
+      esitoDellAttesa('annullata');
       if (c.sessione) { c.sessione.ferma('altro'); c.sessione = null; }
       campo.removeEventListener('input', suInput);
       doveTasti.removeEventListener('keydown', suTasto);
