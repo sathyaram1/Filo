@@ -133,7 +133,7 @@ test('un riquadro di un altro sito che chiede lo schermo: la pillola nomina lui 
 
 test('una scheda che la pagina apre con lo stesso clic sta a schermo pieno: la pillola nomina lei', async ({ app, openTab, testServer }) => {
   const altrove = testServer.html('<html><body style="margin:0;background:#400"><h1>Accedi al tuo conto</h1></body></html>', { pubblico: true });
-  const page = await testServer.openReady(openTab, `<html><body style="margin:0"><button id="vai" style="position:fixed;left:40px;top:40px;width:240px;height:90px">Video</button>
+  await testServer.openReady(openTab, `<html><body style="margin:0"><button id="vai" style="position:fixed;left:40px;top:40px;width:240px;height:90px">Video</button>
 <script>document.getElementById('vai').addEventListener('click', () => { document.documentElement.requestFullscreen().catch(() => {}); window.open(${JSON.stringify(altrove)}, '_blank'); });</script></body></html>`);
   const prima = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
   await clicca(app, 120, 80);
