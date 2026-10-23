@@ -870,9 +870,9 @@
           status: obj.status === 'continue' ? 'continue' : 'done',
         };
       }
-      // La esegue la sidebar con runPageAction(), più sotto.
+      // La esegue la pagina (src/content/aiutoPagina.js), con runPageAction(), più sotto.
       if (obj.action === 'page' && obj.page && typeof obj.page === 'object'
-        && typeof obj.page.op === 'string' && PAGE_ACTIONS[obj.page.op]) {
+        && typeof obj.page.op === 'string' && Object.prototype.hasOwnProperty.call(azioniDiPagina(), obj.page.op)) {
         return {
           kind: 'page_action',
           page: obj.page,
