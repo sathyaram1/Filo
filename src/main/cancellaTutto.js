@@ -27,7 +27,8 @@ const RESTA = Object.freeze({
 // L'identità dei crediti e ciò che la regge: l'account anonimo, la chiave e l'ultimo stato letto, con le copie messe da
 // parte (identity.bin.<etichetta>…). Senza, i crediti sul server non si raggiungono più.
 const IDENTITA = Object.freeze(['identity.bin', 'wallet.bin', 'wallet-stato.bin']);
-// Le righe del registro d'uso non ancora scritte sul server appartengono ai crediti: se l'identità resta, restano.
+// Le righe del registro d'uso non ancora scritte sul server, e il conto di quelle perse, appartengono ai crediti: se
+// l'identità resta, restano.
 const CHIAVI_IDENTITA = Object.freeze(['walletUsageQueue', 'walletUsageLog']);
 const TENTATIVI_MASSIMI = 3;
 
