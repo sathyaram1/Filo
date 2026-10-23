@@ -119,7 +119,8 @@
         }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
-        return { ...r, provider: a.provider, model: aModel };
+        // `tentativo` (da 1): quale della catena ha risposto, per i contatori (#1464).
+        return { ...r, provider: a.provider, model: aModel, tentativo: i + 1 };
       } catch (err) {
         lastErr = err;
         tentativoFallito(onTentativoFallito, err, aModel);
