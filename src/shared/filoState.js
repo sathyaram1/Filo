@@ -180,6 +180,7 @@
       readAutonomia(),
       readSempreAperte(Mem),
     ]);
+    const tabs = schedaChat == null ? tabsLette : tabsLette.map((t) => (t.id === schedaChat ? { ...t, chat: true } : t));
 
     const sessionInfo = session.sessionStartedAt
       ? {
