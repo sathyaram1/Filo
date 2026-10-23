@@ -39,7 +39,8 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
 - **Nessun file sparisce in silenzio.** Alla chat arrivano tutti i file lasciati insieme a un'immagine: la home prende
   gli altri col percorso, l'Aiuto dice in un avviso che non sono immagini.
 - **Le immagini restano nel turno.** Nell'Aiuto stanno nella cronologia, così i passi che fa da solo le vedono ancora;
-  il main le lascia passare solo come `data:` di un'immagine (`src/main/services/storiaAiuto.js`).
+  il main le lascia passare solo come `data:` di un'immagine (`src/main/services/storiaAiuto.js`). Nel filo della
+  home le immagini non si salvano: il messaggio resta, anche senza testo, e dice quante erano.
 - **Fila delle schede e barra laterale** prendono il rilascio nel loro documento (`src/renderer/rilascio.js`) e lo
   mandano al main, che legge dal disco solo immagini e solo per loro (`src/main/rilascioNellaChat.js`), e le consegna
   alla scheda davanti con `CHAT_ALLEGA`.
