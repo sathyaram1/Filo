@@ -20,7 +20,7 @@ const INTERVISTA_FERMA_MS = 24 * 60 * 60 * 1000;
 const PAGINA_LETTURA = 1000;
 const TETTO_PAGINE = 200;
 
-const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {} });
+const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} });
 const AZIONE_MUTA = Object.freeze({ visto() {}, fine() {}, scheda() {} });
 
 function valoreFs(v) {
