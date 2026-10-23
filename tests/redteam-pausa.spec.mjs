@@ -113,6 +113,7 @@ test.beforeEach(() => {
   patch.length = 0;
   chiamate.length = 0;
   serverInPausa = false;
+  invioLento = 0;
 });
 
 // Firestore ha l'indirizzo scritto nel codice: nel main il `fetch` globale lo ridirige al finto.
