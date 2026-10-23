@@ -669,7 +669,6 @@ function crea(dip = {}) {
       }
       delete mappa[k];
       delete stato.rifiutati[k];
-      if (primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
       stato.ultimo = { periodo: k, at: adesso() };
       stato.errore = '';
       if (esito !== 'fallito') esito = 'inviati';
