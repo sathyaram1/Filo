@@ -123,14 +123,15 @@ service cloud.firestore {
     // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
     // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
     // parte fusa (una parte tardiva vale solo col suo nome). Lo scrivono il server e
-    // server:fondi (admin); la pratica si chiude all'ultima parte.
+    // server:fondi (admin); la pratica si chiude all'ultima parte. Il cancello delle
+    // routine ci scrive `worker/…`: fuori forma, ogni update dell'owner cadrebbe (#1336.1).
     function localMergesValido(d) {
       return !('localMerges' in d)
         || (d.localMerges is map
             && d.localMerges.keys().hasOnly(['app', 'server', 'solo', 'ramo'])
             && (!('ramo' in d.localMerges)
                 || (d.localMerges.ramo is string && d.localMerges.ramo.size() <= 200
-                    && d.localMerges.ramo.matches('^claude/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$')))
+                    && d.localMerges.ramo.matches('^(claude|worker)/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$')))
             && (!('app' in d.localMerges) || (d.localMerges.app is int && d.localMerges.app > 0))
             && (!('server' in d.localMerges) || (d.localMerges.server is int && d.localMerges.server > 0))
             && (!('solo' in d.localMerges) || d.localMerges.solo in ['app', 'server']));
