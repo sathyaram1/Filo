@@ -114,7 +114,7 @@ test('un giudizio mancato nella pulizia automatica si dice con un avviso e nei l
     globalThis.__chiamate = 0;
     globalThis.SN_TAB_TRIAGE_DECIDE = async () => {
       globalThis.__chiamate++;
-      throw Object.assign(new Error('OpenRouter 402 Payment Required'), { provider: 'openrouter', status: 402, keySource: 'personal' });
+      throw Object.assign(new Error('OpenRouter 402 Payment Required'), { provider: 'openrouter', status: 402, keySource: 'personal', keyRefused: true });
     };
   });
 
