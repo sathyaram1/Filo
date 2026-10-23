@@ -264,7 +264,7 @@ test('i classificatori: una misura per richiesta servita, col tentativo della ca
     },
   };
   const { G, ricevute } = cancello({ provider: { getProvider: () => P } });
-  const r = await G.decideAll({ action: A.TAB_TRIAGE, requests: [{ state: 'a', questions: {} }, { state: 'b', questions: {} }], parallel: 2 });
+  const r = await G.decideAll({ action: A.FILO_TAB_TRIAGE, requests: [{ state: 'a', questions: {} }, { state: 'b', questions: {} }], parallel: 2 });
   assert.equal(r.model, M);
   assert.equal(ricevute.length, 1, 'un giro, una consegna');
   assert.equal(ricevute[0].info.length, 2);
