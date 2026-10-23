@@ -51,15 +51,10 @@ for (const [nome, html, sel] of [['quill', QUILL, '.ql-editor'], ['draft', DRAFT
     await page.keyboard.type('Ciao marco come va, non so perchè ');
     await page.waitForTimeout(400);
     log.push(`dopo scritto: modello=${JSON.stringify(await m())} dom=${JSON.stringify(await dom())}`);
-    await page.keyboard.type('ok');
-    await page.waitForTimeout(300);
-    log.push(`dopo ok: modello=${JSON.stringify(await m())} dom=${JSON.stringify(await dom())}`);
-    await page.keyboard.press('Backspace');
-    await page.keyboard.press('Backspace');
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(300);
     log.push(`dopo annulla: modello=${JSON.stringify(await m())} dom=${JSON.stringify(await dom())}`);
-    await page.keyboard.type('fine ');
+    await page.keyboard.type('ok fine ');
     await page.waitForTimeout(300);
     log.push(`dopo fine: modello=${JSON.stringify(await m())} dom=${JSON.stringify(await dom())}`);
     console.log(`\n[${nome}]\n` + log.join('\n'));
