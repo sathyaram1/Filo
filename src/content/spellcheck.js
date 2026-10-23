@@ -1991,10 +1991,8 @@
       b.title = s.cercando ? t('spell_segnaposto_cerco') : t('spell_segnaposto_metti', s.correzioni[0]);
       b.style.left = `${r.left + r.width / 2}px`;
       b._snX = r;
-      const posto = postoDelValore(state, b, r, tr);
-      b.style.top = `${posto === 'sotto' ? r.bottom : r.top}px`;
-      b.classList.toggle('sn-sotto', posto === 'sotto');
-      b.classList.toggle('sn-sopra-testo', posto === 'velato');
+      b.style.top = `${r.top}px`;
+      b.classList.toggle('sn-sopra-testo', copreIlTesto(state, b, r, tr.a));
     }
     for (const [k, b] of state.badge) if (!usati.has(k)) { b.remove(); state.badge.delete(k); }
     for (const l of v.querySelectorAll('.sn-spell-lampo')) l.remove();
@@ -2009,21 +2007,19 @@
     }
   }
 
-  // Il valore non copre le parole del campo (#1448): sopra le x se la riga prima lì è libera, se no sotto (le x sull'ultima
-  // riga, mentre si scrive); con parole sopra e sotto resta sopra velato, lascia il clic al testo e si sveglia dalle x.
-  function postoDelValore(state, b, x, tr) {
+  // Sopra le x di una riga che non è la prima il valore cadrebbe sulle parole della riga prima (#1448): lì resta velato,
+  // lascia il clic al testo e si sveglia (pieno, cliccabile) col puntatore sulle x, finché resta su x o valore.
+  function copreIlTesto(state, b, x, da) {
     const w = b.offsetWidth;
     const h = b.offsetHeight;
-    if (!w || !h) return 'sopra';
+    if (!w || !h) return false;
     const cx = x.left + x.width / 2;
-    const copre = (top, da, a) => rettangoliDi(state, da, a).some((r) => {
+    const top = x.top - 1 - h;
+    return rettangoliDi(state, Math.max(0, da - 1000), da).some((r) => {
       const mezzo = r.top + r.height / 2;
       if (mezzo >= x.top && mezzo <= x.bottom) return false;
       return r.bottom > top + 1 && r.top < top + h - 1 && r.right > cx - w / 2 && r.left < cx + w / 2;
     });
-    if (!copre(x.top - 1 - h, Math.max(0, tr.a - 1000), tr.a)) return 'sopra';
-    if (!copre(x.bottom + 1, tr.b, tr.b + 1000)) return 'sotto';
-    return 'velato';
   }
 
   function svegliaValori(e) {
