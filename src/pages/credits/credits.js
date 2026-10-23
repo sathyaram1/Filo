@@ -300,7 +300,12 @@
       $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
       $('redeemForm').hidden = true;
-      if (w.usingOwnKey) {
+      if (w.chiaveStaccata === 'altro_pseudonimo') {
+        // Una chiave nuova è di questo portafoglio: da lì i consumi tornano a registrarsi.
+        note.textContent = 'La chiave personale salvata qui non è quella del tuo portafoglio, e quello che consumi non si registra. Chiedine una nuova.';
+        note.hidden = false;
+        reissue.hidden = false;
+      } else if (w.usingOwnKey) {
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
