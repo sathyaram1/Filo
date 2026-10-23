@@ -96,7 +96,10 @@ export function npmInstall(radice) {
 }
 
 // Fuori da node_modules: crearlo per il blocco cambierebbe da dove un worktree risolve i pacchetti.
-export const fileBlocco = (radice, cartella = tmpdir()) => join(cartella, `filo-pacchetti-${createHash('sha1').update(resolve(radice)).digest('hex').slice(0, 16)}.lock`);
+export function fileBlocco(radice, cartella = tmpdir()) {
+  const impronta = createHash('sha1').update(resolve(radice)).digest('hex').slice(0, 16);
+  return join(cartella, `filo-pacchetti-${impronta}.lock`);
+}
 
 function prendiBlocco(f, ora) {
   try { closeSync(openSync(f, 'wx')); return true; } catch (e) { if (!e || e.code !== 'EEXIST') throw e; }
