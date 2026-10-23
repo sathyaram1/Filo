@@ -1710,9 +1710,8 @@
     aggiornaTestoQuadrato();
   }
 
-  // Dall'etichetta al feedback vero: la scheda è già in questa dashboard, quindi «guarda cosa era stato chiesto» è un
-  // click, non una ricerca. Per id quando c'è: un numero può essere di più documenti (#1517), e il sì dell'owner vale
-  // per l'id. Senza id vale il numero, solo se è di uno. Se non è in lista, nulla.
+  // Dall'etichetta al feedback vero, già in questa dashboard. Per id quando c'è: un numero può essere di più documenti
+  // (#1517), e il sì dell'owner vale per l'id. Senza id vale il numero, solo se è di uno. Se non è in lista, nulla.
   function feedbacksColNumero(num) {
     const cerca = String(num || '').trim().replace(/^#+/, '');
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return [];

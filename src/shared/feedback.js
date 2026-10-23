@@ -109,9 +109,8 @@
     return `${host}${resto.slice(0, limite - host.length - 1)}…`;
   }
 
-  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo
-  // invio uguale viene rifiutato. Id non ammesso → '', cioè nessuna idempotenza.
-  // La forma è quella che le regole chiedono alla create anonima (#1517): 20-128 caratteri.
+  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo invio uguale viene rifiutato.
+  // Id fuori dalla forma che le regole chiedono alla create anonima (#1517) → '', cioè nessuna idempotenza.
   function sanitizeDocId(id) {
     if (!id) return '';
     const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 128);
@@ -703,9 +702,8 @@
         statusPublic: toFsValue('open'),
       },
     };
-    // `createdAt` e `updatedAt` li mette Firestore all'ora della richiesta (REQUEST_TIME), come le regole chiedono
-    // alla create anonima (#1517). `updatedAt` è il campo su cui la dashboard chiede «cosa è cambiato da allora?»:
-    // OGNI cammino che tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
+    // Le due date le mette Firestore (REQUEST_TIME), come le regole chiedono alla create anonima (#1517). Su `updatedAt`
+    // la dashboard chiede «cosa è cambiato da allora?»: OGNI cammino che tocca un feedback lo rimette (`touchUpdatedAt`).
     let dateDelServer = ['createdAt', 'updatedAt'];
     if (seq) {
       doc.fields.seq = { integerValue: String(seq) };
@@ -1314,10 +1312,8 @@
   // che oltre ce ne possono essere altri, e allora non si sceglie.
   const NUMERO_RIGHE_MAX = 200;
 
-  /**
-   * Il solo documento #seq.sub fra le righe lette per quel `seq`. Due o più (un numero doppio, #1517) o una lettura
-   * piena: lancia con gli id, invece di legare il primo che capita. → id | null. PURA.
-   */
+  // Il solo documento #seq.sub fra le righe lette per quel `seq`, o null. Due o più (un numero doppio, #1517) o una
+  // lettura piena: lancia con gli id in `numeroDoppio`, invece di legare il primo che capita. PURA.
   function unicoDelNumero(rows, seq, sub, limite = NUMERO_RIGHE_MAX) {
     const righe = Array.isArray(rows) ? rows : [];
     const etichetta = `#${seq}${sub ? `.${sub}` : ''}`;

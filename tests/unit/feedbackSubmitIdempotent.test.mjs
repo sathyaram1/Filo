@@ -4,13 +4,15 @@
 // server; l'utente, vedendo un (falso) errore, ripremeva "Invia" e ogni
 // ripetizione creava un DOCUMENTO DUPLICATO (osservato: lo stesso feedback #360,
 // #361, #362 + uno senza numero, a 30-40s l'uno dall'altro). Il fix dà a ogni
-// composizione un `submissionId` stabile usato come documentId Firestore: un
+// composizione un `submissionId` stabile usato come id del documento: un
 // secondo create con lo stesso id torna 409 ALREADY_EXISTS e viene trattato come
-// successo idempotente, non come un nuovo feedback.
+// successo idempotente, non come un nuovo feedback. Dal #1517 la create è un
+// `:commit` con `exists: false` (le date le mette Firestore), e senza id d'invio
+// il documento ne prende uno casuale.
 //
-// Pre-condizione che renderebbe rosso il test senza il fix: senza documentId il
-// secondo create colpirebbe l'endpoint auto-id e creerebbe un secondo documento
-// (o, col 409 simulato, `submit` lancerebbe invece di dedurre).
+// Pre-condizione che renderebbe rosso il test senza il fix: senza l'id stabile il
+// secondo create scriverebbe un secondo documento (o, col 409 simulato, `submit`
+// lancerebbe invece di dedurre).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

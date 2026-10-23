@@ -129,9 +129,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // L'id d'invio della riapertura (#1517): casuale, nato al primo tentativo di questa voce (fix, persona) e riusato
-  // dai ritentativi finché uno riesce. Ricavato da dati pubblici, un create anonimo poteva occuparlo prima e il 409
-  // passava per «già scritto da me»: il tester pagava e il suo testo si perdeva. Senza storage resta in memoria.
+  // L'id d'invio della riapertura (#1517): casuale, nato al primo tentativo della voce (fix, persona) e riusato finché
+  // uno riesce. Ricavato da dati pubblici, un create anonimo lo occupava prima. Senza storage resta in memoria.
   const INVII_RIAPERTURA_KEY = 'boardReopenInvii';
   const INVIO_RIAPERTURA_MAX_MS = 30 * 24 * 60 * 60 * 1000;
   const inviiInMemoria = new Map();

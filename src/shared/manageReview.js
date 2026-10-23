@@ -1539,12 +1539,8 @@
     routine: 'routine', server: 'allarme del server', test: 'collaudo',
   };
 
-  /**
-   * Cosa dire accanto al numero di una pratica nominata da una richiesta di fusione o da una domanda (#1517): stato e
-   * classe del mittente del documento con QUELL'id, e un avviso se il numero è di più documenti. `fb` = il documento
-   * in pagina o null; `riserva` = { stato, mittenteClasse } mandati dal server quando il documento non c'è;
-   * `doppi` = quanti documenti in pagina portano quel numero. → { testo, doppi } o null. PURA.
-   */
+  // Accanto al numero di una pratica nominata da una fusione o da una domanda (#1517): stato e mittente del documento
+  // `fb` (o della `riserva` del server se non è in pagina) e `doppi`, quanti documenti hanno quel numero. PURA.
   function descriviRiferimento(fb, riserva, doppi) {
     const n = Number(doppi) || 0;
     const r = riserva && typeof riserva === 'object' ? riserva : {};

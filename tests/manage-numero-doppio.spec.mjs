@@ -8,8 +8,8 @@ import { apriScheda } from './helpers/gestione.mjs';
 const MANAGE = 'filo://manage/manage.html';
 const base = { text: 'x', subSeq: 0, statusPublic: 'open', createdAt: '2026-10-20T08:00:00Z', images: [] };
 // L'estraneo viene per primo: è quello che il vecchio «primo col numero» apriva.
-const ESTRANEO = { ...base, _id: 'fb-estraneo', seq: 5, name: 'Testo che non c’entra', status: 'todo', clientId: 'utente-x', mittenteClasse: 'utente' };
-const VERO = { ...base, _id: 'fb-vero', seq: 5, name: 'La pratica della richiesta', status: 'working', clientId: 'local:claude', senderProof: 'admin', mittenteClasse: 'sessione_locale' };
+const ESTRANEO = { ...base, text: 'Un altro discorso, scritto da un estraneo.', _id: 'fb-estraneo', seq: 5, name: 'Testo che non c’entra', status: 'todo', clientId: 'utente-x', mittenteClasse: 'utente' };
+const VERO = { ...base, text: 'Il testo della pratica vera.', _id: 'fb-vero', seq: 5, name: 'La pratica della richiesta', status: 'working', clientId: 'local:claude', senderProof: 'admin', mittenteClasse: 'sessione_locale' };
 const FUSA = {
   id: 'ab12cd34ef56ab12cd34ef56', branch: 'claude/numero-doppio', sha: 'a1b2c3d4'.repeat(5), mergeSha: 'feedface'.repeat(5),
   who: 'owner@esempio', origin: 'locale', num: '#5', feedbackId: 'fb-vero', blocks: [],
@@ -53,8 +53,9 @@ test('fusione: il bottone d’origine apre il documento della richiesta e dice c
   await scatta(page, 'fusione');
   await box.locator('.sn-mac-origin-link').click();
   await expect(page.locator('#mgDetail')).toBeVisible();
-  await expect(page.locator('#mgDetailHead')).toContainText('La pratica della richiesta');
-  await expect(page.locator('#mgDetailHead')).not.toContainText('Testo che non c’entra');
+  await expect(page.locator('.mg-item[data-id="fb-vero"]')).toHaveClass(/mg-item--selected/);
+  await expect(page.locator('.mg-item[data-id="fb-estraneo"]')).not.toHaveClass(/mg-item--selected/);
+  await expect(page.locator('#mgDetail')).toContainText('Il testo della pratica vera.');
 });
 
 test('fusione senza id e numero doppio: non apre a caso, lo dice', async ({ openTab }) => {
@@ -89,7 +90,8 @@ test('domanda: il collegamento apre il documento del suo id, con stato, mittente
   await scatta(page, 'domanda');
   await dq.locator('.mg-dq-legame').click();
   await expect(page.locator('#mgDetail')).toBeVisible();
-  await expect(page.locator('#mgDetailHead')).toContainText('La pratica della richiesta');
+  await expect(page.locator('.mg-item[data-id="fb-vero"]')).toHaveClass(/mg-item--selected/);
+  await expect(page.locator('#mgDetail')).toContainText('Il testo della pratica vera.');
 });
 
 test('domanda aperta prima della lista: stato e mittente arrivano quando la lista arriva', async ({ openTab }) => {
