@@ -381,6 +381,8 @@ test('Conservativo, dopo una pagina web letta in chat: «dimentica» chiede e di
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
+    // Una riga sola, al singolare fino in fondo (#592.23).
+    expect(testo).toContain('Non entrerà più nelle conversazioni. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
     await clickConfirm(page, 'cancel');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
