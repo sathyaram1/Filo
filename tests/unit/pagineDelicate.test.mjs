@@ -129,6 +129,10 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
   assert.deepEqual(s.elenco.voci, ['studiorossi.it']);
   assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi commercialista').rifiuto, /«commercialista» non è un dominio/);
+  // Un nome con lo spazio si ridice intero, come nell'avviso della pagina Sicurezza (#718.3).
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi il sito studio rossi e banca.it').rifiuto,
+    /^«studio rossi» non è un dominio/);
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi faceb e youtub').rifiuto, /^«faceb», «youtub» non sono domini/);
 });
 
 test('main: il campo password visto resta dopo un riavvio, e dall\'incognito non si scrive', async () => {
