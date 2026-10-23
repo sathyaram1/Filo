@@ -9,7 +9,7 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: NN righe verdi, uscita 0 (#1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
+// Esito atteso: 71 righe verdi, uscita 0 (#1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
 // che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più le fa
 // rifiutare tutte (per questo le chiamate ai modelli hanno il loro documento), mentre la sentinella che legge il file
 // non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
