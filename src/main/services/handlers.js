@@ -8,6 +8,7 @@ const PageRead = require('./pageRead');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { daFilo, origineDi } = require('./handlers/origine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
