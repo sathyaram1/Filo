@@ -4222,8 +4222,8 @@
     if (immediate) { via(); return; }
     setTimeout(via, motionMs(220));
   }
-  // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
-  // toast (es. "Annulla" dopo una modifica automatica di Filo).
+  // `action` opzionale = { label, onClick, title?, durata? }: aggiunge un bottone cliccabile nel
+  // toast (es. "Annulla" dopo una modifica automatica di Filo), offerto anche dal tasto destro sull'avviso.
   function showEditorToast(text, action) {
     const el = document.createElement('div');
     el.className = 'ed-toast';
@@ -4231,15 +4231,17 @@
     span.textContent = text;
     el.appendChild(span);
     const hasAction = action && action.label && typeof action.onClick === 'function';
+    const esegui = () => {
+      removeEdToast(el);
+      try { action.onClick(); } catch (_) {}
+    };
     if (hasAction) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'ed-toast-action';
       btn.textContent = action.label;
-      btn.addEventListener('click', () => {
-        removeEdToast(el);
-        try { action.onClick(); } catch (_) {}
-      });
+      if (action.title) btn.title = action.title;
+      btn.addEventListener('click', esegui);
       el.appendChild(btn);
     }
     // Il clic sull'avviso (fuori dal suo pulsante) lo chiude: è l'unica strada con la durata a 0.
