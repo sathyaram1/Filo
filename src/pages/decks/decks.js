@@ -1420,7 +1420,7 @@
       bot.stopped = true;
     } else if (!r || !r.ok) {
       bot.error = (r && r.error) || 'nessuna risposta';
-      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, maxTokens: r.maxTokens, finishReason: r.finishReason };
+      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, reason: r.reason, maxTokens: r.maxTokens, finishReason: r.finishReason };
       if (window.SN_CHAT_ERRORS?.rimedioPagina?.(rimedio)) bot.rimedio = rimedio;
     } else {
       bot.reply = r.reply || '';
