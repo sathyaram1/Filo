@@ -1,4 +1,4 @@
-// I contatori anonimi (#969, #1461): cosa si conta, in che forma esce, e cosa non passa. Logica pura: niente disco né rete.
+// I contatori anonimi (#969, #1461, #1464): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
@@ -9,6 +9,10 @@
   const VERSIONE = 2;
   const VERSIONE_GIORNO = 1;
   const COLLEZIONE = 'contatori-giornalieri';
+  // Le misure delle chiamate ai modelli (#1464) partono in un documento a parte, con lo stesso id dell'ora: le regole
+  // dell'ora sono già vicine al tetto di mille espressioni che Firestore valuta per scrittura.
+  const VERSIONE_CHIAMATE = 1;
+  const COLLEZIONE_CHIAMATE = 'contatori-chiamate';
 
   // Il tipo di guasto di una chiamata: l'elenco chiuso della decisione dell'owner (#969).
   const ERRORI = Object.freeze(['rete', 'tempo', 'crediti', 'chiave', 'nessun_host', 'fornitore']);
@@ -23,9 +27,46 @@
   const NOMI_POSIZIONI = Object.freeze(POSIZIONI.map(([k]) => k));
 
   const CAMPI_GIORNO = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori']);
-  const MISURE = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
+  const MISURE_ORA = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
     'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte']);
-  const CAMPI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE]);
+  const CAMPI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE_ORA]);
+
+  // ── Le chiamate ai modelli (#1464) ────────────────────────────────────────
+  // Misurate al cancello, sul tentativo che ha servito: per funzione e modello, «modello|…|n». Fasce in token da 1024.
+  const K = 1024;
+  const FASCE_CONTESTO = Object.freeze([['t2k', 2 * K], ['t8k', 8 * K], ['t16k', 16 * K], ['t32k', 32 * K], ['t64k', 64 * K],
+    ['t128k', 128 * K], ['oltre', Infinity]]);
+  // «nd»: l'host non dice quanta parte del contesto ha letto dalla cache, o quanto ha ragionato.
+  const ND = 'nd';
+  const FASCE_CACHE = Object.freeze(['zero', 'q25', 'q50', 'q75', 'q100', ND]);
+  const FASCE_RAGIONAMENTO = Object.freeze([['r0', 0], ['r1k', K], ['r4k', 4 * K], ['r16k', 16 * K], ['oltre', Infinity]]);
+  const FASCE_USCITA = Object.freeze([['o256', 256], ['o1k', K], ['o4k', 4 * K], ['o16k', 16 * K], ['oltre', Infinity]]);
+  const FINI = Object.freeze(['stop', 'length', 'tool_calls', 'filtro', 'altro']);
+  const TENTATIVI = Object.freeze(['t1', 't2', 't3', 't4_oltre']);
+  // Il costo detto dal router, quello stimato dal listino delle Opzioni, quello chiesto dopo (voce, dettatura, una
+  // risposta rotta a metà). Si somma in centomillesimi di dollaro.
+  const ORIGINI_SPESA = Object.freeze(['router', 'stima', 'tardiva']);
+  const CENTOMILLESIMI = 100000;
+  const FASCE_CHIAMATE = Object.freeze([['c1', 1], ['c2', 2], ['c3_5', 5], ['c6_12', 12], ['oltre', Infinity]]);
+  // Quando Filo cambia la richiesta per stare nei limiti del modello: la conversazione stretta dopo un rifiuto per
+  // lunghezza e la finestra imparata più piccola del tetto delle Opzioni (la chat), il ragionamento tolto e richiesto.
+  const ADATTAMENTI = Object.freeze(['contesto_stretto', 'finestra_piccola', 'ragionamento_tolto']);
+  const nomi = (fasce) => fasce.map(([k]) => k);
+  // Quello che segue il modello in ogni voce, per misura: l'elenco chiuso intero.
+  const RESTI = Object.freeze({
+    contesto: Object.freeze(nomi(FASCE_CONTESTO)),
+    cache: FASCE_CACHE,
+    ragionamento: Object.freeze([...nomi(FASCE_RAGIONAMENTO), ND]),
+    uscita: Object.freeze(nomi(FASCE_USCITA).flatMap((f) => FINI.map((x) => `${f}|${x}`))),
+    ripieghi: Object.freeze(TENTATIVI.flatMap((t) => [`${t}|si`, `${t}|no`])),
+    spesa: ORIGINI_SPESA,
+    adattamenti: ADATTAMENTI,
+  });
+  const MISURE_MODELLI = Object.freeze(Object.keys(RESTI));
+  const MISURE_CHIAMATE = Object.freeze([...MISURE_MODELLI, 'chiamate']);
+  const CAMPI_CHIAMATE = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', ...MISURE_CHIAMATE]);
+  // Tutto quello che un'ora tiene sul disco, nei due documenti.
+  const MISURE = Object.freeze([...MISURE_ORA, ...MISURE_CHIAMATE]);
   // Il primo documento di un giorno, o di un mese, di una copia di Filo: chi conta le installazioni legge solo quelli.
   const PRIMI = Object.freeze(['', 'giorno', 'mese']);
 
@@ -81,6 +122,9 @@
   const TETTO_CONFERME = 20;
   const TETTO_VALORI = 12;
   const TETTO_PRIME_VOLTE = 400;
+  // Le voci con un modello di un'ora in una misura delle chiamate, su tutte le funzioni insieme: oltre, il modello
+  // diventa «altro». Le righe «altro» restano libere, così la somma non perde niente.
+  const TETTO_MODELLI_ORA = 80;
   // Due mesi di ore in attesa, e trecento invii a giro: un server tornato dopo settimane si rimette in pari in un giorno.
   const TETTO_ORE_IN_ATTESA = 62 * 24;
   const TETTO_GIORNI_IN_ATTESA = 62;
@@ -139,6 +183,14 @@
   const TIPO_AZIONE_FORMA = '^[A-Za-z][A-Za-z0-9_-]{0,39}$';
   const ERRORE_VISTO_FORMA = '^[a-z0-9_:.-]{1,80}$';
   const PASSO_FORMA = '^[a-z0-9_-]{1,30}$';
+  // Le misure delle chiamate: «modello|resto|n», col resto dal suo elenco chiuso; le chiamate per uso in cinque fasce.
+  const RESTI_FORMA = Object.freeze({
+    contesto: alternative(RESTI.contesto), cache: alternative(RESTI.cache), ragionamento: alternative(RESTI.ragionamento),
+    uscita: `${alternative(nomi(FASCE_USCITA))}[|]${alternative(FINI)}`, ripieghi: `${alternative(TENTATIVI)}[|](si|no)`,
+    spesa: alternative(RESTI.spesa), adattamenti: alternative(RESTI.adattamenti),
+  });
+  const FORME_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, forma(`${MOD}[|]${RESTI_FORMA[c]}[|]${N}`)])));
+  const CHIAMATE_FORMA = `^${N}(,${N}){4}$`;
 
   const re = (s) => new RegExp(s);
   const USO_RE = re(USO_FORMA);
@@ -151,6 +203,8 @@
   const CONTO_RE = re(CONTO_FORMA);
   const ANTICIPO_RE = re(ANTICIPO_FORMA);
   const INTERVISTA_RE = re(INTERVISTA_FORMA);
+  const MODELLI_RE = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, re(FORME_MODELLI[c])])));
+  const CHIAMATE_RE = re(CHIAMATE_FORMA);
 
   // Il tetto di caratteri di ogni valore annidato, misurato sulla sua voce più lunga possibile, con margine.
   const TETTO_CARATTERI_USO = 80;
@@ -164,6 +218,11 @@
   const TETTO_CARATTERI_CONTO = 9;
   const TETTO_CARATTERI_ANTICIPO = 19;
   const TETTO_CARATTERI_INTERVISTA = 45 * SCELTE_INTERVISTA.length;
+  // Una funzione sola può avere tutte le voci col modello dell'ora, più una riga «altro» per resto.
+  const lungo = (campo) => Math.max(...RESTI[campo].map((r) => r.length));
+  const TETTI_CARATTERI_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c,
+    TETTO_MODELLI_ORA * (120 + lungo(c) + 13) + RESTI[c].length * (ALTRO.length + lungo(c) + 13)])));
+  const TETTO_CARATTERI_CHIAMATE = 49;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
@@ -398,6 +457,7 @@
     return {
       uso: {}, errori: {}, azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {},
       anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {}, primeVolte: [],
+      contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
     };
   }
 
@@ -555,6 +615,96 @@
     const g = normale(ora);
     if (g.primeVolte.includes(id) || g.primeVolte.length >= TETTO_PRIME_VOLTE) return false;
     g.primeVolte.push(id);
+    return true;
+  }
+
+  // ── Le chiamate ai modelli (#1464) ──────────────────────────────────────
+  const numero = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) || Number(v) < 0 ? null : Number(v));
+  function fasciaIn(fasce, v) {
+    const n = numero(v);
+    return n == null ? '' : fasce.find(([, fino]) => n <= fino)[0];
+  }
+  function fasciaCache(letti, ingresso, detta) {
+    if (!detta) return ND;
+    const q = (numero(letti) || 0) / ingresso;
+    if (!(q > 0)) return 'zero';
+    return q <= 0.25 ? 'q25' : q <= 0.5 ? 'q50' : q <= 0.75 ? 'q75' : 'q100';
+  }
+  function fineDi(f) {
+    const s = String(f == null ? '' : f).toLowerCase();
+    if (s === 'content_filter') return 'filtro';
+    return ['stop', 'length', 'tool_calls'].includes(s) ? s : ALTRO;
+  }
+  function tentativoDi(t) {
+    const n = Number(t);
+    if (!Number.isInteger(n) || n < 1) return '';
+    return n >= 4 ? 't4_oltre' : `t${n}`;
+  }
+
+  function voceSpecifiche(mappa) {
+    let n = 0;
+    for (const per of Object.values(mappa)) if (oggetto(per)) for (const k of Object.keys(per)) if (!k.startsWith(`${ALTRO}|`)) n++;
+    return n;
+  }
+
+  // `quanto` è 1 per un conto; per la spesa, i centomillesimi con la virgola: si arrotonda quando il documento parte.
+  function piuModello(ora, campo, funzione, modello, resto, quanto = 1) {
+    if (!RESTI[campo].includes(resto)) return false;
+    const mappa = normale(ora)[campo];
+    const per = oggetto(mappa[funzione]) ? mappa[funzione] : {};
+    let m = modelloPulito(modello);
+    if (m !== ALTRO && !has(per, `${m}|${resto}`) && voceSpecifiche(mappa) >= TETTO_MODELLI_ORA) m = ALTRO;
+    const k = `${m}|${resto}`;
+    const prima = Number(per[k]);
+    per[k] = Math.min(MAX_CONTO, (Number.isFinite(prima) && prima > 0 ? prima : 0) + quanto);
+    mappa[funzione] = per;
+    return true;
+  }
+
+  function registraSpesa(ora, funzione, modello, origine, usd) {
+    const u = numero(usd);
+    if (!funzioni().includes(funzione) || !ORIGINI_SPESA.includes(origine) || !(u > 0)) return false;
+    return piuModello(ora, 'spesa', funzione, modello, origine, u * CENTOMILLESIMI);
+  }
+
+  function registraAdattamento(ora, funzione, modello, tipo) {
+    if (!funzioni().includes(funzione) || !ADATTAMENTI.includes(tipo)) return false;
+    return piuModello(ora, 'adattamenti', funzione, modello, tipo);
+  }
+
+  // Una chiamata servita: ogni misura entra solo se la risposta porta il suo dato. `ingresso`, `cacheLetti`, `uscita`
+  // e `ragionamento` sono token; `cacheDetta` e `ragionamento` null dicono che l'host non li ha dati; `fine` c'è solo
+  // per le risposte di testo; `tentativo` (da 1) solo per le catene di ripiego.
+  function registraChiamata(ora, funzione, c = {}) {
+    if (!funzioni().includes(funzione) || !oggetto(c)) return false;
+    const m = c.modello;
+    const ingresso = numero(c.ingresso);
+    if (ingresso > 0) {
+      piuModello(ora, 'contesto', funzione, m, fasciaIn(FASCE_CONTESTO, ingresso));
+      if (c.cacheDetta !== undefined) piuModello(ora, 'cache', funzione, m, fasciaCache(c.cacheLetti, ingresso, c.cacheDetta));
+    }
+    if (c.ragionamento !== undefined) {
+      const r = numero(c.ragionamento);
+      piuModello(ora, 'ragionamento', funzione, m, r == null ? ND : fasciaIn(FASCE_RAGIONAMENTO, r));
+    }
+    if (c.fine !== undefined && numero(c.uscita) != null) {
+      piuModello(ora, 'uscita', funzione, m, `${fasciaIn(FASCE_USCITA, c.uscita)}|${fineDi(c.fine)}`);
+    }
+    const t = tentativoDi(c.tentativo);
+    if (t) piuModello(ora, 'ripieghi', funzione, m, `${t}|${c.ricominciata ? 'si' : 'no'}`);
+    if (c.ragionamentoTolto) piuModello(ora, 'adattamenti', funzione, m, 'ragionamento_tolto');
+    if (oggetto(c.spesa)) registraSpesa(ora, funzione, m, c.spesa.origine, c.spesa.usd);
+    return true;
+  }
+
+  // Le chiamate al modello di un uso: un messaggio di chat coi suoi giri di strumenti ne fa più d'una.
+  function registraChiamate(ora, funzione, n) {
+    const f = Number.isInteger(n) && n >= 1 ? fasciaIn(FASCE_CHIAMATE, n) : '';
+    if (!funzioni().includes(funzione) || !f) return false;
+    const g = normale(ora);
+    const per = oggetto(g.chiamate[funzione]) ? g.chiamate[funzione] : {};
+    piuUno(per, f);
+    g.chiamate[funzione] = per;
     return true;
   }
 
@@ -718,6 +868,43 @@
     return out;
   }
 
+  // Una misura delle chiamate: «modello|resto|n» separati da «;». Oltre TETTO_MODELLI_ORA voci col modello, su tutte le
+  // funzioni, il modello diventa «altro» e la voce si somma alla sua riga.
+  function modelliPuliti(mappa, campo) {
+    const out = {};
+    const resti = RESTI[campo];
+    let specifiche = 0;
+    for (const f of funzioni()) {
+      const per = oggetto(mappa) && has(mappa, f) ? mappa[f] : null;
+      if (!oggetto(per)) continue;
+      const voci = new Map();
+      for (const [k, v] of Object.entries(per)) {
+        const i = String(k).indexOf('|');
+        const resto = i < 0 ? '' : k.slice(i + 1);
+        const n = Math.round(Number(v));
+        if (!resti.includes(resto) || !intero(n) || n === 0) continue;
+        let m = modelloPulito(k.slice(0, i));
+        if (m !== ALTRO && !voci.has(`${m}|${resto}`)) {
+          if (specifiche >= TETTO_MODELLI_ORA) m = ALTRO; else specifiche += 1;
+        }
+        voci.set(`${m}|${resto}`, conto(Math.min(MAX_CONTO, (voci.get(`${m}|${resto}`) || 0) + n)));
+      }
+      if (voci.size) out[f] = [...voci].map(([k, n]) => `${k}|${n}`).join(';');
+    }
+    return out;
+  }
+
+  function chiamatePulite(mappa) {
+    const out = {};
+    for (const f of funzioni()) {
+      const per = oggetto(mappa) && has(mappa, f) ? mappa[f] : null;
+      if (!oggetto(per)) continue;
+      const v = fasceIn(per, nomi(FASCE_CHIAMATE), MAX_CONTO);
+      if (/[1-9]/.test(v)) out[f] = v;
+    }
+    return out;
+  }
+
   function meseDi(giorno) { return String(giorno || '').slice(0, 7); }
 
   function documento({ pseudonimo, chiave, app, os, dati, primo = '' }) {
@@ -748,6 +935,25 @@
     };
   }
 
+  // Le chiamate ai modelli della stessa ora, nel loro documento: stesso pseudonimo, stessa ora, stesso id.
+  function documentoChiamate({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    return {
+      v: VERSIONE_CHIAMATE,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
+      ...Object.fromEntries(MISURE_MODELLI.map((c) => [c, modelliPuliti(d[c], c)])),
+      chiamate: chiamatePulite(d.chiamate),
+    };
+  }
+  // Un'ora senza chiamate ai modelli non ha il secondo documento.
+  function senzaChiamate(doc) { return MISURE_CHIAMATE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
+
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
     const d = oggetto(dati) ? dati : {};
@@ -771,7 +977,7 @@
   }
 
   function idDocumento(doc) {
-    return doc && doc.v === VERSIONE ? `${doc.pseudonimo}_${doc.giorno}_${doc.ora}` : `${doc.pseudonimo}_${doc.giorno}`;
+    return oggetto(doc) && has(doc, 'ora') ? `${doc.pseudonimo}_${doc.giorno}_${doc.ora}` : `${doc.pseudonimo}_${doc.giorno}`;
   }
 
   // ── Il contrario, per chi legge i documenti ───────────────────────────────
@@ -802,6 +1008,15 @@
     const [aperte, scelte, posizioni, vuote] = String(s).split(';');
     return { aperte: Number(aperte), scelte: fasceLette(scelte, NOMI_FASCE), posizioni: fasceLette(posizioni, NOMI_POSIZIONI), vuote: Number(vuote) };
   }
+  // Una misura delle chiamate: { modello, resto, n }, col resto com'è nella voce («o1k|stop», «t2|no»).
+  function leggiModelli(campo, s) {
+    if (!MODELLI_RE[campo] || !MODELLI_RE[campo].test(String(s))) return null;
+    return String(s).split(';').map((v) => {
+      const p = v.split('|');
+      return { modello: p[0], resto: p.slice(1, -1).join('|'), n: Number(p[p.length - 1]) };
+    });
+  }
+  function leggiChiamate(s) { return CHIAMATE_RE.test(String(s)) ? fasceLette(s, nomi(FASCE_CHIAMATE)) : null; }
   const somma = (o) => Object.values(o).reduce((a, n) => a + n, 0);
 
   // ── La validazione: la stessa forma che chiedono le regole, e in più i conti che devono tornare ─────────────
@@ -853,6 +1068,30 @@
     if (!Array.isArray(doc.primeVolte) || doc.primeVolte.length > TETTO_PRIME_VOLTE
       || doc.primeVolte.some((x) => typeof x !== 'string' || !re(CHIAVE_AZIONE_FORMA).test(x))
       || new Set(doc.primeVolte).size !== doc.primeVolte.length) return no('primeVolte');
+    return { ok: true, motivo: '' };
+  }
+
+  function validaChiamate(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    if (!oggetto(doc)) return no('non è un documento');
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_CHIAMATE.length || !CAMPI_CHIAMATE.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== VERSIONE_CHIAMATE) return no('versione');
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    const ammesse = funzioni();
+    for (const c of MISURE_CHIAMATE) {
+      const [forma, tetto] = c === 'chiamate' ? [CHIAMATE_RE, TETTO_CARATTERI_CHIAMATE] : [MODELLI_RE[c], TETTI_CARATTERI_MODELLI[c]];
+      if (!oggetto(doc[c])) return no(c);
+      for (const [f, v] of Object.entries(doc[c])) {
+        if (!ammesse.includes(f)) return no(`${c}: funzione ${f}`);
+        if (typeof v !== 'string' || v.length > tetto || !forma.test(v)) return no(`${c} di ${f}`);
+      }
+      if (c === 'chiamate') continue;
+      const tutte = Object.values(doc[c]).flatMap((v) => leggiModelli(c, v));
+      if (tutte.filter((x) => x.modello !== ALTRO).length > TETTO_MODELLI_ORA) return no(`${c}: voci oltre il tetto`);
+    }
     return { ok: true, motivo: '' };
   }
 
@@ -944,7 +1183,10 @@
   }
 
   global.SN_CONTATORI = {
-    VERSIONE, VERSIONE_GIORNO, COLLEZIONE, ERRORI, OS, PRIMI, FASCE, NOMI_FASCE, POSIZIONI, NOMI_POSIZIONI, CAMPI, CAMPI_GIORNO, MISURE,
+    VERSIONE, VERSIONE_GIORNO, VERSIONE_CHIAMATE, COLLEZIONE, COLLEZIONE_CHIAMATE, ERRORI, OS, PRIMI, FASCE, NOMI_FASCE, POSIZIONI,
+    NOMI_POSIZIONI, CAMPI, CAMPI_GIORNO, CAMPI_CHIAMATE, MISURE, MISURE_ORA, MISURE_MODELLI, MISURE_CHIAMATE,
+    FASCE_CONTESTO, FASCE_CACHE, FASCE_RAGIONAMENTO, FASCE_USCITA, FINI, TENTATIVI, ORIGINI_SPESA, CENTOMILLESIMI, FASCE_CHIAMATE,
+    ADATTAMENTI, RESTI, TETTO_MODELLI_ORA,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
@@ -954,20 +1196,20 @@
     FORME: Object.freeze({
       USO_FORMA, ERRORI_FORMA, MISURA_FORMA, IMPOSTAZIONI_FORMA, RICERCA_FORMA, CORRETTORE_FORMA, CONFERME_FORMA,
       CONTO_FORMA, ANTICIPO_FORMA, INTERVISTA_FORMA, CHIAVE_AZIONE_FORMA, CHIAVE_IMPOSTAZIONE_FORMA, TIPO_AZIONE_FORMA,
-      ERRORE_VISTO_FORMA, PASSO_FORMA,
+      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, MODELLI: FORME_MODELLI,
     }),
     TETTI: Object.freeze({
       TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI, TETTO_CARATTERI_ERRORI_ORA, TETTO_CARATTERI_MISURA, TETTO_CARATTERI_IMPOSTAZIONE,
       TETTO_CARATTERI_RICERCA, TETTO_CARATTERI_CORRETTORE, TETTO_CARATTERI_CONFERME, TETTO_CARATTERI_CONTO,
-      TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA,
+      TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, MODELLI: TETTI_CARATTERI_MODELLI,
     }),
     funzioni, funzioneDi, azioni, azioneDiPagina, tipiAzione, chiaviImpostazioni, chiaveImpostazione, valoreImpostazione, viaDi,
     passiIntervista, erroreVisto, tipoErroreVisto, fasciaDi, posizioneDi, famigliaOs, versioneApp, modelloPulito,
     hostPulito, tipoErrore,
     oraVuota, registraUso, registraAzione, registraErrore, registraImpostazione, registraRicerca, registraProposta,
     registraConferma, registraAnnullato, registraAnticipo, registraChiesto, registraErroreVisto, registraIntervista,
-    registraPrimaVolta,
-    documento, documentoGiorno, idDocumento, valida, leggiUso, leggiMisura, leggiErrori, leggiRicerca,
+    registraPrimaVolta, registraChiamata, registraSpesa, registraAdattamento, registraChiamate,
+    documento, documentoGiorno, documentoChiamate, senzaChiamate, idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
     giornoDi, oraDi, giornoPrima, meseDi, oreDaInviare, daInviare, potaOre, potaGiorni, pseudonimoDelMese,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -1,6 +1,6 @@
-// I contatori anonimi (#969, #1461): misura usi dei modelli, azioni e gli altri gesti di elenco chiuso, li tiene per ora
-// sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non spedisce; spenti,
-// butta anche quello che aveva, senza un ultimo segnale. Cosa esce e in che forma: src/shared/contatoriGiornalieri.js.
+// I contatori anonimi (#969, #1461, #1464): misura usi e chiamate dei modelli, azioni e gli altri gesti di elenco chiuso,
+// li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
+// spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const crypto = require('node:crypto');
@@ -20,7 +20,7 @@ const INTERVISTA_FERMA_MS = 24 * 60 * 60 * 1000;
 const PAGINA_LETTURA = 1000;
 const TETTO_PAGINE = 200;
 
-const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {} });
+const MUTO = Object.freeze({ visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} });
 const AZIONE_MUTA = Object.freeze({ visto() {}, fine() {}, scheda() {} });
 
 function valoreFs(v) {
@@ -195,13 +195,25 @@ function crea(dip = {}) {
     C.registraPrimaVolta(ora, id);
   }
 
-  function registraUso(funzione, attese, errori, { uso = true, t0 = adesso() } = {}) {
+  // `chiamate`: quante volte l'uso è andato al modello (le risposte dalla cache no).
+  function registraUso(funzione, attese, errori, { uso = true, t0 = adesso(), chiamate = 0 } = {}) {
     if (!uso && !errori.length) return Promise.resolve(false);
     const rip = uso ? ripetuta(`f:${funzione}`, t0) : false;
     return conta((ora) => {
       if (uso && C.registraUso(ora, funzione, { ...attese, ripetuta: rip })) primaVolta(ora, funzione);
+      if (uso && chiamate > 0) C.registraChiamate(ora, funzione, chiamate);
       for (const e of errori) C.registraErrore(ora, funzione, e);
     });
+  }
+
+  // I numeri della risposta che ha servito, e il costo arrivato dopo (#1464): contano subito, anche dentro un uso.
+  function chiamataServita(funzione, info) {
+    const lista = (Array.isArray(info) ? info : [info]).filter((x) => oggetto(x));
+    if (!lista.length) return;
+    conta((ora) => { for (const c of lista) C.registraChiamata(ora, funzione, c); }).catch(() => {});
+  }
+  function spesaTardiva(funzione, modello, usd) {
+    conta((ora) => C.registraSpesa(ora, funzione, modello, 'tardiva', usd)).catch(() => {});
   }
 
   function errorePer(lista) {
@@ -217,7 +229,8 @@ function crea(dip = {}) {
     const funzione = C.funzioneDi(action);
     const fuori = usoCorrente.getStore();
     if (!funzione || inIncognito() || (fuori && !fuori.chiuso && fuori.funzione === funzione)) return fn();
-    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, chiuso: false, soloGuasti, ok: false };
+    // `chiamate` conta anche le risposte dalla cache (l'uso c'è stato); `alModello` solo quelle andate al modello.
+    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, alModello: 0, chiuso: false, soloGuasti, ok: false };
     try {
       const r = await usoCorrente.run(uso, fn);
       uso.ok = true;
@@ -225,7 +238,9 @@ function crea(dip = {}) {
     } finally {
       uso.chiuso = true;
       const fine = uso.ok ? adesso() - uso.t0 : null;
-      if (uso.chiamate > 0) registraUso(funzione, { visto: uso.visto, fine }, uso.errori, { uso: !soloGuasti, t0: uso.t0 }).catch(() => {});
+      if (uso.chiamate > 0) {
+        registraUso(funzione, { visto: uso.visto, fine }, uso.errori, { uso: !soloGuasti, t0: uso.t0, chiamate: uso.alModello }).catch(() => {});
+      }
     }
   }
 
@@ -277,13 +292,18 @@ function crea(dip = {}) {
       const funzione = C.funzioneDi(action);
       if (!funzione || inIncognito()) return MUTO;
       // Un lavoro partito dentro un uso e arrivato dopo la sua fine conta da sé.
+      const chiamata = (info) => chiamataServita(funzione, info);
+      const tardiva = (modello, usd) => spesaTardiva(funzione, modello, usd);
       const uso = usoCorrente.getStore();
       if (uso && !uso.chiuso && uso.funzione === funzione) {
         uso.chiamate += 1;
+        uso.alModello += 1;
         return {
           visto() { if (uso.visto == null) uso.visto = adesso() - uso.t0; },
           errore: errorePer(uso.errori),
           fine(ok) { if (ok && uso.visto == null) uso.visto = adesso() - uso.t0; },
+          chiamata,
+          tardiva,
         };
       }
       const t0 = adesso();
@@ -298,8 +318,10 @@ function crea(dip = {}) {
           chiuso = true;
           const fine = ok ? adesso() - t0 : null;
           if (ok && visto == null) visto = fine;
-          registraUso(funzione, { visto, fine }, errori, { t0 }).catch(() => {});
+          registraUso(funzione, { visto, fine }, errori, { t0, chiamate: 1 }).catch(() => {});
         },
+        chiamata,
+        tardiva,
       };
     } catch (_) { return MUTO; }
   }
@@ -422,6 +444,14 @@ function crea(dip = {}) {
     return true;
   }
 
+  // La chat che cambia la richiesta per stare nella finestra del modello (#1464): `tipo` dall'elenco chiuso.
+  function adattamento(action, modello, tipo) {
+    const f = C.funzioneDi(action);
+    if (!f || !C.ADATTAMENTI.includes(tipo) || inIncognito()) return false;
+    conta((ora) => C.registraAdattamento(ora, f, modello, tipo)).catch(() => {});
+    return true;
+  }
+
   function chiesto(action) {
     const f = C.funzioneDi(action);
     if (!f) return false;
@@ -539,10 +569,10 @@ function crea(dip = {}) {
   }
 
   // ── La spedizione ────────────────────────────────────────────────────────
-  async function spedisci(doc) {
+  async function spedisci(doc, collezione = C.COLLEZIONE) {
     const { FIRESTORE_BASE, API_KEY } = rest();
     if (!FIRESTORE_BASE || !API_KEY) return { ok: false, motivo: 'server non configurato' };
-    const url = `${FIRESTORE_BASE}/${C.COLLEZIONE}?documentId=${encodeURIComponent(C.idDocumento(doc))}&key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}/${collezione}?documentId=${encodeURIComponent(C.idDocumento(doc))}&key=${API_KEY}`;
     const fields = Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, valoreFs(v)]));
     let res;
     try {
@@ -613,8 +643,16 @@ function crea(dip = {}) {
         delete mappa[k];
         continue;
       }
-      const r = await spedisci(doc);
+      const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
+      let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
+      // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
+      // allora l'ora rispedita risponde 409.
+      if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
+      if (r.ok && chiamate) {
+        r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
+        if (mia !== generazione) return 'spenti';
+      }
       if (!r.ok && r.soloQuesto) {
         stato.rifiutati[k] = oggi;
         stato.errore = r.motivo;
@@ -631,13 +669,22 @@ function crea(dip = {}) {
       }
       delete mappa[k];
       delete stato.rifiutati[k];
-      if (primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
       stato.ultimo = { periodo: k, at: adesso() };
       stato.errore = '';
       if (esito !== 'fallito') esito = 'inviati';
     }
     await salva();
     return esito;
+  }
+
+  // Le chiamate ai modelli di un'ora (#1464), se ne ha: un documento che non passa la validazione non ferma l'ora.
+  function documentoChiamate(k, base) {
+    const d = C.documentoChiamate(base);
+    if (C.senzaChiamate(d)) return null;
+    const v = C.validaChiamate(d);
+    if (v.ok) return d;
+    log(`le chiamate di ${k} non partono: ${v.motivo}`);
+    return null;
   }
 
   // Si ricordano i giorni che possono ancora partire (le ore restano in attesa al più due mesi) e tre mesi.
@@ -738,7 +785,7 @@ function crea(dip = {}) {
 
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
-    proposta, anticipoPronto, anticipoAperto, chiesto, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
+    proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina,
     controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
   };

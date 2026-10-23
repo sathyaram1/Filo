@@ -34,7 +34,9 @@ function daFs(v) {
 
 function banco({ accesi = true, incognito = false, finestra = true, risposta = 200, disco = new Map() } = {}) {
   const inviati = [];
-  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, n: 0 };
+  // Le chiamate ai modelli di un'ora (#1464) partono nella loro collezione: si contano a parte.
+  const chiamate = [];
+  const b = { t: T0, accesi, incognito, finestra, risposta, disco, inviati, chiamate, n: 0 };
   b.s = Servizio.crea({
     contatori: C,
     storage: {
@@ -54,7 +56,7 @@ function banco({ accesi = true, incognito = false, finestra = true, risposta = 2
     fetch: async (url, opt) => {
       if (b.risposta === 'rete') throw new TypeError('fetch failed');
       const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
-      inviati.push({ url, opt, doc });
+      (url.includes(`/${C.COLLEZIONE_CHIAMATE}?`) ? chiamate : inviati).push({ url, opt, doc });
       const st = typeof b.risposta === 'function' ? b.risposta(doc) : b.risposta;
       return { ok: st >= 200 && st < 300, status: st, json: async () => ({}) };
     },
@@ -97,6 +99,15 @@ test('un documento per ora, con la forma giusta e niente altro; un giorno senza 
     primeVolte: ['filo-chat', 'explain'],
   });
   assert.equal(C.valida(doc).ok, true);
+  // Le chiamate ai modelli della stessa ora partono accanto, con lo stesso id (#1464): qui ogni uso è una chiamata.
+  assert.equal(b.chiamate.length, 1);
+  assert.equal(b.chiamate[0].url, `${BASE}/${C.COLLEZIONE_CHIAMATE}?documentId=99999999999999999901_2026-10-15_09&key=K`);
+  assert.deepEqual(b.chiamate[0].doc, {
+    v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac',
+    contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {},
+    chiamate: { 'filo-chat': '2,0,0,0,0', explain: '1,0,0,0,0' },
+  });
+  assert.equal(C.validaChiamate(b.chiamate[0].doc).ok, true);
 
   // Le ore in cui Filo resta aperto senza niente non partono; il giorno dopo parte una volta sola, vuoto.
   for (let h = 0; h < 5; h++) { b.t += ORA; await b.s.controlla(); }
@@ -133,6 +144,92 @@ test('un messaggio di chat coi suoi giri di strumenti è un uso, con le attese d
   assert.deepEqual(C.leggiMisura(doc.uso['filo-chat']), { n: 1, visto: { s2: 1 }, fine: { s10: 1 }, ripetute: 0 });
   assert.deepEqual(C.leggiMisura(doc.uso['describe-image']), { n: 1, visto: { ms500: 1 }, fine: { ms500: 1 }, ripetute: 0 });
   assert.deepEqual(C.leggiErrori(doc.errori['filo-chat']), [{ modello: 'a/b', host: 'H', tipo: 'fornitore', n: 1 }]);
+});
+
+test('le chiamate di un uso (#1464): i numeri di ognuna subito, quante sono alla fine, la spesa chiesta dopo anche a uso chiuso', async () => {
+  const b = banco();
+  const servita = (h, ingresso, usd) => h.chiamata({
+    modello: 'deepseek/deepseek-v4-pro', ingresso, cacheLetti: ingresso / 2, cacheDetta: true, ragionamento: 300, uscita: 200, fine: 'tool_calls',
+    tentativo: 1, spesa: { usd, origine: 'router' },
+  });
+  let voce = null;
+  await b.s.unUso(A.FILO_CHAT, async () => {
+    const primo = b.s.apri(A.FILO_CHAT);
+    servita(primo, 9000, 0.003); primo.fine(true);
+    b.s.servitaDaCache(A.FILO_CHAT); // una risposta dalla cache non è una chiamata al modello
+    const secondo = b.s.apri(A.FILO_CHAT);
+    servita(secondo, 12000, 0.004); secondo.fine(true);
+  });
+  // La voce: una chiamata sola, il costo arriva dopo che è finita.
+  voce = b.s.apri(A.TTS);
+  voce.chiamata({ modello: 'openai/gpt-4o-mini-tts', ingresso: null, uscita: null, spesa: null });
+  voce.fine(true);
+  voce.tardiva('openai/gpt-4o-mini-tts', 0.0007);
+  await b.s.adattamento(A.FILO_CHAT, 'deepseek/deepseek-v4-pro', 'contesto_stretto');
+  assert.equal(b.s.adattamento(A.FILO_CHAT, 'deepseek/deepseek-v4-pro', 'un tipo inventato'), false);
+  await attendi();
+  b.t += ORA;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, 1);
+  const { doc } = b.chiamate[0];
+  assert.equal(C.validaChiamate(doc).ok, true, C.validaChiamate(doc).motivo);
+  assert.equal(C.idDocumento(doc), C.idDocumento(b.inviati[0].doc));
+  assert.deepEqual(C.leggiChiamate(doc.chiamate['filo-chat']), { c2: 1 }, 'due giri del messaggio, la cache no');
+  assert.deepEqual(C.leggiChiamate(doc.chiamate.tts), { c1: 1 });
+  assert.equal(doc.contesto['filo-chat'], 'deepseek/deepseek-v4-pro|t16k|2');
+  assert.equal(doc.cache['filo-chat'], 'deepseek/deepseek-v4-pro|q50|2');
+  assert.equal(doc.uscita['filo-chat'], 'deepseek/deepseek-v4-pro|o256|tool_calls|2');
+  assert.equal(doc.spesa['filo-chat'], 'deepseek/deepseek-v4-pro|router|700');
+  assert.equal(doc.spesa.tts, 'openai/gpt-4o-mini-tts|tardiva|70');
+  assert.equal(doc.adattamenti['filo-chat'], 'deepseek/deepseek-v4-pro|contesto_stretto|1');
+  assert.equal(doc.contesto.tts, undefined);
+});
+
+test('le chiamate in incognito e a contatori spenti non si contano, nemmeno la spesa che arriva dopo (#1464)', async () => {
+  const b = banco({ incognito: true, finestra: false });
+  const h = b.s.apri(A.FILO_CHAT);
+  h.chiamata({ modello: 'a/b', ingresso: 1000, spesa: { usd: 1, origine: 'router' } });
+  h.fine(true);
+  h.tardiva('a/b', 1);
+  assert.equal(b.s.adattamento(A.FILO_CHAT, 'a/b', 'finestra_piccola'), false);
+  b.incognito = false;
+  // Aperta fuori dall'incognito, spenta prima che il costo arrivi.
+  const voce = b.s.apri(A.TTS);
+  voce.fine(true);
+  await attendi();
+  b.accesi = false;
+  voce.tardiva('openai/gpt-4o-mini-tts', 0.5);
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'spenti');
+  b.accesi = true;
+  b.t += ORA;
+  await b.s.controlla();
+  assert.equal(b.inviati.length + b.chiamate.length, 0);
+});
+
+test('le chiamate che il server non accetta ancora (#1464) si riprovano il giorno dopo; l’ora già arrivata risponde 409 e non si conta due volte', async () => {
+  const b = banco({ finestra: false });
+  b.risposta = (doc) => (C.CAMPI_CHIAMATE.every((k) => k in doc) && 'contesto' in doc ? 403 : 200);
+  const h = b.s.apri(A.EXPLAIN);
+  h.chiamata({ modello: 'a/b', ingresso: 1000, uscita: 10, fine: 'stop', spesa: { usd: 0.001, origine: 'router' } });
+  h.fine(true);
+  await attendi();
+  b.t += ORA;
+  assert.equal(await b.s.controlla(), 'fallito');
+  assert.equal(b.inviati.length, 1, 'l’ora è partita');
+  assert.equal(b.chiamate.length, 1, 'le sue chiamate sono state rifiutate');
+  assert.equal(b.inviati[0].doc.primo, 'mese');
+  const stato = await b.s.letto();
+  assert.equal(Object.keys(stato.ore).length, 1, 'l’ora resta per le sue chiamate');
+  // Il giorno dopo le regole sono pubblicate: l'ora rispedita c'è già (409), le chiamate entrano.
+  b.risposta = (doc) => ('primo' in doc ? 409 : 200);
+  b.t += 24 * ORA;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.chiamate.length, 2);
+  assert.equal(b.chiamate[1].doc.spesa.explain, 'a/b|router|100');
+  assert.deepEqual(Object.keys((await b.s.letto()).ore), []);
+  assert.equal(b.inviati[1].doc.primo, '', 'il segno del primo documento è già dell’ora arrivata');
 });
 
 test('in incognito non si conta niente e non parte nessun documento', async () => {
@@ -237,7 +334,7 @@ test('un invio fallito riprova l’ora dopo, e al ritorno partono tutte le ore r
 test('un’ora che il server rifiuta non ferma le altre: si riprova il giorno dopo, e parte quando le regole la accettano', async () => {
   const b = banco();
   const rifiuta = new Set(['explain-deep']);
-  b.risposta = (doc) => (Object.keys(doc.uso).some((f) => rifiuta.has(f)) ? 403 : 200);
+  b.risposta = (doc) => (Object.keys(doc.uso || doc.chiamate).some((f) => rifiuta.has(f)) ? 403 : 200);
   await usa(b, A.EXPLAIN_DEEP); b.t += ORA;
   await usa(b, A.EXPLAIN); b.t += ORA;
   await b.s.controlla();
@@ -268,7 +365,7 @@ test('i giorni contati prima dell’invio ogni ora partono come allora, e non si
   const [vecchio, nuovo] = b.inviati;
   assert.equal(vecchio.url, `${BASE}/${C.COLLEZIONE}?documentId=99999999999999999901_2026-10-14&key=K`);
   assert.deepEqual(vecchio.doc, { v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-14', mese: '2026-10', app: '0.2.240', os: 'mac', uso: { help: '2;0,2,0,0,0,0,0' }, errori: {} });
-  assert.equal(nuovo.doc.v, 2);
+  assert.equal(nuovo.doc.v, C.VERSIONE);
   assert.equal(nuovo.doc.pseudonimo, vecchio.doc.pseudonimo);
   assert.deepEqual(b.disco.get(Servizio.CHIAVE).giorni, {});
 });

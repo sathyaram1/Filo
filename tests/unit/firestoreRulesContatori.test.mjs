@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461): la collezione è a sola creazione, letta solo dall'admin,
-// e la forma che accetta è la stessa che l'app costruisce, per le ore (v2) e per i giorni rimasti da prima (v1). Il
-// motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica, in millisecondi.
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464): le collezioni sono a sola creazione, lette solo
+// dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v2), i giorni di prima (v1) e le chiamate
+// ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,32 +20,43 @@ for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLeve
 const C = globalThis.SN_CONTATORI;
 const F = C.FORME;
 
-function blocco() {
+const senzaCommenti = (s) => s.replace(/\/\/[^\n]*/g, ' ');
+function blocco(collezione) {
   const righe = RULES.split('\n');
-  const i = righe.findIndex((r) => new RegExp(`^ {4}match\\s+/${C.COLLEZIONE}/\\{`).test(r));
-  assert.ok(i >= 0, `manca il blocco match /${C.COLLEZIONE}`);
+  const i = righe.findIndex((r) => new RegExp(`^ {4}match\\s+/${collezione}/\\{`).test(r));
+  assert.ok(i >= 0, `manca il blocco match /${collezione}`);
   const j = righe.findIndex((r, k) => k > i && /^ {4}\}\s*$/.test(r));
-  return righe.slice(i, j + 1).join('\n').replace(/\/\/[^\n]*/g, ' ');
+  return senzaCommenti(righe.slice(i, j + 1).join('\n'));
 }
-const B = blocco();
+const B = blocco(C.COLLEZIONE);
+const BC = blocco(C.COLLEZIONE_CHIAMATE);
+// Le funzioni che le ore e le loro chiamate condividono stanno fra l'intestazione dei contatori e il blocco delle ore.
+const CONDIVISE = (() => {
+  const a = RULES.indexOf('    // ── I contatori anonimi');
+  const b = RULES.indexOf(`    match /${C.COLLEZIONE}/{`);
+  assert.ok(a >= 0 && b > a, 'le funzioni condivise dei contatori stanno prima del blocco delle ore');
+  return senzaCommenti(RULES.slice(a, b));
+})();
+const TUTTO = [CONDIVISE, B, BC].join('\n');
 
 function corpo(nome) {
-  const m = new RegExp(`function ${nome}\\([^)]*\\)\\s*\\{\\s*return([\\s\\S]*?);\\s*\\}`).exec(B);
+  const m = new RegExp(`function ${nome}\\([^)]*\\)\\s*\\{\\s*((?:let [^;]+;\\s*)*)return([\\s\\S]*?);\\s*\\}`).exec(TUTTO);
   assert.ok(m, `manca la funzione ${nome} nelle regole`);
-  return m[1].replace(/\s+/g, ' ').trim();
+  return m[2].replace(/\s+/g, ' ').trim();
 }
 const GIORNO = corpo('contatoriGiorno');
 const ORA = corpo('contatoriOra');
+const CHIAMATE = corpo('contatoriChiamate');
 
-function regole() {
+function regole(testo) {
   const out = [];
   const re = /allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g;
   let m;
-  while ((m = re.exec(B)) !== null) out.push({ verbi: m[1].split(',').map((v) => v.trim()), cond: m[2].replace(/\s+/g, ' ').trim() });
+  while ((m = re.exec(testo)) !== null) out.push({ verbi: m[1].split(',').map((v) => v.trim()), cond: m[2].replace(/\s+/g, ' ').trim() });
   return out;
 }
-const R = regole();
-const per = (verbo) => R.filter((r) => r.verbi.includes(verbo));
+const R = regole(B);
+const per = (verbo, r = R) => r.filter((x) => x.verbi.includes(verbo));
 
 const stringhe = (s) => [...s.matchAll(/'([^']*)'/g)].map((x) => x[1]);
 function elencoDopo(testo, etichetta) {
@@ -53,15 +64,20 @@ function elencoDopo(testo, etichetta) {
   assert.ok(m, `non trovo l'elenco dopo «${etichetta}»`);
   return stringhe(m[1]);
 }
-const FUNZIONI_REGOLE = elencoDopo(B, 'function funzioniContate\\(\\)');
+const FUNZIONI_REGOLE = elencoDopo(TUTTO, 'function funzioniContate\\(\\)');
 const unite = (forma) => `^(${forma.slice(1, -1)}(#${forma.slice(1, -1)})*)?$`;
 
 // Le misure dell'ora come le controllano le regole: chiuse(d.x, elenco, tetto, valori) o aForma(d.x, chiavi, tettoChiavi, tetto, valori).
-function misureDelleRegole() {
+// Nelle chiamate l'elenco delle funzioni sta in `f`, legato una volta sola a funzioniContate().
+function misureChiuse(testo) {
   const out = {};
-  for (const m of ORA.matchAll(/chiuse\(d\.(\w+), (funzioniContate\(\)|\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
-    out[m[1]] = { chiavi: m[2] === 'funzioniContate()' ? FUNZIONI_REGOLE : stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
+  for (const m of testo.matchAll(/chiuse\(d\.(\w+), (funzioniContate\(\)|f|\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
+    out[m[1]] = { chiavi: ['funzioniContate()', 'f'].includes(m[2]) ? FUNZIONI_REGOLE : stringhe(m[2]), tetto: Number(m[3]), valori: m[4] };
   }
+  return out;
+}
+function misureDelleRegole() {
+  const out = misureChiuse(ORA);
   for (const m of ORA.matchAll(/aForma\(d\.(\w+), '([^']+)', (\d+), (\d+), '([^']+)'\)/g)) {
     out[m[1]] = { formaChiavi: m[2], tettoChiavi: Number(m[3]), tetto: Number(m[4]), valori: m[5] };
   }
@@ -71,10 +87,11 @@ function misureDelleRegole() {
   return out;
 }
 const M = misureDelleRegole();
+const MC = misureChiuse(CHIAMATE);
 
 // Le regole applicate a un documento, come le applica il server a una stringa unita.
-function passa(doc) {
-  for (const [campo, r] of Object.entries(M)) {
+function passa(doc, misure = M) {
+  for (const [campo, r] of Object.entries(misure)) {
     const v = doc[campo];
     if (r.lista) {
       if (!Array.isArray(v) || v.length > r.quante || v.join('#').length > r.tetto || !new RegExp(r.valori).test(v.join('#'))) return `${campo}`;
@@ -115,7 +132,7 @@ test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; 
   assert.deepEqual(Object.keys(ora), [...C.CAMPI]);
   const giorno = C.documentoGiorno({ pseudonimo: 'a'.repeat(20), giorno: '2026-10-15', app: '0.2.243', os: 'win', dati: {} });
   assert.deepEqual(Object.keys(giorno), [...C.CAMPI_GIORNO]);
-  assert.deepEqual(Object.keys(M).sort(), [...C.MISURE].sort(), 'ogni misura ha il suo controllo nelle regole, e nessuna in più');
+  assert.deepEqual(Object.keys(M).sort(), [...C.MISURE_ORA].sort(), 'ogni misura ha il suo controllo nelle regole, e nessuna in più');
 });
 
 test('le chiavi chiuse vengono dagli elenchi dell’app; le altre hanno una forma che ogni voce dell’app rispetta', () => {
@@ -219,7 +236,7 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, ORA]) {
+  for (const testo of [GIORNO, ORA, CHIAMATE]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
@@ -237,11 +254,13 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  assert.match(ORA, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
-  const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(ORA);
-  assert.ok(ora);
-  for (let h = 0; h < 24; h++) assert.ok(new RegExp(ora[1]).test(String(h).padStart(2, '0')));
-  for (const no of ['24', '7', 'T07', '07 ']) assert.ok(!new RegExp(ora[1]).test(no));
+  for (const testo of [ORA, CHIAMATE]) {
+    assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
+    const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
+    assert.ok(ora);
+    for (let h = 0; h < 24; h++) assert.ok(new RegExp(ora[1]).test(String(h).padStart(2, '0')));
+    for (const no of ['24', '7', 'T07', '07 ']) assert.ok(!new RegExp(ora[1]).test(no));
+  }
   // Il segno del primo documento è di un elenco chiuso: è quello che l'owner legge per contare le copie.
   const primo = /d\.primo in \[([^\]]*)\]/.exec(ORA);
   assert.ok(primo, 'manca l’elenco dei segni del primo documento');
@@ -250,6 +269,74 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
   assert.equal(C.idDocumento(doc), `${'b'.repeat(20)}_2026-10-15_07`);
   const vecchio = C.documentoGiorno({ pseudonimo: 'b'.repeat(20), giorno: '2026-10-15', app: '0.2.243', os: 'mac', dati: {} });
   assert.equal(C.idDocumento(vecchio), `${'b'.repeat(20)}_2026-10-15`);
+});
+
+// ── Le chiamate ai modelli di un'ora (#1464) ─────────────────────────────
+test('le chiamate: sola creazione, lette dall’admin, con gli stessi campi e la stessa versione dell’app', () => {
+  const RC = regole(BC);
+  assert.deepEqual(per('get', RC).map((r) => r.cond), ['isAdmin()']);
+  assert.deepEqual(per('list', RC).map((r) => r.cond), ['isAdmin()']);
+  assert.ok(!per('read', RC).length && !per('write', RC).length);
+  for (const v of ['update', 'delete']) assert.ok(per(v, RC).length >= 1 && per(v, RC).every((r) => r.cond === 'false'));
+  assert.deepEqual(per('create', RC).map((r) => r.cond), ['contatoriChiamate(request.resource.data)']);
+  assert.deepEqual(elencoDopo(CHIAMATE, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_CHIAMATE]);
+  assert.deepEqual(elencoDopo(CHIAMATE, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_CHIAMATE]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(CHIAMATE)[1]), C.VERSIONE_CHIAMATE);
+  // La lista delle funzioni si valuta una volta: Firestore conta ogni espressione, e il tetto è mille per scrittura.
+  assert.match(TUTTO, /function contatoriChiamate\(d\) \{\s*let f = funzioniContate\(\);/);
+  const doc = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_CHIAMATE]);
+  assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
+  assert.ok(!/primo/.test(CHIAMATE), 'il segno del primo documento è dell’ora');
+});
+
+test('le chiamate: ogni misura si chiude sulle funzioni con la forma dell’app, e il documento più carico passa', () => {
+  assert.deepEqual(Object.keys(MC).sort(), [...C.MISURE_CHIAMATE].sort());
+  for (const c of C.MISURE_CHIAMATE) {
+    assert.equal(MC[c].chiavi, FUNZIONI_REGOLE, `${c} si chiude sulle funzioni`);
+    assert.equal(MC[c].valori, unite(c === 'chiamate' ? F.CHIAMATE_FORMA : F.MODELLI[c]), `forma dei valori di ${c}`);
+  }
+  // Ogni resto dell'app entra nella forma delle regole.
+  for (const c of C.MISURE_MODELLI) for (const r of C.RESTI[c]) assert.ok(new RegExp(MC[c].valori).test(`a/b|${r}|1`), `${c}: «${r}»`);
+
+  // Per ogni funzione ogni resto, col modello più lungo che l'app lascia uscire: oltre il tetto dell'ora diventa «altro».
+  const ora = C.oraVuota();
+  const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i % 1000).padStart(3, '0')}`;
+  assert.equal(C.modelloPulito(lunghissimo(1)), lunghissimo(1));
+  let k = 0;
+  for (const f of C.funzioni()) {
+    for (const c of C.MISURE_MODELLI) {
+      ora[c][f] = {};
+      for (const r of [...C.RESTI[c]].sort((a, b) => b.length - a.length)) {
+        ora[c][f][`${lunghissimo(k++)}|${r}`] = 999999999;
+        ora[c][f][`altro|${r}`] = 999999999;
+      }
+    }
+    for (const n of [1, 2, 4, 9, 40]) { C.registraChiamate(ora, f, n); ora.chiamate[f] = Object.fromEntries(Object.keys(ora.chiamate[f]).map((x) => [x, 999999999])); }
+  }
+  const doc = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
+  assert.equal(C.validaChiamate(doc).ok, true, C.validaChiamate(doc).motivo);
+  assert.equal(passa(doc, MC), '', 'le chiamate più cariche dell’app devono passare le regole');
+  for (const c of C.MISURE_MODELLI) {
+    const voci = Object.values(doc[c]).flatMap((v) => C.leggiModelli(c, v));
+    assert.equal(voci.filter((x) => x.modello !== 'altro').length, C.TETTO_MODELLI_ORA, `${c}: le voci col modello si fermano al tetto`);
+    assert.equal(voci.filter((x) => x.modello === 'altro').length, C.funzioni().length * C.RESTI[c].length, `${c}: il resto finisce in «altro»`);
+  }
+  const totale = Object.values(MC).reduce((a, r) => a + r.tetto, 0);
+  assert.ok(totale <= 1000000, `i tetti delle chiamate sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
+  assert.ok(JSON.stringify(doc).length < 1000000);
+
+  const vuoto = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.equal(passa(vuoto, MC), '');
+  assert.equal(C.senzaChiamate(vuoto), true, 'un’ora senza chiamate non ha il secondo documento');
+  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MC);
+  assert.notEqual(manomesso('contesto', { 'filo-chat': 'deepseek/v4|t2k|1;come stai oggi|t2k|1' }), '');
+  assert.notEqual(manomesso('uscita', { 'filo-chat': 'deepseek/v4|o1k|finito bene|1' }), '');
+  assert.notEqual(manomesso('spesa', { 'filo-chat': 'deepseek/v4|regalo|1' }), '');
+  assert.notEqual(manomesso('spesa', { 'filo-chat': 'deepseek/v4|router|1.5' }), '', 'la spesa esce intera');
+  assert.notEqual(manomesso('cache', { 'appunti di mario': 'deepseek/v4|q25|1' }), '', 'una chiave fuori dalle funzioni');
+  assert.notEqual(manomesso('chiamate', { 'filo-chat': '1,2,3' }), '');
+  assert.notEqual(manomesso('ragionamento', { 'filo-chat': { n: 1 } }), '');
 });
 
 test('le due funzioni di controllo delle mappe sono quelle che si credono', () => {

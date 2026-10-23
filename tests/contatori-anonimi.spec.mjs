@@ -70,11 +70,14 @@ async function routerFinto(app) {
         }
         await new Promise((r) => setTimeout(r, 30));
         const body = JSON.parse(init.body);
+        // I numeri che il router dichiara (#1464): in coda allo streaming, come fa lui.
+        const usage = globalThis.__usoRouter || null;
         if (body.stream) {
-          const sse = `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [{ delta: { content: 'Ecco fatto.' } }] })}\n\ndata: [DONE]\n\n`;
+          const fine = usage ? `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [], usage })}\n\n` : '';
+          const sse = `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [{ delta: { content: 'Ecco fatto.' }, ...(usage ? { finish_reason: 'stop' } : {}) }] })}\n\n${fine}data: [DONE]\n\n`;
           return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
         }
-        return new Response(JSON.stringify({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' } }], usage: {} }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' }, finish_reason: 'stop' }], usage: usage || {} }), { status: 200, headers: { 'content-type': 'application/json' } });
       };
     }
   });
@@ -130,6 +133,54 @@ test('un messaggio di chat coi suoi giri è un uso solo, e la risposta arriva co
   await expect.poll(async () => (await oggi(app))?.uso?.['filo-chat']?.n || 0, { timeout: 5_000 }).toBe(prima + 1);
   const u = (await oggi(app)).uso['filo-chat'];
   expect(quante(u.visto)).toBe(prima + 1);
+});
+
+// #1464 — dalla risposta del router fino all'ora che parte: i numeri della chiamata, mai il testo.
+test('una risposta della chat porta nell’ora contesto, cache, ragionamento, uscita, ripiego, spesa e chiamate per uso', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await homeDi(app);
+  await expect(home.locator('#input')).toBeVisible();
+  await routerFinto(app);
+  await app.evaluate(() => {
+    globalThis.__usoRouter = {
+      prompt_tokens: 9000, completion_tokens: 700, cost: 0.0042,
+      prompt_tokens_details: { cached_tokens: 6000 }, completion_tokens_details: { reasoning_tokens: 300 },
+    };
+  });
+  await home.locator('#input').fill('quanto fa due più due? scrivilo a mario.rossi@example.com');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ecco fatto.' })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => Object.keys((await oggi(app))?.chiamate?.['filo-chat'] || {}).length, { timeout: 5_000 }).toBe(1);
+  const o = await oggi(app);
+  const resti = (campo) => Object.entries(o[campo]['filo-chat']).map(([k, n]) => [k.split('|').slice(1).join('|'), n]);
+  const modelli = new Set(['contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa'].flatMap((c) => Object.keys(o[c]['filo-chat']).map((k) => k.split('|')[0])));
+  expect([...modelli], 'un modello solo, col suo nome del router').toHaveLength(1);
+  expect([...modelli][0]).toMatch(/^[a-z0-9-]+\/[a-z0-9.:-]+$/);
+  const n = o.uso['filo-chat'].n;
+  expect(resti('contesto')).toEqual([['t16k', n]]);
+  expect(resti('cache'), 'seimila su novemila: fra metà e tre quarti').toEqual([['q75', n]]);
+  expect(resti('ragionamento')).toEqual([['r1k', n]]);
+  expect(resti('uscita')).toEqual([['o1k|stop', n]]);
+  expect(resti('ripieghi'), 'ha risposto il primo della catena, senza ricominciare').toEqual([['t1|no', n]]);
+  expect(resti('spesa')[0][0]).toBe('router');
+  expect(Math.round(resti('spesa')[0][1])).toBe(420 * n);
+  expect(o.chiamate['filo-chat']).toEqual({ c1: n });
+
+  // I due documenti dell'ora passano la validazione, e non portano niente di quello che si è scritto.
+  const esito = await app.evaluate(async () => {
+    const C = globalThis.SN_CONTATORI;
+    const s = await globalThis.SN_CONTATORI_MAIN.letto();
+    const k = C.oraDi(Date.now());
+    const base = { pseudonimo: 'a'.repeat(20), chiave: k, app: '0.2.249', os: 'win', dati: s.ore[k] };
+    const ora = C.documento(base);
+    const chiamate = C.documentoChiamate(base);
+    return { ora: C.valida(ora), chiamate: C.validaChiamate(chiamate), vuote: C.senzaChiamate(chiamate), testo: JSON.stringify([ora, chiamate]) };
+  });
+  expect(esito.ora.ok, esito.ora.motivo).toBe(true);
+  expect(esito.chiamate.ok, esito.chiamate.motivo).toBe(true);
+  expect(esito.vuote).toBe(false);
+  expect(esito.testo).not.toMatch(/mario|due più due|Ecco fatto/);
 });
 
 test('Preferenze: i contatori sono accesi di serie, spenti buttano quello che aspettava e non contano più', async ({ app, openTab }) => {

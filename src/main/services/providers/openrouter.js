@@ -277,6 +277,8 @@
     const detail = await first.res.clone().text().catch(() => '');
     if (!isParamsRefusal(detail)) return first;
     const second = await send(senzaRagionamento, first.keyUsed);
+    // I contatori (#1464) la contano: una richiesta in più, e una risposta senza ragionamento.
+    second.ragionamentoTolto = true;
     if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
     if (!second.keyFallback && first.keyFallback) {
       second.keyFallback = first.keyFallback;
@@ -426,6 +428,21 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  // L'host dice quanta parte del contesto ha letto dalla cache? Uno zero detto e un campo assente sono due cose (#1464).
+  function cacheDetta(usage) {
+    if (!usage || typeof usage !== 'object') return false;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
+    return Boolean(d && (d.cached_tokens != null || d.cachedTokens != null)) || usage.cached_tokens != null;
+  }
+
+  // I token di ragionamento della risposta; null se l'host non li dice (#1464).
+  function reasoningTokensOf(usage) {
+    const d = usage && typeof usage === 'object' ? (usage.completion_tokens_details || usage.completionTokensDetails || null) : null;
+    const v = d ? (d.reasoning_tokens != null ? d.reasoning_tokens : d.reasoningTokens) : null;
+    const n = v == null ? NaN : Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
   // I token SCRITTI in cache (i modelli coi punti espliciti): con le letture dicono se la cache scatta davvero.
   function cacheWriteTokens(usage) {
     if (!usage || typeof usage !== 'object') return 0;
@@ -473,7 +490,7 @@
     const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto } = await postChat(body, apiKey, signal, providerRouting);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
     if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
@@ -488,10 +505,13 @@
       finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
+      ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
+        reasoningTokens: reasoningTokensOf(usage),
         cacheWriteTokens: cacheWriteTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
@@ -514,7 +534,7 @@
     if (r) reqBody.reasoning = r;
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal, providerRouting);
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto } = await postChat(reqBody, apiKey, signal, providerRouting);
     if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
 
     const reader = res.body.getReader();
@@ -525,7 +545,7 @@
     let finishReason = null;
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
-    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0, cacheDetta: false, reasoningTokens: null };
     let generationId = null;
 
     // Una risposta rotta a metà si paga per quanto il modello aveva scritto: l'errore porta con sé l'id per chiederne il costo.
@@ -575,6 +595,8 @@
               promptTokens: obj.usage.prompt_tokens || 0,
               completionTokens: obj.usage.completion_tokens || 0,
               cachedPromptTokens: cachedPromptTokens(obj.usage),
+              cacheDetta: cacheDetta(obj.usage),
+              reasoningTokens: reasoningTokensOf(obj.usage),
               cacheWriteTokens: cacheWriteTokens(obj.usage),
               costUsd: costUsdOf(obj.usage),
               servedBy: servedBy || extractServedBy(obj),
@@ -596,6 +618,7 @@
     return {
       text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason, servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
+      ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
     };
   }
 
@@ -1080,7 +1103,8 @@
       usage: {
         promptTokens: num(usage.input_tokens != null ? usage.input_tokens : usage.prompt_tokens),
         completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
-        cachedPromptTokens: 0,
+        cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
         keySource, keyFallback,
       },
@@ -1145,7 +1169,7 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, cacheDetta, reasoningTokensOf, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,

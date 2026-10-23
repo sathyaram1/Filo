@@ -1,15 +1,17 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1464), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
 // firestoreRulesContatori.test.mjs; questo è l'altra metà: l'ora che l'app spedisce davvero (il servizio
-// src/main/services/contatori.js, con la sua chiamata REST) passa, e il giorno delle copie vecchie anche; uno
-// manomesso no, e la lettura è dell'admin.
+// src/main/services/contatori.js, con la sua chiamata REST) passa insieme alle sue chiamate ai modelli, e il giorno
+// delle copie vecchie anche; uno manomesso no, e la lettura è dell'admin.
 //
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 46 righe verdi, uscita 0 (#1461, 2026-10-21).
+// Esito atteso: 60 righe verdi, uscita 0 (#1464, 2026-10-23). Le regole dell'ora valutano già circa 950 delle mille
+// espressioni che Firestore concede a una scrittura: un controllo in più lì le fa rifiutare tutte, per questo le
+// chiamate ai modelli hanno il loro documento. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection } from 'firebase/firestore';
@@ -82,7 +84,12 @@ const A = globalThis.SN_CONST.ACTIONS;
 console.log('\n— quello che l’app spedisce davvero —');
 await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', async () => {
   const { s, disco, sposta } = servizio(IERI);
-  const h = s.apri(A.FILO_CHAT); sposta(800); h.visto(); h.fine(true);
+  const h = s.apri(A.FILO_CHAT); sposta(800); h.visto();
+  h.chiamata({ modello: 'deepseek/deepseek-v4-pro', ingresso: 30000, cacheLetti: 20000, cacheDetta: true, ragionamento: 900, uscita: 400,
+    fine: 'tool_calls', tentativo: 2, ricominciata: true, ragionamentoTolto: true, spesa: { usd: 0.012, origine: 'router' } });
+  h.fine(true);
+  h.tardiva('deepseek/deepseek-v4-pro', 0.001);
+  s.adattamento(A.FILO_CHAT, 'deepseek/deepseek-v4-pro', 'contesto_stretto');
   const e = s.apri(A.EXPLAIN);
   e.errore(Object.assign(new Error('OpenRouter 402: Insufficient credits'), { status: 402 }), { modello: 'deepseek/deepseek-v4-pro', host: 'DeepInfra' });
   e.fine(false);
@@ -131,6 +138,10 @@ C.registraUso(datiBuoni, 'help', { visto: 1500, fine: 3000 });
 C.registraAzione(datiBuoni, 'reload', { visto: 100, fine: 900 });
 const BUONO = C.documento({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
 const idBuono = C.idDocumento(BUONO);
+C.registraChiamata(datiBuoni, 'help', { modello: 'deepseek/deepseek-v4-flash', ingresso: 5000, cacheDetta: false, ragionamento: null, uscita: 300, fine: 'stop', tentativo: 1, spesa: { usd: 0.0004, origine: 'router' } });
+C.registraChiamate(datiBuoni, 'help', 2);
+const CHIAMATE = C.documentoChiamate({ pseudonimo: 'c'.repeat(20), chiave: '2026-10-14T10', app: '0.2.243', os: 'mac', dati: datiBuoni });
+const COLL_CHIAMATE = C.COLLEZIONE_CHIAMATE;
 const GIORNO_VECCHIO = C.documentoGiorno({ pseudonimo: 'e'.repeat(20), giorno: '2026-10-13', app: '0.2.240', os: 'win', dati: { uso: { help: { n: 2, fasce: { s2: 1 } } }, errori: {} } });
 
 console.log('\n— quello che NON si deve poter fare —');
@@ -155,6 +166,16 @@ await prova('un annullo con una parola accanto al numero', () => rifiuta({ annul
 await prova('un anticipo sotto una funzione fuori elenco', () => rifiuta({ anticipi: { 'via roma 1': '1;0' } }));
 await prova('un errore visto col testo dell’avviso', () => rifiuta({ erroriVisti: { 'impossibile salvare relazione.pdf': '1' } }));
 await prova('una scelta dell’intervista scritta a parole', () => rifiuta({ intervista: { profilo: 'faccio il medico|1' } }));
+await prova('una chiamata col testo libero al posto del modello', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), { ...CHIAMATE, contesto: { help: 'scrivi a mario.rossi@gmail.com|t2k|1' } })));
+await prova('un’uscita con una fine inventata', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), { ...CHIAMATE, uscita: { help: 'a/b|o1k|bene|1' } })));
+await prova('una spesa con la virgola', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), { ...CHIAMATE, spesa: { help: 'a/b|router|1.5' } })));
+await prova('le chiamate di un uso come numero', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), { ...CHIAMATE, chiamate: { help: 3 } })));
+await prova('una misura delle chiamate sotto una funzione fuori elenco', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), { ...CHIAMATE, cache: { 'appunti di mario': 'a/b|q25|1' } })));
+await prova('le chiamate con un campo dell’ora', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), { ...CHIAMATE, uso: {} })));
+await prova('le chiamate senza una misura', () => { const { spesa, ...senza } = CHIAMATE; return assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), senza)); });
+await prova('le chiamate sotto l’id di un’altra ora', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${'c'.repeat(20)}_2026-10-14_11`), CHIAMATE)));
+await prova('le chiamate nella collezione delle ore', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), CHIAMATE)));
+await prova('un anonimo legge le chiamate', () => assertFails(getDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`))));
 await prova('una prima volta che è un testo', () => rifiuta({ primeVolte: ['help', 'appunti di mario'] }));
 await prova('le prime volte come stringa', () => rifiuta({ primeVolte: 'help' }));
 await prova('un’ora che non esiste', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${'c'.repeat(20)}_2026-10-14_24`), conCampo({ ora: '24' }))));
@@ -173,6 +194,25 @@ await prova('un anonimo elenca la collezione', () => assertFails(getDocs(collect
 
 console.log('\n— quello che si deve poter fare, e poi più —');
 await prova('un anonimo crea la sua ora', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
+await prova('un anonimo crea le chiamate della sua ora', () => assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), CHIAMATE)));
+await prova('ma non le riscrive', () => assertFails(setDoc(doc(anon, `${COLL_CHIAMATE}/${idBuono}`), CHIAMATE)));
+await prova('l’admin le legge', () => assertSucceeds(getDoc(doc(owner, `${COLL_CHIAMATE}/${idBuono}`))));
+await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogni funzione, ai tetti) passano', () => {
+  const dati = C.oraVuota();
+  // Modelli lunghi oltre il tetto dell'ora, e ogni resto di ogni funzione sulla riga «altro».
+  const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i % 1000).padStart(3, '0')}`;
+  let k = 0;
+  for (const f of C.funzioni()) {
+    for (const c of C.MISURE_MODELLI) {
+      dati[c][f] = {};
+      for (const r of C.RESTI[c]) { dati[c][f][`${lunghissimo(k++)}|${r}`] = 999999999; dati[c][f][`altro|${r}`] = 999999999; }
+    }
+    for (const n of [1, 2, 4, 9, 40]) for (let i = 0; i < 3; i++) C.registraChiamate(dati, f, n);
+  }
+  const piene = C.documentoChiamate({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '9999.9999.999999', os: 'linux', dati });
+  vero(C.validaChiamate(piene).ok, C.validaChiamate(piene).motivo);
+  return assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${C.idDocumento(piene)}`), piene));
+});
 await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
 await prova('l’ora più carica che l’app costruisce (ogni funzione, azione, impostazione e scelta, ai tetti) passa', () => {
   const dati = C.oraVuota();

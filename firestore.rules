@@ -950,18 +950,23 @@ service cloud.firestore {
     // tests/unit/firestoreRulesContatori.test.mjs confronta tutto con l'app: una funzione nuova va aggiunta e
     // ripubblicata, o le ore che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
     // Legge solo l'admin.
+    // Le funzioni contate e il controllo delle mappe a chiavi chiuse servono alle ore e alle loro chiamate.
+    function funzioniContate() {
+      return [
+        'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
+        'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
+        'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
+        'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+        'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
+        'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
+        'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
+      ];
+    }
+    function chiuse(m, chiavi, tetto, valori) {
+      return m is map && m.keys().hasOnly(chiavi)
+        && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
+    }
     match /contatori-giornalieri/{docId} {
-      function funzioniContate() {
-        return [
-          'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
-          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
-          'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
-          'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
-          'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
-          'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
-          'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
-        ];
-      }
       function contatoriGiorno(d) {
         return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
           && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
@@ -979,10 +984,6 @@ service cloud.firestore {
           && d.errori is map && d.errori.keys().hasOnly(funzioniContate())
           && d.errori.values().join('#').size() <= 600000
           && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
-      }
-      function chiuse(m, chiavi, tetto, valori) {
-        return m is map && m.keys().hasOnly(chiavi)
-          && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
       }
       function aForma(m, chiavi, tettoChiavi, tetto, valori) {
         return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
@@ -1018,6 +1019,41 @@ service cloud.firestore {
       }
       allow get, list: if isAdmin();
       allow create: if contatoriGiorno(request.resource.data) || contatoriOra(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── Le chiamate ai modelli dei contatori (#1464) ─────────────────────────
+    //
+    // Per ogni ora di contatori che ne ha, i numeri delle chiamate ai modelli: per funzione e modello il contesto, la
+    // cache, il ragionamento, l'uscita, i ripieghi, la spesa e gli adattamenti, in fasce; le chiamate per uso. Stesso
+    // pseudonimo, stessa ora e stesso id dell'ora; sta in un documento a parte perché le regole dell'ora sono già
+    // vicine al tetto di mille espressioni che Firestore valuta per scrittura. Le stesse regole dell'ora: sola
+    // creazione, senza login, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-chiamate/{docId} {
+      function contatoriChiamate(d) {
+        let f = funzioniContate();
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa', 'adattamenti', 'chiamate'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa', 'adattamenti', 'chiamate'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.contesto, f, 24000, '^([a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.cache, f, 22000, '^([a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ragionamento, f, 22000, '^([a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.uscita, f, 64000, '^([a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|altro)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ripieghi, f, 28000, '^([a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.spesa, f, 18000, '^([a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.adattamenti, f, 20000, '^([a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.chiamate, f, 5000, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriChiamate(request.resource.data);
       allow update, delete: if false;
     }
 
