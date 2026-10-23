@@ -521,7 +521,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagine,
     esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };
