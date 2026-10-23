@@ -2345,22 +2345,14 @@
         if (tab) api.tabs.activate(tab.id);
         return;
       }
-      // Tenuto premuto, il tasto torna prima della fotografia nuova: si riparte dalla scheda chiesta, non da quella di prima.
-      const tabs = state.tabs || [];
-      const ultima = accantoChiesta;
-      const da = ultima && ultima.da === state.activeId && Date.now() - ultima.t < 1000 ? ultima.a : state.activeId;
-      const accanto = TASTI ? TASTI.indiceSchedaAccanto(e, tabs.findIndex((t) => t.id === da), tabs.length) : null;
-      if (accanto != null) {
+      // La scheda accanto la sceglie il main: qui la fotografia delle schede può essere indietro di un tasto tenuto premuto.
+      const verso = TASTI ? TASTI.versoSchedaAccanto(e) : 0;
+      if (verso) {
         e.preventDefault();
-        const tab = tabs[accanto];
-        if (tab && tab.id !== da) {
-          accantoChiesta = { da: state.activeId, a: tab.id, t: Date.now() };
-          api.tabs.activate(tab.id);
-        }
+        api.tabs.accanto(verso);
       }
     }
   });
-  let accantoChiesta = null;
 
   api.tabs.onUpdate((snap) => {
     fermaLarghezzeSeChiusa(snap);
