@@ -10,6 +10,7 @@ const RedteamGate = require('./services/redteamGate');
 const AzioniContate = require('./services/azioniContate');
 const { tastoPremuto } = require('./tastoDelMouse');
 const RisposteInAttesa = require('./risposteInAttesa');
+const RilascioNellaChat = require('./rilascioNellaChat');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
