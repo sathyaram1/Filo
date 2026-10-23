@@ -1811,6 +1811,16 @@ class TabManager {
     } catch (_) {}
   }
 
+  // La scheda accanto a quella davanti (verso 1 la successiva, -1 la precedente), in giro: dopo l'ultima la prima (#590.14).
+  // Si parte da `activeId`, non dalla vista che ha ricevuto il tasto: tenuto premuto, il tasto dopo può arrivare ancora lì.
+  attivaAccanto(verso) {
+    const n = this.tabs.length;
+    if (!n || (verso !== 1 && verso !== -1)) return;
+    const qui = this.tabs.findIndex((t) => t.id === this.activeId);
+    const target = this.tabs[((qui < 0 ? (verso > 0 ? -1 : 0) : qui) + verso + n) % n];
+    if (target && target.id !== this.activeId) this.activate(target.id);
+  }
+
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
