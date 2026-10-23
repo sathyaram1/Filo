@@ -3236,6 +3236,8 @@
     BARRA_LATERALE_LIMITI,
     AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
+    AVVISO_SCHERMO_PIENO_LIMITI,
+    opzioniAvvisoSchermoPieno,
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,
