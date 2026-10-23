@@ -142,7 +142,8 @@
 
   // Nelle pagine di Filo la chat ha la sua porta: lì il clic arriva in bolla, dopo quella, e chiede al main come sui
   // siti, col segno del modello (#1505). Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
-  // lascerebbe al collegamento l'apertura da sé, senza porta.
+  // lascerebbe al collegamento l'apertura da sé, senza porta. Il tasto centrale ovunque: lasciato al browser apriva
+  // senza il segno del modello, quindi senza l'OK che il clic chiede.
   const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
     if (e.type === 'auxclick' && e.button !== 1) return;
