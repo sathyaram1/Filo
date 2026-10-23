@@ -4355,7 +4355,7 @@ function pageReadsForPrompt(actions) {
       blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
         + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
     }
-    if (out.lettaInParte || out.scaricataInParte) blocco += `\n[${avvisoLettaInParte(out)}]`;
+    if (out.lettaInParte || out.scaricataInParte) blocco += `\n${avvisoLettaInParte(out)}`;
     if (out.schedaNonRisponde) {
       blocco += '\n[La scheda aperta su questa pagina non ha risposto in tempo (forse è troppo grande, o è ancora occupata): '
         + 'questo testo è stato scaricato a parte e può non essere quello che vede l\'utente, per esempio dove ha fatto l\'accesso. '
