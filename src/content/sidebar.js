@@ -351,6 +351,8 @@
     facciata.stato = CHIUSO;
     cambiato();
   }
+  // Tornata dalla cache di navigazione: lo strato se n'è andato con la navigazione, il suo Aiuto con lui.
+  try { window.addEventListener('pageshow', (e) => { if (e.persisted && inFacciata()) lasciaFacciata(); }); } catch (_) {}
 
   // L'icona Aiuto (barra, riga del tasto destro): il clic fa quello che l'icona mostra, decisi dalla stessa regola.
   function passo(context) {
