@@ -874,7 +874,12 @@
 
           // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
           let ogTitle = '', ogDescription = '', r = null;
-          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url }); } catch (_) {}
+          // Scritto da un modello: mai giudicato, o con un dato che al clic chiede l'OK, non si contatta prima (#1505).
+          // `delSito`: il collegamento è della pagina, che sa già dove porta.
+          const proposta = global.SN_MARKDOWN?.scrittoDaUnModello
+            ? global.SN_MARKDOWN.scrittoDaUnModello(linkEl)
+            : !!(linkEl.closest && linkEl.closest('a.filo-md-link, [data-filo-verdetti]'));
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url, proposta, delSito: !proposta }); } catch (_) {}
           if (cancelled) return;
           if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
           else if (r?.bloccato) {

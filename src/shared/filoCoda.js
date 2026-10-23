@@ -37,6 +37,9 @@
     if (Array.isArray(m.fotoInMemoria) && m.fotoInMemoria.length) v.fotoInMemoria = m.fotoInMemoria.slice();
     if (Array.isArray(m.guardate) && m.guardate.length) v.guardate = m.guardate.slice();
     if (m.spontaneo) v.spontaneo = true;
+    // I verdetti dei collegamenti di una frase di Filo (#868.6, #1505): la home li ritrova anche dopo un riavvio.
+    if (Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length) v.linkDaConfermare = m.linkDaConfermare.slice();
+    if (m.senzaVerdetto === true) v.senzaVerdetto = true;
     if (c.onboarding) v.onboarding = true;
     const disp = Array.isArray(c.dispositivi) ? c.dispositivi[i] : '';
     if (qui && disp && disp !== qui) v.altrove = true;
