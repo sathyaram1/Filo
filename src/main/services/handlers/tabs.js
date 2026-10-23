@@ -203,15 +203,8 @@ module.exports = function register(on, ctx) {
 
   // Riapre una scheda chiusa com'era: lo scroll e il paese da cui passava. Dal #872 la chiede la ricerca del filo con
   // l'id della voce d'archivio, e indirizzo, scroll e paese li legge il main; solo le pagine di Filo.
-  // Chi l'aveva chiusa e quanto fa (#1467): una scheda chiusa dalla pulizia e riaperta subito è un suo errore.
   function contaRiaperta(voce, win) {
-    const chiusa = Date.parse(voce.closedAt);
-    try {
-      globalThis.SN_CONTATORI_MAIN?.attivita('riaperte', {
-        chiusaDa: globalThis.SN_CONTATORI.chiusaDa(voce.reason, voce.chiusaDaSola),
-        etaMs: Number.isFinite(chiusa) ? Math.max(0, Date.now() - chiusa) : null,
-      }, { incognito: !!(win && win._filoIncognito) });
-    } catch (_) {}
+    try { globalThis.SN_CONTATORI_MAIN?.riaperta(voce, { incognito: !!(win && win._filoIncognito) }); } catch (_) {}
   }
   on(MSG.REOPEN_ARCHIVED_TAB, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
