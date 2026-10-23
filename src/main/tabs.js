@@ -1952,7 +1952,10 @@ class TabManager {
     // §2.1 — attività in una scheda qualsiasi vuol dire "Filo è in uso".
     this._lastAppInteractionAt = Date.now();
     // L'ora la dice la pagina: una nel futuro la farebbe sembrare usata per sempre, anche dopo un riavvio.
-    if (Number.isFinite(activity.lastInteractionAt)) tab.lastInteractionAt = Math.min(activity.lastInteractionAt, Date.now());
+    if (Number.isFinite(activity.lastInteractionAt)) {
+      tab.lastInteractionAt = Math.min(activity.lastInteractionAt, Date.now());
+      tab._scrollIgnoto = false;
+    }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
     if (typeof activity.formDirty === 'boolean') {
       // Una voce per frame: il «niente» della pagina non cancella il testo di un riquadro.
