@@ -195,13 +195,25 @@ function crea(dip = {}) {
     C.registraPrimaVolta(ora, id);
   }
 
-  function registraUso(funzione, attese, errori, { uso = true, t0 = adesso() } = {}) {
+  // `chiamate`: quante volte l'uso è andato al modello (le risposte dalla cache no).
+  function registraUso(funzione, attese, errori, { uso = true, t0 = adesso(), chiamate = 0 } = {}) {
     if (!uso && !errori.length) return Promise.resolve(false);
     const rip = uso ? ripetuta(`f:${funzione}`, t0) : false;
     return conta((ora) => {
       if (uso && C.registraUso(ora, funzione, { ...attese, ripetuta: rip })) primaVolta(ora, funzione);
+      if (uso && chiamate > 0) C.registraChiamate(ora, funzione, chiamate);
       for (const e of errori) C.registraErrore(ora, funzione, e);
     });
+  }
+
+  // I numeri della risposta che ha servito, e il costo arrivato dopo (#1464): contano subito, anche dentro un uso.
+  function chiamataServita(funzione, info) {
+    const lista = (Array.isArray(info) ? info : [info]).filter((x) => oggetto(x));
+    if (!lista.length) return;
+    conta((ora) => { for (const c of lista) C.registraChiamata(ora, funzione, c); }).catch(() => {});
+  }
+  function spesaTardiva(funzione, modello, usd) {
+    conta((ora) => C.registraSpesa(ora, funzione, modello, 'tardiva', usd)).catch(() => {});
   }
 
   function errorePer(lista) {
