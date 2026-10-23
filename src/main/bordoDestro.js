@@ -2,8 +2,6 @@
 // accende mentre aspetta, il tasto e la chiusura di chi se ne va senza entrare. Il pannello lo disegna la pagina.
 // Regole: patterns/a-sinistra-filo-a-destra-l-app.md
 
-const { tastoPremuto } = require('./tastoDelMouse');
-
 // Le stesse misure della barra di sinistra (barraLaterale.js): la fascia del sistema e la zona di chi si avvicina.
 const BORDO = 5;
 const VICINO = 24;
@@ -50,11 +48,13 @@ class BordoDestro {
 
   // La scheda davanti, se ha un pannello e l'utente la vede (sotto l'avviso del sito il bordo è dell'avviso).
   _scheda() {
-    const t = this.tabs.tabs.find((x) => x.id === this.tabs.activeId) || null;
+    const t = this._lista().find((x) => x.id === this.tabs.activeId) || null;
     if (!t || !t.pannelloApp || !t.view) return null;
-    if (this.tabs.vistaSottoIlVuoto() !== t.view) return null;
+    if (typeof this.tabs.vistaSottoIlVuoto === 'function' && this.tabs.vistaSottoIlVuoto() !== t.view) return null;
     return t;
   }
+
+  _lista() { return (this.tabs && Array.isArray(this.tabs.tabs)) ? this.tabs.tabs : []; }
 
   // ── dalla pagina ─────────────────────────────────────────────────────────
 
@@ -230,7 +230,7 @@ class BordoDestro {
     if (!v) { this.bordoDal = 0; this.ultimo = null; }
     if (this.bordo === !!v) return;
     this.bordo = !!v;
-    const t = v ? tab : this.tabs.tabs.find((x) => x.id === this.schedaAccesa);
+    const t = v ? tab : this._lista().find((x) => x.id === this.schedaAccesa);
     this.schedaAccesa = v && tab ? tab.id : null;
     if (t && t.view) this._manda(t, { azione: 'bordo', acceso: !!v });
   }
@@ -246,4 +246,4 @@ class BordoDestro {
   }
 }
 
-module.exports = { BordoDestro, BORDO, TREMOLIO, tastoPremuto };
+module.exports = { BordoDestro, BORDO, TREMOLIO };
