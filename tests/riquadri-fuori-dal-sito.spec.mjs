@@ -200,6 +200,37 @@ test('con la risposta aperta su un sito Ctrl+W chiude la scheda e Alt+Sinistra t
   await expect.poll(() => urlDelleSchede(app)).not.toContain(url);
 });
 
+const zoomDi = (app, u) => app.evaluate(({ BrowserWindow }, url) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)
+  ._filoTabs.tabs.find((t) => t.view?.webContents?.getURL() === url).view.webContents.getZoomFactor(), u);
+
+test('con la risposta aperta su un sito Ctrl+più, Ctrl+meno, Ctrl+0 e Ctrl+rotella sul riquadro zoomano la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await modelloFinto(app);
+  const p = await testServer.openReady(openTab, pagina());
+  const url = p.url();
+  await traduzioneConLaTastiera(app, p);
+  const prima = await zoomDi(app, url);
+  await premiDoveScrive(app, '=', ['control']);
+  await expect.poll(() => zoomDi(app, url)).toBeGreaterThan(prima);
+  const grande = await zoomDi(app, url);
+  await premiDoveScrive(app, '-', ['control']);
+  await expect.poll(() => zoomDi(app, url)).toBeLessThan(grande);
+  await premiDoveScrive(app, '=', ['control']);
+  await expect.poll(() => zoomDi(app, url)).toBeGreaterThan(prima);
+  await premiDoveScrive(app, '0', ['control']);
+  await expect.poll(() => zoomDi(app, url)).toBe(prima);
+
+  // La rotella con Ctrl sopra il riquadro stesso, non sul vuoto della pagina.
+  const r = await statoDi(app, p, '.sn-popup-body');
+  await app.evaluate(({ webContents }, { x, y }) => {
+    const f = webContents.getAllWebContents().find((w) => String(w.getURL()).startsWith('filo://riquadri/'));
+    f.sendInputEvent({ type: 'mouseMove', x, y });
+    f.sendInputEvent({ type: 'mouseWheel', x, y, deltaX: 0, deltaY: 120, wheelTicksY: 1, canScroll: true, modifiers: ['control'] });
+  }, { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
+  await expect.poll(() => zoomDi(app, url)).not.toBe(prima);
+  expect(await conta(app, p, '.sn-popup')).toBe(1);
+});
+
 test('la prima risposta su una parola in un riquadro incorporato si apre accanto alla parola', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await modelloFinto(app);
