@@ -280,7 +280,7 @@
     if (!C.isEncryptedBytes(sealed)) {
       throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
     }
-    return new Blob([sealed], { type: 'application/octet-stream' });
+    return new Blob([sealed], { type: ATTACHMENT_CONTENT_TYPE });
   }
 
   // Il controllo all'imbocco del deposito: i byte che stanno per partire devono
