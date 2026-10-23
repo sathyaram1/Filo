@@ -88,6 +88,36 @@ test('un token cambiato altrove resta quando qui se ne tocca un altro', async ({
     .toEqual({ accent: '#00cc44', radius: '3px' });
 });
 
+// #1343.1: il salvataggio dei token rilegge la memoria prima di partire; un altro cambio che arriva lì in mezzo
+// (qui il tema, toccato subito dopo il colore) cancellava il colore appena scritto. La rilettura si tiene ferma
+// finché quell'eco non è arrivato, così la corsa che a intermittenza perdeva il colore accade ogni volta.
+test('un colore scritto e lasciato subito per il tema arriva nel salvato e resta nel campo', async ({ app, openTab }) => {
+  const page = await apri(openTab);
+  await page.evaluate(() => {
+    const S = window.SN_STORAGE;
+    const vera = S.getSettings;
+    window.__echi = 0;
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === window.SN_MSG.MSG.SETTINGS_UPDATED) window.__echi++; });
+    S.getSettings = async (...a) => {
+      S.getSettings = vera;
+      window.__letturaFerma = true;
+      await new Promise((r) => { window.__sblocca = r; });
+      return vera(...a);
+    };
+  });
+  await page.fill('#tok-accent', '#1a7d3a');
+  await page.waitForFunction(() => window.__letturaFerma === true);
+  const echi = await page.evaluate(() => window.__echi);
+  await page.selectOption('#theme', 'dark');
+  await page.waitForFunction((n) => window.__echi > n, echi);
+  await page.evaluate(() => window.__sblocca());
+
+  await expect.poll(() => salvate(app).then((s) => (s.themeTokens || {}).accent), { timeout: 3_000 }).toBe('#1a7d3a');
+  expect((await salvate(app)).theme).toBe('dark');
+  await expect(page.locator('#tok-accent')).toHaveValue('#1a7d3a');
+  await expect(page.locator('.sn-token-row[data-token="accent"]')).toHaveClass(/sn-token-modified/);
+});
+
 test('un parametro del colore delle schede cambiato altrove resta quando qui se ne tocca un altro', async ({ app, openTab }) => {
   const page = await apri(openTab);
   await cambiaAltrove(app, { tabColor: { peso_centralita: 8 } });
