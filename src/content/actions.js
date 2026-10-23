@@ -395,11 +395,12 @@
 
   // L'avviso «manca il modello» si dà una volta per pagina: la descrizione parte a ogni
   // immagine e ripetere il toast sarebbe rumore.
+  // La frase dice dove si sceglie il modello: l'avviso porta il tasto per andarci (#663, #1344.1).
   const modelConfigWarned = new Set();
-  function warnModelConfigOnce(message) {
+  function warnModelConfigOnce(message, res) {
     if (!message || modelConfigWarned.has(message)) return;
     modelConfigWarned.add(message);
-    try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
+    try { Popup.showToast(message, { duration: 7000, rimedio: res || null }); } catch (_) {}
   }
 
   // «Descrizione…» solo finché può davvero arrivare: un'attesa che non finirà mai è una
