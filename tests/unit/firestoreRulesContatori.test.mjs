@@ -271,6 +271,74 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
   assert.equal(C.idDocumento(vecchio), `${'b'.repeat(20)}_2026-10-15`);
 });
 
+// ── Le chiamate ai modelli di un'ora (#1464) ─────────────────────────────
+test('le chiamate: sola creazione, lette dall’admin, con gli stessi campi e la stessa versione dell’app', () => {
+  const RC = regole(BC);
+  assert.deepEqual(per('get', RC).map((r) => r.cond), ['isAdmin()']);
+  assert.deepEqual(per('list', RC).map((r) => r.cond), ['isAdmin()']);
+  assert.ok(!per('read', RC).length && !per('write', RC).length);
+  for (const v of ['update', 'delete']) assert.ok(per(v, RC).length >= 1 && per(v, RC).every((r) => r.cond === 'false'));
+  assert.deepEqual(per('create', RC).map((r) => r.cond), ['contatoriChiamate(request.resource.data)']);
+  assert.deepEqual(elencoDopo(CHIAMATE, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_CHIAMATE]);
+  assert.deepEqual(elencoDopo(CHIAMATE, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_CHIAMATE]);
+  assert.equal(Number(/d\.v == (\d+)/.exec(CHIAMATE)[1]), C.VERSIONE_CHIAMATE);
+  // La lista delle funzioni si valuta una volta: Firestore conta ogni espressione, e il tetto è mille per scrittura.
+  assert.match(TUTTO, /function contatoriChiamate\(d\) \{\s*let f = funzioniContate\(\);/);
+  const doc = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.deepEqual(Object.keys(doc), [...C.CAMPI_CHIAMATE]);
+  assert.equal(C.idDocumento(doc), `${'a'.repeat(20)}_2026-10-15_09`, 'lo stesso id della sua ora');
+  assert.ok(!/primo/.test(CHIAMATE), 'il segno del primo documento è dell’ora');
+});
+
+test('le chiamate: ogni misura si chiude sulle funzioni con la forma dell’app, e il documento più carico passa', () => {
+  assert.deepEqual(Object.keys(MC).sort(), [...C.MISURE_CHIAMATE].sort());
+  for (const c of C.MISURE_CHIAMATE) {
+    assert.equal(MC[c].chiavi, FUNZIONI_REGOLE, `${c} si chiude sulle funzioni`);
+    assert.equal(MC[c].valori, unite(c === 'chiamate' ? F.CHIAMATE_FORMA : F.MODELLI[c]), `forma dei valori di ${c}`);
+  }
+  // Ogni resto dell'app entra nella forma delle regole.
+  for (const c of C.MISURE_MODELLI) for (const r of C.RESTI[c]) assert.ok(new RegExp(MC[c].valori).test(`a/b|${r}|1`), `${c}: «${r}»`);
+
+  // Per ogni funzione ogni resto, col modello più lungo che l'app lascia uscire: oltre il tetto dell'ora diventa «altro».
+  const ora = C.oraVuota();
+  const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i % 1000).padStart(3, '0')}`;
+  assert.equal(C.modelloPulito(lunghissimo(1)), lunghissimo(1));
+  let k = 0;
+  for (const f of C.funzioni()) {
+    for (const c of C.MISURE_MODELLI) {
+      ora[c][f] = {};
+      for (const r of [...C.RESTI[c]].sort((a, b) => b.length - a.length)) {
+        ora[c][f][`${lunghissimo(k++)}|${r}`] = 999999999;
+        ora[c][f][`altro|${r}`] = 999999999;
+      }
+    }
+    for (const n of [1, 2, 4, 9, 40]) { C.registraChiamate(ora, f, n); ora.chiamate[f] = Object.fromEntries(Object.keys(ora.chiamate[f]).map((x) => [x, 999999999])); }
+  }
+  const doc = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
+  assert.equal(C.validaChiamate(doc).ok, true, C.validaChiamate(doc).motivo);
+  assert.equal(passa(doc, MC), '', 'le chiamate più cariche dell’app devono passare le regole');
+  for (const c of C.MISURE_MODELLI) {
+    const voci = Object.values(doc[c]).flatMap((v) => C.leggiModelli(c, v));
+    assert.equal(voci.filter((x) => x.modello !== 'altro').length, C.TETTO_MODELLI_ORA, `${c}: le voci col modello si fermano al tetto`);
+    assert.equal(voci.filter((x) => x.modello === 'altro').length, C.funzioni().length * C.RESTI[c].length, `${c}: il resto finisce in «altro»`);
+  }
+  const totale = Object.values(MC).reduce((a, r) => a + r.tetto, 0);
+  assert.ok(totale <= 1000000, `i tetti delle chiamate sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
+  assert.ok(JSON.stringify(doc).length < 1000000);
+
+  const vuoto = C.documentoChiamate({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T00', app: '0.2.249', os: 'win', dati: C.oraVuota() });
+  assert.equal(passa(vuoto, MC), '');
+  assert.equal(C.senzaChiamate(vuoto), true, 'un’ora senza chiamate non ha il secondo documento');
+  const manomesso = (campo, v) => passa({ ...doc, [campo]: v }, MC);
+  assert.notEqual(manomesso('contesto', { 'filo-chat': 'deepseek/v4|t2k|1;come stai oggi|t2k|1' }), '');
+  assert.notEqual(manomesso('uscita', { 'filo-chat': 'deepseek/v4|o1k|finito bene|1' }), '');
+  assert.notEqual(manomesso('spesa', { 'filo-chat': 'deepseek/v4|regalo|1' }), '');
+  assert.notEqual(manomesso('spesa', { 'filo-chat': 'deepseek/v4|router|1.5' }), '', 'la spesa esce intera');
+  assert.notEqual(manomesso('cache', { 'appunti di mario': 'deepseek/v4|q25|1' }), '', 'una chiave fuori dalle funzioni');
+  assert.notEqual(manomesso('chiamate', { 'filo-chat': '1,2,3' }), '');
+  assert.notEqual(manomesso('ragionamento', { 'filo-chat': { n: 1 } }), '');
+});
+
 test('le due funzioni di controllo delle mappe sono quelle che si credono', () => {
   assert.equal(corpo('chiuse'), "m is map && m.keys().hasOnly(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori)");
   assert.equal(corpo('aForma'), "m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi) && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori)");
