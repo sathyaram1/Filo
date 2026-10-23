@@ -94,6 +94,12 @@
   color: var(--sn-fg);
 }
 
+/* Le immagini date all'Aiuto (#1623): sopra la casella prima dell'invio, in cima alla bolla dopo. Il contenuto sta in
+   un'ombra chiusa (sidebar.js), qui solo il posto. */
+.sn-sidebar-allegati { flex-shrink: 0; border-top: 1px solid var(--sn-border); }
+.sn-sidebar-allegati[hidden] { display: none; }
+.sn-sidebar-msg-immagini { display: block; }
+.sn-sidebar-msg-immagini + * , .sn-sidebar-msg-user:has(> .sn-sidebar-msg-immagini) { white-space: pre-wrap; }
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
 
