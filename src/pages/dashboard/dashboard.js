@@ -2030,6 +2030,7 @@
       // La frase arriva solo senza un modello (handlers/wallet.js): con un modello se ne va.
       mostraSenzaModello(msg.message || '');
       suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
+      suggerimentiDel = msg.ts || null;
       renderSuggestions();
       // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
       // che lo aspettava parte qui, non alla prossima scheda.
