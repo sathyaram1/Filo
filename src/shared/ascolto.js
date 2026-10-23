@@ -177,6 +177,7 @@
           s.frasi++;
           chiama(op.suProvvisoria, '');
           chiama(op.suFrase, testo);
+          inCorso();
         });
       },
     });
