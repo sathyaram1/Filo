@@ -3045,6 +3045,14 @@
   // Le regolazioni della barra laterale come le usa chi le legge: un valore fuori dai limiti torna
   // dentro, uno mancante o illeggibile prende il predefinito. Preferenze e chat rifiutano prima.
   const BARRA_LATERALE_LIMITI = Object.freeze({ attesaMs: [100, 3000], uscitaMs: [100, 5000] });
+  // Un'immagine allegata a una chat (home, Aiuto): sopra il tetto entra come file col suo percorso; senza percorso non
+  // entra e la frase lo dice (#1298, #1623).
+  const ALLEGATI_CHAT = Object.freeze({
+    tettoImmagineByte: 4 * 1024 * 1024,
+    fraseTroppoGrandi: (n) => (Number(n) > 1
+      ? `${Math.floor(Number(n))} immagini superano i 4 MB e non sono entrate. Salvale sul computer e trascinale da lì: entreranno come file.`
+      : 'L’immagine supera i 4 MB e non è entrata. Salvala sul computer e trascinala da lì: entrerà come file.'),
+  });
   // Le soglie dell'avviso dei crediti (#818): 0 spegne quella condizione. Le usano la pagina, la chat e la proiezione.
   const AVVISO_CREDITI_LIMITI = Object.freeze({ giorni: Object.freeze([0, 30]), percento: Object.freeze([0, 100]) });
   function opzioniBarraLaterale(v) {
