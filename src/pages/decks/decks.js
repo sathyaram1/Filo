@@ -1824,18 +1824,27 @@
   // Una richiesta sola: il main fa UN batch LLM per i soli mancanti o stantii. refresh=true
   // ricalcola comunque (§6.2); al ritorno il modulo si aggiorna sul posto.
   async function requestOpinions(ids, { refresh = false } = {}) {
-    // Uno stantio resta visibile marcato e si ricalcola SOLO col bottone (§6.2).
+    // Uno stantio resta visibile marcato e si ricalcola SOLO col bottone (§6.2); uno mancato solo con «Riprova».
     const ask = ids.filter((id) => refresh
-      || (!opinionsByCard.has(id) && !opinionPending.has(id)));
+      || (!opinionsByCard.has(id) && !opinionPending.has(id) && !opinionErrors.has(id)));
     if (!ask.length || !current) return;
-    for (const id of ask) opinionPending.add(id);
+    for (const id of ask) { opinionPending.add(id); opinionErrors.delete(id); }
+    let r = null;
     try {
-      const r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
-      if (r && r.ok) {
-        for (const [id, op] of Object.entries(r.opinions || {})) opinionsByCard.set(id, op);
-      }
+      r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
+    } catch (e) {
+      r = { ok: false, error: '' };
     } finally {
       for (const id of ask) opinionPending.delete(id);
+    }
+    if (r && r.ok) {
+      const opinions = r.opinions || {};
+      for (const [id, op] of Object.entries(opinions)) opinionsByCard.set(id, op);
+      const mancanti = r.mancanti || {};
+      for (const id of ask) if (!opinions[id]) opinionErrors.set(id, erroreDelParere({ error: mancanti[id] }));
+    } else {
+      const errore = erroreDelParere(r);
+      for (const id of ask) opinionErrors.set(id, errore);
     }
     const cur = currentDetailCard();
     if (cur && layout.module === 'opinion' && ask.includes(cur.id)) renderDetailModule(cur);
