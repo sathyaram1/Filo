@@ -112,9 +112,8 @@
     return { ...s, config };
   }
 
-  // I moduli della vecchia griglia (#1433): le disposizioni si buttano, quello che un elemento sa ancora usare (cosa
-  // conta il conteggio, le scorciatoie) passa al pannello. Vince il documento aperto per ultimo, poi i più recenti; una
-  // scorciatoia già data a un altro elemento resta al primo.
+  // I vecchi moduli (#1433): passa solo quello che un elemento sa ancora usare. Vince il documento aperto, poi i più
+  // recenti; una scorciatoia già data a un altro elemento resta al primo.
   function configDaModuli(app, collezione) {
     if (app !== 'editor') return {};
     const files = lista(collezione && collezione.files).filter((f) => f && typeof f === 'object');
