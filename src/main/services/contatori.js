@@ -928,6 +928,7 @@ function crea(dip = {}) {
         continue;
       }
       const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
+      const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
       // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
@@ -935,6 +936,10 @@ function crea(dip = {}) {
       if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
       if (r.ok && chiamate) {
         r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
+        if (mia !== generazione) return 'spenti';
+      }
+      if (r.ok && diFinestra) {
+        r = await spedisci(diFinestra, F.COLLEZIONE);
         if (mia !== generazione) return 'spenti';
       }
       if (!r.ok && r.soloQuesto) {
