@@ -297,6 +297,10 @@
       };
       audio.onended = () => finish(true);
       audio.onerror = () => finish(false);
+      audio.addEventListener('timeupdate', () => {
+        const d = audio.duration;
+        if (sessionAlive(s) && d && isFinite(d)) s.letti = Math.max(s.letti || 0, chunk.start + (chunk.end - chunk.start) * (audio.currentTime / d));
+      });
       // Se l'utente ferma (stopReading mette in pausa), sblocca la pipeline.
       audio.onpause = () => { if (!sessionAlive(s)) finish(true); };
       if (chunk.from >= 0 && readTokens.length) {
