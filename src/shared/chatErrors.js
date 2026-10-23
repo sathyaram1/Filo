@@ -265,6 +265,8 @@
     if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
     if (e && e.code === 'RISPOSTA_TAGLIATA') return fraseTagliata(e.finishReason, { vuota: !!e.vuota });
+    // #1596 — la chat ha già accorciato pagine e conversazione e ancora non ci sta: cambiare modello non è il rimedio.
+    if (e && e.code === 'CONTESTO_PIENO') return FRASE_CONTESTO_PIENO;
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
