@@ -6,8 +6,9 @@
   'use strict';
 
   const SEGNAPOSTO = '[dato riservato]';
-  // Le forme del guardiano che contano qui: l'IBAN no, si spiega, si copia e si chiede come un indirizzo.
-  const REGOLE_GUARDIANO = new Set(['chiave', 'password', 'codice', 'carta']);
+  // Le forme del guardiano che contano qui: l'IBAN no, si spiega, si copia e si chiede come un indirizzo. La password
+  // nemmeno: il guardiano la cerca fra le parole vicine all'etichetta (indirizzi di campo, codice), qui conta il suo posto.
+  const REGOLE_GUARDIANO = new Set(['chiave', 'codice', 'carta']);
 
   // «CVV 123», «CVC: 4821», «Codice di sicurezza 318»: tre o quattro cifre annunciate dal nome del codice della carta.
   const CVV = /\b(?:cvv2?|cvc2?|csc|cid|(?:card\s+)?security\s+code|codice\s+(?:di\s+)?sicurezza(?:\s+della\s+carta)?)\b\s*(?:[:=]|è|e'|is)?\s*(\d{3,4})(?![\d/]|[.,:-]\d)/gi;
@@ -122,7 +123,7 @@
 
   function valorePassword(grezzo, { forma = false } = {}) {
     const v = testo(grezzo).trim().replace(/^[«"'(]+/, '').replace(/[.,;:)»"']+$/, '');
-    if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0])) return '';
+    if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0]) || CODICE_SORGENTE.test(v)) return '';
     if (forma && !(/[0-9]/.test(v) || /[^A-Za-zÀ-ÿ]/.test(v) || /[a-zà-ÿ][A-Z]/.test(v))) return '';
     return v;
   }
@@ -147,44 +148,33 @@
     return '';
   }
 
-  // Il posto del valore di un'etichetta, anche in mezzo alla riga («Utente: mario Password: tramonto») o sotto, dopo i
-  // bottoni: lì una parola qualunque conta se sta da sola, cioè se dopo di lei la riga finisce o comincia un altro campo
-  // o una parentesi. Seguita da altre parole è una frase («Password: deve avere almeno otto caratteri») e resta.
+  // Il posto del valore di un'etichetta: dopo il separatore o il verbo che la chiude, anche in mezzo alla riga («Utente:
+  // mario Password: tramonto») o lontano («La password per entrare nel portale di Mario è …»), e sulla prima riga piena
+  // sotto un'etichetta sola, dopo i bottoni. Lì un pezzo con la forma di una password si toglie sempre; una parola
+  // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
+  // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gi');
+  const DOPO = '[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t](?:è|e\'|is|was|era)(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})';
+  const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
+  const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
   const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*$`, 'i');
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
+    const forma = (pezzo) => { const v = formaVicina(pezzo); if (v) out.push({ valore: v, regola: 'password' }); };
     for (let i = 0; i < righe.length; i++) {
       for (const m of righe[i].matchAll(AL_POSTO)) {
         if (!DA_SOLA.test(m[2])) continue;
         const v = valorePassword(m[1]);
         if (v) out.push({ valore: v, regola: 'password' });
       }
+      for (const re of [DOPO_LUNGO, DOPO_CORTA]) for (const m of righe[i].matchAll(re)) forma(m[1]);
       if (!SOLO_ETICHETTA.test(righe[i])) continue;
       const sotto = rigaSotto(righe, i).trim().split(/\s+/);
       if (sotto.length === 1) {
         const v = valorePassword(sotto[0]);
         if (v) out.push({ valore: v, regola: 'password' });
-      }
-    }
-  }
-
-  function vicinoEtichetta(s, out) {
-    const righe = s.split('\n');
-    for (let i = 0; i < righe.length; i++) {
-      const riga = righe[i];
-      for (const m of riga.matchAll(QUALSIASI_ETICHETTA)) {
-        const zona = [riga.slice(m.index + m[0].length, m.index + m[0].length + 120)];
-        if (riga.trim().length <= 60) {
-          const sotto = rigaSotto(righe, i);
-          if (sotto) zona.push(sotto.slice(0, 120));
-        }
-        for (const pezzo of zona.join(' ').split(/[\s|\t]+/)) {
-          const v = formaVicina(pezzo);
-          if (v) out.push({ valore: v, regola: 'password' });
-        }
-      }
+      } else forma(sotto[0]);
     }
   }
 
@@ -195,13 +185,12 @@
     for (const m of s.matchAll(FRASE_DOPO)) {
       const v = m[1].trim();
       const parole = v.split(/\s+/);
-      if (parole.length < 2 || parole.length > 6 || /[?!()]/.test(v) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
+      if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
     }
   }
 
   function passwordAccanto(s, out) {
-    vicinoEtichetta(s, out);
     alPostoDelValore(s, out);
     fraseDopo(s, out);
     for (const m of s.matchAll(ACCANTO_FORTE)) {
@@ -280,9 +269,10 @@
     const valori = [...new Set(trovati.map((x) => String(x.valore)))].sort((a, b) => b.length - a.length);
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
-      const confine = /^\d/.test(v) ? '(?<!\\d)' : '';
-      const fine = /\d$/.test(v) ? '(?!\\d)' : '';
-      t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'g'), SEGNAPOSTO);
+      // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga».
+      const confine = /^[\p{L}\p{N}]/u.test(v) ? '(?<![\\p{L}\\p{N}])' : '';
+      const fine = /[\p{L}\p{N}]$/u.test(v) ? '(?![\\p{L}\\p{N}])' : '';
+      t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'gu'), SEGNAPOSTO);
     }
     return t;
   }
