@@ -932,10 +932,27 @@
       erroriVisti: erroriVistiPuliti(d.erroriVisti),
       intervista: intervistaPulita(d.intervista),
       primeVolte: primeVoltePulite(d.primeVolte),
+    };
+  }
+
+  // Le chiamate ai modelli della stessa ora, nel loro documento: stesso pseudonimo, stessa ora, stesso id.
+  function documentoChiamate({ pseudonimo, chiave, app, os, dati }) {
+    const d = normale(oggetto(dati) ? JSON.parse(JSON.stringify(dati)) : {});
+    const [giorno, ora] = String(chiave || '').split('T');
+    return {
+      v: VERSIONE_CHIAMATE,
+      pseudonimo: String(pseudonimo || ''),
+      giorno: String(giorno || ''),
+      mese: meseDi(giorno),
+      ora: String(ora || ''),
+      app: versioneApp(app),
+      os: OS.includes(os) ? os : ALTRO,
       ...Object.fromEntries(MISURE_MODELLI.map((c) => [c, modelliPuliti(d[c], c)])),
       chiamate: chiamatePulite(d.chiamate),
     };
   }
+  // Un'ora senza chiamate ai modelli non ha il secondo documento.
+  function senzaChiamate(doc) { return MISURE_CHIAMATE.every((c) => !oggetto(doc && doc[c]) || !Object.keys(doc[c]).length); }
 
   // I giorni rimasti da prima dell'invio ogni ora: «n;f1,…,f7» per funzione, come allora.
   function documentoGiorno({ pseudonimo, giorno, app, os, dati }) {
