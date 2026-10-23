@@ -2257,11 +2257,19 @@
 
     // «Aggiorna» (§6.2): refresh della SOLA carta mostrata, in delega su entrambi gli slot.
     const onModuleClick = (e) => {
-      const btn = e.target.closest('[data-op-refresh]');
+      const via = e.target.closest('[data-op-rimedio]');
+      if (via) {
+        const errore = opinionErrors.get(via.dataset.opRimedio);
+        const pagina = errore ? window.SN_CHAT_ERRORS?.rimedioPagina?.(errore) : null;
+        if (pagina) send({ type: MSG.OPEN_URL, url: pagina.url });
+        return;
+      }
+      const btn = e.target.closest('[data-op-refresh], [data-op-retry]');
       if (!btn) return;
-      const id = btn.dataset.opRefresh;
+      const id = btn.dataset.opRefresh || btn.dataset.opRetry;
       btn.disabled = true;
-      requestOpinions([id], { refresh: true }).catch(() => {});
+      // «Riprova» su una carta senza parere chiede solo lei; con un parere vecchio sotto è un «Aggiorna».
+      requestOpinions([id], { refresh: !!btn.dataset.opRefresh || opinionsByCard.has(id) }).catch(() => {});
       const cur = currentDetailCard();
       if (cur && cur.id === id) renderDetailModule(cur); // mostra "sta pensando"
     };
