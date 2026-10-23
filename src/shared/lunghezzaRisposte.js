@@ -17,7 +17,7 @@
   const A = () => (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
   // Le funzioni che non scrivono testo (voce, dettatura, vettori, classificatori a domande chiuse) non hanno tetto.
   const SENZA = ['TTS', 'TRANSCRIBE_AUDIO', 'ARCHIVE_EMBED', 'MANAGE_SEARCH_CLASSIFY'];
-  const CONVERSAZIONI = ['FILO_CHAT', 'FILO_DASHBOARD', 'HELP', 'EDITOR_CHAT', 'DECKS_CHAT', 'EXPLAIN_DEEP'];
+  const CONVERSAZIONI = ['FILO_CHAT', 'FILO_DASHBOARD', 'HELP', 'DECKS_CHAT', 'EXPLAIN_DEEP'];
   const BREVI = [
     'EXPLAIN', 'EXPLAIN_LINK', 'DESCRIBE_IMAGE', 'CATEGORIZE', 'SPELLCHECK_SEMANTIC',
     'HELP_INTENT_GUESS', 'HELP_INTENT_JUDGE', 'FILO_TAB_TRIAGE', 'FILO_CHAT_TRIAGE', 'FILO_TAB_SEARCH',

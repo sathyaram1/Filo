@@ -23,7 +23,6 @@
   const U = (s, p) => ({ s, p });
   const FUNZIONI = {
     [A.FILO_CHAT]: ['conversazione', U('messaggio', 'messaggi')],
-    [A.EDITOR_CHAT]: ['documento', U('messaggio', 'messaggi')],
     [A.DECKS_CHAT]: ['documento', U('messaggio', 'messaggi')],
     [A.HELP]: ['documento', U('passo', 'passi')],
     [A.FILO_DASHBOARD]: ['documento', U('aggiornamento', 'aggiornamenti')],

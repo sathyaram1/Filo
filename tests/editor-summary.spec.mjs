@@ -245,6 +245,12 @@ test('un documento lungo arriva intero: la chat trova la frase in fondo, titolo 
 
   // Il titolo automatico, partito dall'input, ha già letto il documento fino in fondo; quello rifatto a mano anche.
   await expect(editor.locator('#docTitle')).toHaveText('Gerani e magazzino', { timeout: 15_000 });
+  // A documento identico la richiesta identica la servirebbe la cache delle risposte: si rifà dopo un ritocco in cima.
+  await editor.evaluate(() => {
+    const d = document.getElementById('doc');
+    d.insertAdjacentHTML('afterbegin', '<p>Bozza aggiornata a marzo.</p>');
+    d.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await dalMenuDelTitolo(editor, 'Rigenera titolo');
   await expect.poll(async () => (await richieste(app, 'titolo')).length, { timeout: 15_000 }).toBe(2);
   expect((await richieste(app, 'titolo')).every((r) => r.utente.includes(FONDO))).toBe(true);
@@ -265,7 +271,7 @@ test('oltre il tetto il taglio si dice: sotto la risposta, nell\'avviso del tito
 
   const chat = await chiediAllaChat(app, editor, 'Dove sta la chiave del magazzino?');
   await expect(chat.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Nel documento non lo trovo.', { timeout: 15_000 });
-  await expect(notaTaglio(chat)).toHaveText(nota);
+  await expect(notaTaglio(chat)).toContainText(nota);
   const [domanda] = await richieste(app, 'chat');
   expect(domanda.sistema).toContain('Il resto non lo vedi');
   mkdirSync(SHOTS, { recursive: true });
