@@ -678,7 +678,7 @@
     const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a || !/^(?:https?|mailto|tel|sms):/i.test(a.href)) return;
     // Una pagina chiusa nel filo si riapre com'era, dalla sua voce d'archivio: ci pensa il suo clic.
-    if (a.classList.contains('dash-pagina')) return;
+    if (e.type === 'click' && a.classList.contains('dash-pagina')) return;
     e.preventDefault();
     e.stopPropagation();
     apriProposta(a.href, a);
