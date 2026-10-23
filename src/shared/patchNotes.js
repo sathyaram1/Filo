@@ -10,7 +10,9 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.250', date: '2026-10-23',
-      features: [],
+      features: [
+        'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
+      ],
       fixes: [
         'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
       ],
@@ -32,6 +34,7 @@
         'Nell\'intervista di benvenuto Filo ti chiede se può mandare i contatori anonimi, solo numeri senza contenuto che gli servono a migliorare: rispondi con Sì o No. Con il No non parte niente, nemmeno quello che aveva già contato. Lo cambi quando vuoi in Preferenze o chiedendolo a Filo.',
       ],
       fixes: [
+        'Un\'immagine oltre i 4 MB incollata nella chat della home non sparisce più senza dire niente: un avviso ti dice di trascinarla dal computer, così entra come file.',
         'Se la chiave personale salvata sul computer non è più quella del tuo portafoglio, la pagina Crediti te lo dice, e con «Richiedi una nuova chiave» i consumi tornano a registrarsi. Un consumo che il server non accetta non blocca più tutti quelli dopo, e Crediti dice quanti non sono stati registrati.',
         'Nella pagina dei mazzi, se il «Parere di Filo» su una carta non arriva, il riquadro dice perché e offre «Riprova», col tasto per Crediti o Opzioni quando è lì che si rimedia. Prima restava su «Chiedo un parere a Filo…» e lo richiedeva senza fermarsi. L\'anteprima di una carta resta aperta finché ci tieni sopra il puntatore, così i suoi tasti si raggiungono.',
         'Il tasto che apre Crediti, Opzioni o Preferenze c\'è anche nell\'avviso di «Leggi», in quello della descrizione di un\'immagine copiata e sotto una ricerca dei mazzi il cui controllo delle carte non è partito. Nell\'Editor «Rigenera titolo» e «Rigenera riassunto», quando non riescono, dicono perché e portano dove si rimedia. «Leggi» coi crediti finiti dice che sono finiti, non più che la voce non è disponibile.',

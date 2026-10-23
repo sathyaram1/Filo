@@ -255,6 +255,17 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
   });
+  // Da un riquadro incorporato in un sito: il pannello sta nel frame principale della sua scheda.
+  ipcMain.on('filo:rilascio-riquadro', (event, voci) => {
+    try {
+      const wc = event.sender;
+      if (!event.senderFrame || event.senderFrame === wc.mainFrame) return;
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tab = w._filoTabs?.tabs?.find((t) => t.view.webContents === wc);
+        if (tab) { RilascioNellaChat.dalRiquadro(tab, voci).catch(() => {}); return; }
+      }
+    } catch (_) {}
+  });
 
   // #1054 — il menu del tasto destro di questa scheda, o della finestrella di accesso, si disegna nello strato sopra?
   ipcMain.on('filo:strato-menu', (event) => {
