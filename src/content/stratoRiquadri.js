@@ -101,8 +101,9 @@
     V?.collega({
       inoltra: (g) => S.inoltra(g),
       onCursore: (fn) => S.onCursore(fn),
+      // Alla pagina sotto torna solo un gesto vero: i suoi clic sono veri anche per lei.
       proprio: (e) => {
-        if (document.querySelector(MODALI)) return true;
+        if (!e.isTrusted || document.querySelector(MODALI)) return true;
         const t = e.target;
         return !!t && t !== document.documentElement && t !== document.body;
       },

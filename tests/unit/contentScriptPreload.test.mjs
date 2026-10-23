@@ -42,7 +42,6 @@ const DIFFERENZE = {
 const FUORI_DALLO_STRATO = {
   'src/shared/tabColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
   'src/content/pageColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
-  'src/content/translatePage.js': 'la traduzione della pagina intera: lo strato non è la pagina',
   'tests/fixtures/testModels.js': 'modelli di prova delle pagine interne',
 };
 const SOLO_NELLO_STRATO = ['src/content/stratoRiquadri.js'];

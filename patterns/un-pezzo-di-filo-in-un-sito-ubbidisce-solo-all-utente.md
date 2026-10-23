@@ -132,49 +132,24 @@ settantina di spec lo guarda coi locator. Se un giorno ci entra un dato privato
 
 ## I riquadri: spiegazione, Modifica, feedback, attacco red-team
 
-Il caso (#1071): la bozza del feedback iniziata su un sito tornava nella casella
-aperta su un altro, che la leggeva insieme agli allegati; e lo script del sito
-premeva Invia, o l'invio della domanda nella spiegazione e nella Modifica, e
-faceva spendere una chiamata.
+Il caso (#1071): la bozza del feedback iniziata su un sito tornava nella casella aperta su un altro, che la leggeva; e
+lo script del sito premeva Invia, o l'invio della domanda nella spiegazione e nella Modifica, e faceva spendere una
+chiamata. Lo shadow root chiuso e i cancelli sui gesti finti non bastavano: il sito leggeva comunque il testo scritto
+o selezionato (#1071.1, #1509.1). Dal #1509.1 su un sito questi riquadri non stanno più nel suo documento ma nello
+strato sopra la scheda: [I riquadri di Filo su un sito stanno sopra la scheda](i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md).
 
-- **Un riquadro che porta parole dell'utente o di un modello, in un sito, sta in
-  uno shadow root chiuso**: `SN_POPUP.riquadro(contenuto)` (`src/content/popup.js`)
-  mette un host `display: contents` (posa, z-index e zoom restano quelli del
-  riquadro), adotta i nostri fogli con le sole famiglie generiche e chiude ai
-  gesti finti il contenuto. Sulle pagine `filo://` il riquadro resta nel
-  documento: lì non c'è codice di altri.
-- **L'azione che spende o manda guarda da sé `e.isTrusted`**: Invia del
-  feedback e dell'attacco red-team, la domanda della spiegazione, la riscrittura
-  e Sostituisci della Modifica, Allega. Un incolla fabbricato non allega niente.
-- **Chi ascolta su window o sul documento** vede l'host, non il campo toccato:
-  il nodo vero lo dà `SN_FILO_UI.bersaglio(e)` (il tasto destro dentro la casella
-  del feedback apre il menu di un campo di testo; il correttore si aggancia alla
-  casella dal focus). Un aiuto che ripete il testo della casella, come lo strato
-  delle sottolineature del correttore, sta dentro lo stesso riquadro chiuso, mai
-  nel documento. Col fuoco dentro un riquadro
-  chiuso si sta scrivendo (`data-sn-riquadro`, regola in
-  `src/shared/campoTesto.js`): Ctrl/Cmd+Z annulla, non porta via la pagina.
-  Lo stesso vale per il sito, che da fuori vede l'host e non un campo: le sue
-  scorciatoie a un tasto («k» pausa, «/» alla ricerca) si prenderebbero quello
-  che l'utente scrive, anche ascoltando in cattura (#1071, giro 3: fermarli alla
-  radice del riquadro copriva solo chi ascolta dopo). Un tasto vero scritto in un
-  riquadro lo prende Filo per primo, col ponte di `page-preload.js` registrato a
-  document_start, e `SN_FILO_UI.tastoNelRiquadro` consegna al campo una copia
-  segnata come nostra che non esce dallo shadow (chi la ascolta dentro guarda
-  `veroONostro`, non `isTrusted`); se la copia viene annullata si annulla anche
-  l'originale. L'Esc passa come prima (chiude in cattura, e serve allo schermo
-  intero, #514). Un ascoltatore
-  di quelli che dal nodo vero **fa** qualcosa (aprire un collegamento) accetta
-  solo il gesto vero: un clic finto sull'host, con le coordinate giuste, ci
-  arriva.
-- **Un evento che fabbrica Filo stesso** verso un campo di un riquadro (l'Incolla
-  del menu, la correzione, Sostituisci della Modifica) si segna con `SN_FILO_UI.nostro(ev)`: il cancello lo
-  lascia passare, la copia che vede il sito non è nell'elenco.
-- **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
-  l'origine (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in
-  `impostazioniPerOrigine.js`), concessa solo al riquadro che ha davvero
-  quell'origine (`frame.origin`), mai a un documento senza origine. Le pagine di
-  Filo tengono la loro, che a un sito non arriva.
+Restano qui, valide anche lì:
+
+- **L'azione che spende o manda guarda da sé `e.isTrusted`**: Invia del feedback e dell'attacco red-team, la domanda
+  della spiegazione, la riscrittura e Sostituisci della Modifica, Allega.
+- **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta l'origine
+  (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in `impostazioniPerOrigine.js`), concessa solo a chi ha davvero
+  quell'origine (`frame.origin`; lo strato parla col frame principale della pagina sotto), mai a un documento senza
+  origine. Le pagine di Filo tengono la loro, che a un sito non arriva.
+- **Il riquadro chiuso nel documento è il ripiego**: se lo strato non si può fare, `SN_POPUP.riquadro(contenuto)`
+  (`src/content/popup.js`) lo mette in uno shadow root chiuso coi fogli adottati e le sole famiglie generiche, e le
+  regole di prima tornano tutte: `SN_FILO_UI.bersaglio(e)` per il nodo vero, `SN_FILO_UI.tastoNelRiquadro` per i tasti,
+  `SN_FILO_UI.nostro(ev)` per gli eventi che fabbrica Filo.
 
 ## Provarlo
 
@@ -198,9 +173,9 @@ altro sito, e la cronologia non gli arriva; a cronologia aperta dall'utente la
 ricerca testuale del browser, interrogata lettera per lettera, non ricostruisce
 il testo, che l'utente intanto vede e incolla.
 
-I riquadri chiusi si guardano con `tests/helpers/riquadri.mjs` (lo stesso hook,
-`SN_FILO_UI._test.trova`, nel mondo dei content script); la prova dell'attacco
-sta in `tests/riquadri-solo-utente.spec.mjs`.
+I riquadri si guardano con `tests/helpers/riquadri.mjs` (lo stesso hook, `SN_FILO_UI._test.trova`, nella scheda o
+nello strato sopra di lei); la prova dell'attacco sta in `tests/riquadri-solo-utente.spec.mjs`, quella del testo che il
+sito non legge in `tests/riquadri-fuori-dal-sito.spec.mjs`.
 
 ## Limite noto
 
@@ -243,16 +218,10 @@ sopra lo perde, e con lui opacità e trasformazione. L'owner l'ha accettato fino
 menu disegnato fuori dalla pagina (D14, #1052–#1056), che lo chiude; la sua prova in
 `tests/verifica/589.11/` è un rosso atteso.
 
-Lo shadow chiuso non nasconde il **testo**: `window.find` trova anche quello
-scritto in una casella dentro un riquadro chiuso, e `getSelection().modify()`
-allarga la selezione trovata fino alla riga intera, che `toString()` restituisce
-(#1071). Basta indovinare una lettera. Ancora più semplice: gli inserimenti
-(`beforeinput`, `input`) e l'Esc escono dallo shadow verso la finestra del sito, e
-un `execCommand` del sito scrive nella casella che ha il fuoco (#1071.1). Il testo di una voce si può rendere come
-contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
-toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
-vista sopra la scheda come gli avvisi
-([Un avviso su una pagina non sta dentro la pagina](un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md)).
+Lo shadow chiuso non nasconde il **testo**: `window.find` trova anche quello scritto in una casella dentro un riquadro
+chiuso, la selezione allargata da `getSelection().modify()` lo restituisce, e gli inserimenti escono dallo shadow verso
+la finestra del sito (#1071, #1071.1). Per i riquadri la porta l'ha chiusa lo strato sopra la scheda (#1509.1); resta
+aperta solo nel ripiego, quando lo strato non si può fare.
 
 ## Il permesso del sito non è di Filo (#586)
 
