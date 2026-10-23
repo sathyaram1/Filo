@@ -1829,14 +1829,17 @@
       || (!opinionsByCard.has(id) && !opinionPending.has(id) && !opinionErrors.has(id)));
     if (!ask.length || !current) return;
     for (const id of ask) { opinionPending.add(id); opinionErrors.delete(id); }
+    const deckId = current.id;
     let r = null;
     try {
-      r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
-    } catch (e) {
+      r = await send({ type: MSG.DECKS_OPINION, deckId, cardIds: ask, compute: true, refresh });
+    } catch (_) {
       r = { ok: false, error: '' };
     } finally {
       for (const id of ask) opinionPending.delete(id);
     }
+    // I pareri sono per mazzo: quelli di un mazzo lasciato nel frattempo non entrano nella cache del nuovo.
+    if (!current || current.id !== deckId) return;
     if (r && r.ok) {
       const opinions = r.opinions || {};
       for (const [id, op] of Object.entries(opinions)) opinionsByCard.set(id, op);
