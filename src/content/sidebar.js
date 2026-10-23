@@ -1673,8 +1673,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     }
   }
 
-  async function turno({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
     if (!root) return;
+    // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro.
+    const userMessage = scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : '');
     // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
     if (userMessage || daGesto) {
       passiDaSolo = 0;
