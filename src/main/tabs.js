@@ -3823,9 +3823,12 @@ class TabManager {
     // Dopo un riavvio la scheda è ancora quella aperta allora: l'Aiuto risponde a «quando l'ho aperta?» (#826).
     const aperte = kept.map((t) => t.openedAt || null);
     const pagine = kept.map((t) => t.paginaDal || null);
+    // L'ultima volta che l'utente l'ha toccata: alla riapertura la pulizia vede l'inattività vera (#1618). Al minuto,
+    // così i gesti non riscrivono la sessione a ogni aggiornamento della barra (#1089).
+    const usate = kept.map((t) => (t.lastInteractionAt > 0 ? new Date(Math.floor(t.lastInteractionAt / 60_000) * 60_000).toISOString() : null));
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, pagine, activeIndex };
+    return { tabs, colors, aperte, pagine, usate, activeIndex };
   }
 
   _sessionKey() {
