@@ -224,20 +224,28 @@
     // Ogni decimo di secondo: se la casella è cambiata (inviata a mano, corretta) l'attesa finisce senza inviare.
     function controlla() {
       if (c.stato !== 'attesa') { smetti(); return; }
-      if (!campo.isConnected || campo.value !== c.atteso || !campo.value.trim()) { smetti(); imposta('pronto'); return; }
+      if (!campo.isConnected || campo.value !== c.atteso || !campo.value.trim()) {
+        smetti();
+        imposta('pronto');
+        // Vuota: l'ha inviata la persona (il tasto d'invio col mouse); cambiata: l'ha corretta prima che partisse.
+        esitoDellAttesa(!campo.isConnected ? 'annullata' : campo.value.trim() ? 'cambiata' : 'a_mano');
+        return;
+      }
       if (Date.now() - c.dal < c.attesaMs) return;
       if (typeof occupato === 'function' && occupato()) { b.dataset.occupato = '1'; return; }
       smetti();
       imposta('pronto');
+      esitoDellAttesa('da_sola');
       try { invia(); } catch (e) { console.error('[Filo voce]', e); }
     }
     function smetti() {
       if (c.timer) clearInterval(c.timer);
       c.timer = 0;
     }
-    function annullaInvio() {
+    function annullaInvio(invio = 'annullata') {
       smetti();
       imposta('pronto');
+      esitoDellAttesa(invio);
       caretInFondo(campo);
     }
 
