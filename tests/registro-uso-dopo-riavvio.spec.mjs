@@ -1,15 +1,15 @@
-// Verifica #1601, giro 1: i consumi che il server ha rifiutato devono restare detti nella pagina Crediti anche dopo
-// una chiusura di Filo. Il finto server è quello di tests/ripiego-crediti.spec.mjs, ridotto al registro d'uso.
+// I consumi che il server ha rifiutato restano detti nella pagina Crediti anche dopo una chiusura di Filo (#1601):
+// lo scarto avviene di solito appena dopo l'avvio. Il finto server è quello di tests/ripiego-crediti.spec.mjs, ridotto al registro d'uso.
 
 import { createServer } from 'node:http';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from '@playwright/test';
-import { test, expect, chiudiApp } from '../../fixtures/electron.mjs';
-import { argomentiScala } from '../../helpers/scala.mjs';
-import { primaFinestra } from '../../helpers/primaFinestra.mjs';
+import { test, expect, chiudiApp } from './fixtures/electron.mjs';
+import { argomentiScala } from './helpers/scala.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PERSONAL_KEY = 'sk-or-v1-test-personal';
 const PSEUDONYM = 'abcdef0123456789';
 const AZIONE_RIFIUTATA = 'RIFIUTATA_DAL_SERVER';
@@ -75,7 +75,7 @@ const redirect = (app) => app.evaluate((_, b) => {
   globalThis.fetch = (url, init) => vero(String(url).replace(/^https:\/\/firestore\.googleapis\.com/, b), init);
 }, base);
 
-test('r1 un consumo rifiutato dal server resta detto in Crediti dopo aver chiuso e riaperto Filo', async ({ app, openTab }) => {
+test('un consumo rifiutato dal server resta detto in Crediti dopo aver chiuso e riaperto Filo', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   const credits = await openTab('filo://credits/credits.html');
   await expect(credits.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
