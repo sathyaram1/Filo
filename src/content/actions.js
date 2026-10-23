@@ -375,15 +375,6 @@
     } catch (_) { return []; }
   }
 
-  // Serve a mostrare in grigio avanti e indietro nel menu quando la cronologia non lo
-  // consente, come i tasti nella barra in alto.
-  async function getNavState() {
-    try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
-      return { canBack: !!r?.canBack, canFwd: !!r?.canFwd };
-    } catch (_) { return { canBack: true, canFwd: true }; }
-  }
-
   // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
   // incolla, non da una copia scelta: una voce appena tolta non rientra così.
   function pushClipboardEntry(entry, via) {
@@ -2014,7 +2005,6 @@
     insertDictatedText,
     buildPasteItem,
     getClipboardHistory,
-    getNavState,
     pushClipboardEntry,
     requestImageDescription,
     descriptionToFilename,

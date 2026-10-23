@@ -2700,7 +2700,8 @@
     showHomeMessage: true,
     // Barra laterale (#871): apertura spingendo sul bordo, attesa sul bordo, quanto resta aperta dopo
     // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
-    barraLaterale: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true },
+    // `schede`: a schermo intero la fila delle schede scende col mouse sul bordo alto, con le stesse attese (#1246).
+    barraLaterale: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schede: true },
     // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
     // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     avvisoSchermoPieno: { durataMs: 3000 },
@@ -3010,6 +3011,7 @@
       attesaMs: ms('attesaMs'),
       uscitaMs: ms('uscitaMs'),
       striscia: o.striscia !== false,
+      schede: o.schede !== false,
     };
   }
 

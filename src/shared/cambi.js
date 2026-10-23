@@ -109,6 +109,7 @@
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
     'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
+    'barraLaterale.schede': { nome: 'schede dal bordo alto a schermo intero', valore: sino('compaiono', 'restano nascoste'), livello: 1 },
     'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },

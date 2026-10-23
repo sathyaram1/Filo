@@ -21,5 +21,4 @@ contextBridge.exposeInMainWorld('strato', {
     ...(destro ? { destro: { x: Number(destro.x) || 0, y: Number(destro.y) || 0 } } : {}),
   }),
   chiedi: (canale, d) => { if (CANALI.has(canale)) ipcRenderer.send(`strato:${canale}`, d); },
-  barra: (d) => ipcRenderer.invoke('strato:barra', d),
 });
