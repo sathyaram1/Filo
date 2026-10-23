@@ -113,6 +113,7 @@
     documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
+    contaSessione();
     session = null;
     nascosto = false;
     ridottoDallUtente = false;
