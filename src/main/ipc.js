@@ -100,6 +100,20 @@ function provenienzaDi(info) {
   return { via: 'pagina' };
 }
 
+// Le quattro chiamate sincrone che una pagina fa prima dei suoi script: finché non c'è la risposta la pagina è ferma.
+// Quanto ci mettono, per canale, lo contano i contatori anonimi (#1466); da una finestra incognito no.
+function cronometrata(canale, gestore) {
+  return (event, ...args) => {
+    const t0 = performance.now();
+    try { gestore(event, ...args); } finally {
+      try {
+        const C = globalThis.SN_CONTATORI_MAIN;
+        if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
+      } catch (_) {}
+    }
+  };
+}
+
 function registerIpcHandlers() {
   // Niente shell orfane dopo l'uscita: alla riapertura si riparte puliti.
   app.on('before-quit', () => {
@@ -109,17 +123,17 @@ function registerIpcHandlers() {
 
   // SINCRONO perché il preload deve installare gli override PRIMA degli script
   // di pagina. Passa { level, seed }: il master secret NON attraversa mai qui.
-  ipcMain.on('filo:fp-config', (event, href) => {
+  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href) => {
     try {
       event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
-  });
+  }));
 
   // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
   // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
-  ipcMain.on('filo:cookie-wipe', (event, href) => {
+  ipcMain.on('filo:cookie-wipe', cronometrata('cookie-wipe', (event, href) => {
     let out = null;
     try {
       const wc = event.sender;
@@ -138,16 +152,16 @@ function registerIpcHandlers() {
       }
     } catch (_) { out = null; }
     event.returnValue = out;
-  });
+  }));
 
   // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
-  ipcMain.on('filo:adblock-css', (event, href, gate) => {
+  ipcMain.on('filo:adblock-css', cronometrata('adblock-css', (event, href, gate) => {
     try {
       event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
     } catch (_) {
       event.returnValue = { css: '', tokens: false };
     }
-  });
+  }));
 
   // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
   ipcMain.handle('filo:adblock-tokens', (event, msg) => {
@@ -160,14 +174,14 @@ function registerIpcHandlers() {
   });
 
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
-  ipcMain.on('filo:permessi-stato', (event, href) => {
+  ipcMain.on('filo:permessi-stato', cronometrata('permessi-stato', (event, href) => {
     try {
       const Permessi = require('./services/permessiPagine');
       event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
     } catch (_) {
       event.returnValue = { notifiche: 'default' };
     }
-  });
+  }));
 
   // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
   ipcMain.on('filo:permessi-si', (event, parte) => {

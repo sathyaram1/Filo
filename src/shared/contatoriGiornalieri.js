@@ -1,12 +1,13 @@
-// I contatori anonimi (#969, #1461, #1464): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
+// I contatori anonimi (#969, #1461, #1464, #1466): cosa si conta, in che forma esce, cosa non passa. Logica pura, niente rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
 (function (global) {
   'use strict';
 
-  // Un documento per pseudonimo e ora (#1461). I giorni rimasti in attesa da prima partono nella forma di allora.
-  const VERSIONE = 2;
+  // Un documento per pseudonimo e ora (#1461); v3 porta anche le misure del sistema (#1466). Le ore e i giorni rimasti
+  // in attesa partono nella forma di adesso; le copie vecchie mandano ancora v2 e v1, e le regole le accettano.
+  const VERSIONE = 3;
   const VERSIONE_GIORNO = 1;
   const COLLEZIONE = 'contatori-giornalieri';
   // Le misure delle chiamate ai modelli (#1464) partono in un documento a parte, con lo stesso id dell'ora: le regole
@@ -29,7 +30,11 @@
   const CAMPI_GIORNO = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori']);
   const MISURE_ORA = Object.freeze(['uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati',
     'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte']);
-  const CAMPI = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE_ORA]);
+  // I guasti e i tempi che un tester non sa raccontare (#1466): avvio, processi, blocchi, memoria, disco, aggiornamenti.
+  const MISURE_SISTEMA = Object.freeze(['avvioPasso', 'avvioTipo', 'processoMorto', 'finestraBloccata', 'mainFermo',
+    'eccezioneMain', 'memoria', 'ipcSincrono', 'chiusura', 'uscitaPrecedente', 'storageEsito', 'sessione', 'aggiornamento']);
+  const CAMPI_ORA_V2 = Object.freeze(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', ...MISURE_ORA]);
+  const CAMPI = Object.freeze([...CAMPI_ORA_V2, 'sistema']);
 
   // ── Le chiamate ai modelli (#1464) ────────────────────────────────────────
   // Misurate al cancello, sul tentativo che ha servito: per funzione e modello, «modello|…|n». Fasce in token da 1024.
@@ -147,6 +152,47 @@
   const HOST_RE = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,47}$/;
   const ALTRO = 'altro';
 
+  // ── Gli elenchi chiusi del sistema (#1466) ────────────────────────────────
+  // Un codice (il tipo di un processo, il nome di un'eccezione, l'errore del disco) si mappa sul suo elenco, e il resto
+  // diventa «altro» o non esce: messaggi, stack, percorsi e chiavi dello storage non arrivano mai qui.
+  const PASSI_AVVIO = Object.freeze(['impostazioni_lette', 'protocollo_ipc', 'adblock', 'fingerprint', 'permessi',
+    'finestra_creata', 'prima_scheda_visibile', 'sessione_ripristinata']);
+  const TIPI_AVVIO = Object.freeze(['freddo', 'dopo_aggiornamento', 'seconda_istanza']);
+  // I processi che non sono schede come li nomina Electron (`details.type`), più la scheda rimorta mentre si recuperava.
+  const TIPO_PROCESSO_DI = Object.freeze({ GPU: 'gpu', Utility: 'utility', Zygote: 'zygote', 'Sandbox helper': 'sandbox_helper',
+    'Pepper Plugin': 'pepper_plugin', 'Pepper Plugin Broker': 'pepper_plugin' });
+  const TIPI_PROCESSO = Object.freeze(['gpu', 'utility', 'zygote', 'sandbox_helper', 'pepper_plugin', 'scheda_in_recupero', ALTRO]);
+  const COSE_FINESTRA = Object.freeze(['volte', 'tornata', 'chiusa_da_utente']);
+  // I blocchi del ciclo del main si contano sopra ogni soglia: uno da sei secondi conta in tutte e tre.
+  const SOGLIE_FERMO = Object.freeze([['ms200', 200], ['ms1000', 1000], ['ms5000', 5000]]);
+  const ORIGINI_ECCEZIONE = Object.freeze(['uncaught', 'rejection']);
+  const NOMI_ECCEZIONE = Object.freeze(['TypeError', 'RangeError', 'ReferenceError', 'SyntaxError', 'Error', ALTRO]);
+  const FASCE_MB = Object.freeze([['mb256', 256], ['mb512', 512], ['mb1024', 1024], ['mb2048', 2048], ['mb4096', 4096], ['oltre', Infinity]]);
+  // Lo zero ha la sua fascia: «nessuna scheda in attesa» è il caso di tutti i giorni, e non è «una».
+  const FASCE_SCHEDE = Object.freeze([['n0', 0], ['n1', 1], ['n5', 5], ['n20', 20], ['n50', 50], ['oltre', Infinity]]);
+  const CANALI_SINCRONI = Object.freeze(['fp-config', 'cookie-wipe', 'adblock-css', 'permessi-stato']);
+  const ESITI_USCITA = Object.freeze(['pulita', 'non_pulita']);
+  const ESITI_LETTURA = Object.freeze(['ok', 'vuoto', 'illeggibile', 'rovinato_con_copia', 'rovinato_senza_copia',
+    'non_spostato_sola_memoria']);
+  const CODICI_DISCO = Object.freeze(['ENOSPC', 'EACCES', 'EPERM', 'EROFS', 'EBUSY']);
+  // Gli errori su cui la rinomina riprova (src/main/services/scritturaAtomica.js, OCCUPATO).
+  const CODICI_RINOMINA = Object.freeze(['EBUSY', 'EPERM', 'EACCES']);
+  const FASCE_MB_FILE = Object.freeze([['mb1', 1], ['mb5', 5], ['mb20', 20], ['mb50', 50], ['mb100', 100], ['oltre', Infinity]]);
+  const minuscolo = (s) => s.toLowerCase();
+  const EVENTI_STORAGE = Object.freeze([
+    ...ESITI_LETTURA.map((e) => `lettura_${e}`),
+    ...[...CODICI_DISCO, ALTRO].map((c) => `salvataggio_fallito_${minuscolo(c)}`),
+    'salvataggio_tornato',
+    ...CODICI_RINOMINA.map((c) => `rinomina_ritentata_${minuscolo(c)}`),
+    'chiave_non_serializzabile', 'cambiato_senza_set', 'cifratura_assente',
+    ...FASCE_MB_FILE.map(([k]) => `dimensione_${k}`),
+    ...NOMI_FASCE.map((k) => `flush_${k}`),
+  ]);
+  const ESITI_SESSIONE = Object.freeze(['ripristinata', 'niente', 'lettura_fallita']);
+  const EVENTI_AGGIORNAMENTO = Object.freeze(['trovato', 'scaricato', 'scaricamento_fallito', 'installatore_non_valido',
+    'installazione_lanciata_all_avvio', 'installazione_fallita', 'installazione_fallita_secondo_avviso', 'versione_rifiutata',
+    'bloccato_mac', 'bloccato_linux', 'installatore_non_avviato']);
+
   // ── Le forme di quello che esce ───────────────────────────────────────────
   // Ogni valore annidato esce come UNA stringa di forma fissa: le regole Firestore non sanno passare in rassegna una
   // mappa, ma ne uniscono valori e chiavi in una stringa sola, che si misura e si confronta. Le regole ne tengono la
@@ -191,6 +237,42 @@
   });
   const FORME_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, forma(`${MOD}[|]${RESTI_FORMA[c]}[|]${N}`)])));
   const CHIAMATE_FORMA = `^${N}(,${N}){4}$`;
+  // Il sistema (#1466) esce in UN campo, una stringa «misura.voce[.sotto]|n;…» con le sole voci diverse da zero: le
+  // regole hanno un tetto di mille espressioni a richiesta, e tredici mappe in più ci passerebbero sopra. Ogni
+  // percorso viene dagli elenchi chiusi qui sotto (SCHEMA_SISTEMA): una voce nuova allarga la forma, e le ore delle
+  // copie vecchie la rispettano ancora.
+  const ramo = (nomi, figlio = null) => Object.freeze(Object.fromEntries(nomi.map((n) => [n, figlio])));
+  const SCHEMA_SISTEMA = Object.freeze({
+    avvioPasso: ramo(PASSI_AVVIO, ramo(NOMI_FASCE)),
+    avvioTipo: ramo(TIPI_AVVIO),
+    processoMorto: ramo(TIPI_PROCESSO, ramo(MOTIVI_CRASH)),
+    // Quante volte non ha risposto; quanto fino a quando è tornata, o fino alla chiusura.
+    finestraBloccata: Object.freeze({ volte: null, tornata: ramo(NOMI_FASCE), chiusa_da_utente: ramo(NOMI_FASCE) }),
+    // La fascia del ritardo più lungo dell'ora; i blocchi sopra ogni soglia.
+    mainFermo: Object.freeze({ max: ramo(NOMI_FASCE), blocchi: ramo(SOGLIE_FERMO.map(([k]) => k)) }),
+    eccezioneMain: ramo(ORIGINI_ECCEZIONE, ramo(NOMI_ECCEZIONE)),
+    memoria: Object.freeze({ totale: ramo(FASCE_MB.map(([k]) => k)), vive: ramo(FASCE_SCHEDE.map(([k]) => k)),
+      attesa: ramo(FASCE_SCHEDE.map(([k]) => k)) }),
+    ipcSincrono: ramo(CANALI_SINCRONI, ramo(NOMI_FASCE)),
+    // Dal primo «esci» all'uscita; quante volte ha scattato il tetto della pulizia dei cookie.
+    chiusura: Object.freeze({ durata: ramo(NOMI_FASCE), tetto: null }),
+    uscitaPrecedente: ramo(ESITI_USCITA),
+    storageEsito: ramo(EVENTI_STORAGE),
+    // Schede ripristinate; esito; fino alla scheda in vista caricata e alla fine della coda.
+    sessione: Object.freeze({ schede: ramo(FASCE_SCHEDE.map(([k]) => k)), esiti: ramo(ESITI_SESSIONE), vista: ramo(NOMI_FASCE),
+      coda: ramo(NOMI_FASCE) }),
+    aggiornamento: ramo(EVENTI_AGGIORNAMENTO),
+  });
+  // I percorsi di un ramo come alternative: i figli uguali (lo stesso elenco) si raccolgono in un gruppo solo.
+  function percorsiDi(nodo) {
+    const gruppi = new Map();
+    for (const [k, figlio] of Object.entries(nodo)) gruppi.set(figlio, [...(gruppi.get(figlio) || []), k]);
+    const parti = [...gruppi].map(([figlio, chiavi]) => `${alternative(chiavi)}${figlio ? `[.]${percorsiDi(figlio)}` : ''}`);
+    return parti.length === 1 ? parti[0] : alternative(parti);
+  }
+  const VOCE_SISTEMA = `${alternative(MISURE_SISTEMA.map((m) => `${m}[.]${percorsiDi(SCHEMA_SISTEMA[m])}`))}[|]${N}`;
+  // La voce una volta sola, preceduta dall'inizio o da «;»: le regole non accettano un'espressione oltre i 4096 caratteri.
+  const SISTEMA_FORMA = `^((^|;)${VOCE_SISTEMA})*$`;
 
   const re = (s) => new RegExp(s);
   const USO_RE = re(USO_FORMA);
@@ -205,6 +287,7 @@
   const INTERVISTA_RE = re(INTERVISTA_FORMA);
   const MODELLI_RE = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, re(FORME_MODELLI[c])])));
   const CHIAMATE_RE = re(CHIAMATE_FORMA);
+  const SISTEMA_RE = re(SISTEMA_FORMA);
 
   // Il tetto di caratteri di ogni valore annidato, misurato sulla sua voce più lunga possibile, con margine.
   const TETTO_CARATTERI_USO = 80;
@@ -223,6 +306,8 @@
   const TETTI_CARATTERI_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c,
     TETTO_MODELLI_ORA * (120 + lungo(c) + 13) + RESTI[c].length * (ALTRO.length + lungo(c) + 13)])));
   const TETTO_CARATTERI_CHIAMATE = 49;
+  // Ogni percorso del sistema una volta, col conto più alto: il caso che non arriva mai, e il documento resta piccolo.
+  const TETTO_CARATTERI_SISTEMA = 16000;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
@@ -454,16 +539,18 @@
   // Ogni registrazione controlla la sua chiave contro l'elenco chiuso; il documento poi si ricostruisce da capo.
 
   function oraVuota() {
-    return {
+    const o = {
       uso: {}, errori: {}, azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {},
       anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {}, primeVolte: [],
       contesto: {}, cache: {}, ragionamento: {}, uscita: {}, ripieghi: {}, spesa: {}, adattamenti: {}, chiamate: {},
     };
+    for (const k of MISURE_SISTEMA) o[k] = {};
+    return o;
   }
 
   function normale(o) {
     const d = oggetto(o) ? o : {};
-    for (const k of MISURE) {
+    for (const k of [...MISURE, ...MISURE_SISTEMA]) {
       if (k === 'primeVolte') { if (!Array.isArray(d[k])) d[k] = []; } else if (!oggetto(d[k])) d[k] = {};
     }
     return d;
@@ -708,6 +795,188 @@
     return true;
   }
 
+  // ── Il sistema (#1466) ────────────────────────────────────────────────────
+  const ORA_MS = 60 * 60 * 1000;
+  const sotto = (o, k) => (oggetto(o[k]) ? o[k] : (o[k] = {}));
+  const testo = (v) => (typeof v === 'string' ? v : '');
+  function fasciaTra(v, fasce) {
+    const n = typeof v === 'number' ? v : NaN;
+    if (!Number.isFinite(n) || n < 0) return '';
+    return fasce.find(([, fino]) => n <= fino)[0];
+  }
+  // Il codice di un errore del disco, da un errore o già come stringa: mai il suo messaggio.
+  function codiceDi(err) {
+    let c = '';
+    try { c = typeof err === 'string' ? err : (err && typeof err === 'object' ? err.code : ''); } catch (_) { c = ''; }
+    return typeof c === 'string' ? c : '';
+  }
+
+  function registraPassoAvvio(ora, passo, ms) {
+    const f = fasciaDi(ms);
+    if (!PASSI_AVVIO.includes(passo) || !f || typeof ms !== 'number') return false;
+    piuUno(sotto(normale(ora).avvioPasso, passo), f);
+    return true;
+  }
+
+  function registraTipoAvvio(ora, tipo) {
+    if (!TIPI_AVVIO.includes(tipo)) return false;
+    piuUno(normale(ora).avvioTipo, tipo);
+    return true;
+  }
+
+  function tipoProcesso(t) {
+    const s = testo(t);
+    if (TIPI_PROCESSO.includes(s)) return s;
+    return has(TIPO_PROCESSO_DI, s) ? TIPO_PROCESSO_DI[s] : ALTRO;
+  }
+  function motivoCrash(r) { const s = testo(r); return MOTIVI_CRASH.includes(s) ? s : ALTRO; }
+
+  // Un'uscita pulita è una chiusura voluta, non un guasto.
+  function registraProcessoMorto(ora, tipo, motivo) {
+    if (testo(motivo) === 'clean-exit') return false;
+    piuUno(sotto(normale(ora).processoMorto, tipoProcesso(tipo)), motivoCrash(motivo));
+    return true;
+  }
+
+  // `cosa`: 'volte' quando la finestra smette di rispondere; 'tornata' o 'chiusa_da_utente', con la durata, alla fine.
+  function registraFinestraBloccata(ora, cosa, ms = null) {
+    if (!COSE_FINESTRA.includes(cosa)) return false;
+    const f = normale(ora).finestraBloccata;
+    if (cosa === 'volte') { f.volte = conto(f.volte) + 1; return true; }
+    const fa = typeof ms === 'number' ? fasciaDi(ms) : '';
+    if (!fa) return false;
+    piuUno(sotto(f, cosa), fa);
+    return true;
+  }
+
+  // Un campione del ciclo del main: il ritardo più lungo visto da quello prima.
+  function registraMainFermo(ora, ritardoMs) {
+    if (typeof ritardoMs !== 'number' || !Number.isFinite(ritardoMs) || ritardoMs < 0) return false;
+    const f = normale(ora).mainFermo;
+    const v = Math.min(ritardoMs, ORA_MS);
+    f.maxMs = Math.max(typeof f.maxMs === 'number' && Number.isFinite(f.maxMs) ? f.maxMs : 0, v);
+    const b = sotto(f, 'blocchi');
+    for (const [k, soglia] of SOGLIE_FERMO) if (v > soglia) piuUno(b, k);
+    return true;
+  }
+
+  // Solo il nome della classe, e solo se è uno dei nomi di serie: il messaggio e lo stack non si leggono nemmeno.
+  function nomeEccezione(err) {
+    let n = '';
+    try { n = err && typeof err === 'object' ? err.name : ''; } catch (_) { n = ''; }
+    return typeof n === 'string' && NOMI_ECCEZIONE.includes(n) ? n : ALTRO;
+  }
+
+  function registraEccezione(ora, origine, err) {
+    if (!ORIGINI_ECCEZIONE.includes(origine)) return false;
+    piuUno(sotto(normale(ora).eccezioneMain, origine), nomeEccezione(err));
+    return true;
+  }
+
+  function registraMemoria(ora, { mb, vive, attesa } = {}) {
+    const fm = fasciaTra(mb, FASCE_MB);
+    const fv = fasciaTra(vive, FASCE_SCHEDE);
+    const fa = fasciaTra(attesa, FASCE_SCHEDE);
+    if (!fm || !fv || !fa) return false;
+    const m = normale(ora).memoria;
+    piuUno(sotto(m, 'totale'), fm);
+    piuUno(sotto(m, 'vive'), fv);
+    piuUno(sotto(m, 'attesa'), fa);
+    return true;
+  }
+
+  function registraIpcSincrono(ora, canale, ms) {
+    const f = typeof ms === 'number' ? fasciaDi(ms) : '';
+    if (!CANALI_SINCRONI.includes(canale) || !f) return false;
+    piuUno(sotto(normale(ora).ipcSincrono, canale), f);
+    return true;
+  }
+
+  function registraChiusura(ora, { ms, tetto = false } = {}) {
+    const f = typeof ms === 'number' ? fasciaDi(ms) : '';
+    if (!f) return false;
+    const c = normale(ora).chiusura;
+    piuUno(sotto(c, 'durata'), f);
+    if (tetto === true) c.tetto = conto(c.tetto) + 1;
+    return true;
+  }
+
+  function registraUscita(ora, esito) {
+    if (!ESITI_USCITA.includes(esito)) return false;
+    piuUno(normale(ora).uscitaPrecedente, esito);
+    return true;
+  }
+
+  // Gli eventi del disco, ognuno col suo nome dell'elenco: chi li vede passa l'esito o l'errore, mai la chiave o il file.
+  function eventoLettura(esito) { return ESITI_LETTURA.includes(esito) ? `lettura_${esito}` : ''; }
+  function eventoSalvataggio(err) {
+    const c = codiceDi(err);
+    return `salvataggio_fallito_${minuscolo(CODICI_DISCO.includes(c) ? c : ALTRO)}`;
+  }
+  function eventoRinomina(err) {
+    const c = codiceDi(err);
+    return CODICI_RINOMINA.includes(c) ? `rinomina_ritentata_${minuscolo(c)}` : '';
+  }
+  function eventoDimensione(byte) {
+    const f = typeof byte === 'number' ? fasciaTra(byte / (1024 * 1024), FASCE_MB_FILE) : '';
+    return f ? `dimensione_${f}` : '';
+  }
+  function eventoFlush(ms) {
+    const f = typeof ms === 'number' ? fasciaDi(ms) : '';
+    return f ? `flush_${f}` : '';
+  }
+
+  function registraStorage(ora, evento, n = 1) {
+    if (!EVENTI_STORAGE.includes(evento) || !intero(n) || n === 0) return false;
+    const s = normale(ora).storageEsito;
+    s[evento] = conto(conto(s[evento]) + n);
+    return true;
+  }
+
+  // `schede`: quante ne sono tornate; `vistaMs` e `codaMs`: fino alla scheda in vista caricata e alla fine della coda,
+  // null se non ci sono arrivate.
+  function registraSessione(ora, { esito, schede = 0, vistaMs = null, codaMs = null } = {}) {
+    const fascia = fasciaTra(esito === 'ripristinata' ? schede : 0, FASCE_SCHEDE);
+    if (!ESITI_SESSIONE.includes(esito) || !fascia) return false;
+    const s = normale(ora).sessione;
+    piuUno(sotto(s, 'schede'), fascia);
+    piuUno(sotto(s, 'esiti'), esito);
+    if (esito === 'ripristinata') {
+      for (const [campo, ms] of [['vista', vistaMs], ['coda', codaMs]]) {
+        const f = typeof ms === 'number' ? fasciaDi(ms) : '';
+        if (f) piuUno(sotto(s, campo), f);
+      }
+    }
+    return true;
+  }
+
+  function registraAggiornamento(ora, evento) {
+    if (!EVENTI_AGGIORNAMENTO.includes(evento)) return false;
+    piuUno(normale(ora).aggiornamento, evento);
+    return true;
+  }
+
+  // Le misure del sistema raccolte fuori dall'ora (un campione al secondo, una chiamata sincrona per pagina) entrano
+  // nell'ora tutte insieme: sono conti, si sommano; il ritardo più lungo resta il più lungo.
+  function unisciSistema(ora, da) {
+    const g = normale(ora);
+    const somma = (a, b) => {
+      for (const [k, v] of Object.entries(oggetto(b) ? b : {})) {
+        if (k === 'maxMs') {
+          if (typeof v === 'number' && Number.isFinite(v)) a.maxMs = Math.max(typeof a.maxMs === 'number' && Number.isFinite(a.maxMs) ? a.maxMs : 0, v);
+        } else if (oggetto(v)) somma(sotto(a, k), v);
+        else if (intero(v) && v > 0) a[k] = conto(conto(a[k]) + v);
+      }
+    };
+    for (const k of MISURE_SISTEMA) if (oggetto(da && da[k])) somma(g[k], da[k]);
+    return g;
+  }
+
+  function sistemaVuoto(d) {
+    const pieno = (o) => oggetto(o) && Object.values(o).some((v) => (oggetto(v) ? pieno(v) : typeof v === 'number' && v > 0));
+    return !MISURE_SISTEMA.some((k) => pieno(d && d[k]));
+  }
+
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
@@ -905,6 +1174,65 @@
     return out;
   }
 
+  const NOMI_MB = Object.freeze(FASCE_MB.map(([k]) => k));
+  const NOMI_SCHEDE = Object.freeze(FASCE_SCHEDE.map(([k]) => k));
+
+  // Le fasce di una mappa, tenute finché la loro somma sta sotto `tetto`: come fasceIn, ma restano una mappa.
+  function fasceFino(mappa, nomi, tetto) {
+    const v = fasceIn(mappa, nomi, tetto).split(',').map(Number);
+    return Object.fromEntries(nomi.map((k, i) => [k, v[i]]).filter(([, n]) => n > 0));
+  }
+
+  // L'ora del sistema come esce: le stesse mappe, coi conti che devono tornare (il ritardo più lungo diventa la sua
+  // fascia, i blocchi stanno in ordine, il tetto dei cookie e i tempi della sessione non superano le loro volte).
+  function sistemaInChiaro(d) {
+    const g = normale(oggetto(d) ? d : {});
+    const out = {};
+    for (const m of MISURE_SISTEMA) out[m] = g[m];
+    const f = g.mainFermo;
+    const max = typeof f.maxMs === 'number' && Number.isFinite(f.maxMs) && f.maxMs >= 0 ? fasciaDi(f.maxMs) : '';
+    const b = SOGLIE_FERMO.map(([k]) => conto(oggetto(f.blocchi) ? f.blocchi[k] : 0));
+    for (let i = 1; i < b.length; i++) b[i] = Math.min(b[i], b[i - 1]);
+    out.mainFermo = { max: max ? { [max]: 1 } : {}, blocchi: Object.fromEntries(SOGLIE_FERMO.map(([k], i) => [k, b[i]])) };
+    const c = g.chiusura;
+    const durata = fasceFino(c.durata, NOMI_FASCE, MAX_CONTO);
+    out.chiusura = { durata, tetto: Math.min(conto(c.tetto), somma(durata)) };
+    const s = g.sessione;
+    const rip = conto(oggetto(s.esiti) ? s.esiti.ripristinata : 0);
+    out.sessione = { ...s, vista: fasceFino(s.vista, NOMI_FASCE, rip), coda: fasceFino(s.coda, NOMI_FASCE, rip) };
+    return out;
+  }
+
+  // «misura.voce[.sotto]|n», seguendo lo schema: un nome che non c'è nello schema non esce, un conto a zero nemmeno.
+  function sistemaPulito(d) {
+    const chiaro = sistemaInChiaro(d);
+    const voci = [];
+    const giu = (nodo, dati, base) => {
+      for (const [k, figlio] of Object.entries(nodo)) {
+        const v = oggetto(dati) && has(dati, k) ? dati[k] : null;
+        if (figlio) giu(figlio, v, `${base}.${k}`);
+        else if (intero(v) && v > 0) voci.push(`${base}.${k}|${conto(v)}`);
+      }
+    };
+    for (const m of MISURE_SISTEMA) giu(SCHEMA_SISTEMA[m], chiaro[m], m);
+    return voci.join(';');
+  }
+
+  // Il contrario, per chi legge i documenti e per la validazione: le stesse mappe annidate, coi soli conti presenti.
+  function leggiSistema(s) {
+    if (typeof s !== 'string' || !SISTEMA_RE.test(s)) return null;
+    const out = Object.fromEntries(MISURE_SISTEMA.map((m) => [m, {}]));
+    if (!s) return out;
+    for (const voce of s.split(';')) {
+      const [percorso, n] = voce.split('|');
+      const parti = percorso.split('.');
+      let o = out;
+      for (const p of parti.slice(0, -1)) o = sotto(o, p);
+      o[parti[parti.length - 1]] = (o[parti[parti.length - 1]] || 0) + Number(n);
+    }
+    return out;
+  }
+
   function meseDi(giorno) { return String(giorno || '').slice(0, 7); }
 
   function documento({ pseudonimo, chiave, app, os, dati, primo = '' }) {
@@ -932,6 +1260,7 @@
       erroriVisti: erroriVistiPuliti(d.erroriVisti),
       intervista: intervistaPulita(d.intervista),
       primeVolte: primeVoltePulite(d.primeVolte),
+      sistema: sistemaPulito(d),
     };
   }
 
@@ -1018,7 +1347,6 @@
   }
   function leggiChiamate(s) { return CHIAMATE_RE.test(String(s)) ? fasceLette(s, nomi(FASCE_CHIAMATE)) : null; }
   const somma = (o) => Object.values(o).reduce((a, n) => a + n, 0);
-
   // ── La validazione: la stessa forma che chiedono le regole, e in più i conti che devono tornare ─────────────
   function valida(doc) {
     const no = (motivo) => ({ ok: false, motivo });
@@ -1045,6 +1373,13 @@
       erroriVisti: [re(ERRORE_VISTO_FORMA), CONTO_RE, TETTO_CARATTERI_CONTO],
       intervista: [re(PASSO_FORMA), INTERVISTA_RE, TETTO_CARATTERI_INTERVISTA],
     };
+    if (typeof doc.sistema !== 'string' || doc.sistema.length > TETTO_CARATTERI_SISTEMA || !SISTEMA_RE.test(doc.sistema)) return no('sistema');
+    const sis = leggiSistema(doc.sistema);
+    const b = SOGLIE_FERMO.map(([k]) => sis.mainFermo.blocchi?.[k] || 0);
+    if (somma(sis.mainFermo.max || {}) > 1 || b.some((n, i) => i > 0 && n > b[i - 1])) return no('sistema: blocchi del main che non tornano');
+    if ((sis.chiusura.tetto || 0) > somma(sis.chiusura.durata || {})) return no('sistema: tetto oltre le chiusure');
+    const rip = sis.sessione.esiti?.ripristinata || 0;
+    if (somma(sis.sessione.vista || {}) > rip || somma(sis.sessione.coda || {}) > rip) return no('sistema: attese oltre le sessioni ripristinate');
     for (const [campo, [chiaviAmmesse, formaValore, tetto]] of Object.entries(mappe)) {
       const m = doc[campo];
       if (!oggetto(m)) return no(campo);
@@ -1187,6 +1522,9 @@
     NOMI_POSIZIONI, CAMPI, CAMPI_GIORNO, CAMPI_CHIAMATE, MISURE, MISURE_ORA, MISURE_MODELLI, MISURE_CHIAMATE,
     FASCE_CONTESTO, FASCE_CACHE, FASCE_RAGIONAMENTO, FASCE_USCITA, FINI, TENTATIVI, ORIGINI_SPESA, CENTOMILLESIMI, FASCE_CHIAMATE,
     ADATTAMENTI, RESTI, TETTO_MODELLI_ORA,
+    CAMPI_ORA_V2, MISURE_SISTEMA, PASSI_AVVIO, TIPI_AVVIO, TIPO_PROCESSO_DI, TIPI_PROCESSO, COSE_FINESTRA, SOGLIE_FERMO,
+    ORIGINI_ECCEZIONE, NOMI_ECCEZIONE, FASCE_MB, NOMI_MB, FASCE_SCHEDE, NOMI_SCHEDE, CANALI_SINCRONI, ESITI_USCITA, ESITI_LETTURA,
+    CODICI_DISCO, CODICI_RINOMINA, FASCE_MB_FILE, EVENTI_STORAGE, ESITI_SESSIONE, EVENTI_AGGIORNAMENTO, SCHEMA_SISTEMA,
     VIE, PANNELLI, TIPI_PROPOSTA, ESITI_PROPOSTA, LIVELLI_AUTONOMIA, STATI_COMPITO, COSTI, PERIMETRI, ORIGINI, RISPOSTE,
     ESITI_CONFERMA, ANNULLABILI_IN_PAGINA, DOVE_CRASH, MOTIVI_CRASH, TIPI_ERRORE_VISTO, AVVISI_ERRORE, SCELTE_INTERVISTA,
     AVVIO, AZIONE_PAGINA, AZIONE_DI_ICONA, AZIONE_DI_PAGINA, IMPOSTAZIONI_EXTRA, MAI_CONTATE,
@@ -1196,12 +1534,13 @@
     FORME: Object.freeze({
       USO_FORMA, ERRORI_FORMA, MISURA_FORMA, IMPOSTAZIONI_FORMA, RICERCA_FORMA, CORRETTORE_FORMA, CONFERME_FORMA,
       CONTO_FORMA, ANTICIPO_FORMA, INTERVISTA_FORMA, CHIAVE_AZIONE_FORMA, CHIAVE_IMPOSTAZIONE_FORMA, TIPO_AZIONE_FORMA,
-      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, MODELLI: FORME_MODELLI,
+      ERRORE_VISTO_FORMA, PASSO_FORMA, CHIAMATE_FORMA, SISTEMA_FORMA, MODELLI: FORME_MODELLI,
     }),
     TETTI: Object.freeze({
       TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI, TETTO_CARATTERI_ERRORI_ORA, TETTO_CARATTERI_MISURA, TETTO_CARATTERI_IMPOSTAZIONE,
       TETTO_CARATTERI_RICERCA, TETTO_CARATTERI_CORRETTORE, TETTO_CARATTERI_CONFERME, TETTO_CARATTERI_CONTO,
-      TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, MODELLI: TETTI_CARATTERI_MODELLI,
+      TETTO_CARATTERI_ANTICIPO, TETTO_CARATTERI_INTERVISTA, TETTO_CARATTERI_CHIAMATE, TETTO_CARATTERI_SISTEMA,
+      MODELLI: TETTI_CARATTERI_MODELLI,
     }),
     funzioni, funzioneDi, azioni, azioneDiPagina, tipiAzione, chiaviImpostazioni, chiaveImpostazione, valoreImpostazione, viaDi,
     passiIntervista, erroreVisto, tipoErroreVisto, fasciaDi, posizioneDi, famigliaOs, versioneApp, modelloPulito,
@@ -1209,7 +1548,12 @@
     oraVuota, registraUso, registraAzione, registraErrore, registraImpostazione, registraRicerca, registraProposta,
     registraConferma, registraAnnullato, registraAnticipo, registraChiesto, registraErroreVisto, registraIntervista,
     registraPrimaVolta, registraChiamata, registraSpesa, registraAdattamento, registraChiamate,
+    registraPassoAvvio, registraTipoAvvio, registraProcessoMorto, registraFinestraBloccata, registraMainFermo, registraEccezione,
+    registraMemoria, registraIpcSincrono, registraChiusura, registraUscita, registraStorage, registraSessione, registraAggiornamento,
+    tipoProcesso, nomeEccezione, eventoLettura, eventoSalvataggio, eventoRinomina, eventoDimensione, eventoFlush,
+    unisciSistema, sistemaVuoto,
     documento, documentoGiorno, documentoChiamate, senzaChiamate, idDocumento, valida, validaChiamate, leggiUso, leggiMisura, leggiErrori, leggiRicerca, leggiModelli, leggiChiamate,
+    leggiSistema, sistemaInChiaro,
     giornoDi, oraDi, giornoPrima, meseDi, oreDaInviare, daInviare, potaOre, potaGiorni, pseudonimoDelMese,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

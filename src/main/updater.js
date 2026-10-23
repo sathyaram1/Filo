@@ -34,6 +34,16 @@ const dip = {
   avviso: mandaAvviso,
 };
 
+// I passi degli aggiornamenti per i contatori anonimi (#1466): uno per versione e sessione, e la versione non esce (quella
+// d'arrivo la porta già il documento). «Nessun canale verso il server porta un allarme dall'app» non vale più per #1119.
+const contati = new Set();
+function contaAggiornamento(evento, versione = '') {
+  const k = `${evento}|${versione}`;
+  if (versione && contati.has(k)) return;
+  contati.add(k);
+  try { globalThis.SN_CONTATORI_MAIN?.aggiornamento(evento); } catch (_) {}
+}
+
 // La chat (scrivere e leggere la preferenza) chiede qui se la scelta apertura/chiusura vale sul sistema di Filo.
 globalThis.SN_AGGIORNAMENTI = { sceltaNonVale: () => R.sceltaNonVale(dip.piattaforma()) };
 
@@ -138,11 +148,12 @@ function avviaProcesso(cmd, argv) {
   });
 }
 
-function lanciaInstallatore(p) {
-  if (p.amministratore) {
-    return dip.avvia(path.join(process.resourcesPath || '', 'elevate.exe'), [p.file, ...ARGOMENTI_INSTALLATORE]);
-  }
-  return dip.avvia(p.file, ARGOMENTI_INSTALLATORE.slice());
+async function lanciaInstallatore(p) {
+  const partito = p.amministratore
+    ? await dip.avvia(path.join(process.resourcesPath || '', 'elevate.exe'), [p.file, ...ARGOMENTI_INSTALLATORE])
+    : await dip.avvia(p.file, ARGOMENTI_INSTALLATORE.slice());
+  if (!partito) contaAggiornamento('installatore_non_avviato');
+  return partito;
 }
 
 function versioneInUso() {
@@ -189,7 +200,13 @@ async function installaAllAvvioSeServe(impostazioni, { forza = false } = {}) {
   };
   let d = R.decidiAllAvvio({ ...base, installatoreValido: true });
   if (d.azione === 'installa' && !(await installatoreValido(d.pronto))) {
+    contaAggiornamento('installatore_non_valido', d.pronto.versione);
     d = R.decidiAllAvvio({ ...base, installatoreValido: false });
+  }
+  // Un tentativo contato e la versione ancora quella di prima: l'installazione della volta scorsa non è riuscita.
+  if (d.pronto && base.pronto && d.pronto.falliti > (Number(base.pronto.falliti) || 0)) {
+    contaAggiornamento('installazione_fallita', `${d.pronto.versione}#${d.pronto.falliti}`);
+    if (d.avvisa) contaAggiornamento('installazione_fallita_secondo_avviso', d.pronto.versione);
   }
   if (JSON.stringify(d.pronto) !== JSON.stringify(base.pronto)) {
     if (!scriviRicordo(d.pronto) && d.azione === 'installa') return false;
@@ -202,6 +219,9 @@ async function installaAllAvvioSeServe(impostazioni, { forza = false } = {}) {
     return false;
   }
   if (!(await lanciaInstallatore(d.pronto))) return false;
+  // L'uscita di qui non passa dalla chiusura: l'ora dei contatori va nello storage prima che lo si scriva.
+  contaAggiornamento('installazione_lanciata_all_avvio', d.pronto.versione);
+  try { await globalThis.SN_CONTATORI_MAIN?.salvaSubito(); } catch (_) {}
   dip.esci();
   return true;
 }
@@ -244,8 +264,9 @@ function scaricaVerificata(u) {
   return u.downloadUpdate();
 }
 
-// Nessun canale verso il server porta un allarme dall'app: resta la riga di log.
+// Oltre alla riga di log, il conto dei contatori anonimi (#1466): il solo segnale che arriva al server.
 function rifiuta(info) {
+  contaAggiornamento('versione_rifiutata', String((info && info.version) || '?'));
   const dato = (v) => String(JSON.stringify(v === undefined ? null : v)).slice(0, 120);
   console.error(`[updater] versione rifiutata (#1119): latest.yml dice ${dato(info && info.version)}, `
     + `l'etichetta della release ${dato(info && info.tag)}`);
@@ -280,6 +301,7 @@ function shaDalFeed(info, file) {
 function quandoScaricato(info) {
   const versione = info?.version || stato.versioneTrovata || null;
   const file = info?.downloadedFile || null;
+  contaAggiornamento('scaricato', String(versione || '?'));
   // electron-updater aggancia l'installazione alla chiusura subito dopo questo evento, solo se è accesa adesso.
   if (updater && updater.autoInstallOnAppQuit) stato.agganciata = true;
   stato.scaricamento = null;
@@ -393,6 +415,7 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
     stato.rifiutata = null;
     stato.versione = info?.version || null;
     stato.versioneTrovata = info?.version || null;
+    contaAggiornamento('trovato', String(info?.version || '?'));
     console.log('[updater] update disponibile:', info?.version);
     if (stato.chiesta && stato.chiesta !== stato.versioneTrovata) dimenticaRichiesta();
     // Un «Installa» di un avvio precedente, interrotto dalla chiusura, riprende da solo: l'utente l'aveva già chiesto.
@@ -431,6 +454,7 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
   au.on('error', (err) => {
     console.error('[updater] errore', err ? (err.stack || err).toString() : 'sconosciuto');
     if (err && err.rifiutata) {
+      contaAggiornamento('versione_rifiutata', String(err.rifiutata));
       stato.rifiutata = err.rifiutata;
       if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
       return;
@@ -441,7 +465,11 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
       stato.scaricamento = null;
       dimenticaRichiesta();
       togliCarte(() => true);
-    } else scaricamentoFallito();
+    } else {
+      // Un errore prima di aver trovato una versione è il controllo che non è riuscito, non uno scaricamento.
+      if (stato.versioneTrovata && stato.fase !== 'pronto') contaAggiornamento('scaricamento_fallito');
+      scaricamentoFallito();
+    }
     avvisaSeAggiornamentoBloccato(stato.versioneTrovata);
   });
 }
@@ -875,6 +903,7 @@ async function scriviAvviso(caso, versione) {
 async function avvisaSeAggiornamentoBloccato(versione) {
   const caso = AGGIORNAMENTO_BLOCCATO[dip.piattaforma()];
   if (!caso || !versione) return;
+  contaAggiornamento(dip.piattaforma() === 'darwin' ? 'bloccato_mac' : 'bloccato_linux', String(versione));
   await scriviAvviso(caso, versione);
 }
 

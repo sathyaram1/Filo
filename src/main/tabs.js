@@ -2705,9 +2705,12 @@ class TabManager {
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
-      // Se muore di nuovo mentre stiamo recuperando, non si insiste a raffica.
+      // Se muore di nuovo mentre stiamo recuperando, non si insiste a raffica; lo sanno i contatori anonimi (#1466).
       const now = Date.now();
-      if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) return;
+      if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) {
+        try { globalThis.SN_CONTATORI_MAIN?.processoMorto('scheda_in_recupero', reason, { incognito: !!this.incognito }); } catch (_) {}
+        return;
+      }
       tab._crashRecoveryAt = now;
       // Si RICREA la vista: un loadURL sul processo appena morto fa crashare anche il renderer
       // nuovo quando c'è un preload, e si entra in un giro senza fine.
@@ -2790,6 +2793,7 @@ class TabManager {
       if (tab.view && tab.view.webContents === wc) {
         this.anteprime.caricata(tab);
         this.codaRiapertura.caricata(tab);
+        if (tab._sessioneVista) { const vista = tab._sessioneVista; tab._sessioneVista = null; vista(); }
       }
       this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
@@ -3865,6 +3869,9 @@ class TabManager {
   // una scheda vuota.
   async restoreSession() {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
+    const t0 = Date.now();
+    const contatori = globalThis.SN_CONTATORI_MAIN;
+    let letturaFallita = false;
     let urls = [];
     let colors = [];
     const aperte = [];
@@ -3891,11 +3898,16 @@ class TabManager {
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
       }
-    } catch (_) {}
-    if (!urls.length) return false;
+    } catch (_) { letturaFallita = true; }
+    // L'esito della riapertura e i suoi tempi vanno ai contatori anonimi (#1466).
+    if (!urls.length) {
+      try { contatori?.sessione({ esito: letturaFallita ? 'lettura_fallita' : 'niente' }); } catch (_) {}
+      return false;
+    }
 
     this._restoring = true;
     const nate = [];
+    let target = null;
     try {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
@@ -3919,14 +3931,24 @@ class TabManager {
         return nata;
       });
       const i = activeIndex >= 0 && activeIndex < perIndice.length ? activeIndex : perIndice.length - 1;
-      const target = perIndice[i] || nate[nate.length - 1] || null;
+      target = perIndice[i] || nate[nate.length - 1] || null;
       this.codaRiapertura.accoda(perVicinanza(nate, target));
       if (target) this.activate(target.id);
       this.codaRiapertura.avanti();
     } finally {
       this._restoring = false;
     }
-    if (!nate.length) return false;
+    if (!nate.length) {
+      try { contatori?.sessione({ esito: 'niente' }); } catch (_) {}
+      return false;
+    }
+    try {
+      const misura = contatori?.sessione({ esito: 'ripristinata', schede: nate.length, t0 });
+      if (misura) {
+        if (target) target._sessioneVista = misura.vista;
+        this.codaRiapertura.finita().then(() => misura.coda(), () => misura.coda());
+      }
+    } catch (_) {}
     this._persistSession();
     // §2.1 decisione utente: a ogni riapertura Filo riordina/archivia le tab, a pagine
     // caricate (forniscono l'estratto all'LLM). No-op se la pref è disattivata o manca la chiave.

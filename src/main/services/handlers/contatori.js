@@ -12,8 +12,8 @@ const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const testo = (v) => (typeof v === 'string' ? v : '');
 const numero = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-// Crash e blocchi di ogni renderer e processo (#1461): dove e perché, come lo dice Electron. Una scheda in incognito
-// non si conta; quello che cade mentre Filo si chiude non è un crash.
+// Crash e blocchi di ogni renderer e processo (#1461, #1466): dove, quale e perché, come lo dice Electron. Una scheda in
+// incognito non si conta; quello che cade mentre Filo si chiude non è un crash.
 function seguiCrash(contatori, C) {
   let electron;
   try { electron = require('electron'); } catch (_) { return; }
@@ -47,6 +47,8 @@ function seguiCrash(contatori, C) {
     if (inChiusura || !details || details.reason === 'clean-exit') return;
     // Un processo comune a tutte le finestre: con sole finestre incognito aperte non si conta.
     contatori.erroreVisto(`crash:processo:${motivo(details)}`, { incognito: !finestre().some((w) => !w._filoIncognito) });
+    // Quale processo (#1466): GPU, Utility e gli altri non schede, come lo dice Electron; anche prima della prima finestra.
+    contatori.processoMorto(details.type, details.reason);
   });
   app.on('web-contents-created', (_e, wc) => {
     wc.on('unresponsive', () => {
