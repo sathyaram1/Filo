@@ -210,25 +210,20 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   for (const a of C.AVVISI_ERRORE) C.registraErroreVisto(ora, `avviso:${a}`);
   for (let i = 1; i < 300; i++) C.registraErroreVisto(ora, `rete:-${i}`);
   for (const p of C.passiIntervista()) for (const s of C.SCELTE_INTERVISTA) C.registraIntervista(ora, p, s);
-  // Le chiamate: i modelli più lunghi fino al tetto dell'ora, poi ogni resto per ogni funzione sulla riga «altro».
-  const servita = (f, m, { ingresso, letti, detta, ragionamento, uscita, fine, tentativo, ricominciata }) => C.registraChiamata(ora, f, {
-    modello: m, ingresso, cacheLetti: letti, cacheDetta: detta, ragionamento, uscita, fine, tentativo, ricominciata,
-    ragionamentoTolto: true, spesa: { usd: 99, origine: 'router' },
-  });
+  // Le chiamate: per ogni funzione ogni resto, col modello più lungo che l'app lascia uscire; oltre il tetto dell'ora
+  // diventa «altro», e ogni funzione ha anche tutte le sue righe «altro».
+  const lunghissimo = (i) => `${'m'.repeat(60)}/${'x'.repeat(56)}${String(i).padStart(3, '0')}`;
+  assert.equal(C.modelloPulito(lunghissimo(1)), lunghissimo(1));
+  let k = 0;
   for (const f of C.funzioni()) {
-    for (let i = 0; i < 3; i++) {
-      for (const [ingresso, letti, ragionamento, uscita, tentativo] of [[1000, 0, 0, 100, 1], [9000, 3000, 2000, 900, 2], [20000, 9000, 5000, 3000, 3], [40000, 29000, 20000, 9000, 4], [99000, 99000, null, 20000, 5], [200000, 1, 100, 100000, 9]]) {
-        for (const fine of ['stop', 'length', 'tool_calls', 'content_filter', 'error']) {
-          for (const detta of [true, false]) servita(f, modello(i), { ingresso, letti, detta, ragionamento, uscita, fine, tentativo, ricominciata: detta });
-        }
+    for (const c of C.MISURE_MODELLI) {
+      ora[c][f] = {};
+      for (const r of [...C.RESTI[c]].sort((a, b) => b.length - a.length)) {
+        ora[c][f][`${lunghissimo(k++)}|${r}`] = 7;
+        ora[c][f][`altro|${r}`] = 7;
       }
-      for (const o of C.ORIGINI_SPESA) C.registraSpesa(ora, f, modello(i), o, 99);
-      for (const t of C.ADATTAMENTI) C.registraAdattamento(ora, f, modello(i), t);
     }
     for (const n of [1, 2, 4, 9, 40]) C.registraChiamate(ora, f, n);
-  }
-  for (const c of C.MISURE_MODELLI) {
-    for (const r of C.RESTI[c]) assert.ok(Object.values(ora[c]).some((per) => has(per, `altro|${r}`)), `${c}: manca la riga «altro|${r}» nel documento più carico`);
   }
   const gonfia = (o) => { for (const k of Object.keys(o)) { if (Number.isInteger(o[k])) o[k] = 999999999; else if (o[k] && typeof o[k] === 'object') gonfia(o[k]); } };
   gonfia(ora);
