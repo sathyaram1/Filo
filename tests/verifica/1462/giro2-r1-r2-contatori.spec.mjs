@@ -87,9 +87,9 @@ test('r2 il livello di autonomia scelto si legge col suo nome, nell’intervista
     });
     const intervista = page.locator('#mgCtBlocchi section[data-blocco="intervista"] .mg-ct-chip');
     await expect(intervista).toHaveCount(1);
-    await expect(intervista).toContainText(new RegExp(`^${nome} 6$`, 'i'));
+    await expect.soft(intervista).toContainText(new RegExp(`^${nome} 6$`, 'i'));
     const imp = page.locator('#mgCtBlocchi section[data-blocco="impostazioni"] tr.mg-ct-riga .mg-ct-chip');
     await expect(imp).toHaveCount(1);
-    await expect(imp).toContainText(new RegExp(`^${nome} 6$`, 'i'));
+    await expect.soft(imp).toContainText(new RegExp(`^${nome} 6$`, 'i'));
   } finally { await rimetti(app); }
 });
