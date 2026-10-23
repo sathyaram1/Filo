@@ -283,8 +283,9 @@
     const suInput = (e) => {
       if (!e.isTrusted) return;
       c.toccato = true;
+      if (c.sessione && !c.perche) c.perche = 'cambiata';
       c.lasciato = campo.value;
-      if (c.stato === 'attesa') annullaInvio();
+      if (c.stato === 'attesa') annullaInvio('cambiata');
     };
     campo.addEventListener('input', suInput);
     const suTasto = (e) => {
