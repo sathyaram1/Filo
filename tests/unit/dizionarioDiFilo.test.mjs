@@ -39,7 +39,7 @@ test('accenti, apostrofi, maiuscole e le parole che Chromium aggiunge al suo diz
   const giuste = ['perché', 'caffè', 'Perché', 'PERCHÉ', 'più', 'città', "l'albero", "dell'anno", "po'", 'Andato', 'ANDATO',
     'mangiarsela', 'Roma', 'Wikipedia', 'e-mail'];
   assert.deepEqual(giuste.filter((p) => D.sbagliate([p])[0]), []);
-  assert.deepEqual(D.sbagliate(['perche', 'roma', 'citta']), [true, true, true]);
+  assert.deepEqual(D.sbagliate(['perche', 'giornno', 'citta']), [true, true, true]);
   assert.ok(D.proposte('perche').includes('perché'), 'le lettere accentate passano intere nelle proposte');
 });
 
@@ -99,6 +99,42 @@ test('i file italiani restano Latin-9 con CRLF (GPL, com\'erano): la conversione
   const { aff, dic } = D.testiDi('it-IT');
   assert.match(aff, /^SET UTF-8$/m);
   assert.ok(!aff.includes('\r') && !dic.includes('\r'));
-  assert.match(dic, /^perché\//m);
+  assert.match(dic, /^caffè$/m);
   assert.match(dic, /^Wikipedia$/m, 'il delta di Chromium è dentro');
+});
+
+test('la pagina chiede al dizionario di Filo, in un viaggio solo; quello del browser solo finché Filo non sa', () => {
+  const fai = require('../../src/preload/dizionario.js');
+  const viaggi = [];
+  let risposta = null;
+  const ipc = { sendSync: (canale, dato) => { viaggi.push([canale, dato]); return typeof risposta === 'function' ? risposta(canale, dato) : risposta; } };
+  // Il browser di Windows con l'italiano del sistema: ogni parola giusta, nessuna proposta.
+  const browser = { isWordMisspelled: () => false, getWordSuggestions: () => [] };
+  const D = fai(ipc, browser);
+
+  risposta = (c, ps) => (c === 'filo:dizionario-sbagliate' ? ps.map((p) => p === 'andatto') : ['andato']);
+  assert.deepEqual(D.sbagliate(['andato', 'andatto']), [false, true]);
+  assert.equal(D.sbagliata('andatto'), true);
+  assert.deepEqual(D.proposte('andatto'), ['andato']);
+  assert.deepEqual(viaggi.map((v) => v[0]), ['filo:dizionario-sbagliate', 'filo:dizionario-sbagliate', 'filo:dizionario-proposte']);
+  assert.deepEqual(D.sbagliate([]), [], 'niente da chiedere, nessun viaggio');
+  assert.equal(viaggi.length, 3);
+
+  risposta = null;
+  const linux = fai(ipc, { isWordMisspelled: (p) => p === 'quseta', getWordSuggestions: () => ['questa'] });
+  assert.deepEqual(linux.sbagliate(['quseta', 'questa']), [true, false], 'non pronto: risponde il browser');
+  assert.deepEqual(linux.proposte('quseta'), ['questa']);
+
+  const rotto = fai({ sendSync: () => { throw new Error('canale chiuso'); } }, null);
+  assert.deepEqual(rotto.sbagliate(['andatto']), [false], 'senza nessun dizionario ogni parola è giusta');
+  assert.deepEqual(rotto.proposte('andatto'), []);
+});
+
+test('il correttore nelle pagine e nelle pagine di Filo riceve il dizionario di Filo', () => {
+  for (const f of ['src/preload/page-preload.js', 'src/preload/internal-preload.js']) {
+    const testo = readFileSync(fileURLToPath(new URL(`../../${f}`, import.meta.url)), 'utf8');
+    assert.match(testo, /require\('\.\/dizionario\.js'\)\(ipcRenderer, webFrame\)/, f);
+  }
+  const ipc = readFileSync(fileURLToPath(new URL('../../src/main/ipc.js', import.meta.url)), 'utf8');
+  for (const c of ['filo:dizionario-sbagliate', 'filo:dizionario-proposte']) assert.ok(ipc.includes(`ipcMain.on('${c}'`), c);
 });
