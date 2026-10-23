@@ -1756,9 +1756,29 @@ class TabManager {
     const next = color || null;
     const host = hostOf(tab.url);
     if (next && host) this._identityColorCache.set(host, next);
+    // Anche «nessun colore» è una risposta: il riordino della riapertura aspetta di averla da ogni pagina.
+    tab._identitaNota = true;
+    for (const avvisa of [...this._attesaColori]) avvisa();
     if (tab.identityColor === next) return;
     tab.identityColor = next;
     if (this.tabs.includes(tab)) this._broadcast();
+  }
+
+  // Il riordino ordina per colore del sito (#349): parte quando ogni pagina web caricata ha detto il suo, o al tetto.
+  _coloriPronti(tetto = COLORI_TETTO_MS) {
+    const pronti = () => this.tabs.every((t) => t._identitaNota || t._rinviata || !/^https?:\/\//i.test(t.url || ''));
+    if (pronti()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let timer = null;
+      const fine = (ok) => {
+        clearTimeout(timer);
+        this._attesaColori = this._attesaColori.filter((f) => f !== controlla);
+        resolve(ok);
+      };
+      const controlla = () => { if (pronti()) fine(true); };
+      timer = setTimeout(() => fine(false), tetto);
+      this._attesaColori.push(controlla);
+    });
   }
 
   // Copia anche zoom e scroll, non solo l'URL: "duplica" deve dare una scheda
