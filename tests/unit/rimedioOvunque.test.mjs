@@ -65,5 +65,26 @@ test('il «Parere di Filo» mancato non si richiede da solo, e il main dice perc
   const pagina = leggi('src/pages/decks/decks.js');
   assert.match(pagina, /!opinionsByCard\.has\(id\) && !opinionPending\.has\(id\) && !opinionErrors\.has\(id\)/);
   assert.match(pagina, /if \(!op && !pending && !errore\) requestOpinions/);
-  assert.match(leggi('src/main/services/handlers/decks.js'), /mancanti\[id\] = cards\[id\] \? SENZA_PARERE : SENZA_DATI/);
+  assert.match(leggi('src/main/services/handlers/decks.js'), /mancanti\[id\] = cards\[id\] \? senzaParere\(\) : SENZA_DATI/);
+  assert.match(pagina, /erroreDelParere\(mancanti\[id\] \|\| \{\}\)/);
+});
+
+// «Modelli predefiniti» è una scheda della Gestione: una frase d'errore che ci manda chi usa Filo lo lascia senza strada.
+test('le frasi d’errore mandano a cambiare modello dove l’utente lo può fare, e col codice del tasto', () => {
+  const fonti = ['src/shared/chatErrors.js', 'src/main/services/deckOpinions.js', 'src/main/services/handlers/decks.js'];
+  for (const f of fonti) {
+    const righe = leggi(f).split('\n').filter((r) => !/^\s*\/\//.test(r));
+    assert.deepEqual(righe.filter((r) => /in Modelli predefiniti/.test(r)), [], f);
+  }
+  const CE = globalThis.SN_CHAT_ERRORS;
+  assert.equal(CE.DOVE_ALTRO_MODELLO, 'in Opzioni → Modelli per azione');
+  for (const code of ['ALTRO_MODELLO', 'MODEL_UNAVAILABLE', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'NO_TOOL_HOST']) {
+    assert.equal(CE.rimedioPagina({ code }).url, 'filo://options/options.html', code);
+  }
+  assert.equal(CE.rimedio({ code: 'NO_TOOL_HOST', maxTokens: 16384 }), 'preferenze');
+  for (const code of ['MODEL_UNAVAILABLE', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'NO_TOOL_HOST']) {
+    const e = Object.assign(new Error('OpenRouter 404: x'), { code, provider: 'openrouter', status: 404 });
+    assert.match(CE.friendly(e), /in Opzioni → Modelli per azione\.$/, code);
+  }
+  assert.match(leggi('src/main/services/deckOpinions.js'), /DOVE_ALTRO_MODELLO\}\.`,\s*code: 'ALTRO_MODELLO'/);
 });
