@@ -2206,6 +2206,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
     // Un'immagine lasciata dove la pagina non la vuole è dell'Aiuto, salvo dove Filo è spento.
     accoglieRilascio: () => chiuso() !== 'sito',
+    contiene: (n) => !!(root && n && root.contains(n)),
     suChiusura: (fn) => { if (typeof fn === 'function') chiusoPerche = fn; },
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
