@@ -1,12 +1,14 @@
-// I contatori anonimi (#969, #1461): cosa si conta, in che forma esce, e cosa non passa. Logica pura: niente disco né rete.
+// I contatori anonimi (#969, #1461, #1464): cosa si conta, in che forma esce, e cosa non passa. Logica pura: niente disco né rete.
 // Esce solo ciò che sta negli elenchi chiusi di questo file; le regole Firestore ne tengono la forma, e la sentinella
 // tests/unit/firestoreRulesContatori.test.mjs le confronta. Misura e spedizione: src/main/services/contatori.js.
 
 (function (global) {
   'use strict';
 
-  // Un documento per pseudonimo e ora (#1461). I giorni rimasti in attesa da prima partono nella forma di allora.
-  const VERSIONE = 2;
+  // Un documento per pseudonimo e ora (#1461); la v3 aggiunge le misure delle chiamate ai modelli (#1464). Le copie
+  // vecchie mandano ancora la v2 e i giorni rimasti da prima la v1: le regole le tengono tutte e due.
+  const VERSIONE = 3;
+  const VERSIONE_V2 = 2;
   const VERSIONE_GIORNO = 1;
   const COLLEZIONE = 'contatori-giornalieri';
 
