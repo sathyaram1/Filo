@@ -789,12 +789,12 @@
 
   // ── Le attività (#1467) ──────────────────────────────────────────────────
   // Il tipo d'azione di un suggerimento della home: quelli del registro, la domanda in chat, e «altro».
-  function tiposSuggerimento() { return [...tipiAzione(), 'CHAT', ALTRO]; }
+  function tipiSuggerimento() { return [...tipiAzione(), 'CHAT', ALTRO]; }
   function tipoSuggerimento(t) {
     const s = String(t || '').toUpperCase();
-    return s !== 'ALTRO' && tiposSuggerimento().includes(s) ? s : ALTRO;
+    return s !== 'ALTRO' && tipiSuggerimento().includes(s) ? s : ALTRO;
   }
-  const elencoParte = (d) => (d === TIPO_SUGGERIMENTO ? tiposSuggerimento() : d);
+  const elencoParte = (d) => (d === TIPO_SUGGERIMENTO ? tipiSuggerimento() : d);
 
   function combinazioneValida(misura, k) {
     const forme = has(DIMENSIONI_ATTIVITA, misura) ? DIMENSIONI_ATTIVITA[misura] : null;
