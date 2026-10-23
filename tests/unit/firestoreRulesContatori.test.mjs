@@ -79,8 +79,8 @@ function misureDelleRegole() {
 const M = misureDelleRegole();
 
 // Le regole applicate a un documento, come le applica il server a una stringa unita.
-function passa(doc) {
-  for (const [campo, r] of Object.entries(M)) {
+function passa(doc, campi = Object.keys(M)) {
+  for (const [campo, r] of Object.entries(M).filter(([c]) => campi.includes(c))) {
     const v = doc[campo];
     if (r.lista) {
       if (!Array.isArray(v) || v.length > r.quante || v.join('#').length > r.tetto || !new RegExp(r.valori).test(v.join('#'))) return `${campo}`;
