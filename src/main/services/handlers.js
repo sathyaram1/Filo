@@ -6544,8 +6544,8 @@ const TRIAGE_RIAPERTURA = [
   '- TIENI solo quello che verosimilmente riprenderà: comunicazione e lavoro',
   '  (posta, chat, editor, documenti in modifica), contenuti lasciati a metà,',
   '  le schede di un compito ancora aperto;',
-  '- l\'inattività conta più dell\'età: una scheda non toccata da ore o da giorni',
-  '  non è in uso, anche se è stata aperta poco prima di chiudere;',
+  '- conta l\'ultimo uso, non l\'apertura: una scheda non toccata da ore o da',
+  '  giorni non è in uso;',
   '- nel dubbio fra una pagina di consumo e una di lavoro, ARCHIVIA la prima:',
   '  resta nel filo della home e si riapre con un clic.',
 ];
