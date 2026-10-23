@@ -118,6 +118,7 @@ const strato = {
   stato: (d) => ipcRenderer.send('riquadri:stato', d),
   inPagina: (d) => ipcRenderer.send('riquadri:in-pagina', d),
   inoltra: (gesto) => ipcRenderer.send('riquadri:vuoto', gesto),
+  lasciaPassare: () => ipcRenderer.send('riquadri:lascia-passare'),
   onCursore: (fn) => { ipcRenderer.on('riquadri:cursore', (_e, forma) => { try { fn(forma); } catch (_) {} }); },
   onApri: (fn) => { ipcRenderer.on('riquadri:apri', (_e, d) => { try { fn(d); } catch (e) { console.error('[Filo riquadri] apri', e); } }); },
   onEsc: (fn) => { ipcRenderer.on('riquadri:esc', () => { try { fn(); } catch (_) {} }); },
