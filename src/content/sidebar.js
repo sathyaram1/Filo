@@ -1715,6 +1715,8 @@
         if (session) session.documentiCount += 1;
         const r = await cercaDocumenti(parsed);
         if (!r || !r.ok) {
+          // Rifiutata dalla persona: l'ha fermato lei prima che finisse; non riuscita: un errore.
+          if (session) session.esito = r && r.annullata ? 'chiusa_prima' : 'errore';
           if (r && r.annullata) {
             history.push({
               role: 'user',
