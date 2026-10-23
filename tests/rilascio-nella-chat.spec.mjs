@@ -199,6 +199,17 @@ test('Aiuto: Ctrl+V di un’immagine nella casella la allega, e le sole immagini
   await page.click('.sn-sidebar-input textarea');
   await page.keyboard.press('Control+V');
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(1);
+  // «Incolla» del tasto destro manda l'immagine con l'evento di Filo; lo stesso evento fabbricato dalla pagina non vale.
+  await page.evaluate(() => document.querySelector('.sn-sidebar-input textarea').dispatchEvent(new CustomEvent('filo:paste-image', {
+    bubbles: true, cancelable: true, detail: { blob: new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }) },
+  })));
+  await nelMondoDiFilo(app, page, (b64) => {
+    const blob = new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: 'image/png' });
+    const ev = globalThis.SN_FILO_UI.nostro(new CustomEvent('filo:paste-image', { bubbles: true, cancelable: true, detail: { blob } }));
+    document.querySelector('.sn-sidebar-input textarea').dispatchEvent(ev);
+    return 1;
+  }, PNG.toString('base64'));
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.length, { timeout: 5_000 }).toBe(2);
   await page.keyboard.press('Enter');
   await expect.poll(() => nelMondoDiFilo(app, page, () => globalThis.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
   const [p] = await nelMondoDiFilo(app, page, () => globalThis.__richieste);
@@ -235,4 +246,12 @@ test('riquadro incorporato e barra laterale: l’immagine lasciata lì arriva al
   const box = await barra.locator('#pannello').boundingBox();
   await lascia(barra, [altra], { x: box.x + box.width / 2, y: box.y + box.height / 2 });
   await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome), { timeout: 8_000 }).toEqual(['foto 1.png', 'foto 2.png']);
+});
+
+test('una pagina di Filo che non è la home: l’immagine lasciata lì va all’Aiuto di quella pagina', async ({ app, openTab }) => {
+  const page = await openTab('filo://history/history.html');
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 10_000 });
+  const [foto] = immaginiSulDisco(1);
+  await lascia(page, [foto], { x: 300, y: 300 });
+  await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }], fuoco: true });
 });
