@@ -51,7 +51,7 @@ module.exports = function osservaRilascio(win, { pronta, consegna, pannello = ()
     inAttesa = null;
     if (!e.defaultPrevented) prendi(e);
   };
-  // Accettato da Filo fuori da un campo, il rilascio non arriva alla pagina: i file erano per la chat.
+  // Accettato da Filo, il rilascio non arriva alla pagina: i file erano per la chat.
   win.addEventListener('drop', (e) => {
     const mio = nostro;
     nostro = '';
