@@ -219,8 +219,10 @@ test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', ()
   assert.match(win, /'swipe'/, 'nessuno ascolta lo scorrimento a due dita (Mac)');
   // La direzione è quella delle dita: si spinge la pagina a destra per tornare
   // indietro. Invertirla manderebbe avanti chi voleva tornare.
-  assert.match(win, /direzione === 'right'\) tabs\.navigaCronologia\('indietro'\)/);
-  assert.match(win, /direzione === 'left'\) tabs\.navigaCronologia\('avanti'\)/);
+  assert.match(win, /direzione === 'right'\) naviga\('indietro'\)/);
+  assert.match(win, /direzione === 'left'\) naviga\('avanti'\)/);
+  // `naviga` è la stessa porta, contata come gli altri indietro e avanti (#1461).
+  assert.match(win, /const naviga = \(verso\) => [^\n]*tabs\.navigaCronologia\(verso\)/);
 });
 
 test('la barra dei menu del Mac chiama la stessa porta', () => {

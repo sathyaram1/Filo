@@ -502,6 +502,11 @@ function notifyTabs(scope = '') {
   } catch (_) {}
 }
 
+// Lo scaricamento non riuscito è un errore visto (#1461): si conta il tipo, mai il nome del file.
+function contaNonRiuscito(rec) {
+  try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.erroreVisto('avviso:download_failed', { incognito: !!scopeOf(rec) }); } catch (_) {}
+}
+
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
@@ -565,6 +570,7 @@ function completa(rec) {
       rec.savePath = '';
       persist();
       broadcast('error', rec);
+      contaNonRiuscito(rec);
       shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
       return;
     }
@@ -786,6 +792,7 @@ function onWillDownload(item, webContents, scope = '') {
       persist();
       broadcast('error', rec);
       if (rec.state !== 'cancelled') {
+        contaNonRiuscito(rec);
         shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
       }
     }

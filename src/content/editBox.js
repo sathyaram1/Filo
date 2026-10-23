@@ -18,7 +18,7 @@
   function openEditBox(originalText) {
     if (!deps.getPasteContext()) {
       // Rivalido al volo: senza editable il "Sostituisci" non avrebbe senso.
-      Popup.showToast(I18n.t('err_no_selection'));
+      Popup.toastErrore('err_no_selection');
       return;
     }
     const savedCtx = deps.getPasteContext(); // congelo il riferimento per il momento del replace
@@ -154,7 +154,7 @@
       navigator.clipboard.writeText(currentResult).then(() => {
         Popup.showToast(I18n.t('toast_copied'));
         close();
-      }, () => Popup.showToast(I18n.t('err_provider_failed')));
+      }, () => Popup.toastErrore('err_provider_failed'));
     });
     $replace.addEventListener('click', (e) => {
       if (!e.isTrusted) return;
@@ -179,6 +179,7 @@
       } else if (savedCtx.kind === 'ce') {
         try { document.execCommand('insertText', false, currentResult); } catch (_) {}
       }
+      Popup.modificaDiFilo(savedCtx.el || document.activeElement, 'modifica-testo');
       Popup.showToast(I18n.t('edit_box_replaced'));
       close();
     });

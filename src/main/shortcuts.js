@@ -71,8 +71,10 @@ function tastoSchermoIntero(wc, event, input, finestra) {
   const tabs = finestraDiFilo(typeof finestra === 'function' ? finestra() : finestra)?._filoTabs;
   if (!tabs || tabs.schermoPienoDi(wc)) return false;
   event.preventDefault();
-  // Tenuto premuto non lampeggia: entra una volta sola.
-  if (!input.isAutoRepeat) tabs.toggleContentFullscreen();
+  // Tenuto premuto non lampeggia: entra una volta sola. È la stessa azione contata della voce di menu (#1461).
+  if (!input.isAutoRepeat) {
+    require('./services/azioniContate').azione('fullscreen', () => tabs.toggleContentFullscreen(), { incognito: !!(tabs.win && tabs.win._filoIncognito) });
+  }
   return true;
 }
 
@@ -93,7 +95,17 @@ function finestraDiFilo(ripiego) {
   try { return (BrowserWindow.getAllWindows?.() || []).find(viva) || null; } catch (_) { return null; }
 }
 
+// L'Aiuto laterale e Salva per dopo si contano qui, dove arrivano il tasto, la barra dei menu e chi altro li chiede
+// (#1461): la stessa azione dell'icona del tasto destro.
+const AZIONE_DEL_COMANDO = { 'open-help-sidebar': 'help-sidebar', 'save-for-later': 'save-for-later' };
 function dispatch(command, window) {
+  const azione = AZIONE_DEL_COMANDO[command];
+  if (!azione) return dispatchOra(command, window);
+  const win = finestraDiFilo(window);
+  return require('./services/azioniContate').azione(azione, () => dispatchOra(command, window), { incognito: !!(win && win._filoIncognito) });
+}
+
+function dispatchOra(command, window) {
   // Manda al webContents della tab attiva. Se è una pagina interna senza
   // content script, nessuno raccoglie: ok, è il comportamento atteso.
   const win = finestraDiFilo(window);
@@ -105,8 +117,7 @@ function dispatch(command, window) {
     // Una pagina filo:// non va salvata né chiusa: l'uscita è esplicita perché questo comando,
     // a differenza degli altri, agisce comunque.
     if (isInternalTab(active)) return;
-    saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
-    return;
+    return saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
   }
   // Sotto l'avviso del sito pericoloso un pannello della pagina non si vedrebbe: l'Aiuto lì è la domanda a Filo (#813.5).
   const tm = win._filoTabs;

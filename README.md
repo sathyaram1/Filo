@@ -42,9 +42,14 @@ npm start                       # avvia Filo (apre la finestra)
 npm run test:smoke              # smoke headless (verifica che la newtab carichi)
 ```
 
-Prima di aprire la finestra, `npm start` prova ad allineare il ramo in cui sei
-a `origin/main` (`git pull --rebase --autostash`). Se non ci riesce, per
-esempio offline o con un conflitto, annulla e apre Filo comunque.
+Prima di aprire la finestra, `npm start` (e `npm run dev`) prova ad allineare
+il ramo in cui sei a `origin/main` (`git pull --rebase --autostash`). Se non ci
+riesce, per esempio offline o con un conflitto, annulla e apre Filo comunque.
+Poi installa i pacchetti che `package-lock.json` chiede e `node_modules` non
+ha. Se va aggiornato Electron mentre un Filo è acceso, aspetta il prossimo
+avvio: su Windows un Electron acceso non si sostituisce. Le prove
+(`npm run test:unit`, gli spec Playwright, `npm run finish`) fanno lo stesso
+controllo prima di partire, nella cartella da cui arrivano i pacchetti.
 
 Il binario di Electron non lo scarica `npm install`: lo scarica il primo
 `npm start`, o il primo lancio dei test. Per scaricarlo subito:

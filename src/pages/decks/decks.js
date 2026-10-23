@@ -316,7 +316,7 @@
     const next = Decks.renameDeck(r.deck, nome);
     if (next === r.deck) return;
     const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
-    if (!res || !res.ok) { showToast('Rinomina non riuscita.'); return; }
+    if (!res || !res.ok) { toastErrore('Rinomina non riuscita.'); return; }
     const i = decks.findIndex((d) => d.id === id);
     if (i >= 0) decks[i] = res.deck;
     const old = libraryCardEl(id);
@@ -879,7 +879,7 @@
         const verb = move ? 'Spostare' : 'Copiare';
         const t = await send({ type: MSG.DECKS_GET, id: d.id });
         if (!t || !t.ok) {
-          showToast(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
+          toastErrore(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
           return;
         }
         const { deck: target, merged } = Decks.mergeCard(t.deck, cardId, {
@@ -887,7 +887,7 @@
         });
         const up = await send({ type: MSG.DECKS_UPDATE, deck: target });
         if (!up || !up.ok) {
-          showToast(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
+          toastErrore(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
           return;
         }
         if (move) await removeFromDeck(cardId);
@@ -904,7 +904,7 @@
   async function setCommanderTo(cardId) {
     const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
     if (!r || !r.ok) {
-      showToast('Non sono riuscito a cambiare il commander.');
+      toastErrore('Non sono riuscito a cambiare il commander.');
       return;
     }
     if (!current || r.deck.id !== current.id) return;
@@ -1513,7 +1513,7 @@
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (_) { /* resta il messaggio sotto */ }
       ta.remove();
-      if (!ok) { showToast('Non sono riuscito a copiare.'); return; }
+      if (!ok) { toastErrore('Non sono riuscito a copiare.'); return; }
     }
     showToast(done);
   }
@@ -1581,6 +1581,11 @@
     dkToastTempo = null;
     el.classList.remove('show');
     dkToastTempi.lascia(el);
+  }
+  // Un avviso d'errore si conta per i contatori anonimi (#1461): la chiave, mai il testo.
+  function toastErrore(text) {
+    showToast(text);
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'mazzi_non_riuscito' })).catch(() => {}); } catch (_) {}
   }
   function showToast(text) {
     let el = document.getElementById('dkToast');
@@ -1679,7 +1684,7 @@
       if (!r || !r.ok) {
         btn.disabled = false;
         btn.textContent = 'Analizza';
-        showToast('Analisi non riuscita.');
+        toastErrore('Analisi non riuscita.');
         return;
       }
       renderImportPreview(body, r);
@@ -1719,7 +1724,7 @@
         const total = res.addedCount + res.updatedCount;
         showToast(`${total === 1 ? 'Importata 1 carta' : `Importate ${total} carte`}${res.updatedCount ? ` (${res.updatedCount} aggiornat${res.updatedCount === 1 ? 'a' : 'e'})` : ''}.`);
       } else {
-        showToast('Import non riuscito.');
+        toastErrore('Import non riuscito.');
         applyBtn.disabled = false;
         applyBtn.textContent = `Importa ${resolved.length} cart${resolved.length === 1 ? 'a' : 'e'}`;
       }

@@ -263,7 +263,7 @@
     if (!replacement || replacement === original) return;
     suppressAutocorrect = true;
     try {
-      applyFix(el, { start, end }, replacement, { cursor: 'preserve' });
+      applyFix(el, { start, end }, replacement, { cursor: 'preserve', automatica: true });
     } finally {
       // Dopo il flush degli eventi sincroni e dell'input riemesso da setRangeText.
       setTimeout(() => { suppressAutocorrect = false; }, 0);
@@ -465,6 +465,7 @@
     if (state.ro) { try { state.ro.disconnect(); } catch (_) {} state.ro = null; }
     state.attivo = false;
     if (activeEl === el) activeEl = null;
+    lasciaProposte(el);
   }
 
   function detachAll() {
@@ -661,6 +662,7 @@
     allineaScorrimento(state);
     seguiIlCampo();
     passaggiInCorso(state);
+    allineaProposte(state);
   }
 
   // Un segno che si conferma o sparisce è a metà del suo passaggio: alla fine lo strato si ridisegna senza.
@@ -676,6 +678,68 @@
       state.timerPassaggio = null;
       if (state.attivo) renderOverlayContent(state);
     }, resto + 20);
+  }
+
+  // ── I contatori del correttore (#1461) ──────────────────────────────────────
+  // Ogni proposta mostrata finisce una volta accettata, rifiutata o ignorata. Escono tipo, modello ed esito; la parola
+  // e la frase restano qui, nelle chiavi locali. Un candidato sbiadito diventa una proposta quando è giudicato.
+  const proposte = new WeakMap(); // el → Map(chiave → { tipo, modello, segno })
+  function contaProposta(tipo, modello, esito) {
+    try { global.SN_POPUP && global.SN_POPUP.conta({ misura: 'proposta', tipo, modello: String(modello || ''), esito }); } catch (_) {}
+  }
+  function aperteDi(el) {
+    let m = proposte.get(el);
+    if (!m) { m = new Map(); proposte.set(el, m); }
+    return m;
+  }
+  const tipoDelSegno = (s) => (s.segno === 'suggerimento' ? 'suggerimento' : (/\s/.test(String(s.segment || '').trim()) ? 'frase' : 'ortografia'));
+  function chiaveSegno(s) { return `${(s && s.segno) || ''}|${(s && s.segment) || ''}`; }
+  function modelloDelSegno(state, s) {
+    const da = s.fonte === 'rapido' || s.fonte === 'ragionato' ? s.fonte : s.giudicatoDa;
+    if (da === 'rapido') return state.modelloRapido || '';
+    if (da === 'ragionato') return state.modelloRagionato || '';
+    return 'locale';
+  }
+  const propostaVera = (s) => !s.svanisce && (!s.dubbio || (s.segno === 'errore' && !modelloErrori()));
+  function propostaMostrata(el, tipo, chiave, modello) {
+    if (!el) return;
+    const m = aperteDi(el);
+    const k = `${tipo}|${chiave}`;
+    if (m.has(k)) { if (modello) m.get(k).modello = modello; return; }
+    m.set(k, { tipo, modello });
+    contaProposta(tipo, modello, 'mostrata');
+  }
+  function esitoProposta(el, tipo, chiave, esito) {
+    const m = el && proposte.get(el);
+    const k = `${tipo}|${chiave}`;
+    const p = m && m.get(k);
+    if (!p) return false;
+    m.delete(k);
+    contaProposta(p.tipo, p.modello, esito);
+    return true;
+  }
+  function esitoSegno(el, segno, esito) { return !!segno && esitoProposta(el, tipoDelSegno(segno), chiaveSegno(segno), esito); }
+  // I segni in vista adesso: i nuovi sono mostrati, quelli spariti senza una scelta ignorati. Uno nascosto solo perché
+  // il cursore sta sulla sua parola (un tasto destro appena dopo aver scritto) c'è ancora.
+  function allineaProposte(state) {
+    if (!state || !state.el || !R()) return;
+    const vive = new Map();
+    for (const s of segniInVista(state, { ignoraScrittura: true })) {
+      if (!propostaVera(s)) continue;
+      const tipo = tipoDelSegno(s);
+      vive.set(`${tipo}|${chiaveSegno(s)}`, { tipo, modello: modelloDelSegno(state, s), segno: true });
+    }
+    const m = aperteDi(state.el);
+    for (const [k, p] of m) {
+      if (p.segno && !vive.has(k)) { m.delete(k); contaProposta(p.tipo, p.modello, 'ignorata'); }
+    }
+    for (const [k, p] of vive) if (!m.has(k)) { m.set(k, p); contaProposta(p.tipo, p.modello, 'mostrata'); }
+  }
+  function lasciaProposte(el) {
+    const m = proposte.get(el);
+    if (!m) return;
+    for (const p of m.values()) contaProposta(p.tipo, p.modello, 'ignorata');
+    proposte.delete(el);
   }
 
   // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
@@ -1184,6 +1248,7 @@
       if (res && !res.ok) console.warn('[SN] correttore, controllo rapido:', res.code, res.error);
       return;
     }
+    if (res.model) state.modelloRapido = String(res.model);
     applicaRisposta(state, res.text, { fonte: 'rapido', viaggio });
   }
 
@@ -1238,6 +1303,7 @@
       if (res && !res.ok) console.warn('[SN] correttore, controllo ragionato:', res.code, res.error);
       return;
     }
+    if (res.model) state.modelloRagionato = String(res.model);
     applicaRisposta(state, res.text, { fonte: 'ragionato', viaggio, contesto: res.senzaContesto ? {} : contesto });
   }
 
@@ -1381,12 +1447,14 @@
 
   function correggi(el, segno, correzione) {
     if (!el || !segno) return;
+    esitoSegno(el, segno, 'accettata');
     applyFix(el, { start: segno.start, end: segno.end }, correzione, { expectedSegment: segno.segment });
   }
 
   function ignora(el, segno) {
     const state = el && monitored.get(el);
     if (!state || !segno) return;
+    esitoSegno(el, segno, 'rifiutata');
     const ig = chiaveIgnora(segno);
     state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
     renderOverlayContent(state);
@@ -1406,6 +1474,7 @@
 
   async function aggiungiAlDizionario(el, segno) {
     if (!segno) return;
+    esitoSegno(el, segno, 'rifiutata');
     await addToDictionary(segno.segment);
     const state = el && monitored.get(el);
     if (state) aggiornaCodice(state);
@@ -1448,7 +1517,8 @@
     const { segni } = R().segniDaRisposta(res.text, testo, { fonte: 'rapido', nuovo: { start: wordCtx.start, end: wordCtx.end } });
     const e = segni.find((s) => s.start < wordCtx.end && s.end > wordCtx.start);
     if (!e) return { errore: false };
-    return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo };
+    // Il modello va ai contatori del correttore, con la proposta che ne esce (#1461).
+    return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo, modello: String(res.model || '') };
   }
 
   // Cerca di estrarre frase precedente e successiva al campo editabile, per la parola sotto il tasto destro.
@@ -1864,7 +1934,17 @@
     return true;
   }
 
+  // Una correzione applicata da Filo: Ctrl/Cmd+Z subito dopo la disfa, e i contatori lo sanno (#1461).
   function applyFix(el, range, replacement, opts = {}) {
+    const prima = getEditableText(el);
+    const r = applicaCorrezione(el, range, replacement, opts);
+    try {
+      if (getEditableText(el) !== prima) global.SN_POPUP?.modificaDiFilo?.(el, opts.automatica ? 'correzione-automatica' : 'correzione');
+    } catch (_) {}
+    return r;
+  }
+
+  function applicaCorrezione(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
     // 'end' = caret a fine inserzione (popup del correttore). 'preserve' = caret dov'era:
     // nell'autocorrect si è appena digitato lo spazio e il caret deve restare dopo di esso.
@@ -2081,6 +2161,10 @@
     getWordAt,
     getInputWordAt,
     applyFix,
+    propostaMostrata,
+    esitoProposta,
+    esitoSegno,
+    chiaveSegno,
     sostituisciComeBattuta,
     riallineaIssues,
     addToDictionary,

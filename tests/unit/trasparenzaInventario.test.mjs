@@ -77,7 +77,7 @@ const COLLEZIONI = {
   '/counters/{name}': { perche: 'il numero progressivo dei feedback: quanti ne sono arrivati, niente di chi scrive' },
   '/credits/{uid}': { frase: 'Con il login Google c\'è un secondo documento' },
   '/wallet-usage/{id}': { frase: 'Filo scrive anche un registro d\'uso' },
-  '/contatori-giornalieri/{docId}': { frase: 'Una volta al giorno, al primo avvio, Filo manda al server i numeri del giorno prima' },
+  '/contatori-giornalieri/{docId}': { frase: 'Ogni ora Filo manda al server i numeri dell\'ora prima' },
   '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },
