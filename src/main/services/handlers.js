@@ -950,16 +950,20 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
       intera: true,
     });
     const text = (r?.text || '').trim();
-    if (!text || /^NULLA DA IMPARARE/i.test(text)) return;
+    const contaLezione = (esito) => { try { globalThis.SN_CONTATORI_MAIN?.attivita('lezioni', esito); } catch (_) {} };
+    if (!text || /^NULLA DA IMPARARE/i.test(text)) { contaLezione({ nulla: true }); return; }
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let scritte = 0;
+    let scartate = 0;
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
       if (!m) continue;
       // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
       const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
-      if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (l.testo) await FiloMem.appendLesson(l.testo, { fonti });
+      if (l.rifiuto) { scartate += 1; console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
+      if (l.testo) { await FiloMem.appendLesson(l.testo, { fonti }); scritte += 1; }
     }
+    contaLezione({ scritte, scartate });
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
     }
