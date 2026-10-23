@@ -723,10 +723,23 @@
       doc.fields.capabilityGapId = toFsValue(String(capabilityGapId).slice(0, 100));
     }
 
-    // Idempotenza: vedi sanitizeDocId (#370).
-    const docId = sanitizeDocId(submissionId);
-    const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
+    // Idempotenza: vedi sanitizeDocId (#370). Senza un id d'invio valido il documento ne prende uno casuale: la
+    // create passa da `:commit` (le date di Firestore, sotto) e lì l'id lo sceglie chi scrive.
+    const idInvio = sanitizeDocId(submissionId);
+    const docId = idInvio || idCasuale();
+    const endpoint = `${FIRESTORE_BASE}:commit?key=${API_KEY}`;
+    // `exists: false` è la create: un id già scritto torna 409 ALREADY_EXISTS, come la POST di prima.
+    const scrivi = (headers) => fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+      body: JSON.stringify({
+        writes: [{
+          update: { name: `projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}/${docId}`, fields: doc.fields },
+          currentDocument: { exists: false },
+          updateTransforms: dateDelServer.map((fieldPath) => ({ fieldPath, setToServerValue: 'REQUEST_TIME' })),
+        }],
+      }),
+    });
     let res = null;
     let senderProof = '';
     let authRefused = 0;
@@ -751,11 +764,7 @@
         doc.fields.priority = { stringValue: await maybeEncrypt(String(prioritaScelta)) };
         doc.fields.priorityManual = { booleanValue: true };
       }
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify(doc),
-      });
+      res = await scrivi({ Authorization: `Bearer ${idToken}` });
       // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
       if ((soloAdmin || NOME_RISERVATO_RE.test(String(clientId || ''))) && (res.status === 401 || res.status === 403)) {
         throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
@@ -777,22 +786,13 @@
       if (NOME_RISERVATO_RE.test(String(clientId || ''))) {
         doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
       }
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(doc),
-      });
+      res = await scrivi();
     }
-    const riprova = () => fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
-    });
-    if (!senderProof && res.status === 403 && doc.fields.updatedAt) {
+    if (!senderProof && res.status === 403 && dateDelServer.includes('updatedAt')) {
       // Regole senza `updatedAt` ancora in produzione: si toglie solo quello,
       // non numero e titolo con tutto lo schema.
-      delete doc.fields.updatedAt;
-      res = await riprova();
+      dateDelServer = dateDelServer.filter((f) => f !== 'updatedAt');
+      res = await scrivi();
     }
     if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
@@ -805,21 +805,20 @@
       delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
       delete doc.fields.walletPseudonym; // #652: idem, finché le regole non sono deployate
       seq = null;
-      res = await riprova();
+      res = await scrivi();
     }
-    // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
+    // 409 ALREADY_EXISTS con l'id d'invio → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
     const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}), ...(localOnly ? { localOnly: true } : {}) } : {};
-    if (docId && res.status === 409) {
+    if (idInvio && res.status === 409) {
       return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
-    const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
+    return { id: docId, seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
   // È un TETTO, non un totale: oltre la soglia i più vecchi restano fuori,
