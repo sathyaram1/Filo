@@ -283,7 +283,7 @@ describe('i passi del cancello rosso in release.yml: i rossi sulla punta e il fe
         prima: () => writeFileSync(join(s.lavoro, 'esiti-cancello', 'punta'), 'abc123\n::error::finto\n'),
       });
       const avviso = r.out.split('\n').find((x) => x.startsWith('::warning::'));
-      assert.match(avviso, /sulla punta di main \(abc123\)/);
+      assert.match(avviso, /sulla punta di main \(abc123[0-9a-f]*\):/);
       assert.doesNotMatch(r.out, /::error::finto/);
     } finally { togliCartella(s.base); }
   });
