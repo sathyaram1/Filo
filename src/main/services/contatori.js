@@ -444,6 +444,16 @@ function crea(dip = {}) {
     return true;
   }
 
+  // Un'attività di Filo (#1467): una sessione dell'Aiuto, una ricerca web, una dettatura, una lettura, una lezione, una
+  // riga di memoria corretta, un giro di pulizia, una scheda riaperta, la home. `info` passa solo per gli elenchi chiusi.
+  function attivita(misura, info, { incognito = null } = {}) {
+    try {
+      if (!C.chiaveAttivita(misura, info) || (incognito == null ? inIncognito() : incognito)) return false;
+      conta((ora) => C.registraAttivita(ora, misura, info), { incognito }).catch(() => {});
+      return true;
+    } catch (_) { return false; }
+  }
+
   // La chat che cambia la richiesta per stare nella finestra del modello (#1464): `tipo` dall'elenco chiuso.
   function adattamento(action, modello, tipo) {
     const f = C.funzioneDi(action);
