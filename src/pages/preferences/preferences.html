@@ -469,6 +469,17 @@
           </label>
         </div>
         <div class="sn-toggle-row">
+          <label title="Quando finisci una parola: «perchè» diventa «perché», «marco» diventa «Marco». Si annulla subito dopo con la scorciatoia di annulla, o col tasto destro sulla parola.">
+            <input type="checkbox" id="correttoreAutomatica" />
+            <span>Correzione automatica</span>
+          </label>
+        </div>
+        <label for="correttoreAccetti" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una correzione che scegli diventa automatica dopo (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreAccetti" min="1" max="100" step="1" style="width:120px;" />
+        <label for="correttoreAnnulli" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una correzione automatica che annulli non torna più dopo (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreAnnulli" min="1" max="100" step="1" style="width:120px;" />
+        <label for="correttoreRiscritte" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una parola che il correttore non conosce smette di essere segnata dopo che la scrivi uguale (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreRiscritte" min="1" max="100" step="1" style="width:120px;" />
           <label title="Scrivi delle x al posto di un dato che non ricordi («nel 14xx», «un p/e di xx») e Filo lo trova: il valore compare sopra le x, un clic lo mette.">
             <input type="checkbox" id="correttoreSegnaposti" />
             <span>Segnaposto</span>

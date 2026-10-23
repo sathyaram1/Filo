@@ -190,6 +190,7 @@
         blocklist: 'blocklist',
         spellcheckErrori: 'featureFlags.spellcheck',
         spellcheckSuggerimenti: 'featureFlags.spellcheckContext',
+        spellcheckAutomatica: 'correttore.automatica',
         spellcheckSegnaposti: 'correttore.segnaposti',
       },
       gruppi: {},

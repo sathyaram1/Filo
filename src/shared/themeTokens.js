@@ -250,6 +250,19 @@
       css: '--sn-spell-valore-velato',
       default: '0.45',
     },
+    // Il lampo sulla parola che il correttore ha corretto da sé (#1447): uno sfondo caldo che sfuma. Gemelle in spellcheck.css.
+    'correttore.lampo.color': {
+      label: 'Colore del lampo sulla parola corretta da sé',
+      type: 'color',
+      css: '--sn-spell-lampo',
+      default: { light: '#f0b05a66', dark: '#e2ad4d4d' },
+    },
+    'correttore.lampo.durata': {
+      label: 'Durata del lampo sulla parola corretta da sé',
+      type: 'time',
+      css: '--sn-spell-lampo-durata',
+      default: '1000ms',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.

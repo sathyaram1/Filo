@@ -1,6 +1,6 @@
-// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, e i valori
-// dei segnaposti (#1448). Il codice segna subito i suoi candidati, pieni i sicuri e sbiaditi i dubbi; il modello giudica i dubbi.
-// Le regole senza DOM stanno in correttoreRegole.js e coerenza.js, il menu del tasto destro in content.js.
+// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, la
+// correzione automatica a fine parola (#1447) e i valori dei segnaposti (#1448). Le regole senza DOM stanno in
+// correttoreRegole.js, correttoreAutomatica.js e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
   'use strict';
@@ -70,11 +70,12 @@
   // dove ci sono delle x da riempire.
   function segnapostiAttivi() { return !spentoQui() && settings.correttore?.segnaposti !== false && !!Coerenza(); }
   const ragionatoAttivo = () => suggerimentiAttivi() || segnapostiAttivi();
+  function automaticaAttiva() { return !spentoQui() && !!A() && settings.correttore?.automatica !== false; }
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
   }
-  const attivo = () => erroriAttivi() || suggerimentiAttivi() || segnapostiAttivi();
+  const attivo = () => erroriAttivi() || suggerimentiAttivi() || segnapostiAttivi() || automaticaAttiva();
 
   // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
   // caselle di una riga. Sul sito dove Filo è spento il browser fa da sé.
@@ -104,6 +105,16 @@
     document.addEventListener('visibilitychange', riprendiRimandati);
     document.addEventListener('pointermove', svegliaValori, { capture: true, passive: true });
     document.addEventListener('pointerdown', svegliaValori, { capture: true, passive: true });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggiMemorie(); });
+    adottaIlFuoco();
+
+    // Le memorie cambiate altrove (la pagina del correttore, un'altra scheda) arrivano spinte dal main (#1447).
+    try {
+      chrome.runtime.onMessage.addListener((m) => {
+        if (m?.type !== MSG.CORRETTORE_MEMORIE || !m.memorie || typeof m.memorie !== 'object') return;
+        usaMemorie(m.memorie);
+      });
+    } catch (_) {}
 
     try {
       chrome.runtime.onMessage.addListener((m) => {
@@ -1276,6 +1287,15 @@
     }
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
     if (state.lampi.length) state.lampi = riallineaIssues(state.lampi, prima, ora).issues;
+    if (state.automatiche.length) state.automatiche = riallineaIssues(state.automatiche, prima, ora).issues;
+    if (state.rifiutateQui.length) state.rifiutateQui = riallineaIssues(state.rifiutateQui, prima, ora).issues;
+    // Una parola contata che cambia è stata corretta: il suo conto torna indietro.
+    if (state.contate.length) {
+      const restano = riallineaIssues(state.contate, prima, ora).issues;
+      const vive = new Set(restano.map((x) => x.id));
+      for (const x of state.contate) if (!vive.has(x.id)) impara({ passo: 'corretta', parola: x.segment });
+      state.contate = restano;
+    }
     // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche
     // il suo testo nuovo, se è più stretto del pezzo (il ragionato rilegge tutto).
     if (state.inViaggio.length) {

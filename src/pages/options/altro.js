@@ -17,7 +17,7 @@
     $('title').textContent = I18n.t('options_other');
     $('backToModels').textContent = I18n.t('options_back_to_models');
     $('h-correttore').textContent = 'Correttore';
-    for (const [id, chiave] of [['spellcheckErrori', 'spell_switch_errori'], ['spellcheckSuggerimenti', 'spell_switch_suggerimenti'], ['spellcheckSegnaposti', 'spell_switch_segnaposti']]) {
+    for (const [id, chiave] of [['spellcheckErrori', 'spell_switch_errori'], ['spellcheckSuggerimenti', 'spell_switch_suggerimenti'], ['spellcheckAutomatica', 'spell_switch_automatica'], ['spellcheckSegnaposti', 'spell_switch_segnaposti']]) {
       $(`${id}-label`).textContent = I18n.t(chiave);
       $(`${id}-desc`).textContent = I18n.t(`${chiave}_desc`);
     }
@@ -64,6 +64,7 @@
     $('blocklist').value = Siti.testoDaElenco(settings.blocklist);
     mostrato = $('blocklist').value;
     for (const [id, percorso] of INTERRUTTORI) $(id).checked = valoreDi(settings, percorso) !== false;
+    $('spellcheckAutomatica').checked = settings.correttore?.automatica !== false;
     await renderCategories();
   }
 
@@ -277,6 +278,11 @@
     });
     $('blocklist').addEventListener('change', () => save({ riscrivi: true }));
     for (const [id, percorso] of INTERRUTTORI) $(id).addEventListener('change', () => salvaInterruttore(id, percorso));
+    // La correzione automatica a fine parola (#1447): accesa di serie, si spegne da sola.
+    $('spellcheckAutomatica').addEventListener('change', async () => {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { correttore: { automatica: $('spellcheckAutomatica').checked } } });
+      mostraSalvato();
+    });
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.

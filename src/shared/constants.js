@@ -2717,9 +2717,11 @@
       spellcheckContext: true,
     },
     // #1446 — la parte del modello degli errori (spenta resta il solo codice), le parole grammaticali ripetute del
-    // codice e i tempi dei due controlli (limiti in CORRETTORE_TEMPI). #1448 — i segnaposti, e la loro ricerca sul web.
+    // codice e i tempi dei due controlli (limiti in CORRETTORE_TEMPI). #1447 — la correzione automatica a fine parola,
+    // accesa di serie, e quante volte serve per imparare (limiti in CORRETTORE_SOGLIE). #1448 — i segnaposti, e la loro ricerca sul web.
     correttore: {
       modelloErrori: true, ripetizioni: true, pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500,
+      automatica: true, accettiPerImparare: 3, annulliPerImparare: 2, riscrittePerImparare: 3,
       segnaposti: true, segnapostiWeb: true,
     },
     // Tema: 'system' | 'light' | 'dark'

@@ -531,6 +531,9 @@
   // è uguale al pezzo, e non è un errore da correggere.
   const formaLetta = (s) => String(s ?? '').replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim();
 
+  const soloPiuMaiuscole = (scritto, correzione) => scritto !== correzione && scritto.length === correzione.length
+    && [...scritto].every((c, i) => c === correzione[i] || c === correzione[i].toLowerCase());
+
   // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `senzaTipo`: quello di una
   // riga che l'ha perso; `citata(c)`: la prova di una contraddizione, che deve stare nella pagina; `inScrittura`: la
   // parola che non si segna; `nuovo`: il testo nuovo della chiamata, per un pezzo citato che compare più volte.
@@ -590,7 +593,7 @@
   const chiaveVerdetto = (it) => `${it.fonte}\u0001${String(it.segment || '').replace(/’/g, "'").toLowerCase()}`;
 
   global.SN_CORRETTORE = {
-    REGIONE_MAX, TESTO_INTERO_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
+    REGIONE_MAX, TESTO_INTERO_MAX, FISSI, chiudeVirgolette, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
     senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
     leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO, segnaposti, xDelPezzo,
     valoreTrovato, chiaveRicerca, stessaFrase,
