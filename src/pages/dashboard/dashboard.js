@@ -725,7 +725,7 @@
     const type = String(a.type || '').toUpperCase();
     const del = Date.parse(suggerimentiDel || '');
     Promise.resolve(send({
-      type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione,
+      type: MSG.CONTATORI_EVENTO, misura: 'suggerimento', tipo: type, posizione: Number(posizione) || null,
       etaMs: Number.isFinite(del) ? Math.max(0, Date.now() - del) : null,
     })).catch(() => {});
     if (type === 'PULISCI_TAB') {
