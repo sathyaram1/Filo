@@ -619,7 +619,7 @@ describe('ogni allarme dice al server cosa è rotto', () => {
       }
     }
     assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, la suite rossa e gli unit rossi su Windows');
-    assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
+    assert.match(senzaCommenti(job('avviso-cancello')), /build-alarm\.mjs [^\n]*--chiavi-unit esiti-cancello\/unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 
   test('ogni chiamata a inviaAllarme o spedisciAllarme negli script passa le sue chiavi', () => {
