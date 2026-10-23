@@ -11,7 +11,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta } from './helpers/riquadri.mjs';
+import { statoDi, nelMondoDiFilo } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadriInRitardo, apriConRiquadriInRitardo } from './helpers/riquadriInRitardo.mjs';
 
@@ -251,11 +251,11 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  // La spiegazione si apre DENTRO il riquadro, sul testo selezionato lì.
-  // Prima la scorciatoia finiva sempre nel frame principale, che non ha
-  // nessuna selezione: non succedeva nulla. Sui siti il riquadro sta in uno shadow root chiuso (#1071).
+  // La spiegazione parte DAL riquadro, sul testo selezionato lì: prima la scorciatoia finiva sempre nel frame
+  // principale, che non ha nessuna selezione, e non succedeva nulla. Il riquadro della risposta sta nello strato sopra
+  // la scheda (#1509.1), non nel documento della pagina.
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup', frame))?.visibile, { timeout: 8000 }).toBe(true);
-  expect(await conta(app, page, '.sn-popup')).toBe(0);
+  expect(await nelMondoDiFilo(app, page, () => document.querySelectorAll('.sn-popup').length)).toBe(0);
 });
 
 test('un solo menu alla volta: aprirlo nel riquadro chiude quello della pagina', async ({ openTab, testServer }) => {
