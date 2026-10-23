@@ -199,7 +199,7 @@
       let res;
       try {
         res = await chrome.runtime.sendMessage({
-          type: MSG.REDTEAM_SUBMIT, attackText, description,
+          type: MSG.REDTEAM_SUBMIT, attackText, description, apri: true,
         });
       } catch (_) {
         res = { status: 'error' };
