@@ -326,13 +326,11 @@ test('bloccato, con l\'Aiuto aperto accanto il foglio si stringe fino al pannell
   await ed.locator('.sn-sidebar-close').click();
   await expect(ed.locator('.sn-sidebar')).toHaveCount(0);
   await expect.poll(() => ed.evaluate(() => document.documentElement.classList.contains('pd-accanto'))).toBe(false);
-  const senza = await ed.evaluate(() => ({
-    testo: document.getElementById('doc').getBoundingClientRect().right,
-    pannello: document.querySelector('.pd-pannello').getBoundingClientRect().left,
-  }));
-  expect(senza.pannello).toBeGreaterThan(conAiuto.pannello);
-  expect(senza.testo).toBeGreaterThan(conAiuto.testo);
-  expect(senza.testo).toBeLessThanOrEqual(senza.pannello);
+  await expect.poll(() => ed.evaluate((prima) => {
+    const testo = document.getElementById('doc').getBoundingClientRect().right;
+    const pannello = document.querySelector('.pd-pannello').getBoundingClientRect().left;
+    return pannello > prima.pannello && testo > prima.testo && testo <= pannello;
+  }, conAiuto)).toBe(true);
 });
 
 test('la scorciatoia data a un vecchio modulo fuori dalla partenza continua a funzionare: lo strumento entra nel pannello', async ({ app, openTab }) => {
