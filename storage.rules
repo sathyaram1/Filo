@@ -126,13 +126,11 @@ service firebase.storage {
       return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.octetstream$');
     }
 
-    // Nessun metadato scelto da chi carica (#1518): il nome con cui il file si scarica, la
-    // codifica, la cache, la lingua e le chiavi personalizzate (un segno «già sistemato»
-    // compreso). Il codice di scarico lo aggiunge Firebase e qui non si vede: provato
-    // sull'emulatore (tests/rules/storage-allegati-motore-vero.mjs), come le due forme del
-    // Content-Disposition che Firebase scrive da sé, ammesse perché il nome lo fissa lui.
-    // `in` regge un campo che il motore non passa: l'emulatore non passa cacheControl né
-    // contentLanguage, e leggerli senza guardia negava ogni caricamento.
+    // Nessun metadato scelto da chi carica (#1518): nome di scarico, codifica, cache, lingua,
+    // chiavi personalizzate. Il codice di scarico lo aggiunge Firebase e qui non si vede; le due
+    // forme di Content-Disposition che scrive da sé passano, il nome lo fissa lui. Il `in` serve:
+    // l'emulatore non passa cacheControl né contentLanguage, e leggerli nudi negava tutto.
+    // Motore vero: tests/rules/storage-allegati-motore-vero.mjs.
     function senzaMetadatiScelti(r, file) {
       return (r.metadata == null || r.metadata.size() == 0)
         && (r.contentDisposition == null || r.contentDisposition == ''
