@@ -128,6 +128,14 @@
     return v;
   }
 
+  // Una parola senza cifre, simboli né maiuscole in mezzo («Telefono», «Attiva») può essere la password solo dove sta:
+  // altrove nella pagina è una parola, e il segnaposto si mette solo lì (vedi oscura). `inizio`: dove sta nel testo.
+  const SENZA_FORMA = (v) => !(/[0-9]/.test(v) || /[^\p{L}]/u.test(v) || /\p{Ll}\p{Lu}/u.test(v));
+  function alPosto(v, inizioGrezzo, grezzo) {
+    const k = testo(grezzo).indexOf(v);
+    return k >= 0 ? { valore: v, regola: 'password', inizio: inizioGrezzo + k } : { valore: v, regola: 'password' };
+  }
+
   const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
   // Un'espressione di codice («form.password.value», «process.env.DB_PASSWORD») sta al posto di un valore ma non lo è.
   const CODICE_SORGENTE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?$/;
