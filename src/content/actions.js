@@ -1115,7 +1115,7 @@
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
-      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB, via: 'salva_per_dopo' }).catch(() => {});
     };
 
     pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });

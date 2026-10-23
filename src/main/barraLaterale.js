@@ -635,7 +635,7 @@ class BarraLaterale {
           else tabs.openTab('filo://newtab/');
           break;
         case 'newTab': tabs.openTab('filo://newtab/'); break;
-        case 'closeTab': if (attiva) tabs.closeTab(attiva.id); break;
+        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: 'barra' }); break;
         case 'fullscreen': tabs.toggleContentFullscreen(); break;
         case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
         case 'openOptions': tabs.openTab('filo://options/options.html'); break;

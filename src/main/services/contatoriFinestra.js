@@ -74,6 +74,7 @@ function crea(dip = {}) {
     try {
       const { app, nativeTheme } = electron();
       app.on('browser-window-created', (_e, win) => seguiFinestra(win));
+      for (const win of electron().BrowserWindow.getAllWindows()) seguiFinestra(win);
       nativeTheme.on('updated', () => ambienteCambiato());
       app.on('before-quit', () => allUscita());
     } catch (_) {}
@@ -178,4 +179,13 @@ function misura(nome, ...args) {
   } catch (_) { return undefined; }
 }
 
-module.exports = { crea, misura };
+// Da dove arriva un'azione su uno scaricamento: quello che dice chi la manda, se è dell'elenco; se no la cornice
+// della finestra è il pannello e una pagina di Filo è la pagina Download.
+function luogoDownload(msg, sender) {
+  const L = globalThis.SN_CONTATORI_FINESTRA;
+  const detto = msg && typeof msg.luogo === 'string' ? msg.luogo : '';
+  if (L && L.LUOGHI_DOWNLOAD.includes(detto)) return detto;
+  return sender && sender.isShell ? 'pannello' : 'pagina';
+}
+
+module.exports = { crea, misura, luogoDownload };

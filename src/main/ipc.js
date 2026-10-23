@@ -529,9 +529,9 @@ function registerIpcHandlers() {
     const id = !url || url === 'filo://newtab/' ? gesto(win, 'new-tab', apri) : apri();
     return { ok: true, id };
   });
-  ipcMain.handle('tabs:close', (event, { id }) => {
+  ipcMain.handle('tabs:close', (event, { id, via } = {}) => {
     const win = winFor(event);
-    if (win?._filoTabs) gesto(win, 'close-tab', () => win._filoTabs.closeTab(id));
+    if (win?._filoTabs) gesto(win, 'close-tab', () => win._filoTabs.closeTab(id, { via: typeof via === 'string' ? via : 'altro' }));
     return { ok: true };
   });
   ipcMain.handle('tabs:activate', (event, { id }) => {
@@ -750,9 +750,9 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) CartaAnteprima.prepara(win);
   });
-  ipcMain.on('anteprima:nascondi', (event) => {
+  ipcMain.on('anteprima:nascondi', (event, dati) => {
     const win = finestraDellaBarra(event.sender);
-    if (win) CartaAnteprima.nascondi(win);
+    if (win) CartaAnteprima.nascondi(win, { clic: !!(dati && dati.clic === true) });
   });
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────

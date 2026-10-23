@@ -791,7 +791,7 @@ function mandaAvviso(testo, { pulsante = true, tentativi = 10, errore = '' } = {
       try {
         wc.send('shell:toast', {
           text: testo,
-          opts: pulsante ? { unica: CHIAVE_AVVISO, actions: [{ label: ETICHETTA_PULSANTE, aggiornaFilo: true }] } : {},
+          opts: { ...(pulsante ? { unica: CHIAVE_AVVISO, actions: [{ label: ETICHETTA_PULSANTE, aggiornaFilo: true }] } : {}), tipo: errore || 'aggiornamento' },
         });
         dette++;
       } catch (_) {}

@@ -3281,7 +3281,7 @@ async function eseguiAzioneFilo(action, {
           const tm = winOf(sender)?._filoTabs;
           if (!tm) return { executed: false, kept: confirmed, output: { error: 'nessuna finestra con schede' } };
           try {
-            const r = await tm.runAutoTriage({ trigger: 'manual' });
+            const r = await tm.runAutoTriage({ trigger: 'manual', da: 'chat' });
             const archived = (r && r.archived) || 0;
             // Un riordino mai partito (già in corso, o senza giudizio e niente archiviato) non si racconta come riuscito.
             if (!archived && r && (r.giaInCorso || r.giudizioMancato)) {
@@ -5026,7 +5026,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
       win.webContents.send('shell:toast', {
         text: 'L\'ho segnalato a chi sviluppa Filo',
         // La shell traduce `cancelAutoFeedback`: Annulla la ferma, la chiusura dell'avviso la fa partire.
-        opts: { durationSec: 8, actions: [{ label: 'Annulla', cancelAutoFeedback: biglietto }] },
+        opts: { durationSec: 8, tipo: 'segnalazione_automatica', actions: [{ label: 'Annulla', cancelAutoFeedback: biglietto }] },
       });
     } catch (_) {
       // Nessun avviso a schermo: nessuno può dire no.

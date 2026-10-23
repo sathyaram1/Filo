@@ -24,6 +24,7 @@ const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
 const AzioniContate = require('./services/azioniContate');
+const ContatoriFinestra = require('./services/contatoriFinestra');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -277,7 +278,7 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
 function avvisaIndirizzoFermato(rawUrl, win) {
   const a = avvisoIndirizzoFermato(rawUrl);
   if (!a || !win || win.isDestroyed?.()) return;
-  try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
+  try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave, tipo: 'indirizzo_fermato' } }); } catch (_) {}
 }
 // Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
@@ -1153,10 +1154,12 @@ class TabManager {
     return this._dropTab(tab);
   }
 
-  closeTab(id) {
+  // `via`: come la si chiude, per i contatori della finestra (#1470).
+  closeTab(id, { via = 'altro' } = {}) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
     this._avvisaSorvegliante(tab, 'chiusa');
     // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
     // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
@@ -1257,6 +1260,7 @@ class TabManager {
     if (from === to) return false;
     const [tab] = this.tabs.splice(from, 1);
     this.tabs.splice(to, 0, tab);
+    ContatoriFinestra.misura('trascinata', this, Math.abs(to - from));
     this._broadcast();
     return true;
   }
@@ -1264,6 +1268,7 @@ class TabManager {
   // Resta una scheda vuota: la finestra non si chiude da sé.
   closeAllTabs() {
     for (const tab of this.tabs) {
+      ContatoriFinestra.misura('chiusa', tab, 'chiudi_tutto', { incognito: this.incognito });
       this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
@@ -1615,18 +1620,25 @@ class TabManager {
 
   // I DUPLICATI esatti si chiudono per regola, mai chiedendolo all'LLM: non serve giudizio e
   // deve funzionare anche senza modello. All'LLM restano i casi di giudizio.
-  async runAutoTriage({ trigger = 'idle' } = {}) {
+  // `da`: 'chat' quando l'ha chiesto la chat, per i contatori della finestra (#1470).
+  async runAutoTriage({ trigger = 'idle', da = '' } = {}) {
     if (this.incognito) return { archived: 0 };
     // Chi chiede il riordino mentre ne gira già uno non ha ottenuto niente:
     // rispondergli «nessuna scheda da archiviare» è la frase di un riordino
     // riuscito, e i due casi si confondono.
-    if (this._triageRunning) return { archived: 0, giaInCorso: true };
+    if (this._triageRunning) {
+      ContatoriFinestra.misura('giroRiordino', trigger, { giaInCorso: true });
+      return { archived: 0, giaInCorso: true };
+    }
     this._triageRunning = true;
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
       const cands = this._triageCandidates();
-      if (!cands.length) return { archived: 0 };
+      if (!cands.length) {
+        ContatoriFinestra.misura('giroRiordino', trigger, {});
+        return { archived: 0 };
+      }
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
@@ -1683,7 +1695,8 @@ class TabManager {
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
-      const esito = this.applyTriageDecisions(cands, [...byIndex.values()]);
+      const esito = this.applyTriageDecisions(cands, [...byIndex.values()], { via: da === 'chat' ? 'chat' : 'riordino_automatico' });
+      ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
       return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
     } finally {
       this._triageRunning = false;
@@ -1714,7 +1727,7 @@ class TabManager {
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
   // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
   // `cands` è l'elenco indicizzato passato all'LLM.
-  applyTriageDecisions(cands, decisions) {
+  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico' } = {}) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
       if (d && typeof d.i === 'number') byIndex.set(d.i, d);
@@ -1729,6 +1742,7 @@ class TabManager {
     });
 
     for (const { tab, reason } of toArchive) {
+      ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
       this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab, reason);
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
@@ -1746,9 +1760,10 @@ class TabManager {
     // §1.3 — a OGNI giro, non solo quando si è archiviato qualcosa: all'apertura
     // la barra dev'essere riordinata comunque.
     const reordered = this.reorderTabsByColor();
+    if (reordered) ContatoriFinestra.misura('riordinatoPerColore', this);
     if (toArchive.length || reordered) this._broadcast();
     if (toArchive.length) this._showTriageToast(toArchive.length);
-    return { archived: toArchive.length };
+    return { archived: toArchive.length, duplicati: toArchive.filter((x) => x.reason === 'duplicato').length };
   }
 
   // §1.3 — riordina la striscia per colore con la stessa regola della Cronologia (compareRainbow).
@@ -1776,6 +1791,7 @@ class TabManager {
     try {
       this.win.webContents.send('shell:toast', {
         text: 'Schede riordinate. Quelle chiuse restano nel filo della home',
+        opts: { tipo: 'riordino_schede' },
       });
     } catch (_) {}
   }
@@ -2206,7 +2222,7 @@ class TabManager {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
       if (k === 't') return conta('new-tab', () => this.openTab('filo://newtab/'));
-      if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id));
+      if (k === 'w') return conta('close-tab', () => this.closeTab(tab.id, { via: 'ctrl_w' }));
       // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
       // Ctrl+L apre la home di Filo, esattamente come nella shell.
       if (k === 'l') return conta('address-bar', () => this.navigate(tab.id, 'filo://newtab/'));
@@ -3476,7 +3492,7 @@ class TabManager {
     try {
       this.win.webContents.send('shell:toast', {
         text: `Chiusa «${label}»: serviva solo ad avviare lo scaricamento`,
-        opts: { actions: [{ label: 'Riapri', openUrl: url }] },
+        opts: { tipo: 'scheda_ponte_chiusa', actions: [{ label: 'Riapri', openUrl: url }] },
       });
     } catch (_) {}
   }
@@ -3746,7 +3762,7 @@ class TabManager {
       this.win.webContents.send('shell:toast', {
         text: `Sito bloccato: ${label}${perche}`,
         // Una pagina che riprova in continuazione non impila notifiche: finché questa è a schermo resta una.
-        opts: { unica: `sito-bloccato:${label}`, actions: [{ label: 'Apri comunque', openUrl: target, apriComunque: true }] },
+        opts: { unica: `sito-bloccato:${label}`, tipo: 'sito_bloccato', actions: [{ label: 'Apri comunque', openUrl: target, apriComunque: true }] },
       });
     } catch (_) {}
   }
@@ -3791,6 +3807,7 @@ class TabManager {
   }
 
   _broadcast() {
+    ContatoriFinestra.misura('schede', { incognito: this.incognito });
     this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
     this.codaRiapertura.pota(this.tabs);
     // La shell è il primary webContents della BrowserWindow.
@@ -3949,6 +3966,7 @@ class TabManager {
         this.codaRiapertura.finita().then(() => misura.coda(), () => misura.coda());
       }
     } catch (_) {}
+    ContatoriFinestra.misura('sessione', this, nate);
     this._persistSession();
     // §2.1 decisione utente: a ogni riapertura Filo riordina/archivia le tab, a pagine
     // caricate (forniscono l'estratto all'LLM). No-op se la pref è disattivata o manca la chiave.

@@ -64,7 +64,12 @@ module.exports = function register(on, ctx) {
     const esiti = await NomiFile.rimetti(coppie);
     return { ok: esiti.length > 0 && esiti.every((e) => e.ok), esiti };
   }));
-  on(MSG.DOWNLOAD_RIMETTI_NOME, soloFilo(async (msg, sender) => DL().rimettiNome(msg.id, ambito(sender))));
+  on(MSG.DOWNLOAD_RIMETTI_NOME, soloFilo(async (msg, sender) => {
+    // Il nome proposto da Filo rifiutato (#1470): si conta col luogo, mai il nome.
+    const F = require('../contatoriFinestra');
+    F.misura('download', F.luogoDownload(msg, sender), 'rimetti_nome', { incognito: !!ambito(sender) });
+    return DL().rimettiNome(msg.id, ambito(sender));
+  }));
 
   // #947 — il bottone di un file trovato in chat. Il percorso può averlo scritto un modello che ha letto un documento
   // ostile: si apre solo un documento o un'immagine, mai un programma.
