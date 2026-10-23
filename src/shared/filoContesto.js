@@ -593,8 +593,8 @@
       const dentro = ingresso && ingresso < chiesti ? ingresso : chiesti;
       const fuori = dentro < chiesti ? chiesti - dentro : Math.min(Math.max(0, Number(risposta) || 0), max / 2);
       const posto = max - fuori;
-      if (posto > 0) return Math.max(1, Math.ceil(c - c * (posto / dentro) * MARGINE_PAGINE));
-      return null;
+      const e = posto > 0 ? Math.ceil(c - c * (posto / dentro) * MARGINE_PAGINE) : 0;
+      return e > 0 ? e : null;
     }
     const stimato = max ? eccessoNellaFinestra({ finestra: max, caratteri: c, risposta }) : 0;
     return stimato > 0 ? stimato : null;
