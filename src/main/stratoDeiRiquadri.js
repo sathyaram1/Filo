@@ -357,7 +357,7 @@ class StratoDeiRiquadri {
   // Quello che l'utente vede sopra la pagina: i gesti del vuoto delle viste più in alto vanno qui, non alla pagina.
   vistaSopra(wc) {
     const s = this.strati.get(wc);
-    return s && s.visibile ? s.vista : null;
+    return s && s.visibile ? s.perIlVuoto : null;
   }
 
   // Con un riquadro che copre la pagina (feedback, Modifica, red-team) la tastiera che torna alla scheda va a lui.
