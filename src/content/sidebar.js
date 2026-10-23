@@ -461,15 +461,28 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     } catch (_) { ok(null); }
   });
 
-  // Torna se l'Aiuto le ha prese (anche solo per dire che erano troppo grandi).
+  // Il pannello pronto a ricevere: false dove Filo è spento, null con l'Aiuto spento (e lo si dice).
+  function pannelloPerAllegati() {
+    const perche = chiuso();
+    if (perche === 'sito') return false;
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return null; }
+    if (!isOpen() || nascosto) open();
+    else if (collapsed) expand({ ai: false });
+    return true;
+  }
+  function allegatiArrivati({ grandi = 0, rotte = 0 } = {}) {
+    disegnaAllegati();
+    if (grandi) Popup?.showToast?.(Allegati.fraseTroppoGrandiAiuto(grandi));
+    else if (rotte) Popup?.showToast?.(Allegati.fraseIlleggibili(rotte));
+    try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+  }
+
+  // Torna se l'Aiuto le ha prese (anche solo per dire perché non entrano).
   async function allega(files) {
     const lista = Array.from(files || []).filter((f) => f && /^image\//i.test(f.type || ''));
     if (!lista.length) return false;
-    const perche = chiuso();
-    if (perche === 'sito') return false;
-    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return true; }
-    if (!isOpen() || nascosto) open();
-    else if (collapsed) expand({ ai: false });
+    const pronto = pannelloPerAllegati();
+    if (!pronto) return pronto === null;
     let grandi = 0;
     let rotte = 0;
     for (const f of lista) {
@@ -479,10 +492,18 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       if (dataUrl) allegati.immagini.push({ dataUrl, nome: f.name || '' });
       else rotte += 1;
     }
-    disegnaAllegati();
-    if (grandi) Popup?.showToast?.(Allegati.fraseTroppoGrandiAiuto(grandi));
-    else if (rotte) Popup?.showToast?.(Allegati.fraseIlleggibili(rotte));
-    try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+    allegatiArrivati({ grandi, rotte });
+    return true;
+  }
+
+  // Dal main (CHAT_ALLEGA): le immagini lasciate sulla fila delle schede o sulla barra, già lette e misurate.
+  function allegaDaFuori({ immagini = [], grandi = 0 } = {}) {
+    const buone = (Array.isArray(immagini) ? immagini : []).filter((im) => im && /^data:image\//i.test(String(im.dataUrl || '')));
+    const fuori = Math.max(0, Math.floor(Number(grandi) || 0));
+    if (!buone.length && !fuori) return false;
+    if (!pannelloPerAllegati()) return false;
+    for (const im of buone) allegati.immagini.push({ dataUrl: im.dataUrl, nome: typeof im.nome === 'string' ? im.nome : '' });
+    allegatiArrivati({ grandi: fuori });
     return true;
   }
 
