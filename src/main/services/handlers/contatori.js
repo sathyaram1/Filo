@@ -124,6 +124,23 @@ module.exports = function register(on, ctx) {
       case 'tasto-annulla': ok = contatori.tastoAnnulla(); break;
       case 'anticipo-aperto': ok = contatori.anticipoAperto(testo(m.action)); break;
       case 'conferma': ok = contatori.confermaRisposta(testo(m.chiave), testo(m.esito)); break;
+      // Le attività dove la persona le vede (#1467): i conti arrivano come numeri, e qui diventano fasce.
+      case 'aiuto':
+        ok = contatori.attivita('aiuto', {
+          esito: testo(m.esito), passiDaSolo: numero(m.passiDaSolo), passiCliccati: numero(m.passiCliccati),
+          nonTrovati: numero(m.nonTrovati), documenti: numero(m.documenti),
+        });
+        break;
+      case 'ricerca-web-tetto': ok = contatori.attivita('ricercaWeb', { da: 'aiuto', alTetto: true }); break;
+      case 'dettatura':
+        ok = contatori.attivita('dettatura', { motivo: testo(m.motivo), frasi: numero(m.frasi), invio: testo(m.invio), provvisorie: m.provvisorie === true });
+        break;
+      case 'lettura': {
+        const motivo = C.motivoLettura({ ripiego: m.ripiego === true, codice: testo(m.codice), chiaveRifiutata: m.chiaveRifiutata === true, errore: testo(m.errore) });
+        ok = contatori.attivita('lettura', { voce: testo(m.voce), motivo, fino: C.finoLettura(numero(m.quota), m.finita === true) });
+        break;
+      }
+      case 'suggerimento': ok = contatori.attivita('suggerimenti', { tipo: testo(m.tipo), posizione: numero(m.posizione), etaMs: numero(m.etaMs) }); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };
