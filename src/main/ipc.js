@@ -20,6 +20,7 @@ const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
 const AzioniContate = require('./services/azioniContate');
+const { vistaInterna } = require('./services/handlers/origine');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
