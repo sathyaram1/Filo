@@ -321,6 +321,10 @@ export function provaFusione(base, root = ROOT) {
  * minuti, non le quasi sette ore della suite intera sulla macchina di chi
  * sviluppa Filo.
  */
+// Un file che decide il comportamento di un'area col nome di un altro: senza, il registro dei costi cambiava cosa
+// chiede ogni livello di autonomia e lo spec dell'autonomia restava fuori, rosso su main (#600.1).
+const AREE_DECISE_DA = new Map([['actionlevels', ['autonomia']]]);
+
 export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
   const specs = new Set();
@@ -359,7 +363,10 @@ export function specsForChangedFiles(changed, tracked) {
     // servizi non lanciavano niente pur avendo uno spec col loro stesso nome
     // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
-    if (n) aggiungi(n[1]);
+    if (n) {
+      aggiungi(n[1]);
+      for (const decisa of AREE_DECISE_DA.get(n[1].toLowerCase()) || []) aggiungi(decisa);
+    }
     // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
     // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
     if (f.startsWith('tests/') && !f.startsWith('tests/verifica/') && f.endsWith('.spec.mjs')) {
