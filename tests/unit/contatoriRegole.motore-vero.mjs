@@ -103,6 +103,10 @@ await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', asy
   s.chiesto(A.EXPLAIN);
   s.erroreVisto('crash:scheda:oom');
   s.intervista('autonomia', 'default');
+  s.attivita('aiuto', { esito: 'fatto', passiDaSolo: 3, passiCliccati: 1, nonTrovati: 1, documenti: 0 });
+  s.attivita('ricercaWeb', { da: 'chat', fornitore: 'tavily', ripiego: false, risultati: 5 });
+  s.attivita('suggerimenti', { tipo: 'NAVIGA', posizione: 2, etaMs: 60000 });
+  s.memoriaCorretta('quaderno', 'togli', { modulo: 'PROFILO', lezione: false, nata: '2026-10-01T10:00:00.000Z' });
   await new Promise((r) => setTimeout(r, 30));
   sposta(ORA);
   const esito = await s.controlla();
