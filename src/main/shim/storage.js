@@ -19,6 +19,21 @@ function canEncrypt() {
 // L'ultima cifratura fatta: chiavi uguali non si ricifrano a ogni scrittura (#1089), e il file non cambia.
 let ultimaCifratura = { chiaro: null, blob: null };
 
+// Gli esiti del disco per i contatori anonimi (#1466): solo nomi dell'elenco chiuso (SN_CONTATORI.EVENTI_STORAGE), mai
+// una chiave, un percorso o un messaggio. Li ritira src/main/services/contatori.js, che a contatori spenti li butta.
+const CONTI = new Map();
+let dimensione = null;
+let cifraturaContata = false;
+function contaDisco(cosa, dato) {
+  try {
+    const C = globalThis.SN_CONTATORI;
+    if (!C) return;
+    const da = { lettura: C.eventoLettura, salvataggio: C.eventoSalvataggio, flush: C.eventoFlush }[cosa];
+    const evento = da ? da(dato) : cosa;
+    if (C.EVENTI_STORAGE.includes(evento)) CONTI.set(evento, (CONTI.get(evento) || 0) + 1);
+  } catch (_) {}
+}
+
 // Le impostazioni come vanno su disco: settings.apiKeys (in chiaro, in memoria) diventa
 // settings.apiKeysEnc (base64 del blob cifrato). Non muta `s`.
 function impostazioniPerDisco(s) {
@@ -26,6 +41,8 @@ function impostazioniPerDisco(s) {
     if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return s;
     if (!canEncrypt()) { // niente keyring OS → resta com'era (no perdita dati), e l'utente lo sa
       if (Object.values(s.apiKeys).some((v) => typeof v === 'string' && v.trim())) chiaviInChiaro();
+      // Prima di `ready` il portachiavi risulta assente anche dove c'è: si conta solo dopo, una volta per sessione.
+      if (!cifraturaContata && typeof app.isReady === 'function' && app.isReady()) { cifraturaContata = true; contaDisco('cifratura_assente'); }
       return s;
     }
     const chiaro = JSON.stringify(s.apiKeys);
@@ -280,6 +297,7 @@ async function leggiFile() {
     buf = await Disco.leggi(target);
   } catch (err) {
     console.warn('[Filo storage] read failed:', err.message);
+    contaDisco('lettura', 'illeggibile');
     STATE.solaMemoria = true;
     const copia = await leggiCopia(target);
     STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
@@ -294,13 +312,16 @@ async function leggiFile() {
     // Le prove automatiche (playwright.config.js) partono da un utente già accolto, da qualunque avvio: senza, la home
     // comincia l'intervista appena c'è un modello e la chat della prova ci scrive dentro (#663.6).
     if (process.env.FILO_TEST_ACCOLTO === '1') STATE.data = { filo_onboarding: { done: true } };
+    contaDisco('lettura', 'vuoto');
     STATE.loaded = true;
     avviaVerifica();
     return;
   }
+  dimensione = buf.length;
   const testo = Disco.togliBom(buf.toString('utf8'));
   const dati = interpreta(testo);
   if (dati) {
+    contaDisco('lettura', 'ok');
     STATE.data = deserializeFromDisk(dati);
     STATE.loaded = true;
     avviaVerifica();
@@ -313,6 +334,7 @@ async function leggiFile() {
   }
   if (!daParte) STATE.solaMemoria = true;
   const copia = await leggiCopia(target);
+  contaDisco('lettura', !daParte ? 'non_spostato_sola_memoria' : copia ? 'rovinato_con_copia' : 'rovinato_senza_copia');
   STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
   STATE.loaded = true;
   avviaVerifica();
@@ -406,6 +428,7 @@ function serializzaChiave(k) {
   } catch (err) {
     // Un valore che non si serializza tiene nel file la sua ultima forma buona e non ferma le altre chiavi.
     console.error('[Filo storage] chiave non serializzabile:', k, err.message);
+    contaDisco('chiave_non_serializzabile');
     STATE.sporche.delete(k);
     return;
   }
@@ -438,6 +461,7 @@ function verificaMutazioni() {
     try { t = JSON.stringify(STATE.data[k]); } catch (_) { continue; }
     if (t === STATE.testi.get(k)) continue;
     cambiate.push(k);
+    contaDisco('cambiato_senza_set');
     STATE.sporche.add(k);
     if (!STATE.avvisate.has(k)) {
       STATE.avvisate.add(k);
@@ -463,16 +487,22 @@ async function doFlush() {
   STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
   if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
   const mia = ++STATE.generazione;
+  const t0 = Date.now();
   try {
     const txt = testoDelFile();
     const scritta = await Disco.scrivi(target, txt, { primaDiRinominare: () => STATE.genSuDisco < mia });
-    if (scritta) STATE.genSuDisco = mia;
+    if (scritta) {
+      STATE.genSuDisco = mia;
+      dimensione = Buffer.byteLength(txt);
+      contaDisco('flush', Date.now() - t0);
+    }
     salvataggioRiuscito();
     copiaPiuTardi();
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
     // Il file non ha l'ultima versione: la prossima set non va scartata come «già scritta».
     STATE.testi.clear();
+    contaDisco('salvataggio', err);
     salvataggioFallito(err);
   } finally {
     STATE.flushInFlight -= 1;
@@ -506,7 +536,27 @@ function salvataggioRiuscito() {
   STATE.ultimoErrore = null;
   STATE.ritentaMs = 0;
   if (STATE.ritentaTimer) { clearTimeout(STATE.ritentaTimer); STATE.ritentaTimer = null; }
+  if (eraFallito) contaDisco('salvataggio_tornato');
   if (eraFallito && STATE.avvisatoSalvataggio) avvisa('I tuoi dati sono di nuovo salvati.', CHIAVE_SALVATAGGIO, 6);
+}
+
+/** Gli esiti del disco da quando li si è ritirati l'ultima volta, rinomine riprovate comprese; poi si azzerano. */
+function contiDisco() {
+  const out = Object.fromEntries(CONTI);
+  CONTI.clear();
+  try {
+    const C = globalThis.SN_CONTATORI;
+    for (const [codice, n] of Object.entries(Disco.ritentiRinomina())) {
+      const evento = C ? C.eventoRinomina(codice) : '';
+      if (evento) out[evento] = (out[evento] || 0) + n;
+    }
+  } catch (_) {}
+  return out;
+}
+
+/** I byte del file com'era all'ultima lettura o scrittura; null prima della prima. */
+function dimensioneDisco() {
+  return dimensione;
 }
 
 /** Per le prove e per chi deve dire all'utente se i suoi dati arrivano sul disco. */
@@ -739,6 +789,8 @@ module.exports = {
   maxFlushOverlap,
   verificaMutazioni,
   statoDisco,
+  contiDisco,
+  dimensioneDisco,
   setSync,
   runIncognito,
   runNormale,

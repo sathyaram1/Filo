@@ -1,11 +1,22 @@
-// I contatori anonimi (#969, #1461, #1464): misura usi e chiamate dei modelli, azioni e gli altri gesti di elenco chiuso,
-// li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
+// I contatori anonimi (#969, #1461, #1464, #1466): misura usi e chiamate dei modelli, azioni, gesti e guasti di elenco
+// chiuso, li tiene per ora sul disco e spedisce ogni ora le ore chiuse. In incognito e a contatori spenti non conta e non
 // spedisce; spenti, butta quello che aveva, senza un ultimo segnale. Cosa esce: src/shared/contatoriGiornalieri.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const CHIAVE = 'contatoriGiornalieri';
+// Il segno dell'uscita (#1466): «aperta» all'avvio, «chiusa» con la durata della chiusura all'ultimo istante, letto
+// dall'avvio dopo. Un file suo e sincrono: a quel punto lo storage ha già scritto, e un crash non lascia altro.
+const FILE_SEGNO = 'contatori-uscita.json';
+// Il ciclo del main: campioni ogni 50 ms (bastano per soglie da 200 ms in su, e il main non si sveglia di più), letti
+// una volta al secondo. Ogni lettura vale un blocco al più.
+const RISOLUZIONE_FERMO_MS = 50;
+const LETTURA_FERMO_MS = 1000;
+// Una sessione riaperta si misura fino alla scheda in vista e alla fine della coda, o al più per dieci minuti.
+const ATTESA_SESSIONE_MS = 10 * 60 * 1000;
 const PRIMO_CONTROLLO_MS = 60 * 1000;
 const CONTROLLO_OGNI_MS = 60 * 60 * 1000;
 const SALVA_DOPO_MS = 3000;
@@ -37,6 +48,9 @@ function statoVuoto() {
 }
 
 const oggetto = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
+// Lo stato va e viene dallo storage per copia: lo stesso oggetto cambiato fra due salvataggi lo storage lo conterebbe
+// fra i valori cambiati senza set (#1466), e quel conto deve dire degli altri.
+const copia = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 
 function normale(s) {
   const o = oggetto(s) ? s : {};
@@ -75,12 +89,27 @@ function crea(dip = {}) {
   const rest = dip.rest || (() => (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest) || {});
   const log = dip.log || ((...a) => console.warn('[contatori]', ...a));
   // L'ora conta come «Filo aperto» solo con una finestra normale: chi usa solo l'incognito non lascia traccia.
-  const finestraNormale = dip.finestraNormale || (() => {
+  const finestreDiFilo = () => {
     try {
       const { BrowserWindow } = require('electron');
-      return BrowserWindow.getAllWindows().some((w) => w && !w.isDestroyed() && w._filoTabs && !w._filoIncognito);
-    } catch (_) { return false; }
+      return BrowserWindow.getAllWindows().filter((w) => w && !w.isDestroyed() && w._filoTabs);
+    } catch (_) { return []; }
+  };
+  const finestraNormale = dip.finestraNormale || (() => finestreDiFilo().some((w) => !w._filoIncognito));
+  // Un guasto di tutta l'app (un'eccezione, un processo comune) con aperte solo finestre incognito non si conta; prima
+  // che ci sia una finestra, all'avvio, sì.
+  const soloIncognito = dip.soloIncognito || (() => { const f = finestreDiFilo(); return f.length > 0 && f.every((w) => w._filoIncognito); });
+  // Il sistema (#1466): la cartella del segno, gli eventi del disco, la memoria dei processi e le schede delle finestre normali.
+  const cartella = dip.cartella || (() => process.env.FILO_USER_DATA || require('electron').app.getPath('userData'));
+  const contiDisco = dip.contiDisco || (() => require('../shim/storage').contiDisco());
+  const dimensioneDisco = dip.dimensioneDisco || (() => require('../shim/storage').dimensioneDisco());
+  const metriche = dip.metriche || (() => require('electron').app.getAppMetrics());
+  const schede = dip.schede || (() => {
+    const tutte = finestreDiFilo().filter((w) => !w._filoIncognito).flatMap((w) => (Array.isArray(w._filoTabs.tabs) ? w._filoTabs.tabs : []));
+    const attesa = tutte.filter((t) => t && t._rinviata).length;
+    return { vive: tutte.length - attesa, attesa };
   });
+  const istogramma = dip.istogramma || ((o) => require('node:perf_hooks').monitorEventLoopDelay(o));
 
   const usoCorrente = new AsyncLocalStorage();
   let stato = null;
@@ -96,13 +125,20 @@ function crea(dip = {}) {
   // Le conferme già contate «senza risposta»: una risposta tardiva non le conta una seconda volta.
   const confermeScadute = new Map();
   const azioniDiFilo = [];
+  // L'ultima risposta dell'interruttore, per chi non può aspettarla (un campione al secondo, la chiusura). null: non
+  // ancora letta, e quello che arriva intanto aspetta la prima lettura.
+  let ultimoAccesi = null;
+  // Il sistema (#1466) si raccoglie qui, fuori dall'ora e senza scrivere: entra nell'ora alla prima scrittura che c'è
+  // comunque (un conto, il giro dell'ora, la chiusura). Un campione al secondo o una chiamata sincrona per pagina non
+  // diventano così una scrittura dello storage ciascuno.
+  let sospesa = C.oraVuota();
 
   function carica() {
     if (!carico) {
       carico = (async () => {
         let s = null;
         try { s = await runNormale(() => storage.getRaw(CHIAVE, null)); } catch (_) { s = null; }
-        stato = normale(s);
+        stato = normale(copia(s));
       })();
     }
     return carico;
@@ -111,7 +147,7 @@ function crea(dip = {}) {
   async function salva() {
     if (timerSalva) { clearTimeout(timerSalva); timerSalva = null; }
     if (!stato) return;
-    try { await runNormale(() => storage.setRaw(CHIAVE, stato)); } catch (e) { log('stato non salvato', String((e && e.message) || e)); }
+    try { await runNormale(() => storage.setRaw(CHIAVE, copia(stato))); } catch (e) { log('stato non salvato', String((e && e.message) || e)); }
   }
 
   function salvaPresto() {
@@ -125,8 +161,9 @@ function crea(dip = {}) {
   async function accesi() {
     try {
       const s = await impostazioni();
-      return Boolean(s) && !spentiIn(s);
-    } catch (_) { return false; }
+      ultimoAccesi = Boolean(s) && !spentiIn(s);
+    } catch (_) { ultimoAccesi = false; }
+    return ultimoAccesi;
   }
 
   async function azzera() {
@@ -135,6 +172,8 @@ function crea(dip = {}) {
     confermeAperte.clear();
     confermeScadute.clear();
     azioniDiFilo.length = 0;
+    scartaSospesa();
+    if (segnoForse) togliSegno();
     await carica();
     const c = stato;
     const vuoto = !Object.keys(c.ore).length && !Object.keys(c.giorni).length && !Object.keys(c.pseudonimi).length
@@ -173,9 +212,240 @@ function crea(dip = {}) {
     scaduteLeConferme();
     const ora = oraCorrente();
     stato.presenza = C.giornoDi(adesso());
+    raccogli();
     const fatto = scrivi(ora);
     salvaPresto();
     return fatto !== false;
+  }
+
+  // ── Il sistema (#1466): avvio, processi, blocchi, eccezioni, memoria, chiamate sincrone, chiusura, disco, sessione,
+  // aggiornamenti. Ogni porta passa un nome o un codice; l'elenco chiuso lo riduce, e il resto non esce.
+  function sistema(scrivi, { incognito = false } = {}) {
+    try {
+      if (incognito || ultimoAccesi === false) return false;
+      return scrivi(sospesa) !== false;
+    } catch (_) { return false; }
+  }
+
+  // Sincrono: chi lo chiama ha già saputo che i contatori sono accesi e ha caricato lo stato.
+  function raccogli() {
+    try {
+      const d = contiDisco();
+      if (oggetto(d)) for (const [evento, n] of Object.entries(d)) C.registraStorage(sospesa, evento, n);
+    } catch (_) {}
+    if (!stato || C.sistemaVuoto(sospesa)) return;
+    C.unisciSistema(oraCorrente(), sospesa);
+    sospesa = C.oraVuota();
+  }
+
+  function scartaSospesa() {
+    sospesa = C.oraVuota();
+    try { contiDisco(); } catch (_) {}
+  }
+
+  function passoAvvio(passo, ms) { return sistema((o) => C.registraPassoAvvio(o, passo, ms)); }
+
+  // Un passo che finisce quando la pagina `wc` arriva al primo evento fra `eventi`; senza, in un minuto non conta.
+  function passoAvvioFino(passo, t0, wc, eventi = ['dom-ready', 'did-stop-loading']) {
+    try {
+      if (!wc || typeof wc.once !== 'function' || (wc.isDestroyed && wc.isDestroyed())) return false;
+      if (typeof wc.isLoading === 'function' && !wc.isLoading()) return passoAvvio(passo, Math.max(0, adesso() - t0));
+      let fatto = false;
+      let timer = null;
+      const fine = (ok) => {
+        if (fatto) return;
+        fatto = true;
+        if (timer) clearTimeout(timer);
+        if (ok) passoAvvio(passo, Math.max(0, adesso() - t0));
+      };
+      timer = setTimeout(() => fine(false), ATTESA_AZIONE_MS);
+      if (timer && typeof timer.unref === 'function') timer.unref();
+      for (const e of eventi) wc.once(e, () => fine(true));
+      wc.once('destroyed', () => fine(false));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function processoMorto(tipo, motivo, { incognito = null } = {}) {
+    return sistema((o) => C.registraProcessoMorto(o, tipo, motivo), { incognito: incognito == null ? soloIncognito() : incognito });
+  }
+
+  function eccezione(origine, err) {
+    let fuori = false;
+    try { fuori = soloIncognito() || inIncognito(); } catch (_) { fuori = false; }
+    return sistema((o) => C.registraEccezione(o, origine, err), { incognito: fuori });
+  }
+
+  function ipcSincrono(canale, ms, { incognito = false } = {}) {
+    return sistema((o) => C.registraIpcSincrono(o, canale, ms), { incognito });
+  }
+
+  function aggiornamento(evento) { return sistema((o) => C.registraAggiornamento(o, evento)); }
+
+  // La finestra principale che smette di rispondere: quante volte, e quanto dura fino a quando torna o la si chiude.
+  // Durante l'uscita non si conta: una finestra che si chiude può non rispondere, e non è un blocco.
+  function seguiFinestra(win) {
+    if (!win || typeof win.on !== 'function') return false;
+    let dal = 0;
+    const finita = (cosa) => {
+      if (!dal) return;
+      const ms = Math.max(0, adesso() - dal);
+      dal = 0;
+      sistema((o) => C.registraFinestraBloccata(o, cosa, ms));
+    };
+    win.on('unresponsive', () => {
+      if (dal || chiusuraDal) return;
+      dal = adesso();
+      sistema((o) => C.registraFinestraBloccata(o, 'volte'));
+    });
+    win.on('responsive', () => finita('tornata'));
+    win.on('close', () => finita('chiusa_da_utente'));
+    win.on('closed', () => finita('chiusa_da_utente'));
+    return true;
+  }
+
+  // La sessione riaperta all'avvio: l'esito, quante schede, e quanto fino alla scheda in vista caricata e alla fine
+  // della coda. Il conto parte quando sono arrivate tutte e due, o dopo dieci minuti con quello che c'è.
+  function sessione({ esito, schede: n = 0, t0 = adesso() } = {}) {
+    const muto = { vista() {}, coda() {} };
+    try {
+      if (!C.ESITI_SESSIONE.includes(esito)) return muto;
+      if (esito !== 'ripristinata') { sistema((o) => C.registraSessione(o, { esito })); return muto; }
+      const m = { vistaMs: null, codaMs: null, vista: false, coda: false, fatta: false };
+      const chiudi = () => {
+        if (m.fatta) return;
+        m.fatta = true;
+        clearTimeout(timer);
+        sistema((o) => C.registraSessione(o, { esito, schede: n, vistaMs: m.vistaMs, codaMs: m.codaMs }));
+      };
+      const timer = setTimeout(chiudi, ATTESA_SESSIONE_MS);
+      if (timer && typeof timer.unref === 'function') timer.unref();
+      const arrivata = (campo) => () => {
+        if (m.fatta || m[campo]) return;
+        m[campo] = true;
+        m[`${campo}Ms`] = Math.max(0, adesso() - t0);
+        if (m.vista && m.coda) chiudi();
+      };
+      return { vista: arrivata('vista'), coda: arrivata('coda') };
+    } catch (_) { return muto; }
+  }
+
+  // Memoria di tutti i processi di Filo, schede delle finestre normali e grandezza del file dei dati: una volta l'ora.
+  function campionaSistema() {
+    try {
+      const m = metriche();
+      if (Array.isArray(m) && m.length) {
+        const kb = m.reduce((a, p) => a + (Number(p && p.memory && p.memory.workingSetSize) || 0), 0);
+        const { vive, attesa } = schede();
+        sistema((o) => C.registraMemoria(o, { mb: kb / 1024, vive, attesa }));
+      }
+    } catch (_) {}
+    try {
+      const ev = C.eventoDimensione(dimensioneDisco());
+      if (ev) sistema((o) => C.registraStorage(o, ev));
+    } catch (_) {}
+  }
+
+  // ── Il ciclo del main ──
+  let fermo = null;
+  function avviaFermo() {
+    if (fermo) return;
+    try {
+      const h = istogramma({ resolution: RISOLUZIONE_FERMO_MS });
+      h.enable();
+      const t = setInterval(leggiFermo, LETTURA_FERMO_MS);
+      if (t && typeof t.unref === 'function') t.unref();
+      fermo = { h, t, salta: 0 };
+    } catch (_) { fermo = null; }
+  }
+  function fermaFermo() {
+    if (!fermo) return;
+    clearInterval(fermo.t);
+    try { fermo.h.disable(); } catch (_) {}
+    fermo = null;
+  }
+  // I valori dell'istogramma sono intervalli interi fra due campioni: il ritardo è quello che supera la risoluzione.
+  function leggiFermo() {
+    if (!fermo) return;
+    let ritardo = NaN;
+    try { ritardo = Number(fermo.h.max) / 1e6 - RISOLUZIONE_FERMO_MS; fermo.h.reset(); } catch (_) {}
+    if (fermo.salta > 0) { fermo.salta -= 1; return; }
+    if (!Number.isFinite(ritardo) || ritardo < 0 || !finestraNormale()) return;
+    sistema((o) => C.registraMainFermo(o, ritardo));
+  }
+  // Un computer che dorme non è un ciclo fermo: le letture a cavallo del sonno si buttano.
+  function sonno() {
+    if (!fermo) return;
+    try { fermo.h.reset(); } catch (_) {}
+    fermo.salta = 2;
+  }
+
+  // ── Il segno dell'uscita ──
+  let segnoMio = false;
+  // All'inizio non si sa se ce n'è uno di quando i contatori erano accesi: il primo spegnimento lo toglie.
+  let segnoForse = true;
+  let avvioLetto = false;
+  let chiusuraDal = 0;
+  let tettoCookie = false;
+  const percorsoSegno = () => path.join(cartella(), FILE_SEGNO);
+  function leggiSegno() {
+    try { const o = JSON.parse(fs.readFileSync(percorsoSegno(), 'utf8')); return oggetto(o) ? o : null; } catch (_) { return null; }
+  }
+  function scriviSegno(o) {
+    try { fs.writeFileSync(percorsoSegno(), JSON.stringify(o)); return true; } catch (_) { return false; }
+  }
+  function togliSegno() {
+    segnoMio = false;
+    segnoForse = false;
+    try { fs.rmSync(percorsoSegno(), { force: true }); } catch (_) {}
+  }
+
+  // All'avvio: com'era finita la volta prima, se è il primo dopo un aggiornamento, e il segno «aperta» per la prossima.
+  async function avvioProcesso() {
+    if (avvioLetto) return false;
+    avvioLetto = true;
+    if (!(await accesi())) { togliSegno(); return false; }
+    const prima = leggiSegno();
+    const v = C.versioneApp(versione());
+    segnoMio = scriviSegno({ stato: 'aperta', versione: v });
+    segnoForse = segnoMio;
+    const primaV = prima && C.APP_RE.test(String(prima.versione)) ? String(prima.versione) : '';
+    sistema((o) => {
+      C.registraTipoAvvio(o, primaV && primaV !== v ? 'dopo_aggiornamento' : 'freddo');
+      if (!prima) return;
+      C.registraUscita(o, prima.stato === 'chiusa' ? 'pulita' : 'non_pulita');
+      if (prima.stato === 'chiusa') C.registraChiusura(o, { ms: prima.ms, tetto: prima.tetto === true });
+    });
+    return true;
+  }
+
+  function secondaIstanza() { return sistema((o) => C.registraTipoAvvio(o, 'seconda_istanza')); }
+  function inizioChiusura() { if (!chiusuraDal) chiusuraDal = adesso(); }
+  function tettoChiusura() { tettoCookie = true; }
+  // L'ultimo istante dell'uscita, sincrono. `sistema`: chiude il sistema (spegnimento, fine sessione), e non c'è una
+  // durata da misurare; non è un crash.
+  function fineChiusura({ sistema: dalSistema = false } = {}) {
+    if (!segnoMio || ultimoAccesi === false) return false;
+    const ms = !dalSistema && chiusuraDal ? Math.max(0, adesso() - chiusuraDal) : null;
+    return scriviSegno({ stato: 'chiusa', versione: C.versioneApp(versione()), ms, tetto: tettoCookie });
+  }
+
+  // Per la scrittura sincrona della chiusura: lo stato con dentro quello che aspettava. Spenti o mai letti, niente.
+  function perLaChiusura() {
+    try {
+      if (!stato || ultimoAccesi !== true) return {};
+      raccogli();
+      return { [CHIAVE]: copia(stato) };
+    } catch (_) { return {}; }
+  }
+
+  // Prima di un'uscita che non passa dalla chiusura (l'installatore lanciato all'avvio): l'ora va nello storage adesso.
+  async function salvaSubito() {
+    if (!(await accesi())) return false;
+    await carica();
+    raccogli();
+    await salva();
+    return true;
   }
 
   function ripetuta(chiave, t) {
@@ -601,6 +871,11 @@ function crea(dip = {}) {
     scaduteLeConferme();
     abbandonoPerFermo();
     segnaPresenza();
+    // Ogni ora con una finestra normale aperta entrano il campione del sistema e quello che aspettava; con sole
+    // finestre incognito, o nessuna, non entra niente.
+    let aperta = false;
+    try { aperta = Boolean(finestraNormale()); } catch (_) { aperta = false; }
+    if (aperta) { campionaSistema(); raccogli(); } else scartaSospesa();
     for (const [mappa, pota] of [[stato.ore, C.potaOre], [stato.giorni, C.potaGiorni]]) {
       const persi = pota(mappa);
       if (persi.length) log(`${persi.length} periodi mai partiti lasciati andare (dal ${persi[0]} al ${persi[persi.length - 1]})`);
@@ -714,11 +989,34 @@ function crea(dip = {}) {
     if (t && typeof t.unref === 'function') t.unref();
     const i = setInterval(() => { controlla(); }, CONTROLLO_OGNI_MS);
     if (i && typeof i.unref === 'function') i.unref();
+    // Da app pronta: prima, lo storage letto non decifrerebbe le chiavi; e il sonno del computer si sente solo da lì.
+    try {
+      const E = dip.electron || require('electron');
+      if (E && E.app && typeof E.app.whenReady === 'function') {
+        E.app.whenReady().then(() => {
+          accesi().then((si) => { if (si) avviaFermo(); }).catch(() => {});
+          const pm = E.powerMonitor;
+          if (!pm || typeof pm.on !== 'function') return;
+          pm.on('suspend', sonno);
+          pm.on('resume', sonno);
+          pm.on('shutdown', () => { fineChiusura({ sistema: true }); });
+        }).catch(() => {});
+      }
+    } catch (_) {}
   }
 
-  // Spenti dalle Preferenze, dall'intervista o a parole: quello che c'era non parte più.
+  // Spenti dalle Preferenze, dall'intervista o a parole: quello che c'era non parte più, il segno dell'uscita se ne va
+  // e il ciclo del main non si misura più. Riaccesi, si misura di nuovo; il segno torna all'avvio dopo.
   function seguiImpostazioni(s) {
-    if (spentiIn(s)) azzera().catch(() => {});
+    if (spentiIn(s)) {
+      ultimoAccesi = false;
+      fermaFermo();
+      togliSegno();
+      azzera().catch(() => {});
+      return;
+    }
+    if (s && typeof s === 'object') ultimoAccesi = true;
+    if (avviato) avviaFermo();
   }
 
   // ── La lettura dell'owner ───────────────────────────────────────────────
@@ -788,7 +1086,10 @@ function crea(dip = {}) {
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina,
     controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
+    passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,
+    avvioProcesso, secondaIstanza, inizioChiusura, tettoChiusura, fineChiusura, perLaChiusura, salvaSubito,
+    leggiFermo, sonno, avviaFermo, fermaFermo,
   };
 }
 
-module.exports = { crea, CHIAVE, MUTO };
+module.exports = { crea, CHIAVE, MUTO, FILE_SEGNO };

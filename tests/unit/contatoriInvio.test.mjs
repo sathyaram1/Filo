@@ -75,6 +75,8 @@ async function usa(b, action, { attesa = 0, errore = null, ok = true } = {}) {
 }
 
 const vuoti = { azioni: {}, impostazioni: {}, ricerche: {}, correttore: {}, conferme: {}, annullati: {}, anticipi: {}, chiedi: {}, erroriVisti: {}, intervista: {} };
+// Le misure del sistema (#1466) di un'ora senza niente: la loro stringa vuota.
+const vuotiSistema = { sistema: '' };
 
 test('un documento per ora, con la forma giusta e niente altro; un giorno senza niente parte una volta, vuoto', async () => {
   const b = banco();
@@ -92,11 +94,12 @@ test('un documento per ora, con la forma giusta e niente altro; un giorno senza 
   assert.ok(!opt.headers.Authorization, 'si spedisce senza login, come i feedback');
   assert.equal(url, `${BASE}/${C.COLLEZIONE}?documentId=99999999999999999901_2026-10-15_09&key=K`);
   assert.deepEqual(doc, {
-    v: 2, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac', primo: 'mese',
+    v: C.VERSIONE, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', ora: '09', app: '0.2.243', os: 'mac', primo: 'mese',
     uso: { 'filo-chat': '2;1,0,1,0,0,0,0;1,0,1,0,0,0,0;1', explain: '1;0,0,0,0,0,0,0;0,0,0,0,0,0,0;0' },
     errori: { explain: 'deepseek/deepseek-v4-pro|DeepInfra|crediti|1' },
     ...vuoti,
     primeVolte: ['filo-chat', 'explain'],
+    ...vuotiSistema,
   });
   assert.equal(C.valida(doc).ok, true);
   // Le chiamate ai modelli della stessa ora partono accanto, con lo stesso id (#1464): qui ogni uso è una chiamata.

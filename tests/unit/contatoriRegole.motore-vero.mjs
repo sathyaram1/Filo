@@ -1,4 +1,4 @@
-// Le regole Firestore dei contatori anonimi (#969, #1461, #1464), provate col MOTORE VERO e col codice vero dell'app.
+// Le regole Firestore dei contatori anonimi (#969, #1461, #1464, #1466), provate col MOTORE VERO e col codice vero dell'app.
 //
 // NON è un unit test: il nome non finisce in `.test.mjs` apposta (vedi pathsRegole.motore-vero.mjs, che spiega
 // perché e come si prepara la cartella usa-e-getta con l'emulatore). La sentinella sempre accesa è
@@ -9,9 +9,10 @@
 // Si lancia come l'altro, con in più FILO_REPO=<repo>:
 //   FILO_REPO=<repo> RULES_FILE=<repo>/firestore.rules npx firebase emulators:exec \
 //     --only firestore --project filo-prova-969 "node <cartella>/contatoriRegole.motore-vero.mjs"
-// Esito atteso: 60 righe verdi, uscita 0 (#1464, 2026-10-23). Le regole dell'ora valutano già circa 950 delle mille
-// espressioni che Firestore concede a una scrittura: un controllo in più lì le fa rifiutare tutte, per questo le
-// chiamate ai modelli hanno il loro documento. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
+// Esito atteso: NN righe verdi, uscita 0 (#1466 su #1464, 2026-10-23). È l'unica prova del tetto di mille espressioni
+// che Firestore concede a una scrittura: le regole dell'ora ne valutano già circa 950, e un controllo in più le fa
+// rifiutare tutte (per questo le chiamate ai modelli hanno il loro documento), mentre la sentinella che legge il file
+// non se ne accorge. Un rifiuto per il tetto qui si legge «maximum of 1000 expressions».
 
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection } from 'firebase/firestore';
@@ -103,6 +104,14 @@ await prova('l’ora chiusa parte, con ogni misura, e il server la accetta', asy
   s.chiesto(A.EXPLAIN);
   s.erroreVisto('crash:scheda:oom');
   s.intervista('autonomia', 'default');
+  // Il sistema (#1466): ogni misura almeno una volta.
+  s.passoAvvio('adblock', 300);
+  s.processoMorto('GPU', 'crashed', { incognito: false });
+  s.eccezione('uncaught', new TypeError('Cannot read properties of undefined'));
+  s.ipcSincrono('fp-config', 2);
+  s.aggiornamento('trovato');
+  s.sessione({ esito: 'ripristinata', schede: 3, t0: 0 }).vista();
+  s.secondaIstanza();
   await new Promise((r) => setTimeout(r, 30));
   sposta(ORA);
   const esito = await s.controlla();
@@ -189,6 +198,17 @@ await prova('senza il segno di primo documento', () => { const { primo, ...senza
 await prova('una versione dell’app che è testo', () => rifiuta({ app: 'ciao mamma' }));
 await prova('un campo mancante', () => { const { intervista, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
 await prova('un giorno di prima con un campo dell’ora', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), { ...GIORNO_VECCHIO, azioni: {} })));
+// Il sistema (#1466): niente percorsi, messaggi o chiavi dello storage, né come voce né come conto.
+await prova('un processo morto col percorso del dump', () => rifiuta({ sistema: 'processoMorto.gpu.crashed|1;C:/Users/mario/crash.dmp|1' }));
+await prova('un processo morto con un tipo inventato', () => rifiuta({ sistema: 'processoMorto.filo_di_mario.crashed|1' }));
+await prova('un’eccezione col suo messaggio', () => rifiuta({ sistema: 'eccezioneMain.uncaught.Cannot read properties|1' }));
+await prova('un esito del disco con la chiave dello storage', () => rifiuta({ sistema: 'storageEsito.settings.apiKeys|1' }));
+await prova('il sistema con un indirizzo in coda', () => rifiuta({ sistema: 'memoria.totale.mb512|1;https://x.it' }));
+await prova('il sistema come mappa', () => rifiuta({ sistema: { sessione: 'ripristinata' } }));
+await prova('un passo dell’avvio fuori elenco', () => rifiuta({ sistema: 'avvioPasso.apri_relazione.ms500|1' }));
+await prova('un aggiornamento con la versione', () => rifiuta({ sistema: 'aggiornamento.0.2.250|1' }));
+await prova('un’ora v3 senza il sistema', () => { const { sistema, ...senza } = BUONO; return assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), senza)); });
+await prova('un’ora v2 col sistema', () => rifiuta({ v: 2 }));
 await prova('un anonimo legge un’ora', () => assertFails(getDoc(doc(anon, `contatori-giornalieri/${idBuono}`))));
 await prova('un anonimo elenca la collezione', () => assertFails(getDocs(collection(anon, 'contatori-giornalieri'))));
 
@@ -214,6 +234,10 @@ await prova('le chiamate più cariche che l’app costruisce (ogni misura di ogn
   return assertSucceeds(setDoc(doc(anon, `${COLL_CHIAMATE}/${C.idDocumento(piene)}`), piene));
 });
 await prova('una copia vecchia crea ancora il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(GIORNO_VECCHIO)}`), GIORNO_VECCHIO)));
+await prova('una copia vecchia crea ancora la sua ora v2, senza il sistema', () => {
+  const v2 = { ...Object.fromEntries(Object.entries(BUONO).filter(([k]) => C.CAMPI_ORA_V2.includes(k))), v: 2, pseudonimo: 'f'.repeat(20) };
+  return assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(v2)}`), v2));
+});
 await prova('l’ora più carica che l’app costruisce (ogni funzione, azione, impostazione e scelta, ai tetti) passa', () => {
   const dati = C.oraVuota();
   const modello = (i) => `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`;
@@ -233,6 +257,19 @@ await prova('l’ora più carica che l’app costruisce (ogni funzione, azione, 
   for (const d of C.DOVE_CRASH) for (const m of C.MOTIVI_CRASH) C.registraErroreVisto(dati, `crash:${d}:${m}`);
   for (const t of C.TIPI_ERRORE_VISTO) C.registraErroreVisto(dati, `chat:${t}`);
   for (const p of C.passiIntervista()) for (const sc of C.SCELTE_INTERVISTA) C.registraIntervista(dati, p, sc);
+  for (const p of C.PASSI_AVVIO) for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraPassoAvvio(dati, p, ms);
+  for (const t of C.TIPI_AVVIO) C.registraTipoAvvio(dati, t);
+  for (const t of C.TIPI_PROCESSO) for (const m of C.MOTIVI_CRASH) C.registraProcessoMorto(dati, t, m);
+  C.registraFinestraBloccata(dati, 'volte'); C.registraFinestraBloccata(dati, 'tornata', 3000); C.registraFinestraBloccata(dati, 'chiusa_da_utente', 90000);
+  for (const ms of [300, 1500, 7000]) C.registraMainFermo(dati, ms);
+  for (const o of C.ORIGINI_ECCEZIONE) for (const n of C.NOMI_ECCEZIONE) C.registraEccezione(dati, o, { name: n });
+  C.registraMemoria(dati, { mb: 5000, vive: 60, attesa: 0 });
+  for (const c of C.CANALI_SINCRONI) for (const ms of [1, 900, 99999]) C.registraIpcSincrono(dati, c, ms);
+  C.registraChiusura(dati, { ms: 2600, tetto: true });
+  for (const e of C.ESITI_USCITA) C.registraUscita(dati, e);
+  for (const e of C.EVENTI_STORAGE) C.registraStorage(dati, e, 999999);
+  C.registraSessione(dati, { esito: 'ripristinata', schede: 80, vistaMs: 500, codaMs: 40000 }); C.registraSessione(dati, { esito: 'niente' });
+  for (const e of C.EVENTI_AGGIORNAMENTO) C.registraAggiornamento(dati, e);
   const pieno = C.documento({ pseudonimo: 'd'.repeat(20), chiave: '2026-10-14T23', app: '0.2.243', os: 'linux', dati });
   vero(C.valida(pieno).ok, C.valida(pieno).motivo);
   return assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(pieno)}`), pieno));
