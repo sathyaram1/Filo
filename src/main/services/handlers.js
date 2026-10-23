@@ -7492,6 +7492,7 @@ Registro.collega({
     }
     return false;
   },
+  disposizioneIcone: (cambia, { mossa } = {}) => require('./layoutIcone').riscrivi(cambia, { incognito: require('../shim/storage').inIncognito(), mossa }),
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
   annullato: (ids) => contaSe('cambioAnnullato', ids),
 });
