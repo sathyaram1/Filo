@@ -2687,6 +2687,7 @@ async function eseguiAzioneFilo(action, {
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
+            contaSeRiaperta(url, win);
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
