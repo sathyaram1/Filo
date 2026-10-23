@@ -3244,9 +3244,8 @@
     dichiaraCtrlZ();
   }
 
-  // I moduli della vecchia griglia (#1433): quello che sapevano passa agli strumenti del pannello, poi i documenti li
-  // perdono. Si leggono all'apertura, prima che il documento aperto li butti al primo salvataggio; senza risposta dal
-  // main restano dove sono, e la prossima apertura ci riprova.
+  // I vecchi moduli (#1433) si leggono all'apertura, prima che il primo salvataggio li butti, e passano agli strumenti;
+  // senza risposta dal main restano nei documenti, e la prossima apertura ci riprova.
   let moduliVecchi = [];
   const conModuli = (f) => !!(f && Array.isArray(f.modules) && f.modules.length);
   function ricordaModuli() {
