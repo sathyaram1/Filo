@@ -8,7 +8,12 @@
 //      la barra riparte già tinta e il riordino ha i dati subito.
 
 import { createRequire } from 'node:module';
+import { mkdirSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
+
+const SHOTS = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'tests', '.shots');
 
 const mk = (title, color) =>
   `<!doctype html><html><head><title>${title}</title>`
