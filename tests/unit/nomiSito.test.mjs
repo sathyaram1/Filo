@@ -93,6 +93,7 @@ test('pezziDi: un sito per pezzo, il resto fra due siti in un pezzo solo; le par
   assert.deepEqual(N.pezziDi('  studio   rossi  '), ['studio   rossi']);
   assert.deepEqual(N.pezziDi('studio rossi banca.it'), ['studio rossi', 'banca.it']);
   assert.deepEqual(N.pezziDi('https://x.it/?a=1,2'), ['https://x.it/?a=1,2']);
+  assert.deepEqual(N.elencoDaTesto('https://mail.google.com/mail/u/0/, news.bbc.co.uk').valid, ['mail.google.com', 'news.bbc.co.uk']);
   const salta = new Set(['e', 'il', 'sito']);
   assert.deepEqual(N.pezziDi('il sito studio rossi e faceb e banca.it', salta), ['studio rossi', 'faceb', 'banca.it']);
   assert.deepEqual(N.pezziDi('il sito e', salta), []);
