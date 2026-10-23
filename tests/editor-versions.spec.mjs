@@ -1,5 +1,5 @@
 // Versionamento dell'editor: ogni modifica AUTOMATICA di Filo (le "azioni di
-// formattazione" che la chat applica al documento) deve creare un punto di
+// formattazione" che l'Aiuto applica al documento) deve creare un punto di
 // ripristino, così è SEMPRE possibile tornare indietro. Lo storico vive
 // sull'archivio file dell'app, quindi sopravvive al reload.
 //
@@ -20,7 +20,7 @@ async function setDocText(page, text) {
   }, text);
 }
 
-// Simula una modifica automatica di Filo: la stessa via che usa la chat quando
+// Simula una modifica automatica di Filo: la stessa via che usa l'Aiuto quando
 // il modello risponde con azioni di formattazione (grassetto su tutto il testo).
 async function filoAutoEdit(page) {
   return page.evaluate(() => window.__filoEditorFormat.applyFormatActions([{ style: 'bold', target: 'all' }]));
@@ -257,12 +257,12 @@ test('cambiando documento si salva la modifica manuale significativa del file la
 });
 
 // ── Il ripristino non deve portarsi via ciò che non è testo (#384) ─────────
-// Ripristinare una versione più vecchia sostituiva il file INTERO: tornavano
-// indietro anche il nome del documento e i moduli del banco di lavoro (chat
-// inclusa), che il pannello non mostra nemmeno. Questi test asseriscono il
-// SUCCESSO del confine giusto: il testo torna a quello della versione, il nome e
-// la conversazione con Filo restano quelli di adesso. Senza il fix il titolo
-// tornerebbe "Bozza" e il riquadro della chat si svuoterebbe → rossi.
+// Ripristinare una versione più vecchia sostituiva il file INTERO: tornava
+// indietro anche il nome del documento, che il pannello non mostra nemmeno. Questi
+// test asseriscono il SUCCESSO del confine giusto: il testo torna a quello della
+// versione, il nome resta quello di adesso, anche dopo un riavvio. Senza il fix il
+// titolo tornerebbe "Bozza" → rossi. La conversazione con Filo dal #1433 è l'Aiuto,
+// fuori dal documento: un ripristino non la raggiunge.
 
 // Rinomina il documento attivo dal menu documenti (matita), come farebbe l'utente.
 async function renameActiveDoc(page, title) {
@@ -309,49 +309,35 @@ test('ripristinare una versione NON riporta indietro il nome del documento', asy
   await expect(page.locator('#docTitle')).toHaveText('Relazione finale');
 });
 
-test('ripristinare una versione NON cancella la conversazione con Filo, nemmeno dopo un riavvio', async ({ openTab }) => {
+test('ripristinare una versione NON riporta indietro il nome del documento, nemmeno dopo un riavvio', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
   await page.evaluate(() => window.__filoEditorVersions.ready());
 
-  // Punto di ripristino salvato QUANDO LA CHAT ERA VUOTA.
+  // Punto di ripristino salvato mentre il documento si chiamava "Bozza".
   await page.click('#doc');
+  await renameActiveDoc(page, 'Bozza');
   await setDocText(page, LUNGO);
   expect(await page.evaluate(() => window.__filoEditorVersions.snapshotManual())).not.toBeNull();
 
-  // L'utente parla con Filo nel riquadro chat del documento (pagina 2 del banco
-  // di lavoro). Senza chiave AI la risposta è un errore: quel che conta è che la
-  // conversazione (domanda + risposta) resti nel documento.
-  await page.locator('.ed-switch-icon').nth(1).click();
-  const chat = page.locator('.ed-module[data-type="chat"]');
-  await chat.locator('[data-chat="input"]').fill('Puoi riassumere il testo?');
-  await chat.locator('[data-chat="send"]').click();
-  await expect(chat.locator('.ed-chat-msg')).toHaveCount(2, { timeout: 30_000 });
-
   // "Chiudi e riapri Filo": lo storico e il documento si rileggono dal disco —
-  // è qui che prima lo snapshot smetteva di condividere i dati col documento
-  // vivo e il ripristino svuotava la chat.
+  // è qui che lo snapshot smette di condividere i dati col documento vivo.
   // NIENTE flush dello storico qui: il punto di ripristino è già stato scritto
-  // quando è stato creato. Ri-scriverlo adesso maschererebbe il bug (salverebbe
-  // uno snapshot 'aggiornato' con la chat di adesso).
+  // quando è stato creato, e riscriverlo adesso maschererebbe il bug.
   await expect(page.locator('#saveState')).toHaveText('', { timeout: 10_000 });
   await page.reload();
   await page.waitForSelector('#doc');
   await page.evaluate(() => window.__filoEditorVersions.ready());
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await expect(page.locator('.ed-module[data-type="chat"] .ed-chat-msg')).toHaveCount(2);
+  await expect(page.locator('#docTitle')).toHaveText('Bozza');
 
-  // Altro testo, poi ripristino della versione più vecchia.
+  // Rinominato e riscritto dopo il riavvio, poi ripristino della versione più vecchia.
+  await renameActiveDoc(page, 'Relazione finale');
   await page.click('#doc');
   await setDocText(page, 'Un testo nuovo di zecca scritto dopo il riavvio.');
   await restoreOldestFromPanel(page);
 
   await expect(page.locator('#doc')).toHaveText(LUNGO);
-  // La conversazione è ancora tutta lì.
-  await page.locator('.ed-switch-icon').nth(1).click();
-  const log = page.locator('.ed-module[data-type="chat"] .ed-chat-msg');
-  await expect(log).toHaveCount(2);
-  await expect(log.first()).toHaveText('Puoi riassumere il testo?');
+  await expect(page.locator('#docTitle')).toHaveText('Relazione finale');
 });
 
 // ── Doppio clic su "Ripristina" (#415) ────────────────────────────────────

@@ -7,7 +7,6 @@ export const EDITOR = 'filo://editor/editor.html';
 
 export const strumento = (page, id) => page.locator(`.pd-elemento[data-elemento="${id}"]`);
 export const pannelloAperto = (page) => page.evaluate(() => document.documentElement.classList.contains('pd-aperto'));
-export const strumentiNelPannello = (page) => page.evaluate(() => [...document.querySelectorAll('.pd-elementi > .pd-elemento')].map((n) => n.dataset.elemento));
 
 // Aperto col tasto resta aperto finché non si clicca fuori: aperto col clic si chiude al primo passaggio del puntatore
 // sul foglio, anche quello di un riquadro che si chiude sotto il cursore fermo.

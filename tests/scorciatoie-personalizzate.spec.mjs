@@ -11,6 +11,7 @@ import { statoDi } from './helpers/riquadri.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { apriImpostazioni, strumentiSalvati } from './helpers/strumentiEditor.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -235,26 +236,24 @@ test('la scorciatoia scelta resta dopo aver chiuso e riaperto Filo', async ({ te
   }
 });
 
-// Verifica #842: la combinazione di un modulo dell'Editor non va a una delle quattro, che la prenderebbero prima del
-// modulo; e i moduli rifiutano il microfono delle chat come le quattro.
-test('una combinazione già data a un modulo dell\'Editor si rifiuta per Traduci, a parole e in Preferenze', async ({ app, openTab }) => {
+// Verifica #842: la combinazione di uno strumento dell'Editor non va a una delle quattro, che la prenderebbero prima
+// dello strumento; e gli strumenti rifiutano il microfono delle chat come le quattro. Gli strumenti stanno nel pannello
+// di destra e le loro scorciatoie nel main (#1433).
+test('una combinazione già data a uno strumento dell\'Editor si rifiuta per Traduci, a parole e in Preferenze', async ({ app, openTab }) => {
   const editor = await openTab('filo://editor/editor.html');
   await expect(editor.locator('#doc')).toBeVisible();
-  await editor.locator('.ed-module[data-type="settings"]').click();
-  await editor.locator('.ed-module[data-type="word-count"]').click();
+  await apriImpostazioni(editor, 'word-count');
   await editor.fill('#cfgShortcut', 'Ctrl+Shift+Spazio');
   await editor.click('#cfgSave');
   await expect(editor.locator('#cfgShortcutTaken')).toContainText('microfono');
   await editor.fill('#cfgShortcut', 'Ctrl+Shift+Y');
   await editor.click('#cfgSave');
   await expect(editor.locator('#overlay')).toBeHidden();
-  await editor.locator('.ed-module[data-type="settings"]').click();
-  await expect(editor.locator('#settingsView')).toBeHidden();
+  await expect.poll(async () => ((await strumentiSalvati(app))?.config?.['word-count'] || {}).shortcut).toBe('Ctrl+Shift+Y');
 
-  // Subito, senza aspettare il salvataggio automatico dell'Editor.
   const r = await chiedi(app, 'Traduci: Ctrl+Shift+Y');
   expect(r.executed).toBe(false);
-  expect(r.output.error).toContain('modulo dell\'Editor');
+  expect(r.output.error).toContain('nel pannello dell\'Editor');
 
   await editor.click('#doc');
   await premi(app, 'Y', ['control', 'shift']);
@@ -265,6 +264,6 @@ test('una combinazione già data a un modulo dell\'Editor si rifiuta per Traduci
   await tastiDellaRiga(pref, 'translate-selection').click();
   await premi(app, 'Y', ['control', 'shift']);
   const errore = pref.locator('#scorciatoieFilo .sc-riga[data-azione="translate-selection"] .sc-errore');
-  await expect(errore).toContainText('modulo dell\'Editor');
+  await expect(errore).toContainText('nel pannello dell\'Editor');
   expect((await scelte(app))['translate-selection'] || '').toBe('');
 });

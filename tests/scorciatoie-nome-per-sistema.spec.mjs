@@ -67,16 +67,21 @@ test('il suggerimento della barra nomina i tasti di CHI legge', async ({ shell }
   expect(tip).toBe(`Nuova scheda (${attesa})`);
 });
 
-test('i pulsanti dell\'Editor nominano i tasti di CHI legge', async ({ openTab }) => {
+test('i pulsanti dell\'Editor nominano i tasti di CHI legge', async ({ app, openTab }) => {
   const page = await openTab('filo://editor/editor.html');
-  await page.waitForSelector('#sidebarToggle');
+  await page.waitForSelector('.pd-striscia', { state: 'attached' });
 
   const regolaCePresente = await page.evaluate(() => typeof window.SN_TASTI?.etichetta === 'function');
   expect(regolaCePresente).toBe(true);
   expect(await page.evaluate(() => window.SN_TASTI.etichetta('Ctrl+B', 'darwin'))).toBe('Cmd+B');
   expect(await page.evaluate(() => window.SN_TASTI.etichetta('Ctrl+\\', 'darwin'))).toBe('Cmd+\\');
 
-  // Il suggerimento della sidebar: c'è ancora, e nomina il tasto giusto.
-  const attesaBarra = await page.evaluate(() => window.SN_TASTI.etichetta('Ctrl+\\'));
-  await expect(page.locator('#sidebarToggle')).toHaveAttribute('title', `Mostra/nascondi sidebar (${attesaBarra})`);
+  // La striscia sul bordo destro, che apre il pannello degli strumenti (#1433): il suggerimento nomina il tasto giusto.
+  const attesaPannello = await page.evaluate(() => window.SN_TASTI.etichetta('Ctrl+\\'));
+  await expect(page.locator('.pd-striscia')).toHaveAttribute('title', `Strumenti (${attesaPannello})`);
+
+  // Il Grassetto, messo nel pannello, dice il suo tasto nello stesso modo.
+  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'PANNELLO_APP', operazione: 'aggiungi', elemento: 'bold' }));
+  const attesaGrassetto = await page.evaluate(() => window.SN_TASTI.etichetta('Ctrl+B'));
+  await expect(page.locator('.pd-elemento[data-elemento="bold"] .ed-fmt-btn')).toHaveAttribute('title', `Grassetto (${attesaGrassetto})`);
 });

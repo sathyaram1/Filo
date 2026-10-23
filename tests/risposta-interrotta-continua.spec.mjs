@@ -1,5 +1,5 @@
-// #1097.3 giro 1 — una risposta fermata a metà si riprende con «Continua» in ogni chat: Editor, Mazzi, Aiuto e home, e
-// la riga che lo dice si legge da nota, non come parole del modello.
+// #1097.3 giro 1 — una risposta fermata a metà si riprende con «Continua» in ogni chat: Mazzi, Aiuto (che dal #1433 è
+// anche la chat dell'Editor) e home, e la riga che lo dice si legge da nota, non come parole del modello.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home } from './helpers/chatFinta.mjs';
@@ -15,7 +15,7 @@ async function prepara(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: {
-        [C.ACTIONS.EDITOR_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash',
+        [C.ACTIONS.HELP]: 'deepseek-flash',
         [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash', [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
@@ -40,9 +40,6 @@ async function prepara(app) {
         return seguito ? fatto(JSON.stringify({ reply: 'e qualche rampa in più.' }))
           : fatto('{"reply": "Per questo mazzo servono più pescate', 'length');
       }
-      if (sistema.includes('assistente di scrittura dentro un editor')) {
-        return seguito ? fatto('e il resto resta com\'è.') : fatto('Il capitolo sui licheni va accorciato', 'length');
-      }
       return fatto('{}');
     };
     P.completeWithFallback = async (o) => risposta(o);
@@ -53,26 +50,6 @@ async function prepara(app) {
     };
   });
 }
-
-test('Editor: la risposta interrotta lo dice da nota, e «Continua» chiede il seguito', async ({ app, openTab }) => {
-  test.setTimeout(90_000);
-  await prepara(app);
-  const editor = await openTab('filo://editor/editor.html');
-  await editor.waitForSelector('#doc');
-  await editor.locator('.ed-switch-icon').nth(1).click();
-  const chat = editor.locator('.ed-module[data-type="chat"]');
-  await chat.locator('[data-chat="input"]').fill('Cosa ne pensi del capitolo sui licheni?');
-  await chat.locator('[data-chat="send"]').click();
-  await expect(chat.locator('.ed-chat-msg.assistant')).toHaveText('Il capitolo sui licheni va accorciato', { timeout: 10_000 });
-  await expect(chat.locator('.ed-chat-note')).toHaveText('La risposta si è interrotta qui: ha raggiunto la lunghezza massima.');
-  const continua = chat.locator('.ed-chat-continua');
-  await expect(continua).toHaveText('Continua');
-  mkdirSync(SHOTS, { recursive: true });
-  await chat.screenshot({ path: `${SHOTS}/1097-editor-continua.png` });
-  await continua.click();
-  await expect(chat.locator('.ed-chat-msg.assistant').last()).toHaveText('e il resto resta com\'è.', { timeout: 10_000 });
-  await expect(chat.locator('.ed-chat-continua')).toHaveCount(0);
-});
 
 test('Mazzi: la risposta interrotta lo dice da nota, e «Continua» chiede il seguito', async ({ app, openTab }) => {
   test.setTimeout(90_000);
