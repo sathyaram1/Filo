@@ -54,6 +54,27 @@ test('tasto destro nel riquadro dello stesso sito arrivato dopo la pagina: compa
   }
 });
 
+// #775.2 — stessa causa, l'altra porta: il riquadro senza preload non riceveva Alt+E. Selezione col mouse e tasto vero.
+test('Alt+E sul testo selezionato nel riquadro dello stesso sito arrivato dopo la pagina: la spiegazione si apre lì', async ({ app, openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await apriConRiquadriInRitardo(openTab, sito, 1);
+    const frame = page.frames().find((f) => f.url().includes('/riquadro'));
+    await page.frameLocator('#embed').locator('#inner-text').click({ clickCount: 3 });
+    expect(await frame.evaluate(() => String(getSelection()).trim())).toContain('Testo dentro il riquadro');
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+      for (const type of ['keyDown', 'keyUp']) wc.sendInputEvent({ type, keyCode: 'E', modifiers: ['alt'] });
+    });
+    await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo, { timeout: 8000 })
+      .toBe('Approfondimento');
+    expect(await conta(app, page, '.sn-popup')).toBe(0);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
 // Gli altri pezzi di Filo che toccano i riquadri: il puntatore che si muove sulla pagina, una pubblicità bloccata.
 const toccatiMentreArriva = {
   'il puntatore si muove sulla pagina mentre il riquadro arriva: il tasto destro lì dentro apre il menu di Filo':
