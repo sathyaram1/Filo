@@ -1,6 +1,6 @@
-// Il dizionario con cui il correttore sa quali parole non conosce (#1446, #1585): Hunspell in WebAssembly sulle stesse
-// sorgenti in Windows, Mac e Linux. Quello del browser no: dove il sistema ha la lingua, la controlla il sistema e la
-// pagina non la vede (ogni parola «giusta»). Non sceglie le lingue (spellLanguages.js). Regole: tests/unit/dizionarioDiFilo.test.mjs.
+// Il dizionario con cui il correttore sa quali parole non conosce (#1585): Hunspell in WebAssembly, sulle stesse sorgenti
+// in Windows, Mac e Linux. Non sceglie le lingue (spellLanguages.js) e non disegna segni. Perché non quello del browser:
+// patterns/il-dizionario-del-correttore-e-di-filo.md; regole: tests/unit/dizionarioDiFilo.test.mjs.
 
 'use strict';
 

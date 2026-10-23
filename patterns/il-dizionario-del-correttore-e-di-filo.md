@@ -1,4 +1,4 @@
-# Il dizionario del correttore è di Filo, non del browser
+# Il dizionario del correttore è di Filo
 
 [← Tutti i pattern](../PATTERNS.md)
 
