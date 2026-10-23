@@ -5236,6 +5236,18 @@
     box.append(fila, esito);
     return box;
   }
+  function tastoStrada(fb, s) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
+    b.id = s.id;
+    b.dataset.strada = s.key;
+    b.textContent = s.label;
+    b.title = titoloStrada(fb, s.key);
+    b.disabled = azioniInVolo;
+    b.addEventListener('click', () => applyAction(s.azione, null));
+    return b;
+  }
 
   // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
   // pratiche vecchie, ferme prima che l'audit lasciasse traccia: lì il segno è
