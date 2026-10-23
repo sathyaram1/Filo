@@ -69,7 +69,7 @@ test('alla riapertura le schede chiuse si contano nell’avviso', async () => {
     () => tm.runAutoTriage({ trigger: 'reopen' }));
   assert.equal(esito.archived, 1);
   assert.deepEqual(ordine(tm), ['rosso', 'blu']);
-  assert.deepEqual(tm.avvisi, ['Schede riordinate: 1 chiusa, restano nel filo della home']);
+  assert.deepEqual(tm.avvisi, ['Schede riordinate, 1 chiusa. La ritrovi nel filo della home']);
 });
 
 test('alla riapertura, con la barra già in ordine, l’avviso dice che il giro c’è stato', async () => {
