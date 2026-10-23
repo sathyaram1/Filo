@@ -71,6 +71,123 @@ test('alla riapertura le schede vengono riordinate per colore anche senza archiv
     return s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || '')).map((t) => t.title);
   });
   expect(after).toEqual(expectedOrder);
+  // E lo dice (#349): senza avviso «ho guardato e tenuto tutto» e «non sono partito» erano uguali.
+  await expect.poll(() => avviso(shell), { timeout: 6_000 }).toBe('Schede riordinate, nessuna da chiudere');
+});
+
+const avviso = (shell) => shell.evaluate(() => {
+  const el = document.querySelector('.shell-notif.show .shell-notif-msg');
+  return el ? el.textContent : '';
+});
+
+// Un modello finto che fa quello che chiede il prompt della riapertura: archivia le schede non toccate da ore.
+// Registra il prompt, così si vede cosa Filo gli ha detto delle schede riaperte.
+async function modelloCheArchiviaLeVecchie(app, risposta = null) {
+  await app.evaluate(async ({}, risposta) => {
+    const T = globalThis.SN_TEST_MODELS;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'test-key', tavily: '' },
+      models: { ...T.models },
+      modelRegistry: { ...T.registry },
+      autoArchive: { enabled: true, onClose: true, onIdle: false, idleHours: 6 },
+    });
+    globalThis.__promptRiordino = [];
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [0.5, 0.2, 0.9, 0.1]) });
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      const sistema = String((messages[0] && messages[0].content) || '');
+      const utente = messages.slice(1).map((m) => String(m.content || '')).join('\n');
+      const fine = (text) => ({ text, provider: attempts[0].provider, model: attempts[0].model, usage: {} });
+      if (/METADATI/.test(sistema + utente)) return fine('{"suspicious":false,"reason":null,"confidence":"low"}');
+      if (!/gestore delle schede/.test(sistema)) return fine('ok');
+      globalThis.__promptRiordino.push({ sistema, utente });
+      if (risposta != null) return fine(risposta);
+      const decisions = [];
+      for (const riga of utente.split('\n')) {
+        const m = /^#(\d+)\s/.exec(riga);
+        if (!m) continue;
+        const inattiva = /inattiva da (\d+)min/.exec(riga);
+        decisions.push({ i: Number(m[1]), action: inattiva && Number(inattiva[1]) >= 600 ? 'archive' : 'keep', reason: 'test' });
+      }
+      return fine(JSON.stringify({ decisions }));
+    };
+  }, risposta);
+}
+
+const pagina = (titolo, colore, testo) => `<!doctype html><html><head><title>${titolo}</title>`
+  + `<meta name="theme-color" content="${colore}"></head><body><h1>${titolo}</h1><p>${testo}</p></body></html>`;
+
+test.describe('la riapertura vera', () => {
+  // Un sito per scheda: il colore identità si ricorda per sito, e quattro pagine dello stesso host ne avrebbero uno.
+  test.use({ hostInPiu: ['blu.test', 'vecchia.test', 'verde.test', 'rosso.test'] });
+
+  test('riaprendo Filo la scheda lasciata da giorni va nel filo della home, le altre si riordinano, e l’avviso lo dice (#349)', async ({ app, shell, testServer }) => {
+    await modelloCheArchiviaLeVecchie(app);
+    const su = (host, html) => testServer.html(html).replace('127.0.0.1', host);
+    const schede = [
+      { titolo: 'Blu', url: su('blu.test', pagina('Blu', 'rgb(40,80,200)', 'Il documento su cui lavoro')), colore: 'rgb(40, 80, 200)', usata: 2 },
+      { titolo: 'Vecchia', url: su('vecchia.test', pagina('Vecchia', 'rgb(230,200,40)', 'Le notizie di tre giorni fa')), colore: 'rgb(230, 200, 40)', usata: 3 * 24 * 60 },
+      { titolo: 'Verde', url: su('verde.test', pagina('Verde', 'rgb(40,200,80)', 'Una chat aperta')), colore: 'rgb(40, 200, 80)', usata: 5 },
+      // Senza colore salvato: il riordino deve aspettare quello che dice la pagina.
+      { titolo: 'Rosso', url: su('rosso.test', pagina('Rosso', 'rgb(200,40,40)', 'Una pagina di lavoro')), colore: null, usata: 8 },
+    ];
+    const ora = Date.now();
+    await app.evaluate(async ({ BrowserWindow }, { schede, ora }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), {
+        tabs: schede.map((s) => s.url),
+        colors: schede.map((s) => s.colore),
+        aperte: schede.map(() => new Date(ora - 4 * 24 * 3600 * 1000).toISOString()),
+        usate: schede.map((s) => new Date(ora - s.usata * 60 * 1000).toISOString()),
+        activeIndex: 0,
+      });
+      await tm.restoreSession();
+    }, { schede, ora });
+
+    await expect.poll(() => avviso(shell), { timeout: 40_000 }).toBe('Schede riordinate: 1 chiusa, restano nel filo della home');
+
+    // Il modello ha saputo che è una riapertura e da quanto ogni scheda non si usa: senza, ogni scheda riaperta
+    // risultava «inattiva da 0min» (il primo segnale della pagina contava come uso) e la teneva.
+    const [chiesto] = await app.evaluate(() => globalThis.__promptRiordino);
+    expect(chiesto.sistema).toContain('RIAPERTURA');
+    const riga = (titolo) => chiesto.utente.split('\n').find((r) => r.includes(`"${titolo}"`)) || '';
+    const inattiva = (titolo) => Number((/inattiva da (\d+)min/.exec(riga(titolo)) || [])[1]);
+    expect(inattiva('Vecchia')).toBeGreaterThanOrEqual(3 * 24 * 60 - 2);
+    expect(inattiva('Verde')).toBeLessThan(60);
+    expect(inattiva('Rosso')).toBeLessThan(60);
+
+    const dopo = await shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      return s.tabs.filter((t) => /\.test:/.test(t.url || '')).map((t) => ({ title: t.title, identityColor: t.identityColor }));
+    });
+    expect(dopo.map((t) => t.title)).not.toContain('Vecchia');
+    const archiviate = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title));
+    expect(archiviate).toContain('Vecchia');
+    // Ordinate per tinta coi colori veri, quello di Rosso compreso; lo scenario non è già in ordine.
+    expect(dopo.find((t) => t.title === 'Rosso').identityColor).toBeTruthy();
+    const atteso = [...dopo].sort((a, b) => TC.compareRainbow(a.identityColor, b.identityColor)).map((t) => t.title);
+    expect(atteso).toEqual(['Rosso', 'Verde', 'Blu']);
+    expect(dopo.map((t) => t.title)).toEqual(atteso);
+
+    const vista = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
+    mkdirSync(SHOTS, { recursive: true });
+    await (vista || shell).screenshot({ path: join(SHOTS, 'riordino-riapertura-avviso.png') });
+  });
+
+  test('una risposta del modello che non si legge riordina lo stesso e lo dice, invece di sembrare un «tieni tutto» (#349)', async ({ app, shell, testServer }) => {
+    await modelloCheArchiviaLeVecchie(app, 'Non saprei proprio.');
+    const su = (host, html) => testServer.html(html).replace('127.0.0.1', host);
+    await app.evaluate(async ({ BrowserWindow }, urls) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), { tabs: urls, colors: ['rgb(40, 80, 200)', 'rgb(200, 40, 40)'], activeIndex: 0 });
+      await tm.restoreSession();
+    }, [su('blu.test', pagina('Blu', 'rgb(40,80,200)', 'uno')), su('rosso.test', pagina('Rosso', 'rgb(200,40,40)', 'due'))]);
+
+    await expect.poll(() => avviso(shell), { timeout: 40_000 }).toBe('Schede riordinate, ma non sono riuscito a valutare quali chiudere');
+    const titoli = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
+      .filter((t) => /\.test:/.test(t.url || '')).map((t) => t.title));
+    expect(titoli).toEqual(['Rosso', 'Blu']);
+  });
 });
 
 test('la sessione salva e ripristina il colore identità delle schede', async ({ app, shell, openTab, testServer }) => {
