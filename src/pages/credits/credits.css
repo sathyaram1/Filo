@@ -238,6 +238,25 @@
 .sn-wallet-table .sn-wallet-pseudonym { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: pointer; }
 .sn-wallet-table .is-flagged { color: var(--sn-danger, #c45a3b); font-weight: 600; }
 .sn-wallet-table tr.is-used td { opacity: .55; }
+/* Chi è entrato coi codici di una persona sta sotto di lei (#1519): un rientro per livello, legato da un filo
+   nel colore d'accento, come un ramo. */
+.sn-wallet-table tr.is-invitato > td:first-child { position: relative; padding-left: calc(10px + var(--livello, 1) * 18px); }
+.sn-wallet-table tr.is-invitato > td:first-child::before {
+  content: ''; position: absolute; pointer-events: none;
+  left: calc(var(--livello, 1) * 18px - 6px); top: -1px; height: 55%; width: 10px;
+  border-left: 1.5px solid rgba(var(--sn-accent-rgb), .45); border-bottom: 1.5px solid rgba(var(--sn-accent-rgb), .45);
+  border-bottom-left-radius: 6px;
+}
+/* Il numero di chi ha fatto entrare apre le persone contate: si capisce dal colore e dal fondo al passaggio. */
+.sn-wallet-invitati-btn {
+  font: inherit; color: var(--sn-accent); background: none; border: 0; cursor: pointer;
+  padding: 2px 6px; margin: -2px -6px; border-radius: 6px;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, box-shadow calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-wallet-invitati-btn:hover { background: rgba(var(--sn-accent-rgb), 0.12); }
+.sn-wallet-invitati-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-wallet-invitati-btn:active { transform: scale(.98); }
+.sn-wallet-invitati-btn.is-attivo { background: rgba(var(--sn-accent-rgb), 0.18); font-weight: 600; }
 #reissueBtn { margin-top: 8px; }
 
 /* L attributo hidden vince sul display delle sezioni flex/grid. */
