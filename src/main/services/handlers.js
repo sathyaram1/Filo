@@ -961,7 +961,11 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
       // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
       const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
       if (l.rifiuto) { scartate += 1; console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (l.testo) { await FiloMem.appendLesson(l.testo, { fonti }); scritte += 1; }
+      if (!l.testo) continue;
+      // Una lezione che ripete una riga tolta dalla persona non si scrive (#872): per i contatori è scartata.
+      const buf = await FiloMem.appendLesson(l.testo, { fonti });
+      const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+      if (ultima && ultima.text === l.testo) scritte += 1; else scartate += 1;
     }
     contaLezione({ scritte, scartate });
     if (await FiloMem.lessonsBufferShouldCompact()) {
