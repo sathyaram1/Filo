@@ -6,12 +6,12 @@
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { IMMAGINE_IN_LINEA: IN_LINEA } = require('./services/storiaAiuto');
 
 const MIME = Object.freeze({
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
   '.bmp': 'image/bmp', '.avif': 'image/avif', '.svg': 'image/svg+xml',
 });
-const IN_LINEA = /^data:image\/[a-z0-9.+-]+;base64,/i;
 const CASA = /^filo:\/\/(newtab|dashboard)\b/i;
 
 const tetto = () => globalThis.SN_CONST?.ALLEGATI_CHAT?.tettoImmagineByte || 4 * 1024 * 1024;
