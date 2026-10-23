@@ -23,7 +23,7 @@ const TEMPO_ESTRAZIONE_MS = 20000;
 // una pagina enorme su una macchina lenta tiene occupata la scheda per decine di secondi, e scaduta non arriva niente.
 const TEMPO_SCHEDA_MS = 6000;
 const SCADENZA_SCHEDA_MS = 30000;
-const tempi = { scheda: TEMPO_SCHEDA_MS };
+const tempi = { scheda: TEMPO_SCHEDA_MS, scadenzaScheda: SCADENZA_SCHEDA_MS };
 // Quello che Filo ha letto dove l'utente ha fatto l'accesso (la sua scheda, un documento, un comando), per il freno.
 const RISERVATE_TTL_MS = 60 * 60 * 1000;
 const RISERVATE_MAX = 20;
