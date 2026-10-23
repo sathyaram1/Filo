@@ -170,6 +170,10 @@
   // quella risposta non si ricorda, se no una parola sbagliata scritta nel primo secondo resterebbe giusta per sempre.
   const parereDizionario = new Map();
   let dizionarioPronto = false;
+  function ricorda(k, v) {
+    if (parereDizionario.size >= DIZIONARIO_MAX) parereDizionario.clear();
+    parereDizionario.set(k, v);
+  }
   function sbagliataPerIlBrowser(parola) {
     const D = global.SN_DIZIONARIO;
     if (!D) return false;
@@ -177,10 +181,35 @@
     if (parereDizionario.has(k)) return parereDizionario.get(k);
     if (!dizionarioPronto) dizionarioPronto = D.sbagliata('qzxwvkjh');
     const v = D.sbagliata(k);
-    if (!dizionarioPronto) return v;
-    if (parereDizionario.size >= DIZIONARIO_MAX) parereDizionario.clear();
-    parereDizionario.set(k, v);
+    if (dizionarioPronto) ricorda(k, v);
     return v;
+  }
+
+  // Le parole nuove di un testo si chiedono insieme: il dizionario sta nel processo principale, e una domanda per parola
+  // costerebbe un viaggio ciascuna (#1585). I pareri valgono per questo testo anche oltre il tetto della memoria.
+  const PARERI_PER_DOMANDA = 5000;
+  function pareriDelTesto(testo) {
+    const D = global.SN_DIZIONARIO;
+    const pareri = new Map();
+    if (!D || typeof D.sbagliate !== 'function') return pareri;
+    const nuove = [];
+    for (const { parola } of R().parole(testo)) {
+      const k = parola.replace(/’/g, "'");
+      if (pareri.has(k)) continue;
+      if (parereDizionario.has(k)) pareri.set(k, parereDizionario.get(k));
+      else { pareri.set(k, false); nuove.push(k); }
+    }
+    if (!nuove.length) return pareri;
+    if (!dizionarioPronto) dizionarioPronto = D.sbagliata('qzxwvkjh');
+    for (let i = 0; i < nuove.length; i += PARERI_PER_DOMANDA) {
+      const pezzo = nuove.slice(i, i + PARERI_PER_DOMANDA);
+      const v = D.sbagliate(pezzo);
+      pezzo.forEach((k, j) => {
+        pareri.set(k, v[j] === true);
+        if (dizionarioPronto) ricorda(k, v[j] === true);
+      });
+    }
+    return pareri;
   }
 
   function proposteDelBrowser(parola) {
@@ -895,11 +924,12 @@
     const d = testoDaControllare(state.el);
     const Rg = R();
     if (!Rg) { state.codice = []; return false; }
-    const errori = erroriAttivi() ? Rg.senzaSovrapposti([
+    const pareri = erroriAttivi() ? pareriDelTesto(d.testo) : null;
+    const errori = pareri ? Rg.senzaSovrapposti([
       ...Rg.erroriFissi(d.testo),
       ...(ripetizioniAttive() ? Rg.ripetizioni(d.testo) : []),
       ...Rg.candidatiDizionario(d.testo, {
-        sbagliata: sbagliataPerIlBrowser,
+        sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]) : [];

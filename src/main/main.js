@@ -68,6 +68,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
     globalThis.__filoDizionari = require('./services/dizionari');
+    globalThis.__filoDizionarioDiFilo = require('./services/dizionarioDiFilo');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
@@ -194,6 +195,7 @@ app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();
+  try { require('./services/dizionarioDiFilo').prepara({ locale: app.getLocale(), dopoMs: 1500 }); } catch (_) {}
   // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
 
