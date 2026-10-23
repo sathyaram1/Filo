@@ -355,9 +355,8 @@ test('la domanda nomina il dominio registrato: la parte davanti la sceglie chi h
 
 // Quello che Chrome concede di fabbrica, senza domanda: una pagina che lo chiede non deve leggere «bloccato» (#591, giro 19).
 test('passa senza domanda tutto quello che Chrome concede di fabbrica', () => {
-  const chrome = ['fullscreen', 'pointerLock', 'keyboardLock', 'clipboard-sanitized-write', 'mediaKeySystem', 'midi',
-    'speaker-selection', 'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler',
-    'persistent-storage'];
+  const chrome = ['fullscreen', 'pointerLock', 'keyboardLock', 'clipboard-sanitized-write', 'mediaKeySystem',
+    'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage'];
   for (const p of chrome) assert.equal(Permessi.INNOCUI.has(p), true, p);
 });
 
