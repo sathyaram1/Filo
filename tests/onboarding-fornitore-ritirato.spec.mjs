@@ -158,6 +158,23 @@ test.describe('con la home già pronta per la scheda nuova', () => {
   });
 });
 
+// La pagina si prende dalla scheda aperta, non per indirizzo: per indirizzo si trovava anche la home della prima
+// scheda, e la prova passava senza guardare quella nuova (#830.4). «newtab.html» è come si scrivono le altre pagine.
+for (const indirizzo of ['filo://newtab/', 'filo://newtab/newtab.html']) {
+  test(`lo stesso vale aprendo una scheda nuova su ${indirizzo}, senza ricaricare niente`, async ({ app, shell, openTab }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await configCondivisa(app, { provider: 'gemini' });
+    await stubProviders(app);
+    const page = await openTab(indirizzo);
+    await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
+
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await expect(page.locator('.dash-bubble-filo').first())
+      .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+  });
+}
+
 test('arrivati i crediti, l’accoglienza parte sulla home già aperta', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
