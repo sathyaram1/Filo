@@ -1,11 +1,12 @@
-// Dove sta ogni icona globale: riga del tasto destro, «Altro…» o barra laterale (#871).
-// Solo dati e funzioni pure: la scrive il main (una porta sola), la leggono menu e barra.
+// Dove sta ogni icona: nella barra laterale o nel suo «Altro…» (#871, #1246: la riga del tasto destro non c'è più).
+// Solo dati e funzioni pure: la scrive il main (una porta sola), la legge la barra.
 // Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 (function (global) {
   'use strict';
 
-  const ZONE = Object.freeze(['primary', 'secondary', 'bar']);
+  // `primary` (la riga del tasto destro) vive solo nei salvati di prima: migra() la versa nella barra.
+  const ZONE = Object.freeze(['bar', 'secondary']);
 
   // Della finestra e del sistema, non dell'elemento: stanno nella barra, non in «Altro…».
   const GLOBALI = Object.freeze(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
