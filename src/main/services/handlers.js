@@ -19,6 +19,7 @@ const ConversazioniApp = require('./conversazioniApp');
 const FiloParla = require('./filoParla');
 const Schermo = require('./schermo').crea();
 const SempreAperte = require('./sempreAperte');
+const ChiudiSchede = require('./chiudiSchede');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
