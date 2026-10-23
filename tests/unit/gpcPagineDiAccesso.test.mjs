@@ -18,6 +18,8 @@ test('le pagine di accesso dei provider noti restano senza GPC', () => {
     'https://accounts.google.com/signin/v2/identifier', 'https://accounts.google.com/',
     'https://login.microsoftonline.com/common/oauth2/authorize', 'https://appleid.apple.com/auth/authorize',
     'https://github.com/login', 'https://github.com/login/oauth/authorize?client_id=1', 'https://filo.eu.auth0.com/authorize',
+    // Con una porta esplicita l'host resta lo stesso: così le prove servono un host di accesso dal loopback.
+    'http://login.live.com:8080/login', 'https://accounts.google.com:8443/',
   ]) assert.equal(Cookies.senzaGpc(u), true, u);
 });
 
