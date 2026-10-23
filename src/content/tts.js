@@ -559,7 +559,8 @@
       // Dove il cursore si trova ADESSO: mentre si detta si può continuare a scrivere o spostarsi nel campo.
       suFrase: (text) => deps.insertDictatedText(text + ' '),
       suStato: (st) => { if (st === 'trascrive') label.textContent = I18n.t('menu_dictate_transcribing'); },
-      suFine: chiudi,
+      // Nel campo di una pagina il testo resta dov'è: non c'è un invio da contare.
+      suFine: (esito) => { chiudi(); global.SN_ASCOLTO.contaSessione(esito, 'nessuno'); },
     });
     if (!sessione) { chiudi(); return; }
     state.sessione = sessione;
