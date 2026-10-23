@@ -4325,12 +4325,13 @@ function pageReadsForPrompt(actions) {
     const out = a._output;
     if (!out || !('pageRead' in out)) continue;
     const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.url || out.pageRead || ''), 500));
+    // Il consiglio di aprirla in una scheda non vale per la scheda che c'era e non ha risposto.
+    const schedaMuta = (ripiego) => `[Pagina "${indirizzo}" non letta: la scheda aperta non ha risposto in tempo (forse è `
+      + `troppo grande, o è ancora occupata) e ${ripiego}. Puoi riprovare una volta; se non basta dillo all'utente, senza `
+      + 'inventare il contenuto e senza concludere che la pagina non ha il dato.]';
     if (!out.ok) {
       const dettaglio = E.perCanaleSistema(out.dettaglio || 'lettura non riuscita');
-      blocks.push(out.schedaNonRisponde
-        ? `[Pagina "${indirizzo}" non letta: la scheda aperta non ha risposto in tempo (forse è troppo grande, o è ancora `
-          + `occupata) e scaricarla non è riuscito (${dettaglio}). Puoi riprovare una volta; se non basta dillo all'utente, `
-          + 'senza inventare il contenuto e senza concludere che la pagina non ha il dato.]'
+      blocks.push(out.schedaNonRisponde ? schedaMuta(`scaricarla a parte non è riuscito (${dettaglio})`)
         : `[Pagina "${indirizzo}" non letta: ${dettaglio}. ${consiglioPaginaNonLetta(out)}]`);
       continue;
     }
