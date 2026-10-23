@@ -2009,7 +2009,7 @@
         if (im && /^data:image\//i.test(String(im.dataUrl || ''))) addPendingImage(im.dataUrl, typeof im.percorso === 'string' ? im.percorso : '');
       }
       for (const p of Array.isArray(msg.file) ? msg.file : []) if (typeof p === 'string') addPendingFile(p);
-      for (let i = 0; i < Math.min(Number(msg.grandi) || 0, 1000); i++) avvisaTroppoGrandi();
+      if (Number(msg.grandi) > 0) avvisaTroppoGrandi(Math.floor(Number(msg.grandi)));
       inputEl.focus();
     } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
