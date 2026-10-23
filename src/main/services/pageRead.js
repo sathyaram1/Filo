@@ -606,7 +606,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
             ricordaLetturaRiservata(letto.testo, letto.url);
           } else schedaVuota = letto;
         }
-      } catch (_) { esito = null; }
+      } catch (_) { esito = null; schedaNonRisponde = true; }
     }
   }
   if (!esito) {
