@@ -1071,6 +1071,30 @@
     return { ok: true, motivo: '' };
   }
 
+  function validaChiamate(doc) {
+    const no = (motivo) => ({ ok: false, motivo });
+    if (!oggetto(doc)) return no('non è un documento');
+    const chiavi = Object.keys(doc);
+    if (chiavi.length !== CAMPI_CHIAMATE.length || !CAMPI_CHIAMATE.every((k) => has(doc, k))) return no(`campi: ${chiavi.join(',')}`);
+    if (doc.v !== VERSIONE_CHIAMATE) return no('versione');
+    const base = validaTesta(doc);
+    if (base) return no(base);
+    if (!ORA_RE.test(String(doc.ora))) return no('ora');
+    const ammesse = funzioni();
+    for (const c of MISURE_CHIAMATE) {
+      const [forma, tetto] = c === 'chiamate' ? [CHIAMATE_RE, TETTO_CARATTERI_CHIAMATE] : [MODELLI_RE[c], TETTI_CARATTERI_MODELLI[c]];
+      if (!oggetto(doc[c])) return no(c);
+      for (const [f, v] of Object.entries(doc[c])) {
+        if (!ammesse.includes(f)) return no(`${c}: funzione ${f}`);
+        if (typeof v !== 'string' || v.length > tetto || !forma.test(v)) return no(`${c} di ${f}`);
+      }
+      if (c === 'chiamate') continue;
+      const tutte = Object.values(doc[c]).flatMap((v) => leggiModelli(c, v));
+      if (tutte.filter((x) => x.modello !== ALTRO).length > TETTO_MODELLI_ORA) return no(`${c}: voci oltre il tetto`);
+    }
+    return { ok: true, motivo: '' };
+  }
+
   function validaTesta(doc) {
     if (!PSEUDONIMO_RE.test(String(doc.pseudonimo))) return 'pseudonimo';
     if (!GIORNO_RE.test(String(doc.giorno)) || doc.mese !== meseDi(doc.giorno)) return 'giorno';
