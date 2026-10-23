@@ -117,7 +117,7 @@
     const chiudi = () => { if (da >= 0) out.push(intera.slice(da, a)); da = -1; };
     for (const m of intera.matchAll(/[^\s,;]+/g)) {
       if (daScritto(m[0])) { chiudi(); out.push(m[0]); continue; }
-      if (salta && salta.has(m[0].toLowerCase())) continue;
+      if (salta && salta.has(m[0].toLowerCase())) { chiudi(); continue; }
       if (da < 0) da = m.index;
       a = m.index + m[0].length;
     }
