@@ -157,3 +157,29 @@ export function allineaPacchetti(radice, {
     if (blocco) { try { rmSync(blocco, { force: true }); } catch (_) { /* lo toglie il tetto */ } }
   }
 }
+
+/**
+ * Prima delle prove: si allinea la cartella che POSSIEDE il node_modules da cui Node risolve (anche attraverso un
+ * collegamento), mai un'installazione intera in un worktree o nella cartella di prova di finish. Non lancia mai.
+ */
+export function allineaPerLeProve(radice, { allinea = allineaPacchetti, log = console.log, prefisso = '[pacchetti]', opzioni } = {}) {
+  try {
+    if (!pacchettiDaInstallare(radice, opzioni).length) return { esito: 'allineati', mancanti: [] };
+    const base = baseDeiPacchetti(radice);
+    if (!base) {
+      log(`${prefisso} node_modules manca: lancia npm install.`);
+      return { esito: 'non riuscita', mancanti: pacchettiDaInstallare(radice, opzioni) };
+    }
+    const proprietario = dirname(realpathSync(join(base, 'node_modules')));
+    const r = allinea(proprietario, { log, prefisso, opzioni }) || {};
+    const restano = pacchettiDaInstallare(radice, opzioni);
+    if (!restano.length) return { esito: r.esito === 'allineati' ? 'allineati' : 'installati', mancanti: [] };
+    if (resolve(proprietario) !== resolve(radice) && r.esito !== 'rimandati') {
+      log(`${prefisso} Mancano ancora ${descrivi(restano)}: li chiede il lock di questo ramo, non quello di ${proprietario}, da cui arrivano i pacchetti. Installali lì a mano, o dagli un node_modules suo.`);
+    }
+    return { esito: r.esito === 'rimandati' ? 'rimandati' : 'non riuscita', mancanti: restano };
+  } catch (e) {
+    log(`${prefisso} Controllo dei pacchetti saltato: ${e && e.message ? e.message : e}.`);
+    return { esito: 'non riuscita', mancanti: [] };
+  }
+}
