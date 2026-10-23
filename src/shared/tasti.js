@@ -457,6 +457,9 @@
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
     lista.push([etichettaSchermoIntero(esplicita), 'mette e toglie lo schermo intero']);
+    // Fuori da `etichetta`: è Control anche su Mac, e lì diventerebbe Cmd+Tab.
+    lista.push([ACCEL_SCHEDA_SUCCESSIVA, 'passa alla scheda successiva'], [ACCEL_SCHEDA_PRECEDENTE, 'passa alla scheda precedente'],
+      ...ALTRI_TASTI_SCHEDA_ACCANTO.map(([a, v]) => [a, `passa alla scheda ${v > 0 ? 'successiva' : 'precedente'}`]));
     if (!senzaFilo) {
       for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
