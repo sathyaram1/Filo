@@ -1,9 +1,11 @@
 // I pacchetti che package-lock.json chiede e node_modules non ha: chi avvia Filo dai sorgenti li installa prima della
 // finestra (#1572), mai fermando l'avvio e mai sostituendo un Electron acceso. Sentinella: tests/unit/pacchetti.test.mjs.
 
-import { closeSync, existsSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
 
 export const PERCORSO_ELECTRON = 'node_modules/electron';
 // Un'installazione da zero su una linea lenta sta sotto i cinque minuti; il tetto serve solo a non restare appesi.
