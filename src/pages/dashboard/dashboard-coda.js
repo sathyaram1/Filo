@@ -175,7 +175,7 @@
   async function riapri(p) {
     const dove = global.SN_FILO_CODA.daAprire(p);
     if (!dove) return;
-    const riaperta = p.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
+    const riaperta = p.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
     if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
   }
 
