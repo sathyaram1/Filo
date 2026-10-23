@@ -25,10 +25,11 @@ function daFilo(origin, sender) {
 }
 
 // Un sito, o un content script che lui guida, apre una pagina di Filo solo col clic dell'utente, come quello sul menu
-// di Filo che la pagina non può fingere (#1506).
+// di Filo che la pagina non può fingere (#1506). Il clic vale anche dopo una risposta del server (l'invio del Red-team).
+const GESTO_PER_FILO_MS = 30000;
 function filoNegatoAllaPagina(url, sender, origin) {
   if (daFilo(origin, sender) || !navigazioneVersoFilo(url)) return false;
-  return !require('../permessiPagine').gestoDellUtente(sender && sender.wc);
+  return !require('../permessiPagine').gestoDellUtente(sender && sender.wc, GESTO_PER_FILO_MS);
 }
 
 function soloFilo(handler) {
