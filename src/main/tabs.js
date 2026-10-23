@@ -2100,6 +2100,12 @@ class TabManager {
           return true;
         }
       }
+      // Ctrl+Tab e Ctrl+Shift+Tab (#590.14). Un'azione di Filo che l'utente ci aveva messo prima resta sua.
+      const vicina = globalThis.SN_TASTI.azioneFiloDaTasto(input) ? null : indiceSchedaVicina(input, this.tabs.indexOf(tab), this.tabs.length);
+      if (vicina != null) {
+        if (this.tabs[vicina] && this.tabs[vicina] !== tab) this.activate(this.tabs[vicina].id);
+        return true;
+      }
     }
     // Indietro e avanti (#685). Qui, nel main, e non nel content script:
     // `before-input-event` arriva PRIMA che il documento veda il tasto, così
