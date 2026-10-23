@@ -5288,7 +5288,7 @@
   function firmaSalta(fb) {
     const n = MR.normalizeStatus(fb);
     const l4 = (fb && fb.livelli && fb.livelli.l4) || {};
-    return `${n.status}|${n.statusReason || ''}|${l4.esito || ''}|${l4.at || ''}`;
+    return JSON.stringify([n.status, n.statusReason || '', l4.esito || '', l4.at || '']);
   }
 
   function pannelloSaltaAudit(fb) {
