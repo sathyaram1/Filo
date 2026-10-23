@@ -691,11 +691,11 @@ function crea(dip = {}) {
 
   // Le chiamate ai modelli (#1464) e le attività (#1467) di un'ora, se ne ha: un documento che non passa la validazione
   // non ferma l'ora.
-  function documentoAccanto(k, d, vuoto, valida) {
+  function documentoAccanto(k, nome, d, vuoto, valida) {
     if (vuoto(d)) return null;
     const v = valida(d);
     if (v.ok) return d;
-    log(`${d.v && d.contesto ? 'le chiamate' : 'i documenti accanto'} di ${k} non partono: ${v.motivo}`);
+    log(`${nome} di ${k} non partono: ${v.motivo}`);
     return null;
   }
 
