@@ -197,7 +197,8 @@ for (const [nome, rifiuto, frase] of [
     await scrivi(page, 'che ore sono a Tokyo?');
     const bolla = page.locator('.dash-bubble-filo', { hasText: frase });
     await expect(bolla).toBeVisible({ timeout: 15_000 });
-    await expect(bolla).toContainText('Modelli predefiniti');
+    await expect(bolla).toContainText('Opzioni → Modelli per azione');
+    await expect(page.locator('.dash-action-btn-primary', { hasText: 'Apri Opzioni' })).toBeVisible();
     await expect(bolla).not.toContainText('strumenti');
     const corpi = await corpiConStrumenti(app);
     vincoliIntatti(corpi);

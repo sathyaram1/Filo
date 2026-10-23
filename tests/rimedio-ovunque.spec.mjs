@@ -489,7 +489,10 @@ test('«Parere di Filo» che non arriva: una richiesta, non una raffica; il moti
   await page.waitForTimeout(3000);
   expect(await pareri(app), 'richieste ripetute da sole a carta ferma').toBe(prima);
   expect(prima).toBeLessThanOrEqual(2);
-  await expect(modulo.locator('.dk-rimedio')).toHaveCount(0);
+  // La frase manda dove chi usa Filo cambia il modello, non nella Gestione, e il tasto porta lì.
+  await expect(modulo.locator('.dk-op-errore')).not.toContainText('Modelli predefiniti');
+  await expect(modulo.locator('.dk-op-errore')).toContainText('Opzioni → Modelli per azione');
+  await expect(modulo.locator('.dk-rimedio')).toHaveText('Apri Opzioni');
 
   // Crediti finiti: «Riprova» chiede una volta, e il motivo porta il tasto per la pagina Crediti, in evidenza.
   await app.evaluate(() => { globalThis.__parere = '402'; });
@@ -648,4 +651,29 @@ test('descrizione automatica di un’immagine copiata senza modello: l’avviso 
   await expect(avviso.locator('.sn-msg-rimedio')).toHaveText('Apri Opzioni');
   await avviso.locator('.sn-msg-rimedio').click();
   await siApre(app, 'filo://options');
+});
+
+test('immagine copiata coi crediti finiti: la cronologia non promette una descrizione che non arriverà', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const P = globalThis.SN_PROVIDER_OPENROUTER;
+    const boom = () => { const e = new Error('OpenRouter 402: {"error":{"message":"Insufficient credits"}}'); e.status = 402; e.provider = 'openrouter'; throw e; };
+    globalThis.SN_PROVIDER_OPENROUTER = { ...P, streamComplete: boom, complete: boom };
+  });
+  const page = await newtabPage(app);
+  await page.waitForFunction(() => typeof window.SN_ACTIONS?.pushClipboardEntry === 'function', null, { timeout: 10_000 });
+  await page.evaluate((b64) => window.SN_ACTIONS.pushClipboardEntry({ type: 'image', dataUrl: `data:image/png;base64,${b64}`, description: 'Descrizione…' }), PNG_B64);
+  await expect(page.locator('.sn-toast .sn-msg-rimedio', { hasText: 'Apri Crediti' })).toBeVisible({ timeout: 15_000 });
+  const descrizione = async () => {
+    const storia = await page.evaluate(async () => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_CLIPBOARD_HISTORY }));
+    return ((storia && storia.items) || [])[0]?.description || '';
+  };
+  await expect.poll(descrizione, { timeout: 10_000 }).not.toBe('Descrizione…');
 });
