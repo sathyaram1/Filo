@@ -258,6 +258,10 @@
   });
   const FORME_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, forma(`${MOD}[|]${RESTI_FORMA[c]}[|]${N}`)])));
   const CHIAMATE_FORMA = `^${N}(,${N}){4}$`;
+  // Le attività: per misura la forma di una combinazione (le chiavi); i valori sono conti.
+  const parteForma = (d) => (d === TIPO_SUGGERIMENTO ? TIPO_AZIONE_FORMA.slice(1, -1) : alternative(d));
+  const FORME_ATTIVITA = Object.freeze(Object.fromEntries(MISURE_ATTIVITA.map((m) => [m,
+    `^${alternative([...DIMENSIONI_ATTIVITA[m].map((f) => f.map(parteForma).join('[|]')), ALTRO])}$`])));
 
   const re = (s) => new RegExp(s);
   const USO_RE = re(USO_FORMA);
