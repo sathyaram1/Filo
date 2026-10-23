@@ -95,17 +95,20 @@
     const q = (query || '').trim().slice(0, MAX_QUERY_LEN);
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
 
+    // `ripiego`: Tavily c'era e non ha risposto (lo contano i contatori, #1467).
+    let ripiego = false;
     if (tavilyKey) {
       try {
         return await searchTavily({ query: q, apiKey: tavilyKey, maxResults });
       } catch (e) {
         console.warn('[SN] tavily failed, fallback ddg:', e.message || e);
+        ripiego = true;
       }
     }
     try {
-      return await searchDuckDuckGo({ query: q, maxResults });
+      return { ...(await searchDuckDuckGo({ query: q, maxResults })), ...(ripiego ? { ripiego } : {}) };
     } catch (e) {
-      return { ok: false, results: [], reason: `tutti i provider hanno fallito: ${e.message || e}` };
+      return { ok: false, results: [], reason: `tutti i provider hanno fallito: ${e.message || e}`, ...(ripiego ? { ripiego } : {}) };
     }
   }
 
