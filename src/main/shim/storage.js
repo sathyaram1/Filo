@@ -208,8 +208,8 @@ function avvisa(testo, chiave, durataSec = 0, detto, errore = '') {
   STATE.avvisi.push({ testo, chiave });
   try {
     const A = require('../services/avvisoFinestra');
-    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec, errore });
-    else A.avvisoQuandoPronta(testo, { chiave, detto, errore });
+    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec, errore, tipo: errore || 'dati_avviso' });
+    else A.avvisoQuandoPronta(testo, { chiave, detto, errore, tipo: errore || 'dati_avviso' });
   } catch (_) {}
 }
 

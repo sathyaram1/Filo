@@ -218,6 +218,8 @@ module.exports = function register(on, ctx) {
       const pct = typeof scroll === 'number' ? scroll : null;
       // Per il giudizio sui siti la riapertura è di Filo: la chiedono solo le sue pagine (#814).
       const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
+      // Una scheda chiusa dal riordino e riaperta (#1470): il riordino ha sbagliato. Esce solo il tempo, in fasce.
+      if (id && voce) require('../contatoriFinestra').misura('riapertaDallArchivio', voce);
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.

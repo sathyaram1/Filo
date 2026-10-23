@@ -33,6 +33,7 @@ require(path.join(SHARED, 'modelCaps.js'));
 // Va PRIMA dell'editor delle catene, che da qui prende l'elenco delle funzioni impostabili.
 require(path.join(SHARED, 'modelUsage.js'));
 require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
+require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM

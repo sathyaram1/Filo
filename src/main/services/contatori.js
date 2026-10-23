@@ -74,6 +74,7 @@ function normale(s) {
 
 function crea(dip = {}) {
   const C = dip.contatori || globalThis.SN_CONTATORI;
+  const F = dip.contatoriFinestra || globalThis.SN_CONTATORI_FINESTRA || null;
   const disco = () => require('../shim/storage');
   const storage = dip.storage || globalThis.SN_STORAGE;
   const impostazioni = dip.impostazioni || (() => storage.getSettings());
@@ -125,6 +126,8 @@ function crea(dip = {}) {
   // Le conferme già contate «senza risposta»: una risposta tardiva non le conta una seconda volta.
   const confermeScadute = new Map();
   const azioniDiFilo = [];
+  // Chi tiene uno stato da fotografare nell'ora a ogni scrittura (la finestra, #1470): sincrono, non lancia mai.
+  const primaDiScrivere = [];
   // L'ultima risposta dell'interruttore, per chi non può aspettarla (un campione al secondo, la chiusura). null: non
   // ancora letta, e quello che arriva intanto aspetta la prima lettura.
   let ultimoAccesi = null;
@@ -213,6 +216,7 @@ function crea(dip = {}) {
     const ora = oraCorrente();
     stato.presenza = C.giornoDi(adesso());
     raccogli();
+    for (const fn of primaDiScrivere) { try { fn(ora); } catch (_) {} }
     const fatto = scrivi(ora);
     salvaPresto();
     return fatto !== false;
@@ -838,6 +842,12 @@ function crea(dip = {}) {
     return true;
   }
 
+  // ── La finestra (#1470): le sue misure entrano nell'ora dalla stessa porta, con interruttore e incognito ───────
+  function finestra(scrivi, { incognito = null } = {}) {
+    return conta(scrivi, { incognito }).catch(() => false);
+  }
+  function primaDiOgniScrittura(fn) { if (typeof fn === 'function') primaDiScrivere.push(fn); }
+
   // ── La spedizione ────────────────────────────────────────────────────────
   async function spedisci(doc, collezione = C.COLLEZIONE) {
     const { FIRESTORE_BASE, API_KEY } = rest();
@@ -919,6 +929,7 @@ function crea(dip = {}) {
         continue;
       }
       const chiamate = giorno ? null : documentoChiamate(k, { ...base, chiave: k });
+      const diFinestra = giorno ? null : documentoFinestra(k, { ...base, chiave: k });
       let r = await spedisci(doc);
       if (mia !== generazione) return 'spenti';
       // L'ora è arrivata: il suo segno di primo documento vale anche se le sue chiamate partono al giro dopo, e
@@ -926,6 +937,10 @@ function crea(dip = {}) {
       if (r.ok && primo) { stato.primi[g] = true; stato.primi[C.meseDi(g)] = true; }
       if (r.ok && chiamate) {
         r = await spedisci(chiamate, C.COLLEZIONE_CHIAMATE);
+        if (mia !== generazione) return 'spenti';
+      }
+      if (r.ok && diFinestra) {
+        r = await spedisci(diFinestra, F.COLLEZIONE);
         if (mia !== generazione) return 'spenti';
       }
       if (!r.ok && r.soloQuesto) {
@@ -959,6 +974,17 @@ function crea(dip = {}) {
     const v = C.validaChiamate(d);
     if (v.ok) return d;
     log(`le chiamate di ${k} non partono: ${v.motivo}`);
+    return null;
+  }
+
+  // La finestra di un'ora (#1470), se ne ha: come le chiamate, un documento fuori forma non ferma l'ora.
+  function documentoFinestra(k, base) {
+    if (!F) return null;
+    const d = F.documento(base);
+    if (F.senzaDati(d)) return null;
+    const v = F.valida(d);
+    if (v.ok) return d;
+    log(`la finestra di ${k} non parte: ${v.motivo}`);
     return null;
   }
 
@@ -1084,7 +1110,7 @@ function crea(dip = {}) {
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
     proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
-    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina,
+    azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina, finestra, primaDiOgniScrittura,
     controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
     passoAvvio, passoAvvioFino, processoMorto, eccezione, ipcSincrono, aggiornamento, seguiFinestra, sessione,
     avvioProcesso, secondaIstanza, inizioChiusura, tettoChiusura, fineChiusura, perLaChiusura, salvaSubito,

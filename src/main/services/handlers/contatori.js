@@ -5,6 +5,7 @@
 const { soloFilo } = require('./origine');
 const auth = require('../../auth/google-auth');
 const Servizio = require('../contatori');
+const Finestra = require('../contatoriFinestra');
 const Disco = require('../../shim/storage');
 const Registro = require('../registroCambi');
 
@@ -74,6 +75,9 @@ module.exports = function register(on, ctx) {
     },
   });
   globalThis.SN_CONTATORI_MAIN = contatori;
+  // La finestra (#1470): le sue misure passano dallo stesso servizio.
+  const finestra = Finestra.crea({ contatori });
+  globalThis.SN_CONTATORI_FINESTRA_MAIN = finestra;
   contatori.avvia();
 
   // Ogni scrittura delle impostazioni, chiunque l'abbia chiesta, col segno di chi l'ha chiesta (#867): un valore di
@@ -126,6 +130,8 @@ module.exports = function register(on, ctx) {
       case 'tasto-annulla': ok = contatori.tastoAnnulla(); break;
       case 'anticipo-aperto': ok = contatori.anticipoAperto(testo(m.action)); break;
       case 'conferma': ok = contatori.confermaRisposta(testo(m.chiave), testo(m.esito)); break;
+      case 'voce-menu-scheda': ok = finestra.voceMenu(testo(m.id)); break;
+      case 'notifica': ok = finestra.notifica(testo(m.tipo), testo(m.esito), { letta: m.letta === true, inAttesa: m.inAttesa === true }); break;
       default: ok = false;
     }
     return { ok: Boolean(ok) };

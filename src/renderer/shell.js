@@ -400,10 +400,10 @@
     renderAccount();
   }
 
-  // Gli avvisi d'errore della barra si contano per chiave, mai col testo (#1461).
+  // Gli avvisi d'errore della barra si contano per chiave, mai col testo (#1461); la chiave è anche il loro tipo.
   function avvisoErrore(testo, chiave, opts) {
     try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
-    return NOTIFS.show(testo, opts);
+    return NOTIFS.show(testo, { ...(opts || {}), tipo: chiave });
   }
 
   async function doSignIn() {
@@ -609,14 +609,16 @@
         misura: anteprimaSchede.size, tema: tema(),
       });
     }
-    function nascondi() {
+    // `clic`: la carta se ne va perché si è cliccata la sua scheda (contatori della finestra, #1470).
+    function chiudi(clic) {
       if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
       if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!aperta) return;
       aperta = null;
       spentaAlle = Date.now();
-      try { api.anteprima && api.anteprima.nascondi(); } catch (_) {}
+      try { api.anteprima && api.anteprima.nascondi({ clic: clic === true }); } catch (_) {}
     }
+    function nascondi() { chiudi(false); }
     function sopra(id) {
       if (vaVia) { clearTimeout(vaVia); vaVia = null; }
       if (!anteprimaSchede.enabled || drag) return;
@@ -681,7 +683,7 @@
     tabsEl.addEventListener('mousedown', (e) => {
       const el = e.target.closest('.tab[data-anteprima]');
       zittita = el ? el.dataset.anteprima : null;
-      nascondi();
+      chiudi(e.button === 0 && !!el && el.dataset.anteprima === aperta && !e.target.closest('.close'));
     }, true);
     tabsEl.addEventListener('wheel', nascondi, { passive: true });
     tabsEl.addEventListener('contextmenu', nascondi, true);
@@ -995,7 +997,7 @@
       ? (automatico ? `Resti connesso a ${r.nome} anche nei suoi contenuti dentro altri siti.`
         : `Resti connesso a ${r.nome} anche quando chiudi la scheda o riapri Filo.`)
       : (automatico ? `Dentro altri siti i contenuti di ${r.nome} tengono i cookie solo per la visita.`
-        : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`)) + rientra);
+        : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`)) + rientra, 'resta_connesso_scelta');
   }
 
   async function azzeraPermessi(id) {
@@ -1004,7 +1006,7 @@
     if (!r || !r.tolte) return;
     showToast(r.ricarica
       ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
-      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.');
+      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.', 'permessi_azzerati');
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -1040,10 +1042,14 @@
     api.onMenuAction((action) => {
       const id = ctxTabId;
       if (!id) return;
+      // Quale voce si sceglie (#1470); «Chiudi» lo conta la chiusura, e il paese scelto non esce.
+      if (/^tab-/.test(action) && action !== 'tab-close' && !action.startsWith('tab-proxy-go:')) {
+        try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'voce-menu-scheda', id: action })).catch(() => {}); } catch (_) {}
+      }
       if (action === 'tab-duplicate') api.tabs.duplicate(id);
       else if (action === 'tab-mute') api.tabs.setMuted(id);
       else if (action === 'tab-help') api.tabs.help(id);
-      else if (action === 'tab-close') api.tabs.close(id);
+      else if (action === 'tab-close') api.tabs.close(id, 'tasto_destro_scheda');
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
@@ -1441,7 +1447,7 @@
   tabsEl.addEventListener('click', (e) => {
     const s = schedaDellEvento(e);
     if (!s) return;
-    if (e.target.closest('.close')) { api.tabs.close(s.t.id); return; }
+    if (e.target.closest('.close')) { api.tabs.close(s.t.id, 'pulsante_x'); return; }
     if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
     if (suppressClickId === s.t.id) { suppressClickId = null; return; }
     api.tabs.activate(s.t.id);
@@ -1449,7 +1455,7 @@
   tabsEl.addEventListener('auxclick', (e) => {
     if (e.button !== 1) return;
     const s = schedaDellEvento(e);
-    if (s) api.tabs.close(s.t.id);
+    if (s) api.tabs.close(s.t.id, 'clic_centrale');
   });
   // Un font che finisce di caricare cambia la larghezza dei nomi.
   try { document.fonts.addEventListener('loadingdone', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); }); } catch (_) {}
@@ -1536,6 +1542,8 @@
     // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
     const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
+    // Il puntatore sopra la pila: le carte in vista in quel momento sono lette (#1470).
+    let sopraOra = false;
     function hostEl() {
       if (!host) {
         host = document.getElementById('shell-notifs');
@@ -1571,7 +1579,13 @@
       try { api.avvisi.stato({ carte, altre, aperta: aperta && vive().length > MAX_STACK, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
-      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
+      if (api.avvisi.onSopra) {
+        api.avvisi.onSopra((dati) => {
+          sopraOra = !!(dati && dati.sopra);
+          tempi.ferma(sopraOra);
+          if (sopraOra) for (const c of vive()) if (c.dataset.attesa !== '1') c._letta = true;
+        });
+      }
       api.avvisi.onAzione((dati) => {
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
@@ -1595,10 +1609,12 @@
         if (attesa === (c.dataset.attesa === '1')) return;
         if (attesa) {
           c.dataset.attesa = '1';
+          c._inAttesa = true;
           if (c._tempo) c._tempo.annulla();
           c._tempo = null;
         } else {
           delete c.dataset.attesa;
+          if (sopraOra) c._letta = true;
           avviaTempo(c, c._durata);
         }
       });
@@ -1608,7 +1624,7 @@
         aperta = azione === 'apri';
         disponi();
       } else if (azione === 'chiudi-tutti') {
-        for (const c of vive()) dismiss(c);
+        for (const c of vive()) dismiss(c, 'chiuse_tutte');
       }
     }
     function uscita(card) {
@@ -1618,10 +1634,20 @@
     }
     function avviaTempo(card, ms) {
       if (card._tempo) card._tempo.annulla();
-      card._tempo = tempi.avvia(ms, () => dismiss(card));
+      card._tempo = tempi.avvia(ms, () => dismiss(card, 'scaduta'));
     }
-    function dismiss(card) {
+    // Come è uscita di scena (#1470): il tipo e l'esito, mai il testo né l'etichetta del pulsante.
+    function contaUscita(card, esito) {
+      try {
+        Promise.resolve(api.message({
+          type: 'contatori_evento', misura: 'notifica', tipo: card._tipo || '', esito, letta: !!card._letta, inAttesa: !!card._inAttesa,
+        })).catch(() => {});
+      } catch (_) {}
+    }
+    // `esito`: scaduta, chiusa_x, azione_N, chiuse_tutte, sostituita; senza, l'ha ritirata chi l'aveva mostrata.
+    function dismiss(card, esito = 'ritirata') {
       if (!card || card.dataset.closing === '1') return;
+      contaUscita(card, esito);
       card.dataset.closing = '1';
       if (card._tempo) card._tempo.annulla();
       card._tempo = null;
@@ -1640,8 +1666,10 @@
       if (!Array.isArray(actions) || !actions.length) return;
       const bar = document.createElement('div');
       bar.className = 'shell-notif-actions';
+      let indice = 0;
       for (const a of actions) {
         if (!a || !a.label) continue;
+        const esito = `azione_${indice++}`;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'shell-notif-action';
@@ -1651,7 +1679,7 @@
           // ripeterebbe l'azione (due schede da «Apri comunque»).
           if (card.dataset.closing === '1') return;
           try { a.onClick && a.onClick(); } catch (_) {}
-          dismiss(card);
+          dismiss(card, esito);
         });
         bar.appendChild(btn);
       }
@@ -1665,7 +1693,7 @@
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
-      if (opts.key) dismissKey(opts.key);
+      if (opts.key) dismissKey(opts.key, 'sostituita');
       // Una durata scelta da chi chiama vale per la durata standard: quella delle Preferenze la riporta in scala.
       const chiesta = opts.durationSec != null ? Number(opts.durationSec) : window.SN_AVVISI.STANDARD_SEC;
       const durata = window.SN_AVVISI.durata(Number.isFinite(chiesta) && chiesta >= 0 ? chiesta * 1000 : undefined, notifConfig.durationSec);
@@ -1674,6 +1702,11 @@
       const gemella = chiave && Array.from(hostEl().children)
         .find((c) => c.dataset.unica === chiave && c.dataset.closing !== '1');
       if (gemella) {
+        // Chi c'era è stata sostituita: la nuova riparte coi suoi segni.
+        contaUscita(gemella, 'sostituita');
+        gemella._tipo = typeof opts.tipo === 'string' ? opts.tipo : '';
+        gemella._letta = sopraOra && gemella.dataset.attesa !== '1';
+        gemella._inAttesa = false;
         if (gemella._alChiudere !== opts.alChiudere) uscita(gemella);
         gemella._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
         gemella.querySelector('.shell-notif-msg').textContent = text;
@@ -1690,6 +1723,7 @@
       card.dataset.nid = String(++seq);
       card._durata = durata;
       card._alChiudere = typeof opts.alChiudere === 'function' ? opts.alChiudere : null;
+      card._tipo = typeof opts.tipo === 'string' ? opts.tipo : '';
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
 
@@ -1705,12 +1739,13 @@
       close.className = 'shell-notif-close';
       close.setAttribute('aria-label', 'Chiudi notifica');
       close.textContent = '×';
-      close.addEventListener('click', () => dismiss(card));
+      close.addEventListener('click', () => dismiss(card, 'chiusa_x'));
       card.appendChild(close);
       azioni(card, opts.actions);
 
       hostEl().appendChild(card);
       disponi();
+      if (sopraOra && card.dataset.attesa !== '1') card._letta = true;
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
@@ -1730,16 +1765,17 @@
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
-    function dismissKey(key) {
+    function dismissKey(key, esito = 'ritirata') {
       for (const c of hostEl().querySelectorAll('.shell-notif')) {
-        if (c.dataset.key === String(key)) dismiss(c);
+        if (c.dataset.key === String(key)) dismiss(c, esito);
       }
     }
     return { show, dismiss, dismissKey, rispecchia };
   })();
 
   // Anche il toast semplice passa di qui, o non rispetterebbe la durata scelta.
-  function showToast(text) { return NOTIFS.show(text); }
+  // `tipo`: l'id della notifica per i contatori (#1470).
+  function showToast(text, tipo) { return NOTIFS.show(text, tipo ? { tipo } : undefined); }
 
   // ── Aprire uno scaricamento: se il file non c'è più, DILLO ──────────────
   // Il main risponde { ok:false, missing:true, error } quando il percorso non
@@ -1747,9 +1783,10 @@
   // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
   // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
   // cartella come via d'uscita (il file potrebbe essere lì rinominato).
-  function openDownloadFile(id, confirmed) {
+  // `luogo`: 'notifica' dai pulsanti di un avviso; senza, il pannello (contatori #1470).
+  function openDownloadFile(id, confirmed, luogo) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFile(id, confirmed).then((res) => {
+    return api.downloads.openFile(id, confirmed, luogo).then((res) => {
       if (!res || res.ok !== false) return;
       // #588 — è un programma: aprirlo lo esegue. Il main non lo tocca finché
       // non torna un "sì" esplicito; la via di mezzo (guardare dov'è finito
@@ -1758,14 +1795,14 @@
       // sotto la pagina, e il clic sembrerebbe non fare niente.
       if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.parti); return; }
       const opts = res.missing
-        ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
+        ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id, 'notifica') }] }
         : undefined;
       avvisoErrore(res.error || 'Non è stato possibile aprire il file', 'file_non_aperto', opts);
     }).catch(() => {});
   }
-  function openDownloadFolder(id) {
+  function openDownloadFolder(id, luogo) {
     if (!api.downloads) return Promise.resolve();
-    return api.downloads.openFolder(id).then((res) => {
+    return api.downloads.openFolder(id, luogo).then((res) => {
       if (!res) return;
       if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
       if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
@@ -1799,7 +1836,7 @@
           // F4 — la segnalazione automatica aspetta questo avviso (#784.6): Annulla la ferma, chiuderlo la fa partire.
           if (a && a.cancelAutoFeedback && !a.onClick) {
             const fbId = String(a.cancelAutoFeedback);
-            const nonRitirata = (r) => NOTIFS.show((r && r.frase) || 'Non sono riuscito a ritirare la segnalazione');
+            const nonRitirata = (r) => NOTIFS.show((r && r.frase) || 'Non sono riuscito a ritirare la segnalazione', { tipo: 'segnalazione_non_ritirata' });
             allaChiusura = () => { if (!annullata) api.message({ type: 'auto_feedback_parti', id: fbId }).catch(() => {}); };
             return {
               label: a.label,
@@ -1840,19 +1877,19 @@
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
           if (a && a.openDownloadId && !a.onClick && api.downloads) {
             const id = a.openDownloadId;
-            return { label: a.label, onClick: () => openDownloadFile(id) };
+            return { label: a.label, onClick: () => openDownloadFile(id, false, 'notifica') };
           }
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
-            return { label: a.label, onClick: () => openDownloadFolder(id) };
+            return { label: a.label, onClick: () => openDownloadFolder(id, 'notifica') };
           }
           // #950 — il nome dato da solo a uno scaricamento: «Annulla» rimette quello con cui era arrivato.
           if (a && a.rimettiNomeDownloadId && !a.onClick && api.downloads && api.downloads.rimettiNome) {
             const id = a.rimettiNomeDownloadId;
             return {
               label: a.label,
-              onClick: () => api.downloads.rimettiNome(id).then((r) => {
-                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
+              onClick: () => api.downloads.rimettiNome(id, 'notifica').then((r) => {
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso' });
                 else avvisoErrore((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima', 'nome_non_rimesso');
               }).catch(() => {}),
             };
@@ -2331,7 +2368,7 @@
       api.tabs.open('filo://newtab/');
     } else if (meta && e.key.toLowerCase() === 'w') {
       e.preventDefault();
-      const a = activeTab(); if (a) api.tabs.close(a.id);
+      const a = activeTab(); if (a) api.tabs.close(a.id, 'ctrl_w');
     } else if (meta && e.key.toLowerCase() === 'l') {
       // L'indirizzo si scrive dalla home, quindi Ctrl+L apre la home.
       e.preventDefault();
@@ -2509,6 +2546,7 @@
       popupAvvisati.set(tabId, voce);
       voce.carta = NOTIFS.show(testo, {
         durationSec: 8,
+        tipo: 'popup_bloccato',
         actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(voce.url, false, tabId); } catch (_) {} } }],
       });
       const x = voce.carta && voce.carta.querySelector('.shell-notif-close');

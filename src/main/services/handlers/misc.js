@@ -5,6 +5,7 @@ const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { perContoDellaScheda } = require('../perContoDellaScheda');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { luogoDownload } = require('../contatoriFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
@@ -506,17 +507,25 @@ module.exports = function register(on, ctx) {
   // #588.2 — ogni finestra vede e comanda solo le voci del suo ambito: una
   // finestra incognito le sue, quella normale la cronologia.
   const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
+  // Ogni azione su uno scaricamento si conta col luogo da cui arriva (#1470), mai col nome del file.
+  const contata = (azione, fn) => async (msg, s, o) => {
+    require('../contatoriFinestra').misura('download', luogoDownload(msg, s), azione, { incognito: !!ambito(s) });
+    return fn(msg, s, o);
+  };
   on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, items: DL().list(ambito(s)) })));
-  on(MSG.DOWNLOADS_CLEAR, internalOnly(async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) })));
-  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(contata('svuota', async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) }))));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(contata('rimuovi', async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) }))));
   // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
-  // senza, il main risponde needsConfirm e non tocca shell.openPath.
-  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s))));
+  // senza, il main risponde needsConfirm e non tocca shell.openPath. Il sì alla conferma è lo stesso gesto: non conta.
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => {
+    if (!msg.confirmed) require('../contatoriFinestra').misura('download', luogoDownload(msg, s), 'apri_file', { incognito: !!ambito(s) });
+    return DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s));
+  }));
   on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg, s) => DL().confirmDownload(msg.id, !!msg.allow, ambito(s))));
-  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg, s) => DL().openFolder(msg.id, ambito(s))));
-  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg, s) => DL().cancel(msg.id, ambito(s))));
-  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg, s) => DL().pause(msg.id, ambito(s))));
-  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg, s) => DL().resume(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(contata('apri_cartella', async (msg, s) => DL().openFolder(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_CANCEL, internalOnly(contata('annulla', async (msg, s) => DL().cancel(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_PAUSE, internalOnly(contata('pausa', async (msg, s) => DL().pause(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_RESUME, internalOnly(contata('riprendi', async (msg, s) => DL().resume(msg.id, ambito(s)))));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Alla shell, così l'ombra dell'annotazione copre tutto Filo e non la sola area pagina.
@@ -610,7 +619,7 @@ module.exports = function register(on, ctx) {
         perche === 'rifiutato'
           ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
           : 'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
-        { chiave: 'feedback-attesa-accesso-owner' },
+        { chiave: 'feedback-attesa-accesso-owner', tipo: 'segnalazione_in_attesa' },
       ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
