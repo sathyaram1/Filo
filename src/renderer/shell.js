@@ -2345,15 +2345,22 @@
         if (tab) api.tabs.activate(tab.id);
         return;
       }
+      // Tenuto premuto, il tasto torna prima della fotografia nuova: si riparte dalla scheda chiesta, non da quella di prima.
       const tabs = state.tabs || [];
-      const accanto = TASTI ? TASTI.indiceSchedaAccanto(e, tabs.findIndex((t) => t.id === state.activeId), tabs.length) : null;
+      const ultima = accantoChiesta;
+      const da = ultima && ultima.da === state.activeId && Date.now() - ultima.t < 1000 ? ultima.a : state.activeId;
+      const accanto = TASTI ? TASTI.indiceSchedaAccanto(e, tabs.findIndex((t) => t.id === da), tabs.length) : null;
       if (accanto != null) {
         e.preventDefault();
         const tab = tabs[accanto];
-        if (tab && tab.id !== state.activeId) api.tabs.activate(tab.id);
+        if (tab && tab.id !== da) {
+          accantoChiesta = { da: state.activeId, a: tab.id, t: Date.now() };
+          api.tabs.activate(tab.id);
+        }
       }
     }
   });
+  let accantoChiesta = null;
 
   api.tabs.onUpdate((snap) => {
     fermaLarghezzeSeChiusa(snap);
