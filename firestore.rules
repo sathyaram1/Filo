@@ -428,8 +428,10 @@ service cloud.firestore {
            'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
           ]
         )
-        && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp)
+        // Le due date le mette Firestore (REQUEST_TIME, #1517): chi scrive senza account non sceglie
+        // dove cade nelle liste per data né si nasconde alle letture a delta su `updatedAt`.
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
