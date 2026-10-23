@@ -316,7 +316,10 @@ module.exports = function register(on, ctx) {
     if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
     if (sempreAperta) return { ok: true, tolta: await FiloMem.forgetLine({ sempreAperta: msg.sempreAperta }) };
     // La riga resta fra le nascoste del quaderno (#872): l'id serve al suo «Rimetti».
-    const id = await FiloMem.hideLine(lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga });
+    const via = lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga };
+    const com = await FiloMem.descriviRiga(via);
+    const id = await FiloMem.hideLine(via);
+    if (id) contatori()?.memoriaCorretta('quaderno', 'togli', com);
     return { ok: true, tolta: !!id, id: id || null };
   });
 
