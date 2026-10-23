@@ -185,6 +185,17 @@ const dopoUnClic = (azione) => `<!doctype html><meta charset="utf-8"><title>Prov
 PAGINE['/schermi'] = dopoUnClic("window.getScreenDetails().then(() => m('schermi:letti'), (e) => m('schermi:' + e.name));");
 PAGINE['/presenza'] = dopoUnClic("IdleDetector.requestPermission().then((x) => m('presenza:' + x), (e) => m('presenza:' + e.name));");
 PAGINE['/font'] = dopoUnClic("window.queryLocalFonts().then((f) => m('font:' + (f.length ? 'letti' : 'vuoti')), (e) => m('font:' + e.name));");
+// Una pagina qualsiasi che legge l'elenco dei dispositivi: i nomi (uguali in ogni sito) arrivano solo col sì (#1524).
+PAGINE['/dispositivi'] = `<!doctype html><meta charset="utf-8"><title>Dispositivi</title>
+<button id="b" style="position:fixed;top:200px;left:200px">Microfono</button>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  const nomi = () => navigator.mediaDevices.enumerateDevices().then((l) => [...new Set(l.filter((d) => d.label).map((d) => d.kind))].sort().join(',') || 'nessuno');
+  const stato = (name) => navigator.permissions.query({ name }).then((s) => s.state, (e) => e.name);
+  Promise.all([nomi(), stato('microphone'), stato('midi')]).then(([n, mic, midi]) => m('prima:' + n + '/' + mic + '/' + midi));
+  document.getElementById('b').addEventListener('click', () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { s.getTracks().forEach((t) => t.stop()); return nomi().then((n) => m('dopo:' + n)); }, (e) => m('mic:' + e.name)));
+</script>`;
 PAGINE['/spazio'] = dopoUnClic("navigator.storage.persist().then((x) => m('spazio:' + x), (e) => m('spazio:' + e.name));");
 // Un sito che carica foto (#1069): l'utente gli dà la cartella da leggere, e al clic su «Carica» il sito prova a scriverci.
 PAGINE['/cartella'] = `<!doctype html><meta charset="utf-8"><title>Carica foto</title>
