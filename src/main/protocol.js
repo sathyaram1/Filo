@@ -20,6 +20,8 @@ const FILO_PAGE_CSP = [
   "font-src 'self' filo: data:",
   "connect-src 'self' filo: https: data: blob:",
   "frame-src 'self' filo: https:",
+  // Un sito non incornicia una pagina di Filo (#1506).
+  "frame-ancestors 'self' filo:",
   "object-src 'none'",
   "base-uri 'none'",
 ].join('; ');
