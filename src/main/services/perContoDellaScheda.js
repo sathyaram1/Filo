@@ -269,7 +269,8 @@ async function perContoDellaScheda(sender, url, {
     const headers = { 'User-Agent': ua, Accept: accetta, Referer: referer };
     // La politica dichiarata deve dare lo stesso Referer che mandiamo: il servizio di rete di Chromium annulla le
     // richieste che non tornano.
-    const passo = await dip.richiesta(ses, u.href, { headers, credenziali, referrerPolicy: referer ? 'strict-origin' : 'no-referrer', signal });
+    const iniziatore = credenziali === 'include' ? iniziatorePer(origine, u.href) : '';
+    const passo = await dip.richiesta(ses, u.href, { headers, credenziali, iniziatore, referrerPolicy: referer ? 'strict-origin' : 'no-referrer', signal });
     if (passo.rimando) {
       let prossimo;
       try { prossimo = new URL(passo.rimando, u.href); } catch (_) { throw new Error('bad-url'); }
