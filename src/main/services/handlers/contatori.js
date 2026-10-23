@@ -1,4 +1,4 @@
-// Handler di dominio dei contatori anonimi (#969, #1461): crea il servizio, lo mette a disposizione del cancello dei
+// Handler di dominio dei contatori anonimi (#969, #1461, #1467): crea il servizio, lo mette a disposizione del cancello dei
 // modelli, segue le scritture delle impostazioni e riceve i gesti contati nelle pagine. Cosa si conta e quando parte:
 // src/main/services/contatori.js. Le pagine mandano solo nomi da elenchi chiusi e numeri: qui si rifiuta il resto.
 
