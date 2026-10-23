@@ -410,13 +410,16 @@ service cloud.firestore {
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
-      // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
-      // numero progressivo leggibile (#22, #22.1) calcolato dal client.
+      // `name` = titolo breve generato da un LLM all'invio; `seq` = numero
+      // progressivo leggibile (#22) calcolato dal client. Un sotto-numero
+      // (#22.1) lo scrive solo il server, e l'id del documento non lo sceglie
+      // un anonimo a piacere (#1517). Sentinella: firestoreRulesFeedbackAnonimo.test.mjs.
       // `parentId` (DC4): presente solo quando questo feedback è la riapertura
       // di un fix "Risolti" — collega al doc originale (ID Firestore, stessa
       // forma usata altrove nel repo: alfanumerico/`-`/`_`).
       allow create: if
-        request.resource.data.keys().hasOnly(
+        doc.matches('^[A-Za-z0-9_-]{20,128}$')
+        && request.resource.data.keys().hasOnly(
           ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'clientIdHash', 'images',
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
