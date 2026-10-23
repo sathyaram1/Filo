@@ -505,15 +505,23 @@
 
   function togliFiltro() {
     const da = filtro && filtro.giorni;
+    const invitante = filtro && filtro.invitante;
     filtro = null;
     applicaFiltro();
     // Il fuoco torna sul numero da cui si era partiti, come alla chiusura di ogni elenco aperto da un numero.
-    const torna = da && $('ownerNumeri').querySelector(`[data-giorni="${da}"]`);
+    const torna = da ? $('ownerNumeri').querySelector(`[data-giorni="${da}"]`)
+      : (invitante ? (righe.get(invitante) || {}).bottoneInvitati : null);
     if (torna && typeof torna.focus === 'function') torna.focus();
   }
 
+  function personeDelFiltro() {
+    if (!filtro) return null;
+    if (filtro.invitante) return new Set(invitatiLetti.get(filtro.invitante) || []);
+    return new Set(filtro.giorni === 7 ? usoLetto.attivi7 : usoLetto.attivi30);
+  }
+
   function applicaFiltro() {
-    const chi = filtro ? new Set(filtro.giorni === 7 ? usoLetto.attivi7 : usoLetto.attivi30) : null;
+    const chi = personeDelFiltro();
     // Se il conto nuovo è vuoto non c'è più niente da mostrare: il filtro si toglie da sé.
     if (chi && !chi.size) { filtro = null; return applicaFiltro(); }
     for (const tr of $('ownerUsers').querySelectorAll('tbody tr[data-pseudonym]')) {
