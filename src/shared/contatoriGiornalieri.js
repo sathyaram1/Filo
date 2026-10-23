@@ -276,6 +276,7 @@
   const INTERVISTA_RE = re(INTERVISTA_FORMA);
   const MODELLI_RE = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c, re(FORME_MODELLI[c])])));
   const CHIAMATE_RE = re(CHIAMATE_FORMA);
+  const ATTIVITA_RE = Object.freeze(Object.fromEntries(MISURE_ATTIVITA.map((m) => [m, re(FORME_ATTIVITA[m])])));
 
   // Il tetto di caratteri di ogni valore annidato, misurato sulla sua voce più lunga possibile, con margine.
   const TETTO_CARATTERI_USO = 80;
