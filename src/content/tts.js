@@ -265,18 +265,17 @@
       const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
       if (v) { u.voice = v; u.lang = v.lang; }
     }
-    // La voce del browser dà tempi esatti per parola (onboundary): evidenziazione precisa.
-    if (readTokens.length) {
-      u.onboundary = (e) => {
-        if (!sessionAlive(s)) return;
-        if (e.name && e.name !== 'word') return;
-        setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
-      };
-    }
-    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
+    // La voce del browser dà tempi esatti per parola (onboundary): evidenziazione precisa, e fin dove è arrivata.
+    u.onboundary = (e) => {
+      if (!sessionAlive(s)) return;
+      s.letti = Math.max(s.letti || 0, baseChar + (e.charIndex || 0));
+      if (!readTokens.length || (e.name && e.name !== 'word')) return;
+      setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
+    };
+    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); contaLettura(s, true); } };
     // Se la voce del browser fallisce la lettura finisce comunque: uno stato «sta leggendo»
     // appeso darebbe alle altre schede uno stop morto. L'evidenziazione qui NON si azzera.
-    u.onerror = () => { if (sessionAlive(s)) reportReadingState(false); };
+    u.onerror = () => { if (sessionAlive(s)) { reportReadingState(false); contaLettura(s, false); } };
     synth.speak(u);
   }
 
