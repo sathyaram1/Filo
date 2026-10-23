@@ -333,6 +333,8 @@
         { testo: 'Le pubblicità dei video che si possono saltare Filo le salta anche quando il video suona in una scheda che non stai guardando, o con Filo ridotto a icona. Prima la sentivi tutta, finché non tornavi sul video.', segnalazione: 1494 },
         { testo: 'Un sito vede i nomi dei tuoi microfoni, fotocamere e casse solo dopo che gli hai consentito il microfono o la fotocamera, come in Chrome, e l\'elenco dei font installati sul computer non lo legge più. Prima bastava aprire la pagina, o un clic, e uno script di tracciamento poteva riconoscerti da quei nomi su ogni sito, anche in incognito.', segnalazione: 1524 },
         { testo: 'Un colore che scrivi nelle Preferenze resta anche se subito dopo cambi il tema o chiudi la scheda. Prima a volte tornava quello di prima.', segnalazione: 1343 },
+        'Il correttore controlla le date anche sull\'anno di cui parla la pagina. Se nella chat si parla del 2024, o la pagina si chiama «Diario 2024», «mercoledì 9 ottobre» non viene più segnato: il 9 ottobre 2024 era mercoledì. Se il giorno è sbagliato anche in quell\'anno, la correzione proposta per prima vale per quell\'anno.',
+        'I segni del correttore non restano più disegnati sopra la barra fissa di un sito quando il campo ci scorre sotto, né fuori dalla colonna di una mail che scorre.',
       ],
     },
     {
