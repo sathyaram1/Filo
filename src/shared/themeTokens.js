@@ -352,6 +352,17 @@
     return { clean, rejected };
   }
 
+  // Pochi token toccati sopra la mappa salvata adesso: un valore lo scrive, null o vuoto lo toglie, gli altri restano.
+  // Chi ne ha toccati due non rimanda la sua copia intera, che cancellerebbe quelli cambiati altrove nel frattempo.
+  function conModifica(salvati, modifica) {
+    const out = { ...(salvati && typeof salvati === 'object' ? salvati : {}) };
+    for (const [name, value] of Object.entries(modifica && typeof modifica === 'object' ? modifica : {})) {
+      if (value == null || value === '') delete out[name];
+      else out[name] = value;
+    }
+    return out;
+  }
+
   // risoluzione della gerarchia (per la UI delle preferenze e gli unit test)
   function defaultValue(name, theme) {
     const t = TOKENS[name];
