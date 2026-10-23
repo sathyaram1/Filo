@@ -532,11 +532,19 @@
       li.classList.toggle('is-attivo', acceso);
       li.setAttribute('aria-pressed', acceso ? 'true' : 'false');
     }
+    for (const r of righe.values()) {
+      if (!r.bottoneInvitati) continue;
+      const acceso = Boolean(filtro && filtro.invitante === r.u.pseudonym);
+      r.bottoneInvitati.classList.toggle('is-attivo', acceso);
+      r.bottoneInvitati.setAttribute('aria-pressed', acceso ? 'true' : 'false');
+    }
     const riga = $('ownerFiltro');
     riga.textContent = '';
     riga.hidden = !chi;
     if (!chi) return;
-    riga.append(`Solo ${chi.size === 1 ? 'la persona che ha' : `le ${formatInt(chi.size)} persone che hanno`} usato Filo negli ultimi ${filtro.giorni} giorni. `);
+    riga.append(filtro.invitante
+      ? `Solo ${chi.size === 1 ? 'la persona entrata' : `le ${formatInt(chi.size)} persone entrate`} coi codici di ${filtro.invitante}. `
+      : `Solo ${chi.size === 1 ? 'la persona che ha' : `le ${formatInt(chi.size)} persone che hanno`} usato Filo negli ultimi ${filtro.giorni} giorni. `);
     const tutte = document.createElement('button');
     tutte.type = 'button';
     tutte.className = 'sn-btn sn-btn-secondary';
