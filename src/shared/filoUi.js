@@ -200,12 +200,19 @@
     } catch (_) {}
   }
 
+  // Lo strato dei riquadri sopra un sito (#1509.1): pagina di Filo che parla come il sito sotto.
+  const nelloStrato = (() => {
+    try { return location.protocol === 'filo:' && location.host === 'riquadri' && !!global.SN_STRATO_RIQUADRI; } catch (_) { return false; }
+  })();
+
   // La chiave di una bozza scritta in un riquadro: resta al sito dove è nata, e il main concede a ogni riquadro solo
   // quella con la sua origine (BOZZE_PER_SITO in impostazioniPerOrigine.js). Senza origine non c'è bozza (null).
+  // Nello strato l'origine è quella della pagina sotto, la stessa che il main gli riconosce.
   function chiaveDiBozza(nome) {
     try {
-      if (location.protocol === 'filo:') return nome;
-      return location.origin && location.origin !== 'null' ? `${nome}@${location.origin}` : null;
+      const origine = nelloStrato ? String(global.SN_STRATO_RIQUADRI.pagina?.origine || '') : location.origin;
+      if (location.protocol === 'filo:' && !nelloStrato) return nome;
+      return origine && origine !== 'null' ? `${nome}@${origine}` : null;
     } catch (_) { return null; }
   }
 
@@ -238,6 +245,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
+    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, nelloStrato, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
