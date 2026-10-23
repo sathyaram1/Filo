@@ -550,7 +550,9 @@
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
     // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
     { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
-    { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione: passata, chi era entrato non conta più.' },
+    // Il tetto per chi dà inviti (#1519): un tester che riscatta i suoi codici da identità nuove e reti diverse si ferma qui.
+    { chiave: 'redeemsPerInviter', etichetta: 'Ingressi coi codici della stessa persona', min: 0, max: 1000, aiuto: 'Quante persone possono entrare coi codici di una stessa persona, nelle ore scritte sotto, da qualunque connessione. I tuoi codici non contano. A zero nessun limite.' },
+    { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione e coi codici della stessa persona: passata, chi era entrato non conta più.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
