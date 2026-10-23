@@ -1,5 +1,5 @@
 // La riga che dice all'utente quale indirizzo Filo ha fermato per sicurezza e perché (#482). PURA, senza electron.
-// Non decide cosa fermare (lo fa isWebUnsafeNav in tabs.js) e non offre «Apri comunque»: qui non c'è niente da scavalcare.
+// Non decide cosa fermare (isWebUnsafeNav in tabs.js, navigazioneVersoFilo.js) e non offre «Apri comunque»: qui non c'è niente da scavalcare.
 // Prova: tests/unit/indirizzoFermato.test.mjs.
 
 // L'indirizzo lo può aver scritto una pagina o un modello: si accorcia in mezzo, così restano l'inizio e il nome del file.
