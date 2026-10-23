@@ -67,13 +67,8 @@ function installZoom(wc) {
   // Ctrl+rotella che nessuno ha preso (un riquadro senza il nostro preload, un
   // ascoltatore spento da un documento riscritto). Chromium lo segnala qui anche
   // quando il preload l'ha già preso: decide lui se è un'eco (#686.1: ogni scatto
-  // valeva due passi). Non sulle pagine di Filo, dove l'editor sceglie da sé.
-  wc.on('zoom-changed', (_e, dir) => {
-    let url = '';
-    try { url = wc.getURL(); } catch (_) {}
-    if (/^filo:/i.test(url)) return;
-    try { wc.send('filo:zoom-rotella', dir === 'in' ? 'in' : 'out'); } catch (_) {}
-  });
+  // valeva due passi).
+  wc.on('zoom-changed', (_e, dir) => rotellaZoom(wc, dir));
 
   if (!wc.ipc || typeof wc.ipc.on !== 'function') return;
   let modalita = false;
