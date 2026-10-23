@@ -203,14 +203,24 @@ module.exports = function register(on, ctx) {
 
   // Riapre una scheda chiusa com'era: lo scroll e il paese da cui passava. Dal #872 la chiede la ricerca del filo con
   // l'id della voce d'archivio, e indirizzo, scroll e paese li legge il main; solo le pagine di Filo.
+  // Chi l'aveva chiusa e quanto fa (#1467): una scheda chiusa dalla pulizia e riaperta subito è un suo errore.
+  function contaRiaperta(voce, win) {
+    const chiusa = Date.parse(voce.closedAt);
+    try {
+      globalThis.SN_CONTATORI_MAIN?.attivita('riaperte', {
+        chiusaDa: globalThis.SN_CONTATORI.chiusaDa(voce.reason, voce.chiusaDaSola),
+        etaMs: Number.isFinite(chiusa) ? Math.max(0, Date.now() - chiusa) : null,
+      }, { incognito: !!(win && win._filoIncognito) });
+    } catch (_) {}
+  }
   on(MSG.REOPEN_ARCHIVED_TAB, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     let voce = null;
     if (msg && typeof msg.id === 'string' && msg.id) {
       try { voce = (await ArchivedTabs.list()).find((t) => t.id === msg.id) || null; } catch (_) {}
       if (!voce) return { ok: false, error: 'not_found' };
-      // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: chi chiede apre il sito.
-      if (voce.urlTagliato) return { ok: false, error: 'url_tagliato' };
+      // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: chi chiede apre il sito, e la riapertura conta.
+      if (voce.urlTagliato) { contaRiaperta(voce, win); return { ok: false, error: 'url_tagliato' }; }
     }
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
@@ -218,15 +228,7 @@ module.exports = function register(on, ctx) {
       const pct = typeof scroll === 'number' ? scroll : null;
       // Per il giudizio sui siti la riapertura è di Filo: la chiedono solo le sue pagine (#814).
       const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
-      // Chi l'aveva chiusa e quanto fa (#1467): una scheda chiusa dalla pulizia e riaperta subito è un suo errore.
-      if (id && voce) {
-        const chiusa = Date.parse(voce.closedAt);
-        try {
-          globalThis.SN_CONTATORI_MAIN?.attivita('riaperte', {
-            chiusaDa: globalThis.SN_CONTATORI.chiusaDa(voce.reason, voce.chiusaDaSola), etaMs: Number.isFinite(chiusa) ? Math.max(0, Date.now() - chiusa) : null,
-          }, { incognito: !!win._filoIncognito });
-        } catch (_) {}
-      }
+      if (id && voce) contaRiaperta(voce, win);
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.

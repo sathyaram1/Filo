@@ -103,6 +103,8 @@ test('la pulizia delle schede e le schede riaperte: chi le aveva chiuse e da qua
   assert.equal(C.chiusaDa(''), 'persona');
   assert.equal(C.chiusaDa('duplicato'), 'duplicato');
   assert.equal(C.chiusaDa('pagina vecchia, non la usi da giorni'), 'pulizia', 'il perché scritto dal modello non esce, decide solo chi');
+  assert.equal(C.chiusaDa('manual', true), '', 'chiusa dalla pagina stessa o da un crash: non l’ha chiusa la persona');
+  assert.equal(conta('riaperte', { chiusaDa: C.chiusaDa('manual', true), etaMs: 3 * MIN }), '');
   assert.equal(conta('riaperte', { chiusaDa: 'pulizia', etaMs: 3 * MIN }), 'pulizia|min10');
   assert.equal(conta('riaperte', { chiusaDa: 'persona', etaMs: 30 * MIN }), 'persona|ora');
   assert.equal(conta('riaperte', { chiusaDa: 'duplicato', etaMs: 5 * GIORNO }), 'duplicato|oltre');

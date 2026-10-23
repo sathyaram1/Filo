@@ -67,8 +67,9 @@ test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri'
     + leggi('src', 'shared', 'ascolto.js') + leggi('src', 'pages', 'dashboard', 'dashboard.js');
   for (const m of tutto.matchAll(/misura: '([a-z-]+)'/g)) {
     assert.ok(['azione', 'icona', 'ricerca', 'proposta', 'annullato', 'chiesto', 'avviso', 'errore-modello', 'intervista',
-      'tasto-annulla', 'anticipo-aperto', 'conferma', 'aiuto', 'ricerca-web-tetto', 'dettatura', 'lettura', 'suggerimento'].includes(m[1]), m[1]);
-    assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), new RegExp(`case '${m[1]}':`), `il main riceve «${m[1]}»`);
+      'tasto-annulla', 'anticipo-aperto', 'conferma', 'aiuto', 'ricerca-web-tetto', 'dettatura', 'lettura', 'suggerimento',
+      'in-corso'].includes(m[1]), m[1]);
+    assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), new RegExp(`case '${m[1]}':|misura === '${m[1]}'`), `il main riceve «${m[1]}»`);
   }
   for (const m of tutto.matchAll(/pannello: '([a-z-]+)'/g)) assert.ok(C.PANNELLI.includes(m[1]), m[1]);
   // La ricerca porta l'esito, l'attesa e la posizione: mai la query.
@@ -78,23 +79,28 @@ test('i gesti contati nelle pagine mandano solo nomi da elenchi chiusi e numeri'
 });
 
 // Le attività contate nelle pagine (#1467) portano numeri e nomi: nessun campo per un selettore, una query, un testo.
+// Lo stesso oggetto va al main finché l'attività è aperta («in-corso») e quando finisce.
 test('le attività contate nelle pagine mandano solo i campi della loro misura', () => {
   const campi = {
-    aiuto: ['esito', 'passiDaSolo', 'passiCliccati', 'nonTrovati', 'documenti'],
-    dettatura: ['motivo', 'frasi', 'invio', 'provvisorie'],
-    lettura: ['voce', 'ripiego', 'codice', 'chiaveRifiutata', 'senzaModello', 'quota', 'finita'],
+    aiuto: ['esito', 'passiDaSolo', 'passiCliccati', 'nonTrovati', 'documenti', 'id'],
+    dettatura: ['motivo', 'frasi', 'invio', 'provvisorie', 'id'],
+    lettura: ['voce', 'ripiego', 'codice', 'chiaveRifiutata', 'senzaModello', 'quota', 'finita', 'id'],
     suggerimento: ['tipo', 'posizione', 'etaMs'],
   };
   const fonti = {
-    aiuto: leggi('src', 'content', 'sidebar.js'), dettatura: leggi('src', 'shared', 'ascolto.js'),
-    lettura: leggi('src', 'content', 'tts.js'), suggerimento: leggi('src', 'pages', 'dashboard', 'dashboard.js'),
+    aiuto: [leggi('src', 'content', 'sidebar.js'), /const datiSessione = \(s\) => \(\{([^}]*)\}\)/g],
+    dettatura: [leggi('src', 'shared', 'ascolto.js'), /MSG\.CONTATORI_EVENTO, misura, cosa: 'dettatura',([^}]*)\}/g],
+    lettura: [leggi('src', 'content', 'tts.js'), /misura: 'lettura',([^}]*)\}/g],
+    suggerimento: [leggi('src', 'pages', 'dashboard', 'dashboard.js'), /misura: 'suggerimento',([^}]*)\}/g],
   };
-  for (const [misura, s] of Object.entries(fonti)) {
-    const viste = [...s.matchAll(new RegExp(`misura: '${misura}',([^}]*)\\}`, 'g'))];
-    assert.equal(viste.length, 1, `${misura}: un solo punto che la manda`);
+  for (const [misura, [s, re]] of Object.entries(fonti)) {
+    const viste = [...s.matchAll(re)];
+    assert.equal(viste.length, 1, `${misura}: un solo punto che la compone`);
     const chiavi = [...viste[0][1].replace(/\([^()]*\)/g, '').matchAll(/(?:^|[,{\s])(\w+):/g)].map((m) => m[1]).filter((k) => k !== 'type');
     assert.deepEqual(chiavi.sort(), [...campi[misura]].sort(), `${misura}: ${chiavi}`);
   }
+  // Chi manda le attività le compone da lì, e da nessun'altra parte.
+  assert.doesNotMatch(leggi('src', 'content', 'sidebar.js'), /misura: 'aiuto', (?!\.\.\.datiSessione)/);
   assert.match(leggi('src', 'content', 'sidebar.js'), /misura: 'ricerca-web-tetto' \}/, 'il tetto delle ricerche dell’Aiuto non porta la query');
 });
 

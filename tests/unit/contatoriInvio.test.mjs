@@ -736,3 +736,32 @@ test('a contatori spenti l’intervista aperta non si ricorda e non si conta', a
   assert.equal((await b.s.letto()).intervista, null);
   assert.equal(b.inviati.length, 0);
 });
+
+// Chiudere una scheda, una finestra o Filo non dà alla pagina nessun evento (#1467): quello che aveva aperto lo conta il
+// main, una volta, com'era all'ultimo aggiornamento; quello che la pagina ha già contato da sé non si riconta.
+test('le attività aperte in una pagina che se ne va si contano una volta, col loro ultimo stato', async () => {
+  const b = banco();
+  const aiuto = (esito, passi) => ({ esito, passiDaSolo: passi, passiCliccati: 0, nonTrovati: 0, documenti: 0 });
+  assert.equal(b.s.apertaInCorso('7|aiuto|a1', 'aiuto', aiuto('chiusa_prima', 0)), true);
+  b.s.apertaInCorso('7|aiuto|a1', 'aiuto', aiuto('fatto', 2));
+  b.s.apertaInCorso('7|lettura|l1', 'lettura', { voce: 'modello', motivo: 'nessuno', fino: 'q50' });
+  b.s.apertaInCorso('8|aiuto|a2', 'aiuto', aiuto('fatto', 1));
+  // La lettura l'ha chiusa la pagina: conta lei, e il main la dimentica.
+  b.s.finitaInCorso('7|lettura|l1');
+  b.s.chiudiInCorso('7|');
+  await attendi();
+  let ora = Object.values((await b.s.letto()).ore)[0];
+  assert.deepEqual(ora.aiuto, { 'fatto|p2_5|p0|n0|n0': 1 });
+  assert.deepEqual(ora.lettura, {});
+  b.s.chiudiInCorso('7|');
+  // Filo che si chiude conta le altre e salva sul disco prima di uscire.
+  const congedo = b.s.congeda();
+  assert.ok(congedo, 'c’era qualcosa da contare');
+  await congedo;
+  ora = Object.values(b.disco.get(Servizio.CHIAVE).ore)[0];
+  assert.deepEqual(ora.aiuto, { 'fatto|p2_5|p0|n0|n0': 1, 'fatto|p1|p0|n0|n0': 1 });
+  assert.equal(b.s.congeda(), null, 'niente più da contare né da salvare');
+  // In incognito non si tiene niente.
+  b.incognito = true;
+  assert.equal(b.s.apertaInCorso('9|aiuto|a3', 'aiuto', aiuto('fatto', 1)), false);
+});
