@@ -5228,18 +5228,7 @@
     box.className = 'mg-liv-azioni';
     const fila = document.createElement('div');
     fila.className = 'mg-liv-strade';
-    for (const s of strade) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
-      b.id = s.id;
-      b.dataset.strada = s.key;
-      b.textContent = s.label;
-      b.title = titoloStrada(fb, s.key);
-      b.disabled = azioniInVolo;
-      b.addEventListener('click', () => applyAction(s.azione, null));
-      fila.appendChild(b);
-    }
+    for (const s of strade) fila.appendChild(tastoStrada(fb, s));
     const esito = document.createElement('span');
     esito.className = 'mg-liv-esito';
     esito.id = 'mgL5StradeEsito';
