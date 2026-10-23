@@ -6170,11 +6170,19 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // insieme non stanno nella finestra restano le ultime chieste (nell'ordine delle chiamate), le altre si accorciano o
   // lasciano titolo e indirizzo, e la risposta lo dice.
   const pagineLette = [];
-  const pagineVive = () => pagineLette.filter((p) => p.x.res.output.tenuti !== 0);
-  const caratteriPagine = () => pagineVive().reduce((n, p) => n + lunghezzaDi(p), 0);
+  const pagineVive = () => pagineLette.filter((p) => p.x.res.output.tenuti !== 0)
+    .sort((a, b) => b.round - a.round || a.ordine - b.ordine);
   const caratteriStrumenti = () => { try { return tools ? JSON.stringify(tools).length : 0; } catch (_) { return 0; } };
+  // `tutte`: i caratteri delle pagine ancora davanti al modello; `altre`: quanto si libera togliendo tutte meno l'ultima
+  // chiesta, che ha il posto anche a costo di stringere la conversazione (rileggere una pagina tolta deve riuscire).
+  const misuraPagine = () => {
+    const vive = pagineVive();
+    const tutte = vive.reduce((n, p) => n + lunghezzaDi(p), 0);
+    const altre = vive.length > 1 ? tutte - lunghezzaDi(vive[0]) - globalThis.SN_FILO_CONTESTO.PESO_RIMANDO * (vive.length - 1) : 0;
+    return { tutte, altre: Math.max(0, altre) };
+  };
   const lasciaFuoriPagine = (eccesso) => {
-    const vive = pagineVive().sort((a, b) => b.round - a.round || a.ordine - b.ordine);
+    const vive = pagineVive();
     const tenere = globalThis.SN_FILO_CONTESTO.pagineDaTenere(vive.map(lunghezzaDi), eccesso);
     let stretta = false;
     vive.forEach((p, k) => {
