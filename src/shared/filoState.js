@@ -33,6 +33,7 @@
       let fuori = () => null;
       try { if (global.SN_DELICATE) fuori = await global.SN_DELICATE.filtro(); } catch (_) {}
       return sorted.map((t) => ({
+        id: t.id ?? null,
         url: t.url || '',
         title: t.title || '',
         active: !!t.active,
