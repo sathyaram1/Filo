@@ -275,3 +275,37 @@ test('la sessione ripristinata: quante schede tornano e quante l’utente ne chi
   assert.equal(b.m.sessione({ incognito: true }, nate), null);
   assert.equal(b.m.sessione(tm, []), null);
 });
+
+// Una notifica nuova senza tipo si conterebbe «altro» per sempre, senza che nessuno se ne accorga.
+test('ogni notifica della finestra dice il suo tipo, da un elenco che le regole accettano', async () => {
+  const { readFileSync, readdirSync, statSync } = await import('node:fs');
+  const { relative } = await import('node:path');
+  const sorgenti = (dir) => readdirSync(dir).flatMap((n) => {
+    const p = join(dir, n);
+    return statSync(p).isDirectory() ? sorgenti(p) : (n.endsWith('.js') ? [p] : []);
+  });
+  const senza = [];
+  const tipi = new Set(F.tipiNotifica());
+  const guarda = (file, re, inoltro = () => false) => {
+    const t = readFileSync(file, 'utf8');
+    for (const m of t.matchAll(re)) {
+      const pezzo = t.slice(m.index, m.index + 700);
+      if (inoltro(pezzo)) continue;
+      const tipo = /tipo(?:: |: errore \|\| )'([a-z0-9_]+)'/.exec(pezzo) || /tipo: (errore|chiave)\b/.exec(pezzo) || /errore: '([a-z0-9_]+)'/.exec(pezzo)
+        || /^showToast\([\s\S]*?, '([a-z0-9_]+)'\);/.exec(pezzo);
+      const riga = t.slice(0, m.index).split('\n').length;
+      if (!tipo) senza.push(`${relative(ROOT, file)}:${riga}`);
+      else if (/^[a-z0-9_]+$/.test(tipo[1]) && !['errore', 'chiave'].includes(tipo[1]) && !tipi.has(tipo[1])) senza.push(`${relative(ROOT, file)}:${riga} (${tipo[1]} fuori elenco)`);
+    }
+  };
+  for (const f of sorgenti(join(ROOT, 'src', 'main'))) {
+    const nome = relative(ROOT, f).replace(/\\/g, '/');
+    // Gli aiutanti che inoltrano le opzioni dei loro chiamanti: si guardano i chiamanti.
+    const inoltra = ['src/main/services/downloads.js', 'src/main/services/avvisoFinestra.js', 'src/main/updater.js'].includes(nome);
+    if (!inoltra) guarda(f, /send\('shell:toast'/g);
+    guarda(f, /(?<!function )\b(shellToast|avvisoNellaFinestra|avvisoQuandoPronta)\(/g, (p) => /^(avvisoNellaFinestra|avvisoQuandoPronta)\(testo, \{ chiave, (azioni|durataSec)/.test(p) || /^avvisoQuandoPronta\(testo, opts\)/.test(p));
+  }
+  guarda(join(ROOT, 'src', 'renderer', 'shell.js'), /(NOTIFS\.show|showToast)\(/g,
+    (p) => /^NOTIFS\.show\((testo, \{ \.\.\.\(opts \|\| \{\}\), tipo: chiave \}|info\.text, opts|text, opts|text, tipo \?)/.test(p) || /^showToast\(text, tipo\) \{/.test(p));
+  assert.deepEqual(senza, []);
+});

@@ -134,7 +134,7 @@ test('la barra delle schede: chiusure per via, spostamenti, voci del menu, massi
   expect(JSON.stringify(doc)).not.toMatch(/options|history|quaderno|filo:/);
 
   // Il tema scuro si vede nell'ambiente dell'ora.
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
   await expect.poll(async () => (await finestra(app)).ambiente, { timeout: 10_000 }).toMatch(/:scuro$/);
 });
 
@@ -155,17 +155,19 @@ test('le notifiche: tipo ed esito, mai il testo; letta, in attesa, sostituita, s
   await expect(azione).toBeEnabled({ timeout: 4000 });
   await azione.click();
 
-  // Una gemella con la stessa chiave prende il posto della prima; una breve scade da sé.
+  // Una gemella con la stessa chiave prende il posto della prima; una breve scade da sé, col puntatore altrove
+  // (sopra la pila i tempi aspettano).
+  await vista.evaluate(() => window.avvisi.sopra(false));
   await shell.evaluate(() => {
     window.filoNotify('Prima', { durationSec: 0, unica: 'gemelle', tipo: 'aiuto_spento' });
     window.filoNotify('Seconda', { durationSec: 0, unica: 'gemelle', tipo: 'aiuto_spento' });
     window.filoNotify('Breve', { durationSec: 1, tipo: 'riordino_schede' });
     window.filoNotify('Senza tipo', { durationSec: 0 });
   });
+  await expect.poll(async () => (await finestra(app)).notifica?.['riordino_schede:scaduta'] || 0, { timeout: 20_000 }).toBe(1);
   // Sette insieme: oltre il tetto qualcuna aspetta dietro il «+N»; «Chiudi tutti» le porta via.
   await shell.evaluate(() => { for (let i = 0; i < 7; i++) window.filoNotify(`Raffica ${i}`, { durationSec: 0, tipo: 'popup_bloccato' }); });
-  await expect.poll(async () => (await finestra(app)).notifica?.['riordino_schede:scaduta'] || 0, { timeout: 20_000 }).toBe(1);
-  await vista.locator('[data-pila="apri"]').click().catch(() => {});
+  await vista.locator('[data-pila="apri"]').click();
   const tutte = vista.locator('[data-pila="chiudi-tutti"]');
   await tutte.waitFor({ timeout: 5000 });
   await expect(tutte).toBeEnabled({ timeout: 4000 });
@@ -219,6 +221,8 @@ test('il riordino: il giro, le schede che chiude, quella riaperta dall’archivi
   });
   const home = app.windows().find((w) => { try { return w.url().startsWith('filo://history'); } catch (_) { return false; } });
   await home.waitForLoadState('domcontentloaded');
+  // Il modello che giudica tiene tutto: chiude solo la regola dei duplicati.
+  await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = async () => ({ decisions: [] }); });
   const r = await home.evaluate(() => chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
   expect(r.archived).toBe(1);
   await expect.poll(async () => {
@@ -274,8 +278,7 @@ test('in incognito e a contatori spenti non si conta niente della finestra', asy
   await openTab('filo://history/history.html');
   const home = app.windows().find((w) => { try { return w.url().startsWith('filo://history'); } catch (_) { return false; } });
   await home.evaluate(() => chrome.runtime.sendMessage({ type: 'open_incognito' }));
-  const incognito = await expect.poll(async () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs))).toBe(true);
-  void incognito;
+  await expect.poll(async () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs))).toBe(true);
   const prima = await finestra(app);
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)._filoTabs;
@@ -284,12 +287,15 @@ test('in incognito e a contatori spenti non si conta niente della finestra', asy
     tm.moveTab(tm.tabs[0].id, 1);
   });
   // La cornice in incognito: la sua notifica chiusa con la X passa dal suo canale, che non conta.
-  const cornice = await expect.poll(async () => app.windows().length).toBeGreaterThan(1);
-  void cornice;
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
+    return w.webContents.executeJavaScript('typeof window.filoNotify === "function"');
+  })).toBe(true);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
     return w.webContents.executeJavaScript(`(() => { const c = window.filoNotify('In incognito', { durationSec: 0, tipo: 'sito_bloccato' }); c.querySelector('.shell-notif-close').click(); })()`);
   });
+  // Un conto arriva con una scrittura asincrona: si lascia il tempo di arrivare, se dovesse.
   await sleep(1500);
   const dopo = await finestra(app);
   expect(dopo.chiusuraScheda || {}).toEqual(prima.chiusuraScheda || {});
