@@ -443,3 +443,53 @@ test('con la protezione accesa la pagina e i suoi riquadri non hanno proprietà 
   const off = await page.evaluate(proprieta);
   expect(on).toEqual(off);
 });
+
+// Un documento XML o SVG della stessa origine (dal sito, da un blob, in un object) è un'altra finestra della pagina:
+// le sue funzioni esportano col rumore, e un riquadro vuoto inserito lì dentro, letto per indice, anche.
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="5" height="5"/></svg>';
+const XHTML = '<html xmlns="http://www.w3.org/1999/xhtml"><body/></html>';
+async function lettureXml({ svgUrl, xmlUrl, SVG, XHTML }) {
+  /* global fnv, scena */
+  const { c } = scena(document);
+  const daBlob = (b) => new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fnv(fr.result)); fr.readAsDataURL(b); });
+  const comeBlob = (W) => new Promise((res) => W.HTMLCanvasElement.prototype.toBlob.call(c, (b) => daBlob(b).then(res)));
+  const carico = (f) => new Promise((r) => { f.addEventListener('load', r, { once: true }); setTimeout(r, 4000); });
+  const blob = (s, t) => URL.createObjectURL(new Blob([s], { type: t }));
+  const leggi = (W) => fnv(W.HTMLCanvasElement.prototype.toDataURL.call(c));
+  const out = { pagina: fnv(c.toDataURL()), paginaBlob: await comeBlob(window) };
+  const casi = { svgDelSito: svgUrl, xmlDelSito: xmlUrl, svgDaBlob: blob(SVG, 'image/svg+xml'), xhtmlDaBlob: blob(XHTML, 'application/xhtml+xml') };
+  for (const [nome, src] of Object.entries(casi)) {
+    const f = document.createElement('iframe'); f.src = src; document.body.appendChild(f); await carico(f);
+    out[nome] = leggi(f.contentWindow);
+  }
+  const o = document.createElement('object'); o.type = 'image/svg+xml'; o.data = blob(SVG, 'image/svg+xml');
+  document.body.appendChild(o); await carico(o);
+  out.objectSvg = leggi(o.contentWindow);
+  out.objectSvgBlob = await comeBlob(o.contentWindow);
+  const x = document.querySelectorAll('iframe')[3].contentWindow;
+  const dentro = x.document.createElementNS('http://www.w3.org/1999/xhtml', 'iframe');
+  x.document.documentElement.appendChild(dentro);
+  out.vuotoInXhtmlPerIndice = leggi(x[x.length - 1]);
+  return out;
+}
+
+test('un riquadro XML o SVG della stessa origine legge il canvas col rumore della pagina', async ({ openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const svgUrl = testServer.asset(SVG, 'image/svg+xml');
+  const xmlUrl = testServer.asset('<a/>', 'text/xml');
+  const leggi = async () => {
+    const page = await openTab(testServer.html(`<!doctype html><meta charset="utf-8"><body><script>${IMPRONTA}</script></body>`));
+    await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+    return page.evaluate(lettureXml, { svgUrl, xmlUrl, SVG, XHTML });
+  };
+  const on = await leggi();
+  await setFpMode(openTab, 'off');
+  const off = await leggi();
+  expect(on.pagina).not.toBe(off.pagina);
+  for (const k of ['svgDelSito', 'xmlDelSito', 'svgDaBlob', 'xhtmlDaBlob', 'objectSvg', 'vuotoInXhtmlPerIndice']) {
+    expect.soft(off[k], `${k}: con Off la lettura riesce`).toBe(off.pagina);
+    expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+  }
+  expect.soft(on.objectSvgBlob, 'toBlob da un object SVG').toBe(on.paginaBlob);
+  expect.soft(off.objectSvgBlob).toBe(off.paginaBlob);
+});
