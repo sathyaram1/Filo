@@ -249,8 +249,11 @@
       if (!campo.isConnected || campo.value !== c.atteso || !campo.value.trim()) {
         smetti();
         imposta('pronto');
-        // Vuota: l'ha inviata la persona (il tasto d'invio col mouse); cambiata: l'ha corretta prima che partisse.
-        esitoDellAttesa(!campo.isConnected ? 'annullata' : campo.value.trim() ? 'cambiata' : 'a_mano');
+        // Sparita la chat, il testo è perso; vuota senza che la persona l'abbia cancellata, l'ha inviata lei (il tasto
+        // d'invio col mouse); cambiata, aspetta l'invio.
+        if (!campo.isConnected) esitoDellAttesa('annullata');
+        else if (!campo.value.trim()) esitoDellAttesa('a_mano');
+        else annullaInvio(true);
         return;
       }
       if (Date.now() - c.dal < c.attesaMs) return;
@@ -258,16 +261,21 @@
       smetti();
       imposta('pronto');
       esitoDellAttesa('da_sola');
+      // Quello che era rimasto nella casella da prima parte insieme.
+      chiudiDettate((d) => (d.cambiata ? 'cambiata' : 'da_sola'));
       try { invia(); } catch (e) { console.error('[Filo voce]', e); }
     }
     function smetti() {
       if (c.timer) clearInterval(c.timer);
       c.timer = 0;
     }
-    function annullaInvio(invio = 'annullata') {
+    // L'invio da solo fermato (Esc, il microfono, una correzione): il testo resta nella casella e si conta quando parte.
+    function annullaInvio(cambiata = false) {
       smetti();
       imposta('pronto');
-      esitoDellAttesa(invio);
+      const e = c.inAttesa;
+      c.inAttesa = null;
+      if (e) lasciaInCasella(e, cambiata);
       caretInFondo(campo);
     }
 
