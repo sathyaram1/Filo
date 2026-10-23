@@ -925,6 +925,8 @@
       erroriVisti: erroriVistiPuliti(d.erroriVisti),
       intervista: intervistaPulita(d.intervista),
       primeVolte: primeVoltePulite(d.primeVolte),
+      ...Object.fromEntries(MISURE_MODELLI.map((c) => [c, modelliPuliti(d[c], c)])),
+      chiamate: chiamatePulite(d.chiamate),
     };
   }
 
