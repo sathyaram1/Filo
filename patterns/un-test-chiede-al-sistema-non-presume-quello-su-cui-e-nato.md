@@ -329,6 +329,11 @@ al secondo, anche a finestra nascosta. Lo stesso Electron senza Playwright rispo
   `ResizeObserver`, `visibilitychange`, timer rallentati) si prova con
   `apriFiloSenzaPlaywright()` di `tests/helpers/filoSenzaPlaywright.mjs`: guida il main
   dal suo ispettore, come `app.evaluate`, e lascia le pagine senza client di debug.
+  Anche il Node è parte del sistema: il contenitore delle routine ha il 22, la suite e
+  gli unit su GitHub girano sul `node-version` dei workflow (oggi 20), senza il
+  `WebSocket` globale. Il client dell'ispettore è perciò il `ws` di Playwright, e le
+  quattro prove nate così erano rosse solo su main (#1611, sentinella
+  `tests/unit/filoSenzaPlaywright.test.mjs`).
 - La prova asserisce prima la precondizione, `document.visibilityState === 'hidden'`
   nella pagina: senza, crede di guardare una scheda dietro e ne guarda una visibile.
 - Le anteprime delle schede svegliano per un attimo la scheda dietro che cambia
