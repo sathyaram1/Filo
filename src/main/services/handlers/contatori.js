@@ -140,7 +140,25 @@ module.exports = function register(on, ctx) {
   on(MSG.CONTATORI_INSTALLAZIONI, soloFilo(async () => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
     try {
-      return { ok: true, installazioni: await contatori.installazioni({ idToken: await auth.getIdToken() }) };
+      const i = await contatori.installazioni({ idToken: await auth.getIdToken() });
+      return { ok: true, installazioni: { ...i, ieri: Somme.sottoSoglia(i && i.ieri), mese: Somme.sottoSoglia(i && i.mese) } };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    }
+  }));
+
+  const somme = Somme.crea();
+  globalThis.SN_CONTATORI_SOMME = somme;
+  on(MSG.CONTATORI_SOMME, soloFilo(async (msg) => {
+    if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
+    const m = msg && typeof msg === 'object' ? msg : {};
+    try {
+      return {
+        ok: true,
+        somme: await somme.somme({
+          idToken: await auth.getIdToken(), dal: testo(m.dal), al: testo(m.al), app: testo(m.app), os: testo(m.os), forza: m.forza === true,
+        }),
+      };
     } catch (e) {
       return { ok: false, error: String((e && e.message) || e) };
     }
