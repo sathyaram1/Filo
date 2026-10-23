@@ -383,7 +383,9 @@ function esempi(norm, esca) {
   if (norm.isIp && !(esca && esca.length)) return [];
   const zone = norm.isIp ? zoneDi({}, esca) : zoneDi(norm, esca);
   const info = infoDi(norm, zone);
-  return candidati(zone, norm.registrable).map((c) => ({ c, feats: caratteristiche(c, zone, info) }));
+  // formaCerta() distingue il suffisso di paese e il sito ospitato: senza questi due ogni nome intero era certo.
+  const tld = info.suffisso.slice(info.suffisso.lastIndexOf('.') + 1);
+  return candidati(zone, norm.registrable).map((c) => ({ c: Object.assign(c, { tld, ospitato: info.ospitato }), feats: caratteristiche(c, zone, info) }));
 }
 
 const TIPO_VERDETTO = {

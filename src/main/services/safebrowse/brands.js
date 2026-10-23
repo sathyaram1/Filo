@@ -131,7 +131,7 @@ const BRANDS = [
   { token: 'agenziadelleentrate', display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrate.it', 'agenziaentrateriscossione.gov.it'] },
   // I gestori dell'identità digitale usano il nome SPID sui loro siti: sono loro, non imitazioni.
   { token: 'spid', display: 'SPID', domains: ['spid.gov.it'], omonimi: ['aruba.it', 'infocert.it', 'intesa.it', 'lepida.it', 'namirialtsp.com', 'namirial.com', 'poste.it', 'register.it', 'sieltecloud.it', 'tim.it', 'intesigroup.com', 'teamsystem.com', 'eht.eu', 'infocamere.it', 'agid.gov.it', 'gov.it'] },
-  { token: 'bancoposta', display: 'BancoPosta', domains: ['poste.it', 'posteitaliane.it'] },
+  { token: 'bancoposta', display: 'BancoPosta', domains: ['poste.it', 'posteitaliane.it', 'bancoposta.it'] },
   { token: 'postepay', display: 'Postepay', domains: ['postepay.it', 'poste.it', 'posteitaliane.it'] },
   { token: 'inps', display: 'INPS', domains: ['inps.it', 'inps.gov.it'] },
   { token: 'agenziaentrate', display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrate.it', 'agenziaentrateriscossione.gov.it'] },
