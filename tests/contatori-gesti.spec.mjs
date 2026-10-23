@@ -217,6 +217,22 @@ test('i trascinamenti nella home: da dove a dove e se è servito, e quelli lasci
   expect(stato).not.toContain('Mazzi');
 });
 
+test('un file dal disco lasciato nella home fuori dal campo entra in chat e si conta posato, come sul campo', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await homeDi(app);
+  await expect(home.locator('#input')).toBeVisible();
+  const foto = join(cartellaInCasa('filo-test-gesti-'), 'foto.png');
+  writeFileSync(foto, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+  // Il rilascio vero del sistema, lontano dalla casella: la pagina non lo fabbrica.
+  const s = await home.context().newCDPSession(home);
+  const data = { items: [], files: [foto], dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: 120, y: 120, data });
+  await s.detach().catch(() => {});
+  await expect(home.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
+  await expect.poll(() => conto(app, 'trascinamento', 'file_disco', 'chat_home|posato'), { timeout: 8_000 }).toBe(1);
+  expect(JSON.stringify(await app.evaluate(async () => globalThis.SN_CONTATORI_MAIN.letto()))).not.toContain('foto.png');
+});
+
 test('l’Editor conta la vista delle impostazioni, la griglia ridimensionata e il modulo aggiunto, per tipo', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab('filo://editor/editor.html');
