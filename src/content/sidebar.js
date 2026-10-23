@@ -157,9 +157,10 @@
     cambiato();
   }
 
-  function open(context) {
+  function apri(context) {
     if (isOpen()) { mostra(); return; }
     if (root) close({ davvero: true });
+    facciata.attiva = false;
     history = [];
     documenti = null;
     ripiegoDetto = false;
