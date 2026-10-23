@@ -109,7 +109,7 @@ test('tetto pieno: lo dice senza hover, con l\'ora in cui riparte', async ({ app
   const page = await apri(openTab);
   await expect(page.locator('#mgJudgeSpesaTesto')).toHaveText('Oggi: 1,95 $ su 2,00 $, più 0,10 $ prenotati per i giudizi in corso');
   await expect(page.locator('#mgJudgeSpesa')).toHaveClass(/is-pieno/);
-  await expect(page.locator('#mgJudgeSpesaNota')).toHaveText(/^Tetto raggiunto: i nuovi feedback dei non fidati aspettano te fino alle \d{2}:\d{2}\.$/);
+  await expect(page.locator('#mgJudgeSpesaNota')).toHaveText(/^Tetto raggiunto\. I nuovi feedback dei non fidati aspettano te fino alle \d{2}:\d{2}\.$/);
   await page.locator('#mgJudgeBudgetBlock').screenshot({ path: 'tests/.shots/1515-tetto-pieno.png' });
 
   // Alzare il tetto toglie l'avviso subito.

@@ -72,7 +72,7 @@ test('la riga di Gestione: spesa accanto al tetto, tetto pieno detto, ignoto col
   assert.equal(pieno.testo, 'Oggi: 1,95 $ su 2,00 $, più 0,10 $ prenotati per i giudizi in corso');
   assert.equal(pieno.pieno, true);
   assert.equal(pieno.quota, 1);
-  assert.match(pieno.dettaglio, /^Tetto raggiunto: i nuovi feedback dei non fidati aspettano te fino alle \d{2}:\d{2}\.$/);
+  assert.match(pieno.dettaglio, /^Tetto raggiunto\. I nuovi feedback dei non fidati aspettano te fino alle \d{2}:\d{2}\.$/);
 
   const zero = SG.rigaSpesa({ spesoUsd: 0, prenotatoUsd: 0 }, 0, ORA);
   assert.equal(zero.pieno, true, 'con tetto zero nessun non fidato va ai giudici');
