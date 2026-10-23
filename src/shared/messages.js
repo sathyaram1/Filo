@@ -253,8 +253,14 @@
     CONTATORI_INSTALLAZIONI: 'contatori_installazioni',
     // CONTATORI_USO (#969): la persona ha visto la risposta di una chiamata partita prima che la chiedesse (una
     //   spiegazione preparata alla selezione, la correzione di una parola già pronta): l'uso lo conta chi la mostra.
-    //   { action, attesaMs } → { ok }
+    //   `anticipata`: la risposta era stata preparata in anticipo, e questa è la sua apertura (#1461).
+    //   { action, attesaMs, anticipata } → { ok }
     CONTATORI_USO: 'contatori_uso',
+    // CONTATORI_EVENTO (#1461): un gesto contato dove la persona lo fa (un'azione misurata, un'icona, una ricerca in un
+    //   pannello, una proposta del correttore, un annullo in pagina, una risposta chiesta, un avviso d'errore, una
+    //   scelta dell'intervista). Solo nomi da elenchi chiusi e numeri; il main rifiuta il resto.
+    //   { misura, ... } → { ok }
+    CONTATORI_EVENTO: 'contatori_evento',
     // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
     WALLET_OWNER_INVITES: 'wallet_owner_invites',
     // WALLET_OWNER_KNOBS_SET (#652): cambia le manopole dei crediti in
@@ -1003,6 +1009,8 @@
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
+    // L'utente ha detto no alla stessa conferma: non parte niente, lo contano solo i contatori (#1461). { action }
+    FILO_CONFIRM_RIFIUTATA: 'filo_confirm_rifiutata',
     // I cambi di stato come eventi del filo (#867). Solo dalle pagine di Filo: leggono e riscrivono le
     // impostazioni dell'utente. LEGGI { ids } → { eventi }; ANNULLA { id } → { ok, eventi }.
     CAMBI_LEGGI: 'cambi_leggi',

@@ -187,12 +187,12 @@ function loadIfNeeded() {
 const CHIAVE_LETTURA = 'dati-letti';
 const CHIAVE_SALVATAGGIO = 'dati-non-salvati';
 
-function avvisa(testo, chiave, durataSec = 0, detto) {
+function avvisa(testo, chiave, durataSec = 0, detto, errore = '') {
   STATE.avvisi.push({ testo, chiave });
   try {
     const A = require('../services/avvisoFinestra');
-    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec });
-    else A.avvisoQuandoPronta(testo, { chiave, detto });
+    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec, errore });
+    else A.avvisoQuandoPronta(testo, { chiave, detto, errore });
   } catch (_) {}
 }
 
@@ -285,7 +285,7 @@ async function leggiFile() {
     STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
     STATE.loaded = true;
     avviaVerifica();
-    avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA);
+    avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA, 0, null, 'dati_illeggibili');
     return;
   }
   STATE.pulizia = Disco.togliTemporanei(target).catch(() => {});
@@ -318,7 +318,7 @@ async function leggiFile() {
   avviaVerifica();
   // Senza storage.json un arresto adesso farebbe ripartire vuoto il prossimo avvio, che non guarda la copia.
   if (daParte && copia) scheduleFlush();
-  avvisa(testoRovinato(daParte, copia), CHIAVE_LETTURA);
+  avvisa(testoRovinato(daParte, copia), CHIAVE_LETTURA, 0, null, 'dati_illeggibili');
 }
 
 // La copia di riserva segue il file con un minuto di ritardo al più: ferma all'avvio terrebbe sul disco, per tutta
@@ -492,7 +492,7 @@ function salvataggioFallito(err) {
   STATE.ultimoErrore = { code: (err && err.code) || '', message: String((err && err.message) || err), at: Date.now() };
   if (!STATE.avvisatoSalvataggio) {
     STATE.avvisatoSalvataggio = true;
-    avvisa(testoNonSalvato(err), CHIAVE_SALVATAGGIO);
+    avvisa(testoNonSalvato(err), CHIAVE_SALVATAGGIO, 0, null, 'dati_non_salvati');
   }
   STATE.ritentaMs = Math.min(Math.max(STATE.ritentaMs * 2, 10_000), 5 * 60_000);
   if (!STATE.ritentaTimer) {

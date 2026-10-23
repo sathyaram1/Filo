@@ -685,17 +685,18 @@
       if (v.annullabile) return [{ type: 'item', icon: icona('undo', 16), label: `Annulla · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
     }
     // Una conversazione della home si toglie dal filo da una sua bolla: la Cronologia, che lo faceva, non c'è più (#872).
+    // `azione`: il menu del tasto destro misura l'attesa delle voci del catalogo (#1461).
     const bolla = e.closest('.dash-bubble[data-chat]');
     if (bolla && bolla.dataset.chat) {
       const id = bolla.dataset.chat;
       return [
-        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
-        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', azione: 'chat-archive', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', azione: 'chat-archive', onClick: () => { togliConversazione(id).catch(() => {}); } },
       ];
     }
     const nascosta = e.closest('.dash-nascosta');
     if (nascosta && nascosta.dataset.nascosta) {
-      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { nascosta.querySelector('button').click(); } }];
+      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { nascosta.querySelector('button').click(); } }];
     }
     return [];
   }

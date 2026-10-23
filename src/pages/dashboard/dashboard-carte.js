@@ -71,6 +71,11 @@
   }
   function plurale(n, uno, tanti) { return n === 1 ? `1 ${uno}` : `${n} ${tanti}`; }
   let avvisoTimer = null;
+  // Un errore letto sulle carte si conta come nella barra delle schede, per chiave dell'elenco chiuso (#1461).
+  function avvisoErrore(testo, chiave) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    avviso(testo);
+  }
   function avviso(testo) {
     let n = document.getElementById('dashFlash');
     if (!n) {
@@ -165,7 +170,7 @@
       return;
     }
     if (res.missing) caricaDownloads();
-    avviso(res.error || 'Il file non si apre');
+    avvisoErrore(res.error || 'Il file non si apre', 'file_non_aperto');
   }
   const cmdDownload = (type, r) => () => d.send({ type, id: r.id }).then(caricaDownloads);
 
@@ -205,7 +210,7 @@
     const cartella = {
       etichetta: 'Cartella',
       fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then((res) => {
-        if (res && res.ok === false) avviso(res.error || 'La cartella non si apre');
+        if (res && res.ok === false) avvisoErrore(res.error || 'La cartella non si apre', 'cartella_non_aperta');
         caricaDownloads();
       }),
     };
@@ -261,7 +266,7 @@
       const r = await d.send({ type: MSG.FILO_INSTALLA_AGGIORNAMENTO });
       if (!r || r.ok === false) {
         if (b) b.disabled = false;
-        avviso((r && r.error) || 'L’aggiornamento non parte');
+        avvisoErrore((r && r.error) || 'L’aggiornamento non parte', 'aggiornamento_non_avviato');
       }
       d.refreshLive();
     };

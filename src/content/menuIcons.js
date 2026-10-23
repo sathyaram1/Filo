@@ -123,7 +123,25 @@
     if (isOwner) {
       registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
     }
+    for (const [id, voce] of Object.entries(registry)) contaIcona(id, voce);
     return registry;
+  }
+
+  // Le icone si misurano dal clic alla fine della loro azione (#1461). Quelle che chiedono al main una navigazione le
+  // misura lui, fino alla pagina caricata (nav.js, o l'apertura della scheda per le pagine di Filo): qui sarebbero due.
+  const CONTATE_DAL_MAIN = new Set(['back', 'forward', 'reload', 'closeTab', 'newTab', 'incognito', 'openOptions', 'home', 'editorApp',
+    'feedbackApp']);
+  function contaIcona(id, voce) {
+    if (CONTATE_DAL_MAIN.has(id) || !voce || typeof voce.onClick !== 'function') return;
+    const fa = voce.onClick;
+    voce.onClick = (...args) => {
+      const t0 = Date.now();
+      const fine = () => { try { global.SN_POPUP?.conta?.({ misura: 'icona', icona: id, fineMs: Date.now() - t0 }); } catch (_) {} };
+      let r;
+      try { r = fa(...args); } catch (e) { fine(); throw e; }
+      if (r && typeof r.then === 'function') r.then(fine, fine); else fine();
+      return r;
+    };
   }
 
   // Dove sta ogni icona (riga, «Altro…», barra laterale) lo decide src/shared/disposizioneIcone.js,

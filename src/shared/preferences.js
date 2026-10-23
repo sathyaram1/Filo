@@ -1711,11 +1711,12 @@
       spentoAllenta: false,
       nome: 'Contatori anonimi d\'uso',
       stati: ['accesi', 'spenti'],
-      aiuto: 'true | false (una volta al giorno manda a chi sviluppa Filo solo numeri: quante volte si usa ogni funzione, '
-        + 'quanto si aspetta la risposta, quante chiamate falliscono; spenti, non si conta niente e non parte niente)',
-      risk: 'Decide se Filo manda una volta al giorno a chi lo sviluppa dei numeri senza contenuto (usi e attese per '
-        + 'funzione, chiamate fallite, versione e sistema), con uno pseudonimo che cambia ogni mese: mai testi, '
-        + 'indirizzi o nomi di file.',
+      aiuto: 'true | false (ogni ora manda a chi sviluppa Filo solo numeri e nomi da elenchi fissi: usi e attese di funzioni '
+        + 'e azioni, impostazioni cambiate, ricerche nei pannelli, proposte del correttore, conferme, annulli, errori visti, '
+        + 'scelte dell\'intervista; spenti, non si conta niente e non parte niente, nemmeno lo spegnimento)',
+      risk: 'Decide se Filo manda ogni ora a chi lo sviluppa dei numeri senza contenuto (usi e attese di funzioni e azioni, '
+        + 'impostazioni cambiate, ricerche nei pannelli, correttore, conferme, annulli, errori visti, intervista, versione e '
+        + 'sistema), con uno pseudonimo che cambia ogni mese: mai testi, indirizzi, titoli, nomi di file o parole.',
     }),
     elenco({
       keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],

@@ -12,6 +12,7 @@
       version: '0.2.248', date: '2026-10-23',
       features: [
         'Ctrl+Tab porta alla scheda dopo e Ctrl+Shift+Tab a quella prima, come negli altri browser, anche mentre scrivi in una pagina. Dall\'ultima scheda si riparte dalla prima. Su Mac si premono col tasto Control.',
+        'Nell\'intervista di benvenuto Filo ti chiede se può mandare i contatori anonimi, solo numeri senza contenuto che gli servono a migliorare: rispondi con Sì o No. Con il No non parte niente, nemmeno quello che aveva già contato. Lo cambi quando vuoi in Preferenze o chiedendolo a Filo.',
       ],
       fixes: [
         'Se la chiave personale salvata sul computer non è più quella del tuo portafoglio, la pagina Crediti te lo dice, e con «Richiedi una nuova chiave» i consumi tornano a registrarsi. Un consumo che il server non accetta non blocca più tutti quelli dopo, e Crediti dice quanti non sono stati registrati.',

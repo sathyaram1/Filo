@@ -400,15 +400,21 @@
     renderAccount();
   }
 
+  // Gli avvisi d'errore della barra si contano per chiave, mai col testo (#1461).
+  function avvisoErrore(testo, chiave, opts) {
+    try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    return NOTIFS.show(testo, opts);
+  }
+
   async function doSignIn() {
     if (authBusy) return;
     authBusy = true; renderAccount();
     try {
       const r = await api.auth.signIn();
       if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
-      else showToast((r && r.error) || 'Accesso non riuscito: riprova.');
+      else avvisoErrore((r && r.error) || 'Accesso non riuscito: riprova.', 'accesso_non_riuscito');
     } catch (_) {
-      showToast('Accesso non riuscito: riprova.');
+      avvisoErrore('Accesso non riuscito: riprova.', 'accesso_non_riuscito');
     } finally {
       authBusy = false; renderAccount();
     }
@@ -418,9 +424,9 @@
   async function collegaGoogle() {
     try {
       const r = await api.message({ type: 'auth_collega_google' });
-      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+      if (r && r.ok === false) avvisoErrore(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.', 'accesso_non_riuscito');
     } catch (_) {
-      showToast('Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+      avvisoErrore('Non sono riuscito ad aprire l\'accesso a Google. Riprova.', 'accesso_non_riuscito');
     }
   }
 
@@ -1016,7 +1022,7 @@
       : err === 'bad_country'
         ? 'Paese non riconosciuto: riprova con un altro.'
         : 'Non sono riuscito ad aprire la scheda da un altro paese: il fornitore di rete non ha risposto. Riprova più tardi.';
-    showToast(msg);
+    avvisoErrore(msg, 'scheda_da_altro_paese');
   }
 
   function openProxyCountryMenu() {
@@ -1754,15 +1760,15 @@
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
-      NOTIFS.show(res.error || 'Non è stato possibile aprire il file', opts);
+      avvisoErrore(res.error || 'Non è stato possibile aprire il file', 'file_non_aperto', opts);
     }).catch(() => {});
   }
   function openDownloadFolder(id) {
     if (!api.downloads) return Promise.resolve();
     return api.downloads.openFolder(id).then((res) => {
       if (!res) return;
-      if (res.ok === false) { NOTIFS.show(res.error || 'Non è stato possibile aprire la cartella'); return; }
-      if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
+      if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
+      if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
     }).catch(() => {});
   }
 
@@ -1827,7 +1833,7 @@
             return {
               label: a.label,
               onClick: () => api.message({ type: 'aggiornamento_installa' }).then((res) => {
-                if (res && res.ok === false) NOTIFS.show(res.frase || 'Non sono riuscito ad avviare l’aggiornamento');
+                if (res && res.ok === false) avvisoErrore(res.frase || 'Non sono riuscito ad avviare l’aggiornamento', 'aggiornamento_non_avviato');
               }).catch(() => {}),
             };
           }
@@ -1847,7 +1853,7 @@
               label: a.label,
               onClick: () => api.downloads.rimettiNome(id).then((r) => {
                 if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
-                else NOTIFS.show((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima');
+                else avvisoErrore((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima', 'nome_non_rimesso');
               }).catch(() => {}),
             };
           }

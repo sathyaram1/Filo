@@ -22,6 +22,12 @@
     queueMicrotask(() => { if (chiusoOra) { chiusoOra = false; api.fuori(s); } });
   });
 
+  // La ricerca nella cronologia degli appunti fatta nello strato: il main la conta come quella nella pagina (#1461).
+  globalThis.SN_MENU_CONTA = (evento) => {
+    if (!evento || evento.misura !== 'ricerca') return;
+    api.chiedi('conta', { pannello: evento.pannello, esito: evento.esito, attesaMs: evento.attesaMs, posizione: evento.posizione });
+  };
+
   function chiedi(canale, dati = {}) {
     if (!m) return;
     const chiude = chiusoOra;

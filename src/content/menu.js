@@ -136,10 +136,84 @@
     return false;
   }
 
+  // ── Il box come pannello in cui si cerca una voce, per i contatori (#1461) ──────────────────────────────────────
+  // Dall'apertura alla prima scelta, a che posto era la voce fra quelle in vista (prima il pannello, poi il
+  // sottomenu), o chiuso senza scegliere. Escono solo esiti e numeri, nella pagina e nello strato.
+  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-paste-main, .sn-menu-correction-main, .sn-menu-row-btn, '
+    + '.sn-menu-icon-btn, .sn-menu-history-item';
+  function contaNelMenu(evento) {
+    try {
+      if (global.SN_POPUP && typeof global.SN_POPUP.conta === 'function') global.SN_POPUP.conta(evento);
+      else if (typeof global.SN_MENU_CONTA === 'function') global.SN_MENU_CONTA(evento);
+    } catch (_) {}
+  }
+  const contaBox = (ev) => contaNelMenu({ misura: 'ricerca', pannello: 'tasto-destro', ...ev });
+  // Una voce che fa un'azione del catalogo delle capacità la nomina con `azione` (#1461): si misura qui, dal clic alla
+  // fine del suo lavoro, per ogni menu che passa da open, nella pagina e nello strato. Una voce non si misura due volte.
+  const MISURATE = new WeakSet();
+  let azioneInCorso = null;
+  function misuraLeAzioni(items) {
+    for (const it of Array.isArray(items) ? items : []) {
+      if (!it || typeof it !== 'object' || MISURATE.has(it)) continue;
+      MISURATE.add(it);
+      for (const k of ['items', 'subItems']) if (Array.isArray(it[k])) misuraLeAzioni(it[k]);
+      if (typeof it.azione !== 'string' || !it.azione) continue;
+      for (const campo of ['onClick', 'onPickHistory']) {
+        const fa = it[campo];
+        if (typeof fa !== 'function') continue;
+        it[campo] = function (...args) {
+          const voce = { id: it.azione, t0: Date.now(), apre: false };
+          // Una voce che apre una scheda la passa al main con l'azione (`apre`): lì finisce a pagina caricata.
+          const fine = () => { if (!voce.apre) contaNelMenu({ misura: 'azione', id: it.azione, fineMs: Date.now() - voce.t0 }); };
+          const prima = azioneInCorso;
+          azioneInCorso = voce;
+          let r;
+          try { r = fa.apply(this, args); } catch (e) { fine(); throw e; } finally { azioneInCorso = prima; }
+          if (r && typeof r.then === 'function') r.then(fine, fine); else fine();
+          return r;
+        };
+      }
+    }
+    return items;
+  }
+  function vociInVista(pannello) {
+    if (!pannello) return [];
+    return [...pannello.querySelectorAll(VOCI)].filter((b) => !b.classList.contains('sn-menu-row-overflow')
+      && !b.classList.contains('sn-menu-row-empty') && !b.classList.contains('sn-menu-history-gone')
+      && b.getClientRects().length > 0);
+  }
+  function sceltaNelMenu(voce) {
+    const r = activeMenu && activeMenu.ricerca;
+    if (!r || r.scelta) return;
+    r.scelta = true;
+    const principali = vociInVista(activeMenu.root);
+    let i = principali.indexOf(voce);
+    if (i < 0 && activeMenu.subRoot && activeMenu.subRoot.contains(voce)) {
+      const j = vociInVista(activeMenu.subRoot).indexOf(voce);
+      i = j < 0 ? -1 : principali.length + j;
+    }
+    contaBox({ esito: 'scelta', attesaMs: Date.now() - r.t0, posizione: i >= 0 ? i + 1 : null });
+  }
+  // In cattura, prima che la voce chiuda il menu. La cronologia degli appunti sta in un'ombra chiusa: lì la scelta la
+  // segna la riga stessa.
+  function sceltaDalClic(e) {
+    if (!e.isTrusted || !activeMenu) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const voce = percorso.find((n) => n && n.nodeType === 1 && typeof n.matches === 'function' && n.matches(VOCI));
+    if (!voce || voce.matches('.sn-menu-history-item')) return;
+    if (voce.disabled || voce.dataset.snDisabled === '1' || voce.closest('.sn-disabled')) return;
+    if (voce.classList.contains('sn-menu-row-overflow') || voce.classList.contains('sn-menu-row-empty')) return;
+    if (!activeMenu.root.contains(voce) && !(activeMenu.subRoot && activeMenu.subRoot.contains(voce))) return;
+    sceltaNelMenu(voce);
+  }
+
   function close() {
     try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
     if (activeMenu) {
+      if (activeMenu.ricerca && !activeMenu.ricerca.scelta) contaBox({ esito: 'vuota' });
+      activeMenu.ricerca = null;
+      document.removeEventListener('click', sceltaDalClic, true);
       const torna = activeMenu.opener;
       const eraDentro = activeMenu.root.contains(document.activeElement);
       activeMenu.root.remove();
@@ -168,6 +242,9 @@
   // La cronologia degli appunti non sta nel documento ma dentro un host suo (`subHost`): si stacca quello.
   function staccaSub() {
     if (!activeMenu) return;
+    const allaChiusuraSub = activeMenu.subAllaChiusura;
+    activeMenu.subAllaChiusura = null;
+    try { if (typeof allaChiusuraSub === 'function') allaChiusuraSub(); } catch (_) {}
     try { (activeMenu.subHost || activeMenu.subRoot)?.remove(); } catch (_) {}
     activeMenu.subRoot = null;
     activeMenu.subHost = null;
@@ -316,7 +393,9 @@
 
   // items: { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled,
   // onClick, items? }. 'inline' mostra contenuto dinamico, 'paste' apre la cronologia.
-  function open({ x, y, items, keepOnScroll }) {
+  // `alChiudere`: chi ha aperto il menu vuole sapere quando si chiude, da sé o con una voce.
+  function open({ x, y, items, keepOnScroll, alChiudere }) {
+    misuraLeAzioni(items);
     close();
     const tastiera = daTastiera();
     tastoMenuAlle = 0;
@@ -335,6 +414,7 @@
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     const cleanups = [];
+    if (typeof alChiudere === 'function') cleanups.push(alChiudere);
     // Le sezioni che si riempiono più tardi si guardano da vicino, così la rimisura parte appena il
     // testo cambia.
     const crescite = [];
@@ -639,7 +719,10 @@
     activeMenu = {
       root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
       subRoot: null, subHost: null, subAnchor: null, subMode: null, opener, tastiera,
+      ricerca: { t0: Date.now(), scelta: false },
     };
+    document.addEventListener('click', sceltaDalClic, true);
+    contaBox({ esito: 'aperta' });
     if (tastiera) {
       const voci = vociDaTastiera(root);
       const prima = voci.find((b) => b.dataset.snPrima === '1') || voci[0];
@@ -863,6 +946,26 @@
 
       let clearWrap = null;
 
+      // La ricerca nella cronologia, per i contatori (#1461): conta da quando ci si scrive o si sceglie una voce, con
+      // l'attesa dall'apertura e la posizione fra le voci in vista; chiusa senza scelta, è una ricerca a vuoto.
+      const ricerca = { t0: Date.now(), iniziata: false, scelta: false };
+      const contaRicerca = (ev) => contaNelMenu({ misura: 'ricerca', pannello: 'incolla', ...ev });
+      const iniziaRicerca = () => {
+        if (ricerca.iniziata) return;
+        ricerca.iniziata = true;
+        contaRicerca({ esito: 'aperta' });
+      };
+      const sceltaFatta = (row) => {
+        iniziaRicerca();
+        ricerca.scelta = true;
+        const vive = [...list.querySelectorAll('.sn-menu-history-item')]
+          .filter((r) => r.style.display !== 'none' && !r.classList.contains('sn-menu-history-gone'));
+        const i = vive.indexOf(row);
+        contaRicerca({ esito: 'scelta', attesaMs: Date.now() - ricerca.t0, posizione: i >= 0 ? i + 1 : null });
+        sceltaNelMenu(row);
+      };
+      activeMenu.subAllaChiusura = () => { if (ricerca.iniziata && !ricerca.scelta) contaRicerca({ esito: 'vuota' }); };
+
       // Quando l'utente rimuove l'ultima voce: mostra lo stato vuoto e nascondi
       // ricerca/svuota (non c'è più nulla da cercare o svuotare). Le righe già
       // tolte restano a schermo barrate, quindi non contano.
@@ -994,6 +1097,7 @@
           b.appendChild(lbl);
         }
         b.addEventListener('click', () => {
+          sceltaFatta(row);
           close();
           try { onPick && onPick(entry); } catch (e) { console.error(e); }
         });
@@ -1056,6 +1160,7 @@
       });
       input.addEventListener('blur', () => { if (activeMenu) activeMenu.subLocked = false; });
       input.addEventListener('input', applyFilter);
+      input.addEventListener('input', iniziaRicerca);
       searchWrap.appendChild(input);
       sub.appendChild(searchWrap);
 
@@ -1602,6 +1707,8 @@
     _test: { cronologia: statoCronologia },
     daTastiera,
     open,
+    misuraLeAzioni,
+    azioneInCorso: () => azioneInCorso,
     close,
     computeCap: Place.computeCap,
     computeOffset: Place.computeOffset,
