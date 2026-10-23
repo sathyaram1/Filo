@@ -49,7 +49,7 @@ async function avvia({ bloccato = false } = {}) {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), EDITOR);
   let ed = null;
   await expect.poll(() => Boolean(ed = app.windows().find((w) => { try { return w.url().startsWith(EDITOR); } catch (_) { return false; } })), { timeout: 15_000 }).toBe(true);
-  await ed.waitForSelector('.pd-elemento[data-elemento="word-count"]');
+  await ed.waitForSelector('.pd-elemento[data-elemento="word-count"]', { state: 'attached' });
   await ed.evaluate(() => {
     const doc = document.getElementById('doc');
     doc.innerHTML = Array.from({ length: 80 }, (_, i) => `<p>Riga ${i + 1} del documento, abbastanza lunga da occupare la colonna di testo.</p>`).join('');

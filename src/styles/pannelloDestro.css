@@ -51,6 +51,8 @@ html.pd-aperto .pd-striscia::before { opacity: 0; }
   transition: transform calc(200ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1),
     visibility 0s linear calc(200ms * var(--sn-motion, 1));
 }
+/* Accanto all'Aiuto non tocca il bordo: è una carta intera. */
+html.pd-accanto .pd-pannello { border-right: 1px solid var(--sn-border); border-radius: 14px; }
 html.pd-aperto .pd-pannello {
   transform: none;
   visibility: visible;
@@ -132,6 +134,7 @@ html.pd-bloccato .pd-pannello {
 .pd-espanso .pd-maniglia { display: block; }
 .pd-espanso .pd-elemento { cursor: grab; padding-left: 8px; }
 .pd-contenuto { min-width: 0; }
+.pd-espanso .pd-contenuto { pointer-events: none; }
 
 .pd-piu { align-self: center; }
 .pd-catalogo[hidden] { display: none; }

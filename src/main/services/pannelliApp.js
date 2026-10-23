@@ -27,7 +27,8 @@ async function tutti() {
 }
 
 // La prima lettura di un'app porta dentro quello che i suoi vecchi moduli sapevano, una volta sola, dalla copia della
-// collezione che la pagina rispecchia. Senza copia aspetta la pagina, che manda la sua (op 'migra').
+// collezione che la pagina rispecchia. Una copia senza moduli non dice niente (può essere più vecchia di quella della
+// pagina): allora aspetta la pagina, che manda la sua (op 'migra').
 async function leggiEMigra(app) {
   const salvati = await tutti();
   const stato = P().normalizza(app, salvati[app]);
@@ -36,7 +37,8 @@ async function leggiEMigra(app) {
   if (app === 'editor') {
     try { collezione = (await storage.get([COLLEZIONE_EDITOR]))[COLLEZIONE_EDITOR] || null; } catch (_) { collezione = null; }
   }
-  if (!collezione) return stato;
+  const files = collezione && Array.isArray(collezione.files) ? collezione.files : [];
+  if (!files.some((f) => f && Array.isArray(f.modules) && f.modules.length)) return stato;
   const migrato = P().migra(app, stato, collezione) || stato;
   await storage.set({ [CHIAVE]: { ...salvati, [app]: migrato } });
   return migrato;
