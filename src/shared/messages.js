@@ -427,6 +427,12 @@
     // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
     AIUTO_STATO: 'aiuto_stato',                     // { pannello: chiuso|ridotto|aperto, voce, spento: ''|aiuto|sito|pagina } → { ok }
     RISPOSTA_IN_ATTESA: 'risposta_in_attesa',       // { fonte: aiuto|app, attesa } → { ok }: la striscia della barra si accende
+    // Il pannello di destra delle app di Filo (#1433): solo dalle pagine di Filo (`soloFilo`), un sito non ha un pannello.
+    PANNELLO_APP_LEGGI: 'pannello_app_leggi',       // { app } → { ok, stato: { elementi, config } }
+    PANNELLO_APP_MODIFICA: 'pannello_app_modifica', // { app, op: posa|togli|configura, id, primaDi?, config? } → { ok, stato }
+    PANNELLO_APP_STATO: 'pannello_app_stato',       // { app, aperto, dentro } → { ok }: la scheda ha il pannello, e com'è
+    PANNELLO_APP_CAMBIATO: 'pannello_app_cambiato', // spinta → { app, stato }: gli elementi o la loro configurazione
+    PANNELLO_APP_COMANDO: 'pannello_app_comando',   // spinta alla scheda → { azione: apri|chiudi|commuta|bordo, motivo, acceso }
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
