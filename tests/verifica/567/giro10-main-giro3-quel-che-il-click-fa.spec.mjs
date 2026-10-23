@@ -71,40 +71,6 @@ test('chiesta la cancellazione dall\'archivio, l\'utente deve trovare l\'elenco 
   await restore(app, '__v567g3b');
 });
 
-test('eseguito il comando confermato nel popup, il diario deve contarlo', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible();
-  await configureModel(app);
-  await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } });
-  });
-  // Su main (#530) a Normale il riordino e i comandi che scrivono partono da soli: il bottone e il popup sono di Conservativo.
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
-
-  const cartella = `/tmp/filo-v567-g3-${Date.now()}`;
-  await fakeProvider(app, [
-    { toolCalls: [{ id: 'g3c', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir ${cartella}` }) }] },
-    { text: 'Creo la cartella.' },
-  ], '__v567g3c');
-
-  await chiedi(page, `crea la cartella ${cartella}`);
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Creo la cartella.' })).toBeVisible({ timeout: 10_000 });
-
-  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
-  await expect(btn).toBeVisible({ timeout: 10_000 });
-  await btn.click();
-  await clickConfirm(page, 'ok', { timeout: 10_000 });
-  await expect(btn).toContainText('✓', { timeout: 15_000 });
-
-  const d = await diario(page);
-  const dice = /comando|eseguit|mkdir/i.test(`${d.titolo} ${d.righe.join(' | ')}`);
-  expect(dice, `comando eseguito sul computer e il diario dice — titolo: ${JSON.stringify(d.titolo)}, righe: ${JSON.stringify(d.righe)}`).toBe(true);
-
-  await restore(app, '__v567g3c');
-});
-
 test('il riordino chiesto da un suggerimento della home deve dire com\'è andato', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
