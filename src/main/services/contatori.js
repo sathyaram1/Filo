@@ -807,7 +807,7 @@ function crea(dip = {}) {
 
   return {
     apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, azione, azioneMisurata, impostazioniCambiate, ricerca,
-    proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, attivita, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
+    proposta, anticipoPronto, anticipoAperto, chiesto, adattamento, attivita, memoriaCorretta, erroreVisto, intervista, intervistaToccata, intervistaAbbandonata, confermaDecisa, confermaChiesta, confermaRisposta,
     azioneDiFilo, cambioAnnullato, tastoAnnulla, annullatoInPagina,
     controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva,
   };
