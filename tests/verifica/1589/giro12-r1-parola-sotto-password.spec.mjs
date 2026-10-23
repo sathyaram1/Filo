@@ -7,10 +7,10 @@ test('r1 la chat legge la pagina «Accesso e sicurezza»: la voce «Telefono» s
   const h = await openTab('filo://newtab/');
   const url = testServer.html(`<!doctype html><html><head><title>Accesso e sicurezza</title></head><body><main>
     <h1>Accesso e sicurezza</h1>
-    <div><div>Nome</div><div>Mario Rossi</div><a href="#">Modifica</a></div>
-    <div><div>Email</div><div>mario@example.com</div><a href="#">Modifica</a></div>
-    <div><div>Password</div><div>••••••••</div><a href="#">Modifica</a></div>
-    <div><div>Telefono</div><div>+39 333 1234567</div><a href="#">Modifica</a></div>
+    <div><div>Nome</div><div>Mario Rossi</div><button>Modifica</button></div>
+    <div><div>Email</div><div>mario@example.com</div><button>Modifica</button></div>
+    <div><div>Password</div><div>••••••••</div><button>Modifica</button></div>
+    <div><div>Telefono</div><div>+39 333 1234567</div><button>Modifica</button></div>
     <p>Aggiungi un Telefono di riserva per recuperare l'account se perdi l'accesso.</p>
     </main></body></html>`, { pubblico: true });
   await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url, background: true }), url);
