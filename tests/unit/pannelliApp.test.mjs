@@ -9,6 +9,13 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Il main legge il puntatore da `electron.screen`: qui lo dà la prova.
+const puntatore = { x: 0, y: 0 };
+const Module = require('node:module');
+const caricaVero = Module._load;
+Module._load = function (req, ...resto) {
+  return req === 'electron' ? { screen: { getCursorScreenPoint: () => ({ ...puntatore }) } } : caricaVero.call(this, req, ...resto);
+};
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'tasti.js'));
 require(join(ROOT, 'src', 'shared', 'pannelliApp.js'));
@@ -91,7 +98,7 @@ test('le regolazioni del pannello: limiti della barra, lucchetto spento di serie
     { spinta: true, attesaMs: 100, uscitaMs: 5000, striscia: false, bloccato: true });
   assert.deepEqual(C.opzioniPannelloDestro('rotto'), C.DEFAULT_SETTINGS.pannelloDestro);
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
-  const Pref = globalThis.SN_PREFERENCES;
+  const Pref = globalThis.SN_PREF;
   assert.deepEqual(Pref.buildPreferencePartial('pannello_bloccato', 'sì').partial, { pannelloDestro: { bloccato: true } });
   assert.deepEqual(Pref.buildPreferencePartial('pannello_attesa', '0,5 secondi').partial, { pannelloDestro: { attesaMs: 500 } });
 });
@@ -111,27 +118,23 @@ test('Ctrl+\\ (Cmd+\\ su Mac) apre il pannello; con Shift o Alt è un altro tast
 
 // Il bordo destro col puntatore finto: la geometria e la regola del puntatore fermo, senza Electron.
 function bordoFinto({ larghezza = 1100, alto = 40, attesaMs = 250 } = {}) {
-  const Module = require('node:module');
   const cb = { x: 100, y: 50, width: larghezza, height: 800 };
-  const stato = { punto: { x: 0, y: 0 } };
-  const elettrone = { screen: { getCursorScreenPoint: () => ({ ...stato.punto }) } };
-  const vecchio = Module._load;
-  Module._load = function (req, ...resto) { return req === 'electron' ? elettrone : vecchio.call(this, req, ...resto); };
   const { BordoDestro } = require(join(ROOT, 'src', 'main', 'bordoDestro.js'));
-  Module._load = vecchio;
   const mandati = [];
   const tab = { id: 't1', view: { webContents: { mainFrame: { send: (_c, m) => mandati.push(m) } } }, pannelloApp: { app: 'editor', aperto: false } };
   const win = { isDestroyed: () => false, isVisible: () => true, isMinimized: () => false, getContentBounds: () => cb };
   const barra = { win, tabs: { tabs: [tab], activeId: 't1', vistaSottoIlVuoto: () => tab.view }, alto: () => alto, tasti: { scheda: false, shell: false }, trascinamento: null };
   const b = new BordoDestro(barra);
   b.impostazioni({ attesaMs });
-  const sposta = (x, y) => { stato.punto = { x: cb.x + x, y: cb.y + y }; };
-  return { b, tab, mandati, sposta, cb };
+  const sposta = (x, y) => { puntatore.x = cb.x + x; puntatore.y = cb.y + y; };
+  const ferma = () => { for (const k of Object.keys(b.timer)) b._ferma(k); };
+  return { b, tab, mandati, sposta, cb, ferma };
 }
 const aspetta = (ms) => new Promise((r) => setTimeout(r, ms));
 
-test('il bordo destro: fermo apre, nella fila delle schede no, scorrendo lungo il bordo no', async () => {
-  const { b, mandati, sposta, cb } = bordoFinto({ attesaMs: 150 });
+test('il bordo destro: fermo apre, nella fila delle schede no, scorrendo lungo il bordo no', async (t) => {
+  const { b, mandati, sposta, cb, ferma } = bordoFinto({ attesaMs: 150 });
+  t.after(ferma);
   const aperture = () => mandati.filter((m) => m.azione === 'apri').length;
   // Nella fascia delle schede, in alto a destra (riduci, ingrandisci, chiudi): niente.
   sposta(cb.width - 2, 20);
@@ -154,8 +157,9 @@ test('il bordo destro: fermo apre, nella fila delle schede no, scorrendo lungo i
   b._ferma('uscita');
 });
 
-test('sopra la pagina senza pannello, o oltre il bordo su un altro schermo, il bordo destro non apre', async () => {
-  const { b, tab, mandati, sposta, cb } = bordoFinto({ attesaMs: 100 });
+test('sopra la pagina senza pannello, o oltre il bordo su un altro schermo, il bordo destro non apre', async (t) => {
+  const { b, tab, mandati, sposta, cb, ferma } = bordoFinto({ attesaMs: 100 });
+  t.after(ferma);
   sposta(cb.width + 30, 300);
   b._guarda();
   await aspetta(300);
