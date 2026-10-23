@@ -320,22 +320,30 @@ function scrivi(dest, opzioni) {
   return dest;
 }
 
-let scelto = null;
+const scelti = new Map();
 // Il pacchetto di Filo usa il suo file e basta; senza (npm start, i test) si compone dai sorgenti di adesso.
-function percorsoDelPreload() {
-  if (scelto) return scelto;
+function percorsoDelPreload(ingresso = INGRESSO) {
+  if (scelti.has(ingresso)) return scelti.get(ingresso);
+  const nelPacchetto = PACCHETTI[ingresso];
+  if (!nelPacchetto) throw new Error(`[preload impacchettato] ${ingresso} non è fra i preload in sandbox`);
   const { app } = require('electron');
-  if (app.isPackaged && fs.existsSync(NEL_PACCHETTO)) return (scelto = NEL_PACCHETTO);
-  if (app.isPackaged) console.error('[preload impacchettato] manca nel pacchetto:', NEL_PACCHETTO, '— lo compongo adesso');
-  scelto = scrivi(path.join(app.getPath('userData'), 'preload-pacchetto', 'page-preload.js'));
+  let scelto = null;
+  if (app.isPackaged && fs.existsSync(nelPacchetto)) scelto = nelPacchetto;
+  else {
+    if (app.isPackaged) console.error('[preload impacchettato] manca nel pacchetto:', nelPacchetto, '— lo compongo adesso');
+    scelto = scrivi(path.join(app.getPath('userData'), 'preload-pacchetto', path.basename(nelPacchetto)), { ingresso });
+  }
+  scelti.set(ingresso, scelto);
   return scelto;
 }
 
 // build.beforePack di electron-builder, che chiama il `default` di questo modulo: scrive dai sorgenti di adesso, sempre
 // uguale a sé stesso (il Mac universale impacchetta due copie che devono coincidere).
 async function beforePack() {
-  scrivi(NEL_PACCHETTO);
-  console.log(`[preload impacchettato] scritto per il pacchetto: ${NEL_PACCHETTO}`);
+  for (const [ingresso, dest] of Object.entries(PACCHETTI)) {
+    scrivi(dest, { ingresso });
+    console.log(`[preload impacchettato] scritto per il pacchetto: ${dest}`);
+  }
 }
 
-module.exports = { componi, scrivi, percorsoDelPreload, runtime, beforePack, default: beforePack, NEL_PACCHETTO, INGRESSO };
+module.exports = { componi, scrivi, percorsoDelPreload, runtime, beforePack, default: beforePack, NEL_PACCHETTO, INGRESSO, PACCHETTI };
