@@ -335,7 +335,8 @@
       // stava ancora dicendo resta nella casella invece di partire dopo come un secondo messaggio.
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target === campo) {
         if (c.stato === 'attesa') { smetti(); imposta('pronto'); esitoDellAttesa('a_mano'); }
-        tieni('a_mano');
+        tieni(true);
+        verificaPresto();
         return;
       }
       if (e.defaultPrevented) return;
