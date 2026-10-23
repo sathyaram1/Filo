@@ -723,6 +723,134 @@ test('G3 — il ritorno di un viaggio arriva nel calendario, e una fine impossib
   await restore(app, '__fakeG3');
 });
 
+// (G4) Chi chiude il calendario per sbaglio lo riapre dal bottone: deve rivedere LO STESSO evento, o la cena finisce
+// scritta due volte. E al turno dopo il modello sa che l'utente l'ha aggiunto, invece di tirare a indovinare.
+test('G4 — l’evento aggiunto si riapre senza raddoppiare, e al turno dopo il modello sa che è nel calendario', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await calendarioFinto(app, '');
+
+  await fakeProvider(app, [
+    {
+      text: 'Ecco la cena.',
+      toolCalls: [{ id: 'g4', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Cena con Anna","data":"2026-10-02","ora":"20:30","durata_min":90,"luogo":"Da Mario"}' }],
+    },
+    { text: 'Sì, venerdì sera.' },
+  ], '__fakeG4');
+  await page.locator('#input').fill('segnami la cena con Anna venerdì alle 20:30');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la cena.' })).toBeVisible({ timeout: 10_000 });
+
+  await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+  const aperto = page.locator('.dash-action-btn', { hasText: 'Aperto nel calendario' });
+  await expect(aperto).toBeVisible({ timeout: 10_000 });
+  await expect(aperto).toBeEnabled();
+  await expect(aperto).toHaveAttribute('title', /riapre/i);
+  await aperto.click();
+  await expect.poll(async () => (await consegnati(app)).length, { timeout: 10_000 }).toBe(2);
+  await expect(aperto).toBeEnabled();
+
+  const ics = (await consegnati(app)).map((f) => readFileSync(f, 'utf8'));
+  const uid = (t) => (/^UID:(.*)$/m.exec(t.replace(/\r\n /g, '')) || [])[1] || '';
+  expect(uid(ics[0])).not.toBe('');
+  expect(uid(ics[1]), 'riaperto, il calendario deve rivedere lo stesso evento, non un secondo').toBe(uid(ics[0]));
+  expect(ics[0]).toContain('SUMMARY:Cena con Anna');
+  expect(ics[0]).toContain('DTSTART:20261002T203000');
+  expect(ics[0]).toContain('DTEND:20261002T220000');
+  expect(ics[0]).toContain('LOCATION:Da Mario');
+
+  // Il diario non lo chiama più proposta, e il secondo click non lo conta due volte.
+  const activity = page.locator('.dash-activity');
+  await expect(activity.locator('.dash-activity-label')).toContainText('aggiunto un evento al calendario');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Evento aggiunto al calendario' })).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Evento proposto' })).toHaveCount(0);
+
+  // La domanda non nomina il calendario: quello che il modello sa, lo sa dall'aggiunta.
+  await page.locator('#input').fill('me lo ricordi venerdì?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Sì, venerdì sera.' })).toBeVisible({ timeout: 10_000 });
+  const visto = await app.evaluate(() => JSON.stringify(globalThis.__fakeG4_calls.at(-1)));
+  expect(visto).toContain('ha CONFERMATO');
+  expect(visto).toMatch(/Evento aggiunto al calendario: \\?"Cena con Anna/);
+
+  await restore(app, '__fakeG4');
+});
+
+// (G5) Senza un programma di calendario il bottone non finisce nel nulla: la nota dice dov'è il file, e il file c'è.
+test('G5 — senza nessun calendario sul computer l’utente sa dov’è finito l’evento', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await calendarioFinto(app, 'nessun programma associato');
+
+  await fakeProvider(app, [
+    { text: 'Ecco.', toolCalls: [{ id: 'g5', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Riunione col dentista","data":"2026-09-21","ora":"10:00"}' }] },
+  ], '__fakeG5');
+  await page.locator('#input').fill('segna la riunione col dentista lunedì alle 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco.' })).toBeVisible({ timeout: 10_000 });
+
+  await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Evento salvato' })).toBeVisible({ timeout: 10_000 });
+  const [file] = await consegnati(app);
+  expect(file).toMatch(/\.ics$/);
+  const nota = page.locator('.dash-bubble-note', { hasText: 'aprilo col tuo calendario' });
+  await expect(nota).toBeVisible();
+  await expect(nota).toContainText(file);
+  expect(readFileSync(file, 'utf8')).toContain('SUMMARY:Riunione col dentista');
+
+  await restore(app, '__fakeG5');
+});
+
+// (G6) Un titolo ostile (markup, punto e virgola, a capo, emoji, diecimila caratteri) non entra nella pagina come
+// codice, non la allarga e non rompe il file; un doppio clic consegna un evento solo.
+test('G6 — un titolo ostile non rompe né la pagina né il file, e un doppio clic aggiunge un evento solo', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await calendarioFinto(app, '');
+
+  const titolo = `<script>alert(1)</script>; a capo\nqui 🙂 ${'x'.repeat(10_000)}`;
+  await fakeProvider(app, [
+    {
+      text: 'Ok.',
+      toolCalls: [{ id: 'g6', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ titolo, data: '2026-12-31', ora: '23:59', durata_min: 90 }) }],
+    },
+  ], '__fakeG6');
+  await page.locator('#input').fill('segna quella cosa');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ok.' })).toBeVisible({ timeout: 10_000 });
+
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: '<script>alert(1)</script>' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity script, .dash-bubble script')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)).toBe(false);
+
+  await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).dblclick();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Aperto nel calendario' })).toBeVisible({ timeout: 10_000 });
+  await page.waitForTimeout(500);
+  const file = await consegnati(app);
+  expect(file.length, 'un doppio clic non deve consegnare due eventi').toBe(1);
+
+  // Un .ics malformato il calendario lo rifiuta: nessuna riga oltre i 75 ottetti, nessun a capo vero in un campo.
+  const ics = readFileSync(file[0], 'utf8');
+  for (const r of ics.split('\r\n')) expect(Buffer.byteLength(r, 'utf8')).toBeLessThanOrEqual(75);
+  expect(ics).not.toMatch(/[^\r]\n/);
+  expect(ics).toContain('SUMMARY:<script>alert(1)</script>\\; a capo qui 🙂');
+  expect(ics).toContain('DTEND:20270101T012900');
+
+  await restore(app, '__fakeG6');
+});
+
 test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ricevuta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
