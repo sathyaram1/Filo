@@ -316,9 +316,19 @@
       c.toccato = true;
       if (c.sessione && !c.perche) c.perche = 'cambiata';
       c.lasciato = campo.value;
-      if (c.stato === 'attesa') annullaInvio('cambiata');
+      // La persona che svuota la casella butta il dettato; che la cambia, lo corregge.
+      if (c.dettate.length) {
+        if (!campo.value.trim()) chiudiDettate('annullata');
+        else for (const d of c.dettate) d.cambiata = true;
+      }
+      if (c.stato === 'attesa') {
+        if (campo.value.trim()) annullaInvio(true);
+        else { smetti(); imposta('pronto'); esitoDellAttesa('annullata'); }
+      }
     };
     campo.addEventListener('input', suInput);
+    const suClic = () => verificaPresto();
+    document.addEventListener('click', suClic, true);
     const suTasto = (e) => {
       if (!e.isTrusted) return;
       // Invio a mano (la chat l'ha già preso): manda da sé quello che c'è, l'attesa finisce, e quello che si
