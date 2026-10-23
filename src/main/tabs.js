@@ -2100,13 +2100,9 @@ class TabManager {
           return true;
         }
       }
-      // La scheda accanto (Ctrl+Tab, #590.14). Si parte da quella attiva, non da `tab`: due pressioni in fretta
-      // possono arrivare entrambe alla vista di prima, e la seconda deve andare avanti, non rifare la prima.
-      const davanti = this.tabs.findIndex((t) => t.id === this.activeId);
-      const accanto = indiceSchedaAccanto(input, davanti >= 0 ? davanti : this.tabs.indexOf(tab), this.tabs.length);
-      if (accanto != null) {
-        const target = this.tabs[accanto];
-        if (target && target.id !== this.activeId) this.activate(target.id);
+      const verso = versoSchedaAccanto(input);
+      if (verso) {
+        this.attivaAccanto(verso);
         return true;
       }
     }
