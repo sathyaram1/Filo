@@ -139,7 +139,9 @@ test('le chiavi chiuse vengono dagli elenchi dell’app; le altre hanno una form
   assert.equal(new Set(FUNZIONI_REGOLE).size, FUNZIONI_REGOLE.length, 'una funzione scritta due volte nelle regole');
   assert.match(GIORNO, /d\.uso is map && d\.uso\.keys\(\)\.hasOnly\(funzioniContate\(\)\)/);
   assert.match(GIORNO, /d\.errori is map && d\.errori\.keys\(\)\.hasOnly\(funzioniContate\(\)\)/);
-  for (const campo of ['uso', 'errori', 'anticipi', 'chiedi']) assert.equal(M[campo].chiavi, FUNZIONI_REGOLE, `${campo} si chiude sulle funzioni`);
+  for (const campo of ['uso', 'errori', 'anticipi', 'chiedi', ...C.MISURE_MODELLI, 'chiamate']) {
+    assert.equal(M[campo].chiavi, FUNZIONI_REGOLE, `${campo} si chiude sulle funzioni`);
+  }
   assert.deepEqual(M.ricerche.chiavi, [...C.PANNELLI]);
   assert.deepEqual(M.correttore.chiavi, [...C.TIPI_PROPOSTA]);
 
