@@ -38,7 +38,7 @@ function parteFingerprint(seed) {
   function perturb(data, w, h, ox, oy, base, stride, dy) {
     if (!data || w <= 0 || h <= 0) return;
     base = base | 0; stride = stride || w * 4; dy = dy || 1;
-    if (data.length < base + (h - 1) * stride + w * 4) return;
+    if (R(taLen, data, []) < base + (h - 1) * stride + w * 4) return;
     for (var row = 0; row < h; row++) {
       var py = oy + row * dy, i0 = base + row * stride;
       for (var col = 0; col < w; col++) {
