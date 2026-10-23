@@ -4025,6 +4025,11 @@ async function eseguiAzioneFilo(action, {
           win._filoTabs.barra.apri('chat');
           return { executed: true, kept: false, output: { window: 'sidebar' } };
         }
+        // #1433 — l'Aiuto chiesto in chat si apre sulla scheda davanti come col suo tasto: nell'Editor è la chat del documento.
+        if (cmd === 'aiuto') {
+          require('../shortcuts').dispatch('open-help-sidebar', win);
+          return { executed: true, kept: false, output: { window: 'aiuto' } };
+        }
         // home / minimize / settings / apps / account: clicca il bottone REALE
         // della shell, riusando il canale dei comandi rapidi della barra (stessa
         // via dell'assistente di pagina, MSG.SHELL_ACTION) così si riusa tutto il
