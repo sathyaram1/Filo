@@ -252,8 +252,8 @@ Le forme che cadevano, e cosa le ha sostituite:
   di un tetto (in fila costerebbero un tetto ciascuno), e se dopo non finisce più niente si
   chiude la corsa (il disco pieno). L'avviso di chiusura nomina sempre chi la teneva ferma:
   i file in corso o, se non ce n'è più, quelli già chiusi che non l'hanno sbloccata (#1573:
-  sul portatile dell'owner il `node --test` restava acceso oltre il tetto dopo la chiusura
-  del file, e l'avviso diceva «non è andato avanti niente»). Una prova sola che ci si avvicina si divide, e una
+  chiuso il file, una corsa che non finiva lo stesso diceva «non è andato avanti niente»).
+  Una prova sola che ci si avvicina si divide, e una
   scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
   (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
   risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
