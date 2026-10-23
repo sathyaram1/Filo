@@ -119,6 +119,9 @@
   const TETTO_CONFERME = 20;
   const TETTO_VALORI = 12;
   const TETTO_PRIME_VOLTE = 400;
+  // Le voci con un modello di un'ora in una misura delle chiamate, su tutte le funzioni insieme: oltre, il modello
+  // diventa «altro». Le righe «altro» restano libere, così la somma non perde niente.
+  const TETTO_MODELLI_ORA = 80;
   // Due mesi di ore in attesa, e trecento invii a giro: un server tornato dopo settimane si rimette in pari in un giorno.
   const TETTO_ORE_IN_ATTESA = 62 * 24;
   const TETTO_GIORNI_IN_ATTESA = 62;
