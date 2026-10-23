@@ -1815,14 +1815,9 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
-    // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta.
-    const conta = (usato) => {
-      const ev = self.SN_GESTI && self.SN_GESTI.rilascio(e.dataTransfer, 'chat_home', usato);
-      if (ev) send({ type: MSG.CONTATORI_EVENTO, ...ev });
-    };
-    if (fileNelCampo(e.dataTransfer)) { conta(true); return; }
+    if (fileNelCampo(e.dataTransfer)) { contaNellaChat(e.dataTransfer, true); return; }
     const testo = e.dataTransfer?.getData('text/plain') || '';
-    conta(!!testo);
+    contaNellaChat(e.dataTransfer, !!testo);
     if (!testo) return;
     testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
