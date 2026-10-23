@@ -91,6 +91,27 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
   to { text-decoration-color: transparent; }
 }
 
+/* La parola corretta da sé (#1447): un lampo caldo che sfuma in circa un secondo, sopra la parola e fuori dallo
+   specchio (lì ogni sfondo è spento). Colore e durata sono i token correttore.lampo.*. */
+.sn-spell-lampo {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--sn-spell-lampo, #f0b05a66);
+  animation: sn-spell-lampo calc(var(--sn-spell-lampo-durata, 1000ms) * var(--sn-motion, 1)) ease-out both;
+}
+.sn-spell-lampo[data-sn-theme="dark"] {
+  background: var(--sn-spell-lampo, #e2ad4d4d);
+}
+@keyframes sn-spell-lampo {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
 
 .sn-spell-popup {

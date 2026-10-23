@@ -48,6 +48,10 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // Quello che il correttore impara e il dizionario personale (#1447): una fila sola nel main, perché le schede e la
+  // pagina del correttore riscrivono le stesse chiavi. Dai siti si impara scrivendo; cambiare e togliere solo da filo://.
+  on(MSG.CORRETTORE_IMPARA, async (msg, sender, origin) => require('../correttoreImpara').passo(msg, { daFilo: isFilo(origin), origine: origin }));
+
   on('_storage:clear', async (msg, sender, origin) => {
     // Azzerare tutti i dati non è mai legittimo per una pagina web: solo le pagine interne.
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };

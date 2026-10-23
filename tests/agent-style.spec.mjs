@@ -415,7 +415,7 @@ test('#592 — scrivere in chat mentre Filo lavora non conferma lo stile; da tas
   await page.locator('#input').fill('riassumimi la pagina');
   await page.locator('#sendBtn').click();
   await page.locator('#input').focus();
-  await page.keyboard.type('intanto ti chiedo anche un altra cosa sul meteo di domani a roma per favore', { delay: 90 });
+  await page.keyboard.type('intanto ti chiedo anche un altra cosa sul meteo di domani a Roma per favore', { delay: 90 });
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
   expect(await storedStyle(app), 'un tasto battuto per la chat ha confermato lo stile').toBe('');
   await page.screenshot({ path: 'tests/.shots/stile-agente-popup-mentre-scrivi.png' });
@@ -430,7 +430,7 @@ test('#592 — scrivere in chat mentre Filo lavora non conferma lo stile; da tas
 
   // Quello battuto col popup aperto è nel campo, e si riprende a scrivere lì.
   await page.keyboard.type(' e dopodomani', { delay: 20 });
-  await expect(page.locator('#input')).toHaveValue('intanto ti chiedo anche un altra cosa sul meteo di domani a roma per favore e dopodomani');
+  await expect(page.locator('#input')).toHaveValue('intanto ti chiedo anche un altra cosa sul meteo di domani a Roma per favore e dopodomani');
   await restore(app);
 });
 

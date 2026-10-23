@@ -77,6 +77,10 @@
         correttorePausaRapido: 'correttore.pausaRapidoMs',
         correttoreOgniRapido: 'correttore.ogniRapidoMs',
         correttorePausaRagionato: 'correttore.pausaRagionatoMs',
+        correttoreAutomatica: 'correttore.automatica',
+        correttoreAccetti: 'correttore.accettiPerImparare',
+        correttoreAnnulli: 'correttore.annulliPerImparare',
+        correttoreRiscritte: 'correttore.riscrittePerImparare',
         categorieAutomatiche: 'featureFlags.categorize',
       },
       gruppi: {
@@ -184,6 +188,7 @@
         blocklist: 'blocklist',
         spellcheckErrori: 'featureFlags.spellcheck',
         spellcheckSuggerimenti: 'featureFlags.spellcheckContext',
+        spellcheckAutomatica: 'correttore.automatica',
       },
       gruppi: {},
       fuori: {},

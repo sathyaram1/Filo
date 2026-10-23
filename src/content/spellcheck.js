@@ -1,6 +1,6 @@
-// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo. Il codice
-// segna subito i suoi candidati, pieni i sicuri e sbiaditi i dubbi; i controlli del modello confermano o scartano i dubbi.
-// Le regole senza DOM stanno in correttoreRegole.js e coerenza.js, il menu del tasto destro in content.js.
+// Il correttore mentre si scrive (#1446): due segni, errori e suggerimenti, disegnati da Filo sopra il campo, e la
+// correzione automatica a fine parola (#1447). Le regole senza DOM stanno in correttoreRegole.js, correttoreAutomatica.js
+// e coerenza.js, il menu del tasto destro in content.js.
 
 (function (global) {
   'use strict';
@@ -8,6 +8,7 @@
   const { MSG } = global.SN_MSG;
   const { ACTIONS, STORAGE_KEYS } = global.SN_CONST;
   const R = () => global.SN_CORRETTORE;
+  const A = () => global.SN_CORRETTORE_AUTO;
   const Coerenza = () => global.SN_COERENZA;
   const t = (k, ...a) => (global.SN_I18N ? global.SN_I18N.t(k, ...a) : k);
 
@@ -36,10 +37,19 @@
   const ascoltate = new WeakSet();
   let activeEl = null;
   let personalDict = new Set();
+  // Le parole del dizionario personale nella forma in cui sono scritte: «Zanzottera» corregge «zanzottera» (#1447).
+  let formeDizionario = new Map();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
   let settings = null;
   // L'applyFix dell'autocorrect dispatcha un input che rientrerebbe nel listener: questa flag salta una passata.
   let suppressAutocorrect = false;
+  // Quello che Filo impara dai rifiuti (#1447), com'è salvato: conti e parole da non correggere più da sé.
+  let imparato = null;
+  // Come si scrive in questo sito: gli inizi di frase dei testi già mandati e le maiuscole annullate. Il main lo tiene per
+  // sito, così riaperta la chat Filo lo sa già.
+  const stilePagina = { minuscoli: 0, maiuscoli: 0 };
+  const AUTOMATICHE_MAX = 200;
+  let progressivo = 0;
 
   // Suggerimenti del correttore NATIVO per l'ultima parola su cui è stato chiesto il menu: il main li spinge al tasto
   // destro (`_spell:native`, tabs.js). Servono alle caselle di una riga e ai blocchi sigillati (#438).
@@ -54,11 +64,12 @@
   function suggerimentiAttivi() { return !spentoQui() && settings.featureFlags?.spellcheckContext !== false && !!Coerenza(); }
   function modelloErrori() { return erroriAttivi() && settings.correttore?.modelloErrori !== false; }
   function ripetizioniAttive() { return settings?.correttore?.ripetizioni !== false; }
+  function automaticaAttiva() { return !spentoQui() && !!A() && settings.correttore?.automatica !== false; }
   function tempi() {
     const C = global.SN_CONST;
     return C.tempiCorrettore ? C.tempiCorrettore(settings) : { pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 };
   }
-  const attivo = () => erroriAttivi() || suggerimentiAttivi();
+  const attivo = () => erroriAttivi() || suggerimentiAttivi() || automaticaAttiva();
 
   // Lo zigzag del browser si spegne dove i segni li disegna Filo (spellcheck.css); con «Errori» spento anche nelle
   // caselle di una riga. Sul sito dove Filo è spento il browser fa da sé.
@@ -77,12 +88,25 @@
     segnaRadice();
     loadDictionary();
     loadAutocorrect();
+    caricaImparato();
+    caricaStile();
     // In cattura, per i campi dentro i componenti (per quanto possibile).
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
+    window.addEventListener('keydown', annullaColTasto, true);
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
     document.addEventListener('visibilitychange', riprendiRimandati);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) rileggiMemorie(); });
+    adottaIlFuoco();
+
+    // Le memorie cambiate altrove (la pagina del correttore, un'altra scheda) arrivano spinte dal main (#1447).
+    try {
+      chrome.runtime.onMessage.addListener((m) => {
+        if (m?.type !== MSG.CORRETTORE_MEMORIE || !m.memorie || typeof m.memorie !== 'object') return;
+        usaMemorie(m.memorie);
+      });
+    } catch (_) {}
 
     try {
       chrome.runtime.onMessage.addListener((m) => {
@@ -97,22 +121,6 @@
         for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
       });
     } catch (_) {}
-
-    // La pagina del correttore cambia dizionario e correzioni automatiche: qui valgono subito.
-    try {
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area !== 'local') return;
-        if (changes[STORAGE_KEYS.PERSONAL_DICT]) {
-          const words = changes[STORAGE_KEYS.PERSONAL_DICT].newValue || [];
-          personalDict = new Set(words.map((w) => String(w).toLowerCase()));
-          const state = activeEl && monitored.get(activeEl);
-          if (state) aggiornaCodice(state);
-        }
-        if (changes[STORAGE_KEYS.AUTOCORRECT]) {
-          autocorrectMap = changes[STORAGE_KEYS.AUTOCORRECT].newValue || {};
-        }
-      });
-    } catch (_) {}
   }
 
   function updateSettings(s) {
@@ -120,7 +128,7 @@
     segnaRadice();
     if (!attivo()) { detachAll(); return; }
     const state = activeEl && monitored.get(activeEl);
-    if (!state) return;
+    if (!state) { adottaIlFuoco(); return; }
     // Ogni parte si spegne da sola, e le altre restano.
     if (!modelloErrori()) fermaTimer(state, ['timerRapido', 'timerFine']);
     if (!suggerimentiAttivi()) fermaTimer(state, ['timerRagionato']);
@@ -137,11 +145,17 @@
   // ============================================================================
   // Dizionari
   // ============================================================================
+  function usaDizionario(parole) {
+    const lista = Array.isArray(parole) ? parole.map(String) : [];
+    personalDict = new Set(lista.map((w) => w.toLowerCase()));
+    formeDizionario = new Map();
+    for (const w of lista) if (!formeDizionario.has(w.toLowerCase())) formeDizionario.set(w.toLowerCase(), w);
+  }
+
   async function loadDictionary() {
     try {
       const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-      const words = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
-      personalDict = new Set(words.map((w) => String(w).toLowerCase()));
+      usaDizionario(d?.[STORAGE_KEYS.PERSONAL_DICT] || []);
     } catch (_) {}
   }
 
@@ -151,14 +165,12 @@
     const wLower = w.toLowerCase();
     if (personalDict.has(wLower)) return;
     personalDict.add(wLower);
+    formeDizionario.set(wLower, w);
+    // Lo scrive la fila del main, la stessa della pagina del correttore (#1447): la parola resta come l'ha scritta
+    // l'utente («iPhone»), il confronto è senza maiuscole.
     try {
-      // Lo storage tiene la parola come l'ha scritta l'utente («iPhone»); il confronto è senza maiuscole.
-      const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
-      const existing = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
-      if (!existing.some((x) => String(x).toLowerCase() === wLower)) {
-        existing.push(w);
-        await chrome.storage.local.set({ [STORAGE_KEYS.PERSONAL_DICT]: existing });
-      }
+      const r = await chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, passo: 'aggiungiParola', parola: w });
+      if (r && r.ok && Array.isArray(r.parole)) usaDizionario(r.parole);
     } catch (_) {}
   }
 
@@ -212,6 +224,12 @@
     return pareri;
   }
 
+  // Una parola che il dizionario dice giusta, solo a dizionario carico: prima ogni parola risulta giusta.
+  function giustaPerIlBrowser(parola) {
+    const v = sbagliataPerIlBrowser(parola);
+    return dizionarioPronto && !v;
+  }
+
   function proposteDelBrowser(parola) {
     const D = global.SN_DIZIONARIO;
     try { return D ? D.proposte(String(parola || '')).filter((p) => p && p !== parola) : []; } catch (_) { return []; }
@@ -239,52 +257,327 @@
   }
 
   function isWordCharLocal(c) { return !!c && /[\p{L}\p{N}'’\-]/u.test(c); }
-  // Spazio o punteggiatura di fine parola: il confine dopo cui scatta la correzione automatica.
-  function isBoundaryChar(c) {
-    return !!c && /[\s.,!?;:)\]…"'»“”]/u.test(c);
+
+  // ============================================================================
+  // La correzione automatica a fine parola (#1447)
+  // ============================================================================
+  // Dalla memoria alla scheda arrivano solo le parole da non correggere: i conti a metà restano nel main.
+  async function caricaImparato() {
+    if (!A()) return;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, passo: 'leggi' });
+      imparato = A().memoria({ rifiutate: r && r.ok ? r.rifiutate : [] });
+    } catch (_) { imparato = A().memoria(null); }
   }
 
-  function tryAutocorrect(state) {
-    if (suppressAutocorrect) return;
-    if (!autocorrectMap || Object.keys(autocorrectMap).length === 0) return;
+  // Un passo di quello che Filo impara lo fa il main, in una fila sola per tutte le schede e la pagina del correttore
+  // (src/main/services/correttoreImpara.js). `poi(esito)` agisce su quello che il passo ha deciso.
+  function impara(passo, poi) {
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, ...passo })).then(async (esito) => {
+      if (!esito || !esito.ok) return;
+      if (Array.isArray(esito.rifiutate) && A()) imparato = { ...(imparato || A().memoria(null)), rifiutate: esito.rifiutate };
+      if (poi) await poi(esito);
+    }).catch(() => {});
+  }
+
+  function nomeDi(parola) {
+    return A().formaDelNome(parola, { personali: formeDizionario, sbagliata: sbagliataPerIlBrowser });
+  }
+  // Un nome scritto minuscolo, o nella sua forma, non è mai un errore: o si corregge da sé o si lascia stare.
+  function nomeNoto(parola) {
+    if (!A()) return false;
+    const forma = nomeDi(parola);
+    return !!forma && (parola === parola.toLowerCase() || parola === forma);
+  }
+
+  // Si impara una parola fuori dizionario che non è il refuso di una parola vera («ciuruglio» sì, «propio» no).
+  function parolaImparabile(parola) {
+    const p = String(parola || '').replace(/’/g, "'");
+    return !!p && !/\s/.test(p) && sbagliataPerIlBrowser(p) && A().imparabile(p, proposteDelBrowser(p));
+  }
+  // La forma da imparare: a inizio frase la maiuscola non dice niente.
+  function formaDaImparare(parola, inizioFrase) {
+    const p = String(parola || '');
+    const basso = p.toLowerCase();
+    return inizioFrase && p === basso.charAt(0).toUpperCase() + basso.slice(1) ? basso : p;
+  }
+  async function aggiungiImparata(parola) {
+    await addToDictionary(parola);
+    const state = activeEl && monitored.get(activeEl);
+    if (state) aggiornaCodice(state);
+  }
+
+  // Si scrive tutto minuscolo apposta, qui? Il campo prima della parola (senza le correzioni di Filo) e i testi già
+  // mandati dalla pagina.
+  function minuscoloQui(state, finoA) {
+    const testo = getEditableText(state.el);
+    const da = Math.max(0, finoA - 3000);
+    const esclusi = state.automatiche.map((x) => ({ start: x.start - da, end: x.end - da }));
+    return A().scriveMinuscoloQui(A().stileDi(testo.slice(da, finoA), null, esclusi), stilePagina);
+  }
+  function ricordaStile(state, testo) {
+    const esclusi = state.automatiche;
+    aggiungiStile(A().stileDi(testo.slice(-3000), null, testo.length > 3000 ? [] : esclusi));
+  }
+  function aggiungiStile(s) {
+    if (!s || (!s.minuscoli && !s.maiuscoli)) return;
+    Object.assign(stilePagina, A().sommaStile(stilePagina, s));
+    impara({ passo: 'stile', minuscoli: s.minuscoli || 0, maiuscoli: s.maiuscoli || 0 });
+  }
+  async function caricaStile() {
+    if (!A()) return;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CORRETTORE_IMPARA, passo: 'leggiStile' });
+      if (r && r.ok && r.stile) Object.assign(stilePagina, A().sommaStile(stilePagina, r.stile));
+    } catch (_) {}
+  }
+
+  // Una parola chiusa da un tasto vero in questa casella: si corregge da sé, o si conta per quello che Filo impara. Mai
+  // dopo: il testo già superato non cambia da solo, e un testo messo da uno script non si tocca.
+  function fineParolaBattuta(state, evento) {
+    if (suppressAutocorrect || !A()) return;
+    const tipo = evento && evento.inputType;
+    if (tipo !== 'insertText' && tipo !== 'insertLineBreak' && tipo !== 'insertParagraph') return;
+    const G = global.SN_GESTO;
     const el = state.el;
-    const text = getEditableText(el);
-    if (!text) return;
+    // In un riquadro chiuso di Filo il sito non arriva, e i tasti non escono dall'ombra (SN_FILO_UI): lì scrive solo
+    // l'utente. Altrove serve un tasto vero che chiude la parola, dentro questa casella.
+    if (radiceDi(el) ? !evento.isTrusted : !(G && G.prendi('automatica', G.CHIUDE, G.dentro(el)))) return;
+    const testo = getEditableText(el);
     const pos = cursoreNelCampo(el);
-    if (pos <= 1) return;
-    if (!isBoundaryChar(text[pos - 1])) return;
-    const end = pos - 1;
-    if (end <= 0 || !isWordCharLocal(text[end - 1])) return;
-    const match = findAutocorrectMatch(text, end);
-    if (!match) return;
-    const { start } = match;
-    const original = text.slice(start, end);
-    const replacement = R().comeScritto(original, autocorrectMap[match.key]);
-    if (!replacement || replacement === original) return;
+    const fine = A().fineDellaParola(testo, pos);
+    if (fine < 0) return;
+    seguiIlTesto(state);
+    if (automaticaAttiva() && !state.rifiutateQui.some((x) => x.end === fine && testo.slice(x.start, x.end) === x.segment)) {
+      const c = A().correzioneAFineParola(testo, fine, {
+        personali: autocorrectMap,
+        rifiutate: new Set(imparato ? imparato.rifiutate : []),
+        nomeDi,
+        accento: giustaPerIlBrowser,
+        minuscolo: () => minuscoloQui(state, A().parolaPrima(testo, fine)?.start ?? fine),
+      });
+      if (c && correggiDaSe(state, c)) return;
+    }
+    const w = A().parolaPrima(testo, fine);
+    if (w && erroriAttivi() && !A().dentroCodice(testo, fine)) contaRiscritta(state, w, testo);
+  }
+
+  function correggiDaSe(state, c) {
+    const el = state.el;
+    const testoPrima = getEditableText(el);
+    const cursorePrima = cursoreNelCampo(el);
     suppressAutocorrect = true;
     try {
-      applyFix(el, { start, end }, replacement, { cursor: 'preserve', automatica: true });
+      sostituisciParola(el, c.start, c.end, c.originale, c.corretta);
     } finally {
       // Dopo il flush degli eventi sincroni e dell'input riemesso da setRangeText.
       setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
+    const testo = getEditableText(el);
+    const end = c.start + c.corretta.length;
+    if (testo.slice(c.start, end) !== c.corretta) return false;
+    seguiIlTesto(state);
+    const voce = { id: ++progressivo, start: c.start, end, segment: c.corretta, originale: c.originale, fonte: c.fonte };
+    state.automatiche = [...state.automatiche.filter((x) => !(x.start < end && x.end > c.start)), voce].slice(-AUTOMATICHE_MAX);
+    state.ultimaAutomatica = { voce, testo, testoPrima, cursorePrima };
+    lampo(state, c.start, end);
+    return true;
   }
 
-  // La chiave che finisce ESATTAMENTE a `end`, con un confine di parola a sinistra («es» non scatta dentro «mese»). Le
-  // chiavi possono avere spazi («x es» → «per esempio»): a parità di fine vince la più lunga. { start, key } o null.
-  function findAutocorrectMatch(text, end) {
-    const lowerRegion = text.slice(0, end).toLowerCase();
-    let best = null;
-    for (const key of Object.keys(autocorrectMap)) {
-      if (!key) continue;
-      const start = end - key.length;
-      if (start < 0) continue;
-      if (lowerRegion.slice(start) !== key) continue;
-      if (start > 0 && isWordCharLocal(text[start - 1])) continue;
-      if (!isWordCharLocal(text[start])) continue;
-      if (!best || key.length > best.key.length) best = { start, key };
+  // Dal tasto destro, anche dopo aver scritto altro: la parola corretta da sé torna com'era scritta. Vero se è tornata.
+  function annullaAutomatica(el, voce) {
+    const state = el && monitored.get(el);
+    if (!state || !voce) return false;
+    seguiIlTesto(state);
+    const v = state.automatiche.find((x) => x.id === voce.id);
+    if (!v || getEditableText(el).slice(v.start, v.end) !== v.segment) return false;
+    suppressAutocorrect = true;
+    try {
+      sostituisciParola(el, v.start, v.end, v.segment, v.originale);
+    } finally {
+      setTimeout(() => { suppressAutocorrect = false; }, 0);
     }
-    return best;
+    if (getEditableText(el).slice(v.start, v.start + v.originale.length) !== v.originale) return false;
+    seguiIlTesto(state);
+    rifiutata(state, v);
+    return true;
+  }
+
+  // La parola [start, end) diventa `nuova`. Col cursore subito dopo la parola e quel che l'ha chiusa (spazio, virgola)
+  // si riscrivono insieme, così il cursore resta lì anche negli editor che lo rimettono da sé dal loro modello (Lexical).
+  const CODA_MAX = 20;
+  function sostituisciParola(el, start, end, attesa, nuova) {
+    const testo = getEditableText(el);
+    const pos = cursoreNelCampo(el);
+    const coda = pos >= end ? testo.slice(end, pos) : null;
+    if (coda !== null && coda.length <= CODA_MAX && !/[\n\r]/.test(coda) && testo.slice(start, end) === attesa) {
+      const scritta = campoDiTesto(el) ? coda : coda.replace(/ /g, ' ');
+      applyFix(el, { start, end: pos }, nuova + scritta, { cursor: 'end', expectedSegment: attesa + coda, automatica: true });
+      return;
+    }
+    applyFix(el, { start, end }, nuova, { cursor: 'preserve', expectedSegment: attesa, automatica: true });
+  }
+
+  // Gli editor di testo ricco (ProseMirror, Lexical) tengono un loro annulla e la scorciatoia non arriva al browser:
+  // subito dopo una correzione automatica la prende Filo, prima della pagina. Prima l'annulla del browser, che toglie
+  // proprio la correzione (e quello dopo toglie quel che si era scritto); se non la riporta, la riscrive Filo.
+  function annullaColTasto(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key || '').toLowerCase() !== 'z') return;
+    const el = editabileDellEvento(e);
+    const state = el && monitored.get(el);
+    if (!state || campoDiTesto(el)) return;
+    const u = state.ultimaAutomatica;
+    if (!u || getEditableText(el) !== u.testo) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    state.annullando = u;
+    try { document.execCommand('undo'); } catch (_) {}
+    const ora = getEditableText(el);
+    if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
+    state.annullando = null;
+    if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
+    if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+  }
+
+  // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
+  // stesso comando) lo fa il browser, che toglie proprio la correzione: così l'annulla dopo toglie quello che si era
+  // scritto. Il browser però riseleziona la parola, e il tasto dopo la cancellerebbe: il cursore torna dov'era.
+  function primaDellAnnulla(state, e) {
+    if (!e || e.inputType !== 'historyUndo') return;
+    const u = state.ultimaAutomatica;
+    state.annullando = u && getEditableText(state.el) === u.testo ? u : null;
+  }
+  function dopoLAnnulla(state) {
+    const u = state.annullando;
+    state.annullando = null;
+    const el = state.el;
+    if (getEditableText(el) !== u.testoPrima) return;
+    mettiCursore(el, u.cursorePrima);
+    // Un editor che rimette la selezione dal suo modello (Lexical) lo fa dopo: lì il cursore si rimette una volta ancora.
+    setTimeout(() => {
+      if (getEditableText(el) === u.testoPrima && cursoreNelCampo(el) !== u.cursorePrima) mettiCursore(el, u.cursorePrima);
+    }, 0);
+    seguiIlTesto(state);
+    rifiutata(state, u.voce);
+  }
+  function mettiCursore(el, pos) {
+    try {
+      if (campoDiTesto(el)) { el.setSelectionRange(pos, pos); return; }
+      const sel = window.getSelection();
+      const r = document.createRange();
+      placeCaretAtOffset(el, pos, r);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch (_) {}
+  }
+
+  // Una correzione automatica riportata indietro è un rifiuto: quell'occorrenza non si ricorregge, e alla soglia la
+  // parola non si corregge più da sé (e, se è una parola che Filo può imparare, non si segna più).
+  function rifiutata(state, v) {
+    const el = state.el;
+    const end = v.start + v.originale.length;
+    state.automatiche = state.automatiche.filter((x) => x.id !== v.id);
+    state.ultimaAutomatica = null;
+    state.rifiutateQui = [...state.rifiutateQui, { id: ++progressivo, start: v.start, end, segment: v.originale }].slice(-AUTOMATICHE_MAX);
+    if (A().soloMaiuscole(v.originale, v.segment)) aggiungiStile({ minuscoli: 2, maiuscoli: 0 });
+    const parola = v.originale;
+    impara({ passo: 'annullata', parola }, (r) => {
+      if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola)) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
+      return null;
+    });
+  }
+
+  // La parola corretta da sé sotto il tasto destro, finché è ancora come l'ha messa Filo.
+  function automaticaSotto(el, clientX, clientY) {
+    const state = el && monitored.get(el);
+    if (!state || !state.automatiche.length) return null;
+    seguiIlTesto(state);
+    const pos = caretCharOffsetFromPoint(el, clientX, clientY);
+    if (pos < 0) return null;
+    const testo = getEditableText(el);
+    const v = state.automatiche.find((x) => pos >= x.start && pos <= x.end && testo.slice(x.start, x.end) === x.segment);
+    return v ? { id: v.id, originale: v.originale, corretta: v.segment } : null;
+  }
+
+  // Una parola fuori dizionario lasciata com'era: alla soglia Filo la impara e smette di segnarla. Un'occorrenza si conta
+  // una volta, e se poi si corregge il conto torna indietro (seguiIlTesto).
+  function contaRiscritta(state, w, testo) {
+    const parola = w.parola;
+    if (parola.replace(/['’-]/g, '').length < 2 || isInDictionary(parola) || nomeNoto(parola)) return;
+    if (state.contate.some((x) => x.start === w.start && x.end === w.end)) return;
+    if (!parolaImparabile(parola)) return;
+    state.contate = [...state.contate, { id: ++progressivo, start: w.start, end: w.end, segment: parola }].slice(-AUTOMATICHE_MAX);
+    const inizioFrase = A().inizioDiFrase(testo, w.start);
+    impara({ passo: 'riscritta', parola, inizioFrase }, (r) => {
+      if (!r || !r.impara) return null;
+      state.contate = state.contate.filter((x) => x.segment.toLowerCase() !== parola.toLowerCase());
+      return aggiungiImparata(r.impara);
+    });
+  }
+
+  // Una correzione scelta dall'utente (menu, «Correggi tutti»): alla soglia diventa una sua correzione automatica. Solo
+  // per una parola che il dizionario non conosce: «a» → «ha» è giusta lì, e da sé cambierebbe ogni «a» (#1447).
+  function accettata(parola, correzione) {
+    if (!A() || !sbagliataPerIlBrowser(String(parola || '').replace(/’/g, "'"))) return;
+    impara({ passo: 'accettata', parola, correzione }, (r) => {
+      if (r && r.impara) return setAutocorrect(r.impara.parola, r.impara.correzione);
+      return null;
+    });
+  }
+
+  // Il lampo caldo sulla parola corretta da sé, che sfuma (token correttore.lampo.*). Sta fuori dallo specchio, dove
+  // ogni sfondo è spento.
+  function lampo(state, start, end) {
+    const el = state.el;
+    let righe = [];
+    try { righe = [...rangeDelTesto(state, start, end).getClientRects()]; } catch (_) { return; }
+    const r = el.getBoundingClientRect();
+    const radice = radiceDi(el) || document.body;
+    const tema = document.documentElement.dataset.snTheme || '';
+    for (const q of righe) {
+      const left = Math.max(q.left, r.left);
+      const right = Math.min(q.right, r.right);
+      const top = Math.max(q.top, r.top);
+      const bottom = Math.min(q.bottom, r.bottom);
+      if (right - left < 1 || bottom - top < 1) continue;
+      const d = document.createElement('div');
+      d.className = 'sn-spell-lampo';
+      global.SN_FILO_UI?.mark(d);
+      d.setAttribute('aria-hidden', 'true');
+      d.dataset.snTheme = tema;
+      d.style.left = `${left}px`;
+      d.style.top = `${top}px`;
+      d.style.width = `${right - left}px`;
+      d.style.height = `${bottom - top}px`;
+      radice.appendChild(d);
+      const via = () => d.remove();
+      d.addEventListener('animationend', via, { once: true });
+      setTimeout(via, 11000);
+    }
+  }
+
+  // Un Range sul pezzo [start, end) del testo del campo: nella casella sullo specchio, che ne ripete il testo; nel campo
+  // modificabile sul testo vero.
+  function rangeDelTesto(state, start, end) {
+    const el = state.el;
+    let radice = el;
+    if (campoDiTesto(el)) {
+      ensureOverlay(state);
+      if (!state.overlay.firstChild || state.overlay.textContent.replace(/\u200b$/, '') !== getEditableText(el)) syncOverlay(state);
+      radice = state.overlay;
+    }
+    const range = document.createRange();
+    const w = document.createTreeWalker(radice, NodeFilter.SHOW_TEXT);
+    let tot = 0;
+    let fatto = 0;
+    for (let n = w.nextNode(); n && fatto < 2; n = w.nextNode()) {
+      const len = n.nodeValue.length;
+      if (!fatto && start < tot + len) { range.setStart(n, start - tot); fatto = 1; }
+      if (fatto === 1 && end <= tot + len) { range.setEnd(n, end - tot); fatto = 2; }
+      tot += len;
+    }
+    if (fatto < 2) throw new Error('pezzo fuori dal testo');
+    return range;
   }
 
   // Il Range passato messo al carattere `target` del campo modificabile (non lo aggiunge alla selezione).
@@ -398,6 +691,39 @@
     const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
+    rileggiMemorie();
+  }
+
+  // Dizionario, correzioni e quello che Filo ha imparato si rileggono anche tornando a scrivere: una spinta persa (la
+  // scheda nata dopo il cambio, un riquadro) non lascia la pagina indietro.
+  let rilettaAlle = 0;
+  async function rileggiMemorie() {
+    const ora = Date.now();
+    if (ora - rilettaAlle < 500) return;
+    rilettaAlle = ora;
+    await Promise.all([loadDictionary(), loadAutocorrect(), caricaImparato()]);
+    const state = activeEl && monitored.get(activeEl);
+    if (state && state.attivo) aggiornaCodice(state);
+  }
+
+  function usaMemorie(m) {
+    if (Array.isArray(m.sn_personal_dict)) usaDizionario(m.sn_personal_dict);
+    if (m.sn_autocorrect && typeof m.sn_autocorrect === 'object' && !Array.isArray(m.sn_autocorrect)) autocorrectMap = m.sn_autocorrect;
+    if (Array.isArray(m.rifiutate) && A()) imparato = { ...(imparato || A().memoria(null)), rifiutate: m.rifiutate.map(String) };
+    const state = activeEl && monitored.get(activeEl);
+    if (state && state.attivo) aggiornaCodice(state);
+  }
+
+  // Il campo che ha già il fuoco quando il correttore parte o si accende (autofocus, la chat di casa): il suo focusin
+  // è passato prima che ci fosse chi lo ascolta.
+  function adottaIlFuoco() {
+    if (!attivo()) return;
+    let el = document.activeElement;
+    try { while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement; } catch (_) {}
+    const campo = findSupportedEditable(el);
+    if (!campo || campo === activeEl) return;
+    attach(campo);
+    rileggiMemorie();
   }
 
   function onFocusOut(e) {
@@ -425,6 +751,9 @@
       rimandati: new Set(), inVista: [],
       // I testi giudicati per intero, coi segni che ne erano usciti: un annulla che ci torna non ripaga (#1097.5).
       giudicati: { rapido: new Map(), ragionato: new Map() },
+      // La correzione automatica (#1447), sulle posizioni del testo come i segni: le parole corrette da sé, l'ultima
+      // (che l'annulla subito dopo riporta indietro), quelle riportate indietro e le parole contate per impararle.
+      automatiche: [], ultimaAutomatica: null, annullando: null, rifiutateQui: [], contate: [],
     };
     monitored.set(el, state);
     return state;
@@ -435,6 +764,14 @@
     if (!ascoltate.has(el)) {
       ascoltate.add(el);
       el.addEventListener('input', (e) => { const vivo = monitored.get(el); if (vivo && vivo.attivo) suInput(vivo, e); });
+      // Prima del tasto si vede la casella che la chat ha svuotato da sé all'invio, senza un input: il messaggio partito
+      // dice come si scrive qui (seguiIlTesto).
+      el.addEventListener('beforeinput', (e) => {
+        const vivo = monitored.get(el);
+        if (!vivo) return;
+        if (vivo.attivo) seguiIlTesto(vivo);
+        primaDellAnnulla(vivo, e);
+      }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
     }
     if (!state.ro) {
@@ -473,7 +810,8 @@
   }
 
   function suInput(state, evento) {
-    if (erroriAttivi()) tryAutocorrect(state);
+    if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
+    fineParolaBattuta(state, evento);
     state.ultimoTasto = Date.now();
     seguiIlTesto(state);
     // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Quella già chiesta da un
@@ -744,14 +1082,24 @@
 
   // La pagina può spostare il campo senza scorrere né ridimensionare (un avviso che compare sopra, un riquadro che si
   // apre): finché il campo attivo ha segni, a ogni fotogramma il suo riquadro si confronta con quello dell'ultimo disegno.
+  // Anche il testo: una chat che svuota la casella da script all'invio non manda input, e lo strato terrebbe il vecchio.
+  const SEGUI_TESTO_DOPO_TASTO_MS = 10000;
   let seguendo = false;
   function seguiIlCampo() {
     if (seguendo) return;
     seguendo = true;
     const giro = () => {
       const state = activeEl && monitored.get(activeEl);
-      if (!state || !state.overlay || !state.el.isConnected || !state.inVista.length) {
+      const specchioPieno = !!(state && state.overlay && state.overlay.textContent)
+        && Date.now() - state.ultimoTasto < SEGUI_TESTO_DOPO_TASTO_MS;
+      if (!state || !state.overlay || !state.el.isConnected || (!state.inVista.length && !specchioPieno)) {
         seguendo = false;
+        return;
+      }
+      if (getEditableText(state.el) !== state.testo) {
+        seguiIlTesto(state);
+        aggiornaCodice(state);
+        requestAnimationFrame(giro);
         return;
       }
       const r = state.el.getBoundingClientRect();
@@ -914,9 +1262,26 @@
     if (ora === state.testo) return;
     const prima = state.testo;
     state.testo = ora;
-    // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora».
-    if (!ora.trim()) state.ignorate.clear();
+    // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora», e dice come si scrive
+    // in questa pagina.
+    if (!ora.trim()) {
+      state.ignorate.clear();
+      if (prima.trim() && A()) ricordaStile(state, prima);
+      state.automatiche = [];
+      state.rifiutateQui = [];
+      state.contate = [];
+      state.ultimaAutomatica = null;
+    }
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
+    if (state.automatiche.length) state.automatiche = riallineaIssues(state.automatiche, prima, ora).issues;
+    if (state.rifiutateQui.length) state.rifiutateQui = riallineaIssues(state.rifiutateQui, prima, ora).issues;
+    // Una parola contata che cambia è stata corretta: il suo conto torna indietro.
+    if (state.contate.length) {
+      const restano = riallineaIssues(state.contate, prima, ora).issues;
+      const vive = new Set(restano.map((x) => x.id));
+      for (const x of state.contate) if (!vive.has(x.id)) impara({ passo: 'corretta', parola: x.segment });
+      state.contate = restano;
+    }
     // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche
     // il suo testo nuovo, se è più stretto del pezzo (il ragionato rilegge tutto).
     if (state.inViaggio.length) {
@@ -994,7 +1359,7 @@
       ...(ripetizioniAttive() ? Rg.ripetizioni(d.testo) : []),
       ...Rg.candidatiDizionario(d.testo, {
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
-        nota: (p) => isInDictionary(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
+        nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]) : [];
     const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
@@ -1061,7 +1426,7 @@
     const delModello = state.modello.filter((m) => (m.fonte === 'rapido' ? modelloErrori() : suggerimentiAttivi()));
     const valido = (x) => x.start >= 0 && x.end <= testo.length && x.end > x.start && testo.slice(x.start, x.end) === x.segment;
     const tieni = (x) => valido(x) && !ignorato(state, x, testo)
-      && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && isInDictionary(x.segment))
+      && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
       && !(scrive && x.start < scrive.end && x.end > scrive.start);
     const ordina = (k) => [
       ...delModello.filter((m) => m.segno === k),
@@ -1451,6 +1816,8 @@
     applyFix(el, { start: segno.start, end: segno.end }, correzione, { expectedSegment: segno.segment });
   }
 
+  // «Ignora» vale per quel testo; su una parola fuori dizionario che non è il refuso di una parola vera è anche un
+  // rifiuto da cui Filo impara, e la parola non si segna più da nessuna parte (#1447).
   function ignora(el, segno) {
     const state = el && monitored.get(el);
     if (!state || !segno) return;
@@ -1458,6 +1825,10 @@
     const ig = chiaveIgnora(segno);
     state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
     renderOverlayContent(state);
+    const parola = String(segno.segment || '').trim();
+    if (segno.segno === 'errore' && A() && parolaImparabile(parola)) {
+      aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), segno.start)));
+    }
   }
 
   // Una parola che Filo sa giusta in quel campo: nel dizionario personale, scartata dal modello o ignorata. Lì la
@@ -1472,10 +1843,11 @@
     return ignorato(state, { segno: 'errore', segment: w, start: 0, end: w.length }, w);
   }
 
+  // A inizio frase la maiuscola non dice niente: la parola si aggiunge minuscola, se no Filo la metterebbe ovunque.
   async function aggiungiAlDizionario(el, segno) {
     if (!segno) return;
     esitoSegno(el, segno, 'rifiutata');
-    await addToDictionary(segno.segment);
+    await addToDictionary(A() ? formaDaImparare(segno.segment, A().inizioDiFrase(getEditableText(el), segno.start)) : segno.segment);
     const state = el && monitored.get(el);
     if (state) aggiornaCodice(state);
   }
@@ -1994,7 +2366,9 @@
       let cur = 0, startNode = null, startOff = 0, endNode = null, endOff = 0, n;
       while ((n = walker.nextNode())) {
         const len = n.nodeValue.length;
-        if (!startNode && cur + len >= range.start) {
+        // Un pezzo che comincia dove finisce un nodo comincia nel nodo dopo: preso dalla fine di quello prima, la
+        // selezione si porterebbe dietro l'a capo fra i due e la battuta lo cancellerebbe (#1447).
+        if (!startNode && cur + len > range.start) {
           startNode = n; startOff = range.start - cur;
         }
         if (!endNode && cur + len >= range.end) {
@@ -2027,6 +2401,15 @@
           ok = document.execCommand('delete', false);
         }
       } catch (_) {}
+      // La battuta lascia il cursore dopo la parola inserita: la correzione a fine parola lo rimette dopo lo spazio, se
+      // no il tasto dopo scriverebbe attaccato alla parola.
+      if (ok && cursorMode === 'preserve' && caretBefore >= 0) {
+        const delta = safeReplacement.length - (range.end - range.start);
+        const cr = document.createRange();
+        placeCaretAtOffset(el, caretBefore >= range.end ? caretBefore + delta : caretBefore, cr);
+        sel.removeAllRanges();
+        sel.addRange(cr);
+      }
 
       if (!ok) {
         try {
@@ -2058,6 +2441,11 @@
           console.warn('[SN] applyFix CE fallback failed:', e);
         }
       }
+    }
+    // Una correzione scelta dall'utente, di una parola sola, insegna (#1447); quelle che Filo fa da sé no.
+    if (expected !== null && !opts.automatica && safeReplacement && !/\s/.test(expected.trim())
+      && getEditableText(el).slice(range.start, range.start + safeReplacement.length) === safeReplacement) {
+      accettata(expected, safeReplacement);
     }
     // Il segno corretto cade col testo che cambia (anche se l'input non è arrivato). Una correzione scelta dal menu è un
     // gesto: i controlli rileggono il pezzo. L'autocorrezione (`preserve`) arriva battendo, e lì li programma il tasto.
@@ -2170,6 +2558,10 @@
     addToDictionary,
     isInDictionary,
     setAutocorrect,
+    automaticaAttiva,
+    automaticaSotto,
+    annullaAutomatica,
+    accettata,
     getNativeSuggestions,
     onNativeSuggestions,
     onNextNativeSuggestion,

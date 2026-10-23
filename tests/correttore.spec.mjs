@@ -33,7 +33,8 @@ async function apri(app, openTab, testServer, opz = {}) {
       models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       featureFlags: { spellcheck: true, spellcheckContext: opz.suggerimenti !== undefined },
-      correttore: { modelloErrori: true, ripetizioni: true, ...(opz.correttore || {}) },
+      // La correzione automatica (#1447) cambierebbe gli errori fissi battuti qui: la prova sta in correttore-automatica.spec.mjs.
+      correttore: { modelloErrori: true, ripetizioni: true, automatica: false, ...(opz.correttore || {}) },
     });
     Object.assign(globalThis, {
       __rapide: [], __ragionate: [], __errori: opz.errori || {},
@@ -441,4 +442,17 @@ test('il controllo ragionato, a fine frase, non porta la password data in rispos
   const tutti = await partiti();
   expect(tutti.some((t) => t.includes('proponi SUGGERIMENTI') && t.includes('certo, [dato riservato].'))).toBe(true);
   for (const t of tutti) expect(t).not.toContain('Gatto2024');
+});
+
+// #1447 — una chat che all'invio svuota la casella da script non manda input: i segni del testo partito non restano
+// sulla casella vuota.
+test('svuotata la casella da script, i segni del testo di prima spariscono', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  await page.locator('#ta').click();
+  await page.keyboard.type('qual\'è il il motivo');
+  await expect(errore(page, 'qual\'è')).toHaveCount(1, { timeout: 4000 });
+  await page.evaluate(() => { document.getElementById('ta').value = ''; });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 2000 });
+  await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.sn-spell-overlay')).map((o) => o.textContent).join('')))
+    .toBe('');
 });

@@ -77,6 +77,9 @@ async function stubAgents(app) {
           suggestions: [],
         });
       }
+      // Il correttore segue anche la chat della home: i suoi controlli non prendono le risposte accodate per Filo.
+      if (all.includes('Sei il controllo rapido degli errori')) return '';
+      if (all.includes('proponi SUGGERIMENTI')) return '[][][][nessuno]';
       const next = globalThis.__chatReplies.shift();
       return next || JSON.stringify({ text: 'Dimmi pure.', actions: [] });
     };

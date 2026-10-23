@@ -1195,6 +1195,8 @@
     let updateCorrection = null;
     const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
     if (tutti) items.unshift(tutti, { type: 'separator' });
+    const annulla = campoDiFilo ? voceAnnullaCorrezione(campoDiFilo, e) : null;
+    if (annulla) items.unshift(annulla, { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
@@ -1243,6 +1245,7 @@
   // correttore: è l'unica strada nei blocchi sigillati (#438), dove il campo è fuori mano.
   function applyNativeCorrection(word, suggestion) {
     if (!suggestion) return;
+    if (word && SpellCheck?.accettata) SpellCheck.accettata(word, suggestion);
     try {
       const sel = window.getSelection && window.getSelection();
       const selected = sel ? String(sel) : '';
@@ -1781,7 +1784,8 @@
       rigaDelPerche(errore, errore.dubbio ? (scrivi) => { segui(scrivi); avvia(); } : null),
       { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, errore) },
     ];
-    if (unaParola(errore.segment)) {
+    // Un errore fisso resta un errore anche nel dizionario (#1447): la voce non farebbe niente.
+    if (unaParola(errore.segment) && errore.fonte !== 'fisso') {
       items.push({
         type: 'item', label: I18n.t('spell_add_dict'),
         onClick: () => { SpellCheck.aggiungiAlDizionario(editableEl, errore); Popup.showToast(I18n.t('toast_added_to_dict')); },
@@ -1824,9 +1828,19 @@
     try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
   }
 
+  // La parola che il correttore ha corretto da sé (#1447): «Annulla correzione» la riporta com'era scritta, e conta
+  // come un rifiuto da cui Filo impara.
+  function voceAnnullaCorrezione(editableEl, mouseEvent) {
+    const v = SpellCheck?.automaticaSotto?.(editableEl, mouseEvent.clientX, mouseEvent.clientY);
+    if (!v) return null;
+    return { type: 'item', label: I18n.t('spell_annulla_correzione'), onClick: () => SpellCheck.annullaAutomatica(editableEl, v) };
+  }
+
   async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
     const sopra = [];
+    const annulla = voceAnnullaCorrezione(editableEl, mouseEvent);
+    if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
     if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
     const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);

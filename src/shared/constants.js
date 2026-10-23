@@ -64,6 +64,11 @@
     CLIPBOARD_HISTORY: 'clipboardHistory',
     PERSONAL_DICT: 'sn_personal_dict',
     AUTOCORRECT: 'sn_autocorrect',
+    // #1447 — quello che il correttore impara dai rifiuti: conti di correzioni accettate, annullate e parole riscritte,
+    // e le parole da non correggere più da sé (src/content/correttoreAutomatica.js).
+    CORRETTORE_IMPARATO: 'sn_correttore_imparato',
+    // Come si scrive in ogni sito, per non mettere le maiuscole dove si scrive tutto minuscolo (correttoreImpara.js).
+    CORRETTORE_STILI: 'sn_correttore_stili',
     ICON_LAYOUT: 'sn_icon_layout',
     // Tab aperti e indice dell'attivo, per riaprirli alla riapertura di Filo.
     OPEN_TABS: 'sn_open_tabs',
@@ -2592,6 +2597,24 @@
     return out;
   }
 
+  // Quante volte serve per imparare, nella correzione automatica (#1447): Preferenze → Avanzate e IMPOSTA_PREFERENZA.
+  const CORRETTORE_SOGLIE = Object.freeze({
+    accettiPerImparare: Object.freeze({ min: 1, max: 100, predefinito: 3 }),
+    annulliPerImparare: Object.freeze({ min: 1, max: 100, predefinito: 2 }),
+    riscrittePerImparare: Object.freeze({ min: 1, max: 100, predefinito: 3 }),
+  });
+  function soglieCorrettore(settings) {
+    const c = (settings && settings.correttore) || {};
+    const out = {};
+    for (const [k, l] of Object.entries(CORRETTORE_SOGLIE)) {
+      const v = c[k];
+      const n = Number(v);
+      out[k] = v === null || v === undefined || v === '' || !Number.isFinite(n)
+        ? l.predefinito : Math.min(l.max, Math.max(l.min, Math.round(n)));
+    }
+    return out;
+  }
+
   const DEFAULT_SETTINGS = {
     provider: DEFAULT_PROVIDER,
     // #530 — quanto Filo fa da solo (src/shared/autonomia.js). Manopole e fonti spostate: solo dati, finché non arriva la posta.
@@ -2660,8 +2683,12 @@
       spellcheckContext: true,
     },
     // #1446 — la parte del modello degli errori (spenta resta il solo codice), le parole grammaticali ripetute del
-    // codice e i tempi dei due controlli (limiti in CORRETTORE_TEMPI).
-    correttore: { modelloErrori: true, ripetizioni: true, pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 },
+    // codice e i tempi dei due controlli (limiti in CORRETTORE_TEMPI). #1447 — la correzione automatica a fine parola,
+    // accesa di serie, e quante volte serve per imparare (limiti in CORRETTORE_SOGLIE).
+    correttore: {
+      modelloErrori: true, ripetizioni: true, pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500,
+      automatica: true, accettiPerImparare: 3, annulliPerImparare: 2, riscrittePerImparare: 3,
+    },
     // Tema: 'system' | 'light' | 'dark'
     theme: 'system',
     // Override dei token estetici (#146.1): il registro vive in themeTokens.js.
@@ -3145,6 +3172,8 @@
     STORAGE_KEYS,
     CORRETTORE_TEMPI,
     tempiCorrettore,
+    CORRETTORE_SOGLIE,
+    soglieCorrettore,
     AUTOMATION,
     ACTIONS,
     CREDIT,

@@ -127,10 +127,28 @@
     "d'avvero": 'davvero', alot: 'a lot', noone: 'no one',
   }));
 
+  // L'apice dopo la parola che comincia in `start` chiude una virgoletta semplice aperta prima sulla riga («'e'»,
+  // «‘vengo perche'»): lì non è un accento (#1447).
+  const LETTERA = /[\p{L}\p{M}]/u;
+  function chiudeVirgolette(testo, start) {
+    testo = String(testo ?? '');
+    let aperta = false;
+    for (let j = testo.lastIndexOf('\n', start - 1) + 1; j < start; j++) {
+      const c = testo[j];
+      if (c !== "'" && c !== '’' && c !== '‘') continue;
+      const prima = LETTERA.test(testo[j - 1] || '');
+      const dopo = LETTERA.test(testo[j + 1] || '');
+      if (!prima && dopo) aperta = true;
+      else if (prima && !dopo) aperta = false;
+    }
+    return aperta;
+  }
+
   function erroriFissi(testo) {
     const fuori = zoneEscluse(testo);
     const out = [];
     for (const { start, end, parola } of parole(testo)) {
+      if (/['’]$/.test(parola) && chiudeVirgolette(testo, start)) continue;
       const giusta = FISSI.get(parola.replace(/’/g, "'").toLowerCase());
       if (!giusta || diParola(testo[start - 1]) || diParola(testo[end])) continue;
       if (fuori.some(([a, b]) => start < b && end > a)) continue;
@@ -356,6 +374,9 @@
   // è uguale al pezzo, e non è un errore da correggere.
   const formaLetta = (s) => String(s ?? '').replace(/[‘’‚‛]/g, "'").replace(/[“”„]/g, '"').replace(/\s+/g, ' ').trim();
 
+  const soloPiuMaiuscole = (scritto, correzione) => scritto !== correzione && scritto.length === correzione.length
+    && [...scritto].every((c, i) => c === correzione[i] || c === correzione[i].toLowerCase());
+
   // I segni di una risposta sul testo di adesso. `tipi`: quelli che questo controllo può dare; `senzaTipo`: quello di una
   // riga che l'ha perso; `citata(c)`: la prova di una contraddizione, che deve stare nella pagina; `inScrittura`: la
   // parola che non si segna; `nuovo`: il testo nuovo della chiamata, per un pezzo citato che compare più volte.
@@ -392,6 +413,9 @@
         if (correzioni.length) correzioni = [correzione];
       }
       if (inScrittura && start < inScrittura.end && end > inScrittura.start) continue;
+      // Una minuscola dove la correzione vuole la maiuscola non è un errore: un nome scritto minuscolo o si corregge
+      // da sé (correttoreAutomatica.js) o si lascia stare (#1447).
+      if (errore && correzioni.length && soloPiuMaiuscole(testo.slice(start, end), correzioni[0])) continue;
       segni.push({
         start, end, segment: testo.slice(start, end), segno: errore ? 'errore' : 'suggerimento', dubbio: false, fonte,
         tipo, motivo: corta(r.motivo, MOTIVO_MAX), correzioni,
@@ -407,7 +431,7 @@
   const chiaveVerdetto = (it) => `${it.fonte}\u0001${String(it.segment || '').replace(/’/g, "'").toLowerCase()}`;
 
   global.SN_CORRETTORE = {
-    REGIONE_MAX, TESTO_INTERO_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
+    REGIONE_MAX, TESTO_INTERO_MAX, FISSI, chiudeVirgolette, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
     senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
     leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO,
   };

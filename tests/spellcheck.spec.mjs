@@ -178,7 +178,8 @@ test.describe('spellcheck-autocorrect-multiword', () => {
       return document.getElementById('dictList')?.querySelectorAll('.sn-spell-word').length === 2;
     }, null, { timeout: 4_000 });
 
-    const words = await page.locator('#dictList .sn-spell-word').allTextContents();
+    // Le parole imparate si cambiano scrivendoci (#1447): ogni riga è una casella.
+    const words = await page.locator('#dictList .sn-spell-word').evaluateAll((els) => els.map((el) => el.value));
     const set = new Set(words);
     expect(set.has('New')).toBe(true);
     expect(set.has('York')).toBe(true);
@@ -874,7 +875,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     // ASSERISCE IL SUCCESSO: la parola in lista deve essere "iPhone" (casing preservato)
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
-    await expect(wordSpans.first()).toHaveText('iPhone');
+    await expect(wordSpans.first()).toHaveValue('iPhone');
   });
 
   test('dizionario personale dedup case-insensitive: aggiungere "iphone" dopo "iPhone" non crea duplicati', async ({ openTab }) => {
@@ -896,7 +897,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
     // Il casing originale ("iPhone") deve essere preservato
-    await expect(wordSpans.first()).toHaveText('iPhone');
+    await expect(wordSpans.first()).toHaveValue('iPhone');
   });
 
   // ---------------------------------------------------------------------------
@@ -986,7 +987,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     // ASSERISCE IL SUCCESSO 2: nessun duplicato aggiunto (resta una sola parola)
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
-    await expect(wordSpans.first()).toHaveText('casa');
+    await expect(wordSpans.first()).toHaveValue('casa');
 
     // ASSERISCE IL SUCCESSO 3: l'input NON viene ingoiato in silenzio — il testo
     // digitato resta visibile così l'utente capisce cosa è successo.
