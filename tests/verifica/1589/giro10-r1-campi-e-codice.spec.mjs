@@ -97,3 +97,31 @@ test('r1 la chat legge una pagina di programmazione: il codice vicino alla parol
   expect(mandato).toContain('id="pwd1"');
   expect(mandato).toContain('PASSWORD_DEFAULT');
 });
+
+test('r1 una domanda in chat sulla password di un prodotto: il modello riceve il nome del prodotto', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const h = await openTab('filo://newtab/');
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__chiamate = [];
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
+      text: JSON.stringify({ text: '', actions: [] }), model: attempts[0].model, provider: attempts[0].provider, usage: {},
+    });
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      globalThis.__chiamate.push(JSON.stringify(messages));
+      try { onDelta && onDelta('RISPOSTA'); } catch (_) {}
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [], text: 'RISPOSTA', toolCalls: [], finishReason: 'stop' };
+    };
+  });
+  await h.bringToFront();
+  await h.locator('#input').fill('come cambio la password del router TP-Link AX1500? E quella di Office365?');
+  await h.locator('#sendBtn').click();
+  await expect(h.locator('.dash-bubble-filo', { hasText: 'RISPOSTA' })).toBeVisible({ timeout: 20_000 });
+  const mandato = (await app.evaluate(() => globalThis.__chiamate)).join('\n');
+  expect(mandato).toContain('TP-Link AX1500');
+  expect(mandato).toContain('Office365');
+});
