@@ -2429,6 +2429,8 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
+  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale.
+  Sidebar?.suChiusura?.(() => (IS_SUBFRAME || motivoBlocco() ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
   // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
@@ -2484,6 +2486,11 @@
     }
     if (msg?.type === MSG.BARRA_FUORI) {
       try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
+    if (msg?.type === MSG.CHAT_ALLEGA) {
+      if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Promise.resolve(Sidebar?.allegaDaFuori?.(msg)).catch(() => {}); } catch (_) {} }
       return;
     }
     if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {

@@ -5,6 +5,7 @@ const { BrowserWindow } = require('electron');
 const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const PageRead = require('./pageRead');
+const { storiaAiuto } = require('./storiaAiuto');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
@@ -241,7 +242,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
       : { role: 'user', content: parts };
-    return [sys, ...(payload.history || []), userMsg];
+    return [sys, ...storiaAiuto(payload.history), userMsg];
   }
   if (action === ACTIONS.CATEGORIZE) {
     return [{ role: 'user', content: PROMPTS.categorize(payload) }];

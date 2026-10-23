@@ -13,6 +13,7 @@ const { createSession, defaultCwd, commandExists } = require('./services/shell')
 const { resolveShell } = require('./services/terminal');
 const { virgoletteIncollando, propostaVirgolette } = require('./services/shellVirgolette');
 const SegretiLetti = require('./services/segretiLetti');
+const RilascioNellaChat = require('./rilascioNellaChat');
 // Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
 const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
@@ -247,6 +248,22 @@ function registerIpcHandlers() {
       const wc = event.sender;
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
       if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
+    } catch (_) {}
+  });
+  // #1623 — le immagini lasciate sulla fila delle schede: solo dalla barra di una finestra, mai da una pagina.
+  ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
+  });
+  // Da un riquadro incorporato in un sito: il pannello sta nel frame principale della sua scheda.
+  ipcMain.on('filo:rilascio-riquadro', (event, voci) => {
+    try {
+      const wc = event.sender;
+      if (!event.senderFrame || !wc.mainFrame || event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId) return;
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tab = w._filoTabs?.tabs?.find((t) => t.view.webContents === wc);
+        if (tab) { RilascioNellaChat.dalRiquadro(tab, voci).catch(() => {}); return; }
+      }
     } catch (_) {}
   });
 

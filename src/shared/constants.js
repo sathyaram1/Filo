@@ -2005,6 +2005,18 @@
       return [sistema, ...pulite].join('\n\n');
     },
 
+    // #1623 — le immagini che l'utente ha dato all'Aiuto, nel suo messaggio: solo il numero, i nomi li scrive chi ha
+    // fatto il file.
+    allegatiAiuto: (immagini = 0) => {
+      const n = Math.max(0, Math.floor(Number(immagini) || 0));
+      if (!n) return '';
+      const quali = n === 1 ? 'l’immagine di questo messaggio l’ha allegata l’utente: non è la pagina'
+        : `le ${n} immagini di questo messaggio le ha allegate l’utente: non sono la pagina`;
+      return `(Sistema: ${esterno().perCanaleSistema(`${quali}, che vedi nello screenshot`)}.)`;
+    },
+    // Il messaggio con le sole immagini, senza testo scritto.
+    soloAllegatiAiuto: () => '(Sistema: l’utente ti ha mandato le immagini allegate senza scrivere niente.)',
+
     // Modifica testo: l'utente seleziona un testo in una casella di input e dà
     // un'istruzione su come modificarlo. L'AI restituisce SOLO il testo modificato,
     // niente preamboli/virgolette.
@@ -3030,6 +3042,33 @@
   // Le regolazioni della barra laterale come le usa chi le legge: un valore fuori dai limiti torna
   // dentro, uno mancante o illeggibile prende il predefinito. Preferenze e chat rifiutano prima.
   const BARRA_LATERALE_LIMITI = Object.freeze({ attesaMs: [100, 3000], uscitaMs: [100, 5000] });
+  // Un'immagine allegata a una chat: nella home sopra il tetto entra come file col suo percorso, e senza percorso la
+  // frase lo dice (#1298); l'Aiuto i file non li apre: oltre il tetto rimpicciolisce l'immagine (lato più lungo in
+  // pixel), e solo oltre il tetto di lettura dice che non entra (#1623).
+  const quante = (n) => Math.max(1, Math.floor(Number(n) || 1));
+  const ALLEGATI_CHAT = Object.freeze({
+    tettoImmagineByte: 4 * 1024 * 1024,
+    tettoLetturaByte: 64 * 1024 * 1024,
+    latoRimpicciolita: 2048,
+    fraseTroppoGrandi: (n) => (quante(n) > 1
+      ? `${quante(n)} immagini superano i 64 MB e non sono entrate.`
+      : 'L’immagine supera i 64 MB e non è entrata.'),
+    fraseImmaginiTolte: (n) => (quante(n) > 1
+      ? `La richiesta non è stata accettata: le prossime domande partono senza le ${quante(n)} immagini.`
+      : 'La richiesta non è stata accettata: le prossime domande partono senza l’immagine.'),
+    fraseIlleggibili: (n) => (quante(n) > 1 ? `${quante(n)} immagini non si sono aperte.` : 'L’immagine non si è aperta.'),
+    fraseNonImmaginiAiuto: (n) => (quante(n) > 1
+      ? `${quante(n)} file non sono immagini e non sono entrati: all’Aiuto si danno solo immagini.`
+      : 'Un file non è un’immagine e non è entrato: all’Aiuto si danno solo immagini.'),
+    // Il messaggio dell'Aiuto come resta nel filo, che le immagini non le tiene: quante erano.
+    testoNelFilo: (scritto, immagini) => {
+      const n = Math.max(0, Math.floor(Number(immagini) || 0));
+      const testo = String(scritto || '');
+      if (!n) return testo;
+      const nota = n > 1 ? `(${n} immagini allegate)` : '(un’immagine allegata)';
+      return testo.trim() ? `${testo}\n${nota}` : nota;
+    },
+  });
   // Le soglie dell'avviso dei crediti (#818): 0 spegne quella condizione. Le usano la pagina, la chat e la proiezione.
   const AVVISO_CREDITI_LIMITI = Object.freeze({ giorni: Object.freeze([0, 30]), percento: Object.freeze([0, 100]) });
   function opzioniBarraLaterale(v) {
@@ -3298,6 +3337,7 @@
     AGENT_STYLE_MAX,
     agentStyleLength,
     BARRA_LATERALE_LIMITI,
+    ALLEGATI_CHAT,
     AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
     AVVISO_SCHERMO_PIENO_LIMITI,
