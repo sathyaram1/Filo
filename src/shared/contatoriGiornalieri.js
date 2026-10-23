@@ -294,6 +294,13 @@
   const TETTI_CARATTERI_MODELLI = Object.freeze(Object.fromEntries(MISURE_MODELLI.map((c) => [c,
     TETTO_MODELLI_ORA * (120 + lungo(c) + 13) + RESTI[c].length * (ALTRO.length + lungo(c) + 13)])));
   const TETTO_CARATTERI_CHIAMATE = 49;
+  // Le chiavi di una misura delle attività: tutte le combinazioni ammesse più «altro», alla loro lunghezza massima.
+  const lungaParte = (d) => (d === TIPO_SUGGERIMENTO ? 40 : Math.max(...d.map((x) => x.length)));
+  const lungaChiave = (m) => Math.max(ALTRO.length,
+    ...DIMENSIONI_ATTIVITA[m].map((f) => f.reduce((a, d) => a + lungaParte(d), f.length - 1)));
+  const TETTI_CHIAVI_ATTIVITA = Object.freeze(Object.fromEntries(MISURE_ATTIVITA.map((m) => [m,
+    (TETTO_VOCI_ATTIVITA + 1) * (lungaChiave(m) + 1)])));
+  const TETTO_CARATTERI_ATTIVITA = (TETTO_VOCI_ATTIVITA + 1) * 10;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
