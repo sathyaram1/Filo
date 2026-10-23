@@ -3043,10 +3043,13 @@
   // dentro, uno mancante o illeggibile prende il predefinito. Preferenze e chat rifiutano prima.
   const BARRA_LATERALE_LIMITI = Object.freeze({ attesaMs: [100, 3000], uscitaMs: [100, 5000] });
   // Un'immagine allegata a una chat: nella home sopra il tetto entra come file col suo percorso, e senza percorso la
-  // frase lo dice (#1298); l'Aiuto i file non li apre, e oltre il tetto lo dice e basta (#1623).
+  // frase lo dice (#1298); l'Aiuto i file non li apre: oltre il tetto rimpicciolisce l'immagine (lato più lungo in
+  // pixel), e solo oltre il tetto di lettura dice che non entra (#1623).
   const quante = (n) => Math.max(1, Math.floor(Number(n) || 1));
   const ALLEGATI_CHAT = Object.freeze({
     tettoImmagineByte: 4 * 1024 * 1024,
+    tettoLetturaByte: 64 * 1024 * 1024,
+    latoRimpicciolita: 2048,
     fraseTroppoGrandi: (n) => (quante(n) > 1
       ? `${quante(n)} immagini superano i 4 MB e non sono entrate. Salvale sul computer e trascinale da lì: entreranno come file.`
       : 'L’immagine supera i 4 MB e non è entrata. Salvala sul computer e trascinala da lì: entrerà come file.'),
