@@ -427,7 +427,6 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
         if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
         if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
       }
-      for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
       return tolti;
     }, opts);
   }
