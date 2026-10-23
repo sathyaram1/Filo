@@ -6564,6 +6564,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     senzaRisposta = { passi, interrotta: true, motivo: 'tagliato' };
     textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
+  // #1596 — le pagine lette e rimaste fuori dalla finestra: lo sa l'utente, e lo sa il modello ai turni dopo.
+  textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
   const esitoTurno = senzaRisposta ? senzaRisposta.motivo : nonDisponibile ? 'non_disponibile' : textReply === '(vuoto)' ? 'vuoto' : 'risposta';
