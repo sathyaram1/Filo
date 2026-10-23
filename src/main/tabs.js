@@ -642,6 +642,8 @@ class TabManager {
     try {
       const type = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
       this._broadcastToViews({ type, fullscreen: on });
+      // La shell cambia il quadrato in «Esci da schermo intero».
+      if (this.win && !this.win.isDestroyed() && !this.win.webContents.isDestroyed()) this.win.webContents.send('filo:broadcast', { type, fullscreen: on });
     } catch (_) {}
     return on;
   }
