@@ -383,6 +383,8 @@ test('Conservativo, dopo una pagina web letta in chat: «dimentica» chiede e di
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
     // Una riga sola, al singolare fino in fondo (#592.23).
+    mkdirSync(SHOTS, { recursive: true });
+    await page.screenshot({ path: join(SHOTS, 'autonomia-dimentica-una-riga.png') });
     expect(testo).toContain('Non entrerà più nelle conversazioni. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
     await clickConfirm(page, 'cancel');
