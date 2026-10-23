@@ -117,11 +117,14 @@ function parteFingerprint(seed) {
   }
   function copyOrNull(src, F) { try { return noisyCopy(src, F); } catch (e) { return null; } }
 
-  // La copia nasce nel documento della finestra a cui appartiene la funzione: il Blob che ne esce è suo.
+  // La copia nasce nel documento della finestra a cui appartiene la funzione: il Blob che ne esce è suo. Col namespace
+  // esplicito: in un documento XML o SVG createElement('canvas') non dà un canvas, e la copia fallirebbe in silenzio.
   function canvasHtml(w) {
-    var oCreate = w.Document.prototype.createElement;
-    var F = family(w.HTMLCanvasElement, w.CanvasRenderingContext2D, function (W, H) {
-      var c = R(oCreate, w.document, ['canvas']); c.width = W; c.height = H; return c;
+    var oCreate = w.Document.prototype.createElementNS, CP = w.HTMLCanvasElement && w.HTMLCanvasElement.prototype;
+    var dw = CP && gOPD(CP, 'width'), dh = CP && gOPD(CP, 'height');
+    var F = dw && dh && family(w.HTMLCanvasElement, w.CanvasRenderingContext2D, function (W, H) {
+      var c = R(oCreate, w.document, ['http://www.w3.org/1999/xhtml', 'canvas']);
+      R(dw.set, c, [W]); R(dh.set, c, [H]); return c;
     });
     var P = F && w.HTMLCanvasElement.prototype;
     if (P && P.toDataURL) {
