@@ -1,6 +1,6 @@
-// Il motore del dizionario del correttore (#1585): Hunspell in WebAssembly sulle stesse sorgenti in Windows, Mac e Linux.
-// Gira nel thread che gli apre dizionarioDiFilo.js (nel processo principale solo se il thread non parte): non sceglie le
-// lingue e non parla con le pagine. Regole: tests/unit/dizionarioDiFilo.test.mjs.
+// Il motore del dizionario del correttore (#1585): Hunspell in WebAssembly, sulle stesse sorgenti in Windows, Mac e Linux.
+// Gira nel thread di dizionarioDiFilo.js (nel processo principale solo se il thread non parte): non sceglie le lingue e
+// non parla con le pagine. Regole: tests/unit/dizionarioDiFilo.test.mjs.
 
 'use strict';
 
