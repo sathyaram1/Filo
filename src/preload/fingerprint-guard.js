@@ -199,9 +199,9 @@ function parteFingerprint(seed) {
     if (!buf || R(waHas, rumoreAudio, [buf])) return;
     R(waAdd, rumoreAudio, [buf]);
     try {
-      for (var ch = 0; ch < buf.numberOfChannels; ch++) {
-        var d = buf.getChannelData(ch);
-        for (var i = 0; i < d.length; i++) {
+      for (var ch = 0, n = R(abCh, buf, []); ch < n; ch++) {
+        var d = R(abData, buf, [ch]);
+        for (var i = 0, L = R(taLen, d, []); i < L; i++) {
           d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
         }
       }
