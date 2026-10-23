@@ -42,11 +42,14 @@ class SchedeInAlto {
     const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
     if (!sotto || sotto.webContents !== wc) return;
     if (input.type === 'mouseLeave') { this._ferma('spinta'); return; }
+    if (input.type === 'mouseDown' || input.type === 'mouseUp') { this._tasto(input.type === 'mouseDown'); return; }
     if (input.type !== 'mouseMove') return;
     this.mossePagina += 1;
+    // Il movimento porta lo stato vero del tasto: un rilascio perso fuori dalla finestra non tiene le schede giù.
+    this.premuto = !!tastoPremuto(input);
     if (!this._attivo()) { this.nascondi(); return; }
     if (this.visibili) {
-      if (Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
+      if (!this.premuto && Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
       return;
     }
     const y = Number(input.y);
