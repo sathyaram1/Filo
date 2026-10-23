@@ -978,6 +978,8 @@ class BarraLaterale {
       }
       case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
+      // #1623 — un'immagine lasciata sulla barra va alla chat della scheda davanti.
+      case 'barra:rilascio': RilascioNellaChat.consegna(this.win, d.voci).catch(() => {}); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;
     }
