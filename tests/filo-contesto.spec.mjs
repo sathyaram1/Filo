@@ -867,6 +867,24 @@ test('un modello della chat con la finestra più piccola di tre giorni di filo r
   const [, secondo] = await app.evaluate(() => globalThis.__accettate);
   expect(secondo).toContain('domanda 19.5');
   expect(secondo).toContain('ci sei?');
+  // I contatori (#1464): una conversazione stretta dopo il rifiuto, e il turno dopo partito dalla finestra imparata.
+  const adattamenti = () => app.evaluate(async () => {
+    const s = await globalThis.SN_CONTATORI_MAIN.letto();
+    const conti = {};
+    for (const ora of Object.values(s.ore || {})) {
+      for (const [k, n] of Object.entries((ora.adattamenti || {})['filo-chat'] || {})) {
+        const [modello, tipo] = k.split('|');
+        conti[tipo] = (conti[tipo] || 0) + n;
+        conti.modelli = [...new Set([...(conti.modelli || []), modello])];
+      }
+    }
+    return conti;
+  });
+  await expect.poll(async () => (await adattamenti()).finestra_piccola || 0, { timeout: 5_000 }).toBe(1);
+  const a = await adattamenti();
+  expect(a.contesto_stretto).toBe(1);
+  expect(a.modelli, 'il modello della chat, col suo nome del router').toHaveLength(1);
+  expect(a.modelli[0]).not.toBe('altro');
 });
 
 // #1301 — il ricordo automatico non accumula copie e non nomina due volte la stessa conversazione.
