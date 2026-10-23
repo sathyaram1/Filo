@@ -109,6 +109,8 @@
       closedAt: meta.closedAt || new Date().toISOString(),
       // 'manual' per la chiusura dell'utente, altri valori dall'auto-archiviazione (§2.1).
       reason: meta.reason || 'manual',
+      // Chiusa dalla pagina stessa o da un crash: né la persona né la pulizia (i contatori delle riaperte, #1467).
+      ...(meta.chiusaDaSola === true ? { chiusaDaSola: true } : {}),
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
       coOpenUrls: insieme.map((x) => x.testo),
       ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),
