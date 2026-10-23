@@ -163,6 +163,24 @@
   }
 
   // Il nome che l'utente vede sulla carta, non l'id che il modello manda.
+  // Il pannello di destra a parole: il nome dello strumento lo dice il catalogo, uno sconosciuto l'ha scritto il modello.
+  function descriviPannello(a, fatto) {
+    const P = global.SN_PANNELLI_APP;
+    const op = String((a && a.operazione) || '').trim().toLowerCase();
+    const app = String((a && a.app) || 'editor');
+    const id = P ? P.risolvi(app, a && a.elemento) : null;
+    const nome = id ? `«${P.nome(app, id)}»` : (a && a.elemento ? `«${String(a.elemento).slice(0, 60)}»` : 'uno strumento');
+    if (op === 'aggiungi') return fatto ? `${nome} ora sta nel pannello degli strumenti` : `Mettere ${nome} nel pannello degli strumenti`;
+    if (op === 'togli') return fatto ? `${nome} non sta più nel pannello degli strumenti` : `Togliere ${nome} dal pannello degli strumenti`;
+    const frasi = {
+      apri: ['Aprire il pannello degli strumenti', 'Il pannello degli strumenti è aperto'],
+      chiudi: ['Chiudere il pannello degli strumenti', 'Il pannello degli strumenti è chiuso'],
+      blocca: ['Tenere aperto il pannello degli strumenti', 'Il pannello degli strumenti resta aperto e spinge la pagina'],
+      sblocca: ['Sbloccare il pannello degli strumenti', 'Il pannello degli strumenti si apre sopra la pagina'],
+    }[op] || ['Cambiare il pannello degli strumenti', 'Pannello degli strumenti cambiato'];
+    return frasi[fatto ? 1 : 0];
+  }
+
   function descriviCarta(a, fatto) {
     const C = global.SN_CARTE_HOME;
     // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
@@ -1104,6 +1122,15 @@
         return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
       },
     },
+    // ── il pannello di destra delle app di Filo a parole (#1433) ──────────────
+    // Costo 1: è quello che l'utente fa col mouse (aprirlo, bloccarlo, trascinarci dentro o fuori uno strumento), e si
+    // disfa allo stesso modo.
+    PANNELLO_APP: {
+      costo: 1,
+      campo: null,
+      describe: (a) => descriviPannello(a, false),
+      describeDone: (a) => descriviPannello(a, true),
+    },
     // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
     // Il costo è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
     // sempre, prima del cancello (mai dall'azione del modello). Rimettere com'era un cambio sensibile può
@@ -1377,6 +1404,7 @@
     IMPOSTA_ESTETICA: fatta,
     PULSANTE_PREFERENZE: senza('muto', 'spento'),
     COMANDO_FINESTRA: senza('already'),
+    PANNELLO_APP: fatta,
     TIENI_APERTA: fatta,
     NON_TENERE_APERTA: fatta,
     CHIUDI_SCHEDE: senza('restano'),

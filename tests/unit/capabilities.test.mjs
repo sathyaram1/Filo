@@ -564,25 +564,28 @@ test('nessuna capacità descrive come voce da cliccare una spiegazione che arriv
   }
 });
 
-// #545: la chat deve sapere quali moduli dell'Editor prendono una scorciatoia;
-// l'elenco vero è la tabella delle azioni dell'Editor, il manifesto la segue.
-test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e solo quelli', () => {
+// #545: la chat deve sapere quali strumenti dell'Editor prendono una scorciatoia; l'elenco vero è la tabella delle
+// azioni dell'Editor, i nomi li dà il catalogo del pannello (#1433), il manifesto li segue.
+test('il manifesto nomina ogni strumento dell\'Editor che prende una scorciatoia, e solo quelli', () => {
   const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
   const blocco = /const AZIONE_SCORCIATOIA = \{([\s\S]*?)\n  \};/.exec(src);
   assert.ok(blocco, 'tabella delle azioni delle scorciatoie non trovata nell\'Editor');
   const tipi = [...blocco[1].matchAll(/^\s+'?([a-z-]+)'?:/gm)].map((m) => m[1]);
+  require(join(ROOT, 'src', 'shared', 'pannelliApp.js'));
+  const cat = globalThis.SN_PANNELLI_APP.catalogo('editor');
+  assert.deepEqual(cat.elementi.filter((e) => e.azione).map((e) => e.id).sort(), tipi.slice().sort(),
+    'il catalogo dice che prendono una scorciatoia strumenti diversi da quelli che l\'Editor sa far partire');
   const etichetta = (tipo) => {
-    const m = new RegExp(`^\\s+'?${tipo}'?:\\s*\\{\\s*label: '([^']+)'`, 'm').exec(src);
-    assert.ok(m, `etichetta del modulo ${tipo} non trovata`);
-    return m[1];
+    const n = globalThis.SN_PANNELLI_APP.nome('editor', tipo);
+    assert.ok(n, `nome dello strumento ${tipo} non trovato nel catalogo`);
+    return n;
   };
   const frase = /[^.]*prendono una scorciatoia[^.]*\./.exec(CAP.get('editor').desc);
-  assert.ok(frase, 'la voce «editor» non dice quali moduli prendono una scorciatoia');
+  assert.ok(frase, 'la voce «editor» non dice quali strumenti prendono una scorciatoia');
   for (const tipo of tipi) {
     assert.ok(frase[0].includes(etichetta(tipo)), `il manifesto non dice che «${etichetta(tipo)}» prende una scorciatoia`);
   }
-  const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
-  for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
+  for (const altro of cat.elementi.map((e) => e.nome).filter((l) => !tipi.map(etichetta).includes(l))) {
     assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
   }
 });

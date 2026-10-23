@@ -646,6 +646,12 @@
     return { partial: { correttore: { [campo]: volte } }, label: etichetta(cifre(volte)) };
   }
 
+  // Il pannello di destra delle app (#1433) ha gli stessi tempi della barra, e la stessa lettura.
+  function msPannello(v, campo, etichetta) {
+    const r = msBarra(v, campo, etichetta);
+    return r && r.partial ? { ...r, partial: { pannelloDestro: r.partial.barraLaterale } } : r;
+  }
+
   function msBarra(v, campo, etichetta) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
@@ -860,6 +866,53 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { barraLaterale: { schede: b } }, label: `Schede dal bordo alto a schermo intero → ${b ? 'compaiono' : 'restano nascoste'}` };
+      },
+    },
+    {
+      scrive: ['pannelloDestro.spinta'],
+      costo: 1,
+      aiuto: 'true | false (il pannello degli strumenti delle app di Filo si apre spingendo il mouse sul bordo destro)',
+      keys: ['pannello_spinta', 'pannello spinta', 'apri il pannello dal bordo', 'bordo destro', 'spinta sul bordo destro'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { pannelloDestro: { spinta: b } }, label: `Pannello degli strumenti spingendo sul bordo destro → ${b ? 'si apre' : 'non si apre'}` };
+      },
+    },
+    {
+      scrive: ['pannelloDestro.attesaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 100-3000 (attesa sul bordo destro prima che il pannello degli strumenti si apra)',
+      keys: ['pannello_attesa', 'pannello attesa', 'attesa sul bordo destro', 'ritardo apertura pannello'],
+      build(v) { return msPannello(v, 'attesaMs', (n) => `Attesa sul bordo destro prima che il pannello si apra → ${n} ms`); },
+    },
+    {
+      scrive: ['pannelloDestro.uscitaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 100-5000 (dopo quanto il pannello degli strumenti si chiude quando il mouse esce)',
+      keys: ['pannello_uscita', 'pannello uscita', 'chiusura del pannello', 'ritardo chiusura pannello'],
+      build(v) { return msPannello(v, 'uscitaMs', (n) => `Il pannello si chiude ${n} ms dopo che il mouse esce`); },
+    },
+    {
+      scrive: ['pannelloDestro.striscia'],
+      costo: 1,
+      aiuto: 'true | false (la striscia sottile sul bordo destro delle app di Filo che indica il pannello degli strumenti)',
+      keys: ['pannello_striscia', 'pannello striscia', 'striscia sul bordo destro', 'striscia del pannello'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { pannelloDestro: { striscia: b } }, label: `Striscia del pannello degli strumenti → ${b ? 'visibile' : 'nascosta'}` };
+      },
+    },
+    {
+      scrive: ['pannelloDestro.bloccato'],
+      costo: 1,
+      aiuto: 'true | false (il pannello degli strumenti resta aperto e spinge la pagina invece di coprirla)',
+      keys: ['pannello_bloccato', 'pannello bloccato', 'blocca il pannello', 'tieni aperto il pannello', 'lucchetto del pannello'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { pannelloDestro: { bloccato: b } }, label: `Pannello degli strumenti → ${b ? 'bloccato aperto' : 'si apre sopra la pagina'}` };
       },
     },
     {

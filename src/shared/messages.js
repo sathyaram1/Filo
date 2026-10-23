@@ -450,7 +450,7 @@
     CHAT_ALLEGA: 'chat_allega',
     // Il pannello di destra delle app di Filo (#1433): solo dalle pagine di Filo (`soloFilo`), un sito non ha un pannello.
     PANNELLO_APP_LEGGI: 'pannello_app_leggi',       // { app } → { ok, stato: { elementi, config } }
-    PANNELLO_APP_MODIFICA: 'pannello_app_modifica', // { app, op: posa|togli|configura, id, primaDi?, config? } → { ok, stato }
+    PANNELLO_APP_MODIFICA: 'pannello_app_modifica', // { app, op: posa|togli|configura|migra, id, primaDi?, config? } → { ok, stato }
     PANNELLO_APP_STATO: 'pannello_app_stato',       // { app, aperto, dentro } → { ok }: la scheda ha il pannello, e com'è
     PANNELLO_APP_CAMBIATO: 'pannello_app_cambiato', // spinta → { app, stato }: gli elementi o la loro configurazione
     PANNELLO_APP_COMANDO: 'pannello_app_comando',   // spinta alla scheda → { azione: apri|chiudi|commuta|bordo, motivo, acceso }

@@ -270,6 +270,9 @@ module.exports = function register(on, ctx) {
     if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
       msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
       msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+      // Il documento dell'Editor (#1433) entra nel prompt come testo dell'utente solo se lo manda l'Editor: da un sito
+      // sarebbe testo di fuori presentato per suo.
+      if ('documento' in msg.payload && !/^filo:\/\/editor\//i.test(String(origin || ''))) delete msg.payload.documento;
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.

@@ -137,12 +137,22 @@
     return config;
   }
 
-  // Una volta sola, sul salvato che non l'ha ancora avuta: dopo, la configurazione è del pannello.
-  function migra(app, stato, collezione) {
+  // Una volta sola, sul salvato che non l'ha ancora avuta: dopo, la configurazione è del pannello. Quella che
+  // l'utente ha già dato a un elemento vince su quella dei vecchi moduli.
+  function migraConfig(app, stato, conf) {
     const s = normalizza(app, stato);
     if (!s || s.migrato) return null;
-    const config = { ...configDaModuli(app, collezione), ...s.config };
-    return { ...s, config, migrato: true };
+    const config = {};
+    const grezza = conf && typeof conf === 'object' ? conf : {};
+    for (const id of Object.keys(grezza)) {
+      const pulita = noto(app, id) ? pulisciConfig(app, id, grezza[id]) : {};
+      if (Object.keys(pulita).length) config[id] = pulita;
+    }
+    return { ...s, config: { ...config, ...s.config }, migrato: true };
+  }
+
+  function migra(app, stato, collezione) {
+    return migraConfig(app, stato, configDaModuli(app, collezione));
   }
 
   // Le scorciatoie degli elementi che stanno nel pannello, per chi le confronta con le altre di Filo.
@@ -169,7 +179,7 @@
   }
 
   global.SN_PANNELLI_APP = Object.freeze({
-    CATALOGHI, CONTI, catalogo, elemento, noto, nome, normalizza, posa, togli, configura, configDaModuli, migra,
+    CATALOGHI, CONTI, catalogo, elemento, noto, nome, normalizza, posa, togli, configura, configDaModuli, migra, migraConfig,
     scorciatoie, risolvi,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

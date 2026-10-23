@@ -54,6 +54,7 @@
     COMANDO_FINESTRA: 'windowFrame',
     ACCOUNT: 'user',
     SPOSTA_ICONA: 'pin',
+    PANNELLO_APP: 'apps',
     INSTALLA_AGGIORNAMENTO: 'download',
     RIMEDIO_CREDITI: 'credits',
     PULSANTE_PREFERENZE: 'options',

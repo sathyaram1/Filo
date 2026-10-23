@@ -623,6 +623,10 @@ const TASTI_DI_FILO = {
   'CommandOrControl+-': 'rimpicciolisci la PAGINA',
   'CommandOrControl+0': 'riporta la PAGINA al 100%',
   'CommandOrControl+Shift+B': 'apre e chiude la barra laterale',
+  // Il pannello degli strumenti delle app (#1433): lo ascolta la scheda (src/main/bordoDestro.js), e la barra lo scrive
+  // senza prenderselo, così sui siti il tasto resta loro.
+  'Ctrl+\\': 'apre e chiude il pannello degli strumenti delle app di Filo',
+  'Cmd+\\': 'apre e chiude il pannello degli strumenti delle app di Filo (la forma del Mac)',
   // Lo schermo intero ha il tasto abituale di ogni sistema (src/shared/tasti.js), e Filo lo ascolta ovunque.
   F11: 'mette e toglie lo schermo intero',
   'Ctrl+Cmd+F': 'mette e toglie lo schermo intero (la forma del Mac: F11 lì è del sistema)',
@@ -805,7 +809,9 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
     .map((v) => v.role);
   assert.deepEqual(ignoti, [], 'role nuovo nella barra: scrivi qui sopra il tasto che Electron gli dà su Mac');
 
+  // Una voce che scrive il tasto senza registrarlo (registerAccelerator: false) non se lo prende.
   const scoperti = vociDellaBarra('darwin')
+    .filter((v) => v.registerAccelerator !== false)
     .map((v) => v.accelerator || (v.role && TASTO_DEL_ROLE_SU_MAC[String(v.role).toLowerCase()]))
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.

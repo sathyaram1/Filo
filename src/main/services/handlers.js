@@ -225,8 +225,9 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     return [{ role: 'user', content: PROMPTS.translatePageChunk({ chunk: payload.chunk }) }];
   }
   if (action === ACTIONS.HELP) {
+    // L'llms.txt e i percorsi condivisi sono dei siti: una pagina di Filo (filo://editor) non ne ha.
     const domain = (() => {
-      try { return new URL(payload.url || '').hostname.toLowerCase(); }
+      try { const u = new URL(payload.url || ''); return /^https?:$/.test(u.protocol) ? u.hostname.toLowerCase() : ''; }
       catch (_) { return ''; }
     })();
     const [llmsRes, pathsRes] = await Promise.all([
@@ -238,7 +239,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     const sys = { role: 'system', content: PROMPTS.help({
       url: payload.url, title: payload.title, outline: payload.outline,
       viewport: payload.viewport, siteKnowledge, knownPaths,
-      apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(),
+      apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(), documento: payload.documento || null,
       valuta: payload.valuta === true ? await memoriaPerValuta() : null,
     }) };
     const parts = [];
@@ -3868,6 +3869,37 @@ async function eseguiAzioneFilo(action, {
           { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito, via: 'chat' });
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
         return { executed: true, kept: false, output: { icona: id, dove, layout } };
+      }
+      case 'PANNELLO_APP': {
+        // #1433 — il pannello di destra delle app a parole: le stesse porte del mouse (la pagina per aprire e chiudere,
+        // il main per gli strumenti, le Preferenze per il lucchetto).
+        const P = globalThis.SN_PANNELLI_APP;
+        const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
+        const win = winOf(sender);
+        const tabs = win && win._filoTabs;
+        const lista = (tabs && tabs.tabs) || [];
+        const daChi = sender?.tab?.id ? lista.find((t) => t.id === sender.tab.id) : null;
+        const davanti = lista.find((t) => t.id === tabs?.activeId) || null;
+        const scheda = [daChi, davanti].find((t) => t && t.pannelloApp) || null;
+        const app = scheda ? scheda.pannelloApp.app : (P && P.catalogo(String(action.app || '')) ? String(action.app) : 'editor');
+        if (op === 'aggiungi' || op === 'togli') {
+          const id = P ? P.risolvi(app, action.elemento ?? action.id) : null;
+          if (!id) return { executed: false, kept: false, output: { elemento: 'sconosciuto', disponibili: P ? P.catalogo(app).elementi.map((e) => e.nome) : [] } };
+          const esito = await require('./pannelliApp').modifica(app, { op: op === 'aggiungi' ? 'posa' : 'togli', id });
+          const dentro = !!(esito && esito.stato && esito.stato.elementi.includes(id));
+          return { executed: true, kept: false, output: { app, elemento: id, nelPannello: dentro, giaCosi: !!(esito && !esito.cambiato) } };
+        }
+        if (op === 'blocca' || op === 'sblocca') {
+          await applySettingsUpdate({ pannelloDestro: { bloccato: op === 'blocca' } });
+          if (op === 'blocca' && scheda && tabs.barra?.destro) tabs.barra.destro.comanda(scheda, 'apri', 'chat');
+          return { executed: true, kept: false, output: { bloccato: op === 'blocca', apertoSu: scheda ? app : null } };
+        }
+        if (op === 'apri' || op === 'chiudi') {
+          if (!scheda || !tabs?.barra?.destro) return { executed: false, kept: false, output: { pannello: 'nessuna app col pannello davanti' } };
+          tabs.barra.destro.comanda(scheda, op, 'chat');
+          return { executed: true, kept: false, output: { pannello: op === 'apri' ? 'aperto' : 'chiuso', app } };
+        }
+        return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
       }
       case 'CARTA_HOME': {
         const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
