@@ -448,13 +448,13 @@ test('una scheda aperta che non risponde in tempo lo dice al modello, con la cop
   await reteDiProva(app, { vietata: true });
   await stubModello(app, [
     { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
-    { finale: { cerca: '(non ha risposto in tempo)', testo: 'RISPOSTA BIS: la scheda $1.' } },
+    { finale: { cerca: '(scaricarla a parte non è riuscito)', testo: 'RISPOSTA BIS: $1.' } },
   ]);
   await chiedi(page, 'riprova a leggerla');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA BIS: la scheda non ha risposto in tempo.' })).toBeVisible({ timeout: 30_000 });
-  const niente = esitiDi((await chiamate(app))[1]).join('\n');
-  expect(niente).toContain('non letta');
-  expect(niente).not.toContain('NAVIGA');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA BIS: scaricarla a parte non è riuscito.' })).toBeVisible({ timeout: 30_000 });
+  const niente = esitiDi((await chiamate(app))[1]).at(-1);
+  expect(niente).toContain('la scheda aperta non ha risposto in tempo');
+  expect(niente, 'la pagina è quella aperta dall\'utente: un\'altra fonte non è il consiglio giusto').not.toContain('un\'altra fonte');
 });
 
 test('aperta in una scheda come consiglia Filo, la pagina che rimanda si rilegge dalla scheda con l\'indirizzo di partenza', async ({ app, openTab, testServer }) => {
