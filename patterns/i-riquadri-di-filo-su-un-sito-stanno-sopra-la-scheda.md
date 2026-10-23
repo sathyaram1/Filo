@@ -24,7 +24,8 @@ lì non c'è codice di altri.
   in sandbox come sui siti: `src/preload/riquadri-preload.js`, impacchettato da `src/main/preloadPacchetto.js`.
 - **Si posa prima di aprire:** lo strato prende le misure della pagina e il riquadro le aspetta, o una risposta nata in
   una vista larga zero sceglierebbe il lato sbagliato. L'ancora di una risposta arriva in px della pagina e il main la
-  porta in px della vista (zoom); da un riquadro incorporato vale l'ultimo punto del puntatore sulla scheda.
+  porta in px della vista (zoom); da un riquadro incorporato vale l'ultimo punto del puntatore sulla scheda, seguito da
+  quando la scheda nasce (non da quando nasce lo strato: la prima risposta finirebbe in alto a sinistra).
 - **Subito sopra la sua scheda:** avvisi della barra, conferme, barra laterale e menu restano sopra, come sopra la
   pagina. Si vede solo con la sua scheda davanti, senza l'avviso del sito pericoloso, e solo se ha qualcosa aperto.
 - **Il vuoto è della pagina:** fuori dai riquadri clic, rotella e trascinamenti tornano alla scheda
