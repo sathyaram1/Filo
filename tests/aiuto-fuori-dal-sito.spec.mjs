@@ -113,7 +113,7 @@ test('Aiuto su un sito: Filo apre la sezione sulla pagina, il passo indicato sta
   test.setTimeout(90_000);
   await prepara(app, [
     { text: 'Apro la sezione.', highlight: { selector: '#altro', action: 'reveal' }, status: 'continue' },
-    { text: 'Premi il bottone.', highlight: { selector: '#vai', action: 'click', note: 'qui' }, status: 'continue', collapse: false },
+    { text: 'Premi il bottone.', highlight: { selector: '#vai', action: 'click', note: 'Nota-riservata-15093 qui' }, status: 'continue', collapse: false },
     { text: 'Fatto, sei nei movimenti.', status: 'done' },
   ]);
   const { sito, strato } = await apriAiuto(app, shell, openTab, testServer);
@@ -124,9 +124,15 @@ test('Aiuto su un sito: Filo apre la sezione sulla pagina, il passo indicato sta
   // Il reveal lo fa Filo sulla pagina sotto, e il giro dopo lo sa.
   await expect.poll(() => sito.evaluate(() => document.querySelector('#altro').open), { timeout: 15_000 }).toBe(true);
   await expect(strato.locator('.sn-sidebar-log', { hasText: 'sezione aperta' })).toBeVisible();
-  // La cornice del passo è nella pagina; il pannello non la copre.
+  // La cornice del passo è nella pagina, la sua nota nello strato, sopra il bottone: il sito non la legge.
   await expect.poll(() => sito.evaluate(() => !!document.querySelector('.sn-highlight')), { timeout: 15_000 }).toBe(true);
+  const nota = strato.locator('.sn-nota-del-passo', { hasText: 'Nota-riservata-15093' });
+  await expect(nota).toBeVisible();
   const b = await sito.locator('#vai').boundingBox();
+  const n = await nota.boundingBox();
+  expect(n.y + n.height <= b.y + 1 || n.y >= b.y + b.height - 1, 'la nota sta sopra o sotto il bottone').toBe(true);
+  expect(Math.abs(n.x - Math.max(4, b.x))).toBeLessThan(2);
+  await nienteAlSito(sito, 'Nota-riservata');
   const p = await strato.locator('.sn-sidebar').boundingBox();
   expect(b.x + b.width <= p.x || b.x >= p.x + p.width || b.y + b.height <= p.y || b.y >= p.y + p.height, 'il pannello copre il passo').toBe(true);
 
@@ -137,6 +143,39 @@ test('Aiuto su un sito: Filo apre la sezione sulla pagina, il passo indicato sta
   await expect(strato.locator('.sn-sidebar-msg-assistant', { hasText: 'Fatto, sei nei movimenti' })).toBeVisible({ timeout: 15_000 });
   expect(await app.evaluate(() => globalThis.__aiuto[2])).toContain('l\'utente ha cliccato');
   await expect.poll(() => sito.evaluate(() => !!document.querySelector('.sn-highlight'))).toBe(false);
+  await expect(strato.locator('.sn-nota-del-passo')).toHaveCount(0);
+});
+
+test('Aiuto su un sito: il testo proposto per un campo lo vede solo l\'utente, e Accetta lo scrive nel campo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app, [
+    { text: 'Scrivo la causale.', highlight: { selector: '#causale', action: 'fill', value: 'Affitto-15093 ottobre', note: 'Causale' }, status: 'continue', collapse: false },
+    { text: 'Fatto, ora conferma.', status: 'done' },
+  ]);
+  const sito = await testServer.openReady(openTab, `<!doctype html><title>Bonifico</title><body style="margin:0;padding:40px">
+    <label>Causale <input id="causale" style="width:240px"></label>${SPIA}</body>`);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const strato = await paginaDelloStrato(app, sito);
+  await strato.waitForSelector('.sn-sidebar-input textarea', { timeout: 10_000 });
+  await strato.locator('.sn-sidebar-input textarea').click();
+  await strato.keyboard.insertText('scrivi la causale');
+  await strato.keyboard.press('Enter');
+  const accetta = strato.locator('.sn-nota-del-passo .sn-highlight-accept');
+  await expect(accetta).toBeVisible({ timeout: 15_000 });
+  await expect(strato.locator('.sn-nota-del-passo')).toContainText('Affitto-15093 ottobre');
+  // Finché l'utente non accetta, il testo proposto il sito non lo vede.
+  await nienteAlSito(sito, 'Affitto-15093');
+  await expect(sito.locator('#causale')).toHaveValue('');
+  // Un clic finto sul bottone, da codice, non lo accetta.
+  await strato.evaluate(() => document.querySelector('.sn-highlight-accept').click());
+  await sito.waitForTimeout(300);
+  await expect(sito.locator('#causale')).toHaveValue('');
+  await accetta.click();
+  await expect(sito.locator('#causale')).toHaveValue('Affitto-15093 ottobre');
+  await expect(strato.locator('.sn-sidebar-log', { hasText: 'testo inserito' })).toBeVisible({ timeout: 15_000 });
+  await expect(strato.locator('.sn-sidebar-msg-assistant', { hasText: 'Fatto, ora conferma' })).toBeVisible({ timeout: 15_000 });
+  await expect(strato.locator('.sn-nota-del-passo')).toHaveCount(0);
 });
 
 test('Aiuto su un sito: un pannello sopra il passo si sposta di lato', async ({ app, shell, openTab, testServer }) => {

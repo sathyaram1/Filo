@@ -337,7 +337,9 @@
 
   // `segui`: il clic sul passo (o l'Accetta di un campo) è un gesto dell'utente da riportare a `suAzione`, con quello
   // che serve al giro dopo: il nome dell'elemento e l'indirizzo di prima del clic. `id` dice di quale passo si tratta.
-  function evidenzia(h, suAzione) {
+  // Con `suPosa(rect | null)` nota, valore e Accetta li disegna chi chiede, fuori dal documento, sul rettangolo che riceve.
+  let passoMostrato = 0;
+  function evidenzia(h, suAzione, suPosa) {
     h = h && typeof h === 'object' ? h : {};
     const selector = String(h.selector || '');
     const id = Number(h.id) || 0;
@@ -347,8 +349,24 @@
       pulisci({ hover: true });
       suAzione({ id, etichetta, daUrl });
     } : null;
+    const fuori = typeof suPosa === 'function';
     let ok = false;
-    try { ok = !!Highlight.show(selector, { note: String(h.note || ''), action: h.action, value: h.value, onAction }); } catch (_) { ok = false; }
+    try {
+      ok = !!Highlight.show(selector, {
+        note: String(h.note || ''), action: h.action, value: h.value, onAction,
+        senzaNota: fuori, suPosa: fuori ? (r) => suPosa(id, r) : null,
+      });
+    } catch (_) { ok = false; }
+    passoMostrato = ok ? id : 0;
+    return { ok };
+  }
+
+  // L'Accetta premuto sulla nota fuori dal documento, per il passo `id` se è ancora quello mostrato.
+  function accetta(a) {
+    const id = Number(a && a.id) || 0;
+    if (!id || id !== passoMostrato) return { ok: false };
+    let ok = false;
+    try { ok = !!Highlight.accetta(); } catch (_) { ok = false; }
     return { ok };
   }
 
@@ -363,6 +381,7 @@
 
   // `hover`: anche il menu tenuto aperto da Filo, che dopo un gesto vero dell'utente non serve più.
   function pulisci(a) {
+    passoMostrato = 0;
     try { Highlight.clear(); } catch (_) {}
     if (a && a.hover) { try { Highlight.clearForceHover?.(); } catch (_) {} }
     return { ok: true };
@@ -376,6 +395,19 @@
 
   const manda = (m) => { try { Promise.resolve(chrome.runtime.sendMessage(m)).catch(() => {}); } catch (_) {} };
 
+  // Dove sta il bersaglio del passo, allo strato: una volta per fotogramma, mentre la pagina scorre o cambia.
+  let posaInCoda = null;
+  function mandaPosa(id, r) {
+    const prima = posaInCoda;
+    posaInCoda = { id, rect: r ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null };
+    if (prima) return;
+    requestAnimationFrame(() => {
+      const x = posaInCoda;
+      posaInCoda = null;
+      if (x) manda({ type: MSG.AIUTO_ALLO_STRATO, comando: 'posa', id: x.id, rect: x.rect });
+    });
+  }
+
   async function servi(m) {
     const args = m.args && typeof m.args === 'object' ? m.args : {};
     let esito = null;
@@ -384,8 +416,9 @@
       else if (m.op === 'leggi') esito = await leggi(args);
       else if (m.op === 'azione') esito = await azione(args.page);
       else if (m.op === 'evidenzia') {
-        esito = evidenzia(args, (ev) => manda({ type: MSG.AIUTO_ALLO_STRATO, comando: 'azione', ...ev }));
-      } else if (m.op === 'auto') esito = auto(args);
+        esito = evidenzia(args, (ev) => manda({ type: MSG.AIUTO_ALLO_STRATO, comando: 'azione', ...ev }), mandaPosa);
+      } else if (m.op === 'accetta') esito = accetta(args);
+      else if (m.op === 'auto') esito = auto(args);
       else if (m.op === 'pulisci') esito = pulisci(args);
     } catch (e) {
       console.error('[Filo] Aiuto sulla pagina', m.op, e);
@@ -404,7 +437,7 @@
   }
 
   global.SN_AIUTO_PAGINA = {
-    AZIONI, leggi, azione, evidenzia, auto, pulisci, describeElementBriefly,
+    AZIONI, leggi, azione, evidenzia, accetta, auto, pulisci, describeElementBriefly,
     resolveActionText, resolveImageEl, resolveLinkEl,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

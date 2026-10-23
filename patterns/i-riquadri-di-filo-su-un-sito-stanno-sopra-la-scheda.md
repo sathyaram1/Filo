@@ -17,11 +17,12 @@ lì non c'è codice di altri.
   (`src/main/stratoDeiRiquadri.js`) crea o riusa lo strato della pagina e gli consegna la richiesta. Se lo strato non si
   può fare, il riquadro si apre nel documento come prima, non sparisce.
 - **L'Aiuto lavora sulla pagina sotto** (#1509.3): conversazione e pannello stanno nello strato; quello che tocca la
-  pagina (la foto, lo schema, le immagini a vista, l'attesa dopo un passo, le azioni del menu, la cornice e la nota sul
-  passo indicato) lo fa il suo frame principale, `src/content/aiutoPagina.js`. Lo strato chiede `AIUTO_ALLA_PAGINA`, il
-  main lo gira alla pagina (`AIUTO_DALLO_STRATO`) e aspetta `AIUTO_ESITO`, con un tetto di tempo per operazione
-  (`OP_PAGINA`): chiede solo lo strato, risponde solo il frame principale. Il clic dell'utente sul passo e la cornice da
-  scoprire tornano allo strato con `AIUTO_ALLO_STRATO`. Nel documento del sito resta la facciata di `SN_SIDEBAR`: apre
+  pagina (la foto, lo schema, le immagini a vista, l'attesa dopo un passo, le azioni del menu, la cornice sul passo
+  indicato) lo fa il suo frame principale, `src/content/aiutoPagina.js`. Lo strato chiede `AIUTO_ALLA_PAGINA`, il main
+  lo gira alla pagina (`AIUTO_DALLO_STRATO`) e aspetta `AIUTO_ESITO`, con un tetto di tempo per operazione
+  (`OP_PAGINA`): chiede solo lo strato, risponde solo il frame principale. Nota, valore proposto e «Accetta» del passo
+  stanno nello strato: la pagina gli manda dove sta il bersaglio (`posa`, anche per scostare il pannello) e il clic
+  dell'utente sul passo (`azione`), con `AIUTO_ALLO_STRATO`; il valore entra nel campo solo all'Accetta. Nel documento del sito resta la facciata di `SN_SIDEBAR`: apre
   lo strato e tiene lo stato che il pannello le manda, per la barra laterale e il menu. L'uscita di un'azione di pagina
   (cercare, aprire un link) torna allo strato e passa da `runFiloAction`, con la sua conferma.
 - **Lo strato parla come la pagina sotto**, col suo frame principale (`senderInfo` in `src/main/ipc.js`): bozze per

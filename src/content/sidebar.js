@@ -117,6 +117,8 @@
     if (!davvero && inVolo > 0) { if (!nascosto) nascondi(); return; }
     Pagina.pulisci({ hover: true }).catch(() => {});
     evidenziato = null;
+    togliNotaPasso();
+    passoQui = 0;
     if (docClickHandler) {
       document.removeEventListener('mousedown', docClickHandler, true);
       docClickHandler = null;
@@ -143,6 +145,8 @@
     nascosto = true;
     Pagina.pulisci({ hover: true }).catch(() => {});
     evidenziato = null;
+    togliNotaPasso();
+    passoQui = 0;
     try { voce?.ferma(); } catch (_) {}
     root.classList.add('sn-sidebar-nascosta');
     cambiato();
@@ -379,28 +383,72 @@
     close(opts);
   }
 
-  // La cornice del passo si muove con la pagina: il pannello nello strato le si sposta di lato, una volta per fotogramma.
-  let evitaInCoda = null;
-  function evita(rect) {
-    if (!inFacciata()) { ensureNotOverTarget(rect); return; }
-    if (!rect) return;
-    const prima = evitaInCoda;
-    evitaInCoda = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
-    if (prima) return;
-    requestAnimationFrame(() => {
-      const x = evitaInCoda;
-      evitaInCoda = null;
-      if (x) comandoAlloStrato({ comando: 'evita', rect: x });
-    });
-  }
-
   // Nello strato: quello che la pagina sotto chiede al pannello.
   function dallaPagina(d) {
     if (!nelloStrato || !d || typeof d !== 'object') return;
     if (d.comando === 'passo') passo();
     else if (d.comando === 'chiudi') close({ davvero: !!d.davvero });
-    else if (d.comando === 'evita') ensureNotOverTarget(d.rect);
+    else if (d.comando === 'posa') posaDelPasso(Number(d.id) || 0, d.rect || null);
     else if (d.comando === 'azione') suAzioneUtente(d);
+  }
+
+  // ---------- La nota del passo, nello strato (#1509.3) ----------
+  // Su un sito la cornice del passo sta nella pagina, che la tiene sul bersaglio e dice qui dove sta; nota, valore
+  // proposto e «Accetta» stanno qui, dove il sito non li legge e non li preme, e il pannello si scosta dal bersaglio.
+  let passoQui = 0;
+  let notaPasso = null;
+  function mostraNotaPasso(h) {
+    togliNotaPasso();
+    passoQui = h.id;
+    if (!nelloStrato || (!h.note && h.action !== 'fill')) return;
+    const tip = document.createElement('div');
+    tip.className = 'sn-highlight-tip sn-nota-del-passo';
+    global.SN_FILO_UI?.mark(tip);
+    tip.style.zIndex = '2147483500';
+    tip.style.visibility = 'hidden';
+    if (h.note) {
+      const nota = document.createElement('div');
+      nota.className = 'sn-highlight-note';
+      nota.textContent = h.note;
+      tip.appendChild(nota);
+    }
+    if (h.action === 'fill') {
+      const valore = document.createElement('div');
+      valore.className = 'sn-highlight-value';
+      valore.textContent = h.value ? `«${h.value}»` : '';
+      const accetta = document.createElement('button');
+      accetta.type = 'button';
+      accetta.className = 'sn-highlight-accept';
+      accetta.textContent = '✓ Accetta';
+      accetta.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!gestoVero(e) || accetta.disabled) return;
+        accetta.disabled = true;
+        chiediSotto('accetta', { id: h.id }).then((r) => { if (!(r && r.ok) && accetta.isConnected) accetta.disabled = false; });
+      });
+      tip.append(valore, accetta);
+    }
+    document.documentElement.appendChild(tip);
+    notaPasso = { id: h.id, el: tip };
+  }
+  function togliNotaPasso() {
+    if (notaPasso) { try { notaPasso.el.remove(); } catch (_) {} }
+    notaPasso = null;
+  }
+  // Sopra il bersaglio, o sotto se in alto non c'è posto; null: il bersaglio non c'è più.
+  function posaDelPasso(id, rect) {
+    if (!id || id !== passoQui) return;
+    if (!rect) { togliNotaPasso(); return; }
+    ensureNotOverTarget(rect);
+    if (!notaPasso || notaPasso.id !== id) return;
+    const tip = notaPasso.el;
+    tip.style.maxWidth = `${Math.min(360, window.innerWidth - 16)}px`;
+    const alto = tip.offsetHeight || 24;
+    let top = rect.top - alto - 6;
+    if (top < 4) top = rect.bottom + 6;
+    tip.style.left = `${Math.max(4, rect.left)}px`;
+    tip.style.top = `${top}px`;
+    tip.style.visibility = '';
   }
 
   // ---------- Drag header ----------
@@ -1609,6 +1657,8 @@
       // Il tooltip usa SOLO highlight.note, non il testo della chat, per non duplicare il
       // messaggio; per i fill il riquadro resta comunque (valore + Accetta).
       evidenziato = null;
+      togliNotaPasso();
+      passoQui = 0;
       await Pagina.pulisci({}).catch(() => null);
       // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
       if (parsed.highlight && !nascosto) {
@@ -1664,9 +1714,11 @@
             // Il gesto dell'utente sul passo torna con il suo id: uno vecchio, dopo un passo nuovo, non conta.
             const h = { ...parsed.highlight, id: ++passiIndicati, segui: parsed.status === 'continue' };
             evidenziato = h.segui ? h : null;
-            await Pagina.evidenzia({
+            mostraNotaPasso(h);
+            const mostrato = await Pagina.evidenzia({
               id: h.id, selector: h.selector, note: h.note || '', action: h.action, value: h.value, segui: h.segui,
             }).catch(() => null);
+            if (!(mostrato && mostrato.ok) && passoQui === h.id) { togliNotaPasso(); passoQui = 0; }
           }
         }
       }
@@ -1737,6 +1789,8 @@
     const highlight = evidenziato;
     if (!root || !highlight || !ev || Number(ev.id) !== highlight.id) return;
     evidenziato = null;
+    togliNotaPasso();
+    passoQui = 0;
     const label = String(ev.etichetta || '');
     let logText, aiNote;
     if (highlight.action === 'fill') {
@@ -1765,7 +1819,7 @@
   }
 
   global.SN_SIDEBAR = {
-    open, close: chiudi, isOpen, ensureNotOverTarget: evita, paroleUtente, notaFermata, fileSotto, passo, stato,
+    open, close: chiudi, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
     dalloStrato, dallaPagina,
   };

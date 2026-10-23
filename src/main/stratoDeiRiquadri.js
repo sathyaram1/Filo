@@ -13,8 +13,8 @@ const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto']);
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
 // può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
-const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, auto: 15000, pulisci: 15000 });
-const COMANDI_AIUTO = new Set(['passo', 'chiudi', 'evita', 'azione']);
+const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000 });
+const COMANDI_AIUTO = new Set(['passo', 'chiudi', 'posa', 'azione']);
 const AIUTO_CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false });
 // Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina. Oltre, la
 // richiesta si rifiuta col numero, mai tagliata.
@@ -217,26 +217,31 @@ class StratoDeiRiquadri {
     return { ok: true };
   }
 
-  // AIUTO_ALLO_STRATO dalla pagina: l'icona Aiuto premuta di nuovo, l'Aiuto spento, il passo evidenziato che la
-  // cornice deve scoprire, il gesto dell'utente sul passo indicato. Senza un Aiuto vivo nello strato non va da nessuna parte.
+  // AIUTO_ALLO_STRATO dalla pagina: l'icona Aiuto premuta di nuovo, l'Aiuto spento, dove sta il bersaglio del passo
+  // (la sua nota e il pannello da scostare), il gesto dell'utente sul passo indicato. Senza un Aiuto vivo nello strato non va da nessuna parte.
   comandoAiuto(sender, d) {
     const s = sender && !sender.strato ? this.strati.get(sender.wc) : null;
     const comando = String((d && d.comando) || '');
     if (!s || !s.pronta || !s.aiuto || !COMANDI_AIUTO.has(comando) || !vivo(s.vista.webContents)) return { ok: false };
     // Il passo e la sua cornice stanno nel documento principale: un riquadro incorporato non li ha.
-    if ((comando === 'evita' || comando === 'azione') && !principaleDi(sender)) return { ok: false };
+    if ((comando === 'posa' || comando === 'azione') && !principaleDi(sender)) return { ok: false };
     const out = { comando };
     if (comando === 'chiudi') out.davvero = !!d.davvero;
-    if (comando === 'evita') {
-      let zoom = 1;
-      try { zoom = s.wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
-      const r = {};
-      for (const k of ['left', 'top', 'right', 'bottom']) {
-        const v = numero(d.rect && d.rect[k]);
-        if (v === undefined) return { ok: false };
-        r[k] = v * zoom;
+    if (comando === 'posa') {
+      // Il bersaglio del passo, in px della pagina: nello strato, a zoom 1, in px della vista. null: non c'è più.
+      out.id = Math.max(0, Math.min(1e9, Math.round(Number(d.id) || 0)));
+      out.rect = null;
+      if (d.rect) {
+        let zoom = 1;
+        try { zoom = s.wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+        const r = {};
+        for (const k of ['left', 'top', 'right', 'bottom']) {
+          const v = numero(d.rect[k]);
+          if (v === undefined) return { ok: false };
+          r[k] = v * zoom;
+        }
+        out.rect = r;
       }
-      out.rect = r;
     }
     if (comando === 'azione') {
       out.id = Math.max(0, Math.min(1e9, Math.round(Number(d.id) || 0)));
