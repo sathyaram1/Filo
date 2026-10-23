@@ -428,6 +428,21 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  // L'host dice quanta parte del contesto ha letto dalla cache? Uno zero detto e un campo assente sono due cose (#1464).
+  function cacheDetta(usage) {
+    if (!usage || typeof usage !== 'object') return false;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
+    return Boolean(d && (d.cached_tokens != null || d.cachedTokens != null)) || usage.cached_tokens != null;
+  }
+
+  // I token di ragionamento della risposta; null se l'host non li dice (#1464).
+  function reasoningTokensOf(usage) {
+    const d = usage && typeof usage === 'object' ? (usage.completion_tokens_details || usage.completionTokensDetails || null) : null;
+    const v = d ? (d.reasoning_tokens != null ? d.reasoning_tokens : d.reasoningTokens) : null;
+    const n = v == null ? NaN : Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
   // I token SCRITTI in cache (i modelli coi punti espliciti): con le letture dicono se la cache scatta davvero.
   function cacheWriteTokens(usage) {
     if (!usage || typeof usage !== 'object') return 0;
