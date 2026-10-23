@@ -517,6 +517,7 @@ for (const [nome, html] of [
     const menu = await tastoDestroSu(page, ocra(page).first());
     await expect(menu.locator('.sn-menu-segno')).toContainText('Il 9 ottobre 2024 è mercoledì');
     await expect(menu.locator('.sn-menu-correction').first()).toHaveText('mercoledì 9 ottobre');
+    await page.screenshot({ path: 'tests/.shots/1115-2-data-anno-della-pagina.png' }).catch(() => {});
     await menu.locator('.sn-menu-correction-main', { hasText: 'mercoledì 9 ottobre' }).first().click();
     await expect(page.locator('#ta')).toHaveValue('certo, mercoledì 9 ottobre, pioveva perchè era autunno\ne mercoledì 9 ottobre?');
     await expect(ocra(page)).toHaveCount(0);
