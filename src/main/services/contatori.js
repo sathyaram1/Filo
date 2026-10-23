@@ -74,6 +74,7 @@ function normale(s) {
 
 function crea(dip = {}) {
   const C = dip.contatori || globalThis.SN_CONTATORI;
+  const F = dip.finestra || globalThis.SN_CONTATORI_FINESTRA || null;
   const disco = () => require('../shim/storage');
   const storage = dip.storage || globalThis.SN_STORAGE;
   const impostazioni = dip.impostazioni || (() => storage.getSettings());
