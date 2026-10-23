@@ -38,13 +38,18 @@ test('esplora PDF', async ({ app, openTab, testServer }) => {
   const pdf = testServer.asset(readFileSync('tests/fixtures/documenti/documento-con-testo.pdf'), 'application/pdf');
   await naviga(app, pdf);
   await pausa(4000);
-  for (const id of ['translate', 'qrCode', 'saveForLater']) {
+  for (const id of ['translate']) {
     const ico = await icona(app, id);
     console.log('PDF', id, JSON.stringify(await stato(ico)));
     if ((await ico.getAttribute('aria-disabled')) === 'true') continue;
     await ico.click();
-    await pausa(2500);
-    await foto(app, `pdf-${id}`);
+    for (const ms of [300, 800, 1500, 3000]) { await pausa(ms); await foto(app, `pdf-${id}-${ms}`); }
+    console.log('pagina', JSON.stringify(await app.evaluate(async ({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+      const t = tm.tabs.find((x) => x.id === tm.activeId);
+      const fr = t.view.webContents.mainFrame.framesInSubtree.map((f) => f.url);
+      return { url: t.view.webContents.getURL(), fr };
+    })));
     await comandaBarra(app, 'chiudi');
     await pausa(500);
   }
