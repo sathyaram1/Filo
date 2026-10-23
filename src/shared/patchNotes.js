@@ -13,7 +13,9 @@
       features: [
         'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
       ],
-      fixes: [],
+      fixes: [
+        'La pulizia automatica delle schede archivia davvero quelle che non tocchi da ore. Prima una pagina che si ricaricava o scorreva da sola, come una chat, faceva sembrare Filo sempre in uso, e alla riapertura ogni scheda risultava appena usata. Se la pulizia non riesce a valutare le schede, per esempio coi crediti finiti, un avviso ti dice perché.',
+      ],
     },
     {
       version: '0.2.248', date: '2026-10-23',
