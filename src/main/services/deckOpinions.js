@@ -144,6 +144,8 @@
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
         intera: true,
+        // «Aggiorna» e «Riprova» chiedono un parere nuovo: la risposta di prima, magari senza la carta, tornerebbe uguale.
+        noCache: mode === 'force',
       });
       const parsed = P.parseOpinionBatch(r.text);
       sintesi = parsed.sintesi;
