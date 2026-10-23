@@ -8,7 +8,7 @@ const { tastoPremuto } = require('./tastoDelMouse');
 const BORDO_PX = 2;
 // Appena scese, la pagina si sposta sotto il puntatore: un movimento arrivato in quell'istante non è un'uscita.
 const ASSESTAMENTO_MS = 150;
-// Il mondo isolato in cui si guarda se la prima riga della pagina è un riquadro: la pagina non lo vede.
+// Il mondo isolato in cui si chiede alla pagina dove comincia sullo schermo: la pagina non lo vede.
 const MONDO = 1343;
 
 class SchedeInAlto {
@@ -19,7 +19,8 @@ class SchedeInAlto {
     this.scese = 0;
     // I movimenti visti dal riquadro principale: uno che arriva solo da un altro riquadro non li fa crescere.
     this.mossePagina = 0;
-    // La domanda in volo «la prima riga è un riquadro?»: un movimento lontano dal bordo la annulla (_ferma).
+    // Dove comincia la pagina sullo schermo (per scheda), e la domanda in volo: un movimento lontano dal bordo la annulla.
+    this.cimaSulloSchermo = null;
     this.sondaCima = null;
     this.timer = { spinta: null, uscita: null };
     const shell = win && win.webContents;
@@ -60,8 +61,8 @@ class SchedeInAlto {
   }
 
   // `input-event` vede solo il riquadro principale: sopra un riquadro di un altro sito in cima alla pagina il bordo non
-  // arriverebbe mai (#1343 r2). `before-mouse-event` passa da ogni riquadro, ma con la y del riquadro: un movimento
-  // che il riquadro principale non ripete vale come bordo solo se un riquadro copre davvero la prima riga della pagina.
+  // arriverebbe mai (#1343 r2). `before-mouse-event` passa da ogni riquadro, ma con la y del riquadro: la y della pagina
+  // si ricava dalla posizione sullo schermo meno la cima della pagina sullo schermo (screenY, chiesto una volta).
   dalRiquadro(wc, input) {
     if (!input || input.type !== 'mouseMove' || !wc) return;
     const sotto = typeof this.tabs.vistaSottoIlVuoto === 'function' ? this.tabs.vistaSottoIlVuoto() : null;
@@ -73,25 +74,30 @@ class SchedeInAlto {
         if (Date.now() - this.scese > ASSESTAMENTO_MS) this._programmaUscita();
         return;
       }
-      const y = Number(input.y);
-      if (!(Number.isFinite(y) && y <= BORDO_PX) || tastoPremuto(input)) { this._ferma('spinta'); return; }
-      if (this.timer.spinta || this.sondaCima) return;
-      const sonda = this._riquadroInCima(wc).then((si) => {
+      const gy = Number(input.globalY);
+      if (tastoPremuto(input) || !Number.isFinite(gy)) { this._ferma('spinta'); return; }
+      if (this.cimaSulloSchermo && this.cimaSulloSchermo.wc === wc) { this._sulBordo(gy - this.cimaSulloSchermo.y); return; }
+      if (this.sondaCima) return;
+      const sonda = this._cimaDellaPagina(wc).then((y) => {
         if (this.sondaCima !== sonda) return;
         this.sondaCima = null;
-        if (!si || this.visibili || this.timer.spinta || !this._attivo()) return;
-        this.timer.spinta = setTimeout(() => { this.timer.spinta = null; this.mostra(); }, this._opzioni().attesaMs);
+        if (!Number.isFinite(y) || this.visibili || !this._attivo()) return;
+        this.cimaSulloSchermo = { wc, y };
+        this._sulBordo(gy - y);
       });
       this.sondaCima = sonda;
     });
   }
 
-  _riquadroInCima(wc) {
-    const codice = `[...document.querySelectorAll('iframe,frame,embed,object')].some((f) => {
-      const r = f.getBoundingClientRect(); return r.width > 0 && r.top <= ${BORDO_PX} && r.bottom > ${BORDO_PX}; })`;
+  _sulBordo(y) {
+    if (y > BORDO_PX) { this._ferma('spinta'); return; }
+    if (!this.timer.spinta) this.timer.spinta = setTimeout(() => { this.timer.spinta = null; this.mostra(); }, this._opzioni().attesaMs);
+  }
+
+  _cimaDellaPagina(wc) {
     try {
-      return wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: codice }]).then((v) => v === true, () => false);
-    } catch (_) { return Promise.resolve(false); }
+      return wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: 'screenY' }]).then((v) => Number(v), () => NaN);
+    } catch (_) { return Promise.resolve(NaN); }
   }
 
   _dallaShell(input) {
@@ -111,6 +117,7 @@ class SchedeInAlto {
     this._ferma('spinta');
     this._ferma('uscita');
     this.visibili = false;
+    this.cimaSulloSchermo = null;
   }
 
   nascondi() {

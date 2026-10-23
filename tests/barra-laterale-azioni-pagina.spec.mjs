@@ -3,6 +3,8 @@
 // del filo che «rimetti come prima» annulla senza toccare gli altri.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, premiNellaBarra } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
@@ -162,4 +164,88 @@ test('dopo un riordino «rimetti come prima» in chat rimette la disposizione di
   const annullo = (await registro(app)).filter((e) => e.tipo === 'icone').pop();
   expect(annullo.annulla).toBe(mossa.id);
   await ripristina(app);
+});
+
+// #1343 — le azioni le esegue Filo dentro la pagina: dove non c'è si spengono dicendo perché, come l'Aiuto; dove non ha
+// il fuoco (il visore PDF) o sta ancora arrivando fanno lo stesso quello che dicono; l'indirizzo è quello vero del sito.
+const DALLE_PREFERENZE = { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' };
+const naviga = (app, u) => app.evaluate(({ BrowserWindow }, url) => {
+  const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+  tm.navigate(tm.activeId, url);
+}, u);
+const appunti = (app) => app.evaluate(({ clipboard }) => clipboard.readText());
+async function iconaInVista(app, id) {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const ico = barra.locator(`#nav .ico[data-id="${id}"]`);
+  if (!(await ico.count())) await barra.locator('#nav [data-altro]').click();
+  return ico;
+}
+async function condivisa(app, voluto, timeout = 6000) {
+  await app.evaluate(({ clipboard }) => clipboard.writeText('niente'));
+  const share = await iconaInVista(app, 'share');
+  await expect(share).not.toHaveAttribute('aria-disabled', 'true');
+  await share.click();
+  await expect.poll(() => appunti(app), { timeout }).toBe(voluto);
+}
+
+test('dove Filo è spento o la pagina è di Filo le azioni si spengono dicendo perché; sul PDF e sull\'errore funzionano', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA('Spento'));
+  await app.evaluate(async (_e, a) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { blocklist: [a.host] } }, a.da),
+    { host: new URL(page.url()).hostname, da: DALLE_PREFERENZE });
+  for (const id of ['share', 'screenshot', 'qrCode']) {
+    const ico = await iconaInVista(app, id);
+    await expect(ico, id).toHaveAttribute('aria-disabled', 'true', { timeout: 8000 });
+    await expect(ico, id).toHaveAttribute('data-sugg', 'Filo è spento su questo sito');
+  }
+  await app.evaluate(async (_e, da) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { blocklist: [] } }, da), DALLE_PREFERENZE);
+
+  // Il visore PDF tiene il fuoco: gli appunti li scrive Filo, non la pagina.
+  const pdf = testServer.asset(readFileSync('tests/fixtures/documenti/documento-con-testo.pdf'), 'application/pdf');
+  await naviga(app, pdf);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    return !!tm.tabs.find((t) => t.id === tm.activeId).aiuto;
+  }), { timeout: 10_000 }).toBe(true);
+  await condivisa(app, pdf);
+  await app.evaluate(({ clipboard }) => clipboard.clear());
+  await (await iconaInVista(app, 'screenshot')).click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.has('image/png')), { timeout: 15_000 }).toBe(true);
+
+  // Il sito che non risponde: si condivide il sito, non la pagina d'errore di Filo.
+  const irraggiungibile = 'http://127.0.0.1:9/irraggiungibile';
+  await naviga(app, irraggiungibile);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    const t = tm.tabs.find((x) => x.id === tm.activeId);
+    return !!t.aiuto && /^filo:\/\/error\//.test(t.view.webContents.getURL());
+  }), { timeout: 10_000 }).toBe(true);
+  await condivisa(app, irraggiungibile);
+
+  // La home non ha un indirizzo da dare a qualcuno.
+  await naviga(app, 'filo://newtab/');
+  const share = await iconaInVista(app, 'share');
+  await expect(share).toHaveAttribute('aria-disabled', 'true', { timeout: 8000 });
+  await expect(share).toHaveAttribute('data-sugg', 'Questa pagina di Filo non ha un indirizzo da condividere');
+  await expect(await iconaInVista(app, 'screenshot')).not.toHaveAttribute('aria-disabled', 'true');
+});
+
+test('Condividi premuto su una pagina che sta ancora arrivando aspetta la pagina e copia il suo indirizzo', async ({ app, openTab, testServer }) => {
+  const lento = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.write('<!doctype html><title>Lenta</title><h1>Arriva…</h1>' + ' '.repeat(4096));
+    setTimeout(() => res.end('<p>finita</p>'), 5000);
+  });
+  await new Promise((r) => lento.listen(0, '127.0.0.1', r));
+  try {
+    await testServer.openReady(openTab, PAGINA('Prima'));
+    const url = `http://127.0.0.1:${lento.address().port}/lenta`;
+    await naviga(app, url);
+    await new Promise((r) => setTimeout(r, 1000));
+    await condivisa(app, url, 12_000);
+  } finally {
+    lento.close();
+  }
 });

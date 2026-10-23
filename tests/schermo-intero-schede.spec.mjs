@@ -108,3 +108,26 @@ test('nello schermo pieno di un video le schede non scendono, e da Preferenze si
   await pausa(700);
   expect((await stato(app)).visibili, 'spente in Preferenze').toBe(false);
 });
+
+// #1343 — un riquadro di un altro sito in cima alla pagina non nasconde il bordo; quello a metà pagina non lo imita.
+test('sopra un riquadro di un altro sito in cima le schede compaiono; sul bordo alto di uno a metà pagina no', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html('<!doctype html><html><body style="margin:0;background:#cde;height:100vh">Riquadro</body></html>', { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+    <iframe id="cima" src="${dentro}" style="display:block;width:100%;height:250px;border:0"></iframe>
+    <div style="height:250px">Articolo</div>
+    <iframe id="meta" src="${dentro}" style="display:block;width:600px;height:250px;border:0;margin-left:100px"></iframe>
+    <div style="height:900px"></div></body></html>`);
+  await expect.poll(() => page.frames().length).toBeGreaterThan(2);
+  await schermoIntero(app, true);
+  await expect.poll(async () => (await stato(app)).alto).toBe(0);
+
+  const meta = await page.locator('#meta').boundingBox();
+  await muovi(page, 400, meta.y + 100);
+  await page.mouse.move(400, meta.y + 1, { steps: 4 });
+  await pausa(1200);
+  expect((await stato(app)).visibili, 'a metà pagina il bordo di un riquadro non è il bordo dello schermo').toBe(false);
+
+  await muovi(page, 400, 150);
+  await page.mouse.move(400, 0, { steps: 4 });
+  await expect.poll(async () => (await stato(app)).visibili, { timeout: 4000 }).toBe(true);
+});

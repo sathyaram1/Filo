@@ -16,7 +16,9 @@
         'Se sposti un\'icona della barra laterale e poi scrivi a Filo «rimetti come prima», l\'icona torna dov\'era e il resto non cambia.',
         'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
       ],
-      fixes: [],
+      fixes: [
+        'Sulla pagina di un sito che non risponde, Condividi, QR code e Salva per dopo usano l\'indirizzo del sito e non quello interno della pagina d\'errore. Su un PDF Condividi e Screenshot funzionano.',
+      ],
     },
     {
       version: '0.2.248', date: '2026-10-23',
