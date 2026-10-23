@@ -76,10 +76,10 @@
     if (!im) return '';
     try {
       if (blob.size <= tetto) {
-        const url = await comeDataUrl(blob);
-        if (LETTA.test(url)) return url;
-        const url = disegna(im, Math.min(lato, Math.max(im.w, im.h)), 'image/png');
-        if (LETTA.test(url) && byteDi(url) <= tetto) return url;
+        const com_e = await comeDataUrl(blob);
+        if (LETTA.test(com_e)) return com_e;
+        const png = disegna(im, Math.min(lato, Math.max(im.w, im.h)), 'image/png');
+        if (LETTA.test(png) && byteDi(png) <= tetto) return png;
       }
       for (let l = lato; l >= 256; l = Math.floor(l * 0.7)) {
         const url = disegna(im, l, 'image/jpeg');
