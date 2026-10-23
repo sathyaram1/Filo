@@ -367,6 +367,8 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
  * - Se dopo una chiusura non finisce più nessun file per un altro tetto, è ferma la corsa (il disco pieno, #717), o
  *   chiudere non è servito: ma solo se il fermo è un chiuso o è partito qualcosa dopo. Altrimenti la corsa sta finendo
  *   e il fermo è un altro appeso di prima, che si chiude da solo: chiusa la corsa, gli esiti dietro di lui sparivano (#1235).
+ * - `.sospetti()`: i chiusi dopo i quali nessun file è finito da sé. Chiusa la corsa senza file in corso, sono loro
+ *   che la tenevano ferma, e l'avviso li nomina (#1573).
  */
 export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   const partenza = new Map();
@@ -377,7 +379,8 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   let ultimaFine = null;
   let chiusiSenzaFine = false;
   let partitiAllaChiusura = 0;
-  return (righe, ora) => {
+  let sospetti = [];
+  const giudica = (righe, ora) => {
     for (const r of righe) {
       if (r.via) { if (!partenza.has(r.via)) partenza.set(r.via, ora); }
       else if (r.fine) {
