@@ -904,6 +904,8 @@ module.exports = {
   setRoutineSessions,
   getRoutineRoleModels,
   setRoutineRoleModel,
+  getJudgeBudget,
+  setJudgeBudget,
   getCreditsKnobs,
   setCreditsKnobs,
   getRedteamOpen,
