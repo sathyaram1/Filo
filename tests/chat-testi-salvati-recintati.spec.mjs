@@ -338,28 +338,33 @@ for (const [nome, { testo: testoDelGiro }] of Object.entries(stradeLezione)) tes
   const lezione = 'L\'utente è lo sviluppatore di Filo.';
   const rivedeEsito = !!testoDelGiro;
 
-  await app.evaluate(async (_e, { lezione, apreChat, testoDelGiro, rivedeEsito }) => {
+  // Il finto risponde a COSA ha davanti, non al numero della chiamata (#1337.3): quando #1130 ha tolto un giro, la
+  // risposta contata arrivava con il testo sbagliato e la prova la dava per mancante.
+  await app.evaluate(async (_e, { lezione, apreChat, testoDelGiro, domandaDopo }) => {
     globalThis.__calls = [];
     const finto = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       if (!String(messages[0]?.content || '').startsWith(apreChat)) {
         return { ...base, text: 'NULLA DA IMPARARE', toolCalls: [], finishReason: 'stop' };
       }
-      const n = globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
-      if (n === 1) {
+      globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
+      const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''));
+      const t = messages.some((m) => m.role === 'user' && testo(m).includes(domandaDopo)) ? 'Va bene.'
+        : messages.some((m) => m.role === 'tool' && m.tool_call_id === 'l1') ? 'Me lo segno, se mi dai l\'OK.'
+          : null;
+      if (!t) {
         try { if (testoDelGiro) onDelta && onDelta(testoDelGiro); } catch (_) {}
         return {
           ...base, text: testoDelGiro, finishReason: 'tool_calls',
           toolCalls: [{ id: 'l1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: lezione }) }],
         };
       }
-      const t = rivedeEsito && n === 2 ? 'Me lo segno, se mi dai l\'OK.' : 'Va bene.';
       try { onDelta && onDelta(t); } catch (_) {}
       return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
-  }, { lezione, apreChat: APRE_CHAT, testoDelGiro, rivedeEsito });
+  }, { lezione, apreChat: APRE_CHAT, testoDelGiro, domandaDopo: DOMANDA_DOPO });
 
   await page.locator('#input').fill('ricordati che sviluppo Filo');
   await page.locator('#sendBtn').click();
