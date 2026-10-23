@@ -352,6 +352,9 @@
         ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
         : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
       note.hidden = false;
+    } else if (w.chiaveStaccata === 'senza_portafoglio') {
+      note.textContent = 'La chiave personale salvata qui non è di nessun portafoglio sul server, e quello che consumi non si registra. Con un invito ne ricevi una tua.';
+      note.hidden = false;
     } else if (server && server.invitesOpen === false) {
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
       note.hidden = false;
