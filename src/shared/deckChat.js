@@ -72,6 +72,8 @@
     if (m.pending || m.interrupted) { out.interrupted = true; return out; }
     // Fermata dall'utente (#792): resta detta così, col suo Riprova, anche riaprendo la chat.
     if (m.stopped === true) { out.stopped = true; return out; }
+    const rimedio = rimedioDi(m.rimedio);
+    if (rimedio) out.rimedio = rimedio;
     if (m.error) { out.error = str(m.error) || 'nessuna risposta'; return out; }
     const reply = str(m.reply);
     if (reply) out.reply = reply;
