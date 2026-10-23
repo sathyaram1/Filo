@@ -1785,6 +1785,11 @@
     inputEl.focus();
     return true;
   }
+  // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta. Sul campo e fuori conta uguale.
+  const contaNellaChat = (dt, usato) => {
+    const ev = self.SN_GESTI && self.SN_GESTI.rilascio(dt, 'chat_home', usato);
+    if (ev) send({ type: MSG.CONTATORI_EVENTO, ...ev });
+  };
   // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
   // si vede dove andrà a finire.
   const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
