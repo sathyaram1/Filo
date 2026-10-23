@@ -1585,6 +1585,12 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   max-width: 720px;
   box-sizing: border-box;
 }
+/* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
+.dash-input-wrap { transition: border-color calc(0.15s * var(--sn-motion, 1)) ease, box-shadow calc(0.15s * var(--sn-motion, 1)) ease; }
+.dash-input-wrap.dash-input-bersaglio {
+  border-color: var(--sn-accent);
+  box-shadow: 0 0 0 4px rgba(var(--sn-accent-rgb), 0.18);
+}
 .dash-input {
   flex: 1;
   min-width: 0;

@@ -270,7 +270,7 @@ module.exports = function register(on, ctx) {
       if (!win) return;
       win.webContents.send('shell:toast', {
         text: avviso.testo,
-        opts: { durationSec: 0, key: 'avviso-crediti', actions: [{ label: 'Come farli durare', openUrl: CREDITI_URL }] },
+        opts: { durationSec: 0, key: 'avviso-crediti', tipo: 'avviso_crediti', actions: [{ label: 'Come farli durare', openUrl: CREDITI_URL }] },
       });
     } catch (_) {}
   }

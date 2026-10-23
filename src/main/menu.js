@@ -105,9 +105,10 @@ const nuovaScheda = contata('new-tab', () => {
   try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 });
 
-const chiudiScheda = contata('close-tab', () => {
+// Dal tasto è Ctrl/Cmd+W, da un clic sulla voce un'altra strada (contatori della finestra, #1470).
+const chiudiScheda = contata('close-tab', (_voce, _win, ev) => {
   const c = schedaAttiva();
-  try { c && c.tabs.closeTab(c.tab.id); } catch (_) {}
+  try { c && c.tabs.closeTab(c.tab.id, { via: ev && ev.triggeredByAccelerator ? 'ctrl_w' : 'altro' }); } catch (_) {}
 });
 
 function chiudiFinestra() {

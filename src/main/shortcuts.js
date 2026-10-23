@@ -202,7 +202,7 @@ async function salvaPerDopo(win, tab) {
     if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
     return res?.entry;
   });
-  try { win._filoTabs.closeTab(tab.id); } catch (_) {}
+  try { win._filoTabs.closeTab(tab.id, { via: 'salva_per_dopo' }); } catch (_) {}
   return entry;
 }
 

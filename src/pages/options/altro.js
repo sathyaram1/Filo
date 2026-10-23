@@ -17,7 +17,7 @@
     $('title').textContent = I18n.t('options_other');
     $('backToModels').textContent = I18n.t('options_back_to_models');
     $('h-correttore').textContent = 'Correttore';
-    for (const [id, chiave] of [['spellcheckErrori', 'spell_switch_errori'], ['spellcheckSuggerimenti', 'spell_switch_suggerimenti'], ['spellcheckAutomatica', 'spell_switch_automatica']]) {
+    for (const [id, chiave] of [['spellcheckErrori', 'spell_switch_errori'], ['spellcheckSuggerimenti', 'spell_switch_suggerimenti'], ['spellcheckAutomatica', 'spell_switch_automatica'], ['spellcheckSegnaposti', 'spell_switch_segnaposti']]) {
       $(`${id}-label`).textContent = I18n.t(chiave);
       $(`${id}-desc`).textContent = I18n.t(`${chiave}_desc`);
     }
@@ -63,7 +63,7 @@
     disegnaScorciatoie(settings);
     $('blocklist').value = Siti.testoDaElenco(settings.blocklist);
     mostrato = $('blocklist').value;
-    for (const [id, flag] of INTERRUTTORI) $(id).checked = settings.featureFlags?.[flag] !== false;
+    for (const [id, percorso] of INTERRUTTORI) $(id).checked = valoreDi(settings, percorso) !== false;
     $('spellcheckAutomatica').checked = settings.correttore?.automatica !== false;
     await renderCategories();
   }
@@ -198,10 +198,13 @@
     mostraSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // I due segni del correttore stanno insieme qui e nella chat (#1115): ognuno si spegne da solo.
-  const INTERRUTTORI = [['spellcheckErrori', 'spellcheck'], ['spellcheckSuggerimenti', 'spellcheckContext']];
-  async function salvaInterruttore(id, flag) {
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { featureFlags: { [flag]: $(id).checked } } });
+  // I due segni del correttore e i segnaposti (#1448) stanno insieme qui e nella chat (#1115): ognuno si spegne da solo.
+  const INTERRUTTORI = [['spellcheckErrori', 'featureFlags.spellcheck'], ['spellcheckSuggerimenti', 'featureFlags.spellcheckContext'],
+    ['spellcheckSegnaposti', 'correttore.segnaposti']];
+  const valoreDi = (s, percorso) => percorso.split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), s);
+  async function salvaInterruttore(id, percorso) {
+    const [sezione, voce] = percorso.split('.');
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { [sezione]: { [voce]: $(id).checked } } });
     mostraSalvato();
   }
 
@@ -274,7 +277,7 @@
       caselle.cambiato('blocklist', e);
     });
     $('blocklist').addEventListener('change', () => save({ riscrivi: true }));
-    for (const [id, flag] of INTERRUTTORI) $(id).addEventListener('change', () => salvaInterruttore(id, flag));
+    for (const [id, percorso] of INTERRUTTORI) $(id).addEventListener('change', () => salvaInterruttore(id, percorso));
     // La correzione automatica a fine parola (#1447): accesa di serie, si spegne da sola.
     $('spellcheckAutomatica').addEventListener('change', async () => {
       await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { correttore: { automatica: $('spellcheckAutomatica').checked } } });

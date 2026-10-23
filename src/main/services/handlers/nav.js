@@ -64,10 +64,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // La pagina chiude solo sé stessa; `via` dice da quale gesto, per i contatori della finestra (#1470).
   on(MSG.CLOSE_TAB, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      if (win?._filoTabs) contata('close-tab', () => win._filoTabs.closeTab(sender.tab.id));
+      const via = ['tasto_destro_riga', 'salva_per_dopo'].includes(msg && msg.via) ? msg.via : 'altro';
+      if (win?._filoTabs) contata('close-tab', () => win._filoTabs.closeTab(sender.tab.id, { via }));
     }
     return { ok: true };
   });

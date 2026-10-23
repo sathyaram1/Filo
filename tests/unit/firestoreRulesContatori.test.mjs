@@ -1,6 +1,6 @@
-// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464): le collezioni sono a sola creazione, lette solo
-// dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v2), i giorni di prima (v1) e le chiamate
-// ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file che si pubblica.
+// Sentinella sulle regole dei contatori anonimi (#969, #1461, #1464, #1466): le collezioni sono a sola creazione, lette
+// solo dall'admin, e la forma che accettano è quella che l'app costruisce: le ore (v3, più le v2 e i giorni v1 delle copie
+// vecchie) e le chiamate ai modelli di un'ora. Il motore vero la prova contatoriRegole.motore-vero.mjs; questa rilegge il file.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,7 @@ for (const f of ['constants', 'tasti', 'modelUsage', 'capabilities', 'actionLeve
 }
 const C = globalThis.SN_CONTATORI;
 const F = C.FORME;
+const T = C.TETTI;
 
 const senzaCommenti = (s) => s.replace(/\/\/[^\n]*/g, ' ');
 function blocco(collezione) {
@@ -39,14 +40,23 @@ const CONDIVISE = (() => {
 })();
 const TUTTO = [CONDIVISE, B, BC].join('\n');
 
+// Il corpo di una funzione delle regole, coi `let` già sostituiti dove sono usati: la rilettura vede quello che si valuta.
 function corpo(nome) {
   const m = new RegExp(`function ${nome}\\([^)]*\\)\\s*\\{\\s*((?:let [^;]+;\\s*)*)return([\\s\\S]*?);\\s*\\}`).exec(TUTTO);
   assert.ok(m, `manca la funzione ${nome} nelle regole`);
-  return m[2].replace(/\s+/g, ' ').trim();
+  let testo = m[2];
+  // Fuori dalle stringhe: la «f» delle chiamate starebbe anche dentro «[0-9a-f]».
+  for (const [, n, v] of m[1].matchAll(/let (\w+) = ([^;]*);/g)) {
+    testo = testo.split(/('[^']*')/).map((p, i) => (i % 2 ? p : p.replace(new RegExp(`\\b${n}\\b`, 'g'), v.trim()))).join('');
+  }
+  return testo.replace(/\s+/g, ' ').trim();
 }
 const GIORNO = corpo('contatoriGiorno');
 const ORA = corpo('contatoriOra');
 const CHIAMATE = corpo('contatoriChiamate');
+const ORA3 = corpo('contatoriOra3');
+const TESTA = corpo('testaOra');
+const MISURE_ORA = corpo('misureOra');
 
 function regole(testo) {
   const out = [];
@@ -67,8 +77,8 @@ function elencoDopo(testo, etichetta) {
 const FUNZIONI_REGOLE = elencoDopo(TUTTO, 'function funzioniContate\\(\\)');
 const unite = (forma) => `^(${forma.slice(1, -1)}(#${forma.slice(1, -1)})*)?$`;
 
-// Le misure dell'ora come le controllano le regole: chiuse(d.x, elenco, tetto, valori) o aForma(d.x, chiavi, tettoChiavi, tetto, valori).
-// Nelle chiamate l'elenco delle funzioni sta in `f`, legato una volta sola a funzioniContate().
+// Le misure dell'ora come le controllano le regole: chiuse(d.x, elenco, tetto, valori) o aForma(d.x, chiavi, tettoChiavi,
+// tetto, valori); il sistema (#1466), una stringa sola, è controllato a parte nell'ora v3.
 function misureChiuse(testo) {
   const out = {};
   for (const m of testo.matchAll(/chiuse\(d\.(\w+), (funzioniContate\(\)|f|\[[^\]]*\]), (\d+), '([^']+)'\)/g)) {
@@ -76,23 +86,30 @@ function misureChiuse(testo) {
   }
   return out;
 }
-function misureDelleRegole() {
-  const out = misureChiuse(ORA);
-  for (const m of ORA.matchAll(/aForma\(d\.(\w+), '([^']+)', (\d+), (\d+), '([^']+)'\)/g)) {
+function misureDelleRegole(testo) {
+  const out = misureChiuse(testo);
+  for (const m of testo.matchAll(/aForma\(d\.(\w+), '([^']+)', (\d+), (\d+), '([^']+)'\)/g)) {
     out[m[1]] = { formaChiavi: m[2], tettoChiavi: Number(m[3]), tetto: Number(m[4]), valori: m[5] };
   }
-  const pv = /d\.primeVolte is list && d\.primeVolte\.size\(\) <= (\d+) && d\.primeVolte\.join\('#'\)\.size\(\) <= (\d+) && d\.primeVolte\.join\('#'\)\.matches\('([^']+)'\)/.exec(ORA);
-  assert.ok(pv, 'manca il controllo delle prime volte');
-  out.primeVolte = { lista: true, quante: Number(pv[1]), tetto: Number(pv[2]), valori: pv[3] };
+  const pv = /d\.primeVolte is list && d\.primeVolte\.size\(\) <= (\d+) && d\.primeVolte\.join\('#'\)\.size\(\) <= (\d+) && d\.primeVolte\.join\('#'\)\.matches\('([^']+)'\)/.exec(testo);
+  if (pv) out.primeVolte = { lista: true, quante: Number(pv[1]), tetto: Number(pv[2]), valori: pv[3] };
   return out;
 }
-const M = misureDelleRegole();
+const MO = misureDelleRegole(MISURE_ORA);
 const MC = misureChiuse(CHIAMATE);
+const sis = /d\.sistema is string && d\.sistema\.size\(\) <= (\d+) && d\.sistema\.matches\('([^']+)'\)$/.exec(ORA3);
+assert.ok(sis, 'manca il controllo del sistema nell’ora v3');
+const MS = { sistema: { stringa: true, tetto: Number(sis[1]), valori: sis[2] } };
+const M = { ...MO, ...MS };
 
 // Le regole applicate a un documento, come le applica il server a una stringa unita.
 function passa(doc, misure = M) {
   for (const [campo, r] of Object.entries(misure)) {
     const v = doc[campo];
+    if (r.stringa) {
+      if (typeof v !== 'string' || v.length > r.tetto || !new RegExp(r.valori).test(v)) return `${campo}`;
+      continue;
+    }
     if (r.lista) {
       if (!Array.isArray(v) || v.length > r.quante || v.join('#').length > r.tetto || !new RegExp(r.valori).test(v.join('#'))) return `${campo}`;
       continue;
@@ -118,21 +135,30 @@ test('si legge solo da admin, si crea una volta e non si tocca più', () => {
   }
   assert.ok(per('write').length === 0, 'una `write` scavalcherebbe il no a update e delete');
   assert.equal(per('create').length, 1);
-  assert.equal(per('create')[0].cond, 'contatoriGiorno(request.resource.data) || contatoriOra(request.resource.data)');
+  assert.equal(per('create')[0].cond, 'contatori(request.resource.data)');
+  // La forma si sceglie dalla versione: provarle tutte in fila passerebbe il tetto di mille espressioni a richiesta.
+  assert.equal(corpo('contatori'), '(d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 1 && contatoriGiorno(d))');
 });
 
-test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; i giorni di prima tengono la loro forma', () => {
-  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI]);
-  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI]);
+test('i campi dell’ora sono quelli che l’app costruisce, tutti obbligatori; le ore v2 e i giorni di prima tengono la loro forma', () => {
+  assert.deepEqual(elencoDopo(ORA3, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI]);
+  assert.deepEqual(elencoDopo(ORA3, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI]);
+  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_ORA_V2]);
+  assert.deepEqual(elencoDopo(ORA, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_ORA_V2]);
+  // Le due ore controllano la stessa testa e le stesse misure di #1461; solo la v3 quelle del sistema.
+  assert.match(ORA, /&& d\.v == 2 && testaOra\(d\) && misureOra\(d\)$/);
+  assert.match(ORA3, /&& d\.v == 3 && testaOra\(d\) && misureOra\(d\) && d\.sistema is string/);
   assert.deepEqual(elencoDopo(GIORNO, 'd\\.keys\\(\\)\\.hasOnly\\('), [...C.CAMPI_GIORNO]);
   assert.deepEqual(elencoDopo(GIORNO, 'd\\.keys\\(\\)\\.hasAll\\('), [...C.CAMPI_GIORNO]);
-  assert.equal(Number(/d\.v == (\d+)/.exec(ORA)[1]), C.VERSIONE);
+  assert.equal(Number(/d\.v == (\d+)/.exec(ORA3)[1]), C.VERSIONE);
+  assert.equal(Number(/d\.v == (\d+)/.exec(ORA)[1]), 2);
   assert.equal(Number(/d\.v == (\d+)/.exec(GIORNO)[1]), C.VERSIONE_GIORNO);
   const ora = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T09', app: '0.2.243', os: 'win', dati: C.oraVuota() });
   assert.deepEqual(Object.keys(ora), [...C.CAMPI]);
   const giorno = C.documentoGiorno({ pseudonimo: 'a'.repeat(20), giorno: '2026-10-15', app: '0.2.243', os: 'win', dati: {} });
   assert.deepEqual(Object.keys(giorno), [...C.CAMPI_GIORNO]);
-  assert.deepEqual(Object.keys(M).sort(), [...C.MISURE_ORA].sort(), 'ogni misura ha il suo controllo nelle regole, e nessuna in più');
+  assert.deepEqual(Object.keys(MO).sort(), [...C.MISURE_ORA].sort(), 'ogni misura ha il suo controllo nelle regole, e nessuna in più');
+
 });
 
 test('le chiavi chiuse vengono dagli elenchi dell’app; le altre hanno una forma che ogni voce dell’app rispetta', () => {
@@ -147,6 +173,23 @@ test('le chiavi chiuse vengono dagli elenchi dell’app; le altre hanno una form
   for (const campo of ['uso', 'errori', 'anticipi', 'chiedi']) assert.equal(M[campo].chiavi, FUNZIONI_REGOLE, `${campo} si chiude sulle funzioni`);
   assert.deepEqual(M.ricerche.chiavi, [...C.PANNELLI]);
   assert.deepEqual(M.correttore.chiavi, [...C.TIPI_PROPOSTA]);
+  // Il sistema (#1466): la forma delle regole è quella dell'app, e ogni percorso viene dagli elenchi chiusi.
+  assert.equal(M.sistema.valori, F.SISTEMA_FORMA);
+  assert.ok(M.sistema.tetto >= T.TETTO_CARATTERI_SISTEMA, 'il tetto del sistema nelle regole è sotto quello dell’app');
+  const voce = new RegExp(F.SISTEMA_FORMA);
+  for (const m of C.MISURE_SISTEMA) {
+    const giu = (nodo, base) => {
+      for (const [k, figlio] of Object.entries(nodo)) {
+        if (figlio) giu(figlio, `${base}.${k}`);
+        else assert.ok(voce.test(`${base}.${k}|1`), `${base}.${k} non passerebbe le regole`);
+      }
+    };
+    giu(C.SCHEMA_SISTEMA[m], m);
+  }
+  for (const k of ['mario rossi', 'https://x.it/a', 'relazione finale.docx', '<script>', 'ciao, come stai', 'settings.apiKeys',
+    'processoMorto.gpu.C:/Users/mario', 'eccezioneMain.uncaught.Cannot read', 'storageEsito.settings']) {
+    assert.ok(!voce.test(`${k}|1`), `sistema: «${k}» passerebbe le regole`);
+  }
 
   const forma = (campo) => new RegExp(`^${M[campo].formaChiavi.slice(2, -4).split('(#')[0]}$`);
   const fuori = (lista, campo) => lista.filter((k) => !forma(campo).test(k));
@@ -212,12 +255,36 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   for (const a of C.AVVISI_ERRORE) C.registraErroreVisto(ora, `avviso:${a}`);
   for (let i = 1; i < 300; i++) C.registraErroreVisto(ora, `rete:-${i}`);
   for (const p of C.passiIntervista()) for (const s of C.SCELTE_INTERVISTA) C.registraIntervista(ora, p, s);
-  const gonfia = (o) => { for (const k of Object.keys(o)) { if (Number.isInteger(o[k])) o[k] = 999999999; else if (o[k] && typeof o[k] === 'object') gonfia(o[k]); } };
+  // Il sistema (#1466), ogni voce di ogni elenco.
+  for (const p of C.PASSI_AVVIO) for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraPassoAvvio(ora, p, ms);
+  for (const t of C.TIPI_AVVIO) C.registraTipoAvvio(ora, t);
+  for (const t of C.TIPI_PROCESSO) for (const m of C.MOTIVI_CRASH) C.registraProcessoMorto(ora, t, m);
+  C.registraFinestraBloccata(ora, 'volte');
+  for (const cosa of ['tornata', 'chiusa_da_utente']) for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraFinestraBloccata(ora, cosa, ms);
+  for (const ms of [10, 300, 2000, 60000]) C.registraMainFermo(ora, ms);
+  for (const o of C.ORIGINI_ECCEZIONE) for (const n of C.NOMI_ECCEZIONE) C.registraEccezione(ora, o, { name: n });
+  for (const [mb, n] of [[100, 0], [400, 1], [800, 3], [1500, 10], [3000, 40], [9000, 99]]) C.registraMemoria(ora, { mb, vive: n, attesa: n });
+  for (const c of C.CANALI_SINCRONI) for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraIpcSincrono(ora, c, ms);
+  for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraChiusura(ora, { ms, tetto: true });
+  for (const e of C.ESITI_USCITA) C.registraUscita(ora, e);
+  for (const e of C.EVENTI_STORAGE) C.registraStorage(ora, e);
+  for (const [schede, ms] of [[0, 100], [1, 900], [4, 1500], [19, 4000], [49, 9000], [400, 20000], [2, 99999]]) {
+    C.registraSessione(ora, { esito: 'ripristinata', schede, vistaMs: ms, codaMs: ms });
+  }
+  C.registraSessione(ora, { esito: 'niente' }); C.registraSessione(ora, { esito: 'lettura_fallita' });
+  for (const e of C.EVENTI_AGGIORNAMENTO) C.registraAggiornamento(ora, e);
+  const gonfia = (o) => { for (const k of Object.keys(o)) { if (Number.isInteger(o[k]) && k !== 'maxMs') o[k] = 999999999; else if (o[k] && typeof o[k] === 'object') gonfia(o[k]); } };
   gonfia(ora);
 
   const doc = C.documento({ pseudonimo: 'a'.repeat(20), chiave: '2026-10-15T23', app: '9999.9999.999999', os: 'win', dati: ora });
   assert.equal(C.valida(doc).ok, true, C.valida(doc).motivo);
   assert.equal(passa(doc), '', 'il documento più carico dell’app deve passare le regole');
+  const letto = C.leggiSistema(doc.sistema);
+  for (const campo of C.MISURE_SISTEMA) assert.ok(Object.keys(letto[campo]).length, `${campo} è pieno nel documento più carico`);
+  assert.ok(doc.sistema.length <= T.TETTO_CARATTERI_SISTEMA, `il sistema più carico è lungo ${doc.sistema.length}`);
+  // Un'ora v2 di una copia vecchia passa ancora le misure di #1461.
+  const v2 = Object.fromEntries(Object.entries(doc).filter(([k]) => C.CAMPI_ORA_V2.includes(k)));
+  assert.equal(passa(v2, MO), '');
   const totale = Object.values(M).reduce((a, r) => a + r.tetto + (r.tettoChiavi || 0), 0);
   assert.ok(totale <= 1000000, `i tetti delle regole sommano ${totale}: oltre, un documento passerebbe il limite di Firestore (1 MiB)`);
   assert.ok(JSON.stringify(doc).length < 1000000);
@@ -233,10 +300,17 @@ test('i valori annidati hanno la forma dell’app, e i tetti reggono il document
   assert.notEqual(manomesso('primeVolte', ['explain', 'appunti di mario']), '');
   assert.notEqual(manomesso('chiedi', { explain: { n: 3, nota: 'ciao' } }), '', 'una mappa al posto della stringa non si unisce: rifiutata');
   assert.notEqual(manomesso('annullati', { NAVIGA: '1 volta' }), '');
+  // Il sistema: un percorso, un messaggio o una chiave dello storage non passano, né come voce né come conto.
+  assert.notEqual(manomesso('sistema', 'processoMorto.gpu.crashed|1;C:\\Users\\mario\\x.dmp|1'), '');
+  assert.notEqual(manomesso('sistema', 'eccezioneMain.uncaught.Cannot read properties|1'), '');
+  assert.notEqual(manomesso('sistema', 'storageEsito.settings.apiKeys|1'), '');
+  assert.notEqual(manomesso('sistema', 'avvioPasso.adblock.ms500|1 lento'), '');
+  assert.notEqual(manomesso('sistema', { avvioPasso: 'adblock' }), '', 'una mappa al posto della stringa');
+  assert.notEqual(manomesso('sistema', 'aggiornamento.trovato|1;'.repeat(2000)), '', 'oltre il tetto');
 });
 
 test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l’id dice pseudonimo, giorno e ora', () => {
-  for (const testo of [GIORNO, ORA, CHIAMATE]) {
+  for (const testo of [GIORNO, TESTA, CHIAMATE]) {
     const pattern = (campo) => {
       const m = new RegExp(`d\\.${campo}\\.matches\\('([^']+)'\\)`).exec(testo);
       assert.ok(m, `manca il controllo di forma su ${campo}`);
@@ -254,7 +328,7 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     assert.deepEqual(stringhe(os[1]), [...C.OS]);
   }
   assert.match(GIORNO, /docId == d\.pseudonimo \+ '_' \+ d\.giorno &&/);
-  for (const testo of [ORA, CHIAMATE]) {
+  for (const testo of [TESTA, CHIAMATE]) {
     assert.match(testo, /docId == d\.pseudonimo \+ '_' \+ d\.giorno \+ '_' \+ d\.ora/);
     const ora = /d\.ora is string && d\.ora\.matches\('([^']+)'\)/.exec(testo);
     assert.ok(ora);
@@ -262,11 +336,12 @@ test('pseudonimo, giorno, ora, versione e sistema hanno la forma dell’app, e l
     for (const no of ['24', '7', 'T07', '07 ']) assert.ok(!new RegExp(ora[1]).test(no));
   }
   // Il segno del primo documento è di un elenco chiuso: è quello che l'owner legge per contare le copie.
-  const primo = /d\.primo in \[([^\]]*)\]/.exec(ORA);
+  const primo = /d\.primo in \[([^\]]*)\]/.exec(TESTA);
   assert.ok(primo, 'manca l’elenco dei segni del primo documento');
   assert.deepEqual(stringhe(primo[1]), [...C.PRIMI]);
   const doc = C.documento({ pseudonimo: 'b'.repeat(20), chiave: '2026-10-15T07', app: '0.2.243', os: 'mac', dati: C.oraVuota() });
   assert.equal(C.idDocumento(doc), `${'b'.repeat(20)}_2026-10-15_07`);
+  assert.equal(C.idDocumento({ ...doc, v: 2 }), `${'b'.repeat(20)}_2026-10-15_07`, 'un’ora v2 resta un’ora');
   const vecchio = C.documentoGiorno({ pseudonimo: 'b'.repeat(20), giorno: '2026-10-15', app: '0.2.243', os: 'mac', dati: {} });
   assert.equal(C.idDocumento(vecchio), `${'b'.repeat(20)}_2026-10-15`);
 });
@@ -337,6 +412,11 @@ test('le chiamate: ogni misura si chiude sulle funzioni con la forma dell’app,
   assert.notEqual(manomesso('cache', { 'appunti di mario': 'deepseek/v4|q25|1' }), '', 'una chiave fuori dalle funzioni');
   assert.notEqual(manomesso('chiamate', { 'filo-chat': '1,2,3' }), '');
   assert.notEqual(manomesso('ragionamento', { 'filo-chat': { n: 1 } }), '');
+});
+
+test('nessuna espressione regolare del blocco passa i 4096 caratteri che le regole accettano', () => {
+  const lunghe = [...B.matchAll(/'(\^[^']*)'/g)].map((m) => m[1].length).filter((n) => n > 4096);
+  assert.deepEqual(lunghe, [], 'una forma oltre i 4096 caratteri: le regole non si pubblicano');
 });
 
 test('le due funzioni di controllo delle mappe sono quelle che si credono', () => {

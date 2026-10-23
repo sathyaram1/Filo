@@ -989,6 +989,20 @@
     spell_ocra_data: '%s è %s.',
     spell_ocra_relativa: '%s è %s.',
     spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
+    // I segnaposti (#1448)
+    spell_switch_segnaposti: 'Segnaposto',
+    spell_switch_segnaposti_desc: 'Scrivi delle x al posto di un dato che non ricordi («nel 14xx», «un p/e di xx») e Filo lo trova: il valore compare sopra le x, un clic lo mette.',
+    spell_segnaposto_forse: 'Forse un dato da trovare.',
+    spell_segnaposto_cerco: 'Cerco il dato…',
+    spell_segnaposto_nessuno: 'Non ho trovato questo dato.',
+    spell_segnaposto_errore: 'La ricerca non è riuscita.',
+    spell_segnaposto_riprova: 'Cerca di nuovo',
+    spell_segnaposto_delicata: 'Su questa pagina non cerco da solo.',
+    spell_segnaposto_cerca: 'Cerca il dato',
+    spell_segnaposto_bloccata: 'Non cerco: la ricerca porterebbe fuori un dato riservato.',
+    spell_segnaposto_apri_fonte: 'Apri la fonte',
+    spell_segnaposto_fonte: 'Fonte: %s',
+    spell_segnaposto_metti: 'Metti %s',
 
     // Pagina Gestisci correttore
     spell_page_title: 'Filo — Correttore',

@@ -419,7 +419,7 @@ function spegni(win) {
   try {
     w.webContents.send('shell:toast', {
       text: 'Non ti propongo più la tua email nei siti. La riaccendi in Preferenze, nelle impostazioni avanzate.',
-      opts: { durationSec: 8, key: 'proposta-email' },
+      opts: { durationSec: 8, key: 'proposta-email', tipo: 'proposta_email_spenta' },
     });
   } catch (_) {}
 }

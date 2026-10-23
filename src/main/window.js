@@ -152,6 +152,8 @@ function misuraAvvio() {
 
 function createMainWindow() {
   const avvio = misuraAvvio();
+  const tCrea = Date.now();
+  const contatori = () => globalThis.SN_CONTATORI_MAIN || null;
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -184,16 +186,25 @@ function createMainWindow() {
   win._filoTabs = tabs;
 
   wireWindowCommon(win, tabs);
+  // Quando non risponde, e lo spegnimento del sistema su Windows, che non passa dall'uscita (#1466).
+  try { contatori()?.seguiFinestra(win); } catch (_) {}
+  win.on('session-end', () => { try { contatori()?.fineChiusura({ sistema: true }); } catch (_) {} });
 
   win.webContents.once('did-finish-load', async () => {
+    // I passi dell'avvio (#1466) solo per la prima finestra del processo, come il tempo di avvio.
+    const passo = (nome, t0) => { if (avvio) { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} } };
+    passo('finestra_creata', tCrea);
+    const tSessione = Date.now();
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
+    passo('sessione_ripristinata', tSessione);
     revealWindow(win);
     if (avvio) {
       avvio.visto();
       const davanti = tabs.tabs.find((t) => t.id === tabs.activeId);
       const wc = davanti && davanti.view && davanti.view.webContents;
+      try { contatori()?.passoAvvioFino('prima_scheda_visibile', Date.now(), wc); } catch (_) {}
       if (wc && !wc.isDestroyed() && wc.isLoading()) avvio.scheda(wc);
       else avvio.fine();
     }

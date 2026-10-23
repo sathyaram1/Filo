@@ -1,15 +1,19 @@
 // Preload della shell: espone window.filoShell (tab, download, finestra, account).
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('filoShell', {
   // Alla barra serve per nominare il tasto giusto: regola in CLAUDE.md § Mac.
   sistema: process.platform,
+  // #1623 — le immagini lasciate sulla fila delle schede vanno alla chat della scheda davanti.
+  percorsoDelFile: (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } },
+  rilascioNellaChat: (voci) => ipcRenderer.send('shell:rilascio-nella-chat', Array.isArray(voci) ? voci : []),
   // Dove sta il puntatore quando è fuori dal documento della barra (#428).
   puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {
     open: (url) => ipcRenderer.invoke('tabs:open', { url }),
-    close: (id) => ipcRenderer.invoke('tabs:close', { id }),
+    // `via`: come la si chiude, per i contatori (#1470).
+    close: (id, via) => ipcRenderer.invoke('tabs:close', { id, via }),
     activate: (id) => ipcRenderer.invoke('tabs:activate', { id }),
     navigate: (id, url) => ipcRenderer.invoke('tabs:navigate', { id, url }),
     move: (id, toIndex) => ipcRenderer.invoke('tabs:move', { id, toIndex }),
@@ -72,15 +76,16 @@ contextBridge.exposeInMainWorld('filoShell', {
     remove: (id) => ipcRenderer.invoke('filo:message', { type: 'download_remove', id }),
     // `confirmed` = la shell ha già mostrato la seconda conferma su un
     // programma (#588); senza, il main risponde needsConfirm e non apre niente.
-    openFile: (id, confirmed) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed }),
+    // `luogo`: da dove arriva il gesto, per i contatori (#1470); senza, il pannello.
+    openFile: (id, confirmed, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed, luogo }),
     // Risposta all'avviso "questo è un programma: scaricarlo?".
     confirm: (id, allow) => ipcRenderer.invoke('filo:message', { type: 'download_confirm', id, allow: !!allow }),
-    openFolder: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id }),
+    openFolder: (id, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id, luogo }),
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
     // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
-    rimettiNome: (id) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id }),
+    rimettiNome: (id, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id, luogo }),
     // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
@@ -108,7 +113,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   anteprima: {
     prepara: () => ipcRenderer.send('anteprima:prepara'),
     mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
-    nascondi: () => ipcRenderer.send('anteprima:nascondi'),
+    nascondi: (dati) => ipcRenderer.send('anteprima:nascondi', { clic: !!(dati && dati.clic === true) }),
   },
   // §2.3 — toast informativo (es. dopo il riordino automatico delle schede).
   onToast: (fn) => {

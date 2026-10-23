@@ -95,6 +95,18 @@ const { initAutoUpdater, installaAllAvvioSeServe } = require('./updater');
 // PRIMA di app.whenReady, o i privilegi dello schema non si applicano.
 require('./protocol').registerProtocolSchemes();
 
+// Le eccezioni del main che nessuno gestisce (#1466), per i contatori anonimi: solo il nome della classe, mai messaggio
+// né stack. Il monitor non cambia quello che Electron fa di un'eccezione (il suo avviso); un rifiuto senza gestione,
+// che Electron si limitava a scrivere, resta scritto qui.
+const contatori = () => globalThis.SN_CONTATORI_MAIN || null;
+process.on('uncaughtExceptionMonitor', (err, origine) => {
+  try { contatori()?.eccezione(origine === 'unhandledRejection' ? 'rejection' : 'uncaught', err); } catch (_) {}
+});
+process.on('unhandledRejection', (motivo) => {
+  try { console.warn('[Filo] promessa rifiutata senza gestione:', motivo); } catch (_) {}
+  try { contatori()?.eccezione('rejection', motivo); } catch (_) {}
+});
+
 let mainWindow = null;
 
 // ── Il collegamento d'invito: filo://invito/<codice> (#651) ──────────────────
@@ -185,15 +197,23 @@ function configureSpellchecker() {
 }
 
 app.whenReady().then(async () => {
+  // I passi dell'avvio per i contatori anonimi (#1466): quanto pesa ognuno, non solo il tutto.
+  const passo = (nome, t0) => { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} };
+  let t = Date.now();
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
   // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
   try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
   try { await require('./services/correttoreMigrazione').migra(); } catch (e) { console.warn('[Filo] correttore a due segni:', e?.message || e); }
   let impostazioniAvvio = {};
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
+  passo('impostazioni_lette', t);
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
+  // Com'era finita la volta prima e il segno di questa: solo la copia che tiene il lucchetto, e dopo l'installatore.
+  if (app.hasSingleInstanceLock()) { try { contatori()?.avvioProcesso().catch(() => {}); } catch (_) {} }
+  t = Date.now();
   await registerFiloProtocol();
   registerIpcHandlers();
+  passo('protocollo_ipc', t);
   configureSpellchecker();
   try { require('./services/dizionarioDiFilo').prepara({ locale: app.getLocale(), dopoMs: 1500 }); } catch (_) {}
   // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
@@ -214,9 +234,13 @@ app.whenReady().then(async () => {
     try { require('./services/riquadriRotti').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
+    t = Date.now();
     try { await require('./services/fingerprint').init(s); } catch (_) {}
+    passo('fingerprint', t);
     try { await Cookies.wipeTrackerCookies(s); } catch (_) {}
+    t = Date.now();
     try { await require('./services/adblock').init(s); } catch (_) {}
+    passo('adblock', t);
     try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
@@ -235,7 +259,9 @@ app.whenReady().then(async () => {
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
     // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
+    t = Date.now();
     try { await require('./services/permessiPagine').carica(); } catch (_) {}
+    passo('permessi', t);
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
     // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
@@ -435,15 +461,25 @@ app.whenReady().then(async () => {
 // Salvataggio SINCRONO delle schede aperte: quello normale ha un debounce, e
 // chi esce subito dopo aver aperto una scheda la perderebbe.
 app.on('before-quit', () => {
+  try { contatori()?.inizioChiusura(); } catch (_) {}
   try {
     const tm = mainWindow?._filoTabs;
     const Storage = require('./shim/storage');
+    // L'ora dei contatori viaggia con le schede: dopo questa scrittura non ne parte un'altra (#1466).
+    let contati = {};
+    try { contati = contatori()?.perLaChiusura() || {}; } catch (_) { contati = {}; }
     // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
     if (tm && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
-      Storage.setSync({ [key]: tm.sessionState() });
-    } else Storage?.flushSync?.();
+      Storage.setSync({ [key]: tm.sessionState(), ...contati });
+    } else if (Object.keys(contati).length && Storage?.setSync) Storage.setSync(contati);
+    else Storage?.flushSync?.();
   } catch (_) {}
+});
+
+// L'ultimo istante dell'uscita: il segno «chiusa» con quanto è durata, letto dall'avvio dopo (#1466).
+app.on('will-quit', () => {
+  try { contatori()?.fineChiusura(); } catch (_) {}
 });
 
 // Uscire distrugge le schede senza chiudere le loro pagine: chi aveva caselle da spedire perdeva l'ultima modifica.
@@ -479,7 +515,10 @@ app.on('before-quit', (e) => {
   if (!pending || typeof pending.then !== 'function') return;
   e.preventDefault();
   const finish = () => { cookieWipeDone = true; app.quit(); };
-  const timer = setTimeout(finish, 2500);
+  const timer = setTimeout(() => {
+    try { contatori()?.tettoChiusura(); } catch (_) {}
+    finish();
+  }, 2500);
   pending.then(() => { clearTimeout(timer); finish(); }, () => { clearTimeout(timer); finish(); });
 });
 
@@ -493,6 +532,7 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
+    try { contatori()?.secondaIstanza(); } catch (_) {}
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();

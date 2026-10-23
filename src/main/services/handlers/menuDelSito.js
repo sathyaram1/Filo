@@ -29,7 +29,7 @@ module.exports = function register(on, ctx) {
   function avvisa(sender, testo, actions) {
     const win = winOf(sender);
     if (!win || win.isDestroyed()) return;
-    try { win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 20, key: 'menu-del-sito', actions } }); } catch (_) {}
+    try { win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 20, key: 'menu-del-sito', tipo: 'menu_del_sito', actions } }); } catch (_) {}
   }
 
   async function sitiAdesso() {

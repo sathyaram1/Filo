@@ -555,6 +555,33 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
+// Prima degli script della pagina: un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623). Il pannello
+// vive nel frame principale: da un riquadro, che Filo forse non l'ha ancora montato, le immagini lette passano dal main.
+try {
+  const leggi = (f) => new Promise((ok) => {
+    const r = new FileReader();
+    r.onload = () => ok(typeof r.result === 'string' ? r.result : '');
+    r.onerror = () => ok('');
+    r.readAsDataURL(f);
+  });
+  require('./rilascio-file.js')(window, IS_SUBFRAME ? {
+    pronta: () => true,
+    consegna: async (files) => {
+      const voci = [];
+      for (const f of files) {
+        if (!/^image\//i.test(f.type || '')) { voci.push({ nome: f.name || '', altro: true }); continue; }
+        const dataUrl = await leggi(f);
+        if (dataUrl) voci.push({ nome: f.name || '', dataUrl });
+      }
+      if (voci.length) { try { ipcRenderer.send('filo:rilascio-riquadro', voci); } catch (_) {} }
+    },
+  } : {
+    pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+    consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+    pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+  });
+} catch (e) { console.error('[Filo CS] rilascio', e); }
+
 // Il gesto che vale per finestre e schermo pieno lo dice solo questo ascolto, in ogni frame, prima della pagina: è
 // l'unico a sapere se l'input è caduto sull'interfaccia di Filo (#737.1 giri 6 e 7). Solo l'input vero: la pagina non
 // lo fabbrica. Il collegamento cliccato si apre anche se la pagina ha speso il gesto per sé. Regole: services/permessiPagine.js.
@@ -857,6 +884,7 @@ function loadScripts() {
   // tab): in un riquadro descriverebbero il rettangolo sbagliato e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
+  try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo CS] immaginiChat', e); } // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina

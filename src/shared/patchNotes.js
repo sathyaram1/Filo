@@ -9,15 +9,27 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.249', date: '2026-10-23',
+      version: '0.2.250', date: '2026-10-23',
       features: [
-        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
+        'Un\'immagine che trascini dentro Filo entra nella chat dovunque la lasci. Nella home va nella casella da qualunque punto della pagina, che si accende mentre la trascini. Su un sito si apre l\'Aiuto con l\'immagine già allegata, salvo che il sito la voglia per sé, come una pagina che carica file. Nell\'Aiuto ora la puoi anche incollare.',
         'Le icone che stavano in cima al menu del tasto destro (Traduci, Screenshot, Condividi, Salva per dopo, QR code e Nuova scheda) ora sono nella barra laterale a sinistra, e agiscono sulla scheda che hai davanti. Le altre aspettano in «Altro…», in fondo alla barra. Le riordini trascinandole, e una lasciata sulla freccia di «Altro…» va messa da parte.',
         'Se sposti un\'icona della barra laterale e poi scrivi a Filo «rimetti come prima», l\'icona torna dov\'era e il resto non cambia.',
         'A schermo intero le schede compaiono quando porti il mouse sul bordo alto e lo tieni fermo un attimo, e spariscono quando torni sulla pagina. Se non le vuoi, le spegni in Preferenze, nella sezione «Barra laterale».',
       ],
       fixes: [
         'Sulla pagina di un sito che non risponde, Condividi, QR code e Salva per dopo usano l\'indirizzo del sito e non quello interno della pagina d\'errore. Su un PDF Condividi e Screenshot funzionano.',
+        'La pagina sulla privacy ora dice dove sta ogni parte del server, dal codice al database alle identità. Prima diceva solo che il codice gira in Europa, e sembrava che ci stessero anche i dati, che invece per ora sono negli Stati Uniti.',
+        'Un\'immagine oltre i 4 MB incollata nella chat della home ora entra rimpicciolita. Prima spariva senza dire niente.',
+      ],
+    },
+    {
+      version: '0.2.249', date: '2026-10-23',
+      features: [
+        'Il correttore corregge da solo quando finisci una parola, come sul telefono: «perchè» diventa «perché» e «marco» diventa «Marco». Un lampo caldo ti mostra cosa ha cambiato. Se non ti va bene, annulla subito dopo o usa il tasto destro sulla parola, e torna com\'era. Filo impara dai tuoi rifiuti: una correzione annullata due volte non torna, e una parola che il correttore non conosce, scritta tre volte uguale, smette di essere segnata. Le parole imparate le vedi, le cambi e le togli in Gestisci correttore.',
+        'Se non ricordi un dato, scrivi delle x al suo posto: «l\'America l\'hanno scoperta nel 14xx», «Google ha un p/e di soli xx». Il correttore lo trova e te lo mostra in piccolo sopra le x, e un clic lo mette. Un dato che cambia nel tempo, come un prezzo, lo cerca su Wikipedia o sul web, e col tasto destro vedi da dove viene e di quando è. Si spegne in Opzioni → Altro, alla voce «Segnaposto».',
+      ],
+      fixes: [
+        'La pulizia automatica delle schede archivia davvero quelle che non tocchi da ore. Prima una pagina che si ricaricava o scorreva da sola, come una chat, faceva sembrare Filo sempre in uso, e alla riapertura ogni scheda risultava appena usata. Se la pulizia non riesce a valutare le schede, per esempio coi crediti finiti, un avviso ti dice perché.',
       ],
     },
     {

@@ -13,6 +13,7 @@ const { createSession, defaultCwd, commandExists } = require('./services/shell')
 const { resolveShell } = require('./services/terminal');
 const { virgoletteIncollando, propostaVirgolette } = require('./services/shellVirgolette');
 const SegretiLetti = require('./services/segretiLetti');
+const RilascioNellaChat = require('./rilascioNellaChat');
 // Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
 const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
@@ -100,6 +101,20 @@ function provenienzaDi(info) {
   return { via: 'pagina' };
 }
 
+// Le quattro chiamate sincrone che una pagina fa prima dei suoi script: finché non c'è la risposta la pagina è ferma.
+// Quanto ci mettono, per canale, lo contano i contatori anonimi (#1466); da una finestra incognito no.
+function cronometrata(canale, gestore) {
+  return (event, ...args) => {
+    const t0 = performance.now();
+    try { gestore(event, ...args); } finally {
+      try {
+        const C = globalThis.SN_CONTATORI_MAIN;
+        if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
+      } catch (_) {}
+    }
+  };
+}
+
 function registerIpcHandlers() {
   // Niente shell orfane dopo l'uscita: alla riapertura si riparte puliti.
   app.on('before-quit', () => {
@@ -109,17 +124,17 @@ function registerIpcHandlers() {
 
   // SINCRONO perché il preload deve installare gli override PRIMA degli script
   // di pagina. Passa { level, seed }: il master secret NON attraversa mai qui.
-  ipcMain.on('filo:fp-config', (event, href) => {
+  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href) => {
     try {
       event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
-  });
+  }));
 
   // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
   // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
-  ipcMain.on('filo:cookie-wipe', (event, href) => {
+  ipcMain.on('filo:cookie-wipe', cronometrata('cookie-wipe', (event, href) => {
     let out = null;
     try {
       const wc = event.sender;
@@ -138,16 +153,16 @@ function registerIpcHandlers() {
       }
     } catch (_) { out = null; }
     event.returnValue = out;
-  });
+  }));
 
   // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
-  ipcMain.on('filo:adblock-css', (event, href, gate) => {
+  ipcMain.on('filo:adblock-css', cronometrata('adblock-css', (event, href, gate) => {
     try {
       event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
     } catch (_) {
       event.returnValue = { css: '', tokens: false };
     }
-  });
+  }));
 
   // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
   ipcMain.handle('filo:adblock-tokens', (event, msg) => {
@@ -160,14 +175,14 @@ function registerIpcHandlers() {
   });
 
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
-  ipcMain.on('filo:permessi-stato', (event, href) => {
+  ipcMain.on('filo:permessi-stato', cronometrata('permessi-stato', (event, href) => {
     try {
       const Permessi = require('./services/permessiPagine');
       event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
     } catch (_) {
       event.returnValue = { notifiche: 'default' };
     }
-  });
+  }));
 
   // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
   ipcMain.on('filo:permessi-si', (event, parte) => {
@@ -233,6 +248,22 @@ function registerIpcHandlers() {
       const wc = event.sender;
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
       if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
+    } catch (_) {}
+  });
+  // #1623 — le immagini lasciate sulla fila delle schede: solo dalla barra di una finestra, mai da una pagina.
+  ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
+  });
+  // Da un riquadro incorporato in un sito: il pannello sta nel frame principale della sua scheda.
+  ipcMain.on('filo:rilascio-riquadro', (event, voci) => {
+    try {
+      const wc = event.sender;
+      if (!event.senderFrame || !wc.mainFrame || event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId) return;
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tab = w._filoTabs?.tabs?.find((t) => t.view.webContents === wc);
+        if (tab) { RilascioNellaChat.dalRiquadro(tab, voci).catch(() => {}); return; }
+      }
     } catch (_) {}
   });
 
@@ -515,9 +546,9 @@ function registerIpcHandlers() {
     const id = !url || url === 'filo://newtab/' ? gesto(win, 'new-tab', apri) : apri();
     return { ok: true, id };
   });
-  ipcMain.handle('tabs:close', (event, { id }) => {
+  ipcMain.handle('tabs:close', (event, { id, via } = {}) => {
     const win = winFor(event);
-    if (win?._filoTabs) gesto(win, 'close-tab', () => win._filoTabs.closeTab(id));
+    if (win?._filoTabs) gesto(win, 'close-tab', () => win._filoTabs.closeTab(id, { via: typeof via === 'string' ? via : 'altro' }));
     return { ok: true };
   });
   ipcMain.handle('tabs:activate', (event, { id }) => {
@@ -736,9 +767,9 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) CartaAnteprima.prepara(win);
   });
-  ipcMain.on('anteprima:nascondi', (event) => {
+  ipcMain.on('anteprima:nascondi', (event, dati) => {
     const win = finestraDellaBarra(event.sender);
-    if (win) CartaAnteprima.nascondi(win);
+    if (win) CartaAnteprima.nascondi(win, { clic: !!(dati && dati.clic === true) });
   });
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────

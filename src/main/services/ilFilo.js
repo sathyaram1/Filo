@@ -167,7 +167,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     if (ora - avvisi.illeggibile < RIPETI_ILLEGGIBILE_MS) return;
     avvisi.illeggibile = ora;
     avvisa(`Filo non riesce a leggere le chat e le pagine visitate, perché ${causaDi(e)}. Finché non ci riesce non salva niente di nuovo, e riprova a ogni richiesta.`,
-      { chiave: 'filo-illeggibile' });
+      { chiave: 'filo-illeggibile', tipo: 'filo_illeggibile' });
   }
 
   async function avvisaSePesa() {
@@ -177,7 +177,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     if (byte <= SOGLIA_AVVISO) return;
     avvisi.peso = true;
     avvisa(`Le chat e le pagine visitate occupano ${Math.round(byte / (1024 * 1024))} MB sul disco. Cancellare le pagine di un periodo le alleggerisce.`,
-      { chiave: 'filo-pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
+      { chiave: 'filo-pesante', tipo: 'filo_pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
   }
 
   // Le chat salvate prima del filo (#525) diventano segmenti: una chat già nel filo non si riscrive, così la
