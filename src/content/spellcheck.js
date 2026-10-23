@@ -1808,6 +1808,17 @@
     }
   }
 
+  // La pagina intorno per le date senza anno (coerenza.dateDi): si rilegge al più ogni INTORNO_MS, non a ogni tasto.
+  function intornoDelCampo(state) {
+    const ora = Date.now();
+    if (state.intorno && ora - state.intorno.t < INTORNO_MS) return state.intorno.v;
+    const c = contestoDelCampo(state.el, { intorno: INTORNO_MAX });
+    let titolo = '';
+    try { titolo = radiceDi(state.el) ? '' : String(document.title || ''); } catch (_) {}
+    state.intorno = { t: ora, v: { prima: c.prima, dopo: c.dopo, titolo } };
+    return state.intorno.v;
+  }
+
   // ============================================================================
   // Applicazione correzioni
   // ============================================================================
