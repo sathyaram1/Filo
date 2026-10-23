@@ -389,7 +389,7 @@
       id: 'chat-immagini-trascinate', title: 'Dai un’immagine a Filo trascinandola', category: 'assistant',
       desc: 'Un’immagine che trascini dentro Filo entra nella chat come se l’avessi incollata, dovunque la lasci. Nella nuova scheda va nella casella da qualunque punto della pagina, e la casella si accende mentre la trascini; gli altri file entrano col loro nome e percorso. Su un sito o su un’altra pagina di Filo va all’Aiuto, che si apre con l’immagine già allegata e il cursore nella casella. Lasciata sulla fila delle schede o sulla barra laterale va alla chat della scheda che hai davanti. Più immagini insieme entrano tutte, e ognuna si toglie con la sua ×.',
       invoke: 'Trascina un’immagine dal computer o da un’altra finestra e lasciala su Filo, oppure incollala nella casella della chat.',
-      doesNot: 'Se il sito accoglie il file da sé, come una pagina che carica foto, lo lascia al sito. Oltre i 4 MB un’immagine nella nuova scheda entra come file col suo percorso; incollata, o nell’Aiuto, non entra e un avviso lo dice. All’Aiuto vanno solo immagini, e un sito non può farne allegare una da solo: conta solo il tuo trascinamento. Dentro un riquadro incorporato in un sito, come un video o una mappa, il rilascio non arriva all’Aiuto.',
+      doesNot: 'Se il sito accoglie il file da sé, come una pagina che carica foto, lo lascia al sito. Oltre i 4 MB un’immagine nella nuova scheda entra come file col suo percorso; incollata, o nell’Aiuto, non entra e un avviso lo dice. All’Aiuto vanno solo immagini, e un sito non può farne allegare una da solo: conta solo il tuo trascinamento.',
     },
     {
       id: 'voice-chat', title: 'Parla a Filo', category: 'assistant',

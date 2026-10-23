@@ -7,6 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 // Un PNG vero oltre i 4 MB: in coda ai byte dell'immagine, che restano leggibili.
@@ -193,4 +194,22 @@ test('fila delle schede: l’immagine lasciata lì va alla chat della scheda dav
   const page = await testServer.openReady(openTab, SITO);
   await lascia(shell, [foto], { x: box.x + box.width + 260, y: box.y + box.height / 2 });
   await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }] });
+});
+
+test('riquadro incorporato e barra laterale: l’immagine lasciata lì arriva all’Aiuto della pagina', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html('<!doctype html><html><body style="margin:0;height:100vh;background:#eef">un riquadro</body></html>');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="margin:0;height:100vh"><iframe id="r" src="${dentro}" style="position:fixed;left:0;top:0;width:400px;height:300px;border:0"></iframe></body></html>`);
+  await expect.poll(() => page.frames().some((f) => f.url() === dentro && f !== page.mainFrame())).toBe(true);
+  await page.frames().find((f) => f.url() === dentro).waitForLoadState('domcontentloaded');
+  const [foto, altra] = immaginiSulDisco(2);
+  await lascia(page, [foto], { x: 150, y: 150 });
+  await expect.poll(() => statoAiuto(app, page), { timeout: 8_000 }).toMatchObject({ aperto: true, allegati: [{ nome: 'foto 1.png' }] });
+
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const box = await barra.locator('#pannello').boundingBox();
+  await lascia(barra, [altra], { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  await expect.poll(async () => (await statoAiuto(app, page)).allegati.map((a) => a.nome), { timeout: 8_000 }).toEqual(['foto 1.png', 'foto 2.png']);
 });

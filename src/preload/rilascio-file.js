@@ -8,12 +8,19 @@ const conImmagini = (dt) => {
   try { return Array.from((dt && dt.items) || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || '')); } catch (_) { return false; }
 };
 
+// Un campo prende il rilascio da sé, senza che la pagina lo dica: il campo file lo carica, un editor lo scrive.
+const campo = (e) => {
+  const t = typeof e.composedPath === 'function' ? e.composedPath()[0] : e.target;
+  if (!t || t.nodeType !== 1) return false;
+  return !!t.isContentEditable || t.localName === 'input' || t.localName === 'textarea';
+};
+
 // `pronta()`: c'è una chat che lo prende; `consegna(files)`: gliele dà. La pagina decide sul dragover, come per il
 // browser: l'ultimo ascolto in bolla di window vede se l'ha voluto lei, e solo allora Filo lo accetta.
 module.exports = function osservaRilascio(win, { pronta, consegna }) {
   let nostro = false;
   const dopoLaPagina = (e) => {
-    if (e.defaultPrevented) return;
+    if (e.defaultPrevented || campo(e)) return;
     try { if (!pronta()) return; } catch (_) { return; }
     e.preventDefault();
     try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
