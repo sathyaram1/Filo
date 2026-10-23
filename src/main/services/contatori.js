@@ -229,7 +229,8 @@ function crea(dip = {}) {
     const funzione = C.funzioneDi(action);
     const fuori = usoCorrente.getStore();
     if (!funzione || inIncognito() || (fuori && !fuori.chiuso && fuori.funzione === funzione)) return fn();
-    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, chiuso: false, soloGuasti, ok: false };
+    // `chiamate` conta anche le risposte dalla cache (l'uso c'è stato); `alModello` solo quelle andate al modello.
+    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, alModello: 0, chiuso: false, soloGuasti, ok: false };
     try {
       const r = await usoCorrente.run(uso, fn);
       uso.ok = true;
@@ -237,7 +238,9 @@ function crea(dip = {}) {
     } finally {
       uso.chiuso = true;
       const fine = uso.ok ? adesso() - uso.t0 : null;
-      if (uso.chiamate > 0) registraUso(funzione, { visto: uso.visto, fine }, uso.errori, { uso: !soloGuasti, t0: uso.t0 }).catch(() => {});
+      if (uso.chiamate > 0) {
+        registraUso(funzione, { visto: uso.visto, fine }, uso.errori, { uso: !soloGuasti, t0: uso.t0, chiamate: uso.alModello }).catch(() => {});
+      }
     }
   }
 
