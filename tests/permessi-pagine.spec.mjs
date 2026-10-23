@@ -789,6 +789,37 @@ for (const [via, dopo, domanda] of [
   });
 }
 
+// L'elenco dei font installati rivela i programmi ed è uguale in ogni sito: Electron non lo fa chiedere, quindi niente (#1524).
+test('i font del computer: dopo un clic sulla pagina il sito non legge l\'elenco, e nessuna domanda', async () => {
+  test.setTimeout(60_000);
+  await apri('/font');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/font'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.waitForLoadState('domcontentloaded');
+  await pagina.locator('#b').click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['font:vuoti']);
+  await expect(barra()).toBeHidden();
+});
+
+test('i nomi di microfoni e uscite audio il sito li legge solo dopo Consenti al microfono; la fotocamera resta senza', async () => {
+  test.setTimeout(60_000);
+  await apri('/dispositivi');
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['prima:nessuno/prompt/prompt']);
+  await expect(barra()).toBeHidden();
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/dispositivi'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.locator('#b').click();
+  await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+  const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+  await expect(si).toBeEnabled({ timeout: 5_000 });
+  await si.click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['prima:nessuno/prompt/prompt', 'dopo:audioinput,audiooutput']);
+
+  await pagina.reload();
+  await expect.poll(() => esiti.length, { timeout: 10_000 }).toBe(3);
+  expect(esiti[2], 'il sì ricordato vale alla pagina dopo').toBe('prima:audioinput,audiooutput/granted/prompt');
+});
+
 test('le risposte ricordate le legge e le toglie solo una pagina di Filo, non un sito visitato', async () => {
   const out = await app.evaluate(async () => {
     const MSG = globalThis.SN_MSG.MSG;
