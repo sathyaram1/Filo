@@ -259,7 +259,7 @@ function registerIpcHandlers() {
   ipcMain.on('filo:rilascio-riquadro', (event, voci) => {
     try {
       const wc = event.sender;
-      if (!event.senderFrame || event.senderFrame === wc.mainFrame) return;
+      if (!event.senderFrame || !wc.mainFrame || event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId) return;
       for (const w of BrowserWindow.getAllWindows()) {
         const tab = w._filoTabs?.tabs?.find((t) => t.view.webContents === wc);
         if (tab) { RilascioNellaChat.dalRiquadro(tab, voci).catch(() => {}); return; }

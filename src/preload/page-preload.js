@@ -13,7 +13,7 @@
 // alla pagina, ma il DOM (document, window) è condiviso. Esattamente come
 // in Chrome con i content script.
 
-const { ipcRenderer, webFrame, webUtils } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
 // Prima di qualunque HTML scritto da Filo: la CSP della pagina non è la sua (#1122).
