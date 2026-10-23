@@ -191,14 +191,25 @@
     }
 
     function finito(giro, esito) {
-      if (giro !== c.giro) return;
-      if (c.sessione && campo.isConnected && campo.value !== c.lasciato) c.toccato = true;
+      // Una sessione lasciata da un giro dopo (chat sparita, tasto ripremuto): quello che aveva detto non parte.
+      if (giro !== c.giro) { contaFine(esito, esito.frasi > 0 ? 'annullata' : 'nessuno'); return; }
+      if (c.sessione && campo.isConnected && campo.value !== c.lasciato) {
+        c.toccato = true;
+        if (!c.perche) c.perche = campo.value.trim() ? 'cambiata' : 'a_mano';
+      }
       c.sessione = null;
       const parte = esito.frasi > 0 && !esito.errore && ['utente', 'finito', 'tempo'].includes(esito.motivo)
         && c.daSolo && !c.toccato && campo.isConnected && campo.value.trim();
-      if (parte) { attendi(); return; }
+      if (parte) { c.inAttesa = esito; attendi(); return; }
       imposta('pronto');
+      contaFine(esito, invioSenzaAttesa(esito));
       if (esito.frasi > 0 && campo.isConnected) caretInFondo(campo);
+    }
+    function invioSenzaAttesa(esito) {
+      if (!(esito.frasi > 0) || esito.errore) return 'nessuno';
+      if (c.perche) return c.perche;
+      if (!campo.isConnected) return 'annullata';
+      return c.daSolo ? 'nessuno' : 'tenuta';
     }
 
     function attendi() {
