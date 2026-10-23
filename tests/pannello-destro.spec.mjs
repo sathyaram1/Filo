@@ -241,11 +241,7 @@ test('la chat è l\'Aiuto: vede il documento e una richiesta ne cambia la format
 
 test('a parole: Filo apre il pannello, ci mette e toglie uno strumento, lo blocca', async ({ app, openTab }) => {
   const ed = await apriEditor(openTab);
-  const esegui = (azione) => app.evaluate(async (_e, a) => {
-    const win = require('electron').BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
-    const t = win._filoTabs.tabs.find((x) => x.id === win._filoTabs.activeId);
-    return globalThis.SN_EXECUTE_FILO_ACTION(a, { tab: { id: t.id, url: t.url }, url: t.url, wc: t.view.webContents });
-  }, azione);
+  const esegui = (azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
   let r = await esegui({ type: 'PANNELLO_APP', operazione: 'apri' });
   expect(r.executed).toBe(true);
   await expect.poll(() => aperto(ed)).toBe(true);
