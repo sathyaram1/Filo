@@ -1065,13 +1065,13 @@
     try {
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
-      if (rawText == null) { if (!auto) showEditorToast('Non sono riuscito a generare il titolo.'); return false; }
+      if (rawText == null) { if (!auto) avvisoNonGenerato('il titolo', r); return false; }
       const ok = applyGeneratedTitle(id, rawText);
       if (!ok && !auto) showEditorToast('Non sono riuscito a generare il titolo.');
       if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
       return ok;
-    } catch (_) {
-      if (!auto) showEditorToast('Non sono riuscito a generare il titolo.');
+    } catch (e) {
+      if (!auto) avvisoNonGenerato('il titolo', { error: e && e.message, code: e && e.code });
       return false;
     } finally {
       if (docSwitchBtn) docSwitchBtn.classList.remove('ed-doc-generating');
