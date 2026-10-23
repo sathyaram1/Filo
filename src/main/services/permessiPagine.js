@@ -428,9 +428,9 @@ function origineDelReferrer(referrer) {
 
 // Un clic o un tasto vero sulla scheda, anche sull'interfaccia di Filo disegnata sopra la pagina: vale per ciò che Filo
 // apre su richiesta dell'utente (il rilevatore dei siti pericolosi, #814), mai per i permessi della pagina.
-function gestoDellUtente(wc) {
+function gestoDellUtente(wc, entro = GESTO_MS) {
   const t = wc && Math.max(wc._filoGestoAlle || 0, wc._filoGestoUiAlle || 0);
-  return Boolean(t && Date.now() - t < GESTO_MS);
+  return Boolean(t && Date.now() - t < entro);
 }
 
 // Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
