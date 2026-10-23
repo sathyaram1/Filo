@@ -1128,6 +1128,7 @@
     setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine: inFila(forgetLine),
     // quaderno delle memorie (#872)
     getFonti, quaderno, righeTolte, svuotaQuaderno: inFila(svuotaQuaderno), hideLine: inFila(hideLine), restoreHidden: inFila(restoreHidden),
+    descriviRiga, descriviNascosta,
     forgetHiddenForever: inFila(forgetHiddenForever), editLine: inFila(editLine), applicaCompattazione: inFila(applicaCompattazione),
     // onboarding (#524)
     getOnboarding, setOnboarding,
