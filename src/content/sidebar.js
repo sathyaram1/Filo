@@ -1266,19 +1266,22 @@
     let text = '';
     let imgEl = null;
     let linkEl = null;
+    const nonTrovato = () => { if (session) session.nonTrovati += 1; };
     if (spec.target === 'text') {
       text = resolveActionText(page);
       if (!text && page.op !== 'edit_text') {
+        nonTrovato();
         appendActionLog(`${label}: nessun testo selezionato`);
         return false;
       }
     } else if (spec.target === 'image') {
       imgEl = resolveImageEl(page);
-      if (!imgEl) { appendActionLog(`${label}: immagine non trovata`); return false; }
+      if (!imgEl) { nonTrovato(); appendActionLog(`${label}: immagine non trovata`); return false; }
     } else if (spec.target === 'link') {
       linkEl = resolveLinkEl(page);
       const fallbackUrl = String(page.url ?? page.href ?? '').trim();
       if (!linkEl && !(page.op === 'open_link' && fallbackUrl)) {
+        nonTrovato();
         appendActionLog(`${label}: link non trovato`);
         return false;
       }
