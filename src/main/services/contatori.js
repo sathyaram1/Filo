@@ -569,10 +569,10 @@ function crea(dip = {}) {
   }
 
   // ── La spedizione ────────────────────────────────────────────────────────
-  async function spedisci(doc) {
+  async function spedisci(doc, collezione = C.COLLEZIONE) {
     const { FIRESTORE_BASE, API_KEY } = rest();
     if (!FIRESTORE_BASE || !API_KEY) return { ok: false, motivo: 'server non configurato' };
-    const url = `${FIRESTORE_BASE}/${C.COLLEZIONE}?documentId=${encodeURIComponent(C.idDocumento(doc))}&key=${API_KEY}`;
+    const url = `${FIRESTORE_BASE}/${collezione}?documentId=${encodeURIComponent(C.idDocumento(doc))}&key=${API_KEY}`;
     const fields = Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, valoreFs(v)]));
     let res;
     try {
