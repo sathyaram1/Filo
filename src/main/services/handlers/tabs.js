@@ -223,7 +223,7 @@ module.exports = function register(on, ctx) {
         const chiusa = Date.parse(voce.closedAt);
         try {
           globalThis.SN_CONTATORI_MAIN?.attivita('riaperte', {
-            chiusaDa: globalThis.SN_CONTATORI.chiusaDa(voce.reason), etaMs: Number.isFinite(chiusa) ? Math.max(0, Date.now() - chiusa) : null,
+            chiusaDa: globalThis.SN_CONTATORI.chiusaDa(voce.reason, voce.chiusaDaSola), etaMs: Number.isFinite(chiusa) ? Math.max(0, Date.now() - chiusa) : null,
           }, { incognito: !!win._filoIncognito });
         } catch (_) {}
       }
