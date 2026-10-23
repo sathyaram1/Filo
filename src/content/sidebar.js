@@ -1622,6 +1622,7 @@
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
           appendActionLog('ricerca web: limite raggiunto, ignorata');
+          try { Popup?.conta?.({ misura: 'ricerca-web-tetto' }); } catch (_) {}
           setTimeout(() => submit({
             userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
             preActionUrl: location.href,
