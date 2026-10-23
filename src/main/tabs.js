@@ -1795,7 +1795,7 @@ class TabManager {
       };
       const controlla = () => { if (pronti()) fine(true); };
       timer = setTimeout(() => fine(false), tetto);
-      this._attesaColori.push(controlla);
+      this._attesaColori = [...(this._attesaColori || []), controlla];
     });
   }
 
