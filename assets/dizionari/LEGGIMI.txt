@@ -10,4 +10,8 @@ https://chromium.googlesource.com/chromium/deps/hunspell_dictionaries
 - en-US-10-1.bdic, en-GB-10-1.bdic: SCOWL, di Kevin Atkinson e altri; licenza e crediti in
   sorgenti/README_en_US.txt e sorgenti/README_en_GB.txt.
 
+Le parole che il correttore di Filo segna non le decide il browser (#1585): Filo legge le sorgenti italiane di
+sorgenti/ con Hunspell compilato in WebAssembly (pacchetto hunspell-wasm, sotto MPL 1.1, GPL 2 o LGPL 2.1 a scelta).
+L'inglese viene dai pacchetti dictionary-en e dictionary-en-gb (SCOWL, MIT e BSD), con le loro licenze dentro.
+
 Questi file restano sotto le loro licenze; il resto di Filo sotto la sua (LICENSE nella radice).
