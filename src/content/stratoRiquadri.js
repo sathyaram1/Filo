@@ -108,6 +108,7 @@
         return !!t && t !== document.documentElement && t !== document.body;
       },
       versoLaPagina: () => false,
+      lasciaPassare: () => S.lasciaPassare(),
     });
   } catch (e) { console.error('[Filo riquadri] vuoto', e); }
 
