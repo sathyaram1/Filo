@@ -7390,8 +7390,8 @@ ConversazioniApp.collega({
   tetti: async () => globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo),
 });
 
-// Pagine tolte dal filo, da qualunque strada: le home aperte rifanno le righe delle pagine (#869).
-globalThis.SN_IL_FILO.suPagineTolte(() => broadcastToFiloPages({ type: MSG.FILO_PAGINE_TOLTE }));
+// Pagine entrate, rititolate o tolte dal filo, da qualunque strada: le home aperte rifanno le righe delle pagine (#869).
+globalThis.SN_IL_FILO.suPagine(() => broadcastToFiloPages({ type: MSG.FILO_PAGINE_CAMBIATE }));
 
 // Filo parla per primo (#869): cosa genera il messaggio, quando può farlo, e a chi lo dice.
 FiloParla.collega({

@@ -27,9 +27,11 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   dalle schede chiuse, che la ricerca legge, e una scheda ancora aperta su quella pagina non ci rientra chiudendosi.
   Dalla ricerca, dove una pagina è un indirizzo, si tolgono tutte le sue visite. Al contrario, una scheda chiusa
   eliminata dalla Cronologia (una, scelte dalla chat, o «Svuota archivio») porta via le visite del suo indirizzo mentre
-  era aperta. Ogni cancellazione passa da un punto solo del filo, che la annuncia (`FILO_PAGINE_TOLTE`): le home aperte
-  rifanno le righe delle pagine su quelle che il filo ha adesso. Un gruppo si chiama come la sua prima pagina, quindi
-  tolta quella la riga prende il nome nuovo invece di doppiarsi.
+  era aperta. Ogni pagina che entra nel filo, cambia titolo o se ne va passa da un punto solo, la scrittura del filo,
+  che lo annuncia (`FILO_PAGINE_CAMBIATE`): le home aperte rifanno le righe delle pagine su quelle che il filo ha
+  adesso. Non basta rileggere quando la home torna davanti: una visita si scrive a pagina caricata, spesso con la home
+  già davanti (#1307.4). Un gruppo si chiama come la sua prima pagina, quindi tolta quella la riga prende il nome nuovo
+  invece di doppiarsi.
 - **I cambi**: quelli chiesti in chat hanno il segno sulla bolla; tutti gli altri sono una riga col loro «annulla».
   Le righe sottili (cambi, pagine) di fila stanno strette come le righe di un registro; lo spazio pieno resta intorno
   alle bolle. Ritocchi ripetuti della stessa cosa sono una riga sola (#1490): il registro li fonde, la home riscrive la

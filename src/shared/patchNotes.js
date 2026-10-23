@@ -19,6 +19,7 @@
         'Negli elenchi di siti delle impostazioni, un nome con uno spazio che non è un sito, come «studio rossi», l\'avviso lo riporta intero anche se sulla stessa riga hai scritto un altro sito. Prima lo spezzava in «studio» e «rossi». Anche la chat ti risponde che «studio rossi» non è un dominio, in un pezzo solo. Un indirizzo intero incollato con un altro sito accanto, sulla stessa riga, li aggiunge tutti e due: prima il secondo spariva.',
         'Quando un errore chiede di scegliere un altro modello, manda in Opzioni → Modelli per azione e ha il tasto per andarci. Prima nominava una pagina che solo chi gestisce Filo ha. Un\'immagine copiata la cui descrizione non può arrivare, per esempio coi crediti finiti, nella cronologia degli appunti non resta più su «Descrizione…».',
         'Se di una pagina molto lunga che hai aperto Filo riesce a leggere solo l\'inizio, non ti risponde più che quello che cerchi non c\'è: ti dice che il resto non l\'ha letto. Se la scheda non risponde in tempo, ti avverte che ha letto una copia scaricata a parte, che può essere diversa da quella che vedi.',
+        'Nella home una pagina che finisce di caricarsi mentre sei lì entra subito nel suo gruppo di pagine, col titolo che si dà. Prima compariva solo dopo essere passato a un\'altra scheda e tornato, e se intanto toglievi una pagina dal gruppo il conto restava sbagliato.',
       ],
     },
     {
