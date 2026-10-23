@@ -4646,6 +4646,36 @@ const LEGACY_CONTINUE_NUDGE =
 // conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
+// I nomi delle schede li scrivono i siti: tornano recintati, coi perché di Filo fuori dal recinto.
+const PERCHE_RESTA_APERTA = {
+  chat: 'è la scheda di questa conversazione: Filo non la chiude, la chiude l\'utente',
+  testo: 'c\'è del testo scritto e non ancora inviato',
+  sempre: 'sono di siti che l\'utente tiene sempre aperti',
+  chiusa: 'non c\'erano più',
+  nuova: 'si sono aperte dopo l\'elenco che avevi davanti',
+};
+function esitoChiusuraPerModello(action, o) {
+  if (o.error) return `Nessuna scheda chiusa: ${o.error}. Correggi e riprova, o chiedi all'utente quali intende.`;
+  const E = globalThis.SN_ESTERNO;
+  const restano = Array.isArray(action._restano) ? action._restano : [];
+  const gruppi = Object.keys(PERCHE_RESTA_APERTA).map((p) => {
+    const nomi = restano.filter((x) => x.perche === p).map((x) => `- ${E.neutralizza(String(x.nome || ''), { unaRiga: true })}`);
+    return nomi.length ? `Restano aperte perché ${PERCHE_RESTA_APERTA[p]}:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: nomi.join('\n') })}` : '';
+  }).filter(Boolean);
+  const insiste = restano.some((x) => x.perche === 'testo' || x.perche === 'sempre')
+    ? '\nSe l\'utente vuole chiudere anche quelle col testo o dei siti sempre aperti, chiudile col loro numero.' : '';
+  const coda = `${gruppi.length ? `\n${gruppi.join('\n')}${insiste}` : ''}\nDillo all'utente in una riga.`;
+  const n = Number(o.chiuse) || 0;
+  if (!n) {
+    const perche = o.nessuna === 'sito' ? 'nessuna scheda aperta in questa finestra è di quel sito'
+      : o.nessuna === 'niente' ? 'oltre a quella di questa conversazione e a quelle da lasciare non ce n\'è nessuna' : 'nessuna di quelle indicate si poteva chiudere';
+    return `Nessuna scheda chiusa: ${perche}.${coda}`;
+  }
+  const dove = action._inIncognito ? 'In incognito non restano nel filo della home.'
+    : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con CERCA_CHAT e riaprila con NAVIGA.';
+  return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
+}
+
 function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
