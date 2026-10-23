@@ -1044,14 +1044,15 @@ test('L2 — l’evento aggiunto col bottone resta aggiunto anche nella chat ria
 
 // (M) Due azioni dello stesso tipo nella stessa risposta restano due: il diario
 // teneva una riga sola per tipo, e aggiungendo il primo appuntamento il secondo
-// spariva dal racconto sostituito da una copia del primo.
-test('M — due appuntamenti chiesti insieme restano due nel diario', async ({ app, shell }) => {
+// spariva dal racconto sostituito da una copia del primo. Vale nei due versi: `quale` è il bottone premuto.
+async function dueAppuntamenti(app, shell, quale) {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+  await calendarioFinto(app, '');
 
   await fakeProvider(app, [
     {
