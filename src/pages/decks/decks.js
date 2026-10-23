@@ -2295,10 +2295,11 @@
     // Chi torna da Crediti o dalle Opzioni ha di solito tolto l'ostacolo: i pareri mancati si richiedono, una volta,
     // quando la carta si ridisegna.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible' || !opinionErrors.size) return;
+      if (document.visibilityState !== 'visible' || (!opinionErrors.size && !printsFailed.size)) return;
       opinionErrors.clear();
+      printsFailed.clear();
       const cur = currentDetailCard();
-      if (cur && layout.module === 'opinion') renderDetailModule(cur);
+      if (cur && (layout.module === 'opinion' || layout.module === 'price')) renderDetailModule(cur);
     });
   }
 
