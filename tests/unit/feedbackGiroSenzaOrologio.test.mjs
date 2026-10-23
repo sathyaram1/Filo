@@ -251,6 +251,24 @@ test('idDelNumero: una lettura sul seq, e il sotto-numero sceglie il figlio', as
   } finally { globalThis.fetch = vere; }
 });
 
+// #1517: un documento estraneo col numero di un altro non deve diventare «quel» feedback per il giro o per Aspetta.
+test('idDelNumero: due documenti #5 → rifiuta ed elenca gli id; lettura piena → non sceglie', async () => {
+  const vere = globalThis.fetch;
+  const doc = (id, seq, sub) => ({ document: { name: `p/feedback/${id}`, fields: { seq: { integerValue: String(seq) }, ...(sub != null ? { subSeq: { integerValue: String(sub) } } : {}) } } });
+  let righe = [doc('vero', 5, null), doc('estraneo', 5, 0), doc('figlio', 5, 1)];
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '', json: async () => righe });
+  try {
+    await assert.rejects(() => FB.idDelNumero('#5'), (e) => {
+      assert.match(e.message, /#5 è il numero di 2 feedback \(vero, estraneo\)/);
+      assert.deepEqual(e.numeroDoppio, ['vero', 'estraneo']);
+      return true;
+    });
+    assert.equal(await FB.idDelNumero('5.1'), 'figlio', 'il figlio unico si trova ancora');
+    righe = [doc('vero', 5, null), ...Array.from({ length: 199 }, (_, i) => doc(`f${i}`, 5, i + 1))];
+    await assert.rejects(() => FB.idDelNumero('#5'), /non so dire se è uno solo/);
+  } finally { globalThis.fetch = vere; }
+});
+
 test('il contatore degli invii: una lettura, e «non lo so» non è zero', async () => {
   const vere = globalThis.fetch;
   try {
