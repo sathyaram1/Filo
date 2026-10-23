@@ -18,14 +18,13 @@ rules_version = '2';
 //
 // Il confine ora:
 // - Upload: chiunque manda un feedback, anche senza login — l'invio anonimo è
-//   voluto, e resta — fino a 4 MB, SOLO tipi passivi in allowlist esplicita,
-//   SOLO in creazione e SOLO su un nome che non si indovina (sotto, in
-//   dettaglio).
-//   ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-//   attivi (`text/html` con script, `image/svg+xml`). Il gate deterministico
-//   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
-//   i feedback con allegati fuori allowlist: questa regola è la cintura,
-//   quello le bretelle.
+//   voluto, e resta — fino a 4 MB, SOLO in creazione, SOLO un blob cifrato
+//   dall'app (tipo opaco, estensione fissa, nessun metadato scelto da chi
+//   carica: #1518) e SOLO su un nome che non si indovina (sotto, in dettaglio).
+//   Il tipo VERO del file lo decide il client prima di cifrare
+//   (src/shared/feedbackAttachTypes.js) e lo ricontrolla il gate L0 del server
+//   (filo-security, fileGate) sul documento del feedback: qui non c'è più una
+//   lista di tipi, perché da #602 nessun caricatore manda byte in chiaro.
 // - List: NEGATO (#583). Un elenco è una cosa diversa da un file: chiedendolo,
 //   chiunque si portava via il nome di ogni allegato mai caricato e poi il
 //   contenuto, senza sapere niente di nessun feedback. Il resto dell'audit ha
@@ -103,26 +102,11 @@ service firebase.storage {
     // in laboratorio non si riusciva a misurare (il motore degli emulatori al
     // database quella domanda non la gira).
 
-    // Tipi PASSIVI, allowlist esplicita, allineata a
-    // src/shared/feedbackAttachTypes.js.
-    // ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-    // attivi (`text/html` con script, `image/svg+xml`), eseguibili nel dominio
-    // di Google Storage quando chi fa triage apre il link.
-    function tipoPassivo() {
-      return request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
-        || request.resource.contentType == 'text/plain'
-        || request.resource.contentType == 'text/markdown'
-        || request.resource.contentType == 'text/csv'
-        || request.resource.contentType == 'application/pdf'
-        || request.resource.contentType == 'application/json'
-        // `.tsv` e `.yaml`: li dichiara così `npm run feedback:apri` (scripts/
-        // claude-feedback.mjs), che diceva di usare "la stessa allowlist" e non
-        // era vero — un allegato .yaml partiva dall'app e veniva respinto qui.
-        // Sono passivi quanto il CSV: il browser li scarica, non li esegue.
-        || request.resource.contentType == 'text/tab-separated-values'
-        || request.resource.contentType == 'application/x-yaml'
-        // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
-        || request.resource.contentType == 'application/octet-stream';
+    // Solo il tipo dei blob cifrati (#1518): con la lista dei tipi «passivi» chiunque, senza
+    // mandare un feedback, ci teneva un file qualunque dietro un link che non scade. Tipo ed
+    // estensione vengono da `SN_FEEDBACK` (src/shared/feedback.js): la sentinella li confronta.
+    function soloCifrato() {
+      return request.resource.contentType == 'application/octet-stream';
     }
 
     // Il tetto è il limite del client (4 MB per allegato, misurato sul file
@@ -134,11 +118,27 @@ service firebase.storage {
       return request.resource.size <= 4 * 1024 * 1024 + 64 * 1024;
     }
 
-    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.<estensione>.
+    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.octetstream.
     // L'uuid è la parte che non si indovina; l'etichetta facoltativa distingue
     // la provenienza (`agent_` per i ritrovamenti dell'agente esploratore).
+    // L'estensione è fissa: libera, il link diventava `fattura.exe`.
     function nomeConEntropia(file) {
-      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.[A-Za-z0-9]{1,12}$');
+      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.octetstream$');
+    }
+
+    // Nessun metadato scelto da chi carica (#1518): nome di scarico, codifica, cache, lingua,
+    // chiavi personalizzate. Il codice di scarico lo aggiunge Firebase e qui non si vede; le due
+    // forme di Content-Disposition che scrive da sé passano, il nome lo fissa lui. Il `in` serve:
+    // l'emulatore non passa cacheControl né contentLanguage, e leggerli nudi negava tutto.
+    // Motore vero: tests/rules/storage-allegati-motore-vero.mjs.
+    function senzaMetadatiScelti(r, file) {
+      return (r.metadata == null || r.metadata.size() == 0)
+        && (r.contentDisposition == null || r.contentDisposition == ''
+          || r.contentDisposition == 'inline'
+          || r.contentDisposition == "inline; filename*=utf-8''" + file)
+        && (r.contentEncoding == null || r.contentEncoding == '')
+        && (!('cacheControl' in r) || r.cacheControl == null || r.cacheControl == '')
+        && (!('contentLanguage' in r) || r.contentLanguage == null || r.contentLanguage == '');
     }
 
     match /feedback/{file} {
@@ -154,8 +154,9 @@ service firebase.storage {
 
       allow create: if resource == null
         && dimensioneAmmessa()
-        && tipoPassivo()
-        && nomeConEntropia(file);
+        && soloCifrato()
+        && nomeConEntropia(file)
+        && senzaMetadatiScelti(request.resource, file);
 
       // Un allegato non si sovrascrive e non si cancella: quello che il
       // mittente ha spedito resta quello che l'owner e i giudici leggono.

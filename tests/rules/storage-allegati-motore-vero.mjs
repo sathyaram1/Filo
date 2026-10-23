@@ -32,21 +32,20 @@
 //   npx firebase emulators:exec --only firestore,storage --project filo-prova-582 \
 //     "node storage-allegati-motore-vero.mjs"
 //
-// Esito atteso: tutte le righe verdi, uscita 0. Al primo passaggio
-// (2026-09-11) è stato così: 25/25, con una riga NOTA perché la lettura
-// dell'owner allora passava da `firestore.exists(...)` e l'emulatore quella
-// chiamata non la inoltrava. Adesso quella nota non serve più: la lettura è
-// negata a tutti, owner compreso, e il motore la sa misurare.
+// Esito atteso: tutte le righe verdi, uscita 0, più le righe NOTA di ciò che
+// l'emulatore non sa misurare. Al passaggio di #1518 (2026-10-23, firebase-tools
+// 15.34): 47/47 con due NOTE (Cache-Control e Content-Language non arrivano alle
+// regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
+// metadati prima di valutarle).
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
-// PRIMA (`git show main:storage.rules > vecchie.rules`, poi
-// `STORAGE_RULES_FILE=vecchie.rules`). Fatta il 2026-09-11: 10/23, e i tredici
-// rossi dicono esattamente il danno — senza nessun login si scaricava
-// l'allegato di un altro, si ELENCAVA feedback/ intero, si sovrascriveva un
-// file esistente, e passavano i nomi indovinabili (`screenshot.png`) e le
-// sottocartelle. Passava anche una cosa che non doveva: un allegato da 4 MB
-// tondi, una volta cifrato, veniva RIFIUTATO. Una prova che resta verde su
-// entrambe le versioni non prova niente.
+// PRIMA (`git show origin/main:storage.rules > vecchie.rules`, poi
+// `STORAGE_RULES_FILE=vecchie.rules`; `HEAD` no, sul ramo il salvataggio
+// automatico ha già le nuove). Per #1518: 27/47, e i venti rossi sono il danno
+// segnalato — senza login entravano immagini e testi in chiaro, octet-stream
+// con estensione libera (.exe, .html), un nome di scarico scelto, una chiave
+// personalizzata, una codifica; e la funzione dei metadati non c'era. Una prova
+// che resta verde su entrambe le versioni non prova niente.
 
 import {
   initializeTestEnvironment,
@@ -60,10 +59,12 @@ import { randomUUID } from 'node:crypto';
 
 const REGOLE_STORAGE = process.env.STORAGE_RULES_FILE || 'storage.rules';
 const REGOLE_FIRESTORE = process.env.FIRESTORE_RULES_FILE || 'firestore.rules';
-
+const PROGETTO = 'filo-prova-582';
+const DEPOSITO = `${PROGETTO}.appspot.com`;
+const EMULATORE = 'http://127.0.0.1:9199';
 
 const env = await initializeTestEnvironment({
-  projectId: 'filo-prova-582',
+  projectId: PROGETTO,
   firestore: { host: '127.0.0.1', port: 8089, rules: readFileSync(REGOLE_FIRESTORE, 'utf8') },
   storage: { host: '127.0.0.1', port: 9199, rules: readFileSync(REGOLE_STORAGE, 'utf8') },
 });
@@ -71,8 +72,13 @@ const env = await initializeTestEnvironment({
 await env.clearFirestore();
 await env.clearStorage();
 
+// Quello che carica l'app da #602: un blob cifrato, tipo opaco. Per le regole il
+// contenuto non conta, conta come si presenta.
+const OPACO = 'application/octet-stream';
+const BLOB = new Uint8Array([0x01, 0x04, 0x2a, 0x2a, 0x2a, 0x2a, 0x2a, 0x2a]);
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const nome = (etichetta) => `feedback/${etichetta ? `${etichetta}_` : ''}${Date.now()}_${randomUUID()}.png`;
+// Il nome come lo dà `SN_FEEDBACK.attachmentPath`, ricopiato perché la prova gira fuori dal repo.
+const nome = (etichetta, ext = 'octetstream') => `feedback/${etichetta ? `${etichetta}_` : ''}${Date.now()}_${randomUUID()}.${ext}`;
 
 // Un allegato che c'è GIÀ: è quello che l'anonimo proverà a leggere, a
 // sovrascrivere e a cancellare. Seminato con le regole spente, come farebbe un
@@ -80,7 +86,7 @@ const nome = (etichetta) => `feedback/${etichetta ? `${etichetta}_` : ''}${Date.
 const ESISTENTE = nome();
 await env.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(ctx.firestore(), 'admins', 'owner@example.com'), { added: true });
-  await uploadBytes(ref(ctx.storage(), ESISTENTE), PNG, { contentType: 'image/png' });
+  await uploadBytes(ref(ctx.storage(), ESISTENTE), BLOB, { contentType: OPACO });
 });
 
 const owner = env.authenticatedContext('uid-owner', { email: 'owner@example.com', email_verified: true });
@@ -101,15 +107,30 @@ async function prova(nomeProva, attesa, fn) {
   }
 }
 
-const carica = (ctx, percorso, byte = PNG, tipo = 'image/png') => () =>
-  uploadBytes(ref(ctx.storage(), percorso), byte, { contentType: tipo });
+const carica = (ctx, percorso, byte = BLOB, metadati = { contentType: OPACO }) => () =>
+  uploadBytes(ref(ctx.storage(), percorso), byte, metadati);
+
+/**
+ * Il caricamento come lo fa l'app (src/shared/feedback.js → uploadImage): POST
+ * `uploadType=media`, senza login, nessun metadato oltre al tipo. Torna il
+ * codice di scarico, che è la sola chiave dell'allegato: senza, è un rifiuto.
+ */
+function caricaComeLApp(percorso, tipo = OPACO) {
+  return async () => {
+    const r = await fetch(`${EMULATORE}/v0/b/${DEPOSITO}/o?uploadType=media&name=${encodeURIComponent(percorso)}`, {
+      method: 'POST', headers: { 'Content-Type': tipo }, body: BLOB,
+    });
+    if (r.status === 403) throw Object.assign(new Error('PERMISSION_DENIED'), { code: 'permission-denied' });
+    if (!r.ok) throw new Error(`deposito ${r.status}`);
+    const j = await r.json();
+    if (!j.downloadTokens) throw new Error('accettato senza codice di scarico');
+    return j;
+  };
+}
 
 /**
  * Quello che questo attrezzo non sa provare: si scrive, non si finge.
- * Oggi non ce n'è (l'ultima nota era la lettura dell'owner, ora misurabile):
- * resta qui perché la prossima cosa non provabile va DICHIARATA, non taciuta.
  */
-// eslint-disable-next-line no-unused-vars
 function nota(riga) { esiti.push(['NOTA ', riga]); }
 
 // ── La porta che la segnalazione voleva chiusa ──────────────────────────────
@@ -119,14 +140,9 @@ await prova('allegato esistente — lettura da account Google qualunque: NEGATA'
   () => getBytes(ref(googleQualunque.storage(), ESISTENTE)));
 await prova('allegato esistente — lettura da login anonimo: NEGATA', 'ko',
   () => getBytes(ref(anonimo.storage(), ESISTENTE)));
-// L'owner NON fa eccezione, e questa è l'unica misura che prima non si poteva
-// prendere. Finché la lettura era riservata all'allowlist `admins`, quella riga
-// dipendeva da `firestore.exists(...)` e l'emulatore non la sapeva valutare:
-// restava dichiarata come non provata, giro dopo giro. Ora la lettura è negata a
-// tutti e il motore lo dice. La dashboard vede comunque gli allegati, perché li
-// apre col download token dentro l'URL salvato nel feedback (valutato da
-// Firebase PRIMA delle regole), e il server dei giudici con l'Admin SDK, che le
-// regole non le guarda affatto.
+// L'owner NON fa eccezione: la dashboard apre gli allegati col download token
+// dentro l'URL salvato nel feedback (valutato da Firebase PRIMA delle regole),
+// e il server dei giudici con l'Admin SDK, che le regole non le guarda affatto.
 await prova('allegato esistente — lettura dell’owner: NEGATA anche a lui', 'ko',
   () => getBytes(ref(owner.storage(), ESISTENTE)));
 
@@ -149,41 +165,111 @@ await prova('cancellazione di un allegato esistente: NEGATA', 'ko',
   () => deleteObject(ref(googleQualunque.storage(), ESISTENTE)));
 
 // ── Quello che NON deve essersi rotto: l'invio anonimo di un feedback ───────
-await prova('allegato NUOVO da chi manda un feedback senza login: OK', 'ok',
+await prova('blob cifrato come lo carica l’app, senza login: OK e col codice di scarico', 'ok',
+  caricaComeLApp(nome()));
+await prova('blob cifrato dalla libreria di Firebase, solo col tipo: OK', 'ok',
   carica(fuori, nome()));
 await prova('allegato NUOVO etichettato (agente esploratore): OK', 'ok',
-  carica(fuori, nome('agent')));
-await prova('documento passivo (application/pdf): OK', 'ok',
-  carica(fuori, nome().replace(/\.png$/, '.pdf'), PNG, 'application/pdf'));
-await prova('blob cifrato (application/octet-stream): OK', 'ok',
-  carica(fuori, nome().replace(/\.png$/, '.bin'), PNG, 'application/octet-stream'));
-// I due tipi che `npm run feedback:apri` dichiara e che il bucket respingeva.
-await prova('tabella .tsv (text/tab-separated-values): OK', 'ok',
-  carica(fuori, nome().replace(/\.png$/, '.tsv'), PNG, 'text/tab-separated-values'));
-await prova('configurazione .yaml (application/x-yaml): OK', 'ok',
-  carica(fuori, nome().replace(/\.png$/, '.yaml'), PNG, 'application/x-yaml'));
+  caricaComeLApp(nome('agent')));
 await prova('allegato da 4 MB tondi, cifrato (col preambolo sfora di poco): OK', 'ok',
-  carica(fuori, nome().replace(/\.png$/, '.bin'), new Uint8Array(4 * 1024 * 1024 + 90), 'application/octet-stream'));
+  carica(fuori, nome(), new Uint8Array(4 * 1024 * 1024 + 90)));
+// Le due forme che Firebase scrive da sé: ammesse perché il nome lo fissa lui.
+{
+  const n = nome();
+  await prova('Content-Disposition di serie (inline): OK', 'ok',
+    carica(fuori, nome(), BLOB, { contentType: OPACO, contentDisposition: 'inline' }));
+  await prova('Content-Disposition di serie col nome dell’oggetto: OK', 'ok',
+    carica(fuori, n, BLOB, { contentType: OPACO, contentDisposition: `inline; filename*=utf-8''${n.split('/')[1]}` }));
+}
+
+// ── Byte in chiaro: rifiutati, con qualunque nome (#1518) ───────────────────
+await prova('immagine in chiaro, senza login (image/png, .png): NEGATA', 'ko',
+  carica(fuori, nome('', 'png'), PNG, { contentType: 'image/png' }));
+await prova('immagine in chiaro col nome giusto (image/png, .octetstream): NEGATA', 'ko',
+  carica(fuori, nome(), PNG, { contentType: 'image/png' }));
+await prova('testo in chiaro come lo caricherebbe l’app (text/plain): NEGATO', 'ko',
+  caricaComeLApp(nome('', 'txt'), 'text/plain'));
+for (const [ext, tipo] of [['pdf', 'application/pdf'], ['tsv', 'text/tab-separated-values'], ['yaml', 'application/x-yaml'], ['json', 'application/json']]) {
+  await prova(`documento in chiaro (${tipo}): NEGATO`, 'ko',
+    carica(fuori, nome('', ext), BLOB, { contentType: tipo }));
+}
+
+// ── Il tipo opaco con un nome che non è quello dell'app ─────────────────────
+for (const ext of ['bin', 'exe', 'png', 'html', 'octetstreamx']) {
+  await prova(`octet-stream con estensione .${ext}: NEGATO`, 'ko',
+    caricaComeLApp(nome('', ext)));
+}
+
+// ── Metadati scelti da chi carica (#1518) ───────────────────────────────────
+await prova('nome di scarico scelto (attachment; filename="fattura.exe"): NEGATO', 'ko',
+  carica(fuori, nome(), BLOB, { contentType: OPACO, contentDisposition: 'attachment; filename="fattura.exe"' }));
+await prova('nome di scarico travestito da quello di serie (inline; fattura.exe): NEGATO', 'ko',
+  carica(fuori, nome(), BLOB, { contentType: OPACO, contentDisposition: "inline; filename*=utf-8''fattura.exe" }));
+await prova('chiave personalizzata (un segno «già sistemato»): NEGATA', 'ko',
+  carica(fuori, nome(), BLOB, { contentType: OPACO, customMetadata: { filoSistemato: 'si' } }));
+await prova('codifica scelta (Content-Encoding: gzip): NEGATA', 'ko',
+  carica(fuori, nome(), BLOB, { contentType: OPACO, contentEncoding: 'gzip' }));
+nota('Cache-Control e Content-Language scelti: l’emulatore non li passa alle regole, quindi qui passano. '
+  + 'La riga c’è, e la sua espressione si prova più sotto su una risorsa scritta a mano.');
+nota('Codice di scarico scelto da chi carica: l’emulatore lo toglie dai metadati prima delle regole e lo usa come codice. '
+  + 'Se il motore vero lo lasciasse vedere, la stessa riga che vieta le chiavi personalizzate lo rifiuterebbe (provato più sotto).');
 
 // ── Nomi: il percorso deve restare non indovinabile ─────────────────────────
-await prova('nome indovinabile (screenshot.png): NEGATO', 'ko',
-  carica(fuori, 'feedback/screenshot.png'));
+await prova('nome indovinabile (screenshot.octetstream): NEGATO', 'ko',
+  carica(fuori, 'feedback/screenshot.octetstream'));
 await prova('nome col solo timestamp: NEGATO', 'ko',
-  carica(fuori, `feedback/${Date.now()}.png`));
+  carica(fuori, `feedback/${Date.now()}.octetstream`));
 await prova('sottocartella di feedback/: NEGATA', 'ko',
-  carica(fuori, `feedback/sotto/${Date.now()}_${randomUUID()}.png`));
+  carica(fuori, `feedback/sotto/${Date.now()}_${randomUUID()}.octetstream`));
 await prova('fuori da feedback/: NEGATO', 'ko',
-  carica(fuori, `pubblico/${Date.now()}_${randomUUID()}.png`));
+  carica(fuori, `pubblico/${Date.now()}_${randomUUID()}.octetstream`));
 
 // ── Tipi attivi e dimensione ────────────────────────────────────────────────
 await prova('text/html (documento ATTIVO nel dominio di Storage): NEGATO', 'ko',
-  carica(fuori, nome().replace(/\.png$/, '.html'), PNG, 'text/html'));
+  carica(fuori, nome(), PNG, { contentType: 'text/html' }));
 await prova('image/svg+xml (può contenere script): NEGATO', 'ko',
-  carica(fuori, nome().replace(/\.png$/, '.svg'), PNG, 'image/svg+xml'));
+  carica(fuori, nome(), PNG, { contentType: 'image/svg+xml' }));
 await prova('allegato oltre il tetto (5 MB): NEGATO', 'ko',
-  carica(fuori, nome().replace(/\.png$/, '.bin'), new Uint8Array(5 * 1024 * 1024), 'application/octet-stream'));
+  carica(fuori, nome(), new Uint8Array(5 * 1024 * 1024)));
 
 await env.cleanup();
+
+// ── L'espressione dei metadati, sui campi che l'emulatore non passa ─────────
+// Le stesse regole, più un blocco che chiama `senzaMetadatiScelti` su una
+// risorsa scritta a mano: così il motore vero valuta anche i campi che dal
+// caricamento non gli arrivano. Il blocco vive solo in questa seconda copia.
+const CASI = {
+  'di-serie': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'metadati-assenti': ["{'metadata': null, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'campi-vuoti': ["{'metadata': {}, 'contentDisposition': '', 'contentEncoding': '', 'cacheControl': '', 'contentLanguage': ''}", 'ok'],
+  'cache-nulla': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': null, 'contentLanguage': null}", 'ok'],
+  'cache-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': 'public, max-age=31536000'}", 'ko'],
+  'lingua-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'contentLanguage': 'it'}", 'ko'],
+  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ko'],
+};
+const regole = readFileSync(REGOLE_STORAGE, 'utf8');
+const coda = regole.lastIndexOf('match /{path=**}');
+const blocco = `match /espressione/{caso} {\n      allow create: if ${Object.entries(CASI)
+  .map(([caso, [risorsa]]) => `(caso == '${caso}' && senzaMetadatiScelti(${risorsa}, 'n.octetstream'))`)
+  .join('\n        || ')};\n    }\n\n    `;
+let env2 = null;
+try {
+  env2 = await initializeTestEnvironment({
+    projectId: PROGETTO,
+    storage: { host: '127.0.0.1', port: 9199, rules: regole.slice(0, coda) + blocco + regole.slice(coda) },
+  });
+} catch (e) {
+  // Con regole che la funzione non ce l'hanno (la controprova) il blocco non compila: è un rosso, non un crollo.
+  esiti.push(['ROSSO', `espressione dei metadati: regole senza senzaMetadatiScelti — ${String(e && e.message).slice(0, 160)}`]);
+}
+if (env2) {
+  const fuori2 = env2.unauthenticatedContext();
+  for (const [caso, [, attesa]] of Object.entries(CASI)) {
+    await prova(`espressione dei metadati, ${caso}: ${attesa === 'ok' ? 'OK' : 'NEGATO'}`, attesa,
+      carica(fuori2, `espressione/${caso}`));
+  }
+  await env2.cleanup();
+}
 
 let rossi = 0;
 let note = 0;

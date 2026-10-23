@@ -9,7 +9,7 @@
   const Popup = global.SN_POPUP;
   const Feedback = global.SN_FEEDBACK;
   const Icons = global.SN_ICONS || {};
-  // Allowlist condivisa dei tipi di allegato (stessa lista di storage.rules).
+  // Allowlist condivisa dei tipi di allegato: decide qui, prima della cifratura.
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
   // Vale sia per «Allega» sia per il drag & drop.

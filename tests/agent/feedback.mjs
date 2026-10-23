@@ -3,7 +3,6 @@
 // quindi senza credenziale non parte niente. Testo, indirizzo e mittente viaggiano cifrati come dall'app (#602).
 
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -18,6 +17,9 @@ const __repoRoot = join(__agentDir, '..', '..');
 const __require = createRequire(import.meta.url);
 __require(join(__repoRoot, 'src', 'shared', 'feedbackPublicKey.js'));
 const CRYPTO = __require(join(__repoRoot, 'src', 'shared', 'feedbackCrypto.js'));
+// Nome e tipo dell'allegato dalla stessa fonte dell'app: storage.rules ammette solo quelli (#1518).
+__require(join(__repoRoot, 'src', 'shared', 'feedback.js'));
+const FB = globalThis.SN_FEEDBACK;
 
 // Stessi valori (pubblici) di src/shared/feedback.js.
 const PROJECT_ID = 'filo-8b9cb';
@@ -42,12 +44,10 @@ function toFsValue(v) {
 }
 
 // Il nome NON è libero: storage.rules concede la creazione solo su
-// `<etichetta_>?<millisecondi>_<uuid>.<estensione>` (l'uuid è ciò che rende il
-// percorso non indovinabile, #582). La forma canonica è
-// `SN_FEEDBACK.attachmentPath`; qui è ricopiata perché questo file è un
-// utensile a sé, e la sentinella tests/unit/storageRulesAllegati.test.mjs prova
-// anche la variante con etichetta.
-async function uploadImage(buffer, mime = 'image/png') {
+// `<etichetta_>?<millisecondi>_<uuid>.octetstream` (l'uuid è ciò che rende il
+// percorso non indovinabile, #582; estensione e tipo fissi, #1518). La sentinella
+// tests/unit/storageRulesAllegati.test.mjs prova questo caricamento.
+async function uploadImage(buffer) {
   // Cifratura obbligatoria, come nell'app (#602): se non si può cifrare non si
   // carica. Chi chiama (`pushIssue`) tratta l'errore come «niente immagine» e
   // la segnalazione parte lo stesso, senza lo screenshot.
@@ -58,15 +58,13 @@ async function uploadImage(buffer, mime = 'image/png') {
   if (!CRYPTO.isEncryptedBytes(sealed)) {
     throw new Error('cifratura non riuscita: lo screenshot non risulta cifrato');
   }
-  // Il contenuto cifrato è opaco: viaggia come octet-stream (è il tipo che
-  // storage.rules ammette per i blob cifrati) e la dashboard ne indovina il
-  // formato dai primi byte dopo averlo decifrato.
-  const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
-  const name = `${COLLECTION}/agent_${Date.now()}_${randomUUID()}.${ext}`;
+  // Il contenuto cifrato è opaco: la dashboard ne indovina il formato dai primi
+  // byte dopo averlo decifrato.
+  const name = FB.attachmentPath('agent');
   const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
+    headers: { 'Content-Type': FB.ATTACHMENT_CONTENT_TYPE },
     body: sealed,
   });
   if (!res.ok) throw new Error(`upload storage ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);

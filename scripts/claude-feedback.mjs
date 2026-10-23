@@ -65,6 +65,7 @@ import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
+import '../src/shared/feedbackAttachTypes.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
@@ -77,9 +78,9 @@ const FB = globalThis.SN_FEEDBACK;
 /** Il mittente con cui si firma una sessione locale. Fonte unica: shared. */
 export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
 
-// Tipo dichiarato per estensione: la stessa allowlist del gate deterministico
-// sugli allegati (filo-security, L0 fileGate) e delle storage.rules. Fuori da
-// qui il feedback diventerebbe `suspicious_file`: meglio fermarsi prima.
+// Tipo dichiarato per estensione; se ammetterlo lo decide `SN_FEEDBACK_ATTACH.classify`, l'elenco
+// unico del riquadro e della pagina dei feedback, a cui resta allineato il gate L0 del server
+// (filo-security, fileGate). Fuori da lì il feedback diventerebbe `suspicious_file`.
 // ⚠️ Tabella SENZA eredità, per lo stesso motivo di `PREFISSI_ALLEGATO` in
 // src/shared/feedback.js (#582, giro 7): la chiave è l'estensione di un nome di
 // file, e una tabella normale contiene già `__proto__` e `constructor` senza che
@@ -102,7 +103,9 @@ export function mimeDiAllegato(nome) {
   // `typeof === 'string'` e non `|| ''`: da qui esce il tipo che finisce nel
   // `data:` dell'allegato e poi nella richiesta al deposito. Quello che non è
   // una stringa non è un tipo, ed è un allegato da rifiutare.
-  return typeof tipo === 'string' ? tipo : '';
+  if (typeof tipo !== 'string') return '';
+  const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
+  return ATTACH && ATTACH.classify({ name: String(nome || ''), type: tipo }) ? tipo : '';
 }
 
 /**

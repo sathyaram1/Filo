@@ -32,6 +32,7 @@ import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { PUNTI_DI_CARICAMENTO, chiCaricaNelDeposito } from '../helpers/puntiDiCaricamento.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -309,11 +310,13 @@ test('ogni punto che carica nel deposito passa dalla cifratura', async () => {
   // per ultima è già costato dei giri interi altrove. Chi apre una POST verso
   // il deposito deve stare in un file che la cifratura la usa davvero.
   const { readFileSync } = await import('node:fs');
-  const sorgenti = [
-    join(ROOT, 'src', 'shared', 'feedback.js'),
-    join(ROOT, 'tests', 'agent', 'feedback.mjs'),
-  ];
-  for (const f of sorgenti) {
+  // L'elenco è quello condiviso con storageRulesAllegati, e deve contenere ogni file che carica davvero.
+  const scansione = chiCaricaNelDeposito(ROOT);
+  for (const f of scansione) {
+    assert.ok(PUNTI_DI_CARICAMENTO.includes(f), `${f} carica nel deposito ma non sta in tests/helpers/puntiDiCaricamento.mjs`);
+  }
+  for (const rel of PUNTI_DI_CARICAMENTO) {
+    const f = join(ROOT, ...rel.split('/'));
     const src = readFileSync(f, 'utf8');
     assert.match(src, /uploadType=media/, `${f} doveva essere un punto di caricamento`);
     assert.match(
