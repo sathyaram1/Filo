@@ -485,6 +485,17 @@ function crea(dip = {}) {
     return Promise.all([...inVolo]).then(() => salva(), () => salva());
   }
 
+  // Una scheda chiusa riaperta (`voce` d'archivio): chi l'aveva chiusa e da quanto. Da ogni strada che la riapre, perché
+  // una chiusa dalla pulizia e riaperta subito è un suo errore.
+  function riaperta(voce, { incognito = null } = {}) {
+    if (!voce) return false;
+    const chiusa = Date.parse(voce.closedAt);
+    return attivita('riaperte', {
+      chiusaDa: C.chiusaDa(voce.reason, voce.chiusaDaSola),
+      etaMs: Number.isFinite(chiusa) ? Math.max(0, adesso() - chiusa) : null,
+    }, { incognito });
+  }
+
   // Una riga di memoria corretta dalla persona: `riga` è quella di SN_FILO_MEMORY.descriviRiga, col modulo e la data.
   function memoriaCorretta(via, operazione, riga) {
     if (!riga && operazione !== 'svuota') return false;
