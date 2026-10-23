@@ -583,6 +583,8 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   // Una scheda che non mostra testo (il visore di un PDF, una pagina ancora bianca) non è l'ultima parola: si prova
   // anche a scaricarla, e se nemmeno la rete la dà si riferisce la scheda vuota.
   let schedaVuota = null;
+  // La scheda c'era ma non ha risposto in tempo: quello che arriva dalla rete non è la pagina che l'utente ha davanti.
+  let schedaNonRisponde = false;
   const scheda = trovaScheda(url, schede);
   if (scheda) {
     const chiave = `${scheda.wc.id}|${url}`;
