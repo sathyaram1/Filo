@@ -11,6 +11,9 @@ require('../../shared/feedbackThread.js');
 require('../../shared/routineSessioni.js');
 // Registra SN_ROUTINE_MODELLI: modello e sforzo per fase, stesse regole della pagina.
 require('../../shared/routineModelli.js');
+// Registra SN_SPESA_GIUDICI (#1515), che legge i numeri con SN_CAMPO_NUMERO: stesse regole della pagina.
+require('../../shared/campoNumero.js');
+require('../../shared/spesaGiudici.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
