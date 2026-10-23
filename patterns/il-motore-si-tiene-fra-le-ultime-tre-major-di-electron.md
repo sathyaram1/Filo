@@ -26,7 +26,7 @@ salto si alzano lì `MAJOR` e `USCITA_STABILE`.
 
 ## Le patch della stessa major
 
-Le correzioni di Chromium arrivano nelle patch di Electron (dalla 44.7.0 alla 44.9.3, in due settimane, quattro giri di
+Le correzioni di Chromium arrivano nelle patch di Electron (dalla 44.7.0 alla 44.9.3, in due settimane, più di cento
 correzioni di Chromium, V8 e PDFium), e quasi mai diventano un avviso sul pacchetto npm: gli avvisi di Dependabot non le
 vedono. Il lockfile le ferma, perché la pubblicazione installa con `npm ci`. Ogni sei ore, nel lavoro `scegli` della
 pubblicazione, `scripts/motore-ultima-patch.mjs` confronta il lockfile con l'ultima stabile della stessa major
