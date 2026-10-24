@@ -456,6 +456,27 @@ test('se il ramo è andato avanti l’avviso lo dice, e non finge di aver pubbli
   await expect(status).not.toContainText(/su main/);
 });
 
+test('#1497: la richiesta di un ramo del server lo dice, e il sì racconta che la fusione la porta il server', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, {
+    pending: [richiesta({ repo: 'server', who: 'cancello del server', blocks: [
+      { gate: 'guard_the_guards', label: 'Tocca aree protette (guardie, regole del database, chiavi, automatismi)', items: ['functions/src/l5/gates.js'], more: 0 },
+    ] })],
+    approveReply: { ok: true, result: 'server', esito: 'server:attesa_suite' },
+  });
+  const ramo = page.locator('#mgMergeApprovalsOrphans .sn-mac-branch');
+  await expect(ramo).toHaveText('server · claude/approvazione-fusioni', { timeout: 8_000 });
+  await expect(ramo).toHaveAttribute('title', /filo-security/);
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac').first().screenshot({ path: 'tests/.shots/merge-approvals-server-1497.png' }).catch(() => {});
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
+  await btn.click();
+  await btn.click();
+  const status = page.locator('#mgMergeApprovalsOrphans .sn-mac-status');
+  await expect(status).toContainText(/Approvata: il server riprende/, { timeout: 8_000 });
+  await expect(status).not.toContainText(/inatteso|nessuna fusione/i);
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac').first().screenshot({ path: 'tests/.shots/merge-approvals-server-1497-dopo.png' }).catch(() => {});
+});
+
 test('un guasto del server non diventa un “fatto”: si dice, e la richiesta resta', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriGestione(page, {
