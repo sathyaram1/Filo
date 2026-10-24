@@ -405,19 +405,36 @@
     return out;
   }
 
+  // Il costo in dollari che il router dichiara, null se non lo dice. Con una chiave del fornitore data a OpenRouter
+  // (BYOK, #1582) `cost` è solo la sua commissione: il resto, `upstream_inference_cost`, conta lo stesso nel tetto.
+  const numeroDetto = (v) => (v == null || v === '' ? NaN : Number(v));
+  function costoDichiarato(cost, byok, upstream, parti) {
+    const c = Number(cost);
+    const base = Number.isFinite(c) ? c : null;
+    if (byok !== true) return base;
+    let up = numeroDetto(upstream);
+    if (!Number.isFinite(up)) up = (parti || []).map(numeroDetto).filter(Number.isFinite).reduce((a, b) => a + b, 0);
+    return up > 0 ? (base || 0) + up : base;
+  }
+
+  function costoDaUsage(usage) {
+    const u = usage && typeof usage === 'object' ? usage : {};
+    const d = u.cost_details && typeof u.cost_details === 'object' ? u.cost_details : {};
+    return costoDichiarato(u.cost, u.is_byok, d.upstream_inference_cost, [d.upstream_inference_prompt_cost, d.upstream_inference_completions_cost]);
+  }
+
+  // 0 se assente: chi lo legge sa che deve stimare.
+  function costUsdOf(usage) {
+    const c = costoDaUsage(usage);
+    return Number.isFinite(c) && c > 0 ? c : 0;
+  }
+
   // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
   // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
   // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
   // riuso). È la sola prova che il prefisso immutabile dei prompt sta davvero
   // funzionando: senza questo numero "riuso a zero" e "riuso pieno" sono
   // indistinguibili.
-  // Il costo in dollari che il router dichiara (`usage.cost`, con
-  // `usage.include`). 0 se assente: chi lo legge sa che deve stimare.
-  function costUsdOf(usage) {
-    const c = usage && Number(usage.cost);
-    return Number.isFinite(c) && c > 0 ? c : 0;
-  }
-
   function cachedPromptTokens(usage) {
     if (!usage || typeof usage !== 'object') return 0;
     const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
@@ -1039,7 +1056,7 @@
         cachedPromptTokens: 0,
         seconds: Number(usage.seconds) || 0,
         // Per l'audio non ci sono token: l'unico numero sensato è il costo in dollari del router.
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        costUsd: costoDaUsage(usage),
         keySource, keyFallback,
       },
     };
@@ -1073,7 +1090,7 @@
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: 0,
         cachedPromptTokens: 0,
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        costUsd: costoDaUsage(usage),
         keySource, keyFallback,
       },
     };
@@ -1105,7 +1122,7 @@
         completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
         cachedPromptTokens: cachedPromptTokens(usage),
         cacheDetta: cacheDetta(usage),
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        costUsd: costoDaUsage(usage),
         keySource, keyFallback,
       },
     };
@@ -1123,8 +1140,7 @@
     if (!res.ok) throw await httpError(res);
     const data = (await res.json()).data || {};
     const name = typeof data.provider_name === 'string' ? data.provider_name.trim() : '';
-    const cost = Number(data.total_cost);
-    return { servedBy: name || null, costUsd: Number.isFinite(cost) ? cost : null };
+    return { servedBy: name || null, costUsd: costoDichiarato(data.total_cost, data.is_byok, data.upstream_inference_cost) };
   }
 
   // ─── Cosa sa OpenRouter di una chiave ─────────────────────────────────────
