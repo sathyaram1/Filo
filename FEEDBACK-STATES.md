@@ -431,10 +431,10 @@ fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
-corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
-aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
-lavoro per regola: quello è `locale`, e la sua nota dice quale regola lo tiene
-fuori dalla cloud. La risposta dell'owner appende
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): la
+consegna porta la domanda col gruppo del guasto (#1577; senza, è rifiutata).
+Non è lavoro per regola: quello è `locale`, e la sua nota dice quale regola lo
+tiene fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
@@ -447,7 +447,7 @@ e non apre richieste (esiti `mosso`, `senza_controllo`), la pratica resta dov'è
 e il pentagono propone di rimandarla in lavorazione.
 
 **Le attese con la loro domanda (#1358, SPEC-DOMANDE §3.8).** Ogni fermata dei casi (2),
-(2b), (3), (5), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
+(2b), (3), (5), (6), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
 o `origine_mancante` apre una domanda per l'owner e il feedback prende `domandaId`,
 restando nello stato e col motivo di prima: la macchina a stati non cambia. Dal canale la
 domanda nasce nella stessa transazione dello stato (quella scritta da chi si ferma con
@@ -460,9 +460,19 @@ dettaglio la casella di risposta lascia il posto al tasto «Rispondi alla domand
 risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo testo) lo
 riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
 domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
-`domandaId`: `secaudit`, `l5`, `guasto`, `fidato`, attacchi, spam e file sospetti. Le
+`domandaId`: `secaudit`, `l5`, `fidato`, attacchi, spam e file sospetti. Le
 attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti
-(`npm run domande:migra`, a secco; `-- --dal-vero` per creare).
+(`npm run domande:migra`, a secco; `-- --dal-vero` per creare); un guasto di prima, che
+nominava la domanda solo nella nota, la adotta.
+
+**Le domande che fermano un lavoro in coda (#1577, SPEC-DOMANDE §3.1 `blocca`).** Fuori
+dalle fermate lo stato non cambia: un `todo` o un ramo in revisione con una domanda
+bloccante aperta tiene il suo id in `domandeBloccanti` (lo scrive solo il server, nella
+transazione che cambia la domanda), nessuna routine lo prende, e in dashboard sta in
+**Aspettano** col segno «aspetta D-n». Alla risposta l'id esce dall'elenco e il lavoro
+riparte con la decisione. La ripresa non sposta un `working` né un ramo in revisione (la
+decisione si accoda per il giro dopo); un `done` torna `todo` se la scelta non è la
+provvisoria di una domanda non bloccante, altrimenti la risposta dice «non serviva».
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
 dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel

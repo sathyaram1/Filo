@@ -22,11 +22,13 @@ gruppo scritto come al passo 1.
    <causa> <nome>`, la causa fra `credenziali` `clone` `rete` `servizio`
    `strumento` `permessi`, il nome il programma fallito o l'host che non
    risponde, minuscolo (`guasto: rete openrouter.ai`).
-   `node scripts/domanda.mjs chiedi <file.json>` risponde `OK: domanda D-<n>
-   aperta.`; con `RIFIUTATO dal server: …`, al posto del numero va quel
-   messaggio esatto.
-2. Chi risolve o corregge mette il feedback in attesa (sezione «Il feedback
-   fermo per un guasto»); per gli altri torna in coda da sé.
+   Chi risolve o corregge la consegna insieme alla fermata (passo 2), e il
+   numero `D-<n>` lo stampa la risposta della consegna. Gli altri la aprono con
+   `node scripts/domanda.mjs chiedi <file.json>`, con `"blocca": false` (il
+   lavoro torna in coda da sé), che risponde `OK: domanda D-<n> aperta.`; con
+   `RIFIUTATO dal server: …`, al posto del numero va quel messaggio esatto.
+2. Chi risolve o corregge mette il feedback in attesa con la domanda (sezione
+   «Il feedback fermo per un guasto»); per gli altri torna in coda da sé.
 3. La domanda di fine sessione, poi `node scripts/routine-channel.mjs release
    <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>: <messaggio>"`.
 

@@ -96,9 +96,9 @@
     return troppo || { ok: true, valore: input[campo] };
   }
 
-  const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo']);
+  const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
-  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito']);
+  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
   function validaOpzione(o, i) {
@@ -247,6 +247,10 @@
       collegamenti.push(r.collegamento);
     }
     const domanda = Object.assign({ titolo, priorita: input.priorita, opzioni, consiglio, collegamenti }, testi);
+    if (input.blocca != null) {
+      if (typeof input.blocca !== 'boolean') return no('domanda_non_valida', '«blocca» è true o false: dice se la domanda ferma il lavoro finché l’owner non risponde');
+      domanda.blocca = input.blocca;
+    }
     if (conOrigine && input.origine != null) {
       const o = input.origine;
       const id = isOggetto(o) && typeof o.id === 'string' ? o.id.trim() : '';
@@ -258,6 +262,32 @@
     const sporco = controllaTestoOwner(domanda);
     if (sporco) return sporco;
     return { ok: true, domanda };
+  }
+
+  /** Un'opzione riprende il lavoro su `feedbackId` ('' = su qualunque feedback). PURA. */
+  function riprende(domanda, feedbackId = '') {
+    return (isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : [])
+      .some((o) => isOggetto(o) && isOggetto(o.azione) && o.azione.tipo === 'riprendi' && (!feedbackId || o.azione.feedbackId === feedbackId));
+  }
+
+  const BLOCCA_REGOLA = 'Blocca (true) se andare avanti con la consigliata, e poi l’owner sceglie altro, lascia un danno che un altro giro '
+    + 'non rimedia (soldi, dati dell’utente, sicurezza e segreti, politica sui modelli, terzi, account e credenziali), o se serve un fatto '
+    + 'che sa solo l’owner; nel dubbio blocca. Non blocca (false): il lavoro va avanti con la consigliata come decisione provvisoria';
+
+  /**
+   * Chi apre una domanda che riprende il lavoro su `feedbackId` dice se lo ferma (#1577); null se la domanda è in
+   * regola. `feedbackId` '' vale per qualunque feedback ripreso. PURA.
+   */
+  function controllaBlocca(domanda, feedbackId = '') {
+    const d = isOggetto(domanda) ? domanda : {};
+    const lega = riprende(d, feedbackId);
+    if (lega && typeof d.blocca !== 'boolean') {
+      return no('blocca_mancante', `manca «blocca»: la domanda riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}, dì se lo ferma finché l’owner non risponde. ${BLOCCA_REGOLA}`);
+    }
+    if (!lega && d.blocca === true) {
+      return no('blocca_senza_ripresa', `«blocca» vale per una domanda che riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}: aggiungi l’opzione «riprendi», o togli «blocca»`);
+    }
+    return null;
   }
 
   function riferimentoDi(riferimenti, id) {
@@ -344,7 +374,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi,
+    validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

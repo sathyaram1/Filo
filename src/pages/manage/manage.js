@@ -2752,8 +2752,12 @@
   function domandaBadgeHtml(fb) {
     const id = MR.aspettaDomanda(fb);
     if (!id) return '';
-    const motivo = MR.reasonText(MR.normalizeStatus(fb).statusReason);
-    const titolo = `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
+    // Fermo in coda su una domanda (#1577): il motivo è lei, non lo stato.
+    const ferme = MR.domandeBloccantiDi(fb);
+    const motivo = ferme.includes(id) ? '' : MR.reasonText(MR.normalizeStatus(fb).statusReason);
+    const titolo = ferme.includes(id)
+      ? `Nessuna routine lo prende finché non rispondi ${ferme.length > 1 ? `alle domande ${ferme.join(', ')}` : `alla domanda ${id}`}: apri ${id}`
+      : `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
     return `<button type="button" class="mg-domanda-badge" data-domanda="${esc(id)}" title="${esc(titolo)}" aria-label="${esc(titolo)}">aspetta ${esc(id)}</button>`;
   }
 
@@ -2859,10 +2863,14 @@
     // vera.
     // Chi aspetta altri feedback non lo prende nessuno finché non sono fusi: né un verificatore né il rientro in coda.
     const aspetta = !!(ATT && fb && ATT.aspettaAncora(fb, trovaAtteso));
+    // Così chi è fermo su una domanda bloccante (#1577): riparte alla risposta.
+    const ferme = fb && MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) ? MR.domandeBloccantiDi(fb) : [];
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
-          aspetta
+          ferme.length
+            ? esc(`Nessuna istanza al lavoro: riparte quando rispondi a ${ferme.join(', ')}`)
+            : aspetta
             ? 'Nessuna istanza al lavoro: riparte quando quelli che aspetta sono fusi'
             : progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'

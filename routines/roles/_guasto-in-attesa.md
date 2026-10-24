@@ -15,8 +15,6 @@ per lui»:
   "opzioni": [
     { "testo": "Riprendere quando il guasto è riparato", "pro": "<…>", "contro": "<…>",
       "azione": { "tipo": "riprendi", "feedbackId": "<payload.id>" } },
-    { "testo": "Affidare la riparazione a un agente", "pro": "<cosa può riparare un agente col repo>", "contro": "<…>",
-      "azione": { "tipo": "compito" } },
     { "testo": "Archiviare il feedback", "pro": "<…>", "contro": "<…>",
       "azione": { "tipo": "archivia", "feedbackId": "<payload.id>" } }
   ],
@@ -26,18 +24,21 @@ per lui»:
 }
 ```
 
-Le tre strade sono un modello: tieni quelle che per questo guasto hanno un
-pro vero. La riparazione (azione `compito`, SPEC-DOMANDE § 3.3: la domanda passa
-a un agente col repo) si toglie quando la causa sta fuori dal repo, come una
-credenziale o un'impostazione dell'owner. `consiglio.opzione` è l'indice di
-quella che sceglieresti.
+Le strade sono un modello: tieni quelle che per questo guasto hanno un pro
+vero, e ognuna sblocca questo lavoro (`riprendi` o `archivia` su
+`payload.id`). Una riparazione che un agente col repo può fare la proponi in
+una domanda a parte (`domanda.mjs chiedi`, azione `compito`, senza `blocca`).
+`consiglio.opzione` è l'indice di quella che sceglieresti.
 
-Sul PC dell'owner non lavora nessuno: farlo «in locale» non è una strada da offrire. Poi il feedback aspetta
-l'owner col motivo `guasto`, non `locale`:
+Sul PC dell'owner non lavora nessuno: farlo «in locale» non è una strada da
+offrire. La domanda va con la consegna, non con `domanda.mjs chiedi`: il server
+la apre nella stessa scrittura della fermata, col motivo `guasto` e non
+`locale`, e il feedback aspetta In coda col segno «aspetta D-<n>»; senza
+`--domanda` la consegna è rifiutata. Il numero lo stampa la risposta:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason guasto \
-  --notes "Guasto, non per regola: <gruppo>. Domanda D-<n>. [cosa resta sul ramo]"
+  --notes "Guasto, non per regola: <gruppo>. [cosa resta sul ramo]" --domanda <file.json>
 ```
 
 Se il server rifiuta questa consegna (exit 4), non insistere: il suo messaggio

@@ -358,10 +358,24 @@
       }
       meta.appendChild(l);
     }
+    const ferma = fermaIlLavoro(d);
+    if (ferma) meta.appendChild(ferma);
     const h = el('h2', 'mg-dq-titolo', d.illeggibile ? 'Questa domanda non si legge' : String(d.titolo || '(senza titolo)'));
     const head = el('header', 'mg-dq-testa');
     head.append(meta, h);
     return head;
+  }
+
+  // Cosa fa al suo lavoro una domanda aperta (#1577): lo ferma, o lo lascia andare con la consigliata.
+  function fermaIlLavoro(d) {
+    if (d.stato !== 'aperta' || !d.legata || d.attesa) return null;
+    const r = stato.riferimenti && stato.riferimenti[d.legata];
+    const num = r && typeof r.num === 'string' && r.num ? r.num : 'il lavoro';
+    const s = el('span', `mg-dq-ferma${d.blocca ? ' mg-dq-ferma--si' : ''}`, d.blocca ? `ferma ${num}` : `${num} va avanti`);
+    s.title = d.blocca
+      ? 'Nessuna routine lo prende finché non rispondi.'
+      : 'Il lavoro va avanti con la consigliata; se scegli altro riparte con la tua scelta, anche se è già fuso.';
+    return s;
   }
 
   // L'ultima scelta fatta su questa domanda, per segnarla nell'archivio.
@@ -448,6 +462,9 @@
     else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
     else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
     else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente ${ilGiorno(e.compito.da)}.` : 'Affidata a un agente.';
+    // Una ripresa che non ha spostato il lavoro lo dice (#1577): non serviva, o accodata al giro dopo.
+    else if (e && e.ok && d.stato === 'chiusa' && e.nonServiva) testo = 'Non serviva: il lavoro è già fuso con questa scelta.';
+    else if (e && e.ok && d.stato === 'chiusa' && e.accodata) testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}: la prende il prossimo giro di lavoro.`;
     // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
     else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     if (!testo) return null;

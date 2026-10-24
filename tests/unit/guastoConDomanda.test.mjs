@@ -46,7 +46,12 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = readRoleInstructions(ruolo, opts);
     assert.ok(t.includes(ATTESA), `${ruolo} ${opts.caso || ''}: manca la ricetta dell'attesa`);
-    assert.match(t, /deliver status --status design --reason guasto/);
+    // #1577: la domanda viaggia con la fermata, nella stessa scrittura: il feedback non va nei Ricevuti.
+    assert.match(piatto(t), /deliver status --status design --reason guasto \\ --notes "Guasto, non per regola: <gruppo>\. \[cosa resta sul ramo\]" --domanda <file\.json>/,
+      `${ruolo} ${opts.caso || ''}: la fermata del guasto porta la sua domanda`);
+    const attesa = piatto(t.slice(t.indexOf(ATTESA)));
+    assert.match(attesa, /non con `domanda\.mjs chiedi`/, `${ruolo}: chi risolve non apre la domanda a parte`);
+    assert.doesNotMatch(attesa, /Domanda D-<n>\. \[cosa resta/, `${ruolo}: il numero non si scrive più a mano nella nota`);
   }
   // Agli altri ruoli il server non prende uno stato: la ricetta non si indica.
   for (const [ruolo, opts] of GLI_ALTRI) {
@@ -94,14 +99,16 @@ function domandaDelModello() {
   return d;
 }
 
-test('il modello della domanda passa i controlli del server, con le strade, la riparazione e il feedback legato', () => {
+test('il modello della domanda passa i controlli del server: ogni strada sblocca il lavoro fermo, col feedback legato', () => {
   const v = D.validaDomanda(domandaDelModello(), { conOrigine: false });
   assert.ok(v.ok, `${v.errore}: ${v.dettaglio}`);
+  // In una fermata il server prende solo riprendi e archivia su quel lavoro (#1358): un compito che nessuno lavora
+  // lascerebbe il feedback fermo per sempre (#1577).
   assert.deepEqual(v.domanda.opzioni.map((o) => o.azione), [
     { tipo: 'riprendi', feedbackId: FEEDBACK_ID },
-    { tipo: 'compito' },
     { tipo: 'archivia', feedbackId: FEEDBACK_ID },
   ]);
+  assert.equal(v.domanda.blocca, undefined, 'la fermata blocca da sé: «blocca» false lì è rifiutato');
   assert.deepEqual(v.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
   assert.equal(v.domanda.consiglio.opzione, 0);
   // Senza opzioni (chi verifica, l'esplorazione) la domanda vale lo stesso.
@@ -137,11 +144,13 @@ function chiedi(file) {
   });
 }
 
+// Chi verifica la apre a parte, e il lavoro torna in coda da sé: «blocca» false, come dicono le istruzioni.
 test('col biglietto della routine la domanda arriva al canale col gruppo del guasto e il feedback legato', async () => {
   arrivate = [];
   risposta = { status: 200, body: { ok: true, id: 'D-9', num: 'D-9', numero: 9 } };
   const file = join(CARTELLA, 'guasto-ok.json');
-  writeFileSync(file, JSON.stringify(domandaDelModello()), 'utf8');
+  writeFileSync(file, JSON.stringify({ ...domandaDelModello(), blocca: false }), 'utf8');
+  assert.match(piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8')), /domanda\.mjs chiedi <file\.json>`, con `"blocca": false`/);
   const r = await chiedi(file);
   assert.equal(r.code, 0, r.stderr);
   assert.match(r.stdout, /OK: domanda D-9 aperta\./);
@@ -154,6 +163,32 @@ test('col biglietto della routine la domanda arriva al canale col gruppo del gua
   assert.deepEqual(a.body.data.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
   assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.tipo === 'compito' || o.azione.feedbackId === FEEDBACK_ID));
   assert.ok(!('origine' in a.body.data.domanda), 'l’origine la mette il server dal biglietto');
+  assert.equal(a.body.data.domanda.blocca, false);
+});
+
+function canale(args) {
+  return new Promise((resolve) => {
+    const env = { ...process.env, FILO_ROUTINE_API: base, FILO_ROUTINE_TICKET: '', FILO_ADMIN_REFRESH_TOKEN: '' };
+    execFile(process.execPath, [join(ROOT, 'scripts', 'routine-channel.mjs'), ...args], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS },
+      (err, stdout, stderr) => resolve({ code: err ? err.code : 0, stdout, stderr }));
+  });
+}
+
+test('chi risolve consegna il guasto con la sua domanda: un passo solo, e la risposta dà il numero (#1577)', async () => {
+  arrivate = [];
+  risposta = { status: 200, body: { ok: true, num: '#1577', reply: { outcome: 'stop', status: 'design', domanda: 'D-12' } } };
+  const file = join(CARTELLA, 'guasto-fermata.json');
+  writeFileSync(file, JSON.stringify(domandaDelModello()), 'utf8');
+  const r = await canale(['deliver', BIGLIETTO, 'status', '--status', 'design', '--reason', 'guasto',
+    '--notes', 'Guasto, non per regola: guasto: filo-security. Resta il ramo.', '--domanda', file]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /il lavoro è FERMO e aspetta l'owner \(la domanda è consegnata, domanda D-12\)/);
+  assert.equal(arrivate.length, 1, 'niente domanda a parte prima della fermata');
+  const [a] = arrivate;
+  assert.equal(a.body.intent, 'status');
+  assert.deepEqual([a.body.data.status, a.body.data.reason], ['design', 'guasto']);
+  assert.equal(a.body.data.domanda.gruppo, 'guasto: filo-security');
+  assert.ok(a.body.data.domanda.opzioni.every((o) => ['riprendi', 'archivia'].includes(o.azione.tipo) && o.azione.feedbackId === FEEDBACK_ID));
 });
 
 // #1455: com'era D-89, col nome di file e la lineetta nel contesto. Si ferma prima del canale, e chi chiede sa dove.
