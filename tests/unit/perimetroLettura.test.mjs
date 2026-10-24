@@ -205,6 +205,102 @@ test('#587 giro 11 — scritture equivalenti del percorso non aggirano il perime
   assert.equal(lvl('Get-Content rel,finale.txt', WIN), 1);
 });
 
+// #1511 — sh e bash decodificano `$'…'` e tolgono i backslash: il perimetro misura il percorso che vede la shell.
+test('#1511 — il perimetro legge `$\'…\'` e i backslash come sh e bash', () => {
+  const nascosto = /legge un file nascosto o di configurazione/;
+  const det = (cmd, ctx) => C.classifyDetail(cmd, ctx);
+  const punti = ['\\x2e', '\\056', '\\u002e'];
+  for (const ctx of [LINUX, MAC, { ...LINUX, shell: 'sh' }, { ...MAC, shell: 'bash' }]) {
+    for (const prog of ['cat', 'head']) {
+      for (const pre of ['~/', './']) {
+        for (const p of punti) {
+          const cmd = `${prog} ${pre}$'${p}ssh/config'`;
+          assert.equal(det(cmd, ctx).level, 2, cmd);
+          assert.match(det(cmd, ctx).motivo, nascosto, cmd);
+        }
+        // Il punto scritto da solo nell'escape, col resto del nome fuori dalle virgolette.
+        assert.equal(lvl(`${prog} ${pre}$'\\x2e'aws/credentials`, ctx), 2);
+        // Il backslash fuori dalle virgolette sparisce: `.\ssh` è `.ssh`.
+        assert.equal(lvl(`${prog} ${pre}.\\ssh/config`, ctx), 2);
+      }
+    }
+  }
+  // Library su Mac, con una lettera scritta come escape o dopo un backslash.
+  assert.equal(lvl("cat $'Libr\\x61ry/Application Support/Filo/storage.json'", MAC), 2);
+  assert.equal(lvl("cat ~/$'\\x4c'ibrary/Keychains/login.keychain-db", MAC), 2);
+  assert.equal(lvl('cat ~/Lib\\rary/Keychains/login.keychain-db', MAC), 2);
+  // Un ottale oltre 377 vale il suo byte basso, come in bash: `\456` è il punto.
+  assert.equal(lvl("cat ~/$'\\456ssh/config'", LINUX), 2);
+  // `\'` dentro `$'…'` non chiude la stringa: il percorso dopo è un argomento a sé.
+  assert.equal(lvl("cat a$'\\''b /etc/passwd", LINUX), 2);
+  // Un apice o una virgoletta col backslash davanti non apre niente.
+  assert.equal(lvl('cat a\\"x /etc/passwd \\"', LINUX), 2);
+
+  // Il popup che l'utente vede prima della lettura.
+  const a = { type: 'ESEGUI_COMANDO', comando: "cat ~/$'\\x2essh/id_rsa'", _perimetro: LINUX, _cwd: '~' };
+  assert.equal(AL.costoFor(a), 2);
+  assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto o di configurazione/);
+  assert.equal(AL.costoFor({ ...a, comando: 'cat ~/.\\ssh/id_rsa' }), 2);
+
+  // Escape sconosciuti, NUL e byte che non sono UTF-8: il percorso non si sa.
+  for (const cmd of ["cat $'\\qnota.txt'", "cat ~/$'\\x00'nota.txt", "cat $'\\xffnota.txt'", "cat $'\\xnota.txt'",
+    "cat $'\\unota.txt'", "cat $'\\U110000'", "cat $'\\ud800'", "cat $'nota.txt"]) {
+    const d = det(cmd, LINUX);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /non si sa prima quali file leggerà/, cmd);
+  }
+
+  // Le stesse scritture per un file visibile restano libere.
+  assert.equal(lvl("cat $'nota\\x20di\\x20spesa.txt'", LINUX), 1);
+  assert.equal(lvl("cat ~/$'Documenti/nota\\040di spesa.txt'", MAC), 1);
+  assert.equal(lvl("cat $'\\u00e8 tutto.txt'", LINUX), 1);
+  assert.equal(lvl("cat $'\\xc3\\xa8 tutto.txt'", LINUX), 1);
+  assert.equal(lvl('cat nota\\ di\\ spesa.txt', LINUX), 1);
+  assert.equal(lvl('cat "Documenti/nota \\"vecchia\\".txt"', LINUX), 1);
+  assert.equal(lvl("echo $'\\xff'", LINUX), 1, 'echo stampa e basta');
+  assert.equal(lvl("grep $'ciao\\tmondo' note.txt", LINUX), 1);
+  assert.equal(lvl('cat $"nota di spesa.txt"', LINUX), 1);
+  assert.equal(lvl("echo '$HOME'", LINUX), 1);
+  assert.equal(lvl("echo $'$HOME'", LINUX), 1, 'dentro `$\'…\'` il `$` non si espande');
+});
+
+test('#1511 — git, cd e le altre shell misurano gli stessi percorsi', () => {
+  // git apre i file di `--no-index` come cat: stessa lettura degli argomenti.
+  for (const cmd of ["git diff --no-index $'.ssh/config' a.txt", "git diff --no-index ~/$'\\x2essh'/config a.txt",
+    'git diff --no-index ~/.\\ssh/config a.txt', 'git diff --no-index $".ssh/config" a.txt']) {
+    assert.equal(lvl(cmd, LINUX), 2, cmd);
+  }
+  assert.equal(lvl('git diff --no-index "Documenti/a b.txt" Documenti/c.txt', LINUX), 1);
+  assert.equal(lvl('git diff', LINUX), 1);
+  // Un `cd` scritto così porta dove porta la shell; uno che non si decodifica rende ignota la cartella.
+  assert.equal(lvl("cd ~/$'\\x2essh' && cat config", LINUX), 2);
+  assert.equal(lvl('cd ~/.\\ssh && cat config', LINUX), 2);
+  assert.equal(lvl("cd $'\\xff' && ls", LINUX), 2);
+  assert.equal(lvl("cd $'Documenti' && cat nota.txt", LINUX), 1);
+  // bash su Windows decodifica come altrove; PowerShell e cmd no: lì `\` separa le cartelle.
+  assert.equal(lvl("cat ~/$'\\x2essh'/config", { ...WIN, shell: 'bash' }), 2);
+  assert.equal(lvl('Get-Content .\\Documenti\\a.txt', WIN), 1);
+  assert.equal(lvl('Get-Content .\\Documenti\\a.txt', { ...WIN, shell: 'powershell' }), 1);
+  assert.equal(lvl('type Documenti\\a.txt', { ...WIN, shell: 'cmd' }), 1);
+  assert.equal(lvl('Get-Content AppData\\Roaming\\Filo\\storage.json', { ...WIN, shell: 'powershell' }), 2);
+});
+
+test('#1511 — dove sh può essere dash, `\\\'` dentro `$\'…\'` chiude la stringa: anche quella lettura chiede', () => {
+  // dash: `cat '$a\' .ssh/id_rsa` legge la chiave; bash vede un nome solo. Vale il più severo dei due.
+  for (const ctx of [LINUX, MAC, { ...LINUX, shell: 'sh' }]) {
+    for (const cmd of ["cat $'a\\' .ssh/id_rsa #'", "head $'x\\' .ssh/id_rsa ''", "grep $'a\\' .netrc #'",
+      "head -n $'1\\' .ssh/id_rsa #'", "cat $'a\\c\\' .ssh/id_rsa #'"]) {
+      assert.equal(lvl(cmd, ctx), 2, `${cmd} ${JSON.stringify(ctx)}`);
+    }
+  }
+  // Con bash scelta apposta la lettura è una sola.
+  assert.equal(lvl("cat $'a\\' .ssh/id_rsa #'", { ...LINUX, shell: 'bash' }), 1);
+  assert.equal(lvl("cat $'it\\'s.txt'", LINUX), 1);
+  // `\c\` è 0x1c e la barra dopo resta un separatore, come in bash: la cartella nascosta si vede.
+  assert.equal(lvl("cat ~/$'\\c\\/.ssh/config'", { ...LINUX, shell: 'bash' }), 2);
+  assert.equal(lvl("cat $'\\c\\\\nota.txt'", { ...LINUX, shell: 'bash' }), 1);
+});
+
 // #1072 — un percorso di rete (UNC, `\\?\UNC\`, `//server`) fa aprire a Windows una connessione verso
 // quel computer: anche una sola lettura di nomi chiede un OK, e il popup dice perché. Gemello: #810.13.
 test('#1072 — le letture su un percorso di rete chiedono un OK col motivo «rete»', () => {

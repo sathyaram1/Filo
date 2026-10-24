@@ -36,13 +36,16 @@
     });
   }
 
+  // Nel deposito entrano solo blob cifrati (#602), e storage.rules ammette solo questo tipo con
+  // questa estensione (#1518): il tipo vero del file sta nel documento del feedback, non qui.
+  const ATTACHMENT_CONTENT_TYPE = 'application/octet-stream';
+  const ATTACHMENT_EXT = 'octetstream';
+
   // FONTE UNICA della forma del nome di un allegato: storage.rules concede la creazione SOLO
   // su un nome fatto così. Cambiarla qui e non là = dal deploy nessun allegato si carica.
-  function attachmentPath(mimeOrExt, label) {
-    const raw = String(mimeOrExt || '');
-    const ext = (raw.includes('/') ? raw.split('/')[1] : raw).replace(/[^a-z0-9]/gi, '').slice(0, 12) || 'bin';
+  function attachmentPath(label) {
     const et = String(label || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
-    return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
+    return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ATTACHMENT_EXT}`;
   }
 
   // La voce di `files[]` come la ammettono le regole (documentoAllegato in firestore.rules): solo url, nome e tipo,
@@ -142,11 +145,12 @@
   // allegato in chiaro lì dentro lo legge chiunque si sia portato via il link.
   async function uploadImage(blob) {
     await assertSealed(blob);
-    const name = attachmentPath(blob.type || 'png');
+    const name = attachmentPath();
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      // Il tipo del blob non conta: un ciphertext è opaco, e il deposito ammette solo questo.
+      headers: { 'Content-Type': ATTACHMENT_CONTENT_TYPE },
       body: blob,
     });
     if (!res.ok) {
@@ -290,7 +294,7 @@
     if (!C.isEncryptedBytes(sealed)) {
       throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
     }
-    return new Blob([sealed], { type: 'application/octet-stream' });
+    return new Blob([sealed], { type: ATTACHMENT_CONTENT_TYPE });
   }
 
   // Il controllo all'imbocco del deposito: i byte che stanno per partire devono
@@ -2134,10 +2138,12 @@
     encryptionBlockedMessage,
     isEncryptionError,
     sealForUpload,
-    // #582 — il confine degli allegati: la forma del nome (che storage.rules
+    // #582 — il confine degli allegati: la forma del nome e il tipo (che storage.rules
     // pretende), il riconoscimento di un URL del bucket e le intestazioni con
     // cui l'owner lo scarica. Pure, e usate anche dal main.
     attachmentPath,
+    ATTACHMENT_CONTENT_TYPE,
+    ATTACHMENT_EXT,
     VOCE_DOCUMENTO,
     voceDocumento,
     isAttachmentUrl,

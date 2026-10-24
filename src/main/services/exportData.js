@@ -551,6 +551,9 @@ const REGOLE_IMPORT = {
   CLIPBOARD_HISTORY: 'appunti',
   PERSONAL_DICT: 'contenuto',
   AUTOCORRECT: 'contenuto',
+  CORRETTORE_IMPARATO: 'contenuto',
+  // Un elenco di siti con un conto: dice dove si è scritto, come i cookie.
+  CORRETTORE_STILI: 'stato',
   ICON_LAYOUT: 'contenuto',
   OPEN_TABS: 'stato',
   FILO_RAW_LOG: 'stato',
@@ -591,6 +594,7 @@ const REGOLE_ALTRE_CHIAVI = {
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  walletUsageLog: 'stato',
   // I contatori di questa copia di Filo (#969): portati su un'altra, la stessa copia conterebbe due volte.
   contatoriGiornalieri: 'stato',
   // Il diario dei crediti spesi su questa copia: lo tiene in memoria chi avvisa, e il backup non lo riavvolge.

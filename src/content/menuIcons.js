@@ -110,7 +110,7 @@
       forward:       { id: 'forward',       icon: I('forward'),     label: I18n.t('menu_forward'),           disabled: !canFwd, onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_FORWARD }) },
       reload:        { id: 'reload',        icon: I('reload'),      label: I18n.t('menu_reload'),            onClick: () => chrome.runtime.sendMessage({ type: MSG.NAV_RELOAD }) },
       colorPicker:   { id: 'colorPicker',   icon: I('colorPicker'), label: I18n.t('menu_color_picker'),      nelloStrato: 'contagocce', onClick: (scelto) => Actions.pickColor(scelto) },
-      closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }) },
+      closeTab:      { id: 'closeTab',      icon: I('close'),       label: I18n.t('menu_close_tab'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB, via: 'tasto_destro_riga' }) },
       newTab:        { id: 'newTab',        icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB }) },
       qrCode:        { id: 'qrCode',        icon: I('qrCode'),      label: I18n.t('menu_qr_code'),           onClick: () => Actions.showPageQrCode() },
       incognito:     { id: 'incognito',     icon: I('incognito'),   label: I18n.t('menu_incognito'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_INCOGNITO }) },
@@ -123,7 +123,25 @@
     if (isOwner) {
       registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
     }
+    for (const [id, voce] of Object.entries(registry)) contaIcona(id, voce);
     return registry;
+  }
+
+  // Le icone si misurano dal clic alla fine della loro azione (#1461). Quelle che chiedono al main una navigazione le
+  // misura lui, fino alla pagina caricata (nav.js, o l'apertura della scheda per le pagine di Filo): qui sarebbero due.
+  const CONTATE_DAL_MAIN = new Set(['back', 'forward', 'reload', 'closeTab', 'newTab', 'incognito', 'openOptions', 'home', 'editorApp',
+    'feedbackApp']);
+  function contaIcona(id, voce) {
+    if (CONTATE_DAL_MAIN.has(id) || !voce || typeof voce.onClick !== 'function') return;
+    const fa = voce.onClick;
+    voce.onClick = (...args) => {
+      const t0 = Date.now();
+      const fine = () => { try { global.SN_POPUP?.conta?.({ misura: 'icona', icona: id, fineMs: Date.now() - t0 }); } catch (_) {} };
+      let r;
+      try { r = fa(...args); } catch (e) { fine(); throw e; }
+      if (r && typeof r.then === 'function') r.then(fine, fine); else fine();
+      return r;
+    };
   }
 
   // Dove sta ogni icona (riga, «Altro…», barra laterale) lo decide src/shared/disposizioneIcone.js,

@@ -136,7 +136,7 @@
       current = res.deck;
       // Cambio di mazzo o schermata: il pannello destro riparte dal riposo e la cache dei
       // pareri si svuota, perché i pareri sono per-mazzo (§6.2).
-      if (prevId !== current.id) opinionsByCard.clear();
+      if (prevId !== current.id) { opinionsByCard.clear(); opinionErrors.clear(); }
       carousel = null;
       setDetailState('stats');
       show('builder');
@@ -316,7 +316,7 @@
     const next = Decks.renameDeck(r.deck, nome);
     if (next === r.deck) return;
     const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
-    if (!res || !res.ok) { showToast('Rinomina non riuscita.'); return; }
+    if (!res || !res.ok) { toastErrore('Rinomina non riuscita.'); return; }
     const i = decks.findIndex((d) => d.id === id);
     if (i >= 0) decks[i] = res.deck;
     const old = libraryCardEl(id);
@@ -879,7 +879,7 @@
         const verb = move ? 'Spostare' : 'Copiare';
         const t = await send({ type: MSG.DECKS_GET, id: d.id });
         if (!t || !t.ok) {
-          showToast(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
+          toastErrore(`${verb} non riuscito: mazzo "${d.nome}" non raggiungibile.`);
           return;
         }
         const { deck: target, merged } = Decks.mergeCard(t.deck, cardId, {
@@ -887,7 +887,7 @@
         });
         const up = await send({ type: MSG.DECKS_UPDATE, deck: target });
         if (!up || !up.ok) {
-          showToast(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
+          toastErrore(`${verb} non riuscito: "${d.nome}" non è stato aggiornato.`);
           return;
         }
         if (move) await removeFromDeck(cardId);
@@ -904,7 +904,7 @@
   async function setCommanderTo(cardId) {
     const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
     if (!r || !r.ok) {
-      showToast('Non sono riuscito a cambiare il commander.');
+      toastErrore('Non sono riuscito a cambiare il commander.');
       return;
     }
     if (!current || r.deck.id !== current.id) return;
@@ -1154,15 +1154,13 @@
     if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
+    // La frase nomina la pagina dove si rimedia: il tasto per andarci viene prima di «Riprova», che finché
+    // l'ostacolo resta rimanda la stessa domanda allo stesso muro (#663, #828.1). Come «Riprova», sull'ultima bolla.
+    const pagina = isLast && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
+    const via = pagina ? `<button class="dk-retry dk-rimedio" data-rimedio="1" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>` : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
     if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
-    if (m.error) {
-      // La frase nomina la pagina dove si rimedia: il tasto per andarci viene prima di «Riprova», che finché
-      // l'ostacolo resta rimanda la stessa domanda allo stesso muro (#663, #828.1). Come «Riprova», sull'ultima bolla.
-      const pagina = isLast && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
-      const via = pagina ? `<button class="dk-retry dk-rimedio" data-rimedio="1" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>` : '';
-      return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${via}${retry}</div>`;
-    }
+    if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${via}${retry}</div>`;
     const parts = [cotHtml(m)];
     // Risposta fermata a metà: la riga lo dice da nota, non da risposta, e l'ultima bolla offre «Continua».
     const CE = window.SN_CHAT_ERRORS;
@@ -1175,6 +1173,7 @@
       if (isLast) parts.push('<button class="dk-retry" data-continua="1" title="Continua la risposta da dove si è interrotta">Continua</button>');
     }
     // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
+    if (via) parts.push(via);
     if (m.retryable) parts.push(retry);
     if (m.clearChat) {
       parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
@@ -1420,7 +1419,7 @@
       bot.stopped = true;
     } else if (!r || !r.ok) {
       bot.error = (r && r.error) || 'nessuna risposta';
-      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, maxTokens: r.maxTokens, finishReason: r.finishReason };
+      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, reason: r.reason, maxTokens: r.maxTokens, finishReason: r.finishReason };
       if (window.SN_CHAT_ERRORS?.rimedioPagina?.(rimedio)) bot.rimedio = rimedio;
     } else {
       bot.reply = r.reply || '';
@@ -1434,6 +1433,8 @@
       }
       if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
       if (r.retryable) bot.retryable = true;
+      // Una parte del turno non è partita per un ostacolo che si toglie altrove (il controllo delle carte, #1344.1).
+      if (r.rimedio && window.SN_CHAT_ERRORS?.rimedioPagina?.(r.rimedio)) bot.rimedio = r.rimedio;
       // Import via chat (§11.2): quantità reali per riga (basics tipo
       // "37 Forest") + eventuale commander candidato, per il bottone
       // "Aggiungi tutte" e per il toggle per riga.
@@ -1446,6 +1447,7 @@
       // la cache di pagina si svuota così il prossimo hover legge dal main
       // i pareri freschi invece di mostrare quelli vecchi.
       opinionsByCard.clear();
+      opinionErrors.clear();
       // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
       // aggiornato torna nella risposta → header e statistiche si rinfrescano.
       if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
@@ -1511,7 +1513,7 @@
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (_) { /* resta il messaggio sotto */ }
       ta.remove();
-      if (!ok) { showToast('Non sono riuscito a copiare.'); return; }
+      if (!ok) { toastErrore('Non sono riuscito a copiare.'); return; }
     }
     showToast(done);
   }
@@ -1579,6 +1581,11 @@
     dkToastTempo = null;
     el.classList.remove('show');
     dkToastTempi.lascia(el);
+  }
+  // Un avviso d'errore si conta per i contatori anonimi (#1461): la chiave, mai il testo.
+  function toastErrore(text) {
+    showToast(text);
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'mazzi_non_riuscito' })).catch(() => {}); } catch (_) {}
   }
   function showToast(text) {
     let el = document.getElementById('dkToast');
@@ -1677,7 +1684,7 @@
       if (!r || !r.ok) {
         btn.disabled = false;
         btn.textContent = 'Analizza';
-        showToast('Analisi non riuscita.');
+        toastErrore('Analisi non riuscita.');
         return;
       }
       renderImportPreview(body, r);
@@ -1717,7 +1724,7 @@
         const total = res.addedCount + res.updatedCount;
         showToast(`${total === 1 ? 'Importata 1 carta' : `Importate ${total} carte`}${res.updatedCount ? ` (${res.updatedCount} aggiornat${res.updatedCount === 1 ? 'a' : 'e'})` : ''}.`);
       } else {
-        showToast('Import non riuscito.');
+        toastErrore('Import non riuscito.');
         applyBtn.disabled = false;
         applyBtn.textContent = `Importa ${resolved.length} cart${resolved.length === 1 ? 'a' : 'e'}`;
       }
@@ -1798,6 +1805,21 @@
   // calcolo e la cache persistente per (carta, versione mazzo) vivono nel main.
   const opinionsByCard = new Map();
   const opinionPending = new Set();
+  // Il parere che non è arrivato, col perché (la frase e quello che serve al tasto del rimedio): finché c'è, la
+  // carta non si richiede da sola. Senza, il riquadro la richiedeva a ogni ridisegno, centinaia di volte al secondo (#1344.1).
+  const opinionErrors = new Map();
+  const SENZA_RISPOSTA = 'non ho avuto risposta. Riprova.';
+  function erroreDelParere(r) {
+    const frase = r && r.error && r.error !== 'not_found' ? String(r.error) : SENZA_RISPOSTA;
+    return {
+      frase,
+      ...(r && r.code ? { code: r.code } : {}),
+      ...(r && r.keyRefused ? { keyRefused: true } : {}),
+      ...(r && r.reason ? { reason: r.reason } : {}),
+      ...(r && Number(r.maxTokens) > 0 ? { maxTokens: Number(r.maxTokens) } : {}),
+      ...(r && r.finishReason ? { finishReason: r.finishReason } : {}),
+    };
+  }
 
   // La carta mostrata ADESSO nel pannello destro (preview o carosello).
   function currentDetailCard() {
@@ -1809,18 +1831,30 @@
   // Una richiesta sola: il main fa UN batch LLM per i soli mancanti o stantii. refresh=true
   // ricalcola comunque (§6.2); al ritorno il modulo si aggiorna sul posto.
   async function requestOpinions(ids, { refresh = false } = {}) {
-    // Uno stantio resta visibile marcato e si ricalcola SOLO col bottone (§6.2).
+    // Uno stantio resta visibile marcato e si ricalcola SOLO col bottone (§6.2); uno mancato solo con «Riprova».
     const ask = ids.filter((id) => refresh
-      || (!opinionsByCard.has(id) && !opinionPending.has(id)));
+      || (!opinionsByCard.has(id) && !opinionPending.has(id) && !opinionErrors.has(id)));
     if (!ask.length || !current) return;
-    for (const id of ask) opinionPending.add(id);
+    for (const id of ask) { opinionPending.add(id); opinionErrors.delete(id); }
+    const deckId = current.id;
+    let r = null;
     try {
-      const r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
-      if (r && r.ok) {
-        for (const [id, op] of Object.entries(r.opinions || {})) opinionsByCard.set(id, op);
-      }
+      r = await send({ type: MSG.DECKS_OPINION, deckId, cardIds: ask, compute: true, refresh });
+    } catch (_) {
+      r = { ok: false, error: '' };
     } finally {
       for (const id of ask) opinionPending.delete(id);
+    }
+    // I pareri sono per mazzo: quelli di un mazzo lasciato nel frattempo non entrano nella cache del nuovo.
+    if (!current || current.id !== deckId) return;
+    if (r && r.ok) {
+      const opinions = r.opinions || {};
+      for (const [id, op] of Object.entries(opinions)) opinionsByCard.set(id, op);
+      const mancanti = r.mancanti || {};
+      for (const id of ask) if (!opinions[id]) opinionErrors.set(id, erroreDelParere(mancanti[id] || {}));
+    } else {
+      const errore = erroreDelParere(r);
+      for (const id of ask) opinionErrors.set(id, errore);
     }
     const cur = currentDetailCard();
     if (cur && layout.module === 'opinion' && ask.includes(cur.id)) renderDetailModule(cur);
@@ -1829,12 +1863,17 @@
   // Ristampe (modulo «Prezzo e dati»): conteggio lazy, cache nel main.
   const printsByName = new Map();
   const printsPending = new Set();
+  // Come per i pareri: un conteggio che Scryfall non ha dato non si richiede a ogni ridisegno del riquadro.
+  const printsFailed = new Set();
   async function fetchPrints(card) {
-    if (printsByName.has(card.name) || printsPending.has(card.name)) return;
+    if (printsByName.has(card.name) || printsPending.has(card.name) || printsFailed.has(card.name)) return;
     printsPending.add(card.name);
     try {
       const r = await send({ type: MSG.SCRYFALL_PRINTS, name: card.name });
       if (r && r.ok) printsByName.set(card.name, r.prints);
+      else printsFailed.add(card.name);
+    } catch (_) {
+      printsFailed.add(card.name);
     } finally { printsPending.delete(card.name); }
     const cur = currentDetailCard();
     if (cur && cur.name === card.name && layout.module === 'price') renderDetailModule(cur);
@@ -1890,14 +1929,16 @@
         const price = card.priceEur != null
           ? `${card.priceEur.toFixed(2).replace('.', ',')} € (Cardmarket)` : 'n.d.';
         const prints = printsByName.get(card.name);
+        const fallite = prints == null && printsFailed.has(card.name);
         host.innerHTML = `
           <p class="dk-module-title">Prezzo e dati</p>
           <p>Prezzo: ${esc(price)}</p>
           <p data-prints>${prints != null
-            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}` : 'Ristampe: …'}</p>
+            ? `Ristampe: ${prints} stamp${prints === 1 ? 'a' : 'e'}`
+            : (fallite ? 'Ristampe: Scryfall non ha risposto' : 'Ristampe: …')}</p>
           <p data-legal="${card.legalCommander ? 1 : 0}">${card.legalCommander
             ? '✓ Legale in Commander' : '✗ Non legale in Commander'}</p>`;
-        if (prints == null) fetchPrints(card);
+        if (prints == null && !fallite) fetchPrints(card);
       },
     },
     // Parere di Filo (§6): giudizio contestuale carta-vs-mazzo; stantio = pallino discreto
@@ -1907,8 +1948,14 @@
       render(card, host) {
         const op = opinionsByCard.get(card.id);
         const pending = opinionPending.has(card.id);
+        const errore = pending ? null : opinionErrors.get(card.id);
         let body;
-        if (op) {
+        if (op && errore) {
+          // L'«Aggiorna» non è andato: il parere vecchio resta, col perché e le stesse strade.
+          body = `<p class="dk-op-text">${proseHtml(op.text)}</p>${erroreParereHtml(card.id, errore, 'Non sono riuscito ad aggiornarlo.', 'Aggiorna')}`;
+        } else if (errore) {
+          body = erroreParereHtml(card.id, errore, 'Il parere non è arrivato.', 'Riprova');
+        } else if (op) {
           const staleBar = !op.stale ? '' : (pending
             ? `
               <div class="dk-mod-actions">
@@ -1927,11 +1974,23 @@
         }
         host.innerHTML = `<p class="dk-module-title">Parere di Filo</p>${body}`;
         // L'hover con questo modulo attivo È il trigger (§6.1): cache-first, e uno stantio non si
-        // ricalcola mai da solo (§6.2).
-        if (!op && !pending) requestOpinions([card.id]).catch(() => {});
+        // ricalcola mai da solo (§6.2), come uno mancato.
+        if (!op && !pending && !errore) requestOpinions([card.id]).catch(() => {});
       },
     },
   };
+
+  // Il motivo prima, poi il tasto che toglie l'ostacolo (Crediti, Opzioni, Preferenze) e, accanto, quello per
+  // riprovare: finché l'ostacolo resta, riprovare rimanda la stessa richiesta allo stesso muro (#663, #828.1).
+  function erroreParereHtml(id, errore, apertura, riprova) {
+    const frase = String(errore.frase || '');
+    const pagina = window.SN_CHAT_ERRORS?.rimedioPagina?.(errore) || null;
+    const via = pagina
+      ? `<button class="dk-mod-btn dk-rimedio" data-op-rimedio="${esc(id)}" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>`
+      : '';
+    return `<p class="dk-mod-note dk-op-errore" role="status">${esc(apertura)} ${esc(frase.charAt(0).toUpperCase() + frase.slice(1))}</p>
+      <div class="dk-mod-actions">${via}<button class="dk-mod-btn" data-op-retry="${esc(id)}">${esc(riprova)}</button></div>`;
+  }
 
   // Stesso slot per preview e carosello: il modulo scelto si disegna nello stato attivo.
   function renderDetailModule(card, hostId) {
@@ -2014,6 +2073,13 @@
     if (hoverTimer) clearTimeout(hoverTimer);
     const delay = detailState === 'preview' ? PREVIEW_GRACE_MS : PREVIEW_OPEN_MS;
     hoverTimer = setTimeout(() => { hoverTimer = 0; showPreview(cardId); }, delay);
+  }
+
+  // Sull'anteprima si va per usarla («Aggiorna», il tasto per Crediti o Opzioni): resta aperta finché il puntatore è
+  // lì, e il linger riparte quando esce.
+  function holdPreview() {
+    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = 0; }
+    if (lingerTimer) { clearTimeout(lingerTimer); lingerTimer = 0; }
   }
 
   function hoverLeave() {
@@ -2144,6 +2210,7 @@
     document.addEventListener('mouseover', (e) => {
       const id = hoverCardId(e.target);
       if (id) hoverEnter(id);
+      else if (detailState === 'preview' && e.target.closest && e.target.closest('#statePreview')) holdPreview();
       else hoverLeave();
     });
 
@@ -2212,16 +2279,33 @@
 
     // «Aggiorna» (§6.2): refresh della SOLA carta mostrata, in delega su entrambi gli slot.
     const onModuleClick = (e) => {
-      const btn = e.target.closest('[data-op-refresh]');
+      const via = e.target.closest('[data-op-rimedio]');
+      if (via) {
+        const errore = opinionErrors.get(via.dataset.opRimedio);
+        const pagina = errore ? window.SN_CHAT_ERRORS?.rimedioPagina?.(errore) : null;
+        if (pagina) send({ type: MSG.OPEN_URL, url: pagina.url });
+        return;
+      }
+      const btn = e.target.closest('[data-op-refresh], [data-op-retry]');
       if (!btn) return;
-      const id = btn.dataset.opRefresh;
+      const id = btn.dataset.opRefresh || btn.dataset.opRetry;
       btn.disabled = true;
+      // Esplicito come «Aggiorna»: passa sopra al parere mancato, e su una carta senza parere chiede solo lei.
       requestOpinions([id], { refresh: true }).catch(() => {});
       const cur = currentDetailCard();
       if (cur && cur.id === id) renderDetailModule(cur); // mostra "sta pensando"
     };
     $('previewModule').addEventListener('click', onModuleClick);
     $('carouselModule').addEventListener('click', onModuleClick);
+    // Chi torna da Crediti o dalle Opzioni ha di solito tolto l'ostacolo: i pareri mancati si richiedono, una volta,
+    // quando la carta si ridisegna.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || (!opinionErrors.size && !printsFailed.size)) return;
+      opinionErrors.clear();
+      printsFailed.clear();
+      const cur = currentDetailCard();
+      if (cur && (layout.module === 'opinion' || layout.module === 'price')) renderDetailModule(cur);
+    });
   }
 
   // Switcher (§8.2): popup ancorato sotto l'header, stesse classi dei menu di Filo.

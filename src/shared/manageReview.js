@@ -1719,7 +1719,7 @@
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
     { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
     { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
-    { id: 'utenti', nome: 'Utenti', schede: ['utenti'] },
+    { id: 'utenti', nome: 'Utenti', schede: ['utenti', 'contatori'] },
     { id: 'predefinite', nome: 'Impostazioni predefinite', schede: ['predefiniti'] },
   ]);
 

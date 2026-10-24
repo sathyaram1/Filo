@@ -180,9 +180,12 @@ test('un suggerimento che chiede l\'OK non contatta il sito per l\'icona prima d
 
   const home = await openTab(NEWTAB);
   await home.reload();
-  await expect(vociSuggerite(home).filter({ hasText: 'L\'articolo con l\'icona' }).locator('img')).toHaveAttribute('src', dato(PNG_ROSSO), { timeout: 15000 });
+  // Un suggerimento scritto dal modello prende l'icona solo dalle copie, anche verso un sito che ne ha una (#1505).
+  const articolo = vociSuggerite(home).filter({ hasText: 'L\'articolo con l\'icona' });
+  await expect(articolo.locator('.dash-carta-voce-ico svg')).toBeVisible({ timeout: 15000 });
   const offerte = vociSuggerite(home).filter({ hasText: 'Offerte per te' });
   await expect(offerte.locator('.dash-carta-voce-ico svg')).toBeVisible({ timeout: 10000 });
+  expect((await richieste(app)).filter((r) => r.startsWith('sito-con-icona.test')), 'la carta di un suggerimento ha contattato il sito').toEqual([]);
   // Anche chi chiede l'icona senza sapere dell'OK riceve il no del main: il collegamento in attesa basta.
   const diretta = await app.evaluate((_e, SPIA) => globalThis.SN_HANDLE_MESSAGE(
     { type: globalThis.SN_MSG.MSG.ICONA_SITO, url: `https://${SPIA}/altro` }, { url: 'filo://newtab/' }), SPIA);

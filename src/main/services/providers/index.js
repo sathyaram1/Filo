@@ -119,7 +119,8 @@
         }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
-        return { ...r, provider: a.provider, model: aModel };
+        // `tentativo` (da 1): quale della catena ha risposto, per i contatori (#1464).
+        return { ...r, provider: a.provider, model: aModel, tentativo: i + 1 };
       } catch (err) {
         lastErr = err;
         tentativoFallito(onTentativoFallito, err, aModel);
@@ -143,6 +144,8 @@
     let lastErr = null;
     // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
     const broken = [];
+    // La risposta ricominciata a metà: un tentativo aveva già scritto, o si è rotto dopo essere partito (#1464).
+    let ricominciata = false;
     const noteBroken = (err, a, aModel) => {
       if (err && err.generationId) {
         broken.push({ provider: a.provider, model: aModel, generationId: err.generationId, apiKey: err.keyUsed || a.apiKey, keySource: err.keySource || '' });
@@ -168,13 +171,18 @@
             if (tipo !== 'rete' || !onReset) return false;
             try { onReset({ failed: a.provider, next: a.provider }); } catch (_) {}
             emitted = false;
+            ricominciata = true;
             return true;
           },
           signal,
         );
-        return { ...r, provider: a.provider, model: aModel, ...(broken.length ? { brokenAttempts: broken } : {}) };
+        return {
+          ...r, provider: a.provider, model: aModel, tentativo: i + 1, ricominciata: ricominciata || broken.length > 0,
+          ...(broken.length ? { brokenAttempts: broken } : {}),
+        };
       } catch (err) {
         lastErr = err;
+        if (emitted) ricominciata = true;
         // Porta le chiavi usate: non enumerabile, un errore si stampa e si serializza.
         if (broken.length && err && typeof err === 'object') Object.defineProperty(err, 'brokenAttempts', { value: broken, enumerable: false, configurable: true });
         tentativoFallito(onTentativoFallito, err, aModel);

@@ -67,6 +67,21 @@ test('Preferenze: anche i campi numerici si salvano chiudendo la scheda col curs
     .toBe(23);
 });
 
+// #1343.1: il salvataggio dei colori rileggeva la memoria prima di partire, e la scheda si chiudeva in quell'attimo.
+test('Preferenze: il colore digitato si salva anche chiudendo la scheda subito', async ({ app, shell, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#tok-accent', { timeout: 15_000 });
+  await page.click('#tok-accent');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('#1a7d3a');
+
+  await chiudiScheda(shell, 'preferences');
+
+  await expect
+    .poll(() => impostazioni(app).then((s) => (s.themeTokens || {}).accent), { timeout: 8000 })
+    .toBe('#1a7d3a');
+});
+
 test('Preferenze: la conferma si spegne anche digitando in un campo numerico', async ({ shell, openTab }) => {
   const page = await openTab(PREFERENZE);
   await page.waitForSelector('#showHomeMessage', { timeout: 15_000 });

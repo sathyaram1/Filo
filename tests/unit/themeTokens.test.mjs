@@ -112,6 +112,16 @@ test('sanitize separa override validi e rifiutati', () => {
   assert.deepEqual(rejected.sort(), ['boh', 'radius']);
 });
 
+// #1343.1: le Preferenze mandano solo i token toccati; quelli cambiati altrove (la chat) restano.
+test('conModifica posa i token toccati sulla mappa salvata e lascia gli altri', () => {
+  const salvati = { accent: '#00cc44', radius: '4px' };
+  assert.deepEqual(TT.conModifica(salvati, { bg: '#ffffff', radius: null }), { accent: '#00cc44', bg: '#ffffff' });
+  assert.deepEqual(TT.conModifica(salvati, { accent: '' }), { radius: '4px' });
+  assert.deepEqual(salvati, { accent: '#00cc44', radius: '4px' }, 'la mappa salvata non si tocca');
+  assert.deepEqual(TT.conModifica(undefined, { accent: '#1a7d3a' }), { accent: '#1a7d3a' });
+  assert.deepEqual(TT.conModifica(salvati, null), salvati);
+});
+
 test('effectiveValue ignora gli override non validi', () => {
   assert.equal(TT.effectiveValue('accent', { accent: 'evil;}' }, 'light'), '#c45a3b');
 });

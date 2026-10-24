@@ -148,7 +148,8 @@ function storageKey() {
 
 // Nome file sicuro: niente separatori, caratteri di controllo o traversal. Chromium ha già
 // cambiato le barre in `_`, quindi ogni fila di due o più punti si comprime a uno, ovunque.
-function safeName(name) {
+// Regola unica per i due cammini: anche «Salva immagine come…» propone nel dialogo questo nome (#1510).
+function safeName(name, ripiego = 'download') {
   // I caratteri di direzione (U+202E & co.) non cambiano l'estensione vera ma
   // capovolgono come si LEGGE il nome: «fattura<RLO>txt.exe» si mostra come
   // «fatturaexe.txt». Il file su disco non deve poterlo fare (#588).
@@ -157,8 +158,74 @@ function safeName(name) {
   s = s.trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
   s = s.replace(/[<>:"|?*]/g, '_').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
-  if (!s || s === '.' || s === '..') s = 'download';
+  if (!s || s === '.' || s === '..') s = ripiego;
   return s.slice(0, 180);
+}
+
+// ─── marca d'origine (#1510) ─────────────────────────────────────────────
+// Senza, un file aperto da Esplora risorse o dal Finder salta SmartScreen e Gatekeeper, e Office non lo apre in
+// Visualizzazione protetta. Si scrive sempre, senza contare su Electron: un volume che non la regge (FAT, exFAT)
+// o un xattr che manca lasciano valido lo scaricamento.
+
+// Solo http(s), senza credenziali né frammento: nella marca va l'indirizzo, non le chiavi per entrarci.
+function indirizzoPerMarca(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol !== 'http:' && x.protocol !== 'https:') return '';
+    x.username = ''; x.password = ''; x.hash = '';
+    return x.href;
+  } catch (_) { return ''; }
+}
+
+// In incognito gli indirizzi sarebbero cronologia che sopravvive alla finestra: la zona basta ad armare gli avvisi.
+// Da un altro sito la pagina vale solo per la sua origine, come il Referer che i browser presentano.
+function testoZoneIdentifier({ hostUrl, referrerUrl, incognito } = {}) {
+  const host = incognito ? '' : indirizzoPerMarca(hostUrl);
+  let ref = incognito ? '' : indirizzoPerMarca(referrerUrl);
+  if (ref && host && new URL(ref).origin !== new URL(host).origin) ref = `${new URL(ref).origin}/`;
+  const righe = ['[ZoneTransfer]', 'ZoneId=3'];
+  if (ref) righe.push(`ReferrerUrl=${ref}`);
+  righe.push(`HostUrl=${host || 'about:internet'}`);
+  return righe.join('\r\n') + '\r\n';
+}
+
+// 0081: messo in quarantena da chi ha scaricato, mai aperto: Gatekeeper chiede alla prima apertura.
+function valoreQuarantena(ora = Date.now()) {
+  return `0081;${Math.floor(ora / 1000).toString(16)};Filo;`;
+}
+
+// `sistema` ({ platform, execFile }) esiste per provare i rami degli altri sistemi da uno solo. Risolve true se la
+// marca è scritta, false altrimenti; non rigetta mai.
+function marcaOrigine(file, { hostUrl, referrerUrl, incognito } = {}, sistema = {}) {
+  if (!file) return Promise.resolve(false);
+  const piattaforma = sistema.platform || process.platform;
+  if (piattaforma === 'win32') {
+    // Sincrona: «Apri file» subito dopo lo scaricamento deve già trovarla.
+    try {
+      fs.writeFileSync(`${file}:Zone.Identifier`, testoZoneIdentifier({ hostUrl, referrerUrl, incognito }));
+      return Promise.resolve(true);
+    } catch (_) { return Promise.resolve(false); }
+  }
+  if (piattaforma === 'darwin') {
+    return new Promise((resolve) => {
+      try {
+        const esegui = sistema.execFile || require('node:child_process').execFile;
+        esegui('/usr/bin/xattr', ['-w', 'com.apple.quarantine', valoreQuarantena(), file], (err) => resolve(!err));
+      } catch (_) { resolve(false); }
+    });
+  }
+  // Linux e gli altri: nessuna marca che il sistema guardi prima di aprire un file.
+  return Promise.resolve(false);
+}
+
+// HostUrl è chi ha servito i byte (dopo i rimandi), ReferrerUrl la pagina da cui è partito lo scaricamento.
+function marcaDi(rec) {
+  if (!rec || !rec.savePath) return Promise.resolve(false);
+  return marcaOrigine(rec.savePath, { hostUrl: rec._servito || rec.url, referrerUrl: rec._pagina, incognito: !!scopeOf(rec) });
+}
+
+function paginaDi(webContents) {
+  try { return webContents && !webContents.isDestroyed?.() ? String(webContents.getURL() || '') : ''; } catch (_) { return ''; }
 }
 
 // Un nome lunghissimo farebbe dell'avviso un riquadro enorme: si taglia in MEZZO, così
@@ -435,6 +502,11 @@ function notifyTabs(scope = '') {
   } catch (_) {}
 }
 
+// Lo scaricamento non riuscito è un errore visto (#1461): si conta il tipo, mai il nome del file.
+function contaNonRiuscito(rec) {
+  try { globalThis.SN_CONTATORI_MAIN && globalThis.SN_CONTATORI_MAIN.erroreVisto('avviso:download_failed', { incognito: !!scopeOf(rec) }); } catch (_) {}
+}
+
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
@@ -498,10 +570,12 @@ function completa(rec) {
       rec.savePath = '';
       persist();
       broadcast('error', rec);
-      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
+      contaNonRiuscito(rec);
+      shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
       return;
     }
   }
+  marcaDi(rec);
   rec.state = 'completed';
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
@@ -511,6 +585,7 @@ function completa(rec) {
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
     durationSec: 8,
+    tipo: 'download_finito',
     actions: [
       { label: 'Apri file', openDownloadId: rec.id },
       { label: 'Apri cartella', revealDownloadId: rec.id },
@@ -535,14 +610,16 @@ async function nominaDaSolo(rec) {
     // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
     if (p.errore === 'modello' && !avvisatoSenzaNome) {
       avvisatoSenzaNome = true;
-      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10 }, '');
+      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10, tipo: 'download_senza_nome' }, '');
     }
     return;
   }
   const r = await Nomi.rinomina(letto, p.proposta);
   if (!r.ok || r.invariato) return;
+  require('./contatoriFinestra').misura('rinominato');
   shellToast(`Nome dato: ${shortName(r.nome)}`, {
     durationSec: 10,
+    tipo: 'download_nome_dato',
     actions: [
       { label: 'Annulla', rimettiNomeDownloadId: rec.id },
       { label: 'Apri file', openDownloadId: rec.id },
@@ -638,6 +715,7 @@ function onWillDownload(item, webContents, scope = '') {
     site: sito,
     siteUncertain: incerto,
     servedBy: servito,
+    _pagina: paginaDi(webContents),
     _quarantena: attesa,
     _scope: scope || '',
   };
@@ -717,7 +795,8 @@ function onWillDownload(item, webContents, scope = '') {
       persist();
       broadcast('error', rec);
       if (rec.state !== 'cancelled') {
-        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8 }, scopeOf(rec));
+        contaNonRiuscito(rec);
+        shellToast(`Scaricamento non riuscito: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'download_failed' }, scopeOf(rec));
       }
     }
   }
@@ -768,8 +847,9 @@ function onWillDownload(item, webContents, scope = '') {
 
 // Scaricamenti a mano (#436): «Salva immagine come…» muove i byte da sé, unico modo di
 // presentare il Referer; senza questo registro quel cammino resterebbe muto per l'utente.
+// Risolve quando la marca d'origine è sul file finale (o non si è potuta scrivere).
 function finalizeManual(rec, state, savePath) {
-  if (rec._final) return;
+  if (rec._final) return Promise.resolve(false);
   rec._final = true;
   liveManual.delete(rec.id);
   // Una voce chiusa non aspetta più risposte: chi attendeva la domanda prosegue con un no.
@@ -784,10 +864,12 @@ function finalizeManual(rec, state, savePath) {
     // marca "è un programma" si rifà su QUELLO, non sul nome proposto.
     try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) {}
   }
+  const marca = state === 'completed' ? marcaDi(rec) : Promise.resolve(false);
   rec.state = state;
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
   // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
+  return marca;
 }
 
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
@@ -805,6 +887,8 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     exe: marca(() => ESE().eEseguibile(nome), false),
     site: marca(() => ESE().sito(indirizzo), ''),
     servedBy: marca(() => ESE().servitoDa(indirizzo, servedFrom), ''),
+    _servito: String(servedFrom || indirizzo),
+    _pagina: paginaDi(webContents),
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
@@ -878,7 +962,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO
       // il totale, e la riga non deve restare ferma al 95% a scaricamento finito.
       if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
-      finalizeManual(rec, 'completed', savePath);
+      return finalizeManual(rec, 'completed', savePath);
     },
     fail() { finalizeManual(rec, 'interrupted'); },
     cancel: requestCancel,
@@ -1110,6 +1194,8 @@ module.exports = {
   // nativo, così la rinomina finale è istantanea invece di una copia fra volumi.
   downloadsDir,
   uniquePath,
+  safeName,
+  marcaOrigine,
   list,
   clearCompleted,
   remove,
@@ -1127,6 +1213,7 @@ module.exports = {
   _forgetExists: forgetExists,
   MISSING_TEXT,
   _shortName: shortName,
-  _safeName: safeName,
   _publicRecord: publicRecord,
+  _testoZoneIdentifier: testoZoneIdentifier,
+  _valoreQuarantena: valoreQuarantena,
 };

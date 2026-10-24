@@ -300,7 +300,7 @@ module.exports = function register(on, ctx) {
       // Nel main e non nelle pagine: all'accesso si arriva da molte porte
       // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
       if (auth.isSignedIn() && !remembered) {
-        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO, tipo: 'accesso_non_ricordato' });
       }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e

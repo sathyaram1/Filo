@@ -109,6 +109,15 @@ describe('quali spec lanciare', () => {
       assert.ok(out.includes('tests/editor-chat'), out.join(','));
     });
 
+    // #600.1: il costo di «dimentica» cambiò nel registro (#872) e lo spec dell'autonomia arrivò rosso su main.
+    test('il registro dei costi delle azioni porta lo spec dell’autonomia, che ne prova le conseguenze', () => {
+      const conAutonomia = [...tracked, 'tests/autonomia.spec.mjs'];
+      assert.ok(specsForChangedFiles(['src/shared/actionLevels.js'], conAutonomia).includes('tests/autonomia'));
+      assert.ok(!specsForChangedFiles(['src/shared/actionLevels.js'], tracked).includes('tests/autonomia'),
+        'con l’elenco non si inventa uno spec che non c’è');
+      assert.deepEqual(specsForChangedFiles(['src/shared/constructor.js', 'src/shared/toString.js'], conAutonomia), []);
+    });
+
     test('le prove dei giri (tests/verifica) non entrano per prefisso, e con l’elenco non si inventano nomi', () => {
       assert.deepEqual(specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked), []);
     });
@@ -582,6 +591,12 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
       }
     }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M } }).messaggio, /fusione con main cccccccc/);
+    // #1580.1: chi aveva riprovato il rosso sulla base del ramo lo trovava rosso «su main da solo» e credeva sbagliato questo messaggio.
+    const vecchio = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, baseRamo: 'b'.repeat(40) } }).messaggio;
+    assert.match(vecchio, /non sono del ramo, proseguo\. Il ramo parte da main bbbbbbbb, più vecchio: [^\n]*su main da solo si usa cccccccc, non la base del ramo\./);
+    for (const prova of [{ esito: 'verde', mainSha: M }, { esito: 'verde', mainSha: M, contenuto: true }, { esito: 'rosso_anche_su_main', mainSha: M, baseRamo: 'b'.repeat(40) }]) {
+      assert.doesNotMatch(esitoUnitDelRamo({ checkOnly: false, prova }).messaggio, /parte da main/, JSON.stringify(prova));
+    }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'rosso_anche_su_main', mainSha: M } }).messaggio, /anche su main da solo/);
     const instabili = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, instabili: ['tests/unit/a.test.mjs › lento'] } });
     assert.match(instabili.messaggio, /tests\/unit\/a\.test\.mjs › lento/, 'gli instabili si nominano');

@@ -5,6 +5,7 @@ const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { perContoDellaScheda } = require('../perContoDellaScheda');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { luogoDownload } = require('../contatoriFinestra');
 const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
@@ -122,15 +123,6 @@ function filenameFromUrl(url) {
   } catch (_) { return ''; }
 }
 
-// Il nome dal server è dato ostile: separatori, caratteri di controllo e traversal vanno
-// neutralizzati, o il file esce dalla cartella scelta.
-function safeImageFilename(name) {
-  let n = require('node:path').basename(String(name || ''));
-  n = n.replace(/[\x00-\x1f<>:"/\\|?*]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
-  if (!n) n = 'immagine';
-  return n.slice(0, 200);
-}
-
 // #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
 // da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
 const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
@@ -236,7 +228,7 @@ async function immagineNegliAppunti() {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo, contattabilePrimaDelClic } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
@@ -353,9 +345,9 @@ module.exports = function register(on, ctx) {
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
         onHeaders: ({ filename, totalBytes, servito }) => {
-          // Nome file sicuro: preferisci il Content-Disposition del server, poi
-          // il path dell'URL; neutralizza separatori e tentativi di traversal.
-          const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
+          // Il nome dal server è dato ostile: la regola è quella dei download da link, e dialogo, file
+          // parziale e voce nella barra mostrano lo stesso nome (#1510).
+          const name = downloads.safeName(filename || filenameFromUrl(url) || fallbackName, fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
           entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito, webContents: wc });
@@ -411,7 +403,7 @@ module.exports = function register(on, ctx) {
       entry.fail(); await dropPart();
       return { ok: false, error: e?.message || 'scrittura fallita' };
     }
-    entry.done(dest.filePath);
+    await entry.done(dest.filePath);
     return { ok: true, path: dest.filePath, filename: path.basename(dest.filePath) };
   };
 
@@ -430,7 +422,7 @@ module.exports = function register(on, ctx) {
     if (!P) return { ok: false, error: 'controllo non disponibile' };
     try {
       const res = await require('../firmatariC2pa').analizzaImmagine(byte);
-      const forte = res.prova === 'firmata' && res.firmatario === 'riconosciuto';
+      const forte = res.prova === 'firmata' && (res.firmatario === 'riconosciuto' || res.firmatario === 'provvisorio');
       return { ok: true, frase: P.frase(res), forte, ...res };
     } catch (e) {
       return { ok: false, error: e?.message || 'controllo fallito' };
@@ -491,8 +483,14 @@ module.exports = function register(on, ctx) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
       let esito = { ok: false, error: 'download non avviato' };
       const avvisato = String(origin || '').startsWith('filo://');
-      const r = await apriDaFilo(url, { wc, parole, avvisa: avvisato, tipo: 'SCARICA_COLLEGAMENTO', apri: () => { esito = scarica(); } });
-      return r.aperto ? esito : { ok: false, error: 'segreto', frase: r.frase, avvisato };
+      const r = await apriDaFilo(url, {
+        wc, parole, avvisa: avvisato, tipo: 'SCARICA_COLLEGAMENTO', confermato: msg.confermato === true,
+        proposta: avvisato && msg.proposta === true, apri: () => { esito = scarica(); },
+      });
+      if (r.aperto) return esito;
+      // Un collegamento che al clic chiede l'OK lo chiede anche per scaricarlo: la pagina lo mostra e riprova.
+      if (r.conferma) return { ok: false, conferma: r.conferma, parti: r.parti, avvisato };
+      return { ok: false, error: 'segreto', frase: r.frase, avvisato };
     }
     return scarica();
   });
@@ -509,17 +507,25 @@ module.exports = function register(on, ctx) {
   // #588.2 — ogni finestra vede e comanda solo le voci del suo ambito: una
   // finestra incognito le sue, quella normale la cronologia.
   const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
+  // Ogni azione su uno scaricamento si conta col luogo da cui arriva (#1470), mai col nome del file.
+  const contata = (azione, fn) => async (msg, s, o) => {
+    require('../contatoriFinestra').misura('download', luogoDownload(msg, s), azione, { incognito: !!ambito(s) });
+    return fn(msg, s, o);
+  };
   on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, items: DL().list(ambito(s)) })));
-  on(MSG.DOWNLOADS_CLEAR, internalOnly(async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) })));
-  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(contata('svuota', async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) }))));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(contata('rimuovi', async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) }))));
   // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
-  // senza, il main risponde needsConfirm e non tocca shell.openPath.
-  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s))));
+  // senza, il main risponde needsConfirm e non tocca shell.openPath. Il sì alla conferma è lo stesso gesto: non conta.
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => {
+    if (!msg.confirmed) require('../contatoriFinestra').misura('download', luogoDownload(msg, s), 'apri_file', { incognito: !!ambito(s) });
+    return DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s));
+  }));
   on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg, s) => DL().confirmDownload(msg.id, !!msg.allow, ambito(s))));
-  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg, s) => DL().openFolder(msg.id, ambito(s))));
-  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg, s) => DL().cancel(msg.id, ambito(s))));
-  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg, s) => DL().pause(msg.id, ambito(s))));
-  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg, s) => DL().resume(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(contata('apri_cartella', async (msg, s) => DL().openFolder(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_CANCEL, internalOnly(contata('annulla', async (msg, s) => DL().cancel(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_PAUSE, internalOnly(contata('pausa', async (msg, s) => DL().pause(msg.id, ambito(s)))));
+  on(MSG.DOWNLOAD_RESUME, internalOnly(contata('riprendi', async (msg, s) => DL().resume(msg.id, ambito(s)))));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Alla shell, così l'ombra dell'annotazione copre tutto Filo e non la sola area pagina.
@@ -584,6 +590,7 @@ module.exports = function register(on, ctx) {
             duration: 6000,
           });
         } catch (_) {}
+        try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:allegati_non_caricati'); } catch (_) {}
       },
       // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
@@ -598,7 +605,7 @@ module.exports = function register(on, ctx) {
       // cornice della finestra, dove resta finché non la si chiude.
       onGiveUp: (item, motivo) => {
         try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
-        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'));
+        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'), { errore: 'segnalazione_non_partita' });
       },
       // Dopo un giorno di soli tentativi la coda rinuncia: nell'elenco locale non resta «in partenza».
       onScaduta: (item) => {
@@ -612,7 +619,7 @@ module.exports = function register(on, ctx) {
         perche === 'rifiutato'
           ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
           : 'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
-        { chiave: 'feedback-attesa-accesso-owner' },
+        { chiave: 'feedback-attesa-accesso-owner', tipo: 'segnalazione_in_attesa' },
       ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
@@ -734,7 +741,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.LINK_FERMATO, async (msg) => anteprimaFerma(String((msg && msg.url) || '')) || {});
 
-  on('fetch_link_meta', async (msg, sender) => {
+  on('fetch_link_meta', async (msg, sender, origin) => {
     let rinvio = null;
     try {
       const url = String(msg.url || '');
@@ -742,9 +749,14 @@ module.exports = function register(on, ctx) {
       const ferma = anteprimaFerma(url);
       if (ferma) return { ok: false, ...ferma };
       // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
-      // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
+      // destro (#810), e un collegamento che al clic chiede l'OK uscirebbe prima dell'OK (#1505). Fermato, la
+      // spiegazione parte senza titolo e descrizione.
       const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
+      const contattabile = await contattabilePrimaDelClic(url, {
+        sender, porta, daFilo: isFilo(origin), proposta: msg.proposta === true, delSito: msg.delSito === true,
+      });
+      if (!contattabile) return { ok: false, error: 'da_confermare' };
       // Il tempo copre anche il corpo: un sito che lo manda a gocce non tiene aperto il menu in attesa.
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);

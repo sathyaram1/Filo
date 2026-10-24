@@ -825,6 +825,7 @@
       const ta = document.createElement('textarea');
       ta.id = id;
       ta.dataset.categoria = k;
+      ta.spellcheck = false;
       ta.rows = 6;
       ta.style.width = '100%';
       ta.value = (delicateCaricate[k] || []).join('\n');

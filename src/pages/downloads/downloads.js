@@ -50,6 +50,11 @@
   }
 
   let flashTimer = null;
+  // Un errore letto qui si conta come nella barra delle schede, per chiave dell'elenco chiuso (#1461): mai il testo.
+  function flashErrore(text, chiave) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    flash(text);
+  }
   function flash(text) {
     let el = $('dl-flash');
     if (!el) {
@@ -90,7 +95,7 @@
       if (ok) await openFile(r, true);
       return;
     }
-    flash(res.error || 'Impossibile aprire il file');
+    flashErrore(res.error || 'Impossibile aprire il file', 'file_non_aperto');
     if (res.missing) reload();
   }
 
@@ -108,9 +113,9 @@
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
     if (!res) return;
-    if (res.ok === false) { flash(res.error || 'Cartella non disponibile'); if (res.missing) reload(); return; }
+    if (res.ok === false) { flashErrore(res.error || 'Cartella non disponibile', 'cartella_non_aperta'); if (res.missing) reload(); return; }
     // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
-    if (res.missing) { flash('Il file non c’è più: ho aperto la cartella dov’era'); reload(); }
+    if (res.missing) { flashErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';

@@ -10,6 +10,7 @@ module.exports = function register(on, ctx) {
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
+  require('../fontiSegnaposto');
 
   // Cache audio in memoria: rileggere lo stesso testo con la stessa voce e lo stesso modello
   // è istantaneo invece di rifare la chiamata lenta. Dura quanto la sessione.
@@ -142,8 +143,78 @@ module.exports = function register(on, ctx) {
     const frase = I18n ? I18n.t(`toast_tetto_${fermo.gruppo}`, fermo.tetto) : `${fermo.gruppo}: ${fermo.tetto}`;
     if (fermo.primo) {
       try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
+      try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:tetto_automatiche'); } catch (_) {}
     }
     return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
+  }
+
+  // #1448 — la ricerca di un segnaposto del correttore: le fonti le prende il main (Wikipedia e Wikidata, poi il web se
+  // è acceso), il modello del controllo ragionato ne legge il valore, e la riga torna con la fonte vera. Da una pagina
+  // delicata, o con un dato riservato nella ricerca, non si cerca. Regole: tests/unit/fontiSegnaposto.test.mjs.
+  const SENZA_VALORE = '[][][][nessuno]';
+  function segnapostoDaPagina(payload) {
+    const s = payload && payload.segnaposto;
+    if (!s || typeof s !== 'object') return null;
+    const R = require('../correttoreRiservati');
+    const testo = (v, max) => R.oscura(typeof v === 'string' ? v : '').slice(0, max);
+    const dove = typeof s.dove === 'string' && /^(?:web|wiki:[a-z]{2,3})$/.test(s.dove) ? s.dove : 'wiki:en';
+    const g = s.giaLette && typeof s.giaLette === 'object' ? s.giaLette : null;
+    const giaLette = g && typeof g.domanda === 'string' && typeof g.dove === 'string' ? { domanda: testo(g.domanda, 200), dove: g.dove } : null;
+    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove, suRichiesta: s.suRichiesta === true, giaLette };
+  }
+  // Le fonti da cui un segnaposto ha avuto il suo valore, per sito e domanda: la stessa x richiesta con altre parole, o
+  // precisata, si rilegge prima lì e ripaga la ricerca solo se lì il dato non c'è. Dati che cambiano: durano mezz'ora.
+  const FONTI_LETTE_MAX = 200;
+  const FONTI_LETTE_MS = 30 * 60 * 1000;
+  const fontiLette = new Map();
+  const chiaveLette = (sito, domanda, dove) => [sito, dove, String(domanda).toLowerCase().replace(/\s+/g, ' ').trim()].join('\u0000');
+  async function cercaSegnaposto(sp, { sender, origin, delicata }) {
+    const settings = await getEffectiveSettings();
+    const corr = settings.correttore || {};
+    if (corr.segnaposti === false) return { ok: false, code: 'SEGNAPOSTI_SPENTI' };
+    const R = require('../correttoreRiservati');
+    if (!sp.domanda.trim()) return { text: SENZA_VALORE };
+    // Una ricerca non fatta non è un dato che non c'è: la pagina dice perché. Da una pagina delicata parte solo col
+    // clic di chi scrive; con un dato riservato, o fermata dalla porta delle uscite, non parte mai.
+    if (sp.domanda.includes(R.SEGNAPOSTO)) return { ok: false, code: 'RICERCA_BLOCCATA' };
+    if (delicata && !sp.suRichiesta) return { ok: false, code: 'PAGINA_DELICATA' };
+    const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
+    if (u.blocca) return { ok: false, code: 'RICERCA_BLOCCATA' };
+    const F = globalThis.SN_FONTI_SEGNAPOSTO;
+    const sito = sitoDi(String(sender?.tab?.url || sender?.url || ''));
+    const ricorda = (fonti) => {
+      const k = chiaveLette(sito, sp.domanda, sp.dove);
+      fontiLette.delete(k);
+      fontiLette.set(k, { fonti, alle: Date.now() });
+      while (fontiLette.size > FONTI_LETTE_MAX) fontiLette.delete(fontiLette.keys().next().value);
+    };
+    const lette = sp.giaLette && fontiLette.get(chiaveLette(sito, sp.giaLette.domanda, sp.giaLette.dove));
+    if (lette && Date.now() - lette.alle < FONTI_LETTE_MS) {
+      const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti: lette.fonti }, origin });
+      const riga = F.ricomponi(r && r.text, lette.fonti);
+      if (riga) { ricorda(lette.fonti); return { ...r, text: riga }; }
+    }
+    let ultima = null;
+    let fallita = '';
+    for (const giro of F.giri(sp.dove, corr.segnapostiWeb !== false)) {
+      let fonti = [];
+      try {
+        fonti = giro === 'web'
+          ? await F.web(sp.domanda, settings.apiKeys?.tavily || '')
+          : await F.wikipedia(sp.domanda, giro.replace(/^wiki:/, ''));
+      } catch (e) {
+        fallita = String(e?.message || e);
+        console.warn('[SN] segnaposto, fonti:', fallita);
+      }
+      if (!fonti.length) continue;
+      const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti }, origin });
+      ultima = r;
+      const riga = F.ricomponi(r && r.text, fonti);
+      if (riga) { ricorda(fonti); return { ...r, text: riga }; }
+    }
+    // Fonti che non hanno risposto non dicono che il dato non c'è: la ricerca è fallita, e si può rifare.
+    if (!ultima && fallita) return { ok: false, code: 'FONTI_NON_RAGGIUNTE', error: fallita };
+    return { ...(ultima || {}), text: SENZA_VALORE };
   }
 
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
@@ -152,6 +223,13 @@ module.exports = function register(on, ctx) {
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
     const senzaContesto = await senzaPaginaDelicata(msg, sender);
+    const segnaposto = msg && msg.action === SN_CONST.ACTIONS.SPELLCHECK_CONTEXT ? segnapostoDaPagina(msg.payload) : null;
+    if (segnaposto) {
+      const Cont = globalThis.SN_CONTATORI_MAIN;
+      const giro = () => cercaSegnaposto(segnaposto, { sender, origin, delicata: senzaContesto });
+      const r = await (msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, giro) : giro());
+      return r && r.ok === false ? r : { ok: true, ...r };
+    }
     // Chiavi, password e carte scritte nel campo restano sul computer (#1446); il sito lo dice chi ha mandato, non la pagina.
     if (msg && DEL_CORRETTORE.has(msg.action) && msg.payload && typeof msg.payload === 'object') {
       msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
@@ -188,6 +266,8 @@ module.exports = function register(on, ctx) {
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
     const Cont = globalThis.SN_CONTATORI_MAIN;
     const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
+    // `anticipo`: la risposta preparata prima che la persona la chieda è pronta; se la apre lo dice la pagina (#1461).
+    if (msg && msg.anticipo === true && r && typeof r.text === 'string' && Cont && Cont.anticipoPronto) Cont.anticipoPronto(msg.action);
     if (lettura) await lettura;
     return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
   });
@@ -356,15 +436,23 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  const ttsFallback = (error, errorCode) => {
+  const ttsFallback = (error, errorCode, err = null) => {
+    // Chiave rifiutata o crediti finiti (#1344.1): l'avviso dice perché e porta alla pagina Crediti, non «non disponibile ora».
+    const W = globalThis.SN_WALLET;
+    const keyRefused = Boolean(err && W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(err));
     // I guasti tecnici hanno testi che cambiano a ogni frase: contano come un motivo solo.
-    const motivo = errorCode ? `${errorCode}|${error}` : 'guasto';
+    const motivo = errorCode ? `${errorCode}|${error}` : (keyRefused ? 'chiave' : 'guasto');
     const firstFallback = ttsFallbackAnnounced !== motivo;
     ttsFallbackAnnounced = motivo;
     // `errorCode` distingue i guasti tecnici (che il content script traduce in
     // una frase generica) dagli errori di CONFIGURAZIONE dei modelli, il cui
     // messaggio è già scritto per l'utente e va mostrato tale e quale.
-    return { ok: false, error, errorCode: errorCode || '', firstFallback };
+    return {
+      ok: false, error, errorCode: errorCode || '', firstFallback,
+      ...(keyRefused ? { keyRefused: true, status: Number(err.status) || 0, provider: err.provider || '' } : {}),
+      ...(err && typeof err.userMessage === 'string' && err.userMessage ? { userMessage: err.userMessage } : {}),
+      ...(err && err.reason === 'crediti' ? { reason: 'crediti' } : {}),
+    };
   };
 
   // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
@@ -402,7 +490,7 @@ module.exports = function register(on, ctx) {
       } catch (e) {
         // Nessun modello di sintesi configurato: si legge col browser, ma il motivo vero passa al
         // content script, così l'avviso dice cosa manca invece di un codice interno.
-        return ttsFallback(e?.message || 'no_tts_model', e?.code);
+        return ttsFallback(e?.message || 'no_tts_model', e?.code, e);
       }
       const Voices = globalThis.SN_TTS_VOICES;
       const ttsPrefs = (settings && settings.tts) || {};
@@ -460,9 +548,9 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS fallito:', e.message || e);
         }
       }
-      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code);
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code, lastErr);
     } catch (e) {
-      return ttsFallback(e?.message || String(e));
+      return ttsFallback(e?.message || String(e), '', e);
     }
   }
 

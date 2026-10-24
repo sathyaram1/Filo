@@ -60,6 +60,12 @@ classe che la segnalazione non nominava; un difetto in qualcosa che il ramo ha
 aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
 suo: non si disfa il lavoro fatto).
 
+«C'era già su `main`» si prova su `origin/main` appena scaricato
+(`git fetch origin main`), non sulla base del ramo: main può averlo corretto
+dopo che il ramo è partito, e allora non è un rilievo. Ci rientra un test di
+logica rosso sul ramo che il controllo di fine lavoro trova verde sulla fusione
+con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
+
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
 resta un 3. Il giro continua per i rilievi interni; un vicino può essere
 corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo

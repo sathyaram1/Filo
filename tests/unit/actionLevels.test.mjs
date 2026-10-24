@@ -64,6 +64,21 @@ test('DIMENTICA nasconde (costo 1, si rimette dal quaderno); il «per sempre» �
   assert.ok(d.split('\n')[0].length < 70, 'la prima riga fa da bottone: resta corta');
 });
 
+test('DIMENTICA: una riga sola si dice al singolare fino in fondo, nascosta e per sempre (#592.23)', () => {
+  const una = AL.describe({ type: 'DIMENTICA', _righe: ['Vive a Bologna.'] });
+  assert.match(una, /questa riga/);
+  assert.match(una, /Non entrerà più nelle conversazioni\. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla\.$/);
+  const unaPer = AL.describe({ type: 'DIMENTICA', _righe: ['Vive a Bologna.'], per_sempre: true });
+  assert.match(unaPer, /cancellare per sempre questa riga/);
+  assert.match(unaPer, /Non entrerà più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie\.$/);
+  for (const t of [una, unaPer]) assert.doesNotMatch(t, /entreranno|Le ritrovi|nascoste|rimetterle/);
+
+  const due = AL.describe({ type: 'DIMENTICA', _righe: ['Uno.', 'Due.'] });
+  assert.match(due, /queste 2 righe/);
+  assert.match(due, /Non entreranno più nelle conversazioni\. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle\.$/);
+  assert.match(AL.describe({ type: 'DIMENTICA', _righe: ['Uno.', 'Due.'], per_sempre: true }), /Non entreranno più nelle conversazioni, e il testo sparisce/);
+});
+
 test('NAVIGA con flag anti-esfiltrazione sale a costo 2', () => {
   // Il flag `_exfil` lo inietta il main (taint-match in urlExfil.js), mai l'LLM:
   // un link che porta fuori dati sensibili deve chiedere conferma, non aprirsi.

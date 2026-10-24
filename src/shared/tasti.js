@@ -234,6 +234,24 @@
       : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
+  // ── La scheda dopo e quella prima ──────────────────────────────────────────
+  // Ctrl+Tab e Ctrl+Shift+Tab di ogni browser, su Mac col Control vero (Cmd+Tab è il cambio di app del
+  // sistema): l'etichetta resta «Ctrl+Tab» anche lì. Gira in tondo. Torna l'indice (0-based) o null.
+  function indiceSchedaVicina(ev, attiva, quante) {
+    if (!ev || !(String(ev.code || '') === 'Tab' || String(ev.key || '') === 'Tab')) return null;
+    if (!modificatore(ev, 'ctrl') || modificatore(ev, 'alt') || modificatore(ev, 'meta')) return null;
+    const n = Number(quante);
+    if (!Number.isInteger(n) || n < 1) return null;
+    const indietro = modificatore(ev, 'shift');
+    const i = Number(attiva);
+    if (!Number.isInteger(i) || i < 0 || i >= n) return indietro ? n - 1 : 0;
+    return (i + (indietro ? n - 1 : 1)) % n;
+  }
+
+  function etichettaSchedaVicina(verso) {
+    return verso === 'prima' ? 'Ctrl+Shift+Tab' : 'Ctrl+Tab';
+  }
+
   // ── Indietro e avanti ──────────────────────────────────────────────────────
   // Chi arriva da un browser qualunque prova Alt+freccia e i due tasti laterali
   // del mouse. Nome e comportamento stanno qui insieme per lo stesso motivo del
@@ -421,6 +439,8 @@
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
     lista.push([etichettaSchermoIntero(esplicita), 'mette e toglie lo schermo intero']);
+    lista.push([etichettaSchedaVicina('dopo'), 'porta alla scheda successiva']);
+    lista.push([etichettaSchedaVicina('prima'), 'porta alla scheda precedente']);
     if (!senzaFilo) {
       for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
@@ -1011,7 +1031,7 @@
 
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
-    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
+    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,

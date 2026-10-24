@@ -259,13 +259,16 @@ function finestraDi(parent) {
   wc.on('render-process-gone', () => {
     if (s.win !== win) return;
     const r = s.aperto && !win.isVisible() && s.richiesta && !s.richiesta.ripresa ? s.richiesta : null;
+    // Il menu che si riapre da solo è la stessa ricerca: né una chiusura a vuoto né una seconda apertura.
+    const ricerca = r ? s.ricerca : null;
+    if (r) s.ricerca = null;
     clearTimeout(s.tetto);
     s.win = null;
     s.pronta = false;
     s.attesa = null;
     chiudi(s);
     if (!win.isDestroyed()) win.destroy();
-    if (r && !parent.isDestroyed()) apri(parent, { ...r, ripresa: true });
+    if (r && !parent.isDestroyed()) apri(parent, { ...r, ripresa: true, ricerca });
   });
   win.on('blur', () => sfocato(s, win));
   win.on('closed', () => {
@@ -289,6 +292,11 @@ function dalMenu(s, canale, a, b) {
     // Una voce del menu di prima (cliccata mentre arrivava quello nuovo) non sceglie per lui.
     if (!s.aperto || b !== s.giro) return;
     const scelta = s.scelta;
+    const ric = s.ricerca;
+    if (ric && !ric.fatta) {
+      ric.fatta = true;
+      contaRicerca(s, 'scelta', { attesaMs: Date.now() - ric.t0, posizione: ric.posti.get(typeof a === 'string' ? a : '') || null });
+    }
     // Prima si chiude: chi sceglie può riaprire subito il menu (il secondo livello di una voce a due zone).
     chiudi(s);
     if (scelta) { try { scelta(typeof a === 'string' ? a : ''); } catch (_) {} }
@@ -317,6 +325,9 @@ function chiudi(s) {
   if (!s.aperto) return;
   s.aperto = false;
   s.scelta = null;
+  const ric = s.ricerca;
+  s.ricerca = null;
+  if (ric && !ric.fatta) contaRicerca(s, 'vuota');
   const n = ++s.giro;
   if (inVista === s) inVista = null;
   const win = s.win;
@@ -341,6 +352,29 @@ function sfocato(s, win) {
   }, resta);
 }
 
+// Ogni menu a comparsa è un pannello dove si cerca una voce (#1461): apertura, scelta con l'attesa e il posto della
+// voce fra quelle che si possono scegliere, chiusura senza scelta. Una regola sola qui, per tutti i menu che ci passano.
+function contaRicerca(s, esito, extra = {}) {
+  try {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    if (C && typeof C.ricerca === 'function') C.ricerca('menu', { esito, ...extra }, { incognito: !!(s.parent && s.parent._filoIncognito) });
+  } catch (_) {}
+}
+
+// Il valore che ogni voce manda (lo stesso di vociHTML) e il suo posto, da 1; la freccia di una voce a due zone vale la voce.
+function postiDelleVoci(entries) {
+  const posti = new Map();
+  let n = 0;
+  for (const e of entries || []) {
+    if (!e || e.type === 'separator' || e.disabled) continue;
+    n += 1;
+    const valore = e.action ? '@action:' + String(e.action) : String(e.url || '');
+    if (!posti.has(valore)) posti.set(valore, n);
+    if (e.subAction && !posti.has('@action:' + String(e.subAction))) posti.set('@action:' + String(e.subAction), n);
+  }
+  return posti;
+}
+
 // ── Mostra il menu ────────────────────────────────────────────────────────
 function showPopupMenu(parentWin, entries, x, y, onSelect) {
   if (!parentWin || parentWin.isDestroyed()) return;
@@ -363,6 +397,11 @@ function apri(parentWin, r) {
   s.scelta = r.scelta;
   s.mostratoAlle = Date.now();
   inVista = s;
+  if (r.ripresa && r.ricerca) s.ricerca = r.ricerca;
+  else {
+    s.ricerca = { t0: Date.now(), posti: postiDelleVoci(voci), fatta: false };
+    contaRicerca(s, 'aperta');
+  }
   // La finestra compare quando la pagina conferma le voci nuove (popup-menu:pronto), mai con quelle di prima.
   invia(s, { n: s.giro, html: vociHTML(voci), scuro: !!nativeTheme.shouldUseDarkColors, vars: require('./movimento').variabili() });
 }

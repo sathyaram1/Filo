@@ -102,7 +102,10 @@ async function filoHandler(request) {
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
     } else if (host === 'newtab') {
-      fsPath = path.join(SRC, 'pages', 'dashboard', rel || 'dashboard.html');
+      // La home sta nella cartella dashboard: «newtab.html» è il nome che la regola <host>/<host>.html delle altre
+      // pagine fa scrivere, e deve aprire la home invece di un file che non c'è (#830.4).
+      const home = !rel || rel.toLowerCase() === 'newtab.html';
+      fsPath = path.join(SRC, 'pages', 'dashboard', home ? 'dashboard.html' : rel);
     } else if (host === 'asset') {
       fsPath = path.join(ASSETS, rel);
     } else if (host === 'style') {

@@ -51,7 +51,7 @@
 
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
-      Popup.showToast(I18n.t('toast_not_an_address'));
+      Popup.toastErrore('toast_not_an_address');
       return false;
     }
     copyToClipboard(String(url).trim());
@@ -125,7 +125,7 @@
     let appunti = null;
     if (letti && typeof letti === 'object') appunti = { ok: true, testo: letti.testo, immagine: letti.immagine };
     else try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
-    if (!appunti || !appunti.ok) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
+    if (!appunti || !appunti.ok) { Popup.toastErrore('toast_paste_failed'); return; }
     const text = typeof appunti.testo === 'string' ? appunti.testo : '';
     let blob = null;
     if (appunti.immagine) blob = blobDaDataUrl(appunti.immagine);
@@ -145,17 +145,17 @@
           insertTextAtSelection(text);
           pushClipboardEntry({ type: 'text', text }, 'paste');
         } else {
-          Popup.showToast(I18n.t('toast_cannot_paste_image'));
+          Popup.toastErrore('toast_cannot_paste_image');
         }
         return;
       }
       if (targetKind !== 'ce') {
         // Nessun target editabile valido per un'immagine.
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       if (!insertImageInEditable(blob, dataUrl)) {
-        Popup.showToast(I18n.t('toast_paste_failed'));
+        Popup.toastErrore('toast_paste_failed');
         return;
       }
       const description = await describeImage(blob);
@@ -193,16 +193,16 @@
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
         }
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       if (ctx?.kind !== 'ce') {
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       const ok = insertImageInEditable(blob, entry.dataUrl, descriptionToFilename(entry.description));
       if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
-      else Popup.showToast(I18n.t('toast_paste_failed'));
+      else Popup.toastErrore('toast_paste_failed');
       return;
     }
     insertTextAtSelection(entry.text || '');
@@ -347,6 +347,7 @@
   function buildPasteItem(clipboardHistory) {
     return {
       type: 'paste',
+      azione: 'paste-clipboard',
       label: I18n.t('menu_paste'),
       shortcut: Tasti.etichetta('Ctrl+V'),
       history: clipboardHistory,
@@ -395,11 +396,12 @@
 
   // L'avviso «manca il modello» si dà una volta per pagina: la descrizione parte a ogni
   // immagine e ripetere il toast sarebbe rumore.
+  // La frase dice dove si sceglie il modello: l'avviso porta il tasto per andarci (#663, #1344.1).
   const modelConfigWarned = new Set();
-  function warnModelConfigOnce(message) {
+  function warnModelConfigOnce(message, res) {
     if (!message || modelConfigWarned.has(message)) return;
     modelConfigWarned.add(message);
-    try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
+    try { Popup.showToast(message, { duration: 7000, rimedio: res || null }); } catch (_) {}
   }
 
   // «Descrizione…» solo finché può davvero arrivare: un'attesa che non finirà mai è una
@@ -442,25 +444,32 @@
       }).catch(() => {});
       return null;
     }
+    // La descrizione si chiede una volta sola: una richiesta andata male lascerebbe la voce in cronologia su
+    // «Descrizione…» per sempre (crediti finiti, rete, risposta vuota: #1344.1). Le si dice la verità.
+    const nonArrivera = (chiave) => {
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t(chiave),
+      }).catch(() => {});
+    };
     if (!res?.ok) {
       // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
       if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
-        warnModelConfigOnce(res.error);
-        // La voce in cronologia incolla resterebbe su «Descrizione…» per
-        // sempre: dille la verità invece di far finta che stia arrivando.
-        chrome.runtime.sendMessage({
-          type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
-          dataUrl,
-          description: I18n.t('clipboard_image_no_model'),
-        }).catch(() => {});
+        if (!modelConfigWarned.has(res.error)) Popup.conta({ misura: 'errore-modello', code: String(res.code || ''), status: 0 });
+        warnModelConfigOnce(res.error, res);
+        nonArrivera('clipboard_image_no_model');
+      } else {
+        nonArrivera('clipboard_image_non_descritta');
       }
       console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
     imageDescNoModel = false;
-    if (!res.text) {
+    if (!res.text || !res.text.replace(/\s+/g, ' ').trim()) {
       console.warn('[SN] descrizione immagine: risposta vuota');
+      nonArrivera('clipboard_image_non_descritta');
       return null;
     }
     const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -502,7 +511,7 @@
 
   function triggerExplainOrTranslate(action, selInfo, anchorEvent) {
     if (!selInfo) {
-      Popup.showToast(I18n.t('err_no_selection'));
+      Popup.toastErrore('err_no_selection');
       return;
     }
     if (selInfo.segreto) {
@@ -588,7 +597,7 @@
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
       // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
-      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
+      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
     }).then(
       (res) => {
         // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
@@ -603,8 +612,8 @@
     return entry;
   }
 
-  function contaUso(action, attesaMs) {
-    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs })).catch(() => {}); } catch (_) {}
+  function contaUso(action, attesaMs, anticipata = false) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs, anticipata })).catch(() => {}); } catch (_) {}
   }
 
   // Restituisce la Promise per la spiegazione di questa selezione.
@@ -613,6 +622,8 @@
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
     const chiedi = () => {
+      // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
+      if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       const entry = startExplainRequest(selInfo, { suRichiesta: true });
       prefetchedExplain = entry;
       return entry.promise;
@@ -622,11 +633,13 @@
       return pre.promise.then((res) => {
         if (pre.fermata) return chiedi();
         // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
-        if (pre.anticipata && !pre.usata) {
+        const primaVolta = !!pre.anticipata && !pre.usata;
+        if (primaVolta) {
           pre.usata = true;
           Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
         }
-        return { ...res, giaChiesta: true };
+        // Per i contatori un anticipo è aperto una volta sola, e solo se era pronto: riaperto o fallito non conta (#1461).
+        return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
       });
     }
     return chiedi();
@@ -670,7 +683,7 @@
         getExplainPromise(selInfo).then((res) => {
           // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
           // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
-          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
+          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
           if (!res || res.errore || !res.text) {
@@ -818,7 +831,8 @@
             if (cancelled || !p || !p.ok || !p.frase) return;
             testoChiuso(origine, p.frase);
             origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified'
-              : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
+              : p.firmatario === 'provvisorio' ? 'menu_origin_hint_interim'
+                : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
             origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
           }).catch(() => {});
@@ -874,7 +888,12 @@
 
           // Quando il sito non si contatta lo decide il main (#1307). Un sito bloccato non si spiega: si dice che è in lista.
           let ogTitle = '', ogDescription = '', r = null;
-          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url }); } catch (_) {}
+          // Scritto da un modello: mai giudicato, o con un dato che al clic chiede l'OK, non si contatta prima (#1505).
+          // `delSito`: il collegamento è della pagina, che sa già dove porta.
+          const proposta = global.SN_MARKDOWN?.scrittoDaUnModello
+            ? global.SN_MARKDOWN.scrittoDaUnModello(linkEl)
+            : !!(linkEl.closest && linkEl.closest('a.filo-md-link, [data-filo-verdetti]'));
+          try { r = await chrome.runtime.sendMessage({ type: 'fetch_link_meta', url, proposta, delSito: !proposta }); } catch (_) {}
           if (cancelled) return;
           if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
           else if (r?.bloccato) {
@@ -1018,7 +1037,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        Popup.showToast(I18n.t('toast_save_failed'));
+        Popup.toastErrore('toast_save_failed');
         return null;
       }
       entry = res.entry;
@@ -1026,7 +1045,7 @@
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
       console.error('[SN] savePage', e);
-      Popup.showToast(I18n.t('toast_save_failed'));
+      Popup.toastErrore('toast_save_failed');
       return null;
     }
 
@@ -1096,7 +1115,7 @@
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
-      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB, via: 'salva_per_dopo' }).catch(() => {});
     };
 
     pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
@@ -1169,9 +1188,9 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src, politiche: politicheReferrer(imgEl) });
       if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
-      else if (!res?.cancelled) Popup.showToast(I18n.t('toast_image_save_failed'));
+      else if (!res?.cancelled) Popup.toastErrore('toast_image_save_failed');
     } catch (_) {
-      Popup.showToast(I18n.t('toast_image_save_failed'));
+      Popup.toastErrore('toast_image_save_failed');
     }
   }
 
@@ -1209,9 +1228,9 @@
     }
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url: href });
-      if (res && res.ok === false) Popup.showToast(I18n.t('toast_file_save_failed'));
+      if (res && res.ok === false) Popup.toastErrore('toast_file_save_failed');
     } catch (_) {
-      Popup.showToast(I18n.t('toast_file_save_failed'));
+      Popup.toastErrore('toast_file_save_failed');
     }
   }
 
@@ -1234,7 +1253,7 @@
   async function shareLink(linkEl) {
     const href = indirizzoDelLink(linkEl);
     if (!isAddress(href)) {
-      Popup.showToast(I18n.t('toast_not_an_address'));
+      Popup.toastErrore('toast_not_an_address');
       return;
     }
     const data = { title: nomeDelLink(linkEl) || href, url: href };
@@ -1256,7 +1275,13 @@
       chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB, url: String(url) }).catch(() => {});
       return;
     }
-    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    try {
+      if (typeof global.SN_APERTURA_SCELTA === 'function') {
+        const voce = global.SN_MENU && typeof global.SN_MENU.azioneInCorso === 'function' ? global.SN_MENU.azioneInCorso() : null;
+        if (voce) voce.apre = true;
+        global.SN_APERTURA_SCELTA(url, voce ? { id: voce.id, t0: voce.t0 } : null);
+      }
+    } catch (_) {}
     window.open(url, '_blank', 'noopener');
   }
 
@@ -1351,7 +1376,7 @@
       if (isMediaInPip(el)) { await document.exitPictureInPicture(); return; }
       await el.requestPictureInPicture();
     } catch (_) {
-      Popup.showToast(I18n.t('toast_pip_failed'));
+      Popup.toastErrore('toast_pip_failed');
     }
   }
 
@@ -1360,7 +1385,7 @@
   function copyMediaUrl(el) {
     const src = mediaSrc(el);
     if (!src || /^blob:/i.test(src)) {
-      Popup.showToast(I18n.t('toast_media_stream_only'));
+      Popup.toastErrore('toast_media_stream_only');
       return;
     }
     copyUrlToClipboard(src);
@@ -1370,7 +1395,7 @@
     const audio = isAudioEl(el);
     const failToast = audio ? 'toast_audio_save_failed' : 'toast_video_save_failed';
     const src = mediaSrc(el);
-    if (!src) { Popup.showToast(I18n.t(failToast)); return; }
+    if (!src) { Popup.toastErrore(failToast); return; }
 
     // Come in downloadImage, blob: e data: restano sul cammino anchor. Un blob: di
     // MediaSource non è leggibile: lì non esiste nessun file da salvare.
@@ -1388,7 +1413,7 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
       } catch (_) {
-        Popup.showToast(I18n.t('toast_media_stream_only'));
+        Popup.toastErrore('toast_media_stream_only');
       }
       return;
     }
@@ -1403,9 +1428,9 @@
         politiche: politicheReferrer(el),
       });
       if (res?.ok) Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved'));
-      else if (!res?.cancelled) Popup.showToast(I18n.t(failToast));
+      else if (!res?.cancelled) Popup.toastErrore(failToast);
     } catch (_) {
-      Popup.showToast(I18n.t(failToast));
+      Popup.toastErrore(failToast);
     }
   }
 
@@ -1415,10 +1440,12 @@
     const rate = Number(el.playbackRate) || 1;
     return {
       type: 'split',
+      azione: 'video-audio-controls',
       label: `${I18n.t('menu_media_speed')} ${formatSpeed(rate)}`,
       arrowTitle: I18n.t('menu_media_speed_pick'),
       onClick: () => setMediaSpeed(el, nextMediaSpeed(rate)),
       subItems: MEDIA_SPEEDS.map((s) => ({
+        azione: 'video-audio-controls',
         label: `${Math.abs(s - rate) < 0.001 ? '✓ ' : ''}${formatSpeed(s)}${s === 1 ? ` (${I18n.t('menu_media_speed_normal')})` : ''}`,
         onClick: () => setMediaSpeed(el, s),
       })),
@@ -1430,40 +1457,47 @@
     const items = [];
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'),
       onClick: () => toggleMediaPlay(el),
     });
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'),
       onClick: () => toggleMediaMute(el),
     });
     items.push(buildMediaSpeedItem(el));
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'),
       onClick: () => toggleMediaLoop(el),
     });
     if (mediaPipAvailable(el)) {
       items.push({
         type: 'item',
+        azione: 'video-pip',
         label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'),
         onClick: () => toggleMediaPip(el),
       });
     }
     items.push({
       type: 'item',
+      azione: 'video-audio-controls',
       label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'),
       onClick: () => toggleMediaControls(el),
     });
     items.push({ type: 'separator' });
     items.push({
       type: 'item',
+      azione: 'copy-download-video',
       label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'),
       onClick: () => copyMediaUrl(el),
     });
     items.push({
       type: 'item',
+      azione: 'copy-download-video',
       label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
       onClick: () => downloadMedia(el),
     });
@@ -1485,7 +1519,7 @@
     try {
       const cap = await captureVisibleTab();
       if (!cap?.dataUrl) {
-        Popup.showToast(I18n.t('err_provider_failed'));
+        Popup.toastErrore('err_provider_failed');
         return;
       }
       let copied = false;
@@ -1685,7 +1719,7 @@
       a.download = descriptionToFilename(desc) || `screenshot-${stamp}.png`;
       document.body.appendChild(a); a.click(); a.remove();
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
     }
   }
 
@@ -1701,7 +1735,7 @@
       });
       if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
-      if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
+      if (!text) { Popup.toastErrore('toast_transcribe_empty'); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -1715,7 +1749,7 @@
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
     }
   }
 
@@ -1750,7 +1784,7 @@
   async function pickColor(scelto) {
     const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
     if (!giaScelto && typeof window.EyeDropper !== 'function') {
-      Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
+      Popup.toastErrore('err_color_picker_unsupported', { duration: 3000 });
       return;
     }
     try {
@@ -1778,14 +1812,14 @@
     const QR = global.SN_QR;
     const url = String(location.href || '');
     if (!QR || typeof QR.toMatrix !== 'function') {
-      Popup.showToast(I18n.t('qr_error'), { duration: 3000 });
+      Popup.toastErrore('qr_error', { duration: 3000 });
       return;
     }
     let matrix;
     try {
       matrix = QR.toMatrix(url, { ecc: 'M' });
     } catch (e) {
-      Popup.showToast(I18n.t('qr_error'), { duration: 3500 });
+      Popup.toastErrore('qr_error', { duration: 3500 });
       return;
     }
 
@@ -1961,7 +1995,7 @@
         finish(canvas.toDataURL('image/png'));
       }
     } catch (e) {
-      Popup.showToast(I18n.t('qr_error'), { duration: 2500 });
+      Popup.toastErrore('qr_error', { duration: 2500 });
     }
   }
 

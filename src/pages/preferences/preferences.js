@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, tempiCorrettore } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -151,40 +151,40 @@
     Bootstrap.applyThemeTokens(currentOverrides);
   }
 
-  // La mappa dei token si salva intera: si parte da quella in memoria adesso e
-  // ci si applicano solo i token toccati qui, o un colore chiesto a Filo con la
-  // pagina aperta sparirebbe al primo ritocco (#592).
+  // Si mandano solo i token toccati qui e il main li posa sulla mappa salvata: un colore chiesto a Filo con la pagina
+  // aperta resta al primo ritocco (#592), e il salvataggio parte subito, prima che la scheda si chiuda (#1343.1).
   const tokenDaSalvare = new Set();
   const tokenInCorso = new Set();
   let tokenAzzeraTutti = false;
+  // Un token spedito resta di questa pagina finché il main non risponde: l'eco di un cambio partito prima (il tema
+  // toccato subito dopo, la chat) lo riporterebbe indietro nel campo.
+  const tokenInViaggio = new Map();
+  let giriToken = 0;
 
   async function persistTokens() {
     const biglietto = caselle.spedita('token');
-    const nomi = [...tokenDaSalvare];
     const tutti = tokenAzzeraTutti;
+    const nomi = tutti && Tokens ? Tokens.names() : [...tokenDaSalvare];
     tokenDaSalvare.clear();
     tokenAzzeraTutti = false;
+    if (!nomi.length) return;
+    const giro = ++giriToken;
+    const modifica = {};
     for (const name of nomi) {
+      tokenInViaggio.set(name, giro);
+      modifica[name] = Object.prototype.hasOwnProperty.call(currentOverrides, name) ? currentOverrides[name] : null;
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
       if (v === '' || !Tokens || Tokens.validate(name, v)) tokenInCorso.delete(name);
     }
-    let next = {};
-    if (!tutti) {
-      const fresh = await Storage.getSettings().catch(() => null);
-      next = { ...((fresh && fresh.themeTokens) || {}) };
-      for (const name of nomi) {
-        if (Object.prototype.hasOwnProperty.call(currentOverrides, name)) next[name] = currentOverrides[name];
-        else delete next[name];
-      }
-    }
-    currentOverrides = { ...next };
-    for (const name of tokenInCorso) {
-      const input = $(`tok-${name}`);
-      const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
-    }
-    chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
+    // «Ripristina tutti» sostituisce la mappa: se ne vanno anche i token che questa pagina non conosce.
+    const msg = tutti
+      ? { type: MSG.UPDATE_SETTINGS, settings: { themeTokens: {} } }
+      : { type: MSG.UPDATE_SETTINGS, settings: { themeTokens: modifica }, tokenModifica: true };
+    let r = null;
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    for (const name of nomi) if (tokenInViaggio.get(name) === giro) tokenInViaggio.delete(name);
+    if (r && r.ok && r.settings) riallineaToken(r.settings.themeTokens);
     if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
   }
 
@@ -194,13 +194,14 @@
     if (!Tokens) return;
     const salvati = mappa || {};
     const nomi = new Set([...Object.keys(currentOverrides), ...Object.keys(salvati)]);
+    const mio = (name) => tokenInCorso.has(name) || tokenDaSalvare.has(name) || tokenInViaggio.has(name);
     for (const name of nomi) {
-      if (tokenInCorso.has(name) || tokenDaSalvare.has(name)) continue;
+      if (mio(name)) continue;
       if (Object.prototype.hasOwnProperty.call(salvati, name)) currentOverrides[name] = salvati[name];
       else delete currentOverrides[name];
     }
     for (const name of Tokens.names()) {
-      if (!tokenInCorso.has(name) && !tokenDaSalvare.has(name)) renderTokenRow(name);
+      if (!mio(name)) renderTokenRow(name);
     }
   }
 
@@ -844,6 +845,7 @@
       case 'barraLaterale.striscia': return $('barraStriscia').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
@@ -866,9 +868,15 @@
       case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
       case 'correttore.modelloErrori': return $('correttoreModello').checked;
       case 'correttore.ripetizioni': return $('correttoreRipetizioni').checked;
+      case 'correttore.segnaposti': return $('correttoreSegnaposti').checked;
+      case 'correttore.segnapostiWeb': return $('correttoreSegnapostiWeb').checked;
       case 'correttore.pausaRapidoMs': return tempoCorrettoreDelCampo('pausaRapidoMs');
       case 'correttore.ogniRapidoMs': return tempoCorrettoreDelCampo('ogniRapidoMs');
       case 'correttore.pausaRagionatoMs': return tempoCorrettoreDelCampo('pausaRagionatoMs');
+      case 'correttore.automatica': return $('correttoreAutomatica').checked;
+      case 'correttore.accettiPerImparare': return sogliaCorrettoreDelCampo('accettiPerImparare');
+      case 'correttore.annulliPerImparare': return sogliaCorrettoreDelCampo('annulliPerImparare');
+      case 'correttore.riscrittePerImparare': return sogliaCorrettoreDelCampo('riscrittePerImparare');
       default: return undefined;
     }
   }
@@ -878,6 +886,9 @@
   // I tempi del correttore (#1446): campo per chiave; limiti e predefiniti in SN_CONST.CORRETTORE_TEMPI.
   const CAMPI_TEMPI_CORRETTORE = { pausaRapidoMs: 'correttorePausaRapido', ogniRapidoMs: 'correttoreOgniRapido', pausaRagionatoMs: 'correttorePausaRagionato' };
   const tempoCorrettoreDelCampo = (campo) => tempiCorrettore({ correttore: { [campo]: $(CAMPI_TEMPI_CORRETTORE[campo]).value } })[campo];
+  // Quante volte serve per imparare (#1447): limiti e predefiniti in SN_CONST.CORRETTORE_SOGLIE.
+  const CAMPI_SOGLIE_CORRETTORE = { accettiPerImparare: 'correttoreAccetti', annulliPerImparare: 'correttoreAnnulli', riscrittePerImparare: 'correttoreRiscritte' };
+  const sogliaCorrettoreDelCampo = (campo) => soglieCorrettore({ correttore: { [campo]: $(CAMPI_SOGLIE_CORRETTORE[campo]).value } })[campo];
   const interruttore = (s, nome, diSerie) => {
     const v = s.featureFlags && s.featureFlags[nome];
     return diSerie ? v !== false : v === true;
@@ -926,6 +937,7 @@
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
@@ -944,9 +956,15 @@
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
       case 'correttore.ripetizioni': return !(s.correttore && s.correttore.ripetizioni === false);
+      case 'correttore.segnaposti': return !(s.correttore && s.correttore.segnaposti === false);
+      case 'correttore.segnapostiWeb': return !(s.correttore && s.correttore.segnapostiWeb === false);
       case 'correttore.pausaRapidoMs':
       case 'correttore.ogniRapidoMs':
       case 'correttore.pausaRagionatoMs': return tempiCorrettore(s)[k.split('.')[1]];
+      case 'correttore.automatica': return !(s.correttore && s.correttore.automatica === false);
+      case 'correttore.accettiPerImparare':
+      case 'correttore.annulliPerImparare':
+      case 'correttore.riscrittePerImparare': return soglieCorrettore(s)[k.split('.')[1]];
       case 'featureFlags.help':
       case 'featureFlags.spellcheck':
       case 'featureFlags.spellcheckContext':
@@ -1089,6 +1107,7 @@
     if (vuole('barraLaterale.striscia')) $('barraStriscia').checked = barra.striscia;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
+    if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
@@ -1153,9 +1172,16 @@
     const corr = settings.correttore || {};
     if (vuole('correttore.modelloErrori')) $('correttoreModello').checked = corr.modelloErrori !== false;
     if (vuole('correttore.ripetizioni')) $('correttoreRipetizioni').checked = corr.ripetizioni !== false;
+    if (vuole('correttore.segnaposti')) $('correttoreSegnaposti').checked = corr.segnaposti !== false;
+    if (vuole('correttore.segnapostiWeb')) $('correttoreSegnapostiWeb').checked = corr.segnapostiWeb !== false;
     const tempiCorr = tempiCorrettore(settings);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       if (vuole(`correttore.${campo}`)) $(id).value = String(tempiCorr[campo]);
+    }
+    if (vuole('correttore.automatica')) $('correttoreAutomatica').checked = corr.automatica !== false;
+    const soglieCorr = soglieCorrettore(settings);
+    for (const [campo, id] of Object.entries(CAMPI_SOGLIE_CORRETTORE)) {
+      if (vuole(`correttore.${campo}`)) $(id).value = String(soglieCorr[campo]);
     }
 
     if (vuole('timerRingtone')) {
@@ -1827,10 +1853,17 @@
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     $('correttoreModello').addEventListener('change', persist);
     $('correttoreRipetizioni').addEventListener('change', persist);
+    $('correttoreSegnaposti').addEventListener('change', persist);
+    $('correttoreSegnapostiWeb').addEventListener('change', persist);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(tempiCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
+    }
+    $('correttoreAutomatica').addEventListener('change', persist);
+    for (const [campo, id] of Object.entries(CAMPI_SOGLIE_CORRETTORE)) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(soglieCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
     }
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);
@@ -1846,6 +1879,10 @@
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
     }
+    $('avvisoSchermoPienoDurata').addEventListener('change', persist);
+    $('avvisoSchermoPienoDurata').addEventListener('blur', () => {
+      $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
+    });
     $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.

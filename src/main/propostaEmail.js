@@ -407,17 +407,19 @@ function finestraConLaBarra(win) {
   return BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w._filoTabs) || null;
 }
 
+// «Non propormela più» è un gesto della persona (via `interfaccia`); in incognito resta all'incognito.
 function spegni(win) {
   try {
     const { applySettingsUpdate } = require('./services/handlers');
-    Promise.resolve(applySettingsUpdate({ propostaEmail: { attiva: false } })).catch(() => {});
+    const scrivi = () => require('./services/registroCambi').con({ via: 'interfaccia' }, () => applySettingsUpdate({ propostaEmail: { attiva: false } }));
+    Promise.resolve(win && win._filoIncognito ? require('./shim/storage').runIncognito(scrivi) : scrivi()).catch(() => {});
   } catch (_) {}
   const w = finestraConLaBarra(win);
   if (!w) return;
   try {
     w.webContents.send('shell:toast', {
       text: 'Non ti propongo più la tua email nei siti. La riaccendi in Preferenze, nelle impostazioni avanzate.',
-      opts: { durationSec: 8, key: 'proposta-email' },
+      opts: { durationSec: 8, key: 'proposta-email', tipo: 'proposta_email_spenta' },
     });
   } catch (_) {}
 }

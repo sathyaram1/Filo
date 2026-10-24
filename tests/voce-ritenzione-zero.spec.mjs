@@ -52,6 +52,8 @@ const leggi = (app) => app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
 test('coi crediti la voce senza host a ritenzione zero non parte, e la frase dice funzione, modello, motivo e dove cambiarlo', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Una voce che la regola dei crediti ferma darebbe la frase dei crediti e un rosso che sembra una regressione (#1432.1).
+  expect(await app.evaluate((_e, v) => globalThis.SN_CONST.creditsAllowModel(v), VOCE), `«${VOCE}» non è più ammessa coi crediti: serve una voce a pesi aperti`).toBe(true);
   await preparaRouter(app, 'personal');
   const r = await leggi(app);
   expect(await app.evaluate(() => globalThis.__voci)).toBe(0);

@@ -426,6 +426,46 @@ test('quello che la scritta promette è quello che i tasti fanno', () => {
   }
 });
 
+test('Ctrl+Tab e Ctrl+Shift+Tab: la scheda dopo e quella prima, in tondo, su Mac col Control vero (#590.14)', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+  const tab = (mods) => ({ key: 'Tab', code: 'Tab', ...mods });
+
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 0, 3), 1);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 2, 3), 0, 'dall\'ultima si torna alla prima');
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, shiftKey: true }), 0, 3), 2, 'dalla prima all\'ultima');
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, shiftKey: true }), 2, 3), 1);
+  // La forma del main process (`before-input-event`).
+  assert.equal(T.indiceSchedaVicina({ key: 'Tab', control: true }, 1, 3), 2);
+  assert.equal(T.indiceSchedaVicina({ key: 'Tab', control: true, shift: true }, 1, 3), 0);
+  // Cmd+Tab è il cambio di app del Mac, Win+Tab la vista attività di Windows, Ctrl+Alt+Tab il cambio finestra:
+  // nessuno dei tre è di Filo. Tab da solo resta alla pagina.
+  assert.equal(T.indiceSchedaVicina(tab({ metaKey: true }), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, metaKey: true }), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true, altKey: true }), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina(tab({}), 0, 3), null);
+  assert.equal(T.indiceSchedaVicina({ key: 'a', code: 'KeyA', ctrlKey: true }, 0, 3), null);
+  // Una scheda sola: resta lei. Nessuna scheda: niente.
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), 0, 1), 0);
+  assert.equal(T.indiceSchedaVicina(tab({ ctrlKey: true }), -1, 0), null);
+
+  // Su Mac «Ctrl» nelle etichette è il tasto Control: riscriverlo in Cmd+Tab nominerebbe il cambio di app.
+  assert.equal(T.etichettaSchedaVicina('dopo'), 'Ctrl+Tab');
+  assert.equal(T.etichettaSchedaVicina('prima'), 'Ctrl+Shift+Tab');
+  // Chi sceglie una scorciatoia se lo vede rifiutare: Filo lo prende prima della pagina.
+  for (const p of ['win32', 'darwin', 'linux']) {
+    assert.ok(T.riservato('Ctrl+Tab', p) || T.delSistema('Ctrl+Tab', p), `Ctrl+Tab resta libero da scegliere su ${p}`);
+  }
+  assert.equal(T.chiLaPrende('Ctrl+Tab', 'win32'), 'porta alla scheda successiva');
+  assert.equal(T.chiLaPrende('Ctrl+Shift+Tab', 'linux'), 'porta alla scheda precedente');
+  for (const rel of ['src/main/tabs.js', 'src/renderer/shell.js']) {
+    assert.match(readFileSync(join(ROOT, rel), 'utf8'), /indiceSchedaVicina\(/,
+      `${rel} non ascolta Ctrl+Tab: col fuoco lì il tasto non cambia scheda`);
+  }
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'options', 'altro.js'), 'utf8'), /etichettaSchedaVicina\(/,
+    'l\'elenco delle scorciatoie non mostra Ctrl+Tab');
+});
+
 test('il manifesto delle capacità non nomina un tasto solo per Windows', () => {
   // È la fonte unica di cosa Filo sa fare, ed è un file solo per tutti i
   // sistemi: ogni volta che nomina un tasto deve dire anche la forma Mac,

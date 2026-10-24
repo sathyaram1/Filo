@@ -249,12 +249,24 @@
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
     // CONTATORI_INSTALLAZIONI (#969): quante copie di Filo hanno spedito i contatori giornalieri di ieri e del mese in
     //   corso, cioè gli pseudonimi distinti. Solo pagine di Filo e solo owner, col token dell'account Google.
-    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }
+    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }; sotto le cinque
+    //   copie `n` è null e `sotto` è vero.
     CONTATORI_INSTALLAZIONI: 'contatori_installazioni',
+    // CONTATORI_SOMME (#1462): le somme della scheda Contatori di Gestione per un intervallo di giorni, una versione e un
+    //   sistema ('' per tutti). Solo pagine di Filo e solo owner; alla pagina escono solo somme, e una cella con meno di
+    //   cinque copie esce come { sotto: true }. `forza`: rilegge invece di usare la lettura di pochi minuti fa.
+    //   { dal, al, app, os, forza } → { ok, somme } (forma: src/main/services/contatoriSomme.js)
+    CONTATORI_SOMME: 'contatori_somme',
     // CONTATORI_USO (#969): la persona ha visto la risposta di una chiamata partita prima che la chiedesse (una
     //   spiegazione preparata alla selezione, la correzione di una parola già pronta): l'uso lo conta chi la mostra.
-    //   { action, attesaMs } → { ok }
+    //   `anticipata`: la risposta era stata preparata in anticipo, e questa è la sua apertura (#1461).
+    //   { action, attesaMs, anticipata } → { ok }
     CONTATORI_USO: 'contatori_uso',
+    // CONTATORI_EVENTO (#1461): un gesto contato dove la persona lo fa (un'azione misurata, un'icona, una ricerca in un
+    //   pannello, una proposta del correttore, un annullo in pagina, una risposta chiesta, un avviso d'errore, una
+    //   scelta dell'intervista). Solo nomi da elenchi chiusi e numeri; il main rifiuta il resto.
+    //   { misura, ... } → { ok }
+    CONTATORI_EVENTO: 'contatori_evento',
     // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
     WALLET_OWNER_INVITES: 'wallet_owner_invites',
     // WALLET_OWNER_KNOBS_SET (#652): cambia le manopole dei crediti in
@@ -403,6 +415,9 @@
     OPEN_HISTORY: 'open_history',
     OPEN_OPTIONS: 'open_options',
     OPEN_SPELLCHECK_PAGE: 'open_spellcheck_page',
+    // #1447 — un passo di quello che il correttore impara, o del dizionario personale (src/main/services/correttoreImpara.js).
+    // Dai content script dei siti, che sono quelli che vedono scrivere, solo i passi che imparano; gli altri da filo://.
+    CORRETTORE_IMPARA: 'correttore_impara',
     CLOSE_TAB: 'close_tab',
     CLOSE_ALL_TABS: 'close_all_tabs',               // chiude tutte le tab → 1 newtab
     OPEN_URL: 'open_url',                           // { url }
@@ -420,6 +435,7 @@
     ICON_LAYOUT_GET: 'icon_layout_get',             // → { ok, layout }
     ICON_LAYOUT_DROP: 'icon_layout_drop',           // { id, target, beforeId } → { ok, layout }
     ICON_LAYOUT_CHANGED: 'icon_layout_changed',     // spinta → { layout }
+    CORRETTORE_MEMORIE: 'correttore_memorie',       // spinta → { memorie: { sn_personal_dict?, sn_autocorrect?, rifiutate? } } (#1447)
     BARRA_TRASCINA: 'barra_trascina',               // { fase: inizio|sopra|posa|fine, id, x, y } → { ok, larghezza }
     BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
     BARRA_ETICHETTE_CHIEDI: 'barra_etichette_chiedi', // spinta alla scheda davanti → { ids }: come si chiamano adesso le sue azioni nella barra
@@ -427,6 +443,10 @@
     // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
     AIUTO_STATO: 'aiuto_stato',                     // { pannello: chiuso|ridotto|aperto, voce, spento: ''|aiuto|sito|pagina } → { ok }
     RISPOSTA_IN_ATTESA: 'risposta_in_attesa',       // { fonte: aiuto|app, attesa } → { ok }: la striscia della barra si accende
+    // main → la sola scheda davanti (#1623): le immagini lasciate sulla fila delle schede o sulla barra laterale.
+    // { dove: casa|aiuto, immagini: [{ dataUrl, nome, percorso }], file: [percorso], grandi }: la home prende le sue,
+    // l'Aiuto le altre; `grandi` sono quelle oltre il tetto che non entrano.
+    CHAT_ALLEGA: 'chat_allega',
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
@@ -914,8 +934,9 @@
     // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
     // e le sue schede chiuse (dalla ricerca, dove una pagina è un indirizzo).
     FILO_CODA_TOGLI_PAGINE: 'filo_coda_togli_pagine',
-    // ANNUNCIO (main → pagine di Filo, senza dati): pagine tolte dal filo, da qualunque strada; chi le mostra le rilegge.
-    FILO_PAGINE_TOLTE: 'filo_pagine_tolte',
+    // ANNUNCIO (main → pagine di Filo, senza dati): pagine entrate, rititolate o tolte dal filo, da qualunque strada; chi
+    // le mostra le rilegge.
+    FILO_PAGINE_CAMBIATE: 'filo_pagine_cambiate',
     // ANNUNCIO (main → schede): Filo ha scritto di sua iniziativa. { chat, i, ts, testo, fuso }.
     FILO_PARLA: 'filo_parla',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
@@ -1006,6 +1027,8 @@
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
+    // L'utente ha detto no alla stessa conferma: non parte niente, lo contano solo i contatori (#1461). { action }
+    FILO_CONFIRM_RIFIUTATA: 'filo_confirm_rifiutata',
     // I cambi di stato come eventi del filo (#867). Solo dalle pagine di Filo: leggono e riscrivono le
     // impostazioni dell'utente. LEGGI { ids } → { eventi }; ANNULLA { id } → { ok, eventi }.
     CAMBI_LEGGI: 'cambi_leggi',

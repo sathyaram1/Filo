@@ -91,6 +91,7 @@
     root = null;
     convFilo = '';
     history = [];
+    allegati = { immagini: [] };
     documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
@@ -125,6 +126,7 @@
     if (isOpen()) { mostra(); return; }
     if (root) close({ davvero: true });
     history = [];
+    allegati = { immagini: [] };
     documenti = null;
     ripiegoDetto = false;
     ripiegoDaDire = '';
@@ -176,6 +178,7 @@
       </div>
       <div class="sn-sidebar-conv"></div>
       <div class="sn-sidebar-meta"></div>
+      <div class="sn-sidebar-allegati" hidden></div>
       <form class="sn-sidebar-input" autocomplete="off">
         <textarea rows="1" placeholder="Dimmi cosa vuoi fare sulla pagina…"></textarea>
         <button type="submit">↵</button>
@@ -194,10 +197,43 @@
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
-      if (!text) return;
+      if (!text && !allegati.immagini.length) return;
+      const immagini = allegati.immagini;
       ta.value = '';
-      submit({ userMessage: text });
+      allegati = { immagini: [] };
+      disegnaAllegati();
+      submit({ userMessage: text, immagini });
     };
+    // Ctrl+V di un'immagine e un'immagine lasciata sul pannello entrano come quelle lasciate sulla pagina: solo dall'utente.
+    ta.addEventListener('paste', (e) => {
+      if (!e.isTrusted) return;
+      const files = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === 'file' && /^image\//i.test(it.type || ''))
+        .map((it) => it.getAsFile()).filter(Boolean);
+      if (!files.length) return;
+      e.preventDefault();
+      allega(files);
+    });
+    // «Incolla» del tasto destro e della cronologia degli appunti: l'evento lo manda Filo (src/content/actions.js).
+    form.addEventListener('filo:paste-image', (e) => {
+      if (!global.SN_FILO_UI?.veroONostro?.(e) || !e.detail?.blob) return;
+      e.preventDefault();
+      allega([e.detail.blob]);
+    });
+    const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
+    for (const tipo of ['dragenter', 'dragover']) {
+      root.addEventListener(tipo, (e) => {
+        if (!e.isTrusted || !conImmagini(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+      });
+    }
+    root.addEventListener('drop', (e) => {
+      if (!e.isTrusted || !conImmagini(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      allega(e.dataTransfer.files);
+    });
     form.addEventListener('submit', (e) => e.preventDefault());
     form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
       e.preventDefault();
@@ -348,6 +384,166 @@
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
     root.dataset.spostata = '1';
+  }
+
+  // ---------- Allegati (#1623) ----------
+
+  // Le immagini date all'Aiuto: lasciate sulla pagina o sul pannello, incollate. Il pannello sta nel documento del
+  // sito: anteprime e nomi in uno Shadow DOM chiuso. Oltre il tetto si rimpiccioliscono: l'Aiuto non apre file dal
+  // disco, e un percorso lo leggerebbe il sito.
+  const Allegati = global.SN_CONST.ALLEGATI_CHAT;
+  let allegati = { immagini: [] };
+  // Da content.js: 'sito' dove Filo è spento (il rilascio resta alla pagina), 'aiuto' con l'Aiuto spento, '' altrimenti.
+  let chiusoPerche = () => 'sito';
+  const chiuso = () => { try { return String(chiusoPerche() || ''); } catch (_) { return 'sito'; } };
+  const ombre = new WeakMap();
+  function ombraDi(el, css) {
+    let o = ombre.get(el);
+    if (!o) {
+      o = el.attachShadow({ mode: 'closed' });
+      const stile = document.createElement('style');
+      stile.textContent = css;
+      o.appendChild(stile);
+      ombre.set(el, o);
+    }
+    return o;
+  }
+  const CSS_ALLEGATI = `
+:host { display: block; }
+.riga { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 10px 2px; }
+.voce { position: relative; display: inline-flex; }
+img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display: block; }
+.togli {
+  all: unset; position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1;
+  background: var(--sn-fg); color: var(--sn-bg);
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease, background calc(120ms * var(--sn-motion, 1)) ease;
+}
+.togli:hover, .togli:focus-visible { transform: scale(1.12); background: var(--sn-accent); color: #fff; }
+.bolla { display: flex; flex-wrap: wrap; gap: 6px; }
+:host(.con-testo) .bolla { margin-bottom: 6px; }
+.bolla img { width: auto; height: auto; max-width: 100%; max-height: 160px; }
+`;
+
+  function disegnaAllegati() {
+    const host = root && root.querySelector('.sn-sidebar-allegati');
+    if (!host) return;
+    host.hidden = !allegati.immagini.length;
+    const o = ombraDi(host, CSS_ALLEGATI);
+    for (const n of Array.from(o.childNodes)) if (n.localName !== 'style') n.remove();
+    const riga = document.createElement('div');
+    riga.className = 'riga';
+    for (const im of allegati.immagini) {
+      const v = document.createElement('div');
+      v.className = 'voce';
+      if (im.nome) v.title = im.nome;
+      const img = document.createElement('img');
+      img.src = im.dataUrl;
+      img.alt = im.nome || 'Immagine allegata';
+      const togli = document.createElement('button');
+      togli.type = 'button';
+      togli.className = 'togli';
+      togli.textContent = '×';
+      togli.title = 'Togli';
+      togli.setAttribute('aria-label', 'Togli dal messaggio');
+      togli.addEventListener('click', (e) => {
+        if (!gestoVero(e)) return;
+        allegati.immagini = allegati.immagini.filter((x) => x !== im);
+        disegnaAllegati();
+        root?.querySelector('.sn-sidebar-input textarea')?.focus();
+      });
+      v.append(img, togli);
+      riga.appendChild(v);
+    }
+    o.appendChild(riga);
+  }
+
+  const Immagini = global.SN_IMMAGINI_CHAT;
+
+  // Il pannello pronto a ricevere: false dove Filo è spento, null con l'Aiuto spento (e lo si dice).
+  function pannelloPerAllegati() {
+    const perche = chiuso();
+    if (perche === 'sito') return false;
+    if (perche === 'aiuto') { Popup?.showToast?.(I18n.t('help_disabled')); return null; }
+    if (!isOpen() || nascosto) open();
+    else if (collapsed) expand({ ai: false });
+    return true;
+  }
+  // Quello che non entra lo si dice, tutto in un avviso: nessun file lasciato sparisce in silenzio.
+  function allegatiArrivati({ grandi = 0, rotte = 0, altri = 0 } = {}) {
+    disegnaAllegati();
+    const frasi = [];
+    if (grandi) frasi.push(Allegati.fraseTroppoGrandi(grandi));
+    if (rotte) frasi.push(Allegati.fraseIlleggibili(rotte));
+    if (altri) frasi.push(Allegati.fraseNonImmaginiAiuto(altri));
+    if (frasi.length) Popup?.showToast?.(frasi.join(' '));
+    try { root?.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+  }
+  const conta = (n) => Math.max(0, Math.floor(Number(n) || 0));
+  const RIFIUTO = new Set([400, 413, 415, 422]);
+  function togliImmaginiDallaStoria() {
+    let n = 0;
+    for (const m of history) {
+      if (m && Array.isArray(m.immagini) && m.immagini.length) { n += m.immagini.length; delete m.immagini; }
+    }
+    return n;
+  }
+
+  // Ogni strada passa da qui: oltre il tetto o in un formato che il modello non legge, l'immagine si ridisegna.
+  async function allegaUna(blob, nome, conti) {
+    const dataUrl = blob && Immagini ? await Immagini.perLaChat(blob) : '';
+    if (dataUrl) allegati.immagini.push({ dataUrl, nome });
+    else conti.rotte += 1;
+  }
+
+  // Tutti i file lasciati: le immagini entrano, degli altri si dice che all'Aiuto non vanno. Torna se l'Aiuto le ha
+  // prese (anche solo per dire perché non entrano).
+  async function allega(files) {
+    const tutti = Array.from(files || []).filter(Boolean);
+    const lista = tutti.filter((f) => /^image\//i.test(f.type || ''));
+    if (!tutti.length) return false;
+    const pronto = pannelloPerAllegati();
+    if (!pronto) return pronto === null;
+    const conti = { grandi: 0, rotte: 0, altri: tutti.length - lista.length };
+    for (const f of lista) {
+      if (f.size > Allegati.tettoLetturaByte) { conti.grandi += 1; continue; }
+      await allegaUna(f, f.name || '', conti);
+      if (!root) return true;
+    }
+    allegatiArrivati(conti);
+    return true;
+  }
+
+  // Dal main (CHAT_ALLEGA): le immagini lasciate sulla fila delle schede, sulla barra o in un riquadro, già lette.
+  async function allegaDaFuori({ immagini = [], grandi = 0, altri = 0 } = {}) {
+    const buone = (Array.isArray(immagini) ? immagini : []).filter((im) => im && /^data:image\//i.test(String(im.dataUrl || '')));
+    const conti = { grandi: conta(grandi), rotte: 0, altri: conta(altri) };
+    if (!buone.length && !conti.grandi && !conti.altri) return false;
+    if (!pannelloPerAllegati()) return false;
+    for (const im of buone) {
+      await allegaUna(Immagini?.blobDa(im.dataUrl), typeof im.nome === 'string' ? im.nome : '', conti);
+      if (!root) return true;
+    }
+    allegatiArrivati(conti);
+    return true;
+  }
+
+  function immaginiNellaBolla(msg, immagini) {
+    if (!msg || !immagini.length) return;
+    const box = document.createElement('div');
+    box.className = 'sn-sidebar-msg-immagini';
+    if (msg.textContent.trim()) box.classList.add('con-testo');
+    const o = ombraDi(box, CSS_ALLEGATI);
+    const bolla = document.createElement('div');
+    bolla.className = 'bolla';
+    for (const im of immagini) {
+      const img = document.createElement('img');
+      img.src = im.dataUrl;
+      img.alt = im.nome || 'Immagine allegata';
+      bolla.appendChild(img);
+    }
+    o.appendChild(bolla);
+    msg.prepend(box);
   }
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
@@ -917,12 +1113,15 @@
   }
 
   // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  // Senza una risposta della porta il testo non esce (#1505): un errore vale come fermato.
+  const CAMPO_SENZA_PORTA = 'non ho scritto nel campo: il controllo dei dati in uscita non ha funzionato, e senza quel controllo non lascio uscire niente';
   async function campoFermato(testo) {
     if (!String(testo || '').trim()) return '';
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
-      return r && r.blocca ? String(r.frase || '') : '';
-    } catch (_) { return ''; }
+      if (!r || r.ok !== true) return CAMPO_SENZA_PORTA;
+      return r.blocca ? String(r.frase || CAMPO_SENZA_PORTA) : '';
+    } catch (_) { return CAMPO_SENZA_PORTA; }
   }
 
   async function runFiloAction(action, { etichetta = '' } = {}) {
@@ -952,7 +1151,11 @@
           ? await (res.needsConfirm >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : global.confirm(opts.text);
       } catch (_) { ok = false; }
-      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      if (!ok) {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_RIFIUTATA, action })).catch(() => {}); } catch (_) {}
+        appendActionLog(`${label}: annullata`);
+        return false;
+      }
       let c = null;
       try {
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
@@ -1281,6 +1484,9 @@
         try {
           ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
         } catch (_) { ok = false; }
+        if (d && d.conferma) {
+          try { global.SN_POPUP?.conta?.({ misura: 'conferma', chiave: String(d.conferma), esito: ok ? 'approvata' : 'rifiutata' }); } catch (_) {}
+        }
         if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       }
     }
@@ -1330,7 +1536,12 @@
     const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
     const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
     // history per l'AI: solo {role, content}, niente metadati UI.
-    const aiHistory = history.map(({ role, content }) => ({ role, content }));
+    const aiHistory = history.map(({ role, content, immagini }) => (immagini && immagini.length
+      ? { role, content: [
+        { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
+        ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
+      ] }
+      : { role, content }));
     return {
       url: location.href,
       title: document.title,
@@ -1511,8 +1722,10 @@
     }
   }
 
-  async function turno({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
     if (!root) return;
+    // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro.
+    const userMessage = scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : '');
     // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
     if (userMessage || daGesto) {
       passiDaSolo = 0;
@@ -1528,11 +1741,18 @@
 
     if (userMessage) {
       fermataDetta = false;
-      appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
+      immaginiNellaBolla(appendChatMessage('user', scritto, { nelFilo: false }), immagini);
+      // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
+      nelFiloAiuto('user', Allegati.testoNelFilo(scritto, immagini.length));
+      // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
+      history.push({
+        role: 'user', content: userMessage, kind: 'real',
+        ...(daScelta ? { daScelta: true } : {}),
+        ...(immagini.length ? { immagini: immagini.map((im) => im.dataUrl) } : {}),
+      });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
-      if (session) session.rawUserMessages.push(userMessage);
+      if (session && scritto) session.rawUserMessages.push(scritto);
     }
 
     const thinking = appendThinking();
@@ -1894,9 +2114,16 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText, { nelFilo: false });
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La bolla d'errore la legge chi ha chiesto: si conta il tipo, mai la frase (#1461).
+      try { global.SN_POPUP?.conta?.({ misura: 'errore-modello', code: String((err && (err.code || err.errorCode)) || ''), status: Number(err && err.status) || 0 }); } catch (_) {}
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
       mostraRimedio(assistantEl, err);
+      // Rifiutata una richiesta con immagini in cronologia: restando, ogni domanda dopo fallirebbe uguale.
+      if (RIFIUTO.has(Number(err && err.status))) {
+        const tolte = togliImmaginiDallaStoria();
+        if (tolte) Popup?.showToast?.(Allegati.fraseImmaginiTolte(tolte));
+      }
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });
@@ -1943,8 +2170,12 @@
   }
 
   global.SN_SIDEBAR = {
-    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, allega, allegaDaFuori,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
+    // Un'immagine lasciata dove la pagina non la vuole è dell'Aiuto, salvo dove Filo è spento.
+    accoglieRilascio: () => chiuso() !== 'sito',
+    contiene: (n) => !!(root && n && root.contains(n)),
+    suChiusura: (fn) => { if (typeof fn === 'function') chiusoPerche = fn; },
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
@@ -1957,5 +2188,17 @@
     // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è
     // `percorsoRaccoglibile`, ed è quella la porta che vale.
     renderFeedbackPrompt, percorsoRaccoglibile, puntoRisposta,
+    // Le anteprime stanno in un'ombra chiusa: cosa c'è nella casella, e dove sta la × di una per un clic vero.
+    allegati: () => allegati.immagini.map((im) => ({ nome: im.nome, byte: im.dataUrl.length })),
+    puntoTogli: (i) => {
+      const host = root && root.querySelector('.sn-sidebar-allegati');
+      const o = host && ombre.get(host);
+      const b = o && o.querySelectorAll('.togli')[i];
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    },
+    immaginiNelleBolle: () => Array.from(root ? root.querySelectorAll('.sn-sidebar-msg-user') : [])
+      .map((m) => { const box = m.querySelector('.sn-sidebar-msg-immagini'); const o = box && ombre.get(box); return o ? o.querySelectorAll('img').length : 0; }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -150,11 +150,12 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   const sinistra = (sel) => sicurezza.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().left));
   expect(await sinistra('#sec-delicate-sites')).toBe(await sinistra('#sec-delicate-desc'));
   expect(await sinistra('#sec-delicate-sites')).toBeGreaterThan(await sinistra('#sec-delicate'));
-  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi');
+  // Un nome con lo spazio si ridice intero anche accanto a un sito sulla stessa riga (#718.3).
+  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi\nmario bianchi, altro-studio.test');
   await sicurezza.locator('#sec-delicate-sites').blur();
   await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.siti, { timeout: 4000 })
-    .toEqual(['sito-pubblico.test']);
-  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi');
+    .toEqual(['sito-pubblico.test', 'altro-studio.test']);
+  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi, mario bianchi');
 
   const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Area clienti dello studio', `<p>${SEGRETO}</p>`);
   await t.chiudi();

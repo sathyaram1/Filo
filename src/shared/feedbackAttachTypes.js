@@ -1,6 +1,7 @@
 // Allowlist degli allegati ammessi: `accept` su un <input type=file> è un suggerimento
 // e non vincola né «Tutti i file» né il drop, quindi serve un gate deterministico.
-// Rifiuta i tipi ATTIVI (text/html, svg…). La cintura è storage.rules, da tenere allineata.
+// Rifiuta i tipi ATTIVI (text/html, svg…). Elenco unico di riquadro, pagina dei feedback e riga di
+// comando; il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
 
 (function (global) {
   'use strict';
@@ -10,12 +11,11 @@
     'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp',
   ]);
 
-  // Documenti passivi per MIME esplicito, da tenere uguale a storage.rules.
-  // NIENTE text/html, application/xhtml+xml, text/xml.
+  // Documenti passivi per MIME esplicito. NIENTE text/html, application/xhtml+xml, text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
-    // Col tipo esplicito perché il deposito li accetta: senza, la riga di comando mandava
-    // quello che una persona non poteva allegare (#582).
+    // Col tipo esplicito perché la riga di comando li dichiara così: senza, mandava quello
+    // che una persona non poteva allegare (#582).
     'text/tab-separated-values', 'application/x-yaml',
   ]);
 

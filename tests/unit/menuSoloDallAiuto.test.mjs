@@ -214,6 +214,9 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
     ["await expect(page.locator('.sn-tooltip')).toBeVisible();", 1],
     [`${imp}await expect(menuDi(page).locator('.sn-drag-preview')).toHaveCount(0);`, 0],
     ["await expect(pop.locator('.sn-select-option')).toHaveClass(/sn-disabled/);", 0],
+    // #1452.1: la prova del pannello red team cercava «Invia attacco» sulla pagina, ed era rossa anche su main.
+    ["const voce = page.locator('.sn-menu .sn-menu-item', { hasText: 'Invia attacco' }).first();\nawait expect.poll(async () => voce.isVisible()).toBe(true);\nawait voce.click();", 1],
+    [`${imp}const voce = menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Invia attacco' }).first();\nawait expect.poll(async () => voce.isVisible()).toBe(true);\nawait voce.click();`, 0],
   ];
   for (const [codice, attese] of casi) assert.equal(cercheFuoriDallAiuto(codice).length, attese, codice);
 });

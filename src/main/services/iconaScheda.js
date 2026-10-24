@@ -4,6 +4,8 @@
 
 'use strict';
 
+const { stessoSitoWeb } = require('./perContoDellaScheda');
+
 // Una favicon vera sta sotto i 400 KB (un .ico col 256 px non compresso): oltre, la scheda resta senza icona.
 const TETTO_BYTE = 1024 * 1024;
 const ATTESA_MS = 15000;
@@ -77,11 +79,12 @@ function bytesDi(ses, url, { interna, cookie }) {
 
 // `candidati`: gli indirizzi di page-favicon-updated, nell'ordine della pagina. Torna il primo che è davvero un'immagine.
 // `cookie: false` per chi chiede l'icona senza avere il sito aperto: a quel sito non si dice chi la vuole.
-async function iconaPer(ses, candidati, { interna = false, vivo = () => true, cookie = true } = {}) {
+// I cookie vanno solo a un'icona del sito di `pagina`: a un altro la pagina darebbe i soli SameSite=None, inutili a un'icona.
+async function iconaPer(ses, candidati, { interna = false, vivo = () => true, cookie = true, pagina = '' } = {}) {
   const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u).slice(0, MAX_CANDIDATI);
   for (const url of lista) {
     if (!vivo()) break;
-    const buf = await bytesDi(ses, url, { interna, cookie });
+    const buf = await bytesDi(ses, url, { interna, cookie: cookie && stessoSitoWeb(pagina, url) });
     const tipo = buf && buf.length <= TETTO_BYTE ? tipoImmagine(buf) : '';
     if (tipo) return { url, dato: `data:${tipo};base64,${buf.toString('base64')}` };
   }

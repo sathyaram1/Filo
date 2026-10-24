@@ -237,6 +237,32 @@
       max: 1000,
       default: '240px',
     },
+    // #1448 — il valore trovato per un segnaposto, sopra le x: la sua grandezza rispetto al testo del campo.
+    'correttore.segnaposti.scala': {
+      label: 'Grandezza del valore che il correttore propone sopra un segnaposto, rispetto al testo',
+      type: 'factor',
+      css: '--sn-spell-valore-scala',
+      default: '0.62',
+    },
+    'correttore.segnaposti.velato': {
+      label: 'Quanto si vede il valore di un segnaposto quando copre le parole della riga sopra',
+      type: 'opacity',
+      css: '--sn-spell-valore-velato',
+      default: '0.45',
+    },
+    // Il lampo sulla parola che il correttore ha corretto da sé (#1447): uno sfondo caldo che sfuma. Gemelle in spellcheck.css.
+    'correttore.lampo.color': {
+      label: 'Colore del lampo sulla parola corretta da sé',
+      type: 'color',
+      css: '--sn-spell-lampo',
+      default: { light: '#f0b05a66', dark: '#e2ad4d4d' },
+    },
+    'correttore.lampo.durata': {
+      label: 'Durata del lampo sulla parola corretta da sé',
+      type: 'time',
+      css: '--sn-spell-lampo-durata',
+      default: '1000ms',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
@@ -350,6 +376,17 @@
       else rejected.push(name);
     }
     return { clean, rejected };
+  }
+
+  // Chi ha toccato pochi token manda solo quelli e si posano sulla mappa salvata adesso: la sua copia intera
+  // cancellerebbe quelli cambiati altrove nel frattempo (#1343.1).
+  function conModifica(salvati, modifica) {
+    const out = { ...(salvati && typeof salvati === 'object' ? salvati : {}) };
+    for (const [name, value] of Object.entries(modifica && typeof modifica === 'object' ? modifica : {})) {
+      if (value == null || value === '') delete out[name];
+      else out[name] = value;
+    }
+    return out;
   }
 
   // risoluzione della gerarchia (per la UI delle preferenze e gli unit test)
@@ -524,6 +561,7 @@
     scrollBehavior,
     FACTOR_MAX,
     sanitize,
+    conModifica,
     defaultValue,
     effectiveValue,
     toRgbTriplet,

@@ -233,7 +233,7 @@
   // `baseChar` è l'offset di `utterText` nel testo completo: mappa l'onboundary sui token
   // globali quando il ripiego parte a metà.
   function playBrowserChunk(s, utterText, baseChar) {
-    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); clearHighlight(); reportReadingState(false); return; }
+    if (!ttsSupported()) { Popup.toastErrore('tts_not_supported'); clearHighlight(); reportReadingState(false); return; }
     const synth = window.speechSynthesis;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(utterText);
@@ -305,14 +305,25 @@
     // imposta — mostrarlo com'è vale molto più di una frase generica.
     // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
     // che Filo non conosce: il messaggio dice dove scriverlo.
-    // E quando nessun fornitore ammesso serve il modello: la richiesta non è partita.
-    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST'];
+    // E quando nessun fornitore ammesso serve il modello, o manca l'invito: la richiesta non è partita.
+    // L'avviso porta il tasto della pagina che la frase nomina (#663, #1344.1).
+    const CE = global.SN_CHAT_ERRORS;
+    const rimedio = { code: res.errorCode, keyRefused: !!res.keyRefused, reason: res.reason };
+    const spiegato = [...((CE && CE.CODICI_GIA_SCRITTI) || ['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY']), 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
     if (spiegato.includes(res.errorCode) && res.error) {
-      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000, rimedio: { code: res.errorCode } }); } catch (_) {}
+      try { Popup.toastErrore('tts_model_fallback_reason', { duration: 9000, rimedio }, String(res.error)); } catch (_) {}
+      return;
+    }
+    // La chiave rifiutata (crediti finiti compresi): il perché in italiano, non «non disponibile ora».
+    if (res.keyRefused && CE) {
+      const frase = CE.sentence(CE.fromResponse({
+        error: res.error, status: res.status, provider: res.provider, userMessage: res.userMessage, keyRefused: true,
+      }, ''));
+      try { Popup.toastErrore('tts_model_fallback_reason', { duration: 9000, rimedio }, frase); } catch (_) {}
       return;
     }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';
-    try { Popup.showToast(I18n.t(key)); } catch (_) {}
+    try { Popup.toastErrore(key); } catch (_) {}
   }
 
   // Anti-attesa: la prima frase, corta, suona subito mentre le altre si preparano in
@@ -384,6 +395,7 @@
     const readWords = (model && model.tokens) || null;
     return {
       type: 'item',
+      azione: 'read-aloud',
       icon: Icons.readAloud(18),
       label: I18n.t('menu_read_aloud'),
       onClick: () => readAloud(readText, readWords),
@@ -479,7 +491,7 @@
         settings: { models: { [ACTIONS.TRANSCRIBE_AUDIO]: nickname } },
       });
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
       return;
     }
     // Lo stesso avviso delle Opzioni (#1141): il modello resta scelto, ma si sa subito che con lui non parte.
@@ -503,11 +515,11 @@
   async function startDictation() {
     if (_dictateState) { stopDictation(); return; }
     if (!dictationSupported()) {
-      Popup.showToast(I18n.t('menu_dictate_not_supported'));
+      Popup.toastErrore('menu_dictate_not_supported');
       return;
     }
     if (!deps.restorePasteContext()) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
       return;
     }
     // Nella casella di una chat di Filo dettare è parlare a Filo: stessa strada del tasto microfono, stesso invio.

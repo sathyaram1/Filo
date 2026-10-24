@@ -313,7 +313,14 @@
       // composedPath()[0] vede oltre lo shadow DOM; controlliamo anche
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
-      if (isEditable(target) || isEditable(document.activeElement)) return;
+      if (isEditable(target) || isEditable(document.activeElement)) {
+        // In un campo vuoto non c'è niente da disfare: subito dopo un'azione di Filo (chiesta in chat, col cursore
+        // rimasto nella casella) è lei che si vuole annullare (#1461). Il campo resta suo: niente indietro.
+        if (campoVuoto(isEditable(target) ? target : document.activeElement)) {
+          chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'tasto-annulla' }).catch(() => {});
+        }
+        return;
+      }
       // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
       if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
@@ -321,7 +328,8 @@
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
       e.preventDefault();
       e.stopPropagation();
-      chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
+      // `daAnnulla`: subito dopo un'azione di Filo è anche il suo annullo, per i contatori (#1461).
+      chrome.runtime.sendMessage({ type: MSG.NAV_BACK, daAnnulla: true }).catch(() => {});
     }, { capture: true });
 
     // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
@@ -365,12 +373,17 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
-  // scrollato (0-100%). Throttled per non inondare l'IPC.
+  // Riporta al main quanto ha scrollato (0-100%) e, solo dopo un gesto fisico vero, l'ultima interazione: il
+  // caricamento e lo scorrimento fatto dalla pagina (chat, feed, caroselli) non azzerano l'inattività (#1618).
   function startTabActivityReporter() {
+    // Uno scorrimento è dell'utente se parte entro questo tempo da un suo tasto, clic, rotella o dito.
+    const SCORRE_DOPO_GESTO_MS = 1000;
+    const INTERAZIONE_OGNI_MS = 2000;
     let lastSentScroll = -1;
     let pending = false;
-    let lastSend = 0;
+    let ultimoGesto = -Infinity;
+    let ultimaInterazione = -Infinity;
+    let scrollDaGesto = false;
 
     function scrollPct() {
       const doc = document.documentElement;
@@ -380,38 +393,50 @@
       return Math.max(0, Math.min(100, (y / max) * 100));
     }
 
-    function send(extra) {
-      const payload = { type: MSG.TAB_ACTIVITY, lastInteractionAt: Date.now(), ...extra };
+    function send(extra, interazione) {
+      const payload = { type: MSG.TAB_ACTIVITY, ...extra };
+      if (interazione) {
+        payload.lastInteractionAt = Date.now();
+        ultimaInterazione = performance.now();
+      }
       try {
         Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {});
       } catch (_) {}
-      lastSend = performance.now();
     }
 
-    function onInteract() {
-      const since = performance.now() - lastSend;
-      if (since < 2000) return;
-      send({});
+    // Un evento lanciato da uno script della pagina non è un gesto (isTrusted falso).
+    function onGesto(e) {
+      if (!e || e.isTrusted !== true) return;
+      ultimoGesto = performance.now();
+      if (ultimoGesto - ultimaInterazione < INTERAZIONE_OGNI_MS) return;
+      send({}, true);
     }
 
     function onScroll() {
+      if (performance.now() - ultimoGesto <= SCORRE_DOPO_GESTO_MS) scrollDaGesto = true;
       if (pending) return;
       pending = true;
       setTimeout(() => {
         pending = false;
+        const daGesto = scrollDaGesto;
+        scrollDaGesto = false;
         const pct = Math.round(scrollPct());
         if (pct !== lastSentScroll) {
           lastSentScroll = pct;
-          send({ scrollPct: pct });
+          send({ scrollPct: pct }, daGesto);
         }
       }, 500);
     }
 
-    window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
-    window.addEventListener('keydown', onInteract, { passive: true, capture: true });
+    for (const tipo of ['pointerdown', 'keydown', 'wheel', 'touchmove']) {
+      window.addEventListener(tipo, onGesto, { passive: true, capture: true });
+    }
     window.addEventListener('scroll', onScroll, { passive: true });
 
-    setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+    setTimeout(() => {
+      lastSentScroll = Math.round(scrollPct());
+      send({ scrollPct: lastSentScroll }, false);
+    }, 600);
   }
 
   // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
@@ -1029,6 +1054,7 @@
     if (!sito) return;
     items.unshift({
       type: 'split',
+      azione: 'site-own-menu',
       label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
       onClick: () => apriMenuDelSito(sito),
       arrowTitle: I18n.t('menu_del_sito_scelta'),
@@ -1072,8 +1098,14 @@
     // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
     // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
     try {
-      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
+      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi() || SpellCheck.segnapostiAttivi())) {
         const rt = realTarget(e);
+        // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
+        const valore = SpellCheck.valoreSotto(rt);
+        if (valore) {
+          await openSpellMarksMenu(valore.el, { errore: null, suggerimento: valore.segno }, e, sito);
+          return;
+        }
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
@@ -1186,6 +1218,8 @@
     let updateCorrection = null;
     const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
     if (tutti) items.unshift(tutti, { type: 'separator' });
+    const annulla = campoDiFilo ? voceAnnullaCorrezione(campoDiFilo, e) : null;
+    if (annulla) items.unshift(annulla, { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
@@ -1234,6 +1268,7 @@
   // correttore: è l'unica strada nei blocchi sigillati (#438), dove il campo è fuori mano.
   function applyNativeCorrection(word, suggestion) {
     if (!suggestion) return;
+    if (word && SpellCheck?.accettata) SpellCheck.accettata(word, suggestion);
     try {
       const sel = window.getSelection && window.getSelection();
       const selected = sel ? String(sel) : '';
@@ -1603,6 +1638,12 @@
     return !!(self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.campoDiTesto(el));
   }
 
+  function campoVuoto(el) {
+    if (!el) return false;
+    const v = 'value' in el && typeof el.value === 'string' ? el.value : el.textContent;
+    return typeof v === 'string' && v.trim() === '';
+  }
+
   // Menu correzione: rosso = parola sotto il cursore, blu = errore contestuale.
 
   function getInputSelectionInfo(target) {
@@ -1640,7 +1681,8 @@
 
   // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
   // `parola`: il segno è una parola sola, e allora si può aggiungere al dizionario o correggere da sé d'ora in poi.
-  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true) {
+  // `esito`: chi tiene la proposta per i contatori sa cosa ne ha fatto la persona (#1461).
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true, esito = () => {}) {
     const items = [];
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
@@ -1649,9 +1691,10 @@
       seen.add(v.toLowerCase());
       items.push({
         label: v,
-        onClick: () => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, {
-          expectedSegment: wordCtx.word,
-        }),
+        onClick: () => {
+          esito('accettata');
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, { expectedSegment: wordCtx.word });
+        },
       });
       if (items.length >= 4) break;
     }
@@ -1660,6 +1703,7 @@
       items.push({
         label: I18n.t('spell_add_dict'),
         onClick: () => {
+          esito('rifiutata');
           SpellCheck.addToDictionary(wordCtx.word);
           Popup.showToast(I18n.t('toast_added_to_dict'));
         },
@@ -1669,6 +1713,7 @@
       items.push({
         label: I18n.t('spell_autocorrect'),
         onClick: async () => {
+          esito('accettata');
           await SpellCheck.setAutocorrect(wordCtx.word, correction);
           SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction, { expectedSegment: wordCtx.word });
           Popup.showToast(I18n.t('toast_autocorrect_saved'));
@@ -1691,9 +1736,17 @@
         const scrivi = (s) => {
           el.textContent = '';
           const perche = document.createElement('div');
-          const ripiego = s.segno !== 'errore' ? 'spell_ocra_controlla' : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+          const ripiego = s.cercando ? 'spell_segnaposto_cerco' : s.segno !== 'errore' ? 'spell_ocra_controlla'
+            : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
           perche.textContent = s.motivo || I18n.t(ripiego);
           el.appendChild(perche);
+          // La fonte del valore di un segnaposto (#1448), col giorno a cui il dato si riferisce.
+          if (s.fonteDato && s.fonteDato.nome) {
+            const fonte = document.createElement('div');
+            fonte.className = 'sn-menu-segno-citazione';
+            fonte.textContent = I18n.t('spell_segnaposto_fonte', [s.fonteDato.nome, s.fonteDato.data].filter(Boolean).join(', '));
+            el.appendChild(fonte);
+          }
           if (s.citazione) {
             const prova = document.createElement('div');
             prova.className = 'sn-menu-segno-citazione';
@@ -1726,7 +1779,8 @@
         label: c === undefined ? '' : etichetta(s, c),
         loading: false,
         onClick: c === undefined ? null : () => SpellCheck.correggi(editableEl, s, c),
-        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment)),
+        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment),
+          (e) => SpellCheck.esitoSegno?.(editableEl, s, e)),
       };
     };
     const ascolti = [];
@@ -1761,7 +1815,8 @@
       rigaDelPerche(errore, errore.dubbio ? (scrivi) => { segui(scrivi); avvia(); } : null),
       { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, errore) },
     ];
-    if (unaParola(errore.segment)) {
+    // Un errore fisso resta un errore anche nel dizionario (#1447): la voce non farebbe niente.
+    if (unaParola(errore.segment) && errore.fonte !== 'fisso') {
       items.push({
         type: 'item', label: I18n.t('spell_add_dict'),
         onClick: () => { SpellCheck.aggiungiAlDizionario(editableEl, errore); Popup.showToast(I18n.t('toast_added_to_dict')); },
@@ -1771,8 +1826,45 @@
     return items;
   }
 
+  // Su un segnaposto (#1448): il valore in cima, un clic; il perché con la fonte e la data; «Ignora». Mentre Filo cerca,
+  // la riga del valore aspetta e si riempie quando la ricerca risponde.
+  function vociSegnaposto(editableEl, sp) {
+    if (!sp.dubbio) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
+    const riga = (s) => {
+      if (s.cercando) return { hidden: false, label: I18n.t('spell_segnaposto_cerco'), loading: true, onClick: null };
+      const v = s.correzioni && s.correzioni[0];
+      return v ? { hidden: false, label: v, loading: false, onClick: () => SpellCheck.riempi(editableEl, s) } : { hidden: true, label: '', loading: false, onClick: null };
+    };
+    const ascolti = [];
+    let staccato = null;
+    const segui = (fn) => {
+      ascolti.push(fn);
+      if (!staccato) staccato = SpellCheck.seguiSegno(editableEl, sp, (nuovo) => { if (nuovo && !nuovo.cercando) for (const f of ascolti) f(nuovo); });
+    };
+    const righe = [
+      {
+        type: 'correction', ...riga(sp), senzaFreccia: true,
+        onMount: (_root, update) => {
+          if (sp.cercando) segui((nuovo) => update(riga(nuovo)));
+          return () => { if (staccato) staccato(); };
+        },
+      },
+      rigaDelPerche(sp, sp.cercando ? segui : null),
+    ];
+    if (sp.fonteDato && sp.fonteDato.url) {
+      righe.push({ type: 'item', label: I18n.t('spell_segnaposto_apri_fonte'), onClick: () => Actions.apriInSchedaNuova(sp.fonteDato.url) });
+    }
+    if (sp.ricercaFallita) righe.push({ type: 'item', label: I18n.t(sp.vocePerCercare || 'spell_segnaposto_riprova'), onClick: () => SpellCheck.cercaDiNuovo(editableEl, sp) });
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sp) },
+      { type: 'separator' },
+    );
+    return righe;
+  }
+
   // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
   function vociSuggerimento(editableEl, sugg) {
+    if (sugg.tipo === 'segnaposto') return vociSegnaposto(editableEl, sugg);
     if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
     const righe = [rigaDelPerche(sugg)];
     for (const c of sugg.correzioni || []) {
@@ -1804,12 +1896,23 @@
     try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
   }
 
+  // La parola che il correttore ha corretto da sé (#1447): «Annulla correzione» la riporta com'era scritta, e conta
+  // come un rifiuto da cui Filo impara.
+  function voceAnnullaCorrezione(editableEl, mouseEvent) {
+    const v = SpellCheck?.automaticaSotto?.(editableEl, mouseEvent.clientX, mouseEvent.clientY);
+    if (!v) return null;
+    return { type: 'item', label: I18n.t('spell_annulla_correzione'), onClick: () => SpellCheck.annullaAutomatica(editableEl, v) };
+  }
+
   async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
     const sopra = [];
+    const annulla = voceAnnullaCorrezione(editableEl, mouseEvent);
+    if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
     if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
-    const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
+    const correggibile = (s) => s && !s.dubbio && (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && s.correzioni?.length));
+    const tutti = voceCorreggiTutti(editableEl, 1 + [errore, suggerimento].filter(correggibile).length);
     if (tutti) sopra.push(tutti, { type: 'separator' });
     items.unshift(...sopra);
     conMenuDelSito(items, sito);
@@ -1824,11 +1927,17 @@
     let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
     if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
     let updateCorrection = null;
-    const applyAt = (corr) => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    // La proposta del menu, per i contatori (#1461): chi l'ha fatta, e cosa ne ha fatto la persona.
+    const chiave = `${wordCtx.word}|${wordCtx.start}`;
+    const esito = (e) => SpellCheck.esitoProposta?.(editableEl, 'ortografia', chiave, e);
+    const applyAt = (corr) => {
+      esito('accettata');
+      return SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    };
     const riga = (corr, alts) => ({
       hidden: !corr, label: corr || '', loading: false,
       onClick: corr ? () => applyAt(corr) : null,
-      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || []),
+      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || [], true, esito),
     });
     let mostrata = native[0] || '';
     items.unshift(
@@ -1836,18 +1945,24 @@
       { type: 'separator', hidden: !mostrata },
     );
     conMenuDelSito(items, sito);
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+    // Chiuso senza una scelta: la proposta è ignorata. Dopo, perché il clic che lo chiude arriva prima di chiuderlo.
+    Menu.open({
+      x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true,
+      alChiudere: () => setTimeout(() => esito('ignorata'), 1500),
+    });
+    if (mostrata) SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, 'nativo');
 
-    const mostra = (corr, alts) => {
+    const mostra = (corr, alts, modello = 'nativo') => {
       if (!updateCorrection || !corr || corr === wordCtx.word) return;
       mostrata = corr;
       updateCorrection(riga(corr, alts));
+      SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, modello);
     };
     if (!mostrata) {
       SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => { if (!mostrata && sugg?.length) mostra(sugg[0], sugg.slice(1)); });
     }
-    const esito = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
-    if (esito && esito.errore && esito.correzione) mostra(esito.correzione, native.filter((p) => p !== esito.correzione));
+    const giudizio = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
+    if (giudizio && giudizio.errore && giudizio.correzione) mostra(giudizio.correzione, native.filter((p) => p !== giudizio.correzione), giudizio.modello);
   }
 
   function buildFeedbackItem() {
@@ -1870,6 +1985,7 @@
     if (!self.SN_NOMI_SITO.daScritto(host)) return null;
     return {
       type: 'item',
+      azione: 'filo-off-on-site',
       label: I18n.t('menu_spegni_filo'),
       onClick: () => {
         try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
@@ -2041,15 +2157,17 @@
   // l'immagine è anche un link non partono due box AI a ogni apertura.
   function buildImageActionItems(imgEl) {
     return [
-      { type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
-      { type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
       {
         type: 'item',
+        azione: 'copy-download-image',
         label: I18n.t('menu_copy_image_link'),
         onClick: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
       },
       {
         type: 'item',
+        azione: 'search-image',
         label: I18n.t('menu_search_image'),
         onClick: () => Actions.searchImageOnWeb(imgEl),
       },
@@ -2083,6 +2201,7 @@
     if (Actions.isDownloadableLink(linkEl)) {
       out.push({
         type: 'item',
+        azione: 'download-progress',
         label: I18n.t('menu_save_file'),
         onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
       });
@@ -2090,16 +2209,19 @@
     out.push(
       {
         type: 'item',
+        azione: 'share-copy-link',
         label: I18n.t('menu_copy_link'),
         onClick: () => Actions.copyUrlToClipboard(indirizzo),
       },
       {
         type: 'item',
+        azione: 'save-link',
         label: I18n.t('menu_save_link_for_later'),
         onClick: () => Actions.saveLink(linkEl),
       },
       {
         type: 'item',
+        azione: 'share-copy-link',
         label: I18n.t('menu_share_link'),
         onClick: () => Actions.shareLink(linkEl),
       },
@@ -2130,8 +2252,8 @@
     const items = [];
 
     if (selInfo && editable) {
-      items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
@@ -2147,10 +2269,11 @@
     }
 
     if (selInfo) {
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       if (selInfo.segreto) return items;
       items.push({
         type: 'item',
+        azione: 'search-web',
         label: I18n.t('menu_search_text'),
         onClick: () => Actions.searchTextOnWeb(selInfo.selection),
       });
@@ -2306,6 +2429,8 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
+  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale.
+  Sidebar?.suChiusura?.(() => (IS_SUBFRAME || motivoBlocco() ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
   // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
@@ -2361,6 +2486,11 @@
     }
     if (msg?.type === MSG.BARRA_FUORI) {
       try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
+    if (msg?.type === MSG.CHAT_ALLEGA) {
+      if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Promise.resolve(Sidebar?.allegaDaFuori?.(msg)).catch(() => {}); } catch (_) {} }
       return;
     }
     if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
@@ -2490,10 +2620,10 @@
     if (command === 'explain-selection') {
       // La spiegazione breve è già inline nel menu: la scorciatoia apre l'approfondimento.
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchor);
-      else Popup.showToast(I18n.t('err_no_selection'));
+      else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      else Popup.showToast(I18n.t('err_no_selection'));
+      else Popup.toastErrore('err_no_selection');
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {

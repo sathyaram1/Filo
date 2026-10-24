@@ -196,3 +196,15 @@ test('una risposta fermata dall\'utente resta fermata, col ragionamento, e si pu
   assert.deepEqual(C.historyFor(dopo), [{ role: 'user', content: 'draghi rossi' }]);
   assert.deepEqual(C.applyEdit(dopo, { op: 'drop', turn: '', userText: 'draghi rossi' }).list, []);
 });
+
+test('il tasto per la pagina dove si rimedia resta riaprendo la chat, coi soli campi che la scelgono (#1344.1)', () => {
+  const [errore, parziale, sporco] = C.cleanChat([
+    { who: 'bot', error: 'Per attivare Filo serve un codice d\'invito.', rimedio: { code: 'NO_API_KEY', keyRefused: false } },
+    { who: 'bot', reply: 'Motivo: …', cardIds: ['a'], retryable: true, rimedio: { code: 'NO_ALLOWED_HOST', reason: 'crediti', url: 'https://altrove.test' } },
+    { who: 'bot', reply: 'ok', rimedio: { code: '<img onerror=x>', maxTokens: 'tanti', finishReason: 'length' } },
+  ]);
+  assert.deepEqual(errore.rimedio, { code: 'NO_API_KEY' });
+  assert.deepEqual(parziale.rimedio, { code: 'NO_ALLOWED_HOST', reason: 'crediti' });
+  assert.deepEqual(sporco.rimedio, { finishReason: 'length' });
+  assert.equal(C.cleanChat([{ who: 'bot', reply: 'ok', rimedio: 'crediti' }])[0].rimedio, undefined);
+});

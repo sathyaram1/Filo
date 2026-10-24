@@ -97,7 +97,8 @@
       pushHistory({ role, text: m.text });
       const bolla = makeBubble({ role, text: m.text, markdown: role === 'filo' });
       bubblesEl.appendChild(bolla);
-      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia() : null;
+      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia()
+        : (role === 'filo' && m.contatori ? sceltaContatori() : null);
       if (scelta) {
         const wrap = document.createElement('div');
         wrap.className = 'dash-bubble-actions';
@@ -262,6 +263,74 @@
     segnaLivello(box, A.livelloAttivo(livello));
     // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
     livelloSalvato().then((lv) => { if (lv) segnaLivello(box, A.livelloAttivo(lv)); });
+    return box;
+  }
+
+  // ── La scelta dei contatori anonimi (#1461) ───────────────────────────────
+  // Sì o No sotto la domanda di Filo, come l'autonomia: scrive l'interruttore delle Preferenze e, se la domanda è
+  // ancora in sospeso, diventa la risposta. Il No spegne e butta quello che c'era: non parte niente, nemmeno questa.
+  async function contatoriSalvati() {
+    try {
+      const s = await global.SN_STORAGE.getSettings();
+      return !(s && s.contatori && s.contatori.attivi === false);
+    } catch (_) { return true; }
+  }
+
+  function segnaContatori(box, attivi) {
+    box.dataset.attivi = attivi ? '1' : '0';
+    for (const b of box.querySelectorAll('.dash-contatori-voce')) {
+      const scelto = (b.dataset.attivi === '1') === attivi;
+      b.classList.toggle('scelto', scelto);
+      b.setAttribute('aria-pressed', scelto ? 'true' : 'false');
+    }
+  }
+
+  function aggiornaSceltaContatori(attivi) {
+    for (const box of document.querySelectorAll('.dash-contatori-scelta')) segnaContatori(box, attivi !== false);
+  }
+
+  async function scegliContatori(box, attivi) {
+    if (box.dataset.occupato === '1') return;
+    box.dataset.occupato = '1';
+    try {
+      const r = await send({ type: MSG.UPDATE_SETTINGS, settings: { contatori: { attivi } } });
+      if (!r || r.ok === false) return;
+      aggiornaSceltaContatori(attivi);
+      if (!onboardingActive || isSending() || box.dataset.risposto === '1' || !rispondi) return;
+      const dopo = [...bubblesEl.querySelectorAll('.dash-bubble-user')]
+        .some((u) => box.compareDocumentPosition(u) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if (dopo) return;
+      if (rispondi(attivi ? 'Sì, manda i numeri.' : 'No, non mandare niente.')) box.dataset.risposto = '1';
+    } catch (_) {
+    } finally {
+      delete box.dataset.occupato;
+    }
+  }
+
+  function sceltaContatori(attivi) {
+    const box = document.createElement('div');
+    box.className = 'dash-contatori-scelta';
+    const gruppo = document.createElement('div');
+    gruppo.className = 'dash-contatori-voci';
+    gruppo.setAttribute('role', 'group');
+    gruppo.setAttribute('aria-label', 'Filo manda numeri senza contenuto per migliorare');
+    for (const [si, nome, titolo] of [
+      [true, 'Sì', 'Manda i contatori anonimi: solo numeri, mai testi'],
+      [false, 'No', 'Non mandare niente'],
+    ]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-autonomia-livello dash-contatori-voce';
+      b.dataset.attivi = si ? '1' : '0';
+      b.textContent = nome;
+      b.title = titolo;
+      b.addEventListener('click', () => { scegliContatori(box, si); });
+      gruppo.appendChild(b);
+    }
+    box.appendChild(gruppo);
+    segnaContatori(box, attivi !== false);
+    // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
+    contatoriSalvati().then((a) => segnaContatori(box, a));
     return box;
   }
 
@@ -537,5 +606,7 @@
     makeSkipOnboardingBtn,
     sceltaAutonomia,
     aggiornaSceltaAutonomia,
+    sceltaContatori,
+    aggiornaSceltaContatori,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

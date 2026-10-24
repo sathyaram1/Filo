@@ -100,7 +100,7 @@ const geoBlockMethods = {
 
   // Toast discreto nella shell ("Aperto da {paese}"): informa senza chiedere.
   _geoToast(text) {
-    try { this.win.webContents.send('shell:toast', { text }); } catch (_) {}
+    try { this.win.webContents.send('shell:toast', { text, opts: { tipo: 'aperta_da_paese' } }); } catch (_) {}
   },
 
   // Proposta inline al content script (login attivo, o retry esaurito): l'avviso dice che in

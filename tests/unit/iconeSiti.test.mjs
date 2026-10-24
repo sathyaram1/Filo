@@ -131,9 +131,10 @@ test('una pagina 404 in html non è un\'icona: resta il ripiego della home', asy
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['https://senza.it/favicon.ico']);
 });
 
-test('l\'icona della scheda continua a viaggiare coi cookie della scheda', async () => {
+// Un'icona di un altro sito parte senza: la regola sta in tests/unit/iconaScheda.test.mjs (#1272.4).
+test('l\'icona della scheda continua a viaggiare coi cookie della scheda, se sta sul sito della pagina', async () => {
   const ses = sessione({ 'https://esempio.it/i.png': PNG });
-  await iconaPer(ses, ['https://esempio.it/i.png']);
+  await iconaPer(ses, ['https://esempio.it/i.png'], { pagina: 'https://www.esempio.it/articolo' });
   assert.equal(ses.chiesti[0].init.credentials, 'include');
 });
 

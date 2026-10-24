@@ -2,6 +2,7 @@
 
 const { app } = require('electron');
 const { soloFilo } = require('./origine');
+const { azione: contata } = require('../azioniContate');
 
 // Un'icona della home dice dove sta in px della sua pagina; il menu della shell lo vuole in px della finestra.
 // Il punto resta dentro la vista: una pagina non apre il menu fuori da sé.
@@ -29,7 +30,7 @@ module.exports = function register(on, ctx) {
     // subito dove è finita.
     let url = 'filo://home/home.html';
     if (msg && msg.highlight) url += `?highlight=${encodeURIComponent(String(msg.highlight))}`;
-    if (win?._filoTabs) win._filoTabs.openTab(url);
+    if (win?._filoTabs) contata('open-for-later', () => win._filoTabs.openTab(url));
     return { ok: true };
   });
 
@@ -38,20 +39,22 @@ module.exports = function register(on, ctx) {
   on(MSG.GO_HOME, async (msg, sender) => {
     const win = winOf(sender);
     if (!win?._filoTabs) return { ok: true };
-    if (sender?.tab?.id) win._filoTabs.navigate(sender.tab.id, 'filo://newtab/');
-    else win._filoTabs.openTab('filo://newtab/');
+    contata('home', () => {
+      if (sender?.tab?.id) win._filoTabs.navigate(sender.tab.id, 'filo://newtab/');
+      else win._filoTabs.openTab('filo://newtab/');
+    });
     return { ok: true };
   });
 
   on(MSG.OPEN_HISTORY, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab('filo://history/history.html');
+    if (win?._filoTabs) contata('history', () => win._filoTabs.openTab('filo://history/history.html'));
     return { ok: true };
   });
 
   on(MSG.OPEN_OPTIONS, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab('filo://options/options.html');
+    if (win?._filoTabs) contata('options-models', () => win._filoTabs.openTab('filo://options/options.html'));
     return { ok: true };
   });
 
@@ -61,10 +64,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // La pagina chiude solo sé stessa; `via` dice da quale gesto, per i contatori della finestra (#1470).
   on(MSG.CLOSE_TAB, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.closeTab(sender.tab.id);
+      const via = ['tasto_destro_riga', 'salva_per_dopo'].includes(msg && msg.via) ? msg.via : 'altro';
+      if (win?._filoTabs) contata('close-tab', () => win._filoTabs.closeTab(sender.tab.id, { via }));
     }
     return { ok: true };
   });
@@ -129,9 +134,11 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.NAV_BACK, async (msg, sender) => {
+    // Ctrl/Cmd+Z fuori da un campo subito dopo un'azione di Filo la annulla (#1461).
+    if (msg && msg.daAnnulla === true) { try { globalThis.SN_CONTATORI_MAIN?.tastoAnnulla(); } catch (_) {} }
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.goBack(sender.tab.id);
+      if (win?._filoTabs) contata('navigate-back-forward', () => win._filoTabs.goBack(sender.tab.id));
     }
     return { ok: true };
   });
@@ -139,7 +146,7 @@ module.exports = function register(on, ctx) {
   on(MSG.NAV_FORWARD, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.goForward(sender.tab.id);
+      if (win?._filoTabs) contata('navigate-back-forward', () => win._filoTabs.goForward(sender.tab.id));
     }
     return { ok: true };
   });
@@ -147,7 +154,7 @@ module.exports = function register(on, ctx) {
   on(MSG.NAV_RELOAD, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.reload(sender.tab.id);
+      if (win?._filoTabs) contata('reload', () => win._filoTabs.reload(sender.tab.id));
     }
     return { ok: true };
   });
@@ -210,7 +217,10 @@ module.exports = function register(on, ctx) {
 
   on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
+    if (win?._filoTabs) {
+      const apri = () => win._filoTabs.openTab(msg.url || 'filo://newtab/');
+      if (msg.url) apri(); else contata('new-tab', apri);
+    }
     return { ok: true };
   });
 
@@ -237,7 +247,7 @@ module.exports = function register(on, ctx) {
     // non creare cicli al boot.
     try {
       const { createIncognitoWindow } = require('../../window');
-      createIncognitoWindow();
+      contata('incognito', () => createIncognitoWindow());
       return { ok: true };
     } catch (e) {
       console.error('[Filo] open-incognito', e);

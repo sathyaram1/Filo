@@ -71,7 +71,7 @@
     const testo = fuori.length === 1
       ? `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. ${nome(fuori[0])}, la più vecchia, è uscita dall’elenco.`
       : `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. Le ${fuori.length} più vecchie sono uscite dall’elenco.`;
-    try { require('./avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'pagine-salvate-tetto' }); } catch (_) {}
+    try { require('./avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'pagine-salvate-tetto', tipo: 'pagine_salvate_tetto' }); } catch (_) {}
   }
 
   // Aggiorna SOLO la miniatura di una scheda già salvata (per id). Serve al

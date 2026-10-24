@@ -204,5 +204,11 @@
     return () => { try { rootEl.removeEventListener('click', onClick); } catch (_) {} };
   }
 
-  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
+  // Un collegamento disegnato da qui, o dentro una frase di Filo, l'ha scritto un modello: senza verdetto della porta,
+  // clic, tasto destro e anteprima lo trattano da indirizzo da confermare (#1505).
+  function scrittoDaUnModello(el) {
+    return !!(el && el.closest && (el.closest('a.' + LINK_CLASS) || el.closest('[data-filo-verdetti]')));
+  }
+
+  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, scrittoDaUnModello, LINK_CLASS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

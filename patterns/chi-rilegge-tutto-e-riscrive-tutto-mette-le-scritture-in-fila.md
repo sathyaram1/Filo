@@ -69,3 +69,11 @@ quel turno con la risposta, togli quel turno) e il main la applichi sulla
 versione salvata di adesso, dentro la fila. Un turno che non c'è più (svuotato
 nel frattempo) non si riscrive: si risponde che non c'è. Così è fatta la chat
 dei mazzi (`src/main/services/deckChats.js`, #787, secondo giro di verifica).
+
+Rileggere dalla pagina prima di spedire non basta, e costa due volte: mentre la
+lettura viaggia arriva l'eco di un altro cambio (il tema toccato subito dopo) e
+riporta indietro in memoria quello che si stava per salvare, e la spedizione
+parte dopo il «niente più» della scheda che si chiude. Così i colori delle
+Preferenze si perdevano a intermittenza (#1343.1): ora la pagina manda i soli
+token toccati (`tokenModifica`) e il main li posa sulla mappa salvata
+(`SN_THEME_TOKENS.conModifica`).

@@ -13,11 +13,13 @@ const { createSession, defaultCwd, commandExists } = require('./services/shell')
 const { resolveShell } = require('./services/terminal');
 const { virgoletteIncollando, propostaVirgolette } = require('./services/shellVirgolette');
 const SegretiLetti = require('./services/segretiLetti');
+const RilascioNellaChat = require('./rilascioNellaChat');
 // Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
 const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
+const AzioniContate = require('./services/azioniContate');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
@@ -99,6 +101,20 @@ function provenienzaDi(info) {
   return { via: 'pagina' };
 }
 
+// Le quattro chiamate sincrone che una pagina fa prima dei suoi script: finché non c'è la risposta la pagina è ferma.
+// Quanto ci mettono, per canale, lo contano i contatori anonimi (#1466); da una finestra incognito no.
+function cronometrata(canale, gestore) {
+  return (event, ...args) => {
+    const t0 = performance.now();
+    try { gestore(event, ...args); } finally {
+      try {
+        const C = globalThis.SN_CONTATORI_MAIN;
+        if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
+      } catch (_) {}
+    }
+  };
+}
+
 function registerIpcHandlers() {
   // Niente shell orfane dopo l'uscita: alla riapertura si riparte puliti.
   app.on('before-quit', () => {
@@ -108,17 +124,17 @@ function registerIpcHandlers() {
 
   // SINCRONO perché il preload deve installare gli override PRIMA degli script
   // di pagina. Passa { level, seed }: il master secret NON attraversa mai qui.
-  ipcMain.on('filo:fp-config', (event, href) => {
+  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href) => {
     try {
       event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
-  });
+  }));
 
   // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
   // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
-  ipcMain.on('filo:cookie-wipe', (event, href) => {
+  ipcMain.on('filo:cookie-wipe', cronometrata('cookie-wipe', (event, href) => {
     let out = null;
     try {
       const wc = event.sender;
@@ -137,16 +153,16 @@ function registerIpcHandlers() {
       }
     } catch (_) { out = null; }
     event.returnValue = out;
-  });
+  }));
 
   // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
-  ipcMain.on('filo:adblock-css', (event, href, gate) => {
+  ipcMain.on('filo:adblock-css', cronometrata('adblock-css', (event, href, gate) => {
     try {
       event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
     } catch (_) {
       event.returnValue = { css: '', tokens: false };
     }
-  });
+  }));
 
   // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
   ipcMain.handle('filo:adblock-tokens', (event, msg) => {
@@ -159,14 +175,14 @@ function registerIpcHandlers() {
   });
 
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
-  ipcMain.on('filo:permessi-stato', (event, href) => {
+  ipcMain.on('filo:permessi-stato', cronometrata('permessi-stato', (event, href) => {
     try {
       const Permessi = require('./services/permessiPagine');
       event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
     } catch (_) {
       event.returnValue = { notifiche: 'default' };
     }
-  });
+  }));
 
   // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
   ipcMain.on('filo:permessi-si', (event, parte) => {
@@ -212,8 +228,8 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').schermoVecchio(event.sender, event.senderFrame);
     event.returnValue = true;
   });
-  ipcMain.on('filo:apertura-scelta', (event, url) => {
-    require('./services/permessiPagine').aperturaScelta(event.sender, url);
+  ipcMain.on('filo:apertura-scelta', (event, url, azione) => {
+    require('./services/permessiPagine').aperturaScelta(event.sender, url, azione);
     event.returnValue = true;
   });
   // #965 — il clic su un link «scarica» verso un file da avviso: vero se l'avviso lo ferma prima che parta.
@@ -234,6 +250,22 @@ function registerIpcHandlers() {
       if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
     } catch (_) {}
   });
+  // #1623 — le immagini lasciate sulla fila delle schede: solo dalla barra di una finestra, mai da una pagina.
+  ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
+  });
+  // Da un riquadro incorporato in un sito: il pannello sta nel frame principale della sua scheda.
+  ipcMain.on('filo:rilascio-riquadro', (event, voci) => {
+    try {
+      const wc = event.sender;
+      if (!event.senderFrame || !wc.mainFrame || event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId) return;
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tab = w._filoTabs?.tabs?.find((t) => t.view.webContents === wc);
+        if (tab) { RilascioNellaChat.dalRiquadro(tab, voci).catch(() => {}); return; }
+      }
+    } catch (_) {}
+  });
 
   // #1054 — il menu del tasto destro di questa scheda, o della finestrella di accesso, si disegna nello strato sopra?
   ipcMain.on('filo:strato-menu', (event) => {
@@ -249,6 +281,16 @@ function registerIpcHandlers() {
     } catch (_) {}
     event.returnValue = si;
   });
+
+  // #1585 — il dizionario del correttore (dizionarioDiFilo.js). La pagina chiede sincrona (decide i segni mentre li
+  // disegna) e aspetta il thread del dizionario, il principale no. `null` finché non è pronto: risponde il browser.
+  const dalDizionario = (event, chiedi) => {
+    let p = null;
+    try { p = chiedi(require('./services/dizionarioDiFilo')); } catch (_) {}
+    Promise.resolve(p).catch(() => null).then((out) => { try { event.returnValue = out ?? null; } catch (_) {} });
+  };
+  ipcMain.on('filo:dizionario-sbagliate', (event, parole) => dalDizionario(event, (D) => D.sbagliate(parole)));
+  ipcMain.on('filo:dizionario-proposte', (event, parola) => dalDizionario(event, (D) => D.proposte(parola)));
 
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
@@ -492,17 +534,21 @@ function registerIpcHandlers() {
     }
     return BrowserWindow.fromWebContents(wc) || BrowserWindow.getAllWindows()[0];
   };
+  // I gesti della barra delle schede sono azioni contate (#1461): fino alla pagina visibile e caricata.
+  const gesto = (win, azione, fn) => AzioniContate.azione(azione, fn, { incognito: !!(win && win._filoIncognito) });
   ipcMain.handle('tabs:open', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
     // Per il giudizio sui siti «aperta da Filo» lo dice solo la barra di Filo.
     const daShell = Boolean(finestraDellaBarra(event.sender));
-    const id = win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
+    const apri = () => win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
+    // Una pagina di Filo la conta l'apertura della scheda, da qualunque strada (src/main/tabs.js).
+    const id = !url || url === 'filo://newtab/' ? gesto(win, 'new-tab', apri) : apri();
     return { ok: true, id };
   });
-  ipcMain.handle('tabs:close', (event, { id }) => {
+  ipcMain.handle('tabs:close', (event, { id, via } = {}) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.closeTab(id);
+    if (win?._filoTabs) gesto(win, 'close-tab', () => win._filoTabs.closeTab(id, { via: typeof via === 'string' ? via : 'altro' }));
     return { ok: true };
   });
   ipcMain.handle('tabs:activate', (event, { id }) => {
@@ -512,12 +558,12 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('tabs:navigate', (event, { id, url }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.navigate(id, url);
+    if (win?._filoTabs) gesto(win, 'address-bar', () => win._filoTabs.navigate(id, url));
     return { ok: true };
   });
   ipcMain.handle('tabs:move', (event, { id, toIndex } = {}) => {
     const win = winFor(event);
-    const moved = win?._filoTabs ? win._filoTabs.moveTab(id, toIndex) : false;
+    const moved = win?._filoTabs ? gesto(win, 'reorder-tabs', () => win._filoTabs.moveTab(id, toIndex)) : false;
     return { ok: true, moved };
   });
   ipcMain.handle('tabs:reserve-top', (event, { px }) => {
@@ -534,17 +580,17 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('tabs:back', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.goBack(id);
+    if (win?._filoTabs) gesto(win, 'navigate-back-forward', () => win._filoTabs.goBack(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:forward', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.goForward(id);
+    if (win?._filoTabs) gesto(win, 'navigate-back-forward', () => win._filoTabs.goForward(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:reload', (event, { id }) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.reload(id);
+    if (win?._filoTabs) gesto(win, 'reload', () => win._filoTabs.reload(id));
     return { ok: true };
   });
   // `muted` assente = toggle.
@@ -564,7 +610,7 @@ function registerIpcHandlers() {
   });
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
-    if (win?._filoTabs) win._filoTabs.openHelp(id);
+    if (win?._filoTabs) gesto(win, 'help-sidebar', () => win._filoTabs.openHelp(id));
     return { ok: true };
   });
   ipcMain.handle('tabs:set-active-visible', (event, { visible } = {}) => {
@@ -721,9 +767,9 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) CartaAnteprima.prepara(win);
   });
-  ipcMain.on('anteprima:nascondi', (event) => {
+  ipcMain.on('anteprima:nascondi', (event, dati) => {
     const win = finestraDellaBarra(event.sender);
-    if (win) CartaAnteprima.nascondi(win);
+    if (win) CartaAnteprima.nascondi(win, { clic: !!(dati && dati.clic === true) });
   });
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────

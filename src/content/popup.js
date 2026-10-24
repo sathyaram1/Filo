@@ -57,6 +57,7 @@
   // insieme da qui perché ogni superficie che scriveva solo la frase lasciava l'utente senza strada (#663).
   function scriviErrore(host, res, opts) {
     if (!host) return null;
+    conta({ misura: 'errore-modello', code: String((res && (res.code || res.errorCode)) || ''), status: Number(res && res.status) || 0 });
     host.textContent = frasePerLUtente(res);
     return mostraRimedio(host, res, opts);
   }
@@ -100,37 +101,50 @@
     showToast(frase.charAt(0).toUpperCase() + frase.slice(1), { duration: 6000 });
   }
 
+  // Scritto da un modello (src/shared/filoMarkdown.js): nelle pagine di Filo, senza verdetto, chiede l'OK (#1505).
+  const conVerdetto = (el) => (global.SN_MARKDOWN?.scrittoDaUnModello
+    ? global.SN_MARKDOWN.scrittoDaUnModello(el)
+    : !!(el && el.closest && el.closest('a.filo-md-link, [data-filo-verdetti]')));
+
+  // Un OK che il main chiede si dà qui; `false` se l'utente dice di no.
+  async function chiediOk(r) {
+    const Ui = global.SN_CONFIRM_UI;
+    return Ui ? Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : false;
+  }
+
   async function apriCollegamento(a, { sfondo = false } = {}) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return;
-    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo };
+    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo, proposta: conVerdetto(a) };
     let r = null;
     try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
     // Un dato dell'utente in un link scritto sopra una pagina chiede l'OK, come se lo aprisse l'assistente (#868.6).
     if (r && r.conferma) {
-      const Ui = global.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : false;
-      if (!ok) return;
+      if (!(await chiediOk(r))) return;
       try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
     }
     if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
   }
 
-  // Lo scaricamento di un collegamento scritto da un modello passa dalla stessa porta.
+  // Lo scaricamento di un collegamento scritto da un modello passa dalla stessa porta, e chiede lo stesso OK.
   async function scaricaCollegamento(a) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return null;
+    const msg = { type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a), proposta: conVerdetto(a) };
     let r = null;
-    try {
-      r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a) });
-    } catch (_) {}
-    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) showToast(I18n.t('toast_file_save_failed'));
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    if (r && r.conferma) {
+      if (!(await chiediOk(r))) return { ok: false, annullato: true };
+      try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
+    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) toastErrore('toast_file_save_failed');
     return r;
   }
 
-  // Nelle pagine di Filo la porta sta già su ogni apertura nel main, e la chat ha la sua: lì il clic arriva in bolla,
-  // dopo quella, e basta aprire. Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
-  // lascerebbe al collegamento l'apertura da sé, senza porta.
+  // Nelle pagine di Filo la chat ha la sua porta: lì il clic arriva in bolla, dopo quella, e chiede al main come sui
+  // siti, col segno del modello (#1505). Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
+  // lascerebbe al collegamento l'apertura da sé, senza porta. Il tasto centrale ovunque: lasciato al browser apriva
+  // senza il segno del modello, quindi senza l'OK che il clic chiede.
   const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
     if (e.type === 'auxclick' && e.button !== 1) return;
@@ -142,11 +156,12 @@
     // Sui siti un clic fabbricato sull'host di un riquadro chiuso arriva qui col bersaglio sotto le sue coordinate:
     // il collegamento lo apre solo il clic dell'utente (#1071).
     if (!inPaginaDiFilo && !global.SN_FILO_UI?.veroONostro?.(e)) return;
-    if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
-  if (inPaginaDiFilo) document.addEventListener('click', suCollegamento);
-  else {
+  if (inPaginaDiFilo) {
+    document.addEventListener('click', suCollegamento);
+    document.addEventListener('auxclick', suCollegamento);
+  } else {
     window.addEventListener('click', suCollegamento, true);
     window.addEventListener('auxclick', suCollegamento, true);
   }
@@ -1281,13 +1296,45 @@
 
   // Un errore dell'AI detto con un avviso (le strade senza un riquadro dove scriverlo): frase e tasto insieme.
   function avvisoErrore(res, opts = {}) {
+    conta({ misura: 'errore-modello', code: String((res && (res.code || res.errorCode)) || ''), status: Number(res && res.status) || 0 });
     return showToast(frasePerLUtente(res), { duration: 9000, ...opts, rimedio: res });
   }
+
+  // Un avviso d'errore per chiave del testo: chi lo vede lo legge tradotto, i contatori ne sanno la chiave e basta (#1461).
+  function toastErrore(chiave, opts = {}, ...args) {
+    conta({ misura: 'avviso', chiave: String(chiave || '') });
+    return showToast(I18n.t(chiave, ...args), opts);
+  }
+
+  // Un gesto contato dove la persona lo fa (#1461): solo nomi da elenchi chiusi e numeri, li controlla il main.
+  function conta(evento) {
+    try {
+      const r = chrome.runtime.sendMessage({ ...evento, type: MSG.CONTATORI_EVENTO });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+
+  // Disfare nel campo che Filo ha appena cambiato (una correzione, una riscrittura) si conta col tempo passato, e il
+  // main decide se era «subito dopo» (#1461). Si ascolta l'annullo e non il tasto: su Mac Cmd+Z lo prende il menu.
+  let ultimaModifica = null;
+  function modificaDiFilo(el, tipo) { ultimaModifica = el ? { el, tipo, t: Date.now() } : null; }
+  // Chi scrive dopo la modifica di Filo, col suo Ctrl+Z disfa prima quello che ha scritto lui: non è un annullo di Filo.
+  document.addEventListener('input', (e) => {
+    const m = ultimaModifica;
+    if (!m || !e.isTrusted) return;
+    const qui = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+    if (qui !== m.el && !(m.el.contains && m.el.contains(qui))) return;
+    ultimaModifica = null;
+    if (e.inputType === 'historyUndo') conta({ misura: 'annullato', tipo: m.tipo, msDopo: Date.now() - m.t });
+  }, true);
 
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
   function close() { closeTopmost(); }
 
   global.SN_POPUP = {
+    toastErrore,
+    conta,
+    modificaDiFilo,
     openStreaming,
     notaRipiego, ripiegoMostrato, notaInterrotta,
     close,
