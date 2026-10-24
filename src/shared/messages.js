@@ -701,7 +701,7 @@
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
     // pagine `filo://`, solo il proprietario. `mosso`/`senza_controllo`: la punta non è la versione letta da
     // verifica e audit, o non si sa quale fosse (#1040.1): niente fusione, niente richiesta.
-    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId, sha } → { ok, esito:'attesa_unit'|'riverifica'|'fuso'|'bloccato'|'conflitto'|'ramo_assente'|'attesa_server'|'server_al_pc'|'rimandato'|'all_owner'|'mosso'|'senza_controllo', requestId? } | { ok:false, error }
+    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId, sha } → { ok, esito:'attesa_unit'|'riverifica'|'ricontrollo'|'fuso'|'bloccato'|'conflitto'|'ramo_assente'|'attesa_server'|'server_al_pc'|'rimandato'|'all_owner'|'mosso'|'senza_controllo', requestId? } | { ok:false, error }
     // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
     // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
     // Solo pagine `filo://`, solo il proprietario.
