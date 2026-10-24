@@ -134,7 +134,11 @@ test('il guasto con la sua domanda sta In coda col segno; uno di prima, senza, r
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-23"] .mg-dq-ferma')).toHaveCount(0);
 });
 
-for (const [esito, testo] of [[{ accodata: true }, /la prende il prossimo giro di lavoro/], [{ nonServiva: true }, /Non serviva: il lavoro è già fuso con questa scelta/]]) {
+for (const [esito, testo] of [
+  [{ accodata: true }, /la prende il prossimo giro di lavoro/],
+  [{ nonServiva: true }, /Non serviva: il lavoro è già fuso con questa scelta/],
+  [{ rimandata: true }, /il lavoro torna in verifica con la tua risposta/],
+]) {
   test(`una ripresa che non sposta il lavoro lo dice: ${Object.keys(esito)[0]}`, async ({ openTab }) => {
     const page = await openTab(MANAGE);
     await apri(page, { rispondi: esito });

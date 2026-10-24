@@ -273,10 +273,14 @@ dall'owner e dal server. Campi:
   lavoro va avanti con la consigliata, scritta come decisione provvisoria
   nella conversazione (`payload.provvisorie` per chi viene dopo). Una risposta
   diversa dalla provvisoria riporta in coda anche un fuso (`done` → `todo`);
-  la stessa su un fuso risponde «non serviva». Una risposta che arriva mentre
-  il lavoro è in mano a qualcuno o in verifica non sposta lo stato: la
-  decisione si accoda e la prende il giro dopo. Una fermata (§ 3.8) blocca da
-  sé. `legata` e `provvisoria` le scrive il server.
+  la stessa, senza parole in più, su un fuso risponde «non serviva». Una
+  risposta che arriva mentre il lavoro è in coda, in mano a qualcuno o in
+  verifica non sposta lo stato: la decisione si accoda e la prende il giro
+  dopo. Un lavoro già passato, al controllo di sicurezza, torna in verifica
+  con la risposta (sicurezza e fusione non leggono le decisioni), salvo la
+  stessa scelta della provvisoria. Finché una bloccante è aperta la fusione
+  non parte. Una fermata (§ 3.8) blocca da sé. `legata` e `provvisoria` le
+  scrive il server.
 - `destinatario`: l'owner, oppure la gestione del lavoro per le domande di
   guasto (§ 4.3), tranne quelle dell'addetto comunicazioni.
 - `soloOwner`: sulle domande dell'addetto comunicazioni (§ 4.1), che nessun
