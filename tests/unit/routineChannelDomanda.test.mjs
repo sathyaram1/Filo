@@ -101,3 +101,27 @@ test('deliver status --domanda (#1358): la domanda viaggia controllata accanto a
   assert.match(suNota.stderr, /--domanda vale solo su deliver domanda, status, fixed e verdict/);
   assert.equal(arrivate.length, 1, 'gli errori non chiamano il server');
 });
+
+// #1577: con «blocca» false il server non ferma, e chi consegna lo legge: non un «server vecchio?».
+test('una consegna con una domanda che non ferma lo dice; una che ferma resta FERMA', async () => {
+  const { testoConsegnaRiuscita } = await import('../../scripts/routine-channel.mjs');
+  const data = { domanda: { ...DOMANDA, blocca: false } };
+  const avanti = testoConsegnaRiuscita({ num: '#1577', reply: { outcome: 'provvisoria', status: 'revision_capability', domanda: 'D-7' } }, data, 'status');
+  assert.equal(avanti, "OK: #1577. La domanda D-7 non ferma il lavoro: vale la consigliata finché l'owner non risponde.");
+  const critica = testoConsegnaRiuscita({ reply: { outcome: 'fix', domandaProvvisoria: 'D-8' } }, data, 'verdict');
+  assert.match(critica, /La domanda D-8 non ferma il lavoro/);
+  assert.doesNotMatch(critica, /server vecchio/);
+  const ferma = testoConsegnaRiuscita({ num: '#1577', reply: { outcome: 'stop', domanda: 'D-9' } }, { domanda: DOMANDA }, 'status');
+  assert.match(ferma, /il lavoro è FERMO e aspetta l'owner \(la domanda è consegnata, domanda D-9\)/);
+  assert.match(testoConsegnaRiuscita({ reply: {} }, { domanda: DOMANDA }, 'status'), /server vecchio/);
+});
+
+test('le consegne di chi corregge e di chi verifica dicono anche loro che la domanda non ferma', async () => {
+  const { fixedReplyText, verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  assert.match(fixedReplyText('f1', { outcome: 'provvisoria', domanda: 'D-7' }, true), /torna in coda per la verifica\. La domanda D-7 non ferma il lavoro/);
+  assert.doesNotMatch(fixedReplyText('f1', { outcome: 'provvisoria', domanda: 'D-7' }, true), /ATTENZIONE/);
+  for (const reply of [{ outcome: 'pass', domandaProvvisoria: 'D-8' }, { outcome: 'fix', phase2: { findings: [], derived: [] }, domandaProvvisoria: 'D-8' }]) {
+    assert.match(verifierReplyText(reply), /La domanda D-8 non ferma il lavoro/, reply.outcome);
+  }
+  assert.doesNotMatch(verifierReplyText({ outcome: 'pass' }), /non ferma il lavoro/);
+});

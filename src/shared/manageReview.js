@@ -557,21 +557,32 @@
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
     if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
     // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
-    // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
-    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
+    // Chi aspetta un feedback non ancora fuso (#903), o una domanda aperta che lo ferma (#1577), la coda non lo dà a
+    // nessuno: sta fra quelli che aspettano.
+    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
     return tab;
   }
 
   // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
   const ATTESE_CON_DOMANDA = {
-    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa'],
+    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto'],
     aligned: ['origine_chiusa', 'origine_mancante'],
   };
   const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
 
-  /** L'id della domanda che questo feedback aspetta (`D-12`), o ''. PURA. */
+  /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
+  function domandeBloccantiDi(fb) {
+    const l = fb && fb.domandeBloccanti;
+    return Array.isArray(l) ? l.map(String).filter((id) => DOMANDA_ID_RE.test(id)) : [];
+  }
+  function fermoSuDomanda(fb) {
+    return !!fb && !statusUnreadable(fb) && STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status) && domandeBloccantiDi(fb).length > 0;
+  }
+
+  /** L'id della domanda che questo feedback aspetta (`D-12`), o '': quella della sua attesa, o la prima che lo ferma in coda. PURA. */
   function aspettaDomanda(fb) {
     if (!fb || statusUnreadable(fb)) return '';
+    if (fermoSuDomanda(fb)) return domandeBloccantiDi(fb)[0];
     const id = String(fb.domandaId || '');
     if (!DOMANDA_ID_RE.test(id)) return '';
     const { status, statusReason } = normalizeStatus(fb);
@@ -1868,7 +1879,7 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
-    aspettaRisposta, aspettaDomanda, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
+    aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,

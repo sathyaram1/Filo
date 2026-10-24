@@ -1027,6 +1027,27 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
 }
 
 /** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
+/**
+ * Cosa stampa una consegna registrata. Una con segnalazione o domanda ferma il lavoro: chi consegna deve saperlo
+ * adesso, o crede di averlo mandato in verifica; una domanda con «blocca» false (#1577) non lo ferma. PURA.
+ */
+export function testoConsegnaRiuscita(r, data = {}, intento = '') {
+  const reply = r && r.reply && typeof r.reply === 'object' ? r.reply : null;
+  const ok = r && r.num ? `OK: ${r.num}` : 'OK';
+  const conDomanda = !!data.domanda && typeof data.domanda === 'object' && intento !== 'domanda';
+  const segnalata = typeof data.segnalazione === 'string' && !!data.segnalazione.trim();
+  const cosa = conDomanda ? 'la domanda' : segnalata ? 'la segnalazione' : 'la fermata';
+  if (reply && reply.outcome === 'stop') {
+    const dom = typeof reply.domanda === 'string' && reply.domanda ? `, domanda ${reply.domanda}` : '';
+    return `${ok}: il lavoro è FERMO e aspetta l'owner (${cosa} è consegnata${dom}). Rilascia il biglietto.`;
+  }
+  const provv = reply && (reply.outcome === 'provvisoria' ? reply.domanda : reply.domandaProvvisoria);
+  if (typeof provv === 'string' && provv) return `${r.num ? ok : 'OK: consegnato'}. La domanda ${provv} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
+  if (reply && reply.outcome === 'server') return `${ok}: passato ai lavori server, che lo riprendono dal ramo. Rilascia il biglietto.`;
+  if (segnalata || conDomanda) return `${r && r.num ? ok : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`;
+  return r && r.num ? ok : 'OK: consegnato.';
+}
+
 export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda'];
 
 // Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
@@ -1700,17 +1721,7 @@ if (isMain) {
     }
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
-      // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
-      // adesso, o crede di averlo mandato in verifica.
-      const fermo = r.reply && r.reply.outcome === 'stop';
-      const conDomanda = !!data.domanda && typeof data.domanda === 'object' && intento !== 'domanda';
-      const conSegnalazione = (typeof data.segnalazione === 'string' && data.segnalazione.trim()) || conDomanda;
-      const cosa = conDomanda ? 'la domanda' : (typeof data.segnalazione === 'string' && data.segnalazione.trim()) ? 'la segnalazione' : 'la fermata';
-      const dom = r.reply && typeof r.reply.domanda === 'string' && r.reply.domanda ? `, domanda ${r.reply.domanda}` : '';
-      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (${cosa} è consegnata${dom}). Rilascia il biglietto.`);
-      else if (r.reply && r.reply.outcome === 'server') console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: passato ai lavori server, che lo riprendono dal ramo. Rilascia il biglietto.`);
-      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava ${cosa} ma il server non ha fermato il lavoro (server vecchio?).`);
-      else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
+      console.log(testoConsegnaRiuscita(r, data, intento));
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
